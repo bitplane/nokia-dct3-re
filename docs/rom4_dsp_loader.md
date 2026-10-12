@@ -2913,8 +2913,23 @@ external port `0080`. That port has no modeled device; `bootrecstage` exposes
 an observation-only diagnostic sink with no invented state or response.
 A following unsupported Decode can stop an older accepted instruction before
 retirement, so advancing the reported opcode boundary alone does not prove
-the external write occurred. The current native run stops in that condition;
-the sink has not yet observed the write. Existing atomic profiles are unchanged.
+the external write occurred. With compiler immediate ST covered below, the
+sink now observes value `00df` at port `0080`; its external meaning remains
+unknown. Existing atomic profiles are unchanged.
+
+Short immediate ST now retains complete-Decode CPL/DP and Access SP for its
+direct destination, admitting compiler stack-frame stores. Read presents the
+cached address and Execute writes its original immediate without reading the
+destination. This reuses the basic compiler-addressing path rather than
+consulting live context during the store.
+
+The 128 replay cases cover four values (including opcode-shaped `f495`), two
+offsets, both initial CPL states, two pages and four ownership checkpoints.
+They mutate CPL/literal after Decode and SP/DP after Access. Each leg still
+has one literal fetch, no destination read and one write to the original
+address, preserving the later context changes. General SP-producer/stack
+interleavings, memory-sourced DP forwarding, conditional-execute placement
+and peripheral-write arbitration remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

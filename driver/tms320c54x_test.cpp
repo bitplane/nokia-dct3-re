@@ -5866,6 +5866,39 @@ private:
 		m_phase = 252490; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_direct_immediate_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[variant % 4];
+		unsigned const offset = (variant / 4) % 2 ? 0x20 : 0;
+		bool const compiler = (variant / 8) % 2;
+		u32 const base = (variant / 16) % 2 ? 0x20000 : 0;
+		u16 const target = (compiler ? 0x1000 : 0x400) + offset;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x7600 | offset); program.write_word(base + 0x601, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(target, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x400, 0x1040, "immediate_store_no_data_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Immediate ST does not read its destination"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x400, 0x1040, "direct_immediate_store_publication",
+			[this, target, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == target && word == value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7,
+				"Immediate ST owns its original Decode/Access context and writes the retained literal once"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "direct_immediate_store_literal",
+			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value && !m_pipeline_extensions_reads,
+				"Immediate ST retains even opcode-shaped values without refetch or execution"); ++m_pipeline_extensions_reads; });
+		m_phase = 252510; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29609,13 +29642,66 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 319) { start_pipeline_port_write(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged PORTW: PASS cases=320 source_modes=5 values=4 sxm_states=2 pages=2 restore=320 retained_literals=1 duplicate_source_reads=0 duplicate_io_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_direct_immediate_store(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252500)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252490;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252510)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, offset = (variant / 4) % 2 ? 0x20 : 0;
+			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[variant % 4];
+			bool const compiler = (variant / 8) % 2;
+			u32 const base = (variant / 16) % 2 ? 0x20000 : 0;
+			u16 const target = (compiler ? 0x1000 : 0x400) + offset;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 32;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Compiler direct immediate ST has retained literal and destination ownership");
+			if (tick == 4)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 0x4000);
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
+			}
+			if (tick == 5)
+			{
+				if (compiler) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1020);
+				else m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & ~0x1ff) | 9);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save immediate store after Decode, Access, address presentation or publication");
+			}
+			if (tick == 20)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 && m_cpu->space(AS_DATA).read_word(target) == value &&
+						m_cpu->state_int(tms320c54x_device::STATE_SP) == (compiler ? 0x1020 : 0x1000) && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1ff) == (compiler ? 8 : 9) &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((0x900 | (compiler ? 0x4000 : 0)) ^ 0x4000),
+						"Immediate store does not retarget through changed context or alter subsequent SP/status updates");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore immediate ST without duplicate write or context/literal resampling");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252520; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 127) { start_pipeline_direct_immediate_store(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged direct immediate ST: PASS cases=128 values=4 offsets=2 cpl_states=2 pages=2 restore=128 retained_context=1 destination_reads=0 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252520)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252510;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

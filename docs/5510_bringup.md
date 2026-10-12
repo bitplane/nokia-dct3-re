@@ -2420,13 +2420,14 @@ direct stack-frame decrement. It selects the modeled 95.9616 MHz PLL/system
 clock, still with zero NAND reads. OR *AR1,A at `00:0936` now reads GPIO
 address `003c` through the existing bench model with the staged peripheral
 access clock. `75f8 0008 0080` at `00:093b` is PORTW *(0008),0080 (AL to
-external I/O), not a data-to-data move. Its staged CPU transfer tests pass,
-but the native diagnostic stops on `7600 0001` at `00:0940` (compiler direct
-ST #1,0) while the older PORTW is still pending; no port `0080` write has yet
-been observed in this run. The port remains unmodeled, with a diagnostic-only
-sink rather than an invented peripheral response. The debugger context at
-failure is `00:0942`, not the opcode boundary. The initializer loop's complete
-runtime effects have not yet been accepted.
+external I/O), not a data-to-data move. Compiler direct `7600 0001` at
+`00:0940` now has staged ownership/replay coverage, and the original PORTW
+retires: the diagnostic sink records port `0080`, value `00df`. This is an
+observed I/O write, not a modeled external-device response. The first
+unsupported instruction is `8811` at `00:3092` (STLM A,AR1), after the
+called routine's stack prologue. The debugger context at failure is
+`00:3094`, not the opcode boundary. The initializer loop's complete runtime
+effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
 
@@ -2439,8 +2440,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. Compiler direct immediate
-store ownership needs staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Accumulator-to-MMR STLM
+publication and consumer ownership need staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
