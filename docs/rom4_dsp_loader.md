@@ -2736,18 +2736,29 @@ unchanged status/SP. Exact write-phase placement, interrupt overlap and
 preceding SST-producer latency remain unvalidated; indirect, extended and
 register/peripheral pairs are rejected.
 
-The exact original R060 AA22 prefix at `02:3d73..3d82` composes these
+Direct LDM retains a page-zero register/RAM operand in Read and zero-extends
+it into A/B at Execute, independently of DP, CPL and SXM (SPRU172C page
+4-73, class 3A). The existing peripheral-read wait applies at addresses
+`20..5f`. Nine representative sources cover status, accumulator parts, AR1,
+SP, XPC, negative-valued RAM and PRD. Both destinations, program pages,
+SXM/CPL and pre/post-Read replay give 288 cases, requiring one read and no
+status/SP or other-accumulator change. PRD has the modeled extra clock;
+post-Read RAM changes must not affect the result. Indirect forms, preceding
+MMR producer conflicts and physical wait placement remain unvalidated.
+
+The exact original R060 AA22 prefix at `02:3d73..3d83` composes these
 operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes, `ea00`, `577c`, `f300 0001` and `4f7c`. Six executable cases cover pages 0 and 2 with checkpoints
+pushes, `ea00`, `577c`, `f300 0001`, `4f7c` and `487e`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
 They require eight ordered saves of the original accumulator/status values,
 an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
-and the long-word operand loaded, incremented in B and stored back. All cases
+the long-word operand loaded, incremented in B and stored back, and a page-zero
+LDM zero-extended into A. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-instruction, `487e` at `02:3d83` (LDM into A), remains unsupported in the
+instruction, `f030 c004` at `02:3d84` (immediate AND into A), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
 
 The original four short/long-period, direct/indirect-mask streams run through

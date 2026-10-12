@@ -1741,7 +1741,7 @@ void tms320c54x_device::pipeline_step()
 		return;
 	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
-		((m_pipeline_word[3] & 0xfe00) == 0x1000 || (m_pipeline_word[3] & 0xfe00) == 0x6800) &&
+		((m_pipeline_word[3] & 0xfe00) == 0x1000 || (m_pipeline_word[3] & 0xfe00) == 0x6800 || (m_pipeline_word[3] & 0xfe80) == 0x4800) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		((m_pipeline_word[4] & 0xfc80) == 0x8000 || (m_pipeline_word[4] & 0xfe00) == 0x6800 || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
@@ -1865,6 +1865,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_store = (word & 0xfc80) == 0x8000;
 		bool const direct_long_load = (word & 0xfe80) == 0x5600;
 		bool const direct_long_store = (word & 0xfe80) == 0x4e00;
+		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 ||
 			(u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
@@ -1883,7 +1884,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_add && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1973,6 +1974,8 @@ void tms320c54x_device::pipeline_step()
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_sp;
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x4800)
+		m_pipeline_operand_address[3] = u8(m_pipeline_word[3]);
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00))
 	{
 		m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
@@ -1996,7 +1999,7 @@ void tms320c54x_device::pipeline_step()
 		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
 	}
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 ||
-		(m_pipeline_word[4] & 0xfe00) == 0x6800))
+		(m_pipeline_word[4] & 0xfe00) == 0x6800 || (m_pipeline_word[4] & 0xfe80) == 0x4800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x5600)
 	{
@@ -2071,6 +2074,8 @@ void tms320c54x_device::pipeline_step()
 			++m_pc; // DAGEN write already committed in the opcode's Read stage.
 		else if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
+		else if ((m_op & 0xfe80) == 0x4800)
+			accumulator(BIT(m_op, 8)) = m_pipeline_operand[5];
 		else if ((m_op & 0xfe80) == 0x5600)
 		{
 			u64 value = (u64(m_pipeline_operand[5]) << 16) | m_pipeline_immediate[5];
