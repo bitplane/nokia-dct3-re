@@ -6005,8 +6005,10 @@ private:
 	}
 	static std::array<u64, 2> accumulator_logic_fixture(unsigned variant, bool after)
 	{
-		unsigned const operation = variant % 3, selector = (variant / 3) % 4, pattern = (variant / 384) % 4;
-		int const shift = int((variant / 12) % 32) - 16;
+		bool const complement = variant >= 6144;
+		unsigned const operation = complement ? 3 : variant % 3, selector = complement ? (variant - 6144) % 4 : (variant / 3) % 4;
+		unsigned const pattern = complement ? ((variant - 6144) / 4) % 4 : (variant / 384) % 4;
+		int const shift = complement ? 0 : int((variant / 12) % 32) - 16;
 		std::array<u64, 2> values = {std::array<u64, 4>{0, 0xffffffffffULL, 0x123456789aULL, 0x8000000001ULL}[pattern],
 			std::array<u64, 4>{0xffffffffffULL, 0x55aa55aa55ULL, 0x0f0ff0f00fULL, 0x7fffffffefULL}[pattern]};
 		if (after)
@@ -6017,7 +6019,7 @@ private:
 			{
 				int const source_bit = bit - shift;
 				bool const left = BIT(values[destination], bit), right = source_bit >= 0 && source_bit < 40 && BIT(values[source], source_bit);
-				if (operation == 0 ? left && right : operation == 1 ? left || right : left != right) result |= u64(1) << bit;
+				if (operation == 0 ? left && right : operation == 1 ? left || right : operation == 2 ? left != right : !right) result |= u64(1) << bit;
 			}
 			values[destination] = result;
 		}
@@ -6026,9 +6028,10 @@ private:
 	void start_pipeline_accumulator_logic(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		unsigned const operation = variant % 3, selector = (variant / 3) % 4;
+		bool const complement = variant >= 6144;
+		unsigned const operation = variant % 3, selector = complement ? (variant - 6144) % 4 : (variant / 3) % 4;
 		int const shift = int((variant / 12) % 32) - 16;
-		u16 const opcode = 0xf080 + operation * 0x20 + (selector << 8) + (shift & 31);
+		u16 const opcode = complement ? 0xf493 | (selector << 8) : 0xf080 + operation * 0x20 + (selector << 8) + (shift & 31);
 		u32 const base = selector & 1 ? 0x20000 : 0;
 		auto const initial = accumulator_logic_fixture(variant, false);
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -6037,7 +6040,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xae1b);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0xac0 | (((variant / 1536) % 2) << 8));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0xac0 | ((complement ? ((variant - 6144) / 16) % 2 : (variant / 1536) % 2) << 8));
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, initial[0]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, initial[1]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -29958,10 +29961,11 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			auto const expected = accumulator_logic_fixture(variant, tick >= 6);
-			unsigned const checkpoint = variant / 3072 ? 5 : 3;
+			bool const complement = variant >= 6144;
+			unsigned const checkpoint = (complement ? (variant - 6144) / 32 : variant / 3072) ? 5 : 3;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xae1b &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0xac0 | (((variant / 1536) % 2) << 8)) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 1,
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0xac0 | ((complement ? ((variant - 6144) / 16) % 2 : (variant / 1536) % 2) << 8)) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 1,
 				"Accumulator logic retires its 40-bit zero-fill shift and aliased/cross-register result without status changes");
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
@@ -29980,8 +29984,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252580; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 6143) { start_pipeline_accumulator_logic(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged accumulator logic: PASS cases=6144 operations=AND,OR,XOR selectors=4 shifts=-16..15 patterns=4 sxm=0,1 restore=6144 duplicate_fetches=0 data_accesses=0\n");
+				if (variant == 6143) osd_printf_info("TMS320C54x staged accumulator logic: PASS cases=6144 operations=AND,OR,XOR selectors=4 shifts=-16..15 patterns=4 sxm=0,1 restore=6144 duplicate_fetches=0 data_accesses=0\n");
+				if (variant < 6207) { start_pipeline_accumulator_logic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged CMPL: PASS cases=64 selectors=4 patterns=4 sxm=0,1 restore=64 duplicate_fetches=0 data_accesses=0\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

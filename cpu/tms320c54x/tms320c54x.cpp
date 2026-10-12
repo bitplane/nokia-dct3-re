@@ -96,7 +96,7 @@ constexpr bool staged_short_logic(u16 word)
 
 constexpr bool staged_accumulator_logic(u16 word)
 {
-	return (word & 0xfce0) == 0xf080 || (word & 0xfce0) == 0xf0a0 || (word & 0xfce0) == 0xf0c0;
+	return (word & 0xfce0) == 0xf080 || (word & 0xfce0) == 0xf0a0 || (word & 0xfce0) == 0xf0c0 || (word & 0xfcff) == 0xf493;
 }
 
 constexpr bool staged_absolute_load(u16 word)

@@ -2430,8 +2430,10 @@ retain their address and saturated pair, with 3072 save/replay cases covering
 ordinary offset, preincrement and circular addressing. Original `4ee1` at
 `00:309b` is accepted. Accumulator AND/OR/XOR now have staged coverage over
 all encoded shifts and source/destination combinations; original `f180`
-at `00:2fed` (AND A,0,B) is accepted. The first unsupported instruction is
-now `f493` at `00:2fef` (CMPL A,A); its debugger context is `00:2ff1`, not the opcode boundary. The
+at `00:2fed` (AND A,0,B) is accepted. CMPL also has staged source/destination
+and save/replay coverage, including original `f493` at `00:2fef` (CMPL A,A).
+The first unsupported instruction is now `7001` at `00:30b5`, a compiler
+direct MVKD data-to-data move; its debugger context is `00:30b7`, not the opcode boundary. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2446,7 +2448,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:2fef` needs staged conformance before advancing this diagnostic;
+`00:30b5` needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

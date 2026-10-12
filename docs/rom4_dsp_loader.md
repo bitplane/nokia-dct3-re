@@ -2983,9 +2983,17 @@ all 32 encoded shifts (-16 through 15), four independently chosen operand
 pairs, both SXM states and Decode/Read checkpoints. A bit-by-bit oracle
 checks the result and unchanged status each clock, with one opcode fetch
 and no data access. Original AND A,0,B (`f180`) at `00:2fed` is accepted;
-the diagnostic now stops on CMPL A,A (`f493`) at `00:2fef`. This is opcode
+CMPL A,A (`f493`) at `00:2fef` is also accepted. This is opcode
 coverage, not native startup or speech acceptance. Control-delay and
 interrupt composition for these logical forms are not separately validated.
+
+CMPL uses the same one-word Execute path with no memory access or flags.
+SPRU172C 4-32 specifies the full 40-bit ones complement of the selected
+source into the selected destination. Its 64 replay cases cover four A/B
+selections, four operand pairs, both SXM states and Decode/Read checkpoints;
+the bitwise oracle checks the result and preserved status every clock.
+The original upload now fails closed at compiler direct MVKD `7001` at
+`00:30b5`. This does not establish native startup completion.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
