@@ -2615,7 +2615,21 @@ clears it at retirement. Target Prefetch/Fetch/Execute is clock 6/7/11 for
 a return starting at Prefetch 1. Twenty-four cases cover both forms/pages,
 isolated or adjacent-push returns and restore before/after Access or Read.
 They require one return read/pop/fetch and no sequential execution. General
-DAGEN conflicts, delayed variants and pending IRQ timing remain unvalidated.
+DAGEN conflicts and pending IRQ timing for these plain forms remain unvalidated.
+
+RETD follows example 7-8: its two prefetched delay words are saved rather
+than decoded early or fetched again. After return Read they enter Decode at
+clocks 6/7, with target Prefetch/Fetch/Execute at 6/7/11. Twenty-four cases
+cover two pages, two one-word delays, one two-word STM-to-T delay, and the
+original `fd45 f6bb` (XC 1,AEQ / RSBX INTM) pair. Each replays queued words
+and the retained stack sample without duplicate reads or a third delay Fetch.
+XC protection inside the return delay is mapped onto the resumed word stream,
+not the abandoned sequential address. Twelve cases make an IRQ pending
+during return: A=0 allows the INTM clear, but the first resumed instruction
+must retire before IRQ acknowledgement; A=0800 rejects the clear and leaves
+the source pending. This validates that bounded delay/IRQ composition, not
+RETED, nested controls, NMI, other XC placements or physical silicon timing.
+The full original POPM/AND producer tail and native recorder remain unvalidated.
 
 Staged CALL/CALLD retain a stack destination at the opcode's Access clock
 (complete target Decode), load RTN in the next clock and write the retained
@@ -2691,9 +2705,10 @@ boundaries. Accumulators switch between Decode and Access and switch back
 after sampling; a value nonzero only in the high accumulator bits must still
 select the nonzero condition. Accepted stores retain their publication
 clocks, rejected stores perform no writes, and ST0/ST1 are unchanged.
-This makes the return tail's exact `fd45` executable in isolation, not its
-placement within RETD. Accumulator producer latency, compound/overflow
-predicates and delayed-return/XC protection remain unvalidated or unsupported.
+This makes the return tail's exact `fd45` executable; its placement within
+RETD is covered by the delayed-return fixtures. Accumulator producer latency,
+compound/overflow predicates and other delayed-control/XC combinations
+remain unvalidated or unsupported.
 The complete worker remains unsupported.
 
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,

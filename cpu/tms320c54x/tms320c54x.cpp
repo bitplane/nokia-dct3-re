@@ -743,6 +743,10 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_bc_held));
 	save_item(NAME(m_pipeline_bc_word));
 	save_item(NAME(m_pipeline_bc_address));
+	save_item(NAME(m_pipeline_retd_stage));
+	save_item(NAME(m_pipeline_retd_words));
+	save_item(NAME(m_pipeline_retd_addresses));
+	save_item(NAME(m_pipeline_retd_target));
 	save_item(NAME(m_pipeline_far_return_pending));
 	save_item(NAME(m_pipeline_long_store_pending));
 	save_item(NAME(m_pipeline_dp_wait));
@@ -1748,6 +1752,10 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_bc_held = false;
 	m_pipeline_bc_word = 0;
 	m_pipeline_bc_address = 0;
+	m_pipeline_retd_stage = 0;
+	m_pipeline_retd_words.fill(0);
+	m_pipeline_retd_addresses.fill(0);
+	m_pipeline_retd_target = 0;
 	m_pipeline_xc_active = false;
 	m_pipeline_xc_end = 0;
 	m_pipeline_xc_skip_words = 0;
@@ -1859,6 +1867,31 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_word[1] = m_cache.read_word(physical_program_address(address));
 		}
 	}
+	bool retd_delay_decode = false;
+	unsigned retd_delay_index = 0;
+	if (m_pipeline_retd_stage)
+	{
+		// Example 7-8 retains both prefetched words until return Read is
+		// complete. Decode then releases one word per clock without re-fetch.
+		unsigned const index = m_pipeline_retd_stage <= 2 ? m_pipeline_retd_stage - 1 : m_pipeline_retd_stage - 3;
+		if (m_pipeline_retd_stage <= 2)
+		{
+			if (!m_pipeline_valid[2]) { m_illegal = true; return; }
+			m_pipeline_retd_words[index] = m_pipeline_word[2];
+			m_pipeline_retd_addresses[index] = m_pipeline_address[2];
+			m_pipeline_valid[2] = false;
+			prefetch_bubble = true;
+		}
+		else
+		{
+			retd_delay_decode = true;
+			retd_delay_index = index;
+			m_pipeline_valid[2] = true;
+			m_pipeline_word[2] = m_pipeline_retd_words[index];
+			m_pipeline_address[2] = m_pipeline_retd_addresses[index];
+		}
+		m_pipeline_retd_stage = m_pipeline_retd_stage == 4 ? 0 : m_pipeline_retd_stage + 1;
+	}
 	if (m_pipeline_valid[3] && staged_conditional_branch(m_pipeline_word[3]) && !BIT(m_pipeline_word[3], 9))
 	{
 		// Example 7-16 retains i4 across the empty Fetch slot, rather than
@@ -1910,7 +1943,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((word & 0xfeff) == 0x68f8 || word == 0x76f8) ? 3 :
 				(staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -1976,6 +2009,7 @@ void tms320c54x_device::pipeline_step()
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		bool const plain_return = word == 0xfc00 || word == 0xf4eb;
+		bool const delayed_return = word == 0xfe00;
 		bool const far_return = (word & 0xfdfe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
@@ -1988,7 +2022,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && !staged_xc(word) && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2001,10 +2035,14 @@ void tms320c54x_device::pipeline_step()
 			// XC 1 also protects two following words (SPRU172C 4-199).
 			m_pipeline_xc_active = true;
 			m_pipeline_xc_end = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_address[2] + 2);
+			if (retd_delay_decode)
+				// XC protection counts resumed instruction words, not the
+				// abandoned sequential address beyond RETD's delay window.
+				m_pipeline_xc_end = (m_pipeline_retd_target & 0x7f0000) | u16(m_pipeline_retd_target + retd_delay_index);
 		}
-		if (m_pipeline_valid[2] && (fast_return || plain_return || far_return || branch))
+		if (m_pipeline_valid[2] && (fast_return || plain_return || delayed_return || far_return || branch))
 		{
-			bool const delayed = word == 0xf69b || word == 0xf273 || word == 0xf274 || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
+			bool const delayed = delayed_return || word == 0xf69b || word == 0xf273 || word == 0xf274 || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
@@ -2012,6 +2050,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) ? 0 : 2;
 			if (plain_return || (far_return && !delayed)) m_pipeline_flush_front = true;
+			if (delayed_return) m_pipeline_retd_stage = 1;
 		}
 		if (m_pipeline_valid[2] && (dagen_immediate || immediate_t || direct_move)) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
@@ -2163,7 +2202,7 @@ void tms320c54x_device::pipeline_step()
 		// destination. SP/XPC/control destinations are excluded at Decode.
 		m_pipeline_operand[4] = data_read(m_sp++);
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xfc00 || m_pipeline_word[3] == 0xf4eb))
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xfc00 || m_pipeline_word[3] == 0xf4eb || m_pipeline_word[3] == 0xfe00))
 	{
 		// Example 7-7 allocates the return's DAB in Access. Account for an
 		// older PSHM/POPM Read update before allocating this younger pop.
@@ -2201,7 +2240,7 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
-		else if (m_op == 0xfc00 || m_op == 0xf4eb)
+		else if (m_op == 0xfc00 || m_op == 0xf4eb || m_op == 0xfe00)
 		{
 			m_pc = m_pipeline_operand[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
@@ -2330,9 +2369,13 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_call(m_pipeline_word[4]))
 		// The opcode's Execute precedes the complete two-word slot's Execute.
 		m_data.write_word(m_pipeline_operand_address[4], m_pipeline_immediate[4]);
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0xfc00 || m_pipeline_word[4] == 0xf4eb))
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0xfc00 || m_pipeline_word[4] == 0xf4eb || m_pipeline_word[4] == 0xfe00))
+	{
 		// An older push/store can commit this word in Execute now.
 		m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
+		if (m_pipeline_word[4] == 0xfe00)
+			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
+	}
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
 	{
 		// Our complete two-word slot reaches Read at the opcode's Evaluate

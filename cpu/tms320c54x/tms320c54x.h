@@ -262,6 +262,10 @@ private:
 	bool m_pipeline_bc_held = false;
 	u16 m_pipeline_bc_word = 0;
 	u32 m_pipeline_bc_address = 0;
+	u8 m_pipeline_retd_stage = 0;
+	std::array<u16, 2> m_pipeline_retd_words = {};
+	std::array<u32, 2> m_pipeline_retd_addresses = {};
+	u32 m_pipeline_retd_target = 0;
 	bool m_pipeline_far_return_pending = false;
 	bool m_pipeline_long_store_pending = false;
 	u8 m_pipeline_dp_wait = 0;
