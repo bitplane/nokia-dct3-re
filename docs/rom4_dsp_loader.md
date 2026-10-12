@@ -2512,7 +2512,7 @@ Forty replay cases cover source pages 0/2 and target pages 0/1/2/3/7f,
 requiring one literal fetch, one target fetch, no sequential instruction
 effects and the committed target page. The frontend exposes Fetch-time
 XPC before retirement; that intermediate register value is not a claimed
-silicon commit phase. General XPC-consumer hazards, FBD/FCALL and nested
+silicon commit phase. General XPC-consumer hazards, FBD/FCALLD and nested
 far control/IRQ interactions remain unvalidated or excluded.
 
 The original MU4 timer wrapper is pinned separately by the read-only
@@ -2596,8 +2596,28 @@ flag=`1` writes; all 65,535 other input words skip that setup. This is an
 exhaustive **local** predicate, not a global flag-writer or reset census.
 After wake the routine removes its local frame, restores AR1 and uses
 FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
-and returns. Staged FCALL, POPM SP and IDLE entry/wake ownership still
-need coverage before claiming this complete original call executes.
+and returns. POPM SP and IDLE entry/wake ownership still need coverage
+before claiming this complete original call executes.
+
+Non-delayed staged FCALL now retains a distinct caller-page and page-stack
+destination alongside the PC return word (SPRU172C page 4-57, class 29B).
+The original opcode word owns the first SP allocation; the complete
+two-word slot owns the second. It publishes PC then XPC in separate
+clocks, while target Prefetch uses the explicit target page. It must not
+save the live Fetch-stage XPC, which can already belong to the callee.
+These retained fields are registered for save states. The placement is
+a bounded class-29B model, not measured silicon bank arbitration.
+
+The 80 FCALL/FRET replay cases cover source pages 0/2, target pages
+0/1/2/3/7f and eight boundaries across literal assembly, both stack writes
+and both return reads. FRET consumes saved page then PC; changing their
+RAM locations after the respective reads must not alter the return.
+The speculative caller continuation is flushed, then fetched again and
+retired only after the callee returns. Each leg has exactly two pushes,
+two stack reads, balanced SP, unchanged status/RTN and the correct source
+page. FCALLD, nested control/IRQ interactions and general stack-bank
+conflicts remain excluded or unvalidated. This covers the idle wrapper's
+far-call primitive, not execution of the complete original idle call.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.

@@ -247,6 +247,8 @@ private:
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};
+	std::array<u8, 6> m_pipeline_far_call_page = {};
+	std::array<u16, 6> m_pipeline_far_call_stack = {};
 	bool m_pipeline_intm_follow = false;
 	u8 m_pipeline_decode_remaining = 0;
 	u16 m_pipeline_decode_extension = 0;
