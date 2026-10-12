@@ -2402,6 +2402,29 @@ TINT masked. Even/odd stacks and in-flight save/replay reproduce this bounded
 result without a post-return delay or timer change. The next boundary is
 complete surrounding staged opcode coverage and native warm execution;
 the CPU fixture does not close the metadata acceptance failure below.
+
+`mu4nand -bios bootrecstage` is a separate fail-closed staged coverage
+diagnostic using the same original upload, retained NAND and provisional
+shared-RAM composition as `bootrecsave`. It enables the staged frontend
+before reset-vector execution, without firmware-PC-conditioned switching or
+atomic fallback. Existing profiles remain atomic. The first unsupported
+instruction is `771d` at `00:ff80` (STM immediate to PMST); the serial entry
+at `00:0e41` has not executed. The terminal bootstrap-entry failure is
+expected evidence of this coverage boundary, not a passing recorder gate.
+
+Reproduce in a new disk-backed run directory with a copy of the retained
+`mu4nand_13/nand` seed under `nvram/mu4nand_25/nand`, then run:
+
+```sh
+/path/to/mame mu4nand -bios bootrecstage -rompath /path/to/seed/roms \
+  -nvram_directory "$PWD/nvram" -video none -sound none -nothrottle \
+  -debugger none -log -nonvram_save -seconds_to_run 60
+```
+
+Do not reuse the source seed as writable NVRAM. PMST publication/mapping
+needs independent staged conformance before advancing this diagnostic;
+passing the idle-call fixtures alone is insufficient to enable native
+staged startup.
 The new diagnostic is intentionally not a passing save acceptance gate.
 The independent INTM-change protection fix passes pending-interrupt load,
 multiword-store and return fixtures, but the metadata diagnostic still has

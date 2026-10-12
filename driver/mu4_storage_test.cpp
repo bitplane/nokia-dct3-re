@@ -1162,12 +1162,12 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 25; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 26; }
 	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
 	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile(); }
 	bool recorder_control_profile() const { return system_bios() == 23 || recorder_poll_profile(); }
 	bool recorder_poll_profile() const { return system_bios() == 24 || recorder_save_profile(); }
-	bool recorder_save_profile() const { return system_bios() == 25; }
+	bool recorder_save_profile() const { return system_bios() == 25 || system_bios() == 26; }
 	u16 shared_daram_r(offs_t offset)
 	{
 		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
@@ -1941,6 +1941,13 @@ private:
 			if (cursor + 2 != end || records != 7 || uploaded != 10760)
 				fatalerror("MU4 original bootstrap upload coverage changed records=%u words=%u", records, uploaded);
 			logerror("mu4_original_bootstrap_upload: records=%u words=%u program_only=1 data_alias=unvalidated\n", records, uploaded);
+			if (system_bios() == 26)
+			{
+				// Fail-closed coverage diagnostic from the original serial entry.
+				// No atomic fallback and no firmware-PC-conditioned switch.
+				m_cpu->set_pipeline_frontend(true);
+				logerror("mu4_staged_original: enabled=1 entry=000e41 atomic_fallback=0 acceptance=0\n");
+			}
 			m_phase = 30;
 			if (system_bios() >= 17) m_command->adjust(attotime::from_msec(1));
 			m_check->adjust(attotime::from_seconds(20));
@@ -3656,6 +3663,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(22, "bootreccontrol", "Original recorder subsequent control receive (provisional RAM)")
 	ROM_SYSTEM_BIOS(23, "bootrecpoll", "Original recorder status-poll/control sequence (provisional RAM)")
 	ROM_SYSTEM_BIOS(24, "bootrecsave", "Original recorder metadata transaction (provisional RAM)")
+	ROM_SYSTEM_BIOS(25, "bootrecstage", "Staged original recorder coverage diagnostic (fail-closed)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
