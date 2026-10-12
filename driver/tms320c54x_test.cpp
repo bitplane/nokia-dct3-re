@@ -4589,6 +4589,77 @@ private:
 		m_phase = 251970; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_mar(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const sequence = variant >= 288;
+		unsigned const form = sequence ? 0 : variant / 48;
+		unsigned const ar = sequence ? 2 : (variant / 6) % 8;
+		bool const compatibility = !sequence && BIT(variant / 3, 0);
+		unsigned const selected = compatibility && !ar ? 4 : ar;
+		u16 const initial = sequence ? 0x470 : 0x400 + selected * 0x10;
+		s16 const step = std::array<s16, 6>{0, -1, 1, 3, -1, -32768}[form];
+		u16 const destination = initial + step;
+		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		if (sequence)
+		{
+			// Contiguous original R060 02:3dcf..3dd4, both XC outcomes.
+			std::array<u16, 6> const words{0x108a, 0x6d8a, 0xfd30, 0x8082, 0x6dea, 3};
+			for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		}
+		else
+		{
+			program.write_word(base + 0x600, 0x6d00 | std::array<u16, 6>{0x80, 0x88, 0x90, 0xe8, 0xe8, 0xe8}[form] | ar);
+			if (form >= 3) program.write_word(base + 0x601, u16(step));
+			program.write_word(base + 0x600 + (form >= 3 ? 2 : 1), 0x1080 | ar);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608 | (variant >= 291 ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x400 + i * 0x10);
+		if (sequence) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, initial);
+		m_cpu->space(AS_DATA).write_word(sequence ? initial : destination, 0xcafe);
+		if (sequence) m_cpu->space(AS_DATA).write_word(0x46e, 0x7777);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_extensions_reads = 0;
+		if (sequence || form >= 3)
+			m_pipeline_fetch_tap = program.install_read_tap(base + 0x600 + (sequence ? 5 : 1), base + 0x600 + (sequence ? 5 : 1), "mar_offset_fetch",
+				[this, sequence, step](offs_t, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					expect(value == u16(sequence ? 3 : step) && m_cpu->pipeline_cycles() == (sequence ? 7 : 3),
+						"MAR offset is fetched once through its retained program-word slot");
+					++m_pipeline_extensions_reads;
+				});
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x100, 0xffff, "mar_following_operand",
+			[this, sequence, destination, form](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(address == (sequence ? 0x470 : destination) && value == 0xcafe &&
+					m_cpu->pipeline_cycles() == (sequence ? 5 : form >= 3 ? 7 : 6),
+					"MAR does not read memory; following LD reads its captured updated pointer once");
+				++m_pipeline_operand_reads;
+			});
+		if (sequence)
+			m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x46e, 0x46e, "mar_original_conditional_store",
+				[this, variant](offs_t, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					expect(variant >= 291 && value == 0xcafe && m_cpu->pipeline_cycles() == 9,
+						"Original XC accepts or rejects the store while long MAR retains its own offset");
+					++m_pipeline_store_writes;
+				});
+		m_phase = 251990; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -26976,7 +27047,7 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (variant < 434) { start_pipeline_cmpr(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged CMPR: PASS cases=435 conditions=4 auxiliary_registers=8 unsigned_pairs=4 producer_latency_cases=48 producers=STM,MVDK,POPM,STL original_store_sequences=3 restore=435\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mar(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -26984,6 +27055,73 @@ private:
 		if (m_phase == 251980)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251970;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251990)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const sequence = variant >= 288;
+			unsigned const form = sequence ? 0 : variant / 48;
+			unsigned const ar = sequence ? 2 : (variant / 6) % 8;
+			bool const compatibility = !sequence && BIT(variant / 3, 0);
+			unsigned const selected = compatibility && !ar ? 4 : ar;
+			u16 const initial = sequence ? 0x470 : 0x400 + selected * 0x10;
+			s16 const step = std::array<s16, 6>{0, -1, 1, 3, -1, -32768}[form];
+			unsigned const access = form >= 3 ? 5 : 4;
+			unsigned const read = sequence ? 5 : access + 2;
+			unsigned const execute = read + 1;
+			unsigned const checkpoint = sequence ? std::array<unsigned, 3>{5, 9, 11}[(variant - 288) % 3] :
+				form >= 3 ? std::array<unsigned, 3>{3, 5, 7}[variant % 3] : std::array<unsigned, 3>{3, 4, 6}[variant % 3];
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u16 const pointer = sequence ? initial - unsigned(cycle >= 4) - unsigned(cycle >= 5) + 3 * unsigned(cycle >= 9) :
+				cycle > access + 1 ? 0x650 : cycle >= access ? u16(initial + step) : initial;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= read) &&
+				m_pipeline_extensions_reads == unsigned((sequence || form >= 3) && cycle >= (sequence ? 7 : 3)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0 + selected) == pointer &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= execute ? 0xcafe : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (compatibility && ar && cycle >= access ? (0x0608 | ar << 13) : 0x8608 | (variant >= 291 ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+				"MAR updates one selected pointer, preserves context and retains its modifier through replay");
+			if (sequence)
+			{
+				auto const disable = machine().disable_side_effects();
+				expect(m_pipeline_store_writes == unsigned(variant >= 291 && cycle >= 9) &&
+					m_cpu->space(AS_DATA).read_word(0x46e) == (variant >= 291 && cycle >= 9 ? 0xcafe : 0x7777),
+					"Original conditional store preserves rejected memory and uses its retained pre-MAR destination");
+			}
+			if (!sequence && cycle == access + 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + selected, 0x650);
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MAR and follower around pointer update and operand capture");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= read);
+					m_pipeline_store_writes = unsigned(sequence && variant >= 291 && checkpoint >= 9);
+					m_pipeline_extensions_reads = unsigned((sequence || form >= 3) && checkpoint >= (sequence ? 7 : 3));
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MAR without modifying its pointer or reading an extension twice");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252000;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove();
+				if (sequence) m_pipeline_write_tap.remove();
+				if (sequence || form >= 3) m_pipeline_fetch_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 293) { start_pipeline_mar(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MAR: PASS cases=294 forms=6 auxiliary_registers=8 compatibility_states=2 original_worker_words=6 original_xc_outcomes=2 restore=294 duplicate_data_reads=0 duplicate_offset_fetches=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252000)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251990;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

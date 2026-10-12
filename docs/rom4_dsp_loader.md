@@ -2411,6 +2411,32 @@ Read and Execute must preserve all three writes exactly once. This is
 bounded composition of original instructions, not completion of the
 whole worker, physical bank arbitration or native recording.
 
+Staged MAR supports stationary, single-word postdecrement/postincrement
+and signed linear long-offset modification (`6d80..6d97`, `6de8..6def`).
+SPRU172C pages 4-92--4-93 define compatibility-mode AR0 redirection through
+ARP and nonzero ARF publication of ARP; the standard mode leaves ARP alone.
+The complete slot owns the retained long-offset word and applies its AR
+modification once in Access. The following short LD must see the new
+pointer with no intervening NOP, consistent with SPRU131G table 7-7's
+unlisted-instruction zero-latency rule. This placement is a bounded model,
+not measured silicon phase timing or a general DAGEN arbitration claim.
+
+The 294 replay cases cover all eight AR fields, both compatibility states,
+three short forms and long offsets `0003`, `ffff`, `8000`. A pointer
+mutation after the following LD captures its address must not retarget
+that load or cause MAR to modify the pointer again at Execute. Program-bus
+taps require exactly one offset fetch per leg, including restoration of
+the retained word before Access. Six cases
+execute the contiguous original `108a 6d8a fd30 8082 6dea 0003` at
+`02:3dcf`--`02:3dd4`, covering both XC outcomes and three checkpoints.
+The initial AR2=`0470` decrements twice, then advances by three to `0471`;
+an accepted store publishes the captured source at `046e`, despite the
+same-clock long MAR update, while a rejected store leaves that location
+untouched. Each replay performs one data read and zero or one store.
+Circular/bit-reversed/AR0-indexed MAR forms, absolute MAR and general
+producer conflicts remain excluded. Later ADD/SUB worker instructions,
+full worker composition and live native recording remain separate gaps.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
