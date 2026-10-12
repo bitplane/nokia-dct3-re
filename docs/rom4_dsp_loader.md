@@ -2726,9 +2726,20 @@ second to A, and AR2 advances twice; neither source's producer is identified
 by this bounded census. SPRU131G section 7.1.5/example 7-16 requires BC to
 take five cycles when taken and three when not taken, discarding sequential
 work only for the taken outcome. BCD's unconditional delay-slot execution
-cannot be reused for this branch. Staged BC therefore remains unsupported
-pending retained-prefetch/flush tests; a successful seven-word prefix is not
-evidence that the branch or complete worker executes correctly.
+cannot be reused for this branch. The staged BC subset now supports
+AEQ/ANEQ/BEQ/BNEQ with a saved prefetched sequential word. At the prototype's
+Evaluate clock it either releases that word to Decode or discards it and
+the second prefetched word before either can access data RAM. Forty-eight
+cases cover both pages and outcomes, with restoration before/after word
+retention and predicate evaluation. Each sequential word is fetched once;
+taken branches fetch the target at clock 7 (Execute 11) and perform zero
+sequential data reads, while rejected branches retain the two reads at
+clocks 8/9. Changing the tested accumulator after evaluation cannot change
+the route. Existing BCD delay-slot gates remain unchanged. This is bounded
+comparison against example 7-16, not independent silicon timing evidence;
+adjacent producer composition, multiword sequential slots and IRQ integration
+remain unvalidated. A successful seven-word prefix is not evidence that the
+original nine-word branch sequence or complete worker executes correctly.
 
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
