@@ -2736,8 +2736,21 @@ The original `bootrecstage` reset sequence also executes its full 65,313-word
 copy: observation-only taps verify every program source address, every data
 destination and value equality, then the diagnostic reaches `00:0e41`.
 This closes the reset copy, not native startup or recorder completion; the
-current unsupported SP-adjustment boundary is in
+current unsupported startup boundary is in
 [the MU4 contract](5510_bringup.md).
+
+Absolute ADDM to SP (`6bf8 0018 lk`) is the covered exception to ADDM's
+register/peripheral exclusion. It retains the SP Read operand and immediate,
+then publishes the wrapped result in Execute using the existing ADDM
+arithmetic. The original serial-start prefix `STM #1200,SP; ADDM #03ff,*(SP);
+ANDM #fffe,*(SP)` therefore selects SP=`15fe`, without a firmware-state poke.
+The 256 replay cases cover four initial values, four deltas (including wrap),
+both SXM states, two pages and four boundaries around retained Read/write.
+Bus taps verify exactly three ordered SP reads and writes, including a later
+LDM read of the aligned result. Other ADDM register destinations stay
+fail-closed. General compiler-SP latency, concurrent stack operations and
+register-bank conflicts for this RMW form remain unvalidated; these cases
+prove the bounded original prefix, not every SP consumer hazard.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

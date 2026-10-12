@@ -5473,6 +5473,48 @@ private:
 		m_phase = 252310; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_sp_rmw(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const initial = std::array<u16, 4>{0x1200, 0xfffe, 0, 0x8000}[variant % 4];
+		u16 const delta = std::array<u16, 4>{0x3ff, 1, 0xffff, 0x8000}[(variant / 4) % 4];
+		u16 const sum = initial + delta;
+		u32 const base = BIT(variant, 5) ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 40; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		std::array<u16, 8> const words{0x7718, initial, 0x6bf8, 0x18, delta, 0x68f8, 0x18, 0xfffe};
+		for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		program.write_word(base + 0x60b, 0x4918);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 4) ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x4000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x18, 0x18, "sp_rmw_sources",
+			[this, initial, sum](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 3> const values{initial, sum, u16(sum & 0xfffe)};
+				std::array<unsigned, 3> const cycles{9, 12, 16};
+				expect(m_pipeline_operand_reads < 3 && value == values[m_pipeline_operand_reads] && m_cpu->pipeline_cycles() == cycles[m_pipeline_operand_reads],
+					"Original SP setup reads the published STM value, then ADDM result, then aligned SP once each"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x18, 0x18, "sp_rmw_publications",
+			[this, initial, sum](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 3> const values{initial, sum, u16(sum & 0xfffe)};
+				std::array<unsigned, 3> const cycles{5, 10, 13};
+				expect(m_pipeline_store_writes < 3 && value == values[m_pipeline_store_writes] && m_cpu->pipeline_cycles() == cycles[m_pipeline_store_writes],
+					"STM, absolute ADDM and ANDM own distinct SP publications with unsigned 16-bit wrap"); ++m_pipeline_store_writes;
+			});
+		m_phase = 252330; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -28783,13 +28825,53 @@ private:
 				if (variant == 127) osd_printf_info("TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0\n");
 				if (variant < 143) { start_pipeline_repeat_mvpd(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged RPT interrupts: PASS cases=16 sources=IRQ,NMI counts=4 pages=2 restore=16 deferred_until_final_write=1 correct_continuation=1\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_sp_rmw(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252320)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252310;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252330)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			u16 const initial = std::array<u16, 4>{0x1200, 0xfffe, 0, 0x8000}[variant % 4];
+			u16 const delta = std::array<u16, 4>{0x3ff, 1, 0xffff, 0x8000}[(variant / 4) % 4];
+			u16 const aligned = u16(initial + delta) & 0xfffe;
+			unsigned const tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = std::array<unsigned, 4>{7, 9, 10, 12}[variant / 64];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute SP ADDM and ANDM have retained RMW ownership");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SP setup before/after ADDM Read/write or ANDM Read");
+			}
+			if (tick == 22)
+			{
+				expect(m_pipeline_operand_reads == 3 && m_pipeline_store_writes == 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == aligned &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == aligned && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (BIT(variant, 4) ? 0x100 : 0)),
+					"Original SP adjustment/alignment preserves status and publishes the wrapped aligned result without duplicate operations");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore SP RMW state without repeating a read or publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252340; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 255) { start_pipeline_sp_rmw(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged SP RMW: PASS cases=256 initial_values=4 deltas=4 sxm_states=2 pages=2 restore=256 ordered_reads=1 ordered_writes=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252340)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252330;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

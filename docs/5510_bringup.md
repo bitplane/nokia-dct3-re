@@ -2409,10 +2409,11 @@ shared-RAM composition as `bootrecsave`. It enables the staged frontend
 before reset-vector execution, without firmware-PC-conditioned switching or
 atomic fallback. Existing profiles remain atomic. Reset's STM immediate to
 PMST and the original RPT/MVPD copy now have staged conformance coverage.
-The serial entry at `00:0e41` is reached. The first unsupported operation
-is `6bf8 0018 03ff` at `00:0e43` (ADDM #03ff,*(SP)), immediately after
-STM #1200,SP. The debugger context at failure is `00:0e47`, not the opcode
-boundary. The terminal bootstrap-entry failure remains coverage evidence,
+The serial entry at `00:0e41` is reached. Its original STM/ADDM/ANDM prefix
+selects aligned SP=`15fe`, with bounded staged RMW replay coverage.
+The first unsupported instruction is `f4a0` at `00:0e4c` (LD #0,ARP).
+The debugger context at failure is `00:0e4e`, not the opcode boundary.
+The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
 
 Reproduce in a new disk-backed run directory with a copy of the retained
@@ -2424,8 +2425,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. SP read/modify/write
-ownership needs staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Immediate ARP publication
+needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

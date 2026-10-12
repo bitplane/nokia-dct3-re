@@ -84,6 +84,7 @@ REQUIRED = [
     "TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0",
     "TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0",
     "TMS320C54x staged RPT interrupts: PASS cases=16 sources=IRQ,NMI counts=4 pages=2 restore=16 deferred_until_final_write=1 correct_continuation=1",
+    "TMS320C54x staged SP RMW: PASS cases=256 initial_values=4 deltas=4 sxm_states=2 pages=2 restore=256 ordered_reads=1 ordered_writes=1",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",

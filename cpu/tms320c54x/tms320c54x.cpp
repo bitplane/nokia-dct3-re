@@ -2132,7 +2132,7 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = staged_rmw(word) &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
-		if (m_pipeline_valid[2] && word == 0x6bf8 && m_pipeline_operand_address[2] < 0x60)
+		if (m_pipeline_valid[2] && word == 0x6bf8 && m_pipeline_operand_address[2] < 0x60 && m_pipeline_operand_address[2] != 0x18)
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
