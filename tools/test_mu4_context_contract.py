@@ -8,9 +8,43 @@ from tools.mu4_context_contract import WORKER_LOGIC_BASE, WORKER_LOGIC_WITNESS, 
 from tools.mu4_context_contract import FULL_WORKER_WITNESS, decode_full_worker
 from tools.mu4_context_contract import TIMER_VECTOR_BASE, TIMER_VECTOR_WITNESS, TIMER_RETURN_BASE, decode_timer_wrapper
 from tools.mu4_context_contract import IDLE_BASE, IDLE_WITNESS, IDLE_WRAPPER_BASE, IDLE_WRAPPER_WITNESS, decode_idle_contract, idle_route
+from tools.mu4_context_contract import BOOTSTRAP_BASE, BOOTSTRAP_WITNESS, decode_bootstrap_repeat
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_bootstrap_repeat_is_program_copy_not_nop_or_constant_fill(self):
+        words = dict(enumerate(BOOTSTRAP_WITNESS, BOOTSTRAP_BASE))
+        result = decode_bootstrap_repeat(words)
+        self.assertEqual(result['matched_words'], 12)
+        repeat = result['repeat']
+        self.assertEqual(repeat['executions'], 65313)
+        self.assertEqual(repeat['program_source_range'], ['0060', 'ff80'])
+        self.assertEqual(repeat['data_destination_range'], ['0060', 'ff80'])
+        self.assertEqual(repeat['ar0_after'], 'ff81')
+        self.assertEqual(repeat['operation'], 'MVPD 0060,*AR0+')
+        self.assertEqual(repeat['uploaded_source_words'], 1)
+        self.assertEqual(repeat['source_words_not_in_upload'], 65312)
+
+    def test_bootstrap_source_coverage_does_not_invent_erased_or_zero_words(self):
+        words = dict(enumerate(BOOTSTRAP_WITNESS, BOOTSTRAP_BASE))
+        words[0x60] = 0x1234
+        words[0x61] = 0xffff
+        words[0xff90] = 0
+        repeat = decode_bootstrap_repeat(words)['repeat']
+        self.assertEqual(repeat['uploaded_source_words'], 3)
+        self.assertEqual(repeat['uploaded_source_words'] + repeat['source_words_not_in_upload'], 65313)
+
+    def test_bootstrap_repeat_witness_mutation_and_absence(self):
+        original = dict(enumerate(BOOTSTRAP_WITNESS, BOOTSTRAP_BASE))
+        for address in original:
+            words = original.copy()
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_bootstrap_repeat(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_bootstrap_repeat(words)
+
     def idle_words(self):
         return dict(enumerate(IDLE_WITNESS, IDLE_BASE)) | dict(enumerate(IDLE_WRAPPER_WITNESS, IDLE_WRAPPER_BASE))
 

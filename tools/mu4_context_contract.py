@@ -53,6 +53,37 @@ IDLE_WRAPPER_BASE = 0x23D2F
 IDLE_WRAPPER_WITNESS = (0x4918, 0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495,
                         0x4A0B, 0x4A0B, 0xF982, 0x98D0, 0xF6BE, 0x8A18,
                         0xF495, 0xF495, 0xFC00)
+BOOTSTRAP_BASE = 0xFF80
+BOOTSTRAP_WITNESS = (0x771D, 0xFFC8, 0x7710, 0x0060, 0xF070, 0xFF20,
+                     0x7C90, 0x0060, 0x771D, 0xFFE8, 0xF880, 0x0E41)
+
+
+def decode_bootstrap_repeat(words):
+    for offset, expected in enumerate(BOOTSTRAP_WITNESS):
+        address = BOOTSTRAP_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'bootstrap repeat witness changed or absent at {address:06x}')
+    first, count = BOOTSTRAP_WITNESS[7], BOOTSTRAP_WITNESS[5] + 1
+    last = first + count - 1
+    known = sum(address in words for address in range(first, last + 1))
+    return {
+        'segment': 'aa55', 'matched_word_range': ['00ff80', '00ff8b'],
+        'matched_words': len(BOOTSTRAP_WITNESS),
+        'setup': {'pmst_before': 'ffc8', 'ar0_initial': '0060'},
+        'repeat': {'address': '00ff84', 'opcode': 'f070', 'operand': 'ff20',
+                   'executions': count, 'body': ['7c90', '0060'],
+                   'operation': 'MVPD 0060,*AR0+',
+                   'program_source_range': [f'{first:04x}', f'{last:04x}'],
+                   'data_destination_range': [f'{first:04x}', f'{last:04x}'],
+                   'ar0_after': f'{last + 1:04x}',
+                   'source_increment': 'single-repeat implicit program-address increment',
+                   'destination_increment': 'encoded AR0 postincrement',
+                   'uploaded_source_words': known,
+                   'source_words_not_in_upload': count - known},
+        'continuation': {'pmst_after': 'ffe8', 'branch': 'FB 00:0e41'},
+        'scope': '12 pinned original words; TI single-repeat/MVPD address semantics; '
+                 'not source-hole values, staged bus placement or native execution acceptance',
+    }
 
 
 def idle_route(flag):
@@ -276,6 +307,8 @@ def contract(source):
     result['full_worker'] = decode_full_worker(words)
     result['timer_wrapper'] = decode_timer_wrapper(words)
     result['idle_lifecycle'] = decode_idle_contract(words)
+    result['bootstrap_repeat'] = decode_bootstrap_repeat(
+        uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa55'))
     return result
 
 

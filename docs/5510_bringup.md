@@ -2426,6 +2426,26 @@ Do not reuse the source seed as writable NVRAM. Repeat setup and retirement
 need independent staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
+
+The context tool also pins the 12-word AA55 reset sequence at
+`00:ff80`--`00:ff8b`: PMST=`ffc8`, AR0=`0060`, `RPT #ff20`,
+`MVPD 0060,*AR0+`, PMST=`ffe8`, then `FB 00:0e41`. This is a
+65,313-word program-to-data copy, not a NOP delay or constant fill.
+TI SPRU131G section 6.7 specifies count+1 executions and implicit increment
+of the absolute program source; the encoded AR0 postincrement advances the
+destination independently. Both ranges are `0060`--`ff80`, ending with
+AR0=`ff81`. The original upload supplies 10,749 words in this range;
+54,564 source words are not assigned by the upload inventory, whose absence
+does not establish their runtime values. Do not replace the copy with
+guessed zero-fill or program/data aliasing.
+
+The next staged contract therefore needs both long-immediate repeat and
+program-source MVPD, with retained operand words, count+1 retirements,
+per-iteration source/destination progression, exact continuation and
+save/replay. Interrupt suppression begins when RPT is decoded and includes
+NMI until the repeated instruction completes (SPRU131G 6.7). The repeat's
+first and steady-state bus phases remain to be modeled and tested; this
+read-only address decode is not native execution acceptance.
 The new diagnostic is intentionally not a passing save acceptance gate.
 The independent INTM-change protection fix passes pending-interrupt load,
 multiword-store and return fixtures, but the metadata diagnostic still has
