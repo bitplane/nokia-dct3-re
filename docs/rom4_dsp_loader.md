@@ -2703,17 +2703,29 @@ writers, interrupt overlap and wrapping SP values remain unvalidated. The
 original MU4 prologue's `eeff` is accepted, not a claim that its full handler
 or the recorder completes.
 
-The exact original R060 AA22 prefix at `02:3d73..3d7e` composes these
+Direct DLD retains the high word at its generated address and the low word
+at address XOR 1 in Read, then assembles the accumulator at Execute
+(SPRU172C page 4-42, class 9A). Both destinations, SXM/C16 settings,
+high-word signs, odd/even addresses and DP/CPL addressing have 128 cases
+with restore before/after Read. Changing both source words after Read must
+not affect retirement. The other accumulator, SP and both status registers
+remain unchanged; negative SXM loads extend the guard byte. Register/peripheral
+pairs, indirect and extended-address forms are rejected. Preceding status-
+producer latency remains unvalidated. Paired Read placement is a declared
+prototype model, not independent physical-bus timing evidence.
+
+The exact original R060 AA22 prefix at `02:3d73..3d7f` composes these
 operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes and `ea00`. Six executable cases cover pages 0 and 2 with checkpoints
+pushes, `ea00` and `577c`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
-They require eight ordered stack writes, preserved accumulator values and
-reserved stack slot, final SP `0ff7`, DP zero and cleared CPL/OVM. All cases
+They require eight ordered saves of the original accumulator/status values,
+an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
+and the long-word operand loaded into B. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-word, `577c` at `02:3d7f` (DLD long memory into B), remains unsupported in the
+instruction, `f300 0001` at `02:3d80` (immediate ADD into B), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
 
 The original four short/long-period, direct/indirect-mask streams run through

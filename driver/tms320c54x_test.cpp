@@ -3285,9 +3285,9 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
-		// Original R060 aa22 words at 02:3d73..3d7e; stop before 577c.
+		// Original R060 aa22 words at 02:3d73..3d7f; stop before f300.
 		static constexpr u16 prefix[] = {0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
-			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00};
+			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c};
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x3d73 + i, i < std::size(prefix) ? prefix[i] : 0xf495);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -3301,6 +3301,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		for (unsigned i = 0xff7; i <= 0xfff; ++i) m_cpu->space(AS_DATA).write_word(i, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(0x7c, 0x1357);
+		m_cpu->space(AS_DATA).write_word(0x7d, 0x2468);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x3d73);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
@@ -3313,6 +3315,42 @@ private:
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251470; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_dld(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const compiler = BIT(variant, 5);
+		u16 const offset = 0x7c + BIT(variant, 4);
+		u16 const address = (compiler ? 0x500 : 0x400) + offset;
+		u16 const high = BIT(variant, 3) ? 0x8001 : 0x1234;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, i ? 0xf495 : 0x5600 | (BIT(variant, 0) << 8) | offset);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 1) << 8) | (BIT(variant, 2) << 7) | (compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1111222233ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x4444555566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(address, high);
+		m_cpu->space(AS_DATA).write_word(address ^ 1, 0xabcd);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(address & ~1, address | 1, "staged_dld_pair",
+			[this, address, high](offs_t observed, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_operand_reads < 2 && observed == (address ^ m_pipeline_operand_reads) &&
+					value == (m_pipeline_operand_reads ? 0xabcd : high) && m_cpu->pipeline_cycles() == 5,
+					"DLD retains its ordered address/xor-one word pair in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 251490; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -24434,9 +24472,9 @@ private:
 				expect(m_pipeline_store_writes == 8 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xff7 &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0013572468ULL &&
 					m_cpu->space(AS_DATA).read_word(0xfff) == 0xaaaa,
-					"Original prologue preserves accumulators/reserved slot and establishes cleared CPL/OVM with DP zero");
+					"Original prologue saves accumulator context/reserved slot, clears CPL/OVM, sets DP zero and loads the long-word counter");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
@@ -24449,8 +24487,8 @@ private:
 				}
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 5) { start_pipeline_mu4_prologue(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged original MU4 prologue: PASS words=12 cases=6 context_saves=8 restore=6 full_handler_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				osd_printf_info("TMS320C54x staged original MU4 prologue: PASS words=13 cases=6 context_saves=8 long_word_load=1 restore=6 full_handler_claim=0\n");
+				start_pipeline_dld(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24458,6 +24496,55 @@ private:
 		if (m_phase == 251480)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251470;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251490)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const b = BIT(variant, 0), sxm = BIT(variant, 1), negative = BIT(variant, 3), compiler = BIT(variant, 5);
+			u16 const address = (compiler ? 0x500 : 0x400) + 0x7c + BIT(variant, 4);
+			u64 const result = (sxm && negative ? 0xff00000000ULL : 0) | (negative ? 0x8001abcdULL : 0x1234abcdULL);
+			u64 const checkpoint = BIT(variant, 6) ? 5 : 4;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == (cycle >= 5 ? 2 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 6 && !b ? result : 0x1111222233ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 6 && b ? result : 0x4444555566ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm << 8) | (BIT(variant, 2) << 7) | (compiler ? 0x4000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x500,
+				"DLD retires the retained pair with SXM guard extension without changing the other accumulator or status");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save DLD before/after paired Read");
+			}
+			if (cycle == 5) {
+				m_cpu->space(AS_DATA).write_word(address, 1);
+				m_cpu->space(AS_DATA).write_word(address ^ 1, 2);
+			}
+			if (cycle == 9)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = checkpoint >= 5 ? 2 : 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained DLD operands without duplicate bus reads");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251500;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 127) { start_pipeline_dld(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged DLD: PASS cases=128 destinations=A,B sxm=0,1 c16=0,1 parity=0,1 addressing=DP,CPL restore=128 duplicate_reads=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251500)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251490;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

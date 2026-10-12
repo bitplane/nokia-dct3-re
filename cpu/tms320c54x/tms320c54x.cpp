@@ -1854,6 +1854,7 @@ void tms320c54x_device::pipeline_step()
 		bool const short_load = (word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
 			(BIT(word, 7) || u8(word) < 0x80);
 		bool const direct_store = (word & 0xfc80) == 0x8000;
+		bool const direct_long_load = (word & 0xfe80) == 0x5600;
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 ||
 			(u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
@@ -1871,7 +1872,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1892,7 +1893,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (short_load || direct_store)
+			if (short_load || direct_store || direct_long_load)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -1957,10 +1958,20 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		(m_pipeline_word[3] & 0xfc80) == 0x8000))
+		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_sp;
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x5600)
+	{
+		m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
+		if (m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged DLD register/peripheral pair is unsupported\n", machine().describe_context());
+			m_illegal = true;
+			return;
+		}
+	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
@@ -1976,6 +1987,11 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 ||
 		(m_pipeline_word[4] & 0xfe00) == 0x6800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x5600)
+	{
+		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+		m_pipeline_immediate[4] = m_data.read_word(m_pipeline_operand_address[4] ^ 1);
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xffe0) == 0x4a00)
 	{
 		// Class 16A: retain the source read and stack destination separately.
@@ -2044,6 +2060,12 @@ void tms320c54x_device::pipeline_step()
 			++m_pc; // DAGEN write already committed in the opcode's Read stage.
 		else if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
+		else if ((m_op & 0xfe80) == 0x5600)
+		{
+			u64 value = (u64(m_pipeline_operand[5]) << 16) | m_pipeline_immediate[5];
+			if (BIT(m_st1, 8) && BIT(m_pipeline_operand[5], 15)) value |= u64(0xff) << 32;
+			accumulator(BIT(m_op, 8)) = value;
+		}
 		else if ((m_op & 0xffe0) == 0x4a00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if ((m_op & 0xff00) == 0x8a00)
