@@ -2703,6 +2703,19 @@ writers, interrupt overlap and wrapping SP values remain unvalidated. The
 original MU4 prologue's `eeff` is accepted, not a claim that its full handler
 or the recorder completes.
 
+The exact original R060 AA22 prefix at `02:3d73..3d7e` composes these
+operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
+pushes and `ea00`. Six executable cases cover pages 0 and 2 with checkpoints
+after the first retained source, status saves or a partial accumulator save.
+They require eight ordered stack writes, preserved accumulator values and
+reserved stack slot, final SP `0ff7`, DP zero and cleared CPL/OVM. All cases
+replay without duplicate writes. The bytes were checked through the original
+upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
+the copied prefix with NOPs, leaving the original image and firmware runs
+unchanged. It does not execute the full ISR. The next original
+word, `577c` at `02:3d7f` (DLD long memory into B), remains unsupported in the
+staged frontend. Native handset/recorder execution still uses the atomic core.
+
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
 foreground fetch, one mask write and marker 1, with SP back at `1000`, but

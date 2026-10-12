@@ -3280,6 +3280,41 @@ private:
 		m_phase = 251450; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_mu4_prologue(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
+		// Original R060 aa22 words at 02:3d73..3d7e; stop before 577c.
+		static constexpr u16 prefix[] = {0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
+			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x3d73 + i, i < std::size(prefix) ? prefix[i] : 0xf495);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa61b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4a00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0xff7; i <= 0xfff; ++i) m_cpu->space(AS_DATA).write_word(i, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x3d73);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xff7, 0xffe, "staged_mu4_context_save",
+			[this](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				static constexpr u16 expected[] = {0xa61b, 0x4a00, 0x789a, 0x3456, 0x12, 0x5566, 0x3344, 0x22};
+				expect(m_pipeline_store_writes < 8 && address == 0xffe - m_pipeline_store_writes &&
+					value == expected[m_pipeline_store_writes], "Original MU4 prologue saves status and accumulator words in stack order");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251470; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -24374,7 +24409,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 113) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 register_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mu4_prologue(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24382,6 +24417,47 @@ private:
 		if (m_phase == 251460)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251450;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251470)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = std::array<unsigned, 3>{6, 8, 13}[m_pipeline_peripheral_case / 2];
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original MU4 prologue advances without atomic fallback");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save in-flight original MU4 context prologue");
+			}
+			if (cycle == 20)
+			{
+				expect(m_pipeline_store_writes == 8 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xff7 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+					m_cpu->space(AS_DATA).read_word(0xfff) == 0xaaaa,
+					"Original prologue preserves accumulators/reserved slot and establishes cleared CPL/OVM with DP zero");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_store_writes = checkpoint == 6 ? 0 : checkpoint == 8 ? 2 : 5;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore overlapping original prologue sources and stack writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251480;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 5) { start_pipeline_mu4_prologue(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged original MU4 prologue: PASS words=12 cases=6 context_saves=8 restore=6 full_handler_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251480)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251470;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

@@ -37,6 +37,7 @@ REQUIRED = [
     "TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16",
     "TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 register_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0",
+    "TMS320C54x staged original MU4 prologue: PASS words=12 cases=6 context_saves=8 restore=6 full_handler_claim=0",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",
