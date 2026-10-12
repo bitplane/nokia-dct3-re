@@ -2606,6 +2606,17 @@ alternate address, retained push value and final SP. Other SP producers,
 extended-shift category-II consumers, indirect forms and physical stage
 placement remain unvalidated. The atomic frontend is unchanged.
 
+Plain RET/RETE retain the stack address and increment SP in Access, sample
+the return word in Read and redirect at Execute (SPRU131G example 7-7;
+SPRU172C pages 4-139--140, class 32). Allocation accounts for older
+PSHM/POPM Read updates; the sample follows older Execute writes, so an
+adjacent push's newly written word is visible. RET preserves INTM; RETE
+clears it at retirement. Target Prefetch/Fetch/Execute is clock 6/7/11 for
+a return starting at Prefetch 1. Twenty-four cases cover both forms/pages,
+isolated or adjacent-push returns and restore before/after Access or Read.
+They require one return read/pop/fetch and no sequential execution. General
+DAGEN conflicts, delayed variants and pending IRQ timing remain unvalidated.
+
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
 after both samples, following SPRU172C pages 4-61--62.
@@ -2784,21 +2795,24 @@ the memory-DP delay. These are prototype stage observations, not silicon
 measurements. Nondelayed BC, other condition families, interrupt overlap and
 general multiword delay instructions remain unvalidated.
 
-The exact original R060 AA22 skip-worker path now composes 36 words:
-`02:3d73..3d8b` and `02:3d9a..3da4`. It saves status/accumulator context,
+The exact original R060 AA22 skip-worker path composes 37 words:
+`02:3d73..3d8b` and `02:3d9a..3da5`. It saves status/accumulator context,
 increments a long-memory value, computes the status mask, executes BCD with
-the real memory-DP/NOP delays, then restores context through the common tail.
+the real memory-DP/NOP delays, then restores context and executes RET through
+the common tail.
 Six executable cases cover pages 0 and 2 with checkpoints after the first
 retained source, a partial accumulator save or the POPM BL/store overlap.
 Each requires eight ordered context saves and one reserved-slot write,
-restored A/B/ST0/ST1, final SP `0fff`, the incremented long-memory value and
-return slot `0fff=4044`. The store uses the pre-POPM SP sample, not the live
+restored A/B/ST0/ST1, final SP `1000`, the incremented long-memory value and
+return slot `0fff=4044`, followed by one fetch at `4044` in the same program
+page. The store uses the pre-POPM SP sample, not the live
 incremented SP. Replay must not duplicate writes. The bytes were checked
 through the original upload decoder against `InitData_R060.a00`; this
-CPU-conformance fixture ends the copied path with NOPs, leaving the original
-image and firmware runs unchanged. It does not execute the full ISR. The
-next original instruction is `fc00` RET at `02:3da5`, still unsupported in the
-staged frontend. The worker-call path is not executed by this fixture.
+CPU-conformance fixture runs the copied path through the original `fc00`,
+then executes NOPs at the reserved continuation, leaving the original image
+and firmware runs unchanged. This establishes the skip-worker routine path,
+not its real interrupt-entry integration or live recorder completion. The
+worker-call path is not executed by this fixture.
 Native handset/recorder execution still uses the atomic core.
 
 The read-only `mu4_context_contract.py` pins 51 original AA22 words through
@@ -2825,8 +2839,8 @@ not a claim of correct interrupt-return semantics or full handler execution.
 Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
-complete status predicate. Next establish ordinary RET ownership and the
-worker-call path before a full original-handler fixture; neither skipping
+complete status predicate. Next establish the worker-call path and interrupt
+integration before a full original-handler fixture; neither skipping
 delay effects nor a fixed interrupt delay is a substitute.
 
 The original four short/long-period, direct/indirect-mask streams run through

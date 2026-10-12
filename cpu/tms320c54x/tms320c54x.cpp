@@ -1835,7 +1835,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((word & 0xfeff) == 0x68f8 || word == 0x76f8) ? 3 :
 				(staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_conditional_branch(word) || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -1892,6 +1892,7 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = (word & 0xfe00) == 0x6800 &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
+		bool const plain_return = word == 0xfc00 || word == 0xf4eb;
 		bool const far_return = (word & 0xfdfe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
@@ -1903,7 +1904,7 @@ void tms320c54x_device::pipeline_step()
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1911,7 +1912,7 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		if (m_pipeline_valid[2] && (fast_return || far_return || branch))
+		if (m_pipeline_valid[2] && (fast_return || plain_return || far_return || branch))
 		{
 			bool const delayed = word == 0xf69b || word == 0xf273 || staged_conditional_branch(word) || (far_return && BIT(word, 9));
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
@@ -1920,7 +1921,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed ? 0 : 2;
-			if (far_return && !delayed) m_pipeline_flush_front = true;
+			if (plain_return || (far_return && !delayed)) m_pipeline_flush_front = true;
 		}
 		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
@@ -2044,6 +2045,12 @@ void tms320c54x_device::pipeline_step()
 		// destination. SP/XPC/control destinations are excluded at Decode.
 		m_pipeline_operand[4] = data_read(m_sp++);
 	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xfc00 || m_pipeline_word[3] == 0xf4eb))
+	{
+		// Example 7-7 allocates the return's DAB in Access. Account for an
+		// older PSHM/POPM Read update before allocating this younger pop.
+		m_pipeline_operand_address[3] = m_sp++;
+	}
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
 		m_pipeline_operand_address[4] = basic_address(4, u8(m_pipeline_word[4]));
@@ -2076,6 +2083,13 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
+		else if (m_op == 0xfc00 || m_op == 0xf4eb)
+		{
+			m_pc = m_pipeline_operand[5];
+			m_pipeline_fetch_address = logical_program_address(m_pc);
+			m_pipeline_flush_front = false;
+			if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);
+		}
 		else if ((m_op & 0xfcf0) == 0xf4b0)
 		{
 			u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
@@ -2179,6 +2193,9 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0xfc00 || m_pipeline_word[4] == 0xf4eb))
+		// An older push/store can commit this word in Execute now.
+		m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]))
 	{
 		// Our complete two-word slot reaches Read at the opcode's Evaluate
