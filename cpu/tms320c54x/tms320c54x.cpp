@@ -693,6 +693,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
 	save_item(NAME(m_pipeline_intm_protected));
 	save_item(NAME(m_pipeline_direct_status));
+	save_item(NAME(m_pipeline_direct_sp));
 	save_item(NAME(m_pipeline_intm_follow));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
@@ -1694,6 +1695,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_peripheral_wait_paid.fill(false);
 	m_pipeline_intm_protected.fill(false);
 	m_pipeline_direct_status.fill(0);
+	m_pipeline_direct_sp.fill(0);
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
@@ -1763,6 +1765,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
+		m_pipeline_direct_sp[stage] = m_pipeline_direct_sp[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
@@ -1949,8 +1952,13 @@ void tms320c54x_device::pipeline_step()
 	auto const basic_address = [this](unsigned stage, u8 mode) -> u16 {
 		if (BIT(mode, 7)) return short_smem_address(mode);
 		u16 const status = m_pipeline_direct_status[stage];
-		return BIT(status, 14) ? u16(m_sp + mode) : u16((status & 0x1ff) << 7) | mode;
+		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
+	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
+		(m_pipeline_word[3] & 0xfc80) == 0x8000))
+		// Table 7-9: a basic direct consumer samples SP before an older
+		// PSHM allocates its stack word in this clock's Read stage.
+		m_pipeline_direct_sp[3] = m_sp;
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||

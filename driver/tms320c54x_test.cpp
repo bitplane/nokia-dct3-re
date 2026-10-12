@@ -3211,6 +3211,33 @@ private:
 		m_phase = 251410; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_push_sp_latency(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const gap = BIT(variant, 1);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, BIT(variant, 2) ? 0x4a18 : 0x4a11);
+		program.write_word(0x601 + gap, BIT(variant, 0) ? 0x8027 : 0x1027);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(0x1027, 0x1111);
+		m_cpu->space(AS_DATA).write_word(0x1026, 0x2222);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_phase = 251430; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -24218,7 +24245,7 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 767) { start_pipeline_frame(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_push_sp_latency(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24226,6 +24253,46 @@ private:
 		if (m_phase == 251420)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251410;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251430)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const gap = BIT(m_pipeline_peripheral_case, 1);
+			bool const store = BIT(m_pipeline_peripheral_case, 0);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Push/direct-consumer stream advances without unsupported forms");
+			if (cycle == 5 + gap && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save Access-owned compiler-mode SP before consumer Read");
+			}
+			if (cycle == 10)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xfff &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : gap ? 0x2222 : 0x1111) &&
+					m_cpu->space(AS_DATA).read_word(0xfff) == (BIT(m_pipeline_peripheral_case, 2) ? 0x1000 : 0x5678) &&
+					m_cpu->space(AS_DATA).read_word(0x1027) == (store && !gap ? 0x7777 : 0x1111) &&
+					m_cpu->space(AS_DATA).read_word(0x1026) == (store && gap ? 0x7777 : 0x2222),
+					"PSHM/basic direct consumer has one-instruction SP latency and preserves the alternate address");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore captured compiler-mode SP independently of current SP");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 6 + gap; m_phase = 251440;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 7) { start_pipeline_push_sp_latency(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged PSHM SP latency: PASS cases=8 sources=AR1,SP consumers=LD,ST gap_nops=0,1 restore=8\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251440)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251430;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

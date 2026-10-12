@@ -2586,6 +2586,16 @@ phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
 preceding accumulator-producer latency are not covered by this implementation
 or gate.
 
+Basic compiler-mode LD/ST retain their Access-stage SP sample separately
+from Decode-time CPL/DP. This gives the one-instruction PSHM-to-category-I
+consumer latency in SPRU131G table 7-9: an immediate consumer uses the old
+SP, while one intervening NOP allows the decremented SP. Eight cases cover
+PSHM AR1/SP, LD/ST and both spacings, restoring after the SP sample and
+before consumer Read. Each verifies the operand or destination, untouched
+alternate address, retained push value and final SP. Other SP producers,
+extended-shift category-II consumers, indirect forms and physical stage
+placement remain unvalidated. The atomic frontend is unchanged.
+
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
 after both samples, following SPRU172C pages 4-61--62.
