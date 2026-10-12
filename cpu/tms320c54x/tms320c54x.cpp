@@ -1865,11 +1865,13 @@ void tms320c54x_device::pipeline_step()
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
 		bool const immediate_dp = (word & 0xfe00) == 0xea00;
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
+		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
+			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1982,6 +1984,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = data_read(u8(m_pipeline_word[4]));
 		m_pipeline_operand_address[4] = --m_sp;
 	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x8a00)
+	{
+		// Class 17A: retain the stack word before committing its register
+		// destination. SP/XPC/control destinations are excluded at Decode.
+		m_pipeline_operand[4] = data_read(m_sp++);
+	}
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
 		m_pipeline_operand_address[4] = basic_address(4, u8(m_pipeline_word[4]));
@@ -2038,6 +2046,8 @@ void tms320c54x_device::pipeline_step()
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
 		else if ((m_op & 0xffe0) == 0x4a00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		else if ((m_op & 0xff00) == 0x8a00)
+			data_write(u8(m_op), m_pipeline_operand[5]);
 		else if ((m_op & 0xfc80) == 0x8000)
 			data_write(m_pipeline_operand_address[5],
 				u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));

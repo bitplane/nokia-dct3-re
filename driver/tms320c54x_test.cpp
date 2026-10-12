@@ -3216,9 +3216,10 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		unsigned const gap = BIT(variant, 1);
+		bool const pop = BIT(variant, 3);
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, BIT(variant, 2) ? 0x4a18 : 0x4a11);
+		program.write_word(0x600, pop ? (BIT(variant, 2) ? 0x8a0b : 0x8a11) : (BIT(variant, 2) ? 0x4a18 : 0x4a11));
 		program.write_word(0x601 + gap, BIT(variant, 0) ? 0x8027 : 0x1027);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -3230,12 +3231,53 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x5678);
 		m_cpu->space(AS_DATA).write_word(0x1027, 0x1111);
-		m_cpu->space(AS_DATA).write_word(0x1026, 0x2222);
+		m_cpu->space(AS_DATA).write_word(pop ? 0x1028 : 0x1026, 0x2222);
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_phase = 251430; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_mmr_pop(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u16 const destination = variant / 6 < 18 ? 6 + variant / 6 : 0x19;
+		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x8a00 | destination);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x6aa5);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		u16 const initial = m_cpu->space(AS_DATA).read_word(destination);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1000, "staged_pop_stack",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == 5, "POPM samples its stack word once in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination, "staged_pop_destination",
+			[this, destination, initial](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == 6 &&
+					m_cpu->space(AS_DATA).read_word(destination) == initial, "POPM commits the retained word once at Execute, not early Read");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251450; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -24262,6 +24304,7 @@ private:
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const gap = BIT(m_pipeline_peripheral_case, 1);
 			bool const store = BIT(m_pipeline_peripheral_case, 0);
+			bool const pop = BIT(m_pipeline_peripheral_case, 3);
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Push/direct-consumer stream advances without unsupported forms");
 			if (cycle == 5 + gap && !m_pipeline_replay)
 			{
@@ -24270,12 +24313,14 @@ private:
 			}
 			if (cycle == 10)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xfff &&
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (pop ? 0x1001 : 0xfff) &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : gap ? 0x2222 : 0x1111) &&
-					m_cpu->space(AS_DATA).read_word(0xfff) == (BIT(m_pipeline_peripheral_case, 2) ? 0x1000 : 0x5678) &&
+					m_cpu->space(AS_DATA).read_word(0xfff) == (pop ? 0xaaaa : BIT(m_pipeline_peripheral_case, 2) ? 0x1000 : 0x5678) &&
 					m_cpu->space(AS_DATA).read_word(0x1027) == (store && !gap ? 0x7777 : 0x1111) &&
-					m_cpu->space(AS_DATA).read_word(0x1026) == (store && gap ? 0x7777 : 0x2222),
-					"PSHM/basic direct consumer has one-instruction SP latency and preserves the alternate address");
+					m_cpu->space(AS_DATA).read_word(pop ? 0x1028 : 0x1026) == (store && gap ? 0x7777 : 0x2222),
+					"PSHM/POPM basic direct consumer has one-instruction SP latency and preserves the alternate address");
+				if (pop) expect(m_cpu->space(AS_DATA).read_word(BIT(m_pipeline_peripheral_case, 2) ? 0x0b : 0x11) == 0x5678,
+					"POPM commits its original stack word independently of the compiler-mode consumer");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
@@ -24285,9 +24330,9 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 7) { start_pipeline_push_sp_latency(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged PSHM SP latency: PASS cases=8 sources=AR1,SP consumers=LD,ST gap_nops=0,1 restore=8\n");
-				start_timer_boundary_probe(0, true); return;
+				if (m_pipeline_peripheral_case < 15) { start_pipeline_push_sp_latency(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16\n");
+				start_pipeline_mmr_pop(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24295,6 +24340,48 @@ private:
 		if (m_phase == 251440)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251430;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251450)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
+			u16 const destination = m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0x1001 : 0x1000),
+				"POPM retains one stack read, increment and register write across replay");
+			if (cycle >= 6)
+				expect(m_cpu->space(AS_DATA).read_word(destination) == (destination == 0x0a || destination == 0x0d ? 0xa5 : 0x6aa5) &&
+					m_xf_pin == bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 13)), "POPM destination applies its normal register mask and XF output");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save POPM before/after stack Read or register Write");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= 6);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained POPM stack source and destination commitment");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251460;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 113) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 register_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251460)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251450;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

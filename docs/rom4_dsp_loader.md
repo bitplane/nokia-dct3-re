@@ -2586,12 +2586,22 @@ phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
 preceding accumulator-producer latency are not covered by this implementation
 or gate.
 
+Staged direct POPM supports `8a06..8a17` and `8a19`: ST0/ST1, accumulator
+parts, T/TRN, AR0--AR7 and BK. It retains the stack word and increments SP
+in Read, then writes the register in Execute (SPRU172C page 4-128, class
+17A). All 19 destinations have both program pages and three replay
+boundaries, giving 114 cases. Each requires one stack read/increment and
+one register write per leg, correct guard-byte masking and ST1/XF output.
+SP, XPC, other control/peripheral destinations and indirect forms are
+rejected. Read placement and mixed DAGEN/status-producer conflicts remain
+partial, not measured silicon behavior.
+
 Basic compiler-mode LD/ST retain their Access-stage SP sample separately
-from Decode-time CPL/DP. This gives the one-instruction PSHM-to-category-I
-consumer latency in SPRU131G table 7-9: an immediate consumer uses the old
-SP, while one intervening NOP allows the decremented SP. Eight cases cover
-PSHM AR1/SP, LD/ST and both spacings, restoring after the SP sample and
-before consumer Read. Each verifies the operand or destination, untouched
+from Decode-time CPL/DP. This gives the one-instruction category-I consumer
+latency after PSHM/POPM in SPRU131G table 7-9: an immediate consumer uses the old
+SP, while one intervening NOP allows the updated SP. Sixteen cases cover
+PSHM AR1/SP and POPM AR1/BL, LD/ST and both spacings, restoring after the SP
+sample and before consumer Read. Each verifies the operand or destination, untouched
 alternate address, retained push value and final SP. Other SP producers,
 extended-shift category-II consumers, indirect forms and physical stage
 placement remain unvalidated. The atomic frontend is unchanged.
