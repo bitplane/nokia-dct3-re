@@ -2199,14 +2199,6 @@ void tms320c54x_device::pipeline_step()
 		if (staged_call(m_pipeline_word[3])) m_rtn = m_pipeline_immediate[3];
 		if (staged_far_call(m_pipeline_word[3])) m_pipeline_far_call_stack[3] = --m_sp;
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0xee00)
-	{
-		// SPRU172C 4-60: FRAME has no latency to the following stack
-		// operation. Access-owned SP update is a partial stage model.
-		u16 const previous = m_sp;
-		m_sp = u16(m_sp + s8(m_pipeline_word[3]));
-		pipeline_delay_compiler_sp(previous);
-	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
 	{
 		// Delayed class-34 prototype: two stack samples without the plain
@@ -2368,6 +2360,15 @@ void tms320c54x_device::pipeline_step()
 				if (u8(m_pipeline_word[4]) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 			}
 		}
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0xee00)
+	{
+		// FRAME has zero stack-operation latency (SPRU172C 4-60), but
+		// must not retarget an older PSHM/POPM's Read-owned stack access.
+		// Access placement remains partial; order shared SP updates by age.
+		u16 const previous = m_sp;
+		m_sp = u16(m_sp + s8(m_pipeline_word[3]));
+		pipeline_delay_compiler_sp(previous);
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
 		// DARAM DB reads precede EB writes in the same clock (table 7-2).

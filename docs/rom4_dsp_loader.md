@@ -2597,7 +2597,8 @@ exhaustive **local** predicate, not a global flag-writer or reset census.
 After wake the routine removes its local frame, restores AR1 and uses
 FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
 and returns. The staged IDLE1 primitive has the bounded coverage below;
-composition of this complete original call with its timer ISR remains open.
+composition with its timer ISR remains open; the INTM-blocked complete call
+has the coverage below.
 
 Staged IDLE1 (`f4e1`) is a Decode barrier: older instructions drain,
 younger fetched words are discarded, and the continuation is fetched anew
@@ -2619,6 +2620,24 @@ silicon restart bus phase or execution of the original 44-word call.
 Staged IDLE2/3 and IDLE in a control-delay window remain fail-closed.
 The atomic frontend retains its existing IDLE1/2/3 behavior, and no handset
 or MU4 profile is promoted to staged execution by this fixture.
+
+The complete original 44-word idle routine/wrapper executes in eight staged
+cases with INTM set: zero/nonzero local flag, even/odd caller SP and two
+save/restore checkpoints during sleep. The zero path owns exactly the ordered
+PRD=`1`, TCR=`20`, IMR TINT-clear, IMR wake-mask and local flag writes.
+Its short-period timer remains pending but masked; the nonzero path leaves
+timer/masks untouched. A real external IRQ6 wakes both paths without an ISR
+under INTM, then original FRAME/POPM/FRET and the wrapper restore AR1,
+caller SP and CPL and reach the same-page caller. Both legs retain the
+unserviced wake request. These are typed CPU inputs, not a claim about the
+real flag's initialization or a promoted MU4 execution profile.
+
+Shared SP updates must respect instruction age: a younger FRAME must not
+retarget an older PSHM/POPM's Read-owned stack slot. FRAME's Access placement
+remains a partial model, but its update follows those older stack operations
+within the clock. The original adjacent PSHM AR1/FRAME pair and final AR1
+restoration regression-test this constraint. INTM-clear composition with the
+original timer vector/handler and native warm scheduling remain open.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).
