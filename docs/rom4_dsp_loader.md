@@ -2762,15 +2762,43 @@ pushes, `ea00`, `577c`, `f300 0001`, `4f7c`, `487e`, `f030 c004` and
 `f050 c004`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
 They require eight ordered saves of the original accumulator/status values,
-an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
+an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM,
 the long-word operand loaded, incremented in B and stored back, and a page-zero
 LDM zero-extended and logically masked in A. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-instruction, `fa44 3d9a` at `02:3d88` (conditional branch), remains unsupported in the
+instruction, `fa44 3d9a` at `02:3d88` (delayed ANEQ branch), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
+
+The read-only `mu4_context_contract.py` pins 51 original AA22 words through
+`02:3da5` against the R060 source identity. `487e; f030 c004; f050 c004`
+leaves A equal to `(status[007e] & c004) XOR c004`. Therefore BCD ANEQ
+skips the worker exactly when one of bits 15, 14 or 2 is absent. Exhaustive
+predicate coverage gives 57,344 skip values and 8,192 worker-call values;
+this is not an observation of the live recorder's status or branch choice.
+
+The branch always has delay words `467f` and `f495`: LD from page-zero
+`007f` into DP (three documented base cycles) and NOP. BCD itself has three
+base cycles; SPRU131G example 7-17 explicitly shows conditional evaluation
+and a prefetch bubble. Reusing unconditional BD's Access-stage redirect
+without that distinction is not justified. The untaken branch additionally
+saves AR0/AR2/AR3/T, reaches CALLD `02:3dbc`, executes `770e 0006` (STM #6,T)
+as its two-word call delay, with return continuation `02:3d96`. The skip
+path and returning-worker continuation reach `02:3d9a`, where a current-DP
+load precedes CPL setup and context pops.
+The skip-worker path's DP comes from the branch delay; the worker's effects
+on DP remain unclassified. The pinned `POPM BL -> STL A,6` pair remains
+the known compiler-mode SP-latency boundary. The final `fc00` is pinned,
+not a claim of correct interrupt-return semantics or full handler execution.
+
+Reproduce the bounded original-code audit with:
+`python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
+Its unit tests reject missing or changed witness words and enumerate the
+complete status predicate. Next recover the delayed conditional-branch and
+memory-to-DP ownership together before extending the original-prefix fixture;
+neither skipping delay effects nor a fixed interrupt delay is a substitute.
 
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one

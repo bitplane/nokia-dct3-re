@@ -1,0 +1,102 @@
+"""Read-only original R060 context branch; no execution or full-ISR claim."""
+import argparse
+from collections import Counter
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+if __package__:
+    from .mu4_clock_contract import SOURCE_SHA256
+    from .noki5510_a00_inventory import uploaded_word_image
+else:
+    from mu4_clock_contract import SOURCE_SHA256
+    from noki5510_a00_inventory import uploaded_word_image
+
+
+BASE = 0x23D73
+MASK = 0xC004
+WITNESS = (
+    0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
+    0x4A08, 0x4A09, 0x4A0A, 0x4A0B, 0x4A0C, 0x4A0D,
+    0xEA00, 0x577C, 0xF300, 0x0001, 0x4F7C, 0x487E,
+    0xF030, MASK, 0xF050, MASK,
+    0xFA44, 0x3D9A, 0x467F, 0xF495,
+    0x4A10, 0x4A12, 0x4A13, 0x4A0E, 0x7131, 0x0012,
+    0xF274, 0x3DBC, 0x770E, 0x0006,
+    0x8A0E, 0x8A13, 0x8A12, 0x8A10,
+    0x1036, 0xF7BE, 0x8A0D, 0x8A0C, 0x8A0B, 0x8006,
+    0x8A0A, 0x8A09, 0x8A08, 0x8A07, 0x8A06, 0xFC00,
+)
+
+
+def route_for_status(status):
+    if not isinstance(status, int) or not 0 <= status <= 0xFFFF:
+        raise ValueError('status must be an unsigned 16-bit word')
+    # LDM zero-extends; AND then XOR selects missing required bits.
+    return 'skip_worker' if (status & MASK) ^ MASK else 'call_worker'
+
+
+def decode_words(words):
+    for offset, expected in enumerate(WITNESS):
+        address = BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'context witness changed or absent at {address:06x}')
+    counts = Counter(route_for_status(value) for value in range(0x10000))
+    return {
+        'source_sha256': SOURCE_SHA256,
+        'segment': 'aa22',
+        'matched_word_range': ['023d73', '023da5'],
+        'matched_words': len(WITNESS),
+        'branch': {
+            'address': '023d88', 'opcode': 'fa44', 'condition': 'ANEQ',
+            'delayed': True, 'target': '023d9a',
+            'documented_base_cycles': 3,
+            'status_source': '007e', 'required_mask': 'c004',
+            'taken_when': '(status & c004) != c004',
+            'delay_slots': [
+                {'address': '023d8a', 'words': ['467f'],
+                 'operation': 'LD Smem,DP', 'source_offset': '7f',
+                 'source_dp': 0, 'documented_base_cycles': 3},
+                {'address': '023d8b', 'words': ['f495'], 'operation': 'NOP'},
+            ],
+            'status_coverage': {'tested': 65536, **dict(counts)},
+        },
+        'worker_call': {
+            'address': '023d92', 'target': '023dbc', 'delayed': True,
+            'delay_words': ['770e', '0006'], 'operation': 'STM #6,T',
+            'continuation': '023d96', 'extra_saved_registers': ['AR0', 'AR2', 'AR3', 'T'],
+        },
+        'common_tail': {
+            'entry': '023d9a', 'direct_load_offset': '36',
+            'addressing_page': 'current DP; skip-worker path uses the delay-slot value; worker effects unclassified',
+            'cpl_set': '023d9b', 'pop_bl': '023d9e',
+            'following_compiler_store': '023d9f', 'store_offset': 6,
+            'return_word': {'address': '023da5', 'opcode': 'fc00'},
+        },
+        'scope': '51 pinned original words and exhaustive status predicate; '
+                 'no complete ISR, worker, writer census or physical pipeline validation',
+    }
+
+
+def contract(source):
+    if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
+        raise ValueError('expected original R060 InitData source')
+    return decode_words(uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22'))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('source', type=Path)
+    args = parser.parse_args()
+    try:
+        result = contract(args.source.read_bytes())
+    except (OSError, ValueError) as error:
+        print(f'MU4 context contract: {error}', file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
