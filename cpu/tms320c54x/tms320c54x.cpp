@@ -28,6 +28,11 @@ constexpr bool staged_call(u16 word)
 	return word == 0xf074 || word == 0xf274;
 }
 
+constexpr bool staged_far_branch(u16 word)
+{
+	return (word & 0xff80) == 0xf880; // Non-delayed FB; FCALL/FBD need separate ownership.
+}
+
 constexpr bool staged_move(u16 word)
 {
 	return (word & 0xff00) == 0x7100 && u8(word) < 0x98;
@@ -1977,8 +1982,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
-				(staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+				(staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -2003,7 +2008,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if (staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -2061,7 +2066,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
 			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
 		bool const frame = (word & 0xff00) == 0xee00;
-		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
+		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && staged_far_branch(word));
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
 		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
@@ -2144,11 +2149,11 @@ void tms320c54x_device::pipeline_step()
 		++m_sp;
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_rtn;
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf073 || m_pipeline_word[3] == 0xf273 || staged_call(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf073 || m_pipeline_word[3] == 0xf273 || staged_call(m_pipeline_word[3]) || staged_far_branch(m_pipeline_word[3])))
 	{
 		// SPRU131G examples 7-2/3: the target word's Access starts target
 		// Prefetch; the following two sequential words are delay or flush slots.
-		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+		m_pipeline_fetch_address = (staged_far_branch(m_pipeline_word[3]) ? u32(m_pipeline_word[3] & 0x7f) << 16 : m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
 		if (staged_call(m_pipeline_word[3])) m_rtn = m_pipeline_immediate[3];
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0xee00)
@@ -2399,6 +2404,11 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_decode_flush = 1;
 			}
 		}
+		else if (staged_far_branch(m_op))
+		{
+			m_xpc = m_op & 0x7f;
+			m_pc = m_pipeline_operand[5];
+		}
 		else if (m_op == 0xf073 || m_op == 0xf273 || staged_call(m_op))
 			++m_pc; // Target fetch was already redirected in Access.
 		else if ((m_op & 0xff00) == 0xee00)
@@ -2489,7 +2499,7 @@ void tms320c54x_device::pipeline_step()
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
 		unsigned const xc_retired_words = ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
-			(staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+			(staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
 			u16(m_pipeline_xc_end - address) < xc_retired_words)
 			m_pipeline_xc_active = false;
@@ -2497,7 +2507,7 @@ void tms320c54x_device::pipeline_step()
 			u16(address - m_pipeline_control_address) <= 3)
 		{
 			unsigned const words = ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
-				(staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+				(staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)

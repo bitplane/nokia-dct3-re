@@ -4846,6 +4846,44 @@ private:
 		m_phase = 252050; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_far_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const target_page = std::array<unsigned, 5>{0, 1, 2, 3, 0x7f}[variant / 8];
+		u32 const source = BIT(variant, 0) ? 0x20000 : 0, target = target_page << 16;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(source + 0x600 + i, 0xf495); program.write_word(target + 0x700 + i, 0xf495); }
+		program.write_word(source + 0x600, 0xf880 | target_page); program.write_word(source + 0x601, 0x700);
+		program.write_word(source + 0x602, 0xe811); program.write_word(source + 0x603, 0xe922);
+		program.write_word(target + 0x700, 0xe844);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, source + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(source + 0x601, source + 0x601, "far_branch_target_literal",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x700 && m_cpu->pipeline_cycles() == 3, "FB retains its target literal from one program Fetch");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(target + 0x700, target + 0x700, "far_branch_target_page",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0xe844 && m_cpu->pipeline_cycles() == 6, "FB redirects to its retained seven-bit page without a stack write");
+				++m_pipeline_extensions_reads;
+			});
+		m_phase = 252090; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -27504,7 +27542,7 @@ private:
 				m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 127) { start_pipeline_original_context_call(variant + 1, true); return; }
 				osd_printf_info("TMS320C54x staged complete MU4 context body: PASS cases=128 original_words=89 pages=2 saved_intm_states=2 sxm_states=2 cmpr_outcomes=2 restore=128 context_restored=1 counter_increments=1 full_isr_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_far_branch(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -27512,6 +27550,50 @@ private:
 		if (m_phase == 252080)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252070;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252090)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			unsigned const target_page = std::array<unsigned, 5>{0, 1, 2, 3, 0x7f}[variant / 8];
+			unsigned const source_page = BIT(variant, 0) ? 2 : 0;
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 7, 10}[(variant % 8) / 2];
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 3) && m_pipeline_extensions_reads == unsigned(cycle >= 6) &&
+				// Fetch exposes the next page before retirement; that intermediate
+				// debugger value is not an asserted architectural commit phase.
+				(cycle == 6 || m_cpu->state_int(tms320c54x_device::STATE_XPC) == (cycle >= 7 ? target_page : source_page)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 10 ? 0x44 : 0) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+				"FB commits the explicit target page and flushes sequential instructions without call semantics");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FB partial target decode, redirected fetch and page commitment");
+			}
+			if (cycle == 14)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 3); m_pipeline_extensions_reads = unsigned(checkpoint >= 6);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore FB page and literal without duplicate fetch or fallthrough");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252100;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 39) { start_pipeline_far_branch(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged FB: PASS cases=40 source_pages=2 target_pages=5 restore=40 duplicate_literal_fetches=0 duplicate_target_fetches=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252100)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252090;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

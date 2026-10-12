@@ -41,6 +41,26 @@ FULL_WORKER_WITNESS = (WORKER_WITNESS + WORKER_COPY_WITNESS
                        + (0x8393, 0x8193, 0xF4AB, 0x8C93)
                        + (0x108A, 0x6D8A, 0xFD30, 0x8082, 0x6DEA, 0x0003)
                        + WORKER_LOGIC_WITNESS + WORKER_TAIL_WITNESS)
+TIMER_VECTOR_BASE = 0x2204C
+TIMER_VECTOR_WITNESS = (0x4A1E, 0xF495, 0xF882, 0x3D73)
+TIMER_RETURN_BASE = 0x24044
+
+
+def decode_timer_wrapper(words):
+    for offset, expected in enumerate(TIMER_VECTOR_WITNESS):
+        address = TIMER_VECTOR_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'timer vector witness changed or absent at {address:06x}')
+    if words.get(TIMER_RETURN_BASE) != 0xF4E5:
+        raise ValueError('timer return witness changed or absent at 024044')
+    return {
+        'uploaded_vector_range': ['02204c', '02204f'],
+        'matched_words': 5,
+        'save': {'opcode': '4a1e', 'register': 'XPC', 'mmr': '001e'},
+        'branch': {'opcode': 'f882', 'operation': 'FB', 'target': '023d73', 'delayed': False},
+        'return': {'address': '024044', 'opcode': 'f4e5', 'operation': 'FRETE', 'clears_intm': True},
+        'scope': 'original upload words only; low-vector runtime mapping and complete timer entry/return require execution evidence',
+    }
 
 
 def decode_full_worker(words):
@@ -213,6 +233,7 @@ def contract(source):
     result['worker_copy'] = decode_worker_copy(words)
     result['worker_logic'] = decode_worker_logic(words)
     result['full_worker'] = decode_full_worker(words)
+    result['timer_wrapper'] = decode_timer_wrapper(words)
     return result
 
 

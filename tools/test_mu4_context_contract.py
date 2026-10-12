@@ -6,9 +6,32 @@ from tools.mu4_context_contract import WORKER_TAIL_BASE, WORKER_TAIL_WITNESS, de
 from tools.mu4_context_contract import WORKER_COPY_BASE, WORKER_COPY_WITNESS, decode_worker_copy
 from tools.mu4_context_contract import WORKER_LOGIC_BASE, WORKER_LOGIC_WITNESS, decode_worker_logic
 from tools.mu4_context_contract import FULL_WORKER_WITNESS, decode_full_worker
+from tools.mu4_context_contract import TIMER_VECTOR_BASE, TIMER_VECTOR_WITNESS, TIMER_RETURN_BASE, decode_timer_wrapper
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_timer_wrapper_saves_xpc_and_returns_with_frete(self):
+        words = dict(enumerate(TIMER_VECTOR_WITNESS, TIMER_VECTOR_BASE))
+        words[TIMER_RETURN_BASE] = 0xf4e5
+        result = decode_timer_wrapper(words)
+        self.assertEqual(result['matched_words'], 5)
+        self.assertEqual(result['save']['register'], 'XPC')
+        self.assertEqual(result['branch']['target'], '023d73')
+        self.assertEqual(result['return']['operation'], 'FRETE')
+        self.assertTrue(result['return']['clears_intm'])
+
+    def test_timer_wrapper_witness_mutation_and_absence(self):
+        original = dict(enumerate(TIMER_VECTOR_WITNESS, TIMER_VECTOR_BASE))
+        original[TIMER_RETURN_BASE] = 0xf4e5
+        for address in original:
+            words = original.copy()
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_timer_wrapper(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_timer_wrapper(words)
+
     def test_full_worker_covers_the_zero_control_body(self):
         result = decode_full_worker(dict(enumerate(FULL_WORKER_WITNESS, WORKER_BASE)))
         self.assertEqual(result['matched_words'], 38)

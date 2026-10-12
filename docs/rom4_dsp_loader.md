@@ -2505,6 +2505,26 @@ CPU fixtures. Hardware timer/IRQ entry, real worker operand provenance,
 foreground progress under recurring interrupts and coherent native
 recording remain unvalidated; handsets and MU4 still use the atomic frontend.
 
+Non-delayed staged FB retains both the seven-bit target page and its
+16-bit target word (SPRU172C page 4-53, class 29A). It uses the existing
+unconditional-branch redirect/flush path without call stack effects.
+Forty replay cases cover source pages 0/2 and target pages 0/1/2/3/7f,
+requiring one literal fetch, one target fetch, no sequential instruction
+effects and the committed target page. The frontend exposes Fetch-time
+XPC before retirement; that intermediate register value is not a claimed
+silicon commit phase. General XPC-consumer hazards, FBD/FCALL and nested
+far control/IRQ interactions remain unvalidated or excluded.
+
+The original MU4 timer wrapper is pinned separately by the read-only
+context tool. Uploaded `02:204c`--`02:204f` contains
+`4a1e f495 f882 3d73`: PSHM XPC (MMR `001e`), NOP and FB `02:3d73`.
+The original reserved return at `02:4044` is `f4e5` (FRETE), which restores
+the saved page/PC and clears INTM. Thus a complete timer fixture must
+include the page save and far return, not merely jump to the handler or
+stop at its reserved-return address. Static upload words do not by
+themselves validate their low-vector runtime mapping or hardware IRQ
+entry; those remain the next executable boundary.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
