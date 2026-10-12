@@ -2374,7 +2374,8 @@ AR3 postincrement. All 50 cases require one stack consumption/publication,
 no duplicate replay access and preserved non-arithmetic context. The static
 context tool pins the six original words, but does not assign meanings to
 the operands. Peripheral/extended destinations, general stack/DAGEN/bank
-conflicts and the remaining worker body/native recorder remain unvalidated.
+conflicts and native recorder behavior remain unvalidated. Complete worker
+composition is specified below.
 
 Short accumulator stores now include stationary/postdecrement/postincrement
 indirect addressing, and short ST T/TRN use the same retained destination
@@ -2388,8 +2389,8 @@ publications with a neutral gap; that gap does not claim to execute the
 original intervening CMPR. All 75 cases preserve register/status values and
 produce no duplicate writes on replay. Source-register producer latency,
 extended modes and physical bus placement remain unvalidated; T/TRN stores
-are limited to RAM destinations. Full worker composition remains a
-separate acceptance requirement.
+are limited to RAM destinations. Complete worker composition is specified
+below.
 
 Staged CMPR samples unsigned ARx/AR0 in Access and retains its predicate
 until Execute changes TC, without re-reading live address registers
@@ -2434,8 +2435,8 @@ an accepted store publishes the captured source at `046e`, despite the
 same-clock long MAR update, while a rejected store leaves that location
 untouched. Each replay performs one data read and zero or one store.
 Circular/bit-reversed/AR0-indexed MAR forms, absolute MAR and general
-producer conflicts remain excluded. Full worker composition and live
-native recording remain separate gaps.
+producer conflicts remain excluded. Complete worker composition is
+specified below; live native recording remains a separate gap.
 
 The original worker's `1892` and `1a8a` are **AND** `*AR2+,A` and
 **OR** `*AR2-,A`, not memory ADD/SUB. SPRU172C syntax-1 logical opcode
@@ -2463,6 +2464,32 @@ mutation may affect the retained result or store. Replay around both
 logical reads and the final store requires exactly two reads and one
 write. This closes the selected tail composition, not the complete
 zero-control worker, IRQ entry or a native recorder transaction.
+
+The complete original worker is now separately pinned at
+`02:3dbc`--`02:3de1`: 38 words, including its 22-word zero-control body.
+The composed fixture also executes the four original CALLD/STM-parameter
+words at `02:3d92`--`02:3d95`. Forty-eight cases cover both CMPR/XC
+outcomes, both saved INTM states, both SXM states and six replay boundaries.
+Each leg requires eleven ordered data reads and nine or ten writes,
+including the old DARAM source through PSHD/POPD, consecutive B high/low
+and T publications, the conditional control-word store and final mask/merge
+store. The stack balances, the worker restores the saved INTM predicate,
+and RETD reaches its page-2 continuation without fetching a third delay
+word. The caller continuation is an explicit test marker, not a claim to
+execute the rest of the original outer handler.
+
+The non-taken BC retains the already-fetched first body word; its body
+timeline is one clock earlier than a redirect-style expectation. With
+the selected fixture, ADDM Read is clock 20, PSHD reads the old source
+before ADDM Write in clock 21, and the final result is written in clock 41.
+The selected CMPR match controls a store in clock 33. The exact values
+and clocks are bounded CPU-fixture observations, not measured silicon or
+recovered recorder operand provenance.
+
+The logical and worker fixtures use ST1 bit 8 for SXM; bit 9 is OVM.
+The corrected 576-case matrix checks zero-extension against actual SXM.
+Full original outer-context composition on the body-entering route,
+timer/IRQ entry and coherent native recording remain unvalidated.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.

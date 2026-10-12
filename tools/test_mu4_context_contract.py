@@ -5,9 +5,28 @@ from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worke
 from tools.mu4_context_contract import WORKER_TAIL_BASE, WORKER_TAIL_WITNESS, decode_worker_return, restored_intm
 from tools.mu4_context_contract import WORKER_COPY_BASE, WORKER_COPY_WITNESS, decode_worker_copy
 from tools.mu4_context_contract import WORKER_LOGIC_BASE, WORKER_LOGIC_WITNESS, decode_worker_logic
+from tools.mu4_context_contract import FULL_WORKER_WITNESS, decode_full_worker
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_full_worker_covers_the_zero_control_body(self):
+        result = decode_full_worker(dict(enumerate(FULL_WORKER_WITNESS, WORKER_BASE)))
+        self.assertEqual(result['matched_words'], 38)
+        self.assertEqual(result['body_words'], 22)
+        self.assertEqual(result['matched_word_range'], ['023dbc', '023de1'])
+        self.assertIn('second source word equals zero', result['body_entry'])
+        self.assertIn('CMPR EQ,AR3', result['conditional_store'])
+
+    def test_full_worker_witness_mutation_and_absence(self):
+        for address in range(WORKER_BASE, WORKER_BASE + len(FULL_WORKER_WITNESS)):
+            words = dict(enumerate(FULL_WORKER_WITNESS, WORKER_BASE))
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_full_worker(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_full_worker(words)
+
     def test_worker_tail_is_logical_not_memory_add_sub(self):
         result = decode_worker_logic(dict(enumerate(WORKER_LOGIC_WITNESS, WORKER_LOGIC_BASE)))
         self.assertEqual(result['matched_words'], 6)

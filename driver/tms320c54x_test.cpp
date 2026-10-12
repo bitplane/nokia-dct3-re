@@ -4677,7 +4677,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xb601);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x200 : 0) | (form == 1 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (form == 1 ? 0x4000 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(kind, 0) ? 0x2233445566ULL : source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(kind, 0) ? source : 0x2233445566ULL);
@@ -4737,6 +4737,79 @@ private:
 				++m_pipeline_store_writes;
 			});
 		m_phase = 252030; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_mu4_full_worker(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const matched = BIT(variant, 0), masked = BIT(variant, 1), sxm = BIT(variant, 2);
+		u16 const saved_status = (masked ? 0x800 : 0) | (sxm ? 0x100 : 0);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 96; ++i) program.write_word(0x23d90 + i, 0xf495);
+		std::array<u16, 4> const call{0xf274, 0x3dbc, 0x770e, 6};
+		std::array<u16, 38> const worker{
+			0xfd00, 0x4a07, 0xfd00, 0xf7bb, 0x7192, 0x0010, 0x1092, 0xf844, 0x3ddb,
+			0x6b82, 2, 0x4b92, 0x7182, 0x0013, 0x8b93, 0x8393, 0x8193, 0xf4ab, 0x8c93,
+			0x108a, 0x6d8a, 0xfd30, 0x8082, 0x6dea, 3, 0xf000, 4, 0x1892, 0x1a8a, 0x6d8a, 0x8082,
+			0x8a08, 0xf030, 0x0800, 0xf495, 0xfe00, 0xfd45, 0xf6bb};
+		for (unsigned i = 0; i < call.size(); ++i) program.write_word(0x23d92 + i, call[i]);
+		for (unsigned i = 0; i < worker.size(); ++i) program.write_word(0x23dbc + i, worker[i]);
+		program.write_word(0x23de2, 0xffff); program.write_word(0x23d96, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, saved_status);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1111);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x510);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x2222);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		auto &data = m_cpu->space(AS_DATA);
+		data.write_word(0x510, matched ? 0x472 : 0x474); data.write_word(0x511, 0);
+		data.write_word(0x512, 0xff0f); data.write_word(0x513, 0x470);
+		data.write_word(0x514, 0xff0f); data.write_word(0x515, 0x00f0);
+		for (unsigned i = 0; i < 4; ++i) data.write_word(0x470 + i, 0x7777);
+		m_cpu->set_state_int(STATE_GENPC, 0x23d92); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x400, 0x1000, "full_worker_reads",
+			[this, matched, saved_status](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 11> const addresses{0x510, 0x511, 0x512, 0x512, 0x513, 0xffd, 0x513, 0x514, 0x515, 0xffe, 0xfff};
+				std::array<u16, 11> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0xff0f, 0x470, 0xff0f, 0x470, 0xff0f, 0x00f0, saved_status, 0x3d96};
+				std::array<unsigned, 11> const clocks{13, 15, 20, 21, 22, 24, 29, 37, 38, 41, 45};
+				unsigned const index = m_pipeline_operand_reads;
+				if (index >= addresses.size() || address != addresses[index] || value != values[index] || m_cpu->pipeline_cycles() != clocks[index])
+					osd_printf_info("Full worker read mismatch: index=%u cycle=%llu address=%04x value=%04x\n", index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
+				expect(index < addresses.size() && address == addresses[index] && value == values[index] && m_cpu->pipeline_cycles() == clocks[index],
+					"Complete original worker retains each source, old DARAM word and return slot in order");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = data.install_write_tap(0x400, 0x1000, "full_worker_writes",
+			[this, matched, saved_status](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 10> const addresses{0xfff, 0xffe, 0x512, 0xffd, 0x470, 0x471, 0x472, 0x473, 0x511, 0x513};
+				std::array<u16, 10> const values{0x3d96, saved_status, 0xff11, 0xff0f, 0xff0f, 0x3344, 0x5566, 6, 0x470, 0x4f4};
+				std::array<unsigned, 10> const clocks{6, 11, 21, 22, 25, 26, 27, 29, 33, 41};
+				unsigned const index = m_pipeline_store_writes + unsigned(!matched && m_pipeline_store_writes >= 8);
+				if (index >= addresses.size() || address != addresses[index] || value != values[index] || m_cpu->pipeline_cycles() != clocks[index])
+					osd_printf_info("Full worker write mismatch: index=%u cycle=%llu address=%04x value=%04x\n", index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
+				expect(index < addresses.size() && address == addresses[index] && value == values[index] && m_cpu->pipeline_cycles() == clocks[index],
+					"Complete worker publishes stack, copied word, B/T and conditional/final stores once");
+				++m_pipeline_store_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x23d96, 0x23de2, "full_worker_route",
+			[this](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled() || (address != 0x23d96 && address != 0x23de2)) return;
+				expect(address == 0x23d96 && m_cpu->pipeline_cycles() == 47, "Complete worker returns on page 2 without a third RETD delay word");
+				++m_pipeline_extensions_reads;
+			});
+		m_phase = 252050; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -27220,7 +27293,7 @@ private:
 				m_cpu->state_int(BIT(kind, 0) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 4 ? form == 2 ? 0x471 : form == 3 ? 0x46f : 0x470 : 0x470) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb601 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x200 : 0) | (form == 1 ? 0x4000 : 0)),
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (form == 1 ? 0x4000 : 0)),
 				"Logical Smem retains source despite later RAM changes and never sign-extends or changes flags");
 			if (cycle == 5)
 			{
@@ -27291,7 +27364,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 4) { start_pipeline_mu4_logic_tail(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged original MU4 logical tail: PASS cases=5 original_words=6 page=2 restore=5 duplicate_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mu4_full_worker(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -27299,6 +27372,58 @@ private:
 		if (m_phase == 252040)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252030;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252050)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const matched = BIT(variant, 0), masked = BIT(variant, 1), sxm = BIT(variant, 2);
+			unsigned const checkpoint = std::array<unsigned, 6>{17, 22, 27, 34, 42, 46}[variant / 8];
+			u64 const cycle = m_cpu->pipeline_cycles();
+			auto const reads_at = [](u64 clock) {
+				unsigned count = 0; for (unsigned at : {13, 15, 20, 21, 22, 24, 29, 37, 38, 41, 45}) count += clock >= at; return count;
+			};
+			auto const writes_at = [matched](u64 clock) {
+				unsigned count = matched && clock >= 33; for (unsigned at : {6, 11, 21, 22, 25, 26, 27, 29, 41}) count += clock >= at; return count;
+			};
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_store_writes == writes_at(cycle) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 47), "Complete original body advances with retained bus ownership");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save full original zero-control worker at composed ownership boundaries");
+			}
+			if (cycle == 58)
+			{
+				auto const disable = machine().disable_side_effects();
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((masked ? 0x800 : 0) | (sxm ? 0x100 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (matched ? 0xb600 : 0xa600) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (masked ? 0x800 : 0) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 6 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == (matched ? 0x472 : 0x474) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x513 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x474 &&
+					m_cpu->space(AS_DATA).read_word(0x511) == (matched ? 0x470 : 0) && m_cpu->space(AS_DATA).read_word(0x512) == 0xff11 &&
+					m_cpu->space(AS_DATA).read_word(0x513) == 0x4f4, "Full worker balances its stack, restores INTM and completes both conditional body outcomes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_store_writes = writes_at(checkpoint); m_pipeline_extensions_reads = unsigned(checkpoint >= 47);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore complete original body without duplicate source/stack or store effects");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252060;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 47) { start_pipeline_mu4_full_worker(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged complete MU4 worker: PASS cases=48 original_worker_words=38 call_words=4 control=zero cmpr_outcomes=2 saved_intm_states=2 sxm_states=2 restore=48 duplicate_reads=0 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252060)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252050;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

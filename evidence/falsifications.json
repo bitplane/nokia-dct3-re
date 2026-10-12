@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_memory_logic_fixture_bit9_is_sxm",
+      "status": "disproven",
+      "hypothesis": "The staged logical-operation matrix's ST1 0200 toggle establishes both SXM states",
+      "conclusion": "ST1 bit 9 is OVM; SXM is bit 8. The test incorrectly labeled overflow-mode coverage as sign-extension coverage. Its toggle and expected status were corrected to 0100, and all 576 logical replay cases rerun. The 48 complete original-worker cases also use the actual SXM bit while independently varying saved INTM and the CMPR conditional-store outcome. No CPU arithmetic semantics or atomic handset configuration were changed. The historical marker alone did not establish the claimed SXM coverage.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "mu4_worker_1892_1a8a_are_memory_add_sub",
       "status": "disproven",
       "hypothesis": "The original R060 worker words 1892 and 1a8a require staged memory ADD and SUB",

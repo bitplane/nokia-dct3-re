@@ -37,6 +37,28 @@ WORKER_COPY_BASE = 0x23DC5
 WORKER_COPY_WITNESS = (0x6B82, 0x0002, 0x4B92, 0x7182, 0x0013, 0x8B93)
 WORKER_LOGIC_BASE = 0x23DD5
 WORKER_LOGIC_WITNESS = (0xF000, 0x0004, 0x1892, 0x1A8A, 0x6D8A, 0x8082)
+FULL_WORKER_WITNESS = (WORKER_WITNESS + WORKER_COPY_WITNESS
+                       + (0x8393, 0x8193, 0xF4AB, 0x8C93)
+                       + (0x108A, 0x6D8A, 0xFD30, 0x8082, 0x6DEA, 0x0003)
+                       + WORKER_LOGIC_WITNESS + WORKER_TAIL_WITNESS)
+
+
+def decode_full_worker(words):
+    for offset, expected in enumerate(FULL_WORKER_WITNESS):
+        address = WORKER_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'complete worker witness changed or absent at {address:06x}')
+    return {
+        'matched_word_range': ['023dbc', '023de1'],
+        'matched_words': len(FULL_WORKER_WITNESS),
+        'body_word_range': ['023dc5', '023dda'],
+        'body_words': 22,
+        'body_entry': 'second source word equals zero; other values branch to 023ddb',
+        'conditional_store': 'CMPR EQ,AR3 compares against AR0; XC TC controls STL at 023dd2',
+        'buffer_publications': 'copied source word followed by high/low B and T',
+        'return': 'saved INTM predicate and two-word RETD delay',
+        'scope': '38 original words pinned; no real operand provenance, full IRQ context or native recording proof',
+    }
 
 
 def decode_worker_logic(words):
@@ -190,6 +212,7 @@ def contract(source):
     result['worker_return'] = decode_worker_return(words)
     result['worker_copy'] = decode_worker_copy(words)
     result['worker_logic'] = decode_worker_logic(words)
+    result['full_worker'] = decode_full_worker(words)
     return result
 
 
