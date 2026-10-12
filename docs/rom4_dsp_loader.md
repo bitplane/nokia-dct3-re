@@ -2646,8 +2646,18 @@ and four replay checkpoints cover sleep, active ISR and completed return.
 The final caller SP, AR1, B, CPL/page and cleared IFR reproduce without
 re-seeding worker state. The initial timer interval and worker inputs are
 typed CPU-fixture inputs, not recovered native startup provisioning.
-The zero-flag path with initially enabled short-period TINT, global flag
-writers and actual native warm scheduling remain separate open work.
+Four zero-flag cases additionally begin with TINT enabled and INTM clear.
+The original PRD/TCR writes start the short timer, but the staged frontend
+drains the already-decoded ANDM mask before vector execution. The ISR stacks
+continuation `98e4`, executes the original context route once and returns to
+the ORM wake-mask write. All five setup writes complete, `a531` becomes `1`
+and the CPU sleeps with IMR=`08c0`, masked IFR=`0008`, PC=`98ea` and SP=`0ffa`.
+Even/odd caller stacks and two in-flight replay checkpoints reproduce this
+result without a post-return guard, timer divisor change or forced
+continuation. This is a bounded 138-word staged composition, not acceptance
+of native warm startup or measured silicon interrupt timing. Global flag
+writers, complete surrounding opcode coverage and native warm scheduling
+remain open; production MU4 profiles still use the atomic frontend.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).

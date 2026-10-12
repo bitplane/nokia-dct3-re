@@ -2393,9 +2393,15 @@ the timer rate as CPU clock divided by `(TDDR+1)*(PRD+1)`, consistent with
 the short period. The staged frontend now has executable original-vector,
 handler, worker, FRETE and recurring-interrupt coverage in
 [the CPU contract](rom4_dsp_loader.md). The native warm profile still uses
-the atomic frontend; the next boundary is the exact original idle-call
-composition and its memory-mapped timer/mask ordering, not an arbitrary
-post-return delay.
+the atomic frontend. The staged CPU fixture now composes all 44 original
+idle/wrapper words with the 94-word timer vector/context route. With zero
+flag and TINT enabled, decoded-instruction drain completes ANDM before
+vector execution: the stacked continuation is `98e4`, not atomic `98de`.
+After one ISR the original ORM/flag writes complete and the CPU sleeps with
+TINT masked. Even/odd stacks and in-flight save/replay reproduce this bounded
+result without a post-return delay or timer change. The next boundary is
+complete surrounding staged opcode coverage and native warm execution;
+the CPU fixture does not close the metadata acceptance failure below.
 The new diagnostic is intentionally not a passing save acceptance gate.
 The independent INTM-change protection fix passes pending-interrupt load,
 multiword-store and return fixtures, but the metadata diagnostic still has
