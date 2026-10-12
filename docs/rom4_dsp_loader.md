@@ -2714,18 +2714,28 @@ pairs, indirect and extended-address forms are rejected. Preceding status-
 producer latency remains unvalidated. Paired Read placement is a declared
 prototype model, not independent physical-bus timing evidence.
 
-The exact original R060 AA22 prefix at `02:3d73..3d7f` composes these
+Staged two-word immediate ADD retains its literal through complete Decode
+and uses the shared arithmetic helper at Execute without another program
+read (SPRU172C page 4-4, syntax 7). All source/destination combinations,
+shifts 0/1/7/15, SXM/OVM settings and positive/negative boundary operands
+have 256 cases with restore during partial or complete Decode. They require
+correct carry, destination overflow and saturation; changing the literal
+after Fetch must not affect retirement. Shift-16 forms, other immediate ALU
+operations, mixed status producers and delayed-control overlap remain
+outside this gate.
+
+The exact original R060 AA22 prefix at `02:3d73..3d81` composes these
 operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes, `ea00` and `577c`. Six executable cases cover pages 0 and 2 with checkpoints
+pushes, `ea00`, `577c` and `f300 0001`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
 They require eight ordered saves of the original accumulator/status values,
 an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
-and the long-word operand loaded into B. All cases
+and the long-word operand loaded and incremented in B. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-instruction, `f300 0001` at `02:3d80` (immediate ADD into B), remains unsupported in the
+instruction, `4f7c` at `02:3d82` (DST long memory from B), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
 
 The original four short/long-period, direct/indirect-mask streams run through
