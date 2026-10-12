@@ -44,6 +44,47 @@ FULL_WORKER_WITNESS = (WORKER_WITNESS + WORKER_COPY_WITNESS
 TIMER_VECTOR_BASE = 0x2204C
 TIMER_VECTOR_WITNESS = (0x4A1E, 0xF495, 0xF882, 0x3D73)
 TIMER_RETURN_BASE = 0x24044
+IDLE_BASE = 0x298D0
+IDLE_WITNESS = (0x4A11, 0xEEFF, 0x10F8, 0xA531, 0xF844, 0x98E9,
+                0x7711, 0x0025, 0x7681, 0x0001, 0x7711, 0x0026, 0x7681, 0x0020,
+                0x7711, 0x0000, 0x6881, 0xFFF7, 0x7711, 0x0000, 0x6981, 0x08C0,
+                0x76F8, 0xA531, 0x0001, 0xF4E1, 0xEE01, 0x8A11, 0xF4E4)
+IDLE_WRAPPER_BASE = 0x23D2F
+IDLE_WRAPPER_WITNESS = (0x4918, 0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495,
+                        0x4A0B, 0x4A0B, 0xF982, 0x98D0, 0xF6BE, 0x8A18,
+                        0xF495, 0xF495, 0xFC00)
+
+
+def idle_route(flag):
+    if not isinstance(flag, int) or not 0 <= flag <= 0xFFFF:
+        raise ValueError('idle flag must be an unsigned 16-bit word')
+    return 'skip_setup' if flag else 'initialize_before_idle'
+
+
+def decode_idle_contract(words):
+    for base, witness in ((IDLE_BASE, IDLE_WITNESS), (IDLE_WRAPPER_BASE, IDLE_WRAPPER_WITNESS)):
+        for offset, expected in enumerate(witness):
+            address = base + offset
+            if words.get(address) != expected:
+                raise ValueError(f'idle lifecycle witness changed or absent at {address:06x}')
+    return {
+        'matched_word_ranges': [['0298d0', '0298ec'], ['023d2f', '023d3d']],
+        'matched_words': len(IDLE_WITNESS) + len(IDLE_WRAPPER_WITNESS),
+        'flag': {'address': 'a531', 'load': '10f8 a531', 'branch': 'BC ANEQ,98e9',
+                 'coverage': {'tested': 65536, **dict(Counter(idle_route(flag) for flag in range(65536)))},
+                 'local_commit': {'address': '0298e6', 'value': 1}},
+        'zero_path': [
+            {'address': '0298d8', 'register': 'PRD', 'value': '0001'},
+            {'address': '0298dc', 'register': 'TCR', 'value': '0020'},
+            {'address': '0298e0', 'register': 'IMR', 'operation': 'ANDM #fff7'},
+            {'address': '0298e4', 'register': 'IMR', 'operation': 'ORM #08c0'},
+            {'address': '0298e6', 'memory': 'a531', 'value': '0001'},
+        ],
+        'common_tail': ['IDLE 1', 'FRAME +1', 'POPM AR1', 'FRET'],
+        'wrapper': {'alignment': 'save old SP in B; clear SP bit 0', 'call': 'FCALL 02:98d0',
+                    'return': 'clear CPL; POPM SP; two NOPs; RET'},
+        'scope': '44 original words and exhaustive local predicate; no global flag-writer census, wake source or full runtime acceptance',
+    }
 
 
 def decode_timer_wrapper(words):
@@ -234,6 +275,7 @@ def contract(source):
     result['worker_logic'] = decode_worker_logic(words)
     result['full_worker'] = decode_full_worker(words)
     result['timer_wrapper'] = decode_timer_wrapper(words)
+    result['idle_lifecycle'] = decode_idle_contract(words)
     return result
 
 

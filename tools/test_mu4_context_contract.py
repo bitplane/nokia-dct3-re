@@ -7,9 +7,38 @@ from tools.mu4_context_contract import WORKER_COPY_BASE, WORKER_COPY_WITNESS, de
 from tools.mu4_context_contract import WORKER_LOGIC_BASE, WORKER_LOGIC_WITNESS, decode_worker_logic
 from tools.mu4_context_contract import FULL_WORKER_WITNESS, decode_full_worker
 from tools.mu4_context_contract import TIMER_VECTOR_BASE, TIMER_VECTOR_WITNESS, TIMER_RETURN_BASE, decode_timer_wrapper
+from tools.mu4_context_contract import IDLE_BASE, IDLE_WITNESS, IDLE_WRAPPER_BASE, IDLE_WRAPPER_WITNESS, decode_idle_contract, idle_route
 
 
 class ContextContractTest(unittest.TestCase):
+    def idle_words(self):
+        return dict(enumerate(IDLE_WITNESS, IDLE_BASE)) | dict(enumerate(IDLE_WRAPPER_WITNESS, IDLE_WRAPPER_BASE))
+
+    def test_idle_setup_is_locally_gated_not_an_unconditional_short_timer(self):
+        result = decode_idle_contract(self.idle_words())
+        self.assertEqual(result['matched_words'], 44)
+        self.assertEqual(result['flag']['coverage'], {'tested': 65536, 'initialize_before_idle': 1, 'skip_setup': 65535})
+        self.assertEqual([row['address'] for row in result['zero_path']], ['0298d8', '0298dc', '0298e0', '0298e4', '0298e6'])
+        self.assertEqual(result['wrapper']['call'], 'FCALL 02:98d0')
+        self.assertEqual(result['common_tail'][-1], 'FRET')
+
+    def test_idle_route_exhaustive_and_domain(self):
+        for flag in range(65536):
+            self.assertEqual(idle_route(flag), 'skip_setup' if flag else 'initialize_before_idle')
+        for flag in (-1, 65536, None, '1'):
+            with self.assertRaises(ValueError):
+                idle_route(flag)
+
+    def test_idle_witness_mutation_and_absence(self):
+        for address in self.idle_words():
+            words = self.idle_words()
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_idle_contract(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_idle_contract(words)
+
     def test_timer_wrapper_saves_xpc_and_returns_with_frete(self):
         words = dict(enumerate(TIMER_VECTOR_WITNESS, TIMER_VECTOR_BASE))
         words[TIMER_RETURN_BASE] = 0xf4e5

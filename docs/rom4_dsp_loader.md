@@ -2578,6 +2578,27 @@ pre-load callback time shifts emulated timer phase; the exact-cycle gate
 guards against that harness error. Neither device timer semantics nor
 the default atomic handset/MU4 path are changed by this fixture correction.
 
+Staged `10f8`/`11f8` absolute LD now retains its 16-bit address word and
+Read-stage data, then loads A/B with the selected SXM behavior (SPRU172C
+page 4-66, syntax 1/class 3B). The 64 replay cases vary accumulator,
+actual SXM bit and four data values across four boundaries. DP and CPL
+are deliberately unrelated to the absolute source. Mutating the program
+literal after Fetch and RAM after Read must not retarget or change the
+load; each leg performs one literal fetch and one operand read. The gate
+includes the original idle flag address `a531`, but does not establish
+absolute peripheral timing or a complete idle/wake lifecycle.
+
+The read-only context tool pins all 29 original words at
+`02:98d0`--`02:98ec` and the 15-word wrapper at `02:3d2f`--`02:3d3d`.
+The routine's absolute load of `a531` is followed by BC ANEQ to IDLE1:
+zero executes the ordered PRD=`1`, TCR=`20`, TINT-mask, wake-mask and
+flag=`1` writes; all 65,535 other input words skip that setup. This is an
+exhaustive **local** predicate, not a global flag-writer or reset census.
+After wake the routine removes its local frame, restores AR1 and uses
+FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
+and returns. Staged FCALL, POPM SP and IDLE entry/wake ownership still
+need coverage before claiming this complete original call executes.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute

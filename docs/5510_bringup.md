@@ -2368,6 +2368,12 @@ model a two-CPU-cycle timer period. The original AA22 idle routine at
 at `02:98e4`, and executes IDLE1 at `02:98e9`. Thus the short timer is
 firmware-owned and is immediately followed by an intentional TINT mask;
 it is not an unexplained final configuration to replace with a slower rate.
+The same routine first reads `a531` with absolute LD `10f8 a531` and
+branches directly to IDLE1 when that word is nonzero. Only the zero path
+performs the setup above, then writes `a531=1` before sleeping. The
+read-only context tool pins the entire routine and its caller wrapper,
+including an exhaustive local zero/nonzero predicate. Other writers or
+resets of that flag are not yet a closed census.
 
 A read-only write/interrupt trace before the INTM guard correction observes
 this warm setup at 14.001318 seconds, then repeated TINT entry with return
@@ -2384,8 +2390,12 @@ gap, but its exact correction still requires a standalone timing fixture:
 do not simply defer an arbitrary number of instructions, change the timer
 divisor, or suppress interrupts at firmware PCs. Section 8.4.2 specifies
 the timer rate as CPU clock divided by `(TDDR+1)*(PRD+1)`, consistent with
-the short period. The next target is generic interrupt recognition/drain
-timing and its interaction with memory-mapped timer writes and IMR updates.
+the short period. The staged frontend now has executable original-vector,
+handler, worker, FRETE and recurring-interrupt coverage in
+[the CPU contract](rom4_dsp_loader.md). The native warm profile still uses
+the atomic frontend; the next boundary is the exact original idle-call
+composition and its memory-mapped timer/mask ordering, not an arbitrary
+post-return delay.
 The new diagnostic is intentionally not a passing save acceptance gate.
 The independent INTM-change protection fix passes pending-interrupt load,
 multiword-store and return fixtures, but the metadata diagnostic still has

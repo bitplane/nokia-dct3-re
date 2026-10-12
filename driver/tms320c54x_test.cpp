@@ -5001,6 +5001,46 @@ private:
 		m_phase = 252130; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_absolute_load(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = BIT(variant, 0), sxm = BIT(variant, 1);
+		u16 const value = std::array<u16, 4>{0, 0xffff, 0x8000, 0x1234}[(variant / 4) % 4];
+		u16 const address = BIT(variant, 2) ? 0x430 : 0xa531;
+		u32 const base = BIT(variant, 3) ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : b ? 0x11f8 : 0x10f8);
+		program.write_word(base + 0x601, address);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa61b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | (sxm ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0x123456789aULL : 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(address, value);
+		m_cpu->space(AS_DATA).write_word(0x650, 0xbad);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(address, address, "absolute_load_operand",
+			[this, value](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == 6, "Absolute LD samples its captured address once in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "absolute_load_literal",
+			[this, address](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == address && m_cpu->pipeline_cycles() == 3, "Absolute LD retains its literal as an operand word, not an opcode");
+				++m_pipeline_extensions_reads;
+			});
+		m_phase = 252150; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -27837,7 +27877,7 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
 				if (variant < 95) { start_pipeline_mu4_recurring_timer(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged recurring MU4 timer: PASS cases=96 returns_per_leg=8 periods=2 foreground_pages=2 sxm_states=2 control_outcomes=2 restore=96 exact_return_cycle=1 firmware_reseeding=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_absolute_load(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -27845,6 +27885,57 @@ private:
 		if (m_phase == 252140)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252130;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252150)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const b = BIT(variant, 0), sxm = BIT(variant, 1);
+			u16 const value = std::array<u16, 4>{0, 0xffff, 0x8000, 0x1234}[(variant / 4) % 4];
+			u16 const address = BIT(variant, 2) ? 0x430 : 0xa531;
+			u32 const base = BIT(variant, 3) ? 0x20000 : 0;
+			u64 const result = (sxm ? u64(s64(s16(value))) : u64(value)) & 0xffffffffffULL;
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 4, 6, 7}[variant / 16];
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 3) && m_pipeline_operand_reads == unsigned(cycle >= 6) &&
+				m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (cycle >= 7 ? result : 0x123456789aULL) &&
+				m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x4800 | (sxm ? 0x100 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x470,
+				"Absolute LD ignores DP/CPL, preserves context and uses retained address/data despite later memory changes");
+			if (cycle == 3 || cycle == 6)
+			{
+				auto const disable = machine().disable_side_effects();
+				if (cycle == 3) m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x650);
+				else m_cpu->space(AS_DATA).write_word(address, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save absolute LD literal assembly and sampled data");
+			}
+			if (cycle == 11)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_extensions_reads = unsigned(checkpoint >= 3); m_pipeline_operand_reads = unsigned(checkpoint >= 6);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore absolute LD without re-fetching the address or rereading source RAM");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252160;
+					m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_pipeline_absolute_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged absolute LD: PASS cases=64 accumulators=2 sxm_states=2 values=4 restore=64 duplicate_literal_fetches=0 duplicate_operand_reads=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252160)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252150;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
