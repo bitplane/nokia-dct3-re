@@ -2792,6 +2792,25 @@ the one-word form's program read, data write and single auxiliary update.
 Each replay leg has one program read and one destination write. General
 DAGEN conflict chains, conditional-execute placement, repeated READA and
 interrupt acceptance across the held bus remain unvalidated.
+
+Short non-delayed BANZ (`6c80`--`6c97`) retains its target literal, tests
+the selected auxiliary register before modification and owns its encoded
+update in Access. A taken branch discards the two sequential Decode slots;
+a zero predicate leaves the fall-through intact. SPRU172C page 4-16 assigns
+class 29A four taken/two not-taken clocks; the Access redirect models that
+gap without BC's additional conditional-evaluation bubble. Exact publication
+and bank arbitration remain partial.
+
+The 288 replay cases cover values 0/1/ffff, no modification/decrement/
+increment, encoded ARF=0/1, both CMPT states, pages 0/2 and four checkpoints
+around predicate/update/redirect. Tests distinguish zero-before-decrement
+from nonzero-after-decrement and one-before-decrement from zero-afterward.
+Only the selected AR changes, once, on either outcome; BANZ does not read or
+write data memory. Mutation of its target literal after Fetch cannot
+retarget it, and taken branches must not retire fall-through markers.
+Delayed/long-offset forms, repeat and control-delay placement fail closed.
+Preceding DAGEN-writer conflicts, conditional-execute placement and interrupt
+acceptance through the redirect remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

@@ -58,6 +58,11 @@ constexpr bool staged_read_a(u16 word)
 	return (word & 0xff00) == 0x7e00 && (u8(word) < 0x98 || u8(word) == 0xf8);
 }
 
+constexpr bool staged_banz(u16 word)
+{
+	return (word & 0xff00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98;
+}
+
 constexpr bool staged_mar(u16 word)
 {
 	return (word & 0xff00) == 0x6d00 &&
@@ -1999,6 +2004,22 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_word[1] = m_cache.read_word(physical_program_address(address));
 		}
 	}
+	if (m_pipeline_valid[3] && staged_banz(m_pipeline_word[3]))
+	{
+		// Class 29A tests the selected AR before its encoded modification.
+		// Access redirect gives taken/not-taken paths their two-clock gap;
+		// this stage placement remains a partial model, not silicon timing.
+		u8 const mode = m_pipeline_word[3];
+		bool const taken = m_ar[indirect_ar(mode)] != 0;
+		m_pipeline_immediate[3] = taken;
+		indirect_modify(mode);
+		if (taken)
+		{
+			m_pipeline_valid[2] = false;
+			m_pipeline_decode_flush = 1;
+			m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+		}
+	}
 	bool retd_delay_decode = false;
 	unsigned retd_delay_index = 0;
 	if (m_pipeline_retd_stage)
@@ -2084,7 +2105,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || staged_absolute_load(word) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_read_a(word) || word == 0xf070 || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_banz(word) || staged_read_a(word) || word == 0xf070 || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -2109,7 +2130,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if (m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf070 || m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -2173,7 +2194,7 @@ void tms320c54x_device::pipeline_step()
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
 		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x19;
 		bool const frame = (word & 0xff00) == 0xee00;
-		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word)));
+		bool const branch = staged_banz(word) || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word)));
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_pmst = word == 0x771d;
@@ -2220,7 +2241,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_control_address = m_pipeline_address[2];
 			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
-			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) ? 0 : 2;
+			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) || staged_banz(word) ? 0 : 2;
 			if (plain_return || (far_return && !delayed)) m_pipeline_flush_front = true;
 			if (delayed_return) m_pipeline_retd_stage = 1;
 		}
@@ -2593,6 +2614,8 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_flush_front = false;
 			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
+		else if (staged_banz(m_op))
+			++m_pc; // Predicate, AR modification and target ownership belong to Access.
 		else if (staged_conditional_branch(m_op))
 		{
 			++m_pc;

@@ -5608,6 +5608,44 @@ private:
 		m_phase = 252370; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_banz(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const value = std::array<u16, 3>{0, 1, 0xffff}[variant % 3];
+		unsigned const modification = (variant / 3) % 3, encoded = (variant / 9) % 2;
+		bool const compatibility = (variant / 18) % 2;
+		unsigned const selected = compatibility && !encoded ? 3 : encoded;
+		u32 const base = (variant / 36) % 2 ? 0x20000 : 0;
+		u16 const opcode = 0x6c00 | (modification == 0 ? 0x80 : modification == 1 ? 0x88 : 0x90) | encoded;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, opcode); program.write_word(base + 0x601, 0x700);
+		program.write_word(base + 0x602, 0xe811); program.write_word(base + 0x603, 0xe922);
+		program.write_word(base + 0x700, 0xe844); program.write_word(base + 0x740, 0xe866);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, compatibility ? 0x6608 : 0x608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == selected ? value : 0x410 + i * 0x10);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "banz_no_data_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ tests its AR without reading data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "banz_no_data_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ modifies its AR without a data-memory write"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "banz_literal",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == 0x700 && !m_pipeline_extensions_reads, "BANZ retains its single target literal"); ++m_pipeline_extensions_reads; });
+		m_vector_prefetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "banz_target",
+			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(value && word == 0xe844 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6, "Taken BANZ fetches its retained same-page target once"); ++m_pipeline_operand_reads; });
+		m_phase = 252390; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29047,13 +29085,58 @@ private:
 				if (variant == 191) osd_printf_info("TMS320C54x staged absolute READA AR1: PASS cases=192 source_pages=3 source_regions=2 ovly_states=2 consumer_gaps=4 restore=192 retained_accumulator_source=1 duplicate_program_reads=0 duplicate_register_writes=0\n");
 				if (variant < 239) { start_pipeline_read_a(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged short READA RAM: PASS cases=48 source_pages=3 source_regions=2 ovly_states=2 restore=48 retained_accumulator_source=1 postincrement_once=1 duplicate_program_reads=0 duplicate_data_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_banz(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252380)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252370;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252390)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			u16 const value = std::array<u16, 3>{0, 1, 0xffff}[variant % 3];
+			unsigned const modification = (variant / 3) % 3, encoded = (variant / 9) % 2;
+			bool const compatibility = (variant / 18) % 2;
+			unsigned const selected = compatibility && !encoded ? 3 : encoded;
+			u32 const base = (variant / 36) % 2 ? 0x20000 : 0;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 72;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short non-delayed BANZ has owned predicate, auxiliary update and branch flow");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x740); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZ target, before/after predicate and AR update, or redirect");
+			}
+			if (tick == 22)
+			{
+				expect(m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(value != 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (value ? 0x44 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == (value ? 0 : 0x22) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | ((compatibility ? encoded ? encoded : 3 : 0) << 13)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+					"BANZ uses the pre-modification condition and does not execute discarded fall-through instructions");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == selected ? u16(value + (modification == 1 ? -1 : modification == 2 ? 1 : 0)) : 0x410 + i * 0x10),
+					"BANZ modifies exactly the selected auxiliary once on either branch outcome");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BANZ without changing its target or repeating the auxiliary modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252400; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_pipeline_banz(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged BANZ: PASS cases=288 values=3 modifications=3 encoded_modes=2 cmpt_states=2 pages=2 restore=288 premodify_condition=1 duplicate_auxiliary_updates=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252400)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252390;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
