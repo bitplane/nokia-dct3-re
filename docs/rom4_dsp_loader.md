@@ -2488,8 +2488,22 @@ recovered recorder operand provenance.
 
 The logical and worker fixtures use ST1 bit 8 for SXM; bit 9 is OVM.
 The corrected 576-case matrix checks zero-extension against actual SXM.
-Full original outer-context composition on the body-entering route,
-timer/IRQ entry and coherent native recording remain unvalidated.
+The original outer-context handler is also composed with the active body:
+51 handler words plus all 38 worker words, rather than the former
+skip-body subset. The 128 cases cover pages 0/2, both saved INTM and SXM
+states, both CMPR/XC outcomes and eight replay checkpoints. Every leg
+requires sixteen ordered stack writes, eight ordered worker-source reads,
+six or seven worker RAM writes, one reserved-return read and one caller
+continuation fetch. The worker's B publications contain the handler's
+incremented `13572469` counter, while all original caller registers and
+ST0/ST1 are restored on return with SP=`1000`. The original compiler-mode
+reserved-return store and real caller restoration instructions execute;
+there is no synthetic continuation inside this composition.
+
+This closes the original outer-handler/body composition for the supplied
+CPU fixtures. Hardware timer/IRQ entry, real worker operand provenance,
+foreground progress under recurring interrupts and coherent native
+recording remain unvalidated; handsets and MU4 still use the atomic frontend.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
