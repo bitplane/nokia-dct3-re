@@ -5718,6 +5718,40 @@ private:
 		m_phase = 252410; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_absolute_add(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
+		u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
+		bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
+		u32 const base = BIT(variant, 8) ? 0x20000 : 0;
+		u16 const source = ram ? 0x500 : 0x11;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, b ? 0x01f8 : 0x00f8); program.write_word(base + 0x601, source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, operand);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? initial : 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x500, operand);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "absolute_add_operand",
+			[this, operand](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
+				"Absolute accumulator ADD owns one retained AR/RAM operand read"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "absolute_add_address_literal",
+			[this, source](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == source && !m_pipeline_extensions_reads,
+				"Absolute accumulator ADD does not refetch its source-address literal"); ++m_pipeline_extensions_reads; });
+		m_phase = 252430; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29255,13 +29289,67 @@ private:
 				if (variant == 383) osd_printf_info("TMS320C54x staged memory RPT READA: PASS cases=384 counts=4 source_pages=3 ovly_states=2 source_regions=2 count_sources=AR,RAM restore=384 retained_count=1 retained_program_pointer=1 duplicate_transfers=0\n");
 				if (variant < 399) { start_pipeline_memory_repeat_read_a(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged memory RPT interrupts: PASS cases=16 counts=4 sources=IRQ,NMI restore=16 deferred_until_final_write=1 one_word_continuation=1\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_absolute_add(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252420)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252410;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252430)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
+			u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
+			bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
+			u32 const base = BIT(variant, 8) ? 0x20000 : 0;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 6, 7, 8}[variant / 512];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute AR/RAM accumulator ADD is a retained arithmetic form");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x510); }
+			if (tick == 6)
+			{
+				if (ram) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x500, 0x1234); }
+				else m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1234);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save absolute ADD address, sampled operand or arithmetic publication");
+			}
+			if (tick == 20)
+			{
+				constexpr u64 mask = 0xffffffffffULL;
+				s64 const left = initial & 0x8000000000ULL ? s64(initial) - 0x10000000000LL : s64(initial);
+				s64 const right = sxm ? s16(operand) : operand;
+				s64 const sum = left + right;
+				bool const overflow = sum > 0x7fffffffLL || sum < -0x80000000LL;
+				bool const carry = u64(u32(initial)) + u32(right) > 0xffffffffULL;
+				u64 const expected = overflow && ovm ? (sum < 0 ? 0xff80000000ULL : 0x7fffffffULL) : u64(sum) & mask;
+				u16 const status = 0xa008 | (carry ? 0x800 : 0) | (overflow ? b ? 0x200 : 0x400 : 0);
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+					"Memory ADD retains its sampled operand and reproduces independent 40-bit result, carry, overflow and saturation expectations");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore memory ADD without repeating its read or arithmetic update");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252440; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 2047) { start_pipeline_absolute_add(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged absolute ADD: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=AR,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252440)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252430;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

@@ -2838,6 +2838,22 @@ are distinguished from copy-source reads. No source re-seeding, return
 guard or atomic fallback is used. General preceding-writer conflicts,
 conditional-execute placement and repeated register/peripheral publication
 are not established by these fixtures.
+
+Absolute accumulator ADD (`00f8`/`01f8`) retains its source-address literal,
+selects the AR0--AR7 or RAM operand in Access and samples it once in Read.
+Execute uses that word with the existing 40-bit ADD arithmetic; source
+mutation after Read cannot change the result. Other register/peripheral
+sources, shifted/short forms, repeat and control-delay placement remain
+excluded. This does not infer a physical MMR arbitration delay.
+
+The 2,048 replay cases cover four operands, four accumulator values (including
+32-bit overflow and 40-bit negative values), both SXM/OVM states, A/B,
+AR1/RAM sources, two pages and four checkpoints around operand ownership
+and retirement. Independent integer expectations verify the result, low-32
+carry, destination overflow flag and OVM saturation; the other accumulator,
+SP and unrelated status bits are preserved. Each leg has one literal fetch
+and one operand read. Conditional-execute placement, preceding accumulator/
+status-writer hazards and peripheral source timing remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
