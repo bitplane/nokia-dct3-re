@@ -5825,6 +5825,47 @@ private:
 		m_phase = 252470; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_port_write(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const mode = variant % 5;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 5) % 4];
+		bool const sxm = (variant / 20) % 2;
+		u32 const base = (variant / 40) % 2 ? 0x20000 : 0;
+		bool const absolute = mode == 0 || mode == 1 || mode == 4;
+		u16 const source = mode == 0 ? 8 : mode == 1 || mode == 2 ? 0x500 : mode == 3 ? 0x1020 : 0x25;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, absolute ? 0x75f8 : mode == 2 ? 0x7591 : 0x7520);
+		program.write_word(base + 0x601, absolute ? source : 0x124);
+		if (absolute) program.write_word(base + 0x602, 0x124);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (mode == 3 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, mode == 0 ? 0x1234560000ULL | value : 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		if (mode == 1 || mode == 2 || mode == 3) m_cpu->space(AS_DATA).write_word(source, value);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_port_writes = 0;
+		unsigned const read_cycle = absolute ? mode == 4 ? 8 : 7 : 6;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_portw_source",
+			[this, value, read_cycle](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
+				"PORTW reads its owned MMR/RAM/peripheral word exactly once before I/O publication"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_IO).install_write_tap(0x124, 0x125, "staged_portw_destination",
+			[this, value, read_cycle](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x124 && word == value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == read_cycle + 1,
+				"PORTW publishes its sampled word once through the retained I/O address, not a data-memory destination"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + (absolute ? 0x602 : 0x601), "staged_portw_literals",
+			[this, absolute, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_extensions_reads < (absolute ? 2 : 1) && word == (absolute && !m_pipeline_extensions_reads ? source : 0x124) &&
+				unsigned(at & 0xffff) == 0x601 + m_pipeline_extensions_reads, "PORTW retains source/port literals in their distinct original order"); ++m_pipeline_extensions_reads; });
+		m_phase = 252490; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29515,13 +29556,66 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 863) { start_pipeline_peripheral_logic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged peripheral logic: PASS cases=864 operations=AND,OR,XOR addressing_modes=3 operands=3 accumulators=2 sxm_states=2 pages=2 restore=864 extra_cycles=1 duplicate_reads=0 peripheral_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_port_write(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252480)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252470;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252490)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, mode = variant % 5;
+			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 5) % 4];
+			bool const sxm = (variant / 20) % 2, absolute = mode == 0 || mode == 1 || mode == 4;
+			u32 const base = (variant / 40) % 2 ? 0x20000 : 0;
+			u16 const source = mode == 0 ? 8 : mode == 1 || mode == 2 ? 0x500 : mode == 3 ? 0x1020 : 0x25;
+			unsigned const read_cycle = absolute ? mode == 4 ? 8 : 7 : 6;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 6, 7, 9}[variant / 80];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged PORTW owns separate source-data and destination-I/O transactions");
+			if (tick == (absolute ? 5 : 4))
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + (absolute ? 0x602 : 0x601), 0x125);
+				if (absolute) m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x510);
+			}
+			if (tick == read_cycle)
+			{
+				auto const disable = machine().disable_side_effects();
+				if (mode == 0) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+				else if (mode == 4) m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0x1234);
+				else m_cpu->space(AS_DATA).write_word(source, 0x1234);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_port_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PORTW literal assembly, source Read, paid wait or I/O publication");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (absolute ? 2 : 1) && m_port_writes == 1 && m_first_port_value == value &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == (mode == 2 ? 0x501 : 0x500) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (mode == 3 ? 0x4000 : 0)),
+					"PORTW retires the original sampled word/literals through a real I/O handler without duplicate access or auxiliary modification");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_port_writes = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore PORTW without re-reading its source or publishing another I/O write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252500; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 319) { start_pipeline_port_write(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged PORTW: PASS cases=320 source_modes=5 values=4 sxm_states=2 pages=2 restore=320 retained_literals=1 duplicate_source_reads=0 duplicate_io_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252500)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252490;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

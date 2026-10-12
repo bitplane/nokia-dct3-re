@@ -246,6 +246,11 @@ private:
 	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
 	unsigned m_staged_copy_reads = 0, m_staged_copy_writes = 0;
 	u16 m_staged_copy_word = 0;
+	void staged_unmodeled_port_w(u16 word)
+	{
+		// Diagnostic sink only: no peripheral state or response is invented.
+		logerror("mu4_staged_unmapped_port_write: port=0080 value=%04x write_context_pc=%06x device=unmodeled\n", word, unsigned(m_cpu->pc()));
+	}
 	unsigned native_worker_tail_ms() const { return system_bios() >= 7 ? 20000 : system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
 	void trace_native_iterator(char const *point)
 	{
@@ -1330,6 +1335,8 @@ private:
 			if (measurement_profile()) install_measurement_observers();
 			if (system_bios() == 26)
 			{
+				m_cpu->space(AS_IO).install_write_handler(0x80, 0x80,
+					write16smo_delegate(*this, FUNC(mu4_storage_test_state::staged_unmodeled_port_w)));
 				// Observation only: quantify the original reset copy, not just
 				// reaching the later unsupported opcode. No source-hole values assumed.
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x60, 0xff80, "staged_bootstrap_copy_source",

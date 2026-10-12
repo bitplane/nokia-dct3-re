@@ -2890,6 +2890,31 @@ counters: timer state import/export traverses MMIO. The tests do not establish
 GPIO `003c`'s electrical contract; the native bench maps it through the
 existing GPIO model. IRQ overlap and simultaneous peripheral read/write
 arbitration remain separate work.
+
+PORTW uses opcode family `75xx`, not MVKD (`70xx`). The short and absolute
+forms retain data-source and I/O-destination operands separately (SPRU172C
+page 4-130, class 28A/28B). Absolute `75f8` consumes source address, then
+port address; Access owns source addressing/modification, Read captures its
+word and Execute writes through AS_IO. Peripheral data sources use the
+existing extra-access-clock path. External READY/IOSTROBE timing is not
+modeled by these minimum-cycle fixtures. Repeat, long-offset and control-delay
+forms remain excluded.
+
+The 320 replay cases cover absolute low-accumulator/RAM/peripheral sources,
+short postincrement and compiler direct sources, four values, both SXM
+states, two pages and four ownership checkpoints. Each leg has the original
+literal order, one source read, one real I/O-handler write and at most one
+auxiliary update. Mutating the literals after assembly and source after Read
+cannot retarget/change the write. This is CPU transfer conformance, not
+validation of a connected peripheral's behavior.
+
+The MU4 diagnostic's `75f8 0008 0080` reads AL at data MMR `0008` and writes
+external port `0080`. That port has no modeled device; `bootrecstage` exposes
+an observation-only diagnostic sink with no invented state or response.
+A following unsupported Decode can stop an older accepted instruction before
+retirement, so advancing the reported opcode boundary alone does not prove
+the external write occurred. The current native run stops in that condition;
+the sink has not yet observed the write. Existing atomic profiles are unchanged.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

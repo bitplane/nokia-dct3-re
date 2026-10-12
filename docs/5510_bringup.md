@@ -2419,9 +2419,13 @@ Startup reaches the original `00:090f` routine and executes its compiler
 direct stack-frame decrement. It selects the modeled 95.9616 MHz PLL/system
 clock, still with zero NAND reads. OR *AR1,A at `00:0936` now reads GPIO
 address `003c` through the existing bench model with the staged peripheral
-access clock. The first unsupported instruction is `75f8 0008 0080` at
-`00:093b` (MVKD 0080,*(0008), a RAM-to-MMR move). The debugger context at
-failure is `00:093d`, not the opcode boundary. The initializer loop's complete
+access clock. `75f8 0008 0080` at `00:093b` is PORTW *(0008),0080 (AL to
+external I/O), not a data-to-data move. Its staged CPU transfer tests pass,
+but the native diagnostic stops on `7600 0001` at `00:0940` (compiler direct
+ST #1,0) while the older PORTW is still pending; no port `0080` write has yet
+been observed in this run. The port remains unmodeled, with a diagnostic-only
+sink rather than an invented peripheral response. The debugger context at
+failure is `00:0942`, not the opcode boundary. The initializer loop's complete
 runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2435,8 +2439,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. MVKD data-bus and MMR
-publication ownership need staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Compiler direct immediate
+store ownership needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
