@@ -2037,7 +2037,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
-			m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
+			m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 ||
 				(u8(m_pipeline_word[2]) < 0x98 && (BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))) ||
 			(staged_rmw(m_pipeline_word[2]) &&
@@ -2094,7 +2094,8 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word)));
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		bool const immediate_pmst = word == 0x771d;
+		if (m_pipeline_valid[2] && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2158,7 +2159,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_intm_follow = intm_bit;
 		}
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700)
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700 && m_pipeline_word[3] != 0x771d)
 	{
 		// SPRU131G 7.5.2: STM writes DAGEN in the opcode word's Read,
 		// coincident with Access of our retained two-word operation. An older
@@ -2485,7 +2486,12 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xff00) == 0xee00)
 			; // FRAME's SP update already belongs to its Access stage.
 		else if ((m_op & 0xff00) == 0x7700)
-			++m_pc; // Register write already committed in the opcode's Read stage.
+		{
+			// Non-DAGEN PMST retains its literal until Execute; do not
+			// inherit address-generator early publication. Phase is partial.
+			if (m_op == 0x771d) data_write(0x1d, m_pipeline_immediate[5]);
+			++m_pc;
+		}
 		else if (staged_move(m_op))
 			++m_pc; // Retained move already committed at its owned write clock.
 		else if ((m_op & 0xfe00) == 0x1000)

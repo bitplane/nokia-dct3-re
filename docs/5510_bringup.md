@@ -2407,8 +2407,9 @@ the CPU fixture does not close the metadata acceptance failure below.
 diagnostic using the same original upload, retained NAND and provisional
 shared-RAM composition as `bootrecsave`. It enables the staged frontend
 before reset-vector execution, without firmware-PC-conditioned switching or
-atomic fallback. Existing profiles remain atomic. The first unsupported
-instruction is `771d` at `00:ff80` (STM immediate to PMST); the serial entry
+atomic fallback. Existing profiles remain atomic. Reset's STM immediate to
+PMST now has staged conformance coverage. The first unsupported instruction
+is `f070` at `00:ff84` (long-immediate RPT); the serial entry
 at `00:0e41` has not executed. The terminal bootstrap-entry failure is
 expected evidence of this coverage boundary, not a passing recorder gate.
 
@@ -2421,8 +2422,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. PMST publication/mapping
-needs independent staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Repeat setup and retirement
+need independent staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 The new diagnostic is intentionally not a passing save acceptance gate.

@@ -5334,6 +5334,45 @@ private:
 		m_phase = 252250; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_pmst(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_pipeline_peripheral_case = variant;
+		u16 const value = std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa}[variant % 4];
+		u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
+		u16 const target = BIT(variant, 3) ? 0x8700 : 0x700;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(base + 0x9000 + i, 0xf495); program.write_word(base + target + i, 0xf495); program.write_word(target + i, 0xf495); }
+		std::array<u16, 5> const code{0x771d, value, 0xf495, 0xf073, target};
+		for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x9000 + i, code[i]);
+		program.write_word(base + target, 0xe844); program.write_word(target, 0xe811);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, value ^ 0x20);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_store_writes = m_pipeline_operand_reads = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x1d, 0x1d, "staged_pmst_publication",
+			[this, value](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == 7 && !m_pipeline_store_writes,
+					"STM PMST publishes its retained value once, separate from DAGEN early writes"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "staged_pmst_literal",
+			[this, value](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && !m_pipeline_operand_reads, "STM PMST fetches its original literal exactly once"); ++m_pipeline_operand_reads;
+			});
+		m_phase = 252270; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -28510,13 +28549,55 @@ private:
 				if (variant == 15) osd_printf_info("TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1\n");
 				if (variant < 19) { start_pipeline_original_idle(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged original idle zero/TINT: PASS cases=4 original_words=138 stack_alignments=2 restore=4 mask_drained=1 forced_continuation=0 native_profile_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_pmst(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252260)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252250;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252270)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			u16 const value = std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa}[variant % 4];
+			u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
+			unsigned const tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 8, 11}[variant / 16];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged PMST does not enable unsupported immediate register forms");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0xffff); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_pipeline_store_case = m_pipeline_store_writes; m_pipeline_branch_case = m_pipeline_operand_reads;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PMST literal, publication and subsequent mapping");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == value &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(value, 5) && !BIT(variant, 3) ? 0x11 : 0x44) &&
+					m_cpu->state_int(tms320c54x_device::STATE_XPC) == base >> 16 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+					"PMST changes subsequent lower program mapping only, retains IPTR bits and does not alter source XPC or status");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_store_writes = m_pipeline_store_case; m_pipeline_operand_reads = m_pipeline_branch_case;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore staged PMST without duplicate literal fetch or write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252280; m_check_timer->enable(true); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_pipeline_pmst(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252280)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252270;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

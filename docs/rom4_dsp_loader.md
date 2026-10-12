@@ -2680,7 +2680,21 @@ conflicts remain excluded or unvalidated. This covers the idle wrapper's
 far-call primitive, not execution of the complete original idle call.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
-other MMR destinations and indirect STM remain excluded from this frontend.
+PMST is the separately covered non-DAGEN exception below. Other MMR
+destinations and indirect STM remain excluded from this frontend.
+
+STM immediate to PMST (`771d`, class 12A in SPRU172C page 4-176) retains
+its second word and publishes once in Execute rather than inheriting DAGEN
+early writes. This publication phase is a declared partial model, not a
+measured PMST latency. Sixty-four replay cases cover four full register
+values, source pages 2/3, lower/upper program targets and four boundaries
+around literal assembly, publication and redirection. Changing the fixture
+literal after Fetch must not alter the write. Subsequent lower-bank fetches
+use the new OVLY bit; upper targets stay in their original logical page.
+The full PMST value (including IPTR), XPC, SP and ST1 reproduce without
+duplicate literal fetches or writes. IRQ/IPTR selection across an in-flight
+PMST write and execution already prefetched under another mapping remain
+unvalidated. No native production profile is promoted by these cases.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
