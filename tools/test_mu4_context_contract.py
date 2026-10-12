@@ -4,9 +4,26 @@ from tools.mu4_context_contract import BASE, MASK, WITNESS, contract, decode_wor
 from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worker_entry, worker_route
 from tools.mu4_context_contract import WORKER_TAIL_BASE, WORKER_TAIL_WITNESS, decode_worker_return, restored_intm
 from tools.mu4_context_contract import WORKER_COPY_BASE, WORKER_COPY_WITNESS, decode_worker_copy
+from tools.mu4_context_contract import WORKER_LOGIC_BASE, WORKER_LOGIC_WITNESS, decode_worker_logic
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_worker_tail_is_logical_not_memory_add_sub(self):
+        result = decode_worker_logic(dict(enumerate(WORKER_LOGIC_WITNESS, WORKER_LOGIC_BASE)))
+        self.assertEqual(result['matched_words'], 6)
+        self.assertEqual(result['sequence'], ['ADD #4,A', 'AND *AR2+,A', 'OR *AR2-,A', 'MAR *AR2-', 'STL A,*AR2'])
+        self.assertIn('zero-extend', result['memory_operands'])
+
+    def test_worker_logical_witness_mutation_and_absence(self):
+        for address in range(WORKER_LOGIC_BASE, WORKER_LOGIC_BASE + len(WORKER_LOGIC_WITNESS)):
+            words = dict(enumerate(WORKER_LOGIC_WITNESS, WORKER_LOGIC_BASE))
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_worker_logic(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_worker_logic(words)
+
     def words(self):
         return dict(enumerate(WITNESS, BASE))
 

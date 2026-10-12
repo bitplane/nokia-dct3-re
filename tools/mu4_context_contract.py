@@ -35,6 +35,23 @@ WORKER_TAIL_BASE = 0x23DDB
 WORKER_TAIL_WITNESS = (0x8A08, 0xF030, 0x0800, 0xF495, 0xFE00, 0xFD45, 0xF6BB)
 WORKER_COPY_BASE = 0x23DC5
 WORKER_COPY_WITNESS = (0x6B82, 0x0002, 0x4B92, 0x7182, 0x0013, 0x8B93)
+WORKER_LOGIC_BASE = 0x23DD5
+WORKER_LOGIC_WITNESS = (0xF000, 0x0004, 0x1892, 0x1A8A, 0x6D8A, 0x8082)
+
+
+def decode_worker_logic(words):
+    for offset, expected in enumerate(WORKER_LOGIC_WITNESS):
+        address = WORKER_LOGIC_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'worker logical witness changed or absent at {address:06x}')
+    return {
+        'matched_word_range': ['023dd5', '023dda'],
+        'matched_words': len(WORKER_LOGIC_WITNESS),
+        'sequence': ['ADD #4,A', 'AND *AR2+,A', 'OR *AR2-,A', 'MAR *AR2-', 'STL A,*AR2'],
+        'memory_operands': 'AND and OR zero-extend their Smem words independently of SXM',
+        'pointer_effect': 'increment, decrement, decrement; final store uses initial AR2 minus one',
+        'scope': 'six pinned words; memory meanings and complete worker/recorder behavior unclassified',
+    }
 
 
 def decode_worker_copy(words):
@@ -172,6 +189,7 @@ def contract(source):
     result['worker_entry'] = decode_worker_entry(words)
     result['worker_return'] = decode_worker_return(words)
     result['worker_copy'] = decode_worker_copy(words)
+    result['worker_logic'] = decode_worker_logic(words)
     return result
 
 

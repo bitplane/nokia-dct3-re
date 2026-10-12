@@ -44,6 +44,11 @@ constexpr bool staged_long_mar(u16 word)
 	return (word & 0xfff8) == 0x6de8;
 }
 
+constexpr bool staged_short_logic(u16 word)
+{
+	return ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && u8(word) < 0x98;
+}
+
 constexpr bool staged_xc(u16 word)
 {
 	u16 const form = word & ~u16(0x0200);
@@ -2059,7 +2064,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xfcf8) != 0xf4a8 && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2094,7 +2099,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || data_push || data_pop)
+			if (staged_short_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || data_push || data_pop)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -2164,7 +2169,7 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
+		staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
@@ -2242,14 +2247,19 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
-	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
+	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[3]) ||
 		(staged_rmw(m_pipeline_word[3]) && u8(m_pipeline_word[3]) != 0xf8)))
 	{
 		u8 const mode = m_pipeline_word[3];
 		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode);
-		m_pipeline_operand_address[3] = (m_pipeline_word[3] & 0xfe00) == 0x1000
+		m_pipeline_operand_address[3] = (m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[3])
 			? basic_address(3, mode) : short_smem_address(mode);
+		if (staged_short_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported\n", machine().describe_context());
@@ -2257,7 +2267,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
 	}
-	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 ||
+	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[4]) ||
 		staged_rmw(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x5600)
@@ -2462,6 +2472,13 @@ void tms320c54x_device::pipeline_step()
 			++m_pc;
 			unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
 			accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
+		}
+		else if (staged_short_logic(m_op))
+		{
+			u64 &destination = accumulator(BIT(m_op, 8));
+			u64 const operand = m_pipeline_operand[5]; // Logical Smem is zero-extended, independent of SXM.
+			unsigned const operation = (m_op >> 9) & 3;
+			destination = (operation == 0 ? destination & operand : operation == 1 ? destination | operand : destination ^ operand) & ACC_MASK;
 		}
 		else if ((m_op & 0xfcf8) == 0xf4a8)
 			m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);

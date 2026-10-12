@@ -2388,8 +2388,8 @@ publications with a neutral gap; that gap does not claim to execute the
 original intervening CMPR. All 75 cases preserve register/status values and
 produce no duplicate writes on replay. Source-register producer latency,
 extended modes and physical bus placement remain unvalidated; T/TRN stores
-are limited to RAM destinations. Later worker arithmetic remains a
-separate instruction-ownership requirement.
+are limited to RAM destinations. Full worker composition remains a
+separate acceptance requirement.
 
 Staged CMPR samples unsigned ARx/AR0 in Access and retains its predicate
 until Execute changes TC, without re-reading live address registers
@@ -2434,8 +2434,35 @@ an accepted store publishes the captured source at `046e`, despite the
 same-clock long MAR update, while a rejected store leaves that location
 untouched. Each replay performs one data read and zero or one store.
 Circular/bit-reversed/AR0-indexed MAR forms, absolute MAR and general
-producer conflicts remain excluded. Later ADD/SUB worker instructions,
-full worker composition and live native recording remain separate gaps.
+producer conflicts remain excluded. Full worker composition and live
+native recording remain separate gaps.
+
+The original worker's `1892` and `1a8a` are **AND** `*AR2+,A` and
+**OR** `*AR2-,A`, not memory ADD/SUB. SPRU172C syntax-1 logical opcode
+diagrams and the existing atomic decoder agree. The six words at
+`02:3dd5`--`02:3dda` are now pinned by the read-only context tool:
+`f000 0004 1892 1a8a 6d8a 8082`. The immediate operation is ADD #4;
+the following memory operations perform mask/merge, not arithmetic.
+Operand meanings remain unclassified.
+
+Staged short AND/OR/XOR A/B now retain their Access-stage address and
+Read-stage zero-extended word, then operate on the selected accumulator
+in Execute without changing status flags. Basic DP/CPL sampling and
+short AR updates use the existing LD address path. The 576 replay cases
+cover three operations, both accumulators, four addressing forms, four
+value pairs and both SXM states. Changing source RAM after Read must not
+alter the result; the unselected accumulator and status remain unchanged.
+Register/peripheral operands, extended forms and general source-producer
+latencies remain excluded or unvalidated.
+
+Five cases execute the contiguous original six-word logical tail on
+page 2. With A=`1234`, AR2=`0470`, mask=`ff0f` and merge word=`00f0`,
+the result is `12f8`, written at `046f`. Both memory operands are changed
+after Read and AR2 changes after the final destination capture; neither
+mutation may affect the retained result or store. Replay around both
+logical reads and the final store requires exactly two reads and one
+write. This closes the selected tail composition, not the complete
+zero-control worker, IRQ entry or a native recorder transaction.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.

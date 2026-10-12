@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_worker_1892_1a8a_are_memory_add_sub",
+      "status": "disproven",
+      "hypothesis": "The original R060 worker words 1892 and 1a8a require staged memory ADD and SUB",
+      "conclusion": "TI SPRU172C syntax-1 logical opcode diagrams and the existing atomic decoder identify these words as AND *AR2+,A and OR *AR2-,A. The original upload pins the contiguous tail f000 0004 1892 1a8a 6d8a 8082: immediate ADD #4 followed by logical mask/merge and a pointer modification/store. Staged logical operands are zero-extended regardless of SXM. The read-only context tool rejects every mutated or absent witness word; 576 CPU replay cases cover the logical families, and five original-tail cases compose adjacent operations with retained reads and a final captured destination. This corrects the roadmap premise; it does not assign meanings to the input words or prove complete worker/recorder behavior.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "c54x_popm_dagen_writes_only_in_execute",
       "status": "disproven",
       "hypothesis": "Staged POPM writes every supported MMR destination in Execute after its Read-stage stack sample",
