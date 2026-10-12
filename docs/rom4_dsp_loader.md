@@ -2871,6 +2871,25 @@ later context changes survive. This is a CPU ownership fixture, not a
 firmware-state intervention. General SP-producer/stack interleavings,
 memory-sourced DP forwarding, conditional-execute placement and RMW
 peripheral arbitration remain unvalidated.
+
+Short accumulator AND/OR/XOR now admit peripheral-window sources
+`0020`--`005f` through the same paid extra-access-clock path as peripheral
+loads. Lower register sources remain excluded. Access owns the effective
+address and auxiliary modification; the wait holds the stages without
+issuing a read, then Read samples the peripheral once and Execute consumes
+the retained zero-extended word. This models CPU access cost, not a specific
+peripheral's electrical response latency or bus-priority arbitration.
+
+The 864 replay cases cover three operations, DP direct/indirect/postincrement
+addressing, three PRD values, A/B, both SXM states, two pages and four
+checkpoints before/during/after the wait and publication. Each instruction
+has one peripheral read, no peripheral write and at most one auxiliary
+update. A later PRD mutation cannot change the retained logical result.
+Fixture mutations and debugger peeks are excluded from instruction bus
+counters: timer state import/export traverses MMIO. The tests do not establish
+GPIO `003c`'s electrical contract; the native bench maps it through the
+existing GPIO model. IRQ overlap and simultaneous peripheral read/write
+arbitration remain separate work.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

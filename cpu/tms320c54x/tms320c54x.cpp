@@ -1953,7 +1953,7 @@ void tms320c54x_device::pipeline_step()
 		return;
 	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
-		((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || (m_pipeline_word[3] & 0xff80) == 0x4600) &&
+		((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || (m_pipeline_word[3] & 0xff80) == 0x4600) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		(staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
@@ -2430,7 +2430,7 @@ void tms320c54x_device::pipeline_step()
 		if (preincrement) indirect_modify(mode);
 		bool const absolute = staged_absolute_load(m_pipeline_word[3]);
 		m_pipeline_operand_address[3] = absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
-		if (staged_short_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < 0x60)
+		if (staged_short_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < 0x20)
 		{
 			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());
 			m_illegal = true; return;

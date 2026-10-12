@@ -5791,6 +5791,40 @@ private:
 		m_phase = 252450; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_peripheral_logic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const operation = variant % 3, mode = (variant / 3) % 3;
+		u16 const operand = std::array<u16, 3>{0xf0, 0x8000, 0xffff}[(variant / 9) % 3];
+		bool const b = (variant / 27) % 2, sxm = (variant / 54) % 2;
+		u32 const base = (variant / 108) % 2 ? 0x20000 : 0;
+		u16 const opcode = std::array<u16, 3>{0x1800, 0x1a00, 0x1c00}[operation] | (b ? 0x100 : 0) | (mode == 0 ? 0x25 : mode == 1 ? 0x81 : 0x91);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		std::array<u16, 4> const code{0x7711, 0x25, u16(b ? 0xe955 : 0xe855), opcode};
+		for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x600 + i, code[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, operand);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x410);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0 : 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x25, 0x26, "peripheral_logic_read",
+			[this, operand](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x25 && word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 9,
+				"Peripheral logical operand is read once after exactly one paid access clock"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x25, 0x26, "peripheral_logic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Accumulator logic must not write its peripheral operand"); });
+		m_phase = 252470; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29438,13 +29472,56 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 767) { start_pipeline_direct_rmw(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged direct RMW: PASS cases=768 operations=ANDM,ORM,ADDM offsets=2 values=4 immediates=2 cpl_states=2 pages=2 restore=768 retained_context=1 duplicate_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_peripheral_logic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252460)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252450;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252470)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, operation = variant % 3, mode = (variant / 3) % 3;
+			u16 const operand = std::array<u16, 3>{0xf0, 0x8000, 0xffff}[(variant / 9) % 3];
+			bool const b = (variant / 27) % 2, sxm = (variant / 54) % 2;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = 7 + variant / 216;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Peripheral logical forms use the shared single-access-clock path");
+			if (tick < 9) expect(!m_pipeline_operand_reads, "The paid wait does not issue an early peripheral read");
+			if (tick == 9) { auto const disable = machine().disable_side_effects(); m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0x1234); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_pipeline_branch_case = m_pipeline_operand_reads;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save peripheral logic before wait, held stage, retained read or publication");
+			}
+			if (tick == 20)
+			{
+				u64 const expected = operation == 0 ? 0x55 & operand : operation == 1 ? 0x55 | operand : 0x55 ^ operand;
+				auto const disable = machine().disable_side_effects();
+				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (mode == 2 ? 0x26 : 0x25) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0x1234,
+					"Peripheral AND/OR/XOR zero-extend the sampled word, preserve status and modify an indirect source only once");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_pipeline_branch_case;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore paid peripheral wait and operand without duplicate read or modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252480; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 863) { start_pipeline_peripheral_logic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged peripheral logic: PASS cases=864 operations=AND,OR,XOR addressing_modes=3 operands=3 accumulators=2 sxm_states=2 pages=2 restore=864 extra_cycles=1 duplicate_reads=0 peripheral_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252480)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252470;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
