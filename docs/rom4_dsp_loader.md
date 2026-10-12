@@ -2769,6 +2769,29 @@ provisioning. Each leg verifies one source read, only the selected auxiliary
 register's update and preservation of unrelated ST0/ST1 bits. Mutation after
 Read cannot alter the loaded accumulator. General ST0-load/ARP conflicts,
 CMPT-change hazards and interrupt acceptance during publication remain open.
+
+READA (`7exx`) captures accumulator A as its program address; extended
+devices use A(22:0), independent of the instruction's XPC (SPRU172C page
+4-136). The short destination forms and absolute `7ef8 dmad` retain their
+data destination separately. Four extra held Read clocks model the
+instruction's documented non-repeat cost; A is sampled after older Execute
+publications, then the selected program word is retained for one Execute
+write. Sampling and bus placement remain partial, not measured silicon
+phases. RAM and AR0--AR7 destinations are admitted; other register/peripheral
+destinations, long-offset forms, repeat and control-delay placement fail
+closed.
+
+The 192 absolute-to-AR1 replay cases compose a preceding ADD #1,A with
+READA, three source pages (0/2/7f), lower/upper program regions, both OVLY
+states, zero through three consumer gaps and four checkpoints. Mutation of
+A after source capture and program RAM after Read cannot retarget the
+transfer. Younger indirect consumers with zero/one gap retain their old
+AR1 address; two/three gaps select the published pointer under the declared
+stage model. Forty-eight short RAM/postincrement cases independently check
+the one-word form's program read, data write and single auxiliary update.
+Each replay leg has one program read and one destination write. General
+DAGEN conflict chains, conditional-execute placement, repeated READA and
+interrupt acceptance across the held bus remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
