@@ -5899,6 +5899,51 @@ private:
 		m_phase = 252510; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static u16 stlm_fixture_value(unsigned variant)
+	{
+		unsigned const pattern = (variant / 16) % 4;
+		if (!((variant / 128) % 2)) return pattern == 3 ? 0xf495 : 0x1200;
+		if (pattern == 0) return 0x1200;
+		if (!((variant / 64) % 2) || pattern == 1) return 0xffff;
+		return pattern == 2 ? 0 : 0xf495;
+	}
+	void start_pipeline_stlm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const reg = variant % 8, source = (variant / 8) % 2, gap = (variant / 64) % 4;
+		u64 const value = std::array<u64, 4>{0x1200, 0x0180001200ULL, 0xff7fff1200ULL, 0xfffffff495ULL}[(variant / 16) % 4];
+		u16 const result = stlm_fixture_value(variant), pointer = gap < 2 ? 0x1000 : result;
+		u16 const sample = pointer == 0 ? 0 : pointer == 0x1000 ? 0xaaaa : 0xbbbb;
+		u32 const base = reg & 1 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x8810 | (source << 8) | reg);
+		program.write_word(base + 0x601 + gap, 0x1080 | ((source ^ 1) << 8) | reg);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 128) % 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | (((variant / 64) % 2) << 8));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, source ? 0xdead : value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, source ? value : 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + reg, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0xaaaa);
+		if (result >= 0x60) m_cpu->space(AS_DATA).write_word(result, 0xbbbb);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_indirect_consumer",
+			[this, pointer, sample, gap](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == pointer && word == sample && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 6 + gap,
+					"STLM has no destination read; following indirect load obeys the two-instruction AR latency"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x10, 0x17, "stlm_ar_publication",
+			[this, reg, result](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x10 + reg && word == result && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6,
+					"STLM publishes its saturated low accumulator word once in Execute, independent of DP/CPL"); ++m_pipeline_store_writes; });
+		m_phase = 252530; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29695,13 +29740,54 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 127) { start_pipeline_direct_immediate_store(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged direct immediate ST: PASS cases=128 values=4 offsets=2 cpl_states=2 pages=2 restore=128 retained_context=1 destination_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_stlm(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252520)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252510;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252530)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, reg = variant % 8, source = (variant / 8) % 2, gap = (variant / 64) % 4;
+			u64 const value = std::array<u64, 4>{0x1200, 0x0180001200ULL, 0xff7fff1200ULL, 0xfffffff495ULL}[(variant / 16) % 4];
+			u16 const pointer = gap < 2 ? 0x1000 : stlm_fixture_value(variant);
+			u16 const sample = pointer == 0 ? 0 : pointer == 0x1000 ? 0xaaaa : 0xbbbb;
+			u64 const loaded = ((variant / 64) % 2 && BIT(sample, 15)) ? 0xffffff0000ULL | sample : sample;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{3, 5, 6}[variant / 256];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Direct STLM AR destinations have staged ownership");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save STLM after Decode, Read or Execute");
+			}
+			if (tick == 24)
+			{
+				expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == stlm_fixture_value(variant) &&
+					m_cpu->state_int(source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value &&
+					m_cpu->state_int(source ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == loaded,
+					"STLM preserves its source and publishes saturation independently of the younger consumer");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore STLM without duplicate reads or writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252540; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_pipeline_stlm(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged STLM AR: PASS cases=768 registers=8 accumulators=2 patterns=4 sst=0,1 sxm=0,1 gaps=0,1,2,3 restore=768 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252540)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252530;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

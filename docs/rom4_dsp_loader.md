@@ -2933,6 +2933,25 @@ and peripheral-write arbitration remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
+Direct STLM A/B to AR0-AR7 publishes the saturated low accumulator word in
+Execute, with no destination read and no DP/CPL-derived address. SPRU172C
+4-175 establishes page-zero addressing; SPRU131G 4.3.3 establishes SST/SXM
+saturation, table 7-5 places store-type DAGEN writes in Execute, and table
+7-7 requires two intervening instructions for a normal indirect AR consumer.
+The source/saturation phase remains this partial frontend's Execute model,
+not an independently measured silicon phase. Indirect STLM and other MMR
+destinations remain unsupported. STLM also participates in the existing
+DAGEN-bank conflict checks for younger STM, MVDK and POPM early writes.
+
+The 768 replay cases cover all eight AR destinations, both source
+accumulators, four input patterns, both SST/SXM states, zero through three
+intervening NOPs and saves after Decode, Read or Execute. Each leg verifies
+one register write, one consumer read, an unchanged source accumulator and
+the old/new pointer boundary at two intervening instructions. Original MU4
+startup advances through `8811` at `00:3092` and fails closed on long-offset
+DST `4ee1` at `00:309b`. This remains coverage evidence, not native startup
+or recorder acceptance; existing atomic profiles are unchanged.
+
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
 decrement at 5, vector Fetch/IACK and the older decoded foreground instruction's

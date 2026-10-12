@@ -2423,10 +2423,11 @@ access clock. `75f8 0008 0080` at `00:093b` is PORTW *(0008),0080 (AL to
 external I/O), not a data-to-data move. Compiler direct `7600 0001` at
 `00:0940` now has staged ownership/replay coverage, and the original PORTW
 retires: the diagnostic sink records port `0080`, value `00df`. This is an
-observed I/O write, not a modeled external-device response. The first
-unsupported instruction is `8811` at `00:3092` (STLM A,AR1), after the
-called routine's stack prologue. The debugger context at failure is
-`00:3094`, not the opcode boundary. The initializer loop's complete runtime
+observed I/O write, not a modeled external-device response. Direct STLM to
+AR0-AR7 now has staged saturation, consumer-latency and save/replay coverage,
+including `8811` at `00:3092` (STLM A,AR1). The first unsupported instruction
+is `4ee1` at `00:309b`, a long-offset DST form. The debugger context at
+failure is `00:309d`, not the opcode boundary. The initializer loop's complete runtime
 effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2440,8 +2441,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. Accumulator-to-MMR STLM
-publication and consumer ownership need staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Long-offset DST address,
+pair-publication and consumer ownership need staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
