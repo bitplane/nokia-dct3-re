@@ -33,6 +33,25 @@ WORKER_WITNESS = (0xFD00, 0x4A07, 0xFD00, 0xF7BB, 0x7192, 0x0010,
                   0x1092, 0xF844, 0x3DDB)
 WORKER_TAIL_BASE = 0x23DDB
 WORKER_TAIL_WITNESS = (0x8A08, 0xF030, 0x0800, 0xF495, 0xFE00, 0xFD45, 0xF6BB)
+WORKER_COPY_BASE = 0x23DC5
+WORKER_COPY_WITNESS = (0x6B82, 0x0002, 0x4B92, 0x7182, 0x0013, 0x8B93)
+
+
+def decode_worker_copy(words):
+    for offset, expected in enumerate(WORKER_COPY_WITNESS):
+        address = WORKER_COPY_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'worker copy witness changed or absent at {address:06x}')
+    return {
+        'matched_word_range': ['023dc5', '023dca'],
+        'matched_words': len(WORKER_COPY_WITNESS),
+        'sequence': ['ADDM #2,*AR2', 'PSHD *AR2+', 'MVDK *AR2,AR3', 'POPD *AR3+'],
+        'source_update': 'ADDM applies SXM/OVM arithmetic and C/OVA flags',
+        'destination_pointer': 'second source word, loaded into AR3',
+        'local_stack_effect': 'one word pushed and popped',
+        'daram_order': 'PSHD samples the old source before concurrent ADDM Write',
+        'scope': 'six pinned words; operand meanings, real inputs, later body and recorder completion unclassified',
+    }
 
 
 def restored_intm(saved_status):
@@ -152,6 +171,7 @@ def contract(source):
     result = decode_words(words)
     result['worker_entry'] = decode_worker_entry(words)
     result['worker_return'] = decode_worker_return(words)
+    result['worker_copy'] = decode_worker_copy(words)
     return result
 
 

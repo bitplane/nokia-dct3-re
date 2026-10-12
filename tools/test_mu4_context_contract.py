@@ -3,6 +3,7 @@ import unittest
 from tools.mu4_context_contract import BASE, MASK, WITNESS, contract, decode_words, route_for_status
 from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worker_entry, worker_route
 from tools.mu4_context_contract import WORKER_TAIL_BASE, WORKER_TAIL_WITNESS, decode_worker_return, restored_intm
+from tools.mu4_context_contract import WORKER_COPY_BASE, WORKER_COPY_WITNESS, decode_worker_copy
 
 
 class ContextContractTest(unittest.TestCase):
@@ -99,6 +100,28 @@ class ContextContractTest(unittest.TestCase):
             del words[address]
             with self.assertRaises(ValueError):
                 decode_worker_return(words)
+
+
+    def test_original_worker_copy_word_ownership(self):
+        result = decode_worker_copy(dict(enumerate(WORKER_COPY_WITNESS, WORKER_COPY_BASE)))
+        self.assertEqual(result['matched_words'], 6)
+        self.assertEqual(result['sequence'], ['ADDM #2,*AR2', 'PSHD *AR2+', 'MVDK *AR2,AR3', 'POPD *AR3+'])
+        self.assertIn('old source', result['daram_order'])
+        self.assertIn('operand meanings', result['scope'])
+
+    def test_worker_copy_witness_mutation(self):
+        for address in range(WORKER_COPY_BASE, WORKER_COPY_BASE + len(WORKER_COPY_WITNESS)):
+            words = dict(enumerate(WORKER_COPY_WITNESS, WORKER_COPY_BASE))
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_worker_copy(words)
+
+    def test_worker_copy_witness_absence(self):
+        for address in range(WORKER_COPY_BASE, WORKER_COPY_BASE + len(WORKER_COPY_WITNESS)):
+            words = dict(enumerate(WORKER_COPY_WITNESS, WORKER_COPY_BASE))
+            del words[address]
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_worker_copy(words)
 
 
 if __name__ == '__main__':

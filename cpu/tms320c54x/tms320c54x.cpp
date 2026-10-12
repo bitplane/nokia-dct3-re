@@ -2027,6 +2027,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_alu = staged_immediate_alu(word);
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
+		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
 		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
 			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
 		bool const frame = (word & 0xff00) == 0xee00;
@@ -2034,7 +2035,7 @@ void tms320c54x_device::pipeline_step()
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
 		if (m_pipeline_valid[2] && word != 0xf495 && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -2068,7 +2069,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || data_push)
+			if (short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || data_push || data_pop)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -2138,7 +2139,7 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3])))
+		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
@@ -2150,6 +2151,17 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_operand[3] < 0x60)
 		{
 			logerror("%s: staged PSHD register/peripheral source is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (BIT(mode, 7)) indirect_modify(mode);
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x8b00)
+	{
+		u8 const mode = m_pipeline_word[3];
+		m_pipeline_operand_address[3] = basic_address(3, mode);
+		if (m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged POPD register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (BIT(mode, 7)) indirect_modify(mode);
@@ -2225,10 +2237,16 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = data_read(u8(m_pipeline_word[4]));
 		m_pipeline_operand_address[4] = --m_sp;
 	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x8a00)
+	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xff00) == 0x8a00 || (m_pipeline_word[4] & 0xff00) == 0x8b00))
 	{
-		// Class 17A: retain the stack word before committing its register
-		// destination. SP/XPC/control destinations are excluded at Decode.
+		// Class 17A: retain the stack word before destination publication.
+		// Read-owned SP increment is a partial placement model; POPM excludes
+		// SP/XPC/control destinations and POPD is bounded to RAM.
+		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
+		{
+			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		m_pipeline_operand[4] = data_read(m_sp++);
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
@@ -2346,6 +2364,8 @@ void tms320c54x_device::pipeline_step()
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if ((m_op & 0xff00) == 0x8a00)
 			data_write(u8(m_op), m_pipeline_operand[5]);
+		else if ((m_op & 0xff00) == 0x8b00)
+			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if ((m_op & 0xfc80) == 0x8000)
 			data_write(m_pipeline_operand_address[5],
 				u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));

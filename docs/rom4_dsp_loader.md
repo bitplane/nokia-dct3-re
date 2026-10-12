@@ -2359,6 +2359,23 @@ Peripheral sources, extended addressing, general stack/DAGEN conflicts and
 physical bank arbitration remain excluded or unvalidated; these fixtures do
 not execute the complete zero-control-word worker body or native recorder.
 
+Short RAM POPD retains a captured destination and one stack sample before
+publication (SPRU172C page 4-127, class 17A). Its Read-owned SP increment
+shares the partial POPM placement model, rather than asserting a measured
+silicon update phase. Thirty-two cases cover DP/compiler-relative and
+stationary/postincrement AR3 destinations with four replay boundaries;
+six compiler-mode consumers verify one-clock Category-I SP latency.
+Twelve cases execute the original six words at `02:3dc5`--`02:3dca`:
+ADDM #2,*AR2; PSHD *AR2+; MVDK *AR2,AR3; POPD *AR3+.
+Both SXM states retain the old source word for the stack copy, while ADDM
+updates source RAM and its arithmetic flags. MVDK loads the second source
+word as the destination pointer; POPD writes to that captured address despite
+AR3 postincrement. All 50 cases require one stack consumption/publication,
+no duplicate replay access and preserved non-arithmetic context. The static
+context tool pins the six original words, but does not assign meanings to
+the operands. Peripheral/extended destinations, general stack/DAGEN/bank
+conflicts and the remaining worker body/native recorder remain unvalidated.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute

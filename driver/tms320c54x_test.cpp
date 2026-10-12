@@ -4364,6 +4364,77 @@ private:
 		m_phase = 251910; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_data_pop(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const copy = variant >= 38, follower = variant >= 32 && !copy;
+		unsigned const form = variant < 32 ? variant / 8 : 2, gap = follower ? (variant - 32) & 1 : 0;
+		u16 const destination = copy ? 0x550 : form == 1 ? 0x1020 : 0x470;
+		u16 const stack = copy ? 0xfff : 0x1000;
+		u16 const word = copy ? (BIT(variant - 38, 0) ? 0xffff : 0x1234) : follower ? 0xbeef : BIT(variant, 0) ? 0xbeef : 0x123;
+		u32 const origin = copy ? 0x23dc5 : 0x600; auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(origin + i, 0xf495);
+		if (copy)
+		{
+			std::array<u16, 6> const original{0x6b82, 2, 0x4b92, 0x7182, 0x0013, 0x8b93};
+			for (unsigned i = 0; i < original.size(); ++i) program.write_word(origin + i, original[i]);
+		}
+		else program.write_word(origin, std::array<u16, 4>{0x8b70, 0x8b20, 0x8b83, 0x8b93}[form]);
+		if (follower) program.write_word(origin + 1 + gap, 0x1027);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa208);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (variant >= 44 ? 0x800 : 0x900) | (form == 1 || follower ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, copy ? 0x620 : 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		auto &data = m_cpu->space(AS_DATA);
+		data.write_word(destination, 0xaaaa); data.write_word(stack, word);
+		data.write_word(0x1027, 0x1111); data.write_word(0x1028, 0x2222);
+		if (copy) { data.write_word(0x470, word); data.write_word(0x471, destination); }
+		m_cpu->set_state_int(STATE_GENPC, origin); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x470, 0x1028, "popd_sources",
+			[this, stack, word, copy, follower, gap, destination](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == stack)
+				{
+					expect(value == word && m_cpu->pipeline_cycles() == (copy ? 10 : 5), "POPD samples one retained stack word"); ++m_pipeline_operand_reads;
+				}
+				else if (copy && (address == 0x470 || address == 0x471))
+				{
+					expect(value == (address == 0x471 ? destination : word) && m_cpu->pipeline_cycles() == 6 + m_pipeline_extensions_reads, "Original descriptor copy samples old ADDM/PSHD word then its destination pointer"); ++m_pipeline_extensions_reads;
+				}
+				else if (follower && (address == 0x1027 || address == 0x1028))
+				{
+					expect(address == (gap ? 0x1028 : 0x1027) && value == (gap ? 0x2222 : 0x1111) && m_cpu->pipeline_cycles() == 6 + gap, "POPD preserves one-clock Category-I SP-consumer latency"); ++m_pipeline_extensions_reads;
+				}
+			});
+		m_pipeline_write_tap = data.install_write_tap(0x470, 0x1028, "popd_publications",
+			[this, word, copy, destination](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == destination)
+				{
+					expect(value == word && m_cpu->pipeline_cycles() == (copy ? 11 : 6) && m_pipeline_operand_reads == 1, "POPD publishes its retained stack sample to the captured destination once"); ++m_pipeline_store_writes;
+				}
+				else if (copy && address == 0x470)
+				{
+					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_extensions_reads == 2, "Descriptor source update follows the old-word PSHD sample"); ++m_pipeline_register_writes;
+				}
+				else if (copy && address == 0xfff)
+				{
+					expect(value == word && m_cpu->pipeline_cycles() == 8, "Descriptor copy pushes its retained old source word"); ++m_pipeline_drained_fetches;
+				}
+			});
+		m_phase = 251930; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -26545,13 +26616,65 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 11) { start_pipeline_retd_data_order(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged RETD DARAM ordering: PASS cases=12 adjacent_old_word=6 nop_new_word=6 restore=12 duplicate_accesses=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_data_pop(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251920)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251910;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251930)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			bool const copy = variant >= 38, follower = variant >= 32 && !copy;
+			unsigned const form = variant < 32 ? variant / 8 : 2, gap = follower ? (variant - 32) & 1 : 0;
+			u16 const stack = copy ? 0xfff : 0x1000;
+			u64 const checkpoint = copy ? 8 + ((variant - 38) / 2) % 3 : follower ? 4 + (variant - 32) / 2 : 3 + ((variant >> 1) & 3);
+			auto const sources_at = [copy, follower, gap](u64 clock) { return copy ? unsigned(clock >= 6) + unsigned(clock >= 7) + unsigned(clock >= 8) : unsigned(follower && clock >= 6 + gap); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= (copy ? 10 : 5)) && m_pipeline_extensions_reads == sources_at(cycle) &&
+				m_pipeline_store_writes == unsigned(cycle >= (copy ? 11 : 6)) && m_pipeline_drained_fetches == unsigned(copy && cycle >= 8) &&
+				m_pipeline_register_writes == unsigned(copy && cycle >= 7) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (copy ? (cycle >= 10 ? 0x1000 : cycle >= 6 ? 0xfff : 0x1000) : cycle >= 5 ? 0x1001 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (copy && cycle >= 6 ? 0x471 : 0x470) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (copy ? (cycle >= 9 ? 0x551 : cycle >= 8 ? 0x550 : 0x620) : form == 3 && cycle >= 4 ? 0x471 : 0x470) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (copy && BIT(variant - 38, 0) && cycle >= 7 ? (variant >= 44 ? 0xa608 : 0xaa08) : 0xa208) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((variant >= 44 ? 0x800 : 0x900) | (form == 1 || follower ? 0x4000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (follower && cycle >= 7 + gap ? (gap ? 0x2222 : 0x1111) : 0x123456789aULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
+				"POPD retains stack sample and destination, preserving compiler latency and original descriptor-copy ordering");
+			if (cycle == (copy ? 10 : 5))
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(stack, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save POPD across destination capture, source sample and publication");
+			}
+			if (cycle == 14)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= (copy ? 10 : 5)); m_pipeline_extensions_reads = sources_at(checkpoint);
+					m_pipeline_store_writes = unsigned(checkpoint >= (copy ? 11 : 6)); m_pipeline_drained_fetches = unsigned(copy && checkpoint >= 8); m_pipeline_register_writes = unsigned(copy && checkpoint >= 7);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore POPD without repeated stack consumption or destination retargeting");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251940;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 49) { start_pipeline_data_pop(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251940)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251930;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
