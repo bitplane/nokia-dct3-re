@@ -2267,6 +2267,14 @@ void tms320c54x_device::pipeline_step()
 			return;
 		}
 	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0xfc00 || m_pipeline_word[4] == 0xf4eb || m_pipeline_word[4] == 0xfe00))
+	{
+		// Table 7-2: a DARAM stack Read precedes any same-clock EB write.
+		// A just-pushed word requires a separating instruction, not a bypass.
+		m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
+		if (m_pipeline_word[4] == 0xfe00)
+			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
+	}
 	if (m_pipeline_valid[5])
 	{
 		u32 const address = m_pipeline_address[5];
@@ -2409,13 +2417,6 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_call(m_pipeline_word[4]))
 		// The opcode's Execute precedes the complete two-word slot's Execute.
 		m_data.write_word(m_pipeline_operand_address[4], m_pipeline_immediate[4]);
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0xfc00 || m_pipeline_word[4] == 0xf4eb || m_pipeline_word[4] == 0xfe00))
-	{
-		// An older push/store can commit this word in Execute now.
-		m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
-		if (m_pipeline_word[4] == 0xfe00)
-			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
-	}
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
 	{
 		// Our complete two-word slot reaches Read at the opcode's Evaluate

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_daram_return_bypasses_same_clock_push",
+      "status": "disproven",
+      "hypothesis": "A staged RET/RETE/RETD stack read automatically consumes an older PSHM value written to the same DARAM address in that clock",
+      "conclusion": "TI SPRU131G table 7-2 assigns DB reads to the first half-cycle and EB writes to the second. The old adjacent-push fixture encoded a prototype late-read assumption, not hardware bypass evidence. Stack return samples now precede Execute writes. Thirty-six RET/RETE replay cases require the old RAM target for an adjacent push and the new target after one NOP, with twelve RETD ordering controls establishing the same distinction. Both words remain observable and the sampled route survives restoration without duplicate accesses. Existing original MU4 context, worker and delayed-XC gates remain green. This closes the bounded DARAM ordering assumption; physical memory kind/bank arbitration and other late-read families remain separate unvalidated contracts.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "nsb6_alarm_code_rejection_requires_wake_cause_override",
       "status": "disproven",
       "hypothesis": "8890 powered-off alarm code rejection requires clearing the retained CCONT PWRONX bit or replacing the packed code record",

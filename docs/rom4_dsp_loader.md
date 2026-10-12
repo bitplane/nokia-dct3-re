@@ -2358,12 +2358,6 @@ no duplicate replay accesses. PSHD preserves status and accumulator state.
 Peripheral sources, extended addressing, general stack/DAGEN conflicts and
 physical bank arbitration remain excluded or unvalidated; these fixtures do
 not execute the complete zero-control-word worker body or native recorder.
-The existing adjacent PSHM/RET fixture samples a just-written stack word in
-the same clock via the prototype's late return Read. That must be reconciled
-with table 7-2 before claiming a hardware same-address bypass. Do not copy
-that late placement into PSHD; its read-first ADDM composition is independently
-specified and gate-protected. Memory kind and bank arbitration remain a
-separate physical contract, not something an unchanged end-state proves.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
@@ -2648,11 +2642,13 @@ placement remain unvalidated. The atomic frontend is unchanged.
 Plain RET/RETE retain the stack address and increment SP in Access, sample
 the return word in Read and redirect at Execute (SPRU131G example 7-7;
 SPRU172C pages 4-139--140, class 32). Allocation accounts for older
-PSHM/POPM Read updates; the sample follows older Execute writes, so an
-adjacent push's newly written word is visible. RET preserves INTM; RETE
+PSHM/POPM Read updates. Table 7-2's first-half DB read precedes a same-clock
+second-half EB write: an adjacent push exposes the old DARAM word, while
+one intervening NOP exposes its completed write. No stack-return bypass is
+inferred from the old prototype fixture. RET preserves INTM; RETE
 clears it at retirement. Target Prefetch/Fetch/Execute is clock 6/7/11 for
-a return starting at Prefetch 1. Twenty-four cases cover both forms/pages,
-isolated or adjacent-push returns and restore before/after Access or Read.
+a return starting at Prefetch 1. Thirty-six cases cover both forms/pages,
+isolated, adjacent-push and one-NOP returns, with restoration around Access/Read.
 They require one return read/pop/fetch and no sequential execution. General
 DAGEN conflicts and pending IRQ timing for these plain forms remain unvalidated.
 
@@ -2662,6 +2658,8 @@ clocks 6/7, with target Prefetch/Fetch/Execute at 6/7/11. Twenty-four cases
 cover two pages, two one-word delays, one two-word STM-to-T delay, and the
 original `fd45 f6bb` (XC 1,AEQ / RSBX INTM) pair. Each replays queued words
 and the retained stack sample without duplicate reads or a third delay Fetch.
+Twelve DARAM ordering controls require the old stack word for adjacent
+PSHM/RETD and its new word after one NOP, without altering delay execution.
 XC protection inside the return delay is mapped onto the resumed word stream,
 not the abandoned sequential address. Twelve cases make an IRQ pending
 during return: A=0 allows the INTM clear, but the first resumed instruction

@@ -3620,13 +3620,17 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
-		bool const adjacent = variant >= 12, enable = BIT(variant, 1);
+		bool const pushed = variant >= 12, adjacent = pushed && variant < 24, enable = BIT(variant, 1);
+		unsigned const prefix = pushed ? (adjacent ? 1 : 2) : 0;
+		u16 const target = adjacent ? 0x720 : 0x700;
 		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xe933); program.write_word(base + 0x700 + i, 0xf495); }
-		if (adjacent) program.write_word(base + 0x600, 0x4a11);
-		program.write_word(base + 0x600 + unsigned(adjacent), enable ? 0xf4eb : 0xfc00);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xe933); program.write_word(base + 0x700 + i, 0xf495); program.write_word(base + 0x720 + i, 0xf495); }
+		if (pushed) program.write_word(base + 0x600, 0x4a11);
+		if (prefix == 2) program.write_word(base + 0x601, 0xf495);
+		program.write_word(base + 0x600 + prefix, enable ? 0xf4eb : 0xfc00);
 		program.write_word(base + 0x700, 0xe955);
+		program.write_word(base + 0x720, 0xe999);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -3637,28 +3641,28 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-		m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0x720);
 		m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(adjacent ? 0xfff : 0x1000, adjacent ? 0xfff : 0x1000, "staged_plain_return_stack",
-			[this, adjacent](offs_t, u16 &value, u16) {
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(pushed ? 0xfff : 0x1000, pushed ? 0xfff : 0x1000, "staged_plain_return_stack",
+			[this, prefix, target](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x700 && m_cpu->pipeline_cycles() == 5 + unsigned(adjacent), "RET samples its retained stack destination after an older push write");
+				expect(value == target && m_cpu->pipeline_cycles() == 5 + prefix, "RET samples old DARAM before concurrent push Write; one NOP exposes the new value");
 				++m_pipeline_operand_reads;
 			});
-		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "staged_plain_return_target",
-			[this, adjacent](offs_t, u16 &, u16) {
+		m_pipeline_fetch_tap = program.install_read_tap(base + target, base + target, "staged_plain_return_target",
+			[this, prefix](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() == 7 + unsigned(adjacent), "RET target Fetch follows the five-cycle return");
+				expect(m_cpu->pipeline_cycles() == 7 + prefix, "RET target Fetch uses its retained stack sample");
 				++m_pipeline_extensions_reads;
 			});
-		if (adjacent) m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "staged_plain_return_push",
-			[this](offs_t, u16 &value, u16) {
+		if (pushed) m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "staged_plain_return_push",
+			[this, adjacent](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x700 && m_cpu->pipeline_cycles() == 6, "Adjacent push commits before RET's same-clock stack sample");
+				expect(value == 0x700 && m_cpu->pipeline_cycles() == 6 && m_pipeline_operand_reads == unsigned(adjacent), "Push writes in the second half-cycle, after any same-clock return Read");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251630; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -4319,6 +4323,45 @@ private:
 				}
 			});
 		m_phase = 251890; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_retd_data_order(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const prefix = BIT(variant, 1) ? 2 : 1; u16 const target = prefix == 1 ? 0x720 : 0x700;
+		u32 const base = BIT(variant, 0) ? 0x10000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); program.write_word(base + 0x720 + i, 0xf495); }
+		program.write_word(base + 0x600, 0x4a11); program.write_word(base + 0x600 + prefix, 0xfe00);
+		program.write_word(base + 0x603 + prefix, 0xffff);
+		program.write_word(base + 0x700, 0xe955); program.write_word(base + 0x720, 0xe999);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0x720);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xfff, 0xfff, "retd_read_first",
+			[this, prefix, target](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == target && m_cpu->pipeline_cycles() == 5 + prefix, "RETD reads old DARAM before same-clock push; one NOP exposes completed write"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "retd_push_write",
+			[this, prefix](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == 0x700 && m_cpu->pipeline_cycles() == 6 && m_pipeline_operand_reads == unsigned(prefix == 1), "RETD source Read is ordered before concurrent push Write"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(base + target, base + target, "retd_order_target",
+			[this, prefix](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 7 + prefix, "RETD retains its sampled old/new target across delay release"); ++m_pipeline_extensions_reads;
+			});
+		m_phase = 251910; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -25813,17 +25856,18 @@ private:
 		if (m_phase == 251630)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			unsigned const adjacent = m_pipeline_peripheral_case >= 12;
+			bool const pushed = m_pipeline_peripheral_case >= 12, adjacent = pushed && m_pipeline_peripheral_case < 24;
+			unsigned const prefix = pushed ? (adjacent ? 1 : 2) : 0;
 			bool const enable = BIT(m_pipeline_peripheral_case, 1);
-			u64 const checkpoint = 3 + adjacent + (m_pipeline_peripheral_case / 4) % 3;
+			u64 const checkpoint = 3 + prefix + (m_pipeline_peripheral_case / 4) % 3;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_pipeline_operand_reads == unsigned(cycle >= 5 + adjacent) &&
-				m_pipeline_extensions_reads == unsigned(cycle >= 7 + adjacent) &&
-				m_pipeline_store_writes == unsigned(adjacent && cycle >= 6) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == (adjacent || cycle < 4 ? 0x1000 : 0x1001) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5 + prefix) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 7 + prefix) &&
+				m_pipeline_store_writes == unsigned(pushed && cycle >= 6) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (!pushed && cycle >= 4 ? 0x1001 : prefix == 2 && cycle == 5 ? 0xfff : 0x1000) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (enable && cycle >= 6 + adjacent ? 0 : 0x800) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 11 + adjacent ? 0x55 : 0),
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (enable && cycle >= 6 + prefix ? 0 : 0x800) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 11 + prefix ? (adjacent ? 0x99 : 0x55) : 0),
 				"Plain return owns one pop/read/target fetch, preserves RET's INTM and clears RETE only at retirement");
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
@@ -25835,8 +25879,8 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
-					m_pipeline_operand_reads = unsigned(checkpoint >= 5 + adjacent); m_pipeline_extensions_reads = 0;
-					m_pipeline_store_writes = unsigned(adjacent && checkpoint >= 6);
+					m_pipeline_operand_reads = unsigned(checkpoint >= 5 + prefix); m_pipeline_extensions_reads = 0;
+					m_pipeline_store_writes = unsigned(pushed && checkpoint >= 6);
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore ordinary return and adjacent push ownership without duplicate bus operations");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -25844,8 +25888,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 23) { start_pipeline_plain_return(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged plain returns: PASS cases=24 forms=RET,RETE pages=2 adjacent_push=12 restore=24 duplicate_accesses=0\n");
+				if (m_pipeline_peripheral_case < 35) { start_pipeline_plain_return(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged plain returns: PASS cases=36 forms=RET,RETE pages=2 adjacent_old_word=12 nop_new_word=12 restore=36 duplicate_accesses=0\n");
 				start_pipeline_call(); return;
 			}
 			++m_pipeline_expected_cycle;
@@ -26463,13 +26507,51 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 43) { start_pipeline_data_push(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_read_first=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_retd_data_order(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251900)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251890;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251910)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			unsigned const prefix = BIT(variant, 1) ? 2 : 1; u64 const checkpoint = 4 + prefix + variant / 4;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5 + prefix) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 7 + prefix) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (prefix == 2 && cycle == 5 ? 0xfff : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 11 + prefix ? (prefix == 1 ? 0x99 : 0x55) : 0),
+				"RETD retains read-first DARAM target without changing pop, delays or interrupt mask semantics");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RETD before/after same-address read/write ordering");
+			}
+			if (cycle == 15)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5 + prefix); m_pipeline_store_writes = unsigned(checkpoint >= 6); m_pipeline_extensions_reads = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore RETD target without late forwarding or duplicate stack access");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251920;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 11) { start_pipeline_retd_data_order(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged RETD DARAM ordering: PASS cases=12 adjacent_old_word=6 nop_new_word=6 restore=12 duplicate_accesses=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251920)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251910;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
