@@ -5255,9 +5255,18 @@ private:
 	}
 	void start_pipeline_original_idle(unsigned variant = 0)
 	{
+		bool const service = variant >= 8;
+		if (service)
+		{
+			// Reuse the pinned original timer vector/handler/worker image and
+			// typed worker data. This is CPU composition, not native flag setup.
+			start_pipeline_mu4_timer_context();
+			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
+			m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove();
+		}
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const skip = BIT(variant, 0);
-		u16 const sp = 0x1000 + BIT(variant, 1);
+		bool const skip = service || BIT(variant, 0);
+		u16 const sp = 0x1000 + (service ? BIT(variant, 0) : BIT(variant, 1));
 		std::array<u16, 29> const idle{0x4a11, 0xeeff, 0x10f8, 0xa531, 0xf844, 0x98e9,
 			0x7711, 0x0025, 0x7681, 0x0001, 0x7711, 0x0026, 0x7681, 0x0020,
 			0x7711, 0x0000, 0x6881, 0xfff7, 0x7711, 0x0000, 0x6981, 0x08c0,
@@ -5269,22 +5278,34 @@ private:
 		for (unsigned i = 0; i < idle.size(); ++i) program.write_word(0x298d0 + i, idle[i]);
 		for (unsigned i = 0; i < wrapper.size(); ++i) program.write_word(0x23d2f + i, wrapper[i]);
 		program.write_word(0x20700, 0xe855);
+		if (service)
+		{
+			for (unsigned i = 0; i < wrapper.size(); ++i) program.write_word(0x3d2f + i, wrapper[i]);
+			for (unsigned i = 0; i < 512; ++i) program.write_word(0x700 + i, i ? 0xf495 : 0xe855);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, service ? 0x2020 : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, service ? 0 : 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, sp);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1357);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x77);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x40);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, service ? 8 : 0x40);
 		auto &data = m_cpu->space(AS_DATA);
 		data.write_word(sp, 0x700); data.write_word(0xa531, skip ? 1 : 0);
 		m_cpu->set_state_int(STATE_GENPC, 0x23d2f); m_cpu->set_pipeline_frontend(true);
+		if (service)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 119);
+		}
 		m_pipeline_replay = false; m_idle_fixture_tick = 0;
 		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_vector_acks = m_pipeline_drained_fetches = m_vector_reads = 0;
 		m_pipeline_write_tap = data.install_write_tap(0, 0xa531, "original_idle_setup",
 			[this, skip](offs_t at, u16 &value, u16) {
 				if (machine().side_effects_disabled() || (at != 0 && at != 0x25 && at != 0x26 && at != 0xa531)) return;
@@ -5294,12 +5315,20 @@ private:
 					"Original zero flag owns ordered timer, interrupt mask and local flag writes; nonzero skips them");
 				++m_pipeline_store_writes;
 			});
-		m_pipeline_fetch_tap = program.install_read_tap(0x20700, 0x20700, "original_idle_caller",
-			[this](offs_t, u16 &value, u16) {
+		m_pipeline_fetch_tap = program.install_read_tap(service ? 0x700 : 0x20700, service ? 0x700 : 0x20700, "original_idle_caller",
+			[this, service](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0xe855 && m_idle_fixture_tick >= 120, "Original wrapper reaches its caller only after physical wake");
+				expect(value == 0xe855 && m_idle_fixture_tick >= 120 && (!service || (m_vector_acks == 1 && m_vector_reads == 1)), "Original wrapper reaches its caller only after physical wake and any required ISR return");
 				++m_pipeline_extensions_reads;
 			});
+		if (service)
+			m_vector_prefetch_tap = program.install_read_tap(0x204c, 0x4044, "original_idle_timer_route",
+				[this](offs_t at, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					if (at == 0x204c) { expect(value == 0x4a1e, "Original timer vector saves XPC before far branching"); ++m_pipeline_operand_reads; }
+					if (at == 0x3d73) { expect(value == 0xeeff, "Original idle timer wake enters the uploaded context handler"); ++m_pipeline_drained_fetches; }
+					if (at == 0x4044) { expect(value == 0xf4e5, "Original idle timer wake returns through uploaded FRETE"); ++m_vector_reads; }
+				});
 		m_phase = 252250; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -28414,23 +28443,24 @@ private:
 		if (m_phase == 252250)
 		{
 			unsigned const variant = m_pipeline_peripheral_case;
-			bool const skip = BIT(variant, 0);
-			u16 const sp = 0x1000 + BIT(variant, 1);
+			bool const service = variant >= 8, skip = service || BIT(variant, 0);
+			u16 const sp = 0x1000 + (service ? BIT(variant, 0) : BIT(variant, 1));
 			unsigned const tick = ++m_idle_fixture_tick;
-			unsigned const checkpoint = BIT(variant, 2) ? 110 : 80;
+			unsigned const checkpoint = service ? std::array<unsigned, 4>{80, 110, 140, 300}[(variant - 8) / 2] : BIT(variant, 2) ? 110 : 80;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original 44-word idle call uses only validated staged forms");
 			if (tick >= 80 && tick < 120)
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 0 &&
-					m_pipeline_store_writes == (skip ? 0 : 5) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (skip ? 0x40 : 0x8c0),
+					m_pipeline_store_writes == (skip ? 0 : 5) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (service ? 8 : skip ? 0x40 : 0x8c0),
 					"Original setup masks its short-period timer before sleeping, without executing its continuation");
-			if (tick == 120) { m_cpu->set_input_line(6, ASSERT_LINE); m_cpu->set_input_line(6, CLEAR_LINE); }
+			if (!service && tick == 120) { m_cpu->set_input_line(6, ASSERT_LINE); m_cpu->set_input_line(6, CLEAR_LINE); }
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_idle_fixture_saved_tick = tick; m_pipeline_store_case = m_pipeline_store_writes;
+				m_recurring_irq_snapshot = {m_vector_acks, m_pipeline_operand_reads, m_pipeline_drained_fetches, m_vector_reads, m_pipeline_extensions_reads};
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original idle call after firmware-owned setup and before external wake");
 			}
-			if (tick == 200)
+			if (tick == (service ? 400 : 200))
 			{
 				osd_printf_info("Original idle observation: case=%u replay=%u idle=%llu caller_fetch=%u sp=%04llx ar1=%04llx a=%llx b=%llx st1=%04llx xpc=%llx ifr=%04llx\n",
 					variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), m_pipeline_extensions_reads,
@@ -28441,20 +28471,24 @@ private:
 				expect(!m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == sp + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1357 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_B) == sp &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_XPC) == 2 &&
-					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (skip ? 0x40 : 0x48),
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (service ? 0 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_XPC) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (service ? 0 : skip ? 0x40 : 0x48) &&
+					(!service || (m_vector_acks == 1 && m_pipeline_operand_reads == 1 && m_pipeline_drained_fetches == 1 && m_vector_reads == 1)),
 					"Original idle wake, FRET and wrapper restore caller SP/AR1/CPL, retaining unserviced enabled IRQ under INTM");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_pipeline_store_case; m_pipeline_extensions_reads = 0;
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_pipeline_store_case;
+					m_vector_acks = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1];
+					m_pipeline_drained_fetches = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original idle call with retained timer and stack state");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252260; m_check_timer->enable(true); return;
 				}
-				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
 				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
-				if (variant < 7) { start_pipeline_original_idle(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0\n");
+				if (variant == 7) osd_printf_info("TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0\n");
+				if (variant < 15) { start_pipeline_original_idle(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -28985,6 +29019,12 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 252250 && m_pipeline_peripheral_case >= 8)
+		{
+			expect(line == 3 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x98ea,
+				"Original idle timer wake acknowledges TINT at the unexecuted post-IDLE continuation");
+			++m_vector_acks;
+		}
 		if (m_phase == 252230)
 		{
 			unsigned const kind = m_pipeline_peripheral_case % 6;

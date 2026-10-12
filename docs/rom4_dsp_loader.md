@@ -2597,8 +2597,7 @@ exhaustive **local** predicate, not a global flag-writer or reset census.
 After wake the routine removes its local frame, restores AR1 and uses
 FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
 and returns. The staged IDLE1 primitive has the bounded coverage below;
-composition with its timer ISR remains open; the INTM-blocked complete call
-has the coverage below.
+the complete call and bounded timer-ISR composition have the coverage below.
 
 Staged IDLE1 (`f4e1`) is a Decode barrier: older instructions drain,
 younger fetched words are discarded, and the continuation is fetched anew
@@ -2636,8 +2635,19 @@ Shared SP updates must respect instruction age: a younger FRAME must not
 retarget an older PSHM/POPM's Read-owned stack slot. FRAME's Access placement
 remains a partial model, but its update follows those older stack operations
 within the clock. The original adjacent PSHM AR1/FRAME pair and final AR1
-restoration regression-test this constraint. INTM-clear composition with the
-original timer vector/handler and native warm scheduling remain open.
+restoration regression-test this constraint.
+
+Eight additional cases compose the nonzero-flag idle path with INTM clear,
+the original 94-word timer vector/context handler/worker/FRETE route and
+the observed lower-32K shared program mapping. A real timer expires during
+IDLE1, acknowledges TINT with continuation `98ea`, visits each original
+entry once and returns before the wrapper reaches its caller. Even/odd SP
+and four replay checkpoints cover sleep, active ISR and completed return.
+The final caller SP, AR1, B, CPL/page and cleared IFR reproduce without
+re-seeding worker state. The initial timer interval and worker inputs are
+typed CPU-fixture inputs, not recovered native startup provisioning.
+The zero-flag path with initially enabled short-period TINT, global flag
+writers and actual native warm scheduling remain separate open work.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).
