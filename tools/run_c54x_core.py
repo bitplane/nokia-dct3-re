@@ -48,6 +48,8 @@ REQUIRED = [
     "TMS320C54x staged plain returns: PASS cases=24 forms=RET,RETE pages=2 adjacent_push=12 restore=24 duplicate_accesses=0",
     "TMS320C54x staged calls: PASS cases=84 forms=CALL,CALLD pages=2 adjacent_push=42 stm_t_delay=60 parameters=5 restore=84 duplicate_stack_writes=0",
     "TMS320C54x staged direct MVDK: PASS cases=60 destinations=AR2,SP,BK,RAM source_addressing=DP,CPL restore=60 bank_conflicts=9 duplicate_accesses=0",
+    "TMS320C54x staged original worker XC prefix: PASS cases=4 restore=4 duplicate_pushes=0 conditional_sampling_validated=0",
+    "TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",

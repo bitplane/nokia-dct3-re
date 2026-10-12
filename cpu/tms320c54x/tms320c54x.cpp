@@ -690,6 +690,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_delayed_far));
 	save_item(NAME(m_delayed_words));
 	save_item(NAME(m_xc_guard));
+	save_item(NAME(m_pipeline_xc_active));
+	save_item(NAME(m_pipeline_xc_end));
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
 	save_item(NAME(m_nmi_pending));
@@ -1726,6 +1728,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_flush_front = m_pipeline_vector_pending = false;
 	m_pipeline_decode_flush = m_pipeline_control_words = m_pipeline_delay_decode_words = 0;
 	m_pipeline_control_address = 0;
+	m_pipeline_xc_active = false;
+	m_pipeline_xc_end = 0;
 	m_pipeline_far_return_pending = false;
 	m_pipeline_long_store_pending = false;
 	m_pipeline_dp_wait = 0;
@@ -1919,13 +1923,20 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		bool const unconditional_xc = word == 0xfd00 || word == 0xff00;
+		if (m_pipeline_valid[2] && word != 0xf495 && !unconditional_xc && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
 			m_illegal = true;
 			return;
+		}
+		if (m_pipeline_valid[2] && unconditional_xc)
+		{
+			// XC 1 also protects two following words (SPRU172C 4-199).
+			m_pipeline_xc_active = true;
+			m_pipeline_xc_end = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_address[2] + 2);
 		}
 		if (m_pipeline_valid[2] && (fast_return || plain_return || far_return || branch))
 		{
@@ -2219,8 +2230,13 @@ void tms320c54x_device::pipeline_step()
 			unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
 			accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
 		}
-		else
+		else if (m_op != 0xfd00 && m_op != 0xff00)
 			execute_one(m_op);
+		unsigned const xc_retired_words = ((m_op & 0xfeff) == 0x68f8 || m_op == 0x76f8) ? 3 :
+			((m_op & 0xff80) == 0x7100 || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
+			u16(m_pipeline_xc_end - address) < xc_retired_words)
+			m_pipeline_xc_active = false;
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
 			u16(address - m_pipeline_control_address) <= 3)
 		{
@@ -2316,7 +2332,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 	for (unsigned stage = 0; stage < 5; ++stage)
 		intm_protected |= m_pipeline_valid[stage] && m_pipeline_intm_protected[stage];
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_control_words && !m_pipeline_long_store_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_xc_active && !m_pipeline_control_words && !m_pipeline_long_store_pending && !m_pipeline_dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);

@@ -3781,6 +3781,71 @@ private:
 		m_phase = 251670; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_worker_xc(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		std::array<u16, 4> const prefix{0xfd00, 0x4a07, 0xfd00, 0xf7bb};
+		for (unsigned i = 0; i < prefix.size(); ++i) program.write_word(0x600 + i, prefix[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x4ff, 0x4ff, "worker_xc_push",
+			[this](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == 0 && m_cpu->pipeline_cycles() == 7, "Original XC prefix saves old ST1 once before setting INTM");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251690; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_xc_irq(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(0x40 + i, 0xf495); }
+		program.write_word(0x600, BIT(variant, 0) ? 0xff00 : 0xfd00);
+		program.write_word(0x601, 0x8000); program.write_word(0x602, 0x8001);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_store_writes = m_pipeline_operand_reads = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x700, 0x701, "xc_protected_stores",
+			[this](offs_t address, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == 0x1234 && m_cpu->pipeline_cycles() == 7 + address - 0x700, "Both XC-protected stores retire before interrupt entry");
+				++m_pipeline_store_writes;
+			});
+		m_pipeline_operand_tap = program.install_read_tap(0x40, 0x40, "xc_vector_fetch",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_store_writes == 2 && m_cpu->pipeline_cycles() > 8, "XC 1 and XC 2 protect two full words before vector Fetch");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 251710; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -25411,7 +25476,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 59) { start_pipeline_direct_move(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged direct MVDK: PASS cases=60 destinations=AR2,SP,BK,RAM source_addressing=DP,CPL restore=60 bank_conflicts=9 duplicate_accesses=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_worker_xc(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -25419,6 +25484,83 @@ private:
 		if (m_phase == 251680)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251670;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251690)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = 3 + 2 * m_pipeline_peripheral_case;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_store_writes == unsigned(cycle >= 7) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 6 ? 0x4ff : 0x500) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (cycle >= 9 ? 0x800 : 0),
+				"Original unconditional XC worker prefix preserves PSHM/INTM ordering");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original XC prefix");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = unsigned(checkpoint >= 7);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original XC prefix without duplicate push");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251700;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 3) { start_pipeline_worker_xc(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged original worker XC prefix: PASS cases=4 restore=4 duplicate_pushes=0 conditional_sampling_validated=0\n");
+				start_pipeline_xc_irq(); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251700)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251690;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251710)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = 5 + 3 * (m_pipeline_peripheral_case / 2);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC interrupt fixture advances without unsupported instructions");
+			if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
+			if (cycle <= 8) expect(m_pipeline_operand_reads == 0, "Pending interrupt cannot fetch its vector inside XC word protection");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save pending interrupt in XC protection window");
+			}
+			if (cycle == 24)
+			{
+				expect(m_pipeline_store_writes == 2 && m_pipeline_operand_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x4ff,
+					"XC releases pending IRQ after both stores with one vector fetch and one interrupt stack allocation");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = checkpoint >= 8 ? 2 : 0; m_pipeline_operand_reads = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC interrupt guard and pending source");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251720;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 3) { start_pipeline_xc_irq(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251720)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251710;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

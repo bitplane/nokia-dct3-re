@@ -2643,6 +2643,29 @@ and no duplicate publication on replay. The original `770e 0006` is therefore
 executable at the call boundary; general STM destinations and concurrent
 MMR-producer conflicts remain unvalidated.
 
+The original worker begins at `02:3dbc` with `fd00 4a07 fd00 f7bb`:
+unconditional `XC 1` around PSHM ST1 and SSBX INTM. All four words are
+present in the original R060 upload. This is not a conditional worker-entry
+predicate. SPRU131G section 7.1.4/example
+7-13 places XC condition sampling in Access, before the following instruction
+is decoded; the two preceding one-word instructions have not retired yet.
+SPRU172C pages 4-198--200 permit XC 1 over one one-word instruction and XC 2
+over two words, and protect XC plus two following words from interrupts even
+for XC 1. Rejected slots must not decode or perform memory accesses.
+The atomic implementation's execution-time predicate evaluation therefore
+cannot be reused as a physical staged sampling contract. Staged acceptance
+now covers the original unconditional prefix in four checkpoint/replay
+cases: PSHM publishes the old ST1 once before SSBX sets INTM, with the
+stack allocation preserved on restoration. A saved word-address guard
+implements the two-word protection window. Four additional XC 1/XC 2 cases
+make a maskable IRQ pending after Decode: two following stores must retire
+before the vector is fetched once. Restoration during protection or at its
+completion preserves both stores, IFR clearance and one interrupt stack
+allocation. Multiword protected slots, NMI and protected control transfers
+remain unvalidated. Conditional forms remain unsupported, pending
+Access-time sampling, accepted/rejected slots, producer latency and two-word
+slot tests. The complete worker remains unsupported.
+
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
 now retains its source sample and destination literal in the staged frontend.
 The bounded subset accepts RAM sources and RAM or DAGEN destinations
