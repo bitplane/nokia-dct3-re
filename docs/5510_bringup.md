@@ -2412,10 +2412,11 @@ PMST and the original RPT/MVPD copy now have staged conformance coverage.
 The serial entry at `00:0e41` is reached. Its original STM/ADDM/ANDM prefix
 selects aligned SP=`15fe`, with bounded staged RMW replay coverage.
 Immediate ARP setup, READA into AR1 and BANZ also have staged consumer/
-replay coverage. The original BANZ takes the loop to `00:0e5b`; the first
-unsupported instruction is `47f8 0011` at `00:0e5f` (RPT *(0011), reading
-the count from AR1), followed by `7e92` (READA *AR2+). The debugger context
-at failure is `00:0e61`, not the opcode boundary.
+replay coverage. The original BANZ takes the loop to `00:0e5b`; its
+`47f8 0011` (RPT *(0011), count from AR1) and repeated `7e92` (READA *AR2+)
+now execute in the staged diagnostic. The first unsupported instruction is
+`00f8 0011` at `00:0e62` (ADD *(0011),A, reading AR1). The debugger context
+at failure is `00:0e64`, not the opcode boundary.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
 
@@ -2428,8 +2429,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. Memory-sourced repeat setup
-and repeated READA need staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. Memory-sourced accumulator
+ADD needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

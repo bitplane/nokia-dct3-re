@@ -5646,6 +5646,78 @@ private:
 		m_phase = 252390; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_memory_repeat_read_a(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const interrupt = variant >= 384, nmi = interrupt && BIT(variant, 2);
+		unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[variant % 4];
+		unsigned const page = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 4) % 3];
+		bool const ovly = (variant / 12) % 2, boundary = (variant / 24) % 2, ram_count = (variant / 48) % 2;
+		u32 const source = (page << 16) | (boundary ? 0x7ffe : 0x700);
+		u16 const counter = ram_count ? 0x500 : 0x11;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 80; ++i) program.write_word(0x19000 + i, 0xf495);
+		std::array<u16, 4> const code{0x47f8, counter, 0x7e92, 0xe955};
+		for (unsigned i = 0; i < code.size(); ++i) program.write_word(0x19000 + i, code[i]);
+		if (interrupt)
+		{
+			u32 const vector = nmi ? (ovly ? 4 : 0x10004) : (ovly ? 0x40 : 0x10040);
+			for (unsigned i = 0; i < 16; ++i) program.write_word(vector + i, 0xf495);
+			program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5);
+		}
+		for (unsigned i = 0; i <= count; ++i)
+		{
+			u32 const logical = source + i, physical = ovly && !(logical & 0x8000) ? logical & 0xffff : logical;
+			program.write_word(physical, 0x1200 + i); m_cpu->space(AS_DATA).write_word(0x420 + i, 0xffff);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, ovly ? 0x20 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt && !nmi ? 0 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, count);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x420);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt && !nmi ? 1 : 0);
+		m_cpu->space(AS_DATA).write_word(0x500, count);
+		m_cpu->set_state_int(STATE_GENPC, 0x19000); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_repeat_count_reads = m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_vector_acks = 0;
+		m_vector_prefetch_tap = m_cpu->space(AS_DATA).install_read_tap(counter, counter, "memory_repeat_count",
+			[this, count](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == count && !m_pipeline_repeat_count_reads && m_cpu->pipeline_cycles() == 6, "Memory RPT samples its AR/RAM count once in Read"); ++m_pipeline_repeat_count_reads;
+			});
+		m_pipeline_operand_tap = program.install_read_tap(0, 0x7fffff, "memory_repeat_program_stream",
+			[this, source, ovly, count, interrupt](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled() || (at >= 0x19000 && at < 0x19080)) return;
+				// Include the ISR's discarded prefetched words, not just
+				// its three retiring instructions, in its owned program range.
+				if (interrupt && ((at >= 4 && at < 0x14) || (at >= 0x40 && at < 0x50) || (at >= 0x10004 && at < 0x10014) || (at >= 0x10040 && at < 0x10050))) return;
+				u32 const logical = source + m_pipeline_operand_reads, physical = ovly && !(logical & 0x8000) ? logical & 0xffff : logical;
+				expect(m_pipeline_operand_reads <= count && at == physical && word == 0x1200 + m_pipeline_operand_reads &&
+					m_cpu->pipeline_cycles() == (m_pipeline_operand_reads ? 14 + m_pipeline_operand_reads : 13),
+					"Repeated READA increments its retained 23-bit program pointer and applies OVLY to each source access"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x420, 0x430, "memory_repeat_destinations",
+			[this, count](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_store_writes <= count && at == 0x420 + m_pipeline_store_writes && word == 0x1200 + m_pipeline_store_writes &&
+					m_cpu->pipeline_cycles() == 14 + m_pipeline_store_writes, "Memory RPT/READA owns count+1 data publications, one per steady-state clock"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x19003, 0x19003, "memory_repeat_continuation",
+			[this, count, interrupt](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < (interrupt && !count ? 3 : 2) && word == (m_pipeline_extensions_reads ? 0xe966 : 0xe955) && (!m_pipeline_extensions_reads || m_pipeline_store_writes == count + 1),
+					"Repeated one-word READA returns to its actual fresh continuation, not body+2"); ++m_pipeline_extensions_reads;
+			});
+		m_phase = 252410; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29130,13 +29202,66 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 287) { start_pipeline_banz(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged BANZ: PASS cases=288 values=3 modifications=3 encoded_modes=2 cmpt_states=2 pages=2 restore=288 premodify_condition=1 duplicate_auxiliary_updates=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_memory_repeat_read_a(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252400)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252390;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252410)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const interrupt = variant >= 384, nmi = interrupt && BIT(variant, 2);
+			unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[variant % 4], page = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 4) % 3];
+			bool const ovly = (variant / 12) % 2, boundary = (variant / 24) % 2, ram_count = (variant / 48) % 2;
+			u32 const source = (page << 16) | (boundary ? 0x7ffe : 0x700), physical = ovly && !(source & 0x8000) ? source & 0xffff : source;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = interrupt ? 9 : std::array<unsigned, 4>{4, 6, 10, 16}[variant / 96];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory repeat/READA has retained count, source pointer and one-word continuation ownership");
+			if (interrupt && tick == 3) { int const line = nmi ? INPUT_LINE_NMI : 0; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+			if (interrupt && tick < count + 14) expect(!m_vector_acks, "Memory RPT suppresses pending IRQ/NMI from Decode until final READA publication");
+			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x19003, 0xe966); }
+			if (tick == 6)
+			{
+				if (ram_count) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x500, 0xffff); }
+				else m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0xffff);
+			}
+			if (tick == 10) m_cpu->set_state_int(tms320c54x_device::STATE_A, source + 0x40);
+			if (tick == 13) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(physical, 0xaaaa); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_repeat_count_reads, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save memory count, count-wait, captured program pointer or repeated transfers");
+			}
+			if (tick == count + 40)
+			{
+				expect(m_pipeline_repeat_count_reads == 1 && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == (interrupt && !count ? 3 : 2) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x420 + count + 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == source + 0x40 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x66 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_vector_acks == unsigned(interrupt),
+					"Memory-sourced RPT/READA uses sampled count and internal program pointer, not mutated source register or accumulator");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_repeat_count_reads = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3];
+					m_vector_acks = m_recurring_irq_snapshot[4];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore memory repeat without re-reading count or restarting program pointer progression");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252420; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant == 383) osd_printf_info("TMS320C54x staged memory RPT READA: PASS cases=384 counts=4 source_pages=3 ovly_states=2 source_regions=2 count_sources=AR,RAM restore=384 retained_count=1 retained_program_pointer=1 duplicate_transfers=0\n");
+				if (variant < 399) { start_pipeline_memory_repeat_read_a(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged memory RPT interrupts: PASS cases=16 counts=4 sources=IRQ,NMI restore=16 deferred_until_final_write=1 one_word_continuation=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252420)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252410;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
@@ -29606,6 +29731,7 @@ private:
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
 	unsigned m_recurring_irq_first_return_writes = ~0U, m_recurring_irq_end_writes = 0;
 	unsigned m_idle_fixture_tick = 0, m_idle_fixture_saved_tick = 0;
+	unsigned m_pipeline_repeat_count_reads = 0;
 	u64 m_recurring_irq_checkpoint_cycle = 0, m_recurring_irq_end_cycle = 0;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
@@ -29660,6 +29786,13 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 252410 && m_pipeline_peripheral_case >= 384)
+		{
+			unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[m_pipeline_peripheral_case % 4];
+			expect(line == (BIT(m_pipeline_peripheral_case, 2) ? INPUT_LINE_NMI : 0) && m_pipeline_store_writes == count + 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x9003 && !m_vector_acks,
+				"Memory RPT accepts its pending source only after the full copy and stacks the one-word READA continuation"); ++m_vector_acks;
+		}
 		if (m_phase == 252310 && m_pipeline_peripheral_case >= 128)
 		{
 			unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[m_pipeline_peripheral_case % 4];

@@ -133,6 +133,7 @@ private:
 	void pipeline_step();
 	void pipeline_accept_interrupt();
 	void pipeline_delay_compiler_sp(u16 previous);
+	void pipeline_begin_repeat_stream();
 	void enter_idle(u8 mode);
 	void finish_repeats();
 	void push(u16 value);
@@ -289,6 +290,8 @@ private:
 	u32 m_pipeline_repeat_address = 0;
 	u8 m_pipeline_read_a_wait = 0;
 	u32 m_pipeline_read_a_source = 0;
+	u8 m_pipeline_memory_repeat_wait = 0;
+	u32 m_pipeline_repeat_program_source = 0;
 	u8 m_pipeline_dp_wait = 0;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;

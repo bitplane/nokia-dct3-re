@@ -2721,7 +2721,8 @@ uses its held program read, then the stream performs one program read and
 data write per clock, with implicit source increment and encoded destination
 modification. Exactly count+1 transfers retire before a fresh continuation.
 First/steady-state bus placement is partial, not measured silicon timing.
-Other repeat bodies, nested repeats and control-delay RPT fail closed.
+MVPD and the separately covered READA stream below are the only admitted
+repeat bodies. Nested repeats and control-delay RPT fail closed.
 
 The 128 transfer replay cases cover counts 0/1/3/15, pages 2/3, both OVLY
 states and indirect/postincrement destinations, with four checkpoints across
@@ -2777,8 +2778,9 @@ data destination separately. Four extra held Read clocks model the
 instruction's documented non-repeat cost; A is sampled after older Execute
 publications, then the selected program word is retained for one Execute
 write. Sampling and bus placement remain partial, not measured silicon
-phases. RAM and AR0--AR7 destinations are admitted; other register/peripheral
-destinations, long-offset forms, repeat and control-delay placement fail
+phases. RAM and AR0--AR7 destinations are admitted for nonrepeated READA;
+the repeated RAM stream is covered separately below. Other register/
+peripheral destinations, long-offset forms and control-delay placement fail
 closed.
 
 The 192 absolute-to-AR1 replay cases compose a preceding ADD #1,A with
@@ -2790,8 +2792,9 @@ AR1 address; two/three gaps select the published pointer under the declared
 stage model. Forty-eight short RAM/postincrement cases independently check
 the one-word form's program read, data write and single auxiliary update.
 Each replay leg has one program read and one destination write. General
-DAGEN conflict chains, conditional-execute placement, repeated READA and
-interrupt acceptance across the held bus remain unvalidated.
+DAGEN conflict chains, conditional-execute placement and interrupt acceptance
+across an ordinary held bus remain unvalidated; repeated RAM READA has the
+separate coverage below.
 
 Short non-delayed BANZ (`6c80`--`6c97`) retains its target literal, tests
 the selected auxiliary register before modification and owns its encoded
@@ -2811,6 +2814,30 @@ retarget it, and taken branches must not retire fall-through markers.
 Delayed/long-offset forms, repeat and control-delay placement fail closed.
 Preceding DAGEN-writer conflicts, conditional-execute placement and interrupt
 acceptance through the redirect remain unvalidated.
+
+Absolute memory-sourced RPT (`47f8 Smem`) samples its AR0--AR7 or RAM
+count in Read and retains it through two extra clocks (SPRU172C page 4-146,
+class 5B). Repeat protection begins in Decode, not after that Read. The
+common repeat stream now also admits RAM-destination READA: it retains A's
+initial program pointer separately, increments that internal pointer per
+iteration and does not update architectural A. A one-word READA body resumes
+at body+1; the two-word MVPD body still resumes at body+2. Bus placement is
+partial. Other count addressing forms and control/peripheral count sources
+remain excluded; repeated READA register destinations fail closed.
+
+The 384 replay cases cover counts 0/1/3/15, program pages 0/2/7f, both OVLY
+states, ordinary and 7fff-to-8000 crossing sources, AR1/RAM count sources and
+four checkpoints around count assembly/Read, captured program pointer and
+streaming. Mutating the count after Read, A after pointer capture and the
+first source word after its program Read cannot change the copy. Each leg
+has one count read and exactly count+1 ordered transfers and postincrements.
+Sixteen AR1-count cases additionally present IRQ/NMI at repeat Decode and
+replay with the request pending: IACK follows the last write and stacks the
+one-word body's actual continuation. The ISR's discarded prefetched words
+are distinguished from copy-source reads. No source re-seeding, return
+guard or atomic fallback is used. General preceding-writer conflicts,
+conditional-execute placement and repeated register/peripheral publication
+are not established by these fixtures.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
