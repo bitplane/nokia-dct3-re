@@ -130,6 +130,7 @@ private:
 	void interrupt_entry_step();
 	void reset_pipeline();
 	void pipeline_step();
+	void pipeline_accept_interrupt();
 	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
@@ -255,6 +256,7 @@ private:
 	u8 m_pipeline_delay_decode_words = 0;
 	u32 m_pipeline_control_address = 0;
 	bool m_pipeline_far_return_pending = false;
+	bool m_pipeline_long_store_pending = false;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};

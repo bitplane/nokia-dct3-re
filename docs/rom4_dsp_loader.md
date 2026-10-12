@@ -2724,18 +2724,30 @@ after Fetch must not affect retirement. Shift-16 forms, other immediate ALU
 operations, mixed status producers and delayed-control overlap remain
 outside this gate.
 
-The exact original R060 AA22 prefix at `02:3d73..3d81` composes these
+Direct DST retains the saturated 32-bit source after older Execute writes,
+then writes the high word and XOR-1 low word in two clocks (SPRU172C page
+4-47, class 13A). The pending second write holds pipeline advancement and
+is saved explicitly; interrupt acceptance is reconsidered only after the
+pair completes. All 192 cases cover A/B, SST on/off, in-range/guard-overflow
+signs, odd/even addresses, DP/CPL and restore before/after source capture
+or between writes. Changing the source after capture must not alter either
+write. The gate verifies partial memory state, one write per word and
+unchanged status/SP. Exact write-phase placement, interrupt overlap and
+preceding SST-producer latency remain unvalidated; indirect, extended and
+register/peripheral pairs are rejected.
+
+The exact original R060 AA22 prefix at `02:3d73..3d82` composes these
 operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes, `ea00`, `577c` and `f300 0001`. Six executable cases cover pages 0 and 2 with checkpoints
+pushes, `ea00`, `577c`, `f300 0001` and `4f7c`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
 They require eight ordered saves of the original accumulator/status values,
 an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
-and the long-word operand loaded and incremented in B. All cases
+and the long-word operand loaded, incremented in B and stored back. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-instruction, `4f7c` at `02:3d82` (DST long memory from B), remains unsupported in the
+instruction, `487e` at `02:3d83` (LDM into A), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
 
 The original four short/long-period, direct/indirect-mask streams run through

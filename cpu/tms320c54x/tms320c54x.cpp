@@ -708,6 +708,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_delay_decode_words));
 	save_item(NAME(m_pipeline_control_address));
 	save_item(NAME(m_pipeline_far_return_pending));
+	save_item(NAME(m_pipeline_long_store_pending));
 	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_pll_locked));
@@ -1708,6 +1709,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_decode_flush = m_pipeline_control_words = m_pipeline_delay_decode_words = 0;
 	m_pipeline_control_address = 0;
 	m_pipeline_far_return_pending = false;
+	m_pipeline_long_store_pending = false;
 	m_pipeline_cycles = 0;
 }
 
@@ -1722,6 +1724,13 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	if (m_pipeline_long_store_pending)
+	{
+		m_data.write_word(m_pipeline_operand_address[5] ^ 1, m_pipeline_immediate[5]);
+		m_pipeline_long_store_pending = false;
+		pipeline_accept_interrupt();
+		return;
+	}
 	if (m_pipeline_far_return_pending)
 	{
 		// Retain the second stack operand while the return holds Read.
@@ -1855,6 +1864,7 @@ void tms320c54x_device::pipeline_step()
 			(BIT(word, 7) || u8(word) < 0x80);
 		bool const direct_store = (word & 0xfc80) == 0x8000;
 		bool const direct_long_load = (word & 0xfe80) == 0x5600;
+		bool const direct_long_store = (word & 0xfe80) == 0x4e00;
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 ||
 			(u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
@@ -1873,7 +1883,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_add && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1894,7 +1904,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (short_load || direct_store || direct_long_load)
+			if (short_load || direct_store || direct_long_load || direct_long_store)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -1959,16 +1969,16 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600))
+		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_sp;
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x5600)
+	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00))
 	{
 		m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
 		if (m_pipeline_operand_address[3] < 0x60)
 		{
-			logerror("%s: staged DLD register/peripheral pair is unsupported\n", machine().describe_context());
+			logerror("%s: staged long-word register/peripheral pair is unsupported\n", machine().describe_context());
 			m_illegal = true;
 			return;
 		}
@@ -2067,6 +2077,11 @@ void tms320c54x_device::pipeline_step()
 			if (BIT(m_st1, 8) && BIT(m_pipeline_operand[5], 15)) value |= u64(0xff) << 32;
 			accumulator(BIT(m_op, 8)) = value;
 		}
+		else if ((m_op & 0xfe80) == 0x4e00)
+		{
+			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+			m_pipeline_long_store_pending = true;
+		}
 		else if ((m_op & 0xffe0) == 0x4a00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if ((m_op & 0xff00) == 0x8a00)
@@ -2113,6 +2128,14 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x4e00)
+	{
+		// Retain the source after older Execute writes, then occupy both
+		// write clocks (SPRU172C class 13A). Placement is a partial model.
+		u32 const value = saturated_store(accumulator(BIT(m_pipeline_word[4], 8)));
+		m_pipeline_operand[4] = u16(value >> 16);
+		m_pipeline_immediate[4] = u16(value);
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)
 	{
 		// An adjacent PSHM commits its stack word in older Execute first.
@@ -2137,13 +2160,18 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_valid[0] = true;
 		m_pipeline_fetch_address = (m_pipeline_fetch_address & 0x7f0000) | u16(m_pipeline_fetch_address + 1);
 	}
+	pipeline_accept_interrupt();
+}
+
+void tms320c54x_device::pipeline_accept_interrupt()
+{
 	// Acceptance occurs after this cycle's Decode. Retain decoded slots,
 	// replace the next Decode with INTR, and drain the prefetched bus word.
 	bool intm_protected = m_pipeline_intm_follow;
 	for (unsigned stage = 0; stage < 5; ++stage)
 		intm_protected |= m_pipeline_valid[stage] && m_pipeline_intm_protected[stage];
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_control_words && accept_interrupt())
+		!m_pipeline_control_words && !m_pipeline_long_store_pending && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);
