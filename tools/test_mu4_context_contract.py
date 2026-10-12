@@ -2,6 +2,7 @@ import unittest
 
 from tools.mu4_context_contract import BASE, MASK, WITNESS, contract, decode_words, route_for_status
 from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worker_entry, worker_route
+from tools.mu4_context_contract import WORKER_TAIL_BASE, WORKER_TAIL_WITNESS, decode_worker_return, restored_intm
 
 
 class ContextContractTest(unittest.TestCase):
@@ -74,6 +75,30 @@ class ContextContractTest(unittest.TestCase):
             del words[address]
             with self.assertRaises(ValueError):
                 decode_worker_entry(words)
+
+    def test_original_return_restores_only_intm(self):
+        result = decode_worker_return(dict(enumerate(WORKER_TAIL_WITNESS, WORKER_TAIL_BASE)))
+        self.assertEqual(result['matched_words'], 7)
+        self.assertEqual(result['return']['delay_words'], ['fd45', 'f6bb'])
+        self.assertEqual(result['status_coverage'], {'tested': 65536, 'unmasked': 32768, 'masked': 32768})
+        self.assertIn('not all ST1', result['restores'])
+
+    def test_return_intm_domain_and_exhaustive_predicate(self):
+        for value in range(65536):
+            self.assertEqual(restored_intm(value), 'masked' if value & 0x800 else 'unmasked')
+        for value in (-1, 65536, '0800', None):
+            with self.assertRaises(ValueError):
+                restored_intm(value)
+
+    def test_return_witness_mutation_and_absence(self):
+        for address in range(WORKER_TAIL_BASE, WORKER_TAIL_BASE + len(WORKER_TAIL_WITNESS)):
+            words = dict(enumerate(WORKER_TAIL_WITNESS, WORKER_TAIL_BASE))
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_worker_return(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_worker_return(words)
 
 
 if __name__ == '__main__':

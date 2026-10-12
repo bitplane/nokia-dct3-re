@@ -2629,7 +2629,17 @@ during return: A=0 allows the INTM clear, but the first resumed instruction
 must retire before IRQ acknowledgement; A=0800 rejects the clear and leaves
 the source pending. This validates that bounded delay/IRQ composition, not
 RETED, nested controls, NMI, other XC placements or physical silicon timing.
-The full original POPM/AND producer tail and native recorder remain unvalidated.
+Ten further cases execute all seven original `02:3ddb`--`02:3de1` return-tail
+words with saved ST1 values `0034`/`0834`. POPM samples the saved status,
+AND reduces A to its INTM bit, and the original XC/RSBX pair either restores
+unmasked state or preserves the mask. Both stack words are changed after
+sampling; five replay boundaries must still reproduce the retained values,
+one target Fetch and the correct delayed IRQ outcome. The first continuation
+instruction retires before IRQ acknowledgement. The continuation/vector are
+neutral test instructions, not the native caller/ISR. The read-only contract
+tool pins all seven words and classifies every saved ST1 value: 32,768 masked
+and 32,768 unmasked. It describes restoration of INTM only, not full ST1.
+Complete worker-body execution and the native recorder remain unvalidated.
 
 Staged CALL/CALLD retain a stack destination at the opcode's Access clock
 (complete target Decode), load RTN in the next clock and write the retained

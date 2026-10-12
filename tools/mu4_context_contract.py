@@ -1,4 +1,4 @@
-"""Read-only original R060 context branch; no execution or full-ISR claim."""
+"""Read-only original R060 context/worker contracts; no full-ISR claim."""
 import argparse
 from collections import Counter
 import hashlib
@@ -31,6 +31,35 @@ WITNESS = (
 WORKER_BASE = 0x23DBC
 WORKER_WITNESS = (0xFD00, 0x4A07, 0xFD00, 0xF7BB, 0x7192, 0x0010,
                   0x1092, 0xF844, 0x3DDB)
+WORKER_TAIL_BASE = 0x23DDB
+WORKER_TAIL_WITNESS = (0x8A08, 0xF030, 0x0800, 0xF495, 0xFE00, 0xFD45, 0xF6BB)
+
+
+def restored_intm(saved_status):
+    if not isinstance(saved_status, int) or not 0 <= saved_status <= 0xFFFF:
+        raise ValueError('saved ST1 must be an unsigned 16-bit word')
+    return 'masked' if saved_status & 0x0800 else 'unmasked'
+
+
+def decode_worker_return(words):
+    for offset, expected in enumerate(WORKER_TAIL_WITNESS):
+        address = WORKER_TAIL_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'worker return witness changed or absent at {address:06x}')
+    return {
+        'matched_word_range': ['023ddb', '023de1'],
+        'matched_words': len(WORKER_TAIL_WITNESS),
+        'saved_status_pop': {'address': '023ddb', 'destination': 'AL'},
+        'mask': '0800', 'restores': 'INTM only, not all ST1 fields',
+        'return': {'address': '023ddf', 'opcode': 'fe00', 'operation': 'RETD',
+                   'delay_words': ['fd45', 'f6bb'],
+                   'delay_operations': ['XC 1,AEQ', 'RSBX INTM']},
+        'clear_intm_when': '(saved ST1 & 0800) == 0',
+        'status_coverage': {'tested': 65536,
+                            **dict(Counter(restored_intm(value) for value in range(65536)))},
+        'scope': 'seven pinned original words and exhaustive INTM predicate; '
+                 'no full worker body or native recorder completion',
+    }
 
 
 def worker_route(control_word):
@@ -122,6 +151,7 @@ def contract(source):
     words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22')
     result = decode_words(words)
     result['worker_entry'] = decode_worker_entry(words)
+    result['worker_return'] = decode_worker_return(words)
     return result
 
 

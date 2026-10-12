@@ -4039,6 +4039,52 @@ private:
 		m_phase = 251790; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_original_worker_tail(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const masked = BIT(variant, 0); u16 const saved_status = masked ? 0x0834 : 0x0034;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(0x23ddb + i, 0xf495); program.write_word(0x23d96 + i, 0xf495); program.write_word(0x20040 + i, 0xf495); }
+		std::array<u16, 7> const tail{0x8a08, 0xf030, 0x0800, 0xf495, 0xfe00, 0xfd45, 0xf6bb};
+		for (unsigned i = 0; i < tail.size(); ++i) program.write_word(0x23ddb + i, tail[i]);
+		program.write_word(0x23de2, 0xffff); program.write_word(0x23d96, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0xfff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1122334455ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->space(AS_DATA).write_word(0xfff, saved_status); m_cpu->space(AS_DATA).write_word(0x1000, 0x3d96);
+		m_cpu->set_state_int(STATE_GENPC, 0x23ddb); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xfff, 0x1000, "original_worker_tail_stack",
+			[this, saved_status](offs_t address, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == (address == 0xfff ? saved_status : 0x3d96) && m_cpu->pipeline_cycles() == (address == 0xfff ? 5 : 9), "Original tail samples saved ST1 then its return word once"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x23d96, 0x23d96, "original_worker_tail_target",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 11, "Original tail fetches its page-2 caller continuation once"); ++m_pipeline_extensions_reads;
+			});
+		m_pipeline_write_tap = program.install_read_tap(0x23de0, 0x23de2, "original_worker_tail_delays",
+			[this](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(address == 0x23de0 + m_pipeline_drained_fetches && m_pipeline_drained_fetches < 2 && m_cpu->pipeline_cycles() == 7 + address - 0x23de0, "Original return keeps exactly XC and RSBX as its two delay words"); ++m_pipeline_drained_fetches;
+			});
+		m_vector_prefetch_tap = program.install_read_tap(0x20040, 0x20040, "original_worker_tail_irq",
+			[this, masked](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(!masked && m_cpu->pipeline_cycles() == 18 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55, "Original tail restores unmasked state only after the first continuation retires"); ++m_pipeline_store_writes;
+			});
+		m_phase = 251810; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -25938,13 +25984,60 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 23) { start_pipeline_delayed_return(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged delayed returns: PASS cases=24 pages=2 delay_forms=3 restore=24 xc_irq_cases=12 duplicate_stack_reads=0 third_delay_fetches=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_original_worker_tail(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251800)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251790;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251810)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			bool const masked = BIT(variant, 0); u16 const saved_status = masked ? 0x0834 : 0x0034;
+			u64 const checkpoint = std::array<unsigned, 5>{5, 8, 9, 11, 14}[variant / 2];
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5) + unsigned(cycle >= 9) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 11) &&
+				m_pipeline_drained_fetches == unsigned(cycle >= 7) + unsigned(cycle >= 8) &&
+				m_pipeline_store_writes == unsigned(!masked && cycle >= 18) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (!masked && cycle >= 17 ? 0x1000 : cycle >= 8 ? 0x1001 : cycle >= 5 ? 0x1000 : 0xfff) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 8 ? (masked ? 0x800 : 0) : cycle >= 6 ? 0x2233440000ULL | saved_status : 0x2233445566ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 15 ? 0x55 : 0x1122334455ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (!masked && cycle >= 14 && cycle < 18 ? 0 : 0x800),
+				"Original worker tail restores the saved INTM branch, balances pops and protects resumed execution");
+			if (cycle == 10) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
+			if (cycle == 5) m_cpu->space(AS_DATA).write_word(0xfff, 0xdead);
+			if (cycle == 9) m_cpu->space(AS_DATA).write_word(0x1000, 0xdead);
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original tail around stack samples, AND and delay decision");
+			}
+			if (cycle == 24)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5) + unsigned(checkpoint >= 9);
+					m_pipeline_extensions_reads = unsigned(checkpoint >= 11); m_pipeline_store_writes = 0;
+					m_pipeline_drained_fetches = unsigned(checkpoint >= 7) + unsigned(checkpoint >= 8);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original tail without repeated stack or delay reads");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251820;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 9) { start_pipeline_original_worker_tail(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original worker return tail: PASS cases=10 original_words=7 saved_intm_states=2 restore=10 duplicate_stack_reads=0 irq_after_continuation=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251820)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251810;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
