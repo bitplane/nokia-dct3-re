@@ -2948,9 +2948,29 @@ accumulators, four input patterns, both SST/SXM states, zero through three
 intervening NOPs and saves after Decode, Read or Execute. Each leg verifies
 one register write, one consumer read, an unchanged source accumulator and
 the old/new pointer boundary at two intervening instructions. Original MU4
-startup advances through `8811` at `00:3092` and fails closed on long-offset
-DST `4ee1` at `00:309b`. This remains coverage evidence, not native startup
-or recorder acceptance; existing atomic profiles are unchanged.
+startup advances through `8811` at `00:3092`. This remains coverage evidence,
+not native startup or recorder acceptance; existing atomic profiles are unchanged.
+
+Extended DST A/B now retains its second-word offset/absolute address in
+Decode. Access applies table 5-4's ordinary offset (AR unchanged), linear
+preincrement or circular preincrement once; absolute addressing uses the
+retained literal without consulting AR. Read captures the saturated pair
+after older Execute writes. Execute writes the high word, then the held
+clock writes the low word at `address ^ 1`, preserving odd-address ordering
+(SPRU172C 4-47). The extra extension word adds one clock to the existing
+two-write path. Stage placement remains partial, not measured silicon.
+
+The 3072 replay cases cover four address forms, eight encoded registers,
+both accumulators, four offsets/patterns, both compatibility and SST states,
+and checkpoints after Decode, Read or the first write. They change the
+literal after Decode, AR/BK after Access and source accumulator after Read;
+the original address/pair still publishes exactly once with no destination
+read. Opcode-shaped offset `f495`, negative offsets and both address parities
+are included. Register/peripheral destinations, control-delay placement,
+general bank arbitration and circular-region provenance remain unvalidated;
+the first two fail closed. The original upload passes `4ee1` at `00:309b`
+and now stops on unsupported `f180` at `00:2fed`, still without native
+startup/recorder acceptance or atomic fallback.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP

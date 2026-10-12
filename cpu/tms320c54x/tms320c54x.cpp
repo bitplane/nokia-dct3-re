@@ -121,6 +121,16 @@ constexpr bool staged_accumulator_mmr_store(u16 word)
 	return (word & 0xfe00) == 0x8800 && u8(word) >= 0x10 && u8(word) <= 0x17;
 }
 
+constexpr bool staged_extended_dst(u16 word)
+{
+	return (word & 0xfe00) == 0x4e00 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
+}
+
+constexpr bool staged_dst(u16 word)
+{
+	return (word & 0xfe80) == 0x4e00 || staged_extended_dst(word);
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -2133,6 +2143,11 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
+			if (staged_extended_dst(word))
+			{
+				logerror("%s: staged long DST in a control delay is unsupported\n", machine().describe_context());
+				m_illegal = true; return;
+			}
 			unsigned const words = ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || staged_absolute_load(word) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_port_write(word) || staged_absolute_add(word) || word == 0x47f8 || staged_banz(word) || staged_read_a(word) || word == 0xf070 || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
@@ -2161,7 +2176,7 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 		else if (staged_port_write(m_pipeline_word[2]) || staged_absolute_add(m_pipeline_word[2]) || m_pipeline_word[2] == 0x47f8 || staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
-			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
+			(m_pipeline_word[2] & 0xfeff) == 0xf062 || staged_extended_dst(m_pipeline_word[2]) ||
 			m_pipeline_word[2] == 0xf070 || m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0x98)) ||
@@ -2185,7 +2200,7 @@ void tms320c54x_device::pipeline_step()
 			(BIT(word, 7) || u8(word) < 0x80));
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
 		bool const direct_long_load = (word & 0xfe80) == 0x5600;
-		bool const direct_long_store = (word & 0xfe80) == 0x4e00;
+		bool const direct_long_store = staged_dst(word);
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const memory_dp = (word & 0xff80) == 0x4600;
 		bool const direct_move = staged_move(word);
@@ -2420,9 +2435,33 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x4800)
 		m_pipeline_operand_address[3] = u8(m_pipeline_word[3]);
-	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00))
+	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe80) == 0x5600 || staged_dst(m_pipeline_word[3])))
 	{
-		m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
+		if (staged_extended_dst(m_pipeline_word[3]))
+		{
+			// Table 5-4: MOD 12 retains AR, 13/14 premodify it, and
+			// MOD 15 supplies an absolute address. Do not fetch again here.
+			u8 const mode = m_pipeline_word[3];
+			if (mode == 0xf8) m_pipeline_operand_address[3] = m_pipeline_immediate[3];
+			else
+			{
+				unsigned const ar = indirect_ar(mode);
+				s16 const offset = s16(m_pipeline_immediate[3]);
+				if ((mode & 0x78) == 0x70)
+				{
+					circular_modify(ar, offset);
+					m_pipeline_operand_address[3] = m_ar[ar];
+				}
+				else
+				{
+					m_pipeline_operand_address[3] = u16(m_ar[ar] + offset);
+					if ((mode & 0x78) == 0x68) m_ar[ar] = m_pipeline_operand_address[3];
+				}
+				if (BIT(m_st1, 5) && (mode & 7))
+					m_st0 = (m_st0 & ~u16(0xe000)) | u16((mode & 7) << 13);
+			}
+		}
+		else m_pipeline_operand_address[3] = basic_address(3, u8(m_pipeline_word[3]));
 		if (m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged long-word register/peripheral pair is unsupported\n", machine().describe_context());
@@ -2730,10 +2769,11 @@ void tms320c54x_device::pipeline_step()
 			if (BIT(m_st1, 8) && BIT(m_pipeline_operand[5], 15)) value |= u64(0xff) << 32;
 			accumulator(BIT(m_op, 8)) = value;
 		}
-		else if ((m_op & 0xfe80) == 0x4e00)
+		else if (staged_dst(m_op))
 		{
 			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_pipeline_long_store_pending = true;
+			if (staged_extended_dst(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xffe0) == 0x4a00 || (m_op & 0xff00) == 0x4b00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
@@ -2819,7 +2859,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
-		unsigned const xc_retired_words = ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
+		unsigned const xc_retired_words = staged_extended_dst(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 			(staged_far_call(m_op) || staged_absolute_load(m_op) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
 			u16(m_pipeline_xc_end - address) < xc_retired_words)
@@ -2827,7 +2867,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
 			u16(address - m_pipeline_control_address) <= 3)
 		{
-			unsigned const words = ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
+			unsigned const words = staged_extended_dst(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 				(staged_far_call(m_op) || staged_absolute_load(m_op) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
@@ -2874,10 +2914,10 @@ void tms320c54x_device::pipeline_step()
 			if (stage == 3) m_pipeline_operand_address[stage] = basic_address(stage, u8(word));
 		}
 	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x4e00)
+	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
 	{
 		// Retain the source after older Execute writes, then occupy both
-		// write clocks (SPRU172C class 13A). Placement is a partial model.
+		// write clocks (SPRU172C classes 13A/13B). Placement is a partial model.
 		u32 const value = saturated_store(accumulator(BIT(m_pipeline_word[4], 8)));
 		m_pipeline_operand[4] = u16(value >> 16);
 		m_pipeline_immediate[4] = u16(value);

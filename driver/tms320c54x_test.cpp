@@ -5944,6 +5944,65 @@ private:
 		m_phase = 252530; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct dst_extended_fixture
+	{
+		unsigned reg, selected, source, kind;
+		u16 literal, address, next_ar;
+		u64 value;
+		u32 stored;
+	};
+	static dst_extended_fixture extended_dst_fixture(unsigned variant)
+	{
+		unsigned const reg = variant % 8, source = (variant / 8) % 2, kind = (variant / 16) % 4, pattern = (variant / 64) % 4;
+		bool const compatibility = (variant / 256) % 2, sst = (variant / 512) % 2;
+		unsigned const selected = compatibility && !reg ? 3 : reg;
+		s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[pattern];
+		u16 const linear = u16(0x1007 + offset);
+		int const index = (7 + offset) % 16;
+		u16 const address = kind == 2 ? 0x1000 + (index < 0 ? index + 16 : index) : linear;
+		u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
+		s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
+		u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
+		return {reg, selected, source, kind, kind == 3 ? address : u16(offset), address,
+			u16(kind == 1 || kind == 2 ? address : 0x1007), value, stored};
+	}
+	void start_pipeline_extended_dst(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_dst_fixture(variant);
+		u32 const base = f.reg & 1 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x4e00 | (f.source << 8) | (f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg));
+		program.write_word(base + 0x601, f.literal);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 512) % 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900 | (((variant / 256) % 2) << 5));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : f.value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? f.value : 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x1007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(f.address ^ 1, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_dst_no_operand_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "DST does not read either destination word"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x60, 0xffff, "extended_dst_pair",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_store_writes < 2 && at == (f.address ^ m_pipeline_store_writes) &&
+					word == (m_pipeline_store_writes ? u16(f.stored) : u16(f.stored >> 16)) && m_cpu->pipeline_cycles() == 7 + m_pipeline_store_writes,
+					"Extended DST retains its original address and saturated pair across two owned write clocks"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "extended_dst_literal",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == f.literal && !m_pipeline_extensions_reads, "DST long offset/address is fetched once, including opcode-shaped literals"); ++m_pipeline_extensions_reads; });
+		m_phase = 252550; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29781,13 +29840,67 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 767) { start_pipeline_stlm(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged STLM AR: PASS cases=768 registers=8 accumulators=2 patterns=4 sst=0,1 sxm=0,1 gaps=0,1,2,3 restore=768 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_extended_dst(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252540)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252530;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252550)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = extended_dst_fixture(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 6, 7}[variant / 1024];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Extended DST owns its retained address and both writes");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word((f.reg & 1 ? 0x20000 : 0) + 0x601, 0xdead);
+			}
+			if (tick == 5)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar, "Long DST applies preincrement/circular modification once in Access");
+				u16 const st0 = (variant / 256) % 2 && f.reg && f.kind != 3 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0, "Long DST uses standard ARF or compatibility ARP ownership without DP/CPL addressing");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			}
+			if (tick == 6) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended DST after Decode, source capture or first write");
+			}
+			if (tick == 24)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 1 &&
+						m_cpu->space(AS_DATA).read_word(f.address) == u16(f.stored >> 16) && m_cpu->space(AS_DATA).read_word(f.address ^ 1) == u16(f.stored) &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
+						"DST retains both source words and destination despite later accumulator/AR/literal changes");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore DST without duplicate address updates or writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252560; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 3071) { start_pipeline_extended_dst(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252560)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252550;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
