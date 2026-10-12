@@ -2376,6 +2376,21 @@ context tool pins the six original words, but does not assign meanings to
 the operands. Peripheral/extended destinations, general stack/DAGEN/bank
 conflicts and the remaining worker body/native recorder remain unvalidated.
 
+Short accumulator stores now include stationary/postdecrement/postincrement
+indirect addressing, and short ST T/TRN use the same retained destination
+path (SPRU172C page 4-167, class 10A). Read captures the address and applies
+its AR update once; Execute publishes the selected register value to that
+captured address. Seventy-two cases cover A/B high/low words, T/TRN,
+DP/compiler-relative and stationary/postincrement AR3 destinations, and
+three save/replay boundaries. Changing AR3 after address capture must not
+retarget the write. Three sequence cases verify consecutive high/low B and T
+publications with a neutral gap; that gap does not claim to execute the
+original intervening CMPR. All 75 cases preserve register/status values and
+produce no duplicate writes on replay. Source-register producer latency,
+extended modes and physical bus placement remain unvalidated; T/TRN stores
+are limited to RAM destinations. Original CMPR and later worker arithmetic
+remain separate instruction-ownership requirements.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute

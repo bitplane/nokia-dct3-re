@@ -45,6 +45,11 @@ constexpr bool staged_rmw(u16 word)
 	return (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x6b00;
 }
 
+constexpr bool staged_store(u16 word)
+{
+	return ((word & 0xfc00) == 0x8000 || (word & 0xfe00) == 0x8c00) && u8(word) < 0x98;
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -1806,7 +1811,7 @@ void tms320c54x_device::pipeline_step()
 		((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || (m_pipeline_word[3] & 0xff80) == 0x4600) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
 	bool const write_peripheral = m_pipeline_valid[4] &&
-		((m_pipeline_word[4] & 0xfc80) == 0x8000 || staged_rmw(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
+		(staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
 		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f;
 	if (read_peripheral && write_peripheral)
 	{
@@ -1994,7 +1999,7 @@ void tms320c54x_device::pipeline_step()
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = (word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
 			(BIT(word, 7) || u8(word) < 0x80);
-		bool const direct_store = (word & 0xfc80) == 0x8000;
+		bool const direct_store = staged_store(word);
 		bool const direct_long_load = (word & 0xfe80) == 0x5600;
 		bool const direct_long_store = (word & 0xfe80) == 0x4e00;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
@@ -2096,7 +2101,7 @@ void tms320c54x_device::pipeline_step()
 		// STM T uses this early-write path as a partial model of example
 		// 7-39's zero T latency; T is not subject to the DAGEN-bank deferral.
 		bool const older_store = m_pipeline_word[3] != 0x770e && m_pipeline_valid[5] &&
-			((m_pipeline_word[5] & 0xfc80) == 0x8000 || staged_rmw(m_pipeline_word[5])) &&
+			(staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 		m_pipeline_early_write_deferred[3] = older_store;
 		if (!older_store) data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3]);
@@ -2139,7 +2144,7 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		(m_pipeline_word[3] & 0xfc80) == 0x8000 || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
+		staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
@@ -2184,7 +2189,7 @@ void tms320c54x_device::pipeline_step()
 		if (destination >= 0x10 && destination <= 0x19)
 		{
 			bool const conflict = m_pipeline_valid[5] &&
-				((m_pipeline_word[5] & 0xfc80) == 0x8000 || staged_rmw(m_pipeline_word[5])) &&
+				(staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[3] = conflict;
 			if (!conflict) data_write(destination, m_pipeline_operand[3]);
@@ -2266,8 +2271,17 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = m_sp++;
 	}
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
-		m_pipeline_operand_address[4] = basic_address(4, u8(m_pipeline_word[4]));
+	if (m_pipeline_valid[4] && staged_store(m_pipeline_word[4]))
+	{
+		u8 const mode = m_pipeline_word[4];
+		m_pipeline_operand_address[4] = basic_address(4, mode);
+		if ((m_pipeline_word[4] & 0xfe00) == 0x8c00 && m_pipeline_operand_address[4] < 0x60)
+		{
+			logerror("%s: staged T/TRN store register/peripheral destination is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (BIT(mode, 7)) indirect_modify(mode);
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x7600)
 	{
 		u8 const mode = m_pipeline_word[4];
@@ -2366,9 +2380,10 @@ void tms320c54x_device::pipeline_step()
 			data_write(u8(m_op), m_pipeline_operand[5]);
 		else if ((m_op & 0xff00) == 0x8b00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-		else if ((m_op & 0xfc80) == 0x8000)
-			data_write(m_pipeline_operand_address[5],
-				u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));
+		else if (staged_store(m_op))
+			data_write(m_pipeline_operand_address[5], (m_op & 0xfe00) == 0x8c00
+				? (BIT(m_op, 8) ? m_trn : m_t)
+				: u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));
 		else if (staged_rmw(m_op))
 		{
 			m_pc += u8(m_op) == 0xf8 ? 2 : 1;

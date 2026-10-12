@@ -4435,6 +4435,50 @@ private:
 		m_phase = 251930; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_register_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const sequence = variant >= 72; unsigned const kind = variant % 6, form = (variant / 6) & 3;
+		u16 const destination = !sequence && form == 1 ? 0x1020 : 0x470;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		if (sequence)
+		{
+			program.write_word(0x600, 0x8393); program.write_word(0x601, 0x8193);
+			program.write_word(0x603, 0x8c93); // Neutral gap; the original CMPR is not modeled by this fixture.
+		}
+		else program.write_word(0x600, std::array<u16, 6>{0x8000, 0x8200, 0x8100, 0x8300, 0x8c00, 0x8d00}[kind] |
+			std::array<u16, 4>{0x70, 0x20, 0x83, 0x93}[form]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (!sequence && form == 1 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, sequence ? 6 : 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xcafe);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 3; ++i) m_cpu->space(AS_DATA).write_word(destination + i, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination + 2, "staged_register_store",
+			[this, sequence, kind, destination](offs_t address, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (sequence)
+					expect(m_pipeline_store_writes < 3 && address == destination + m_pipeline_store_writes &&
+						word == std::array<u16, 3>{0x3344, 0x5566, 6}[m_pipeline_store_writes] &&
+						m_cpu->pipeline_cycles() == std::array<unsigned, 3>{6, 7, 9}[m_pipeline_store_writes], "Short stores publish high/low B and T into consecutive captured addresses");
+				else expect(address == destination && word == std::array<u16, 6>{0x789a, 0x3456, 0x5566, 0x3344, 0xbeef, 0xcafe}[kind] &&
+					m_cpu->pipeline_cycles() == 6, "Register store writes the selected source to its retained destination once");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251950; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -26668,13 +26712,54 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 49) { start_pipeline_data_pop(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_register_store(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251940)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251930;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251950)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			bool const sequence = variant >= 72; unsigned const form = (variant / 6) & 3;
+			u64 const checkpoint = sequence ? std::array<unsigned, 3>{5, 6, 8}[variant - 72] : 4 + variant / 24;
+			u64 const mutation_clock = sequence ? 8 : 5;
+			auto const writes_at = [sequence](u64 clock) { return sequence ? unsigned(clock >= 6) + unsigned(clock >= 7) + unsigned(clock >= 9) : unsigned(clock >= 6); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_store_writes == writes_at(cycle) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (cycle > mutation_clock ? 0x650 : sequence ? 0x470 + unsigned(cycle >= 5) + unsigned(cycle >= 6) + unsigned(cycle >= 8) : form == 3 && cycle >= 5 ? 0x471 : 0x470) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (!sequence && form == 1 ? 0x4000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == (sequence ? 6 : 0xbeef) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0xcafe,
+				"Register stores retain destination despite later AR changes and preserve source/status registers");
+			if (cycle == mutation_clock) m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x650);
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save short register stores around address capture and Write");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore register-store addresses without duplicate pointer updates or writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251960;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 74) { start_pipeline_register_store(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged short register stores: PASS cases=75 sources=6 address_forms=4 multi_store_cases=3 restore=75 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251960)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251950;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
