@@ -1869,7 +1869,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
-			((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
+			m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 ||
 				(u8(m_pipeline_word[2]) < 0x98 && (BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))) ||
 			((m_pipeline_word[2] & 0xfe00) == 0x6800 &&
@@ -1910,7 +1910,8 @@ void tms320c54x_device::pipeline_step()
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		bool const immediate_t = word == 0x770e;
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1929,7 +1930,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_decode_flush = delayed ? 0 : 2;
 			if (plain_return || (far_return && !delayed)) m_pipeline_flush_front = true;
 		}
-		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
+		if (m_pipeline_valid[2] && (dagen_immediate || immediate_t)) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
@@ -1957,7 +1958,9 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G 7.5.2: STM writes DAGEN in the opcode word's Read,
 		// coincident with Access of our retained two-word operation. An older
 		// store using that register bank defers the write one clock (7-22).
-		bool const older_store = m_pipeline_valid[5] &&
+		// STM T uses this early-write path as a partial model of example
+		// 7-39's zero T latency; T is not subject to the DAGEN-bank deferral.
+		bool const older_store = m_pipeline_word[3] != 0x770e && m_pipeline_valid[5] &&
 			((m_pipeline_word[5] & 0xfc80) == 0x8000 || (m_pipeline_word[5] & 0xfe00) == 0x6800) &&
 			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 		m_pipeline_early_write_deferred[3] = older_store;
@@ -2125,7 +2128,7 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xff00) == 0xee00)
 			; // FRAME's SP update already belongs to its Access stage.
 		else if ((m_op & 0xff00) == 0x7700)
-			++m_pc; // DAGEN write already committed in the opcode's Read stage.
+			++m_pc; // Register write already committed in the opcode's Read stage.
 		else if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
 		else if ((m_op & 0xfe80) == 0x4800)

@@ -2623,12 +2623,25 @@ return word at the opcode's Execute clock (SPRU131G examples 7-4/5).
 For a call starting at Prefetch 1 these are clocks 4/5/6, with target Fetch 6.
 CALL stacks the PC after its two instruction words; CALLD includes both delay words.
 RTN is also exposed as a debugger state register without changing the MMR map.
-Twenty-four round trips cover both forms/pages, with or without an older
+Eighty-four round trips cover both forms/pages, with or without an older
 PSHM, restoring after allocation, RTN setup or stack commitment. Each requires
 one call write, target fetch and callee RET read, correct delay execution and
 balanced call SP. The older push retains its own distinct stack word. General
-DAGEN conflicts, pending IRQ timing, nested in-flight controls and the original
-worker's two-word STM-to-T delay remain unvalidated by these cases.
+DAGEN conflicts, pending IRQ timing and nested in-flight controls remain
+unvalidated by these cases.
+
+The exact `770e literal` STM-to-T form now uses the retained two-word register
+write path. In this prototype it publishes at the opcode's Read clock, like
+the existing early DAGEN STM path, but is not deferred by DAGEN-bank conflicts.
+This is a partial placement model of SPRU131G example 7-39's zero T latency,
+not a measured physical write phase. Sixty of the call cases use STM-to-T as
+the complete CALLD delay, then LDM T in the callee. They cover parameters
+`0006`, `0000`, `8000`, `f495` and `ffff`, both pages, adjacent pushes and
+checkpoints after call allocation/RTN/stack write. Each requires one T write
+before callee Read, correct unsigned parameter delivery, balanced call SP
+and no duplicate publication on replay. The original `770e 0006` is therefore
+executable at the call boundary; general STM destinations and concurrent
+MMR-producer conflicts remain unvalidated.
 
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
@@ -2853,7 +2866,7 @@ Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
 complete status predicate. CALL/CALLD round trips are implemented, but the
-original worker path still needs its MVDK setup, STM-to-T delay and callee
+original worker path still needs its MVDK setup and callee
 instruction stream. Establish those and interrupt integration before a full
 original-handler fixture; neither skipping
 delay effects nor a fixed interrupt delay is a substitute.
