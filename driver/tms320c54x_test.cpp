@@ -4148,6 +4148,70 @@ private:
 		m_phase = 251830; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_original_context_call(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
+		u16 const saved_status = BIT(variant, 1) ? 0x4a00 : 0x4200;
+		std::array<u16, 51> const main{0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
+			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c, 0xf300, 0x0001, 0x4f7c, 0x487e,
+			0xf030, 0xc004, 0xf050, 0xc004, 0xfa44, 0x3d9a, 0x467f, 0xf495,
+			0x4a10, 0x4a12, 0x4a13, 0x4a0e, 0x7131, 0x0012, 0xf274, 0x3dbc, 0x770e, 0x0006,
+			0x8a0e, 0x8a13, 0x8a12, 0x8a10, 0x1036, 0xf7be, 0x8a0d, 0x8a0c, 0x8a0b,
+			0x8006, 0x8a0a, 0x8a09, 0x8a08, 0x8a07, 0x8a06, 0xfc00};
+		std::array<u16, 9> const entry{0xfd00, 0x4a07, 0xfd00, 0xf7bb, 0x7192, 0x0010, 0x1092, 0xf844, 0x3ddb};
+		std::array<u16, 7> const tail{0x8a08, 0xf030, 0x0800, 0xf495, 0xfe00, 0xfd45, 0xf6bb};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 144; ++i) program.write_word(base + 0x3d73 + i, 0xf495);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x4044 + i, 0xf495);
+		for (unsigned i = 0; i < main.size(); ++i) program.write_word(base + 0x3d73 + i, main[i]);
+		for (unsigned i = 0; i < entry.size(); ++i) program.write_word(base + 0x3dbc + i, entry[i]);
+		for (unsigned i = 0; i < tail.size(); ++i) program.write_word(base + 0x3ddb + i, tail[i]);
+		program.write_word(base + 0x3de2, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa61b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, saved_status);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2468);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x369c);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8888);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0xff0; i <= 0x1000; ++i) data.write_word(i, 0xaaaa);
+		data.write_word(0x7c, 0x1357); data.write_word(0x7d, 0x2468);
+		data.write_word(0x7e, 0xc004); data.write_word(0x7f, 0xe012);
+		data.write_word(0x931, 0x510); data.write_word(0x936, 0x4044);
+		data.write_word(0x510, 0xbeef); data.write_word(0x511, 1);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x3d73); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_write_tap = data.install_write_tap(0xff1, 0xfff, "original_context_call_stack",
+			[this, saved_status](offs_t address, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 15> const expected{0xa61b, saved_status, 0x789a, 0x3456, 0x12, 0x5566, 0x3344, 0x22,
+					0x1357, 0x2468, 0x369c, 0x8888, 0x3d96, u16(saved_status & 0x800), 0x4044};
+				expect(m_pipeline_store_writes < expected.size() && address == (m_pipeline_store_writes < 14 ? 0xffe - m_pipeline_store_writes : 0xfff) &&
+					word == expected[m_pipeline_store_writes], "Original context call route owns all nested saves and reserved return write"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_operand_tap = data.install_read_tap(0xfff, 0xfff, "original_context_call_return",
+			[this](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == 0x4044, "Original call route reads the reserved return after restoring context"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x4044, base + 0x4044, "original_context_call_continuation",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				++m_pipeline_extensions_reads;
+			});
+		m_phase = 251850; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -26150,13 +26214,60 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 15) { start_pipeline_original_worker_roundtrip(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged original worker roundtrip: PASS cases=16 original_words=20 route=skip_body saved_intm_states=2 restore=16 duplicate_stack_reads=0 duplicate_source_reads=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_original_context_call(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251840)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251830;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251850)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			u16 const saved_status = BIT(variant, 1) ? 0x4a00 : 0x4200;
+			u64 const checkpoint = std::array<unsigned, 10>{6, 13, 31, 40, 51, 58, 64, 74, 79, 85}[variant / 4];
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original outer context call route advances without atomic fallback");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_pipeline_register_writes = m_pipeline_store_writes;
+				m_pipeline_branch_case = m_pipeline_operand_reads; m_pipeline_stm_case = m_pipeline_extensions_reads;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save coherent outer handler at ten nested ownership boundaries");
+			}
+			if (cycle == 100)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_pipeline_store_writes == 15 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
+						m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST1) == saved_status && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+						m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x369c &&
+						m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 && m_cpu->space(AS_DATA).read_word(0xfff) == 0x4044 &&
+						m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469,
+						"Original outer handler calls the skip-body worker and restores all saved context with one counter increment");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_register_writes;
+					m_pipeline_operand_reads = m_pipeline_branch_case; m_pipeline_extensions_reads = m_pipeline_stm_case;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore complete context call route without duplicated saves or return fetch");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251860;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 39) { start_pipeline_original_context_call(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original context call route: PASS cases=40 original_words=67 pages=2 saved_intm_states=2 restore=40 context_restored=1 counter_increments=1 full_isr_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251860)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251850;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

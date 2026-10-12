@@ -2655,6 +2655,20 @@ on replay. The source words, caller continuation and vector remain fixture
 inputs; this does not execute the zero-control-word body, outer interrupt
 handler or live recorder and does not establish native speech.
 
+The complete original outer routine now has a bounded call-route fixture:
+all 51 main words plus the nine-word worker entry and seven-word return tail.
+Its input status `c004` selects the call and a nonzero second worker word
+selects the mapped skip-body route. Forty cases cover pages 0/2, masked and
+unmasked entry ST1, and ten replay boundaries across context save, DP delay,
+nested call, branch, return and restoration. The fifteen ordered stack writes
+include all outer/extra saves, the nested return, worker ST1 and reserved
+return slot. Terminal checks require original A/B, ST0/ST1, AR0/AR2/AR3/T,
+balanced SP, one counter increment and one reserved-return Fetch. Checkpoint
+bus counts are retained separately from emulated device state so replay
+cannot hide duplicate operations. The routine is entered directly with
+fixture RAM and a neutral final continuation; timer-driven interrupt entry,
+the zero-control-word worker body and live recorder remain unvalidated.
+
 Staged CALL/CALLD retain a stack destination at the opcode's Access clock
 (complete target Decode), load RTN in the next clock and write the retained
 return word at the opcode's Execute clock (SPRU131G examples 7-4/5).
