@@ -2573,13 +2573,18 @@ early-write contract is not implemented; indirect address modification may
 already have occurred. Long-offset, compiler-mode direct and other indirect
 encodings remain outside this subset.
 
-The exact PSHM XPC form samples XPC once in Read, retains the decremented
-stack destination, then commits the sampled value in Execute. Six cases
-cover both program pages and restore before Read, after Read or after Write,
-asserting one source access, one SP decrement and one stack write per leg.
+Direct PSHM forms `4a00..4a1f` sample their MMR once in Read, retain the
+decremented stack destination, then commit the sampled value in Execute
+(SPRU172C page 4-132, class 16A). The 198 cases retain the six explicit XPC
+controls and cover all 32 direct sources in both program pages, restoring
+before Read, after Read or after Write. Each requires one source access,
+one SP decrement and one stack write per leg. PSHM SP samples the original
+SP before decrement; the original MU4 prologue's `4a06`/`4a07` accumulator
+pushes are now accepted by this staged subset.
 Read-owned stack allocation is a declared partial stage model, not a silicon
 phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
-accumulator-source latency are not covered by this implementation or gate.
+preceding accumulator-producer latency are not covered by this implementation
+or gate.
 
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it

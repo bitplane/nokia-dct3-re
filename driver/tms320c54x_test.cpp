@@ -2935,8 +2935,9 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		u32 const base = variant & 1 ? 0x10000 : 0;
+		u16 const source = variant < 6 ? 0x1e : (variant - 6) / 6;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4a1e);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4a00 | source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -2944,19 +2945,20 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		u16 const expected = m_cpu->space(AS_DATA).read_word(source);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1e, 0x1e, "staged_xpc_push_source",
-			[this, base](offs_t, u16 &value, u16) {
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_mmr_push_source",
+			[this, expected](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == (base >> 16) && m_cpu->pipeline_cycles() == 5, "PSHM XPC samples its source once in Read");
+				expect(value == expected && m_cpu->pipeline_cycles() == 5, "PSHM direct MMR samples its source once in Read before stack allocation");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "staged_xpc_push_stack",
-			[this, base](offs_t, u16 &value, u16) {
+			[this, expected](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == (base >> 16) && m_cpu->pipeline_cycles() == 6, "PSHM XPC writes the retained source to its allocated stack word");
+				expect(value == expected && m_cpu->pipeline_cycles() == 6, "PSHM direct MMR writes the retained source to its allocated stack word");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -23873,7 +23875,7 @@ private:
 		if (m_phase == 251270)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			u64 const checkpoint = 4 + m_pipeline_peripheral_case / 2;
+			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0xfff : 0x1000), "PSHM XPC retains source, stack ownership and one decrement across replay");
@@ -23895,8 +23897,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 5) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged XPC push: PASS cases=6 source_read=5 stack_write=6 restore=6 duplicate_accesses=0 silicon_phase_claim=0\n");
+				if (m_pipeline_peripheral_case < 197) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0\n");
 				start_pipeline_far_return(); return;
 			}
 			++m_pipeline_expected_cycle;
