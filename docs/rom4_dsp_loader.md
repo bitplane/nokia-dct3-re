@@ -2656,7 +2656,15 @@ The atomic implementation's execution-time predicate evaluation therefore
 cannot be reused as a physical staged sampling contract. Staged acceptance
 now covers the original unconditional prefix in four checkpoint/replay
 cases: PSHM publishes the old ST1 once before SSBX sets INTM, with the
-stack allocation preserved on restoration. A saved word-address guard
+stack allocation preserved on restoration. Four further cases execute the
+original seven words through `7192 0010 1092`, with neutral NOPs afterward.
+MVDK samples the old AR2 address once, increments AR2 and publishes AR0;
+the adjacent LD samples the next word and increments AR2 again. Source RAM
+changes after the move sample cannot change the retained AR0 value. Saved
+context at four boundaries reproduces one stack push and two ordered RAM
+reads without duplicate pointer updates. This is bounded prefix composition,
+not a complete worker, interrupt entry or native recorder run.
+A saved word-address guard
 implements the two-word protection window. Four additional XC 1/XC 2 cases
 make a maskable IRQ pending after Decode: two following stores must retire
 before the vector is fetched once. Restoration during protection or at its
