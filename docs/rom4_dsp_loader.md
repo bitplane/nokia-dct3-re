@@ -2641,6 +2641,20 @@ tool pins all seven words and classifies every saved ST1 value: 32,768 masked
 and 32,768 unmasked. It describes restoration of INTM only, not full ST1.
 Complete worker-body execution and the native recorder remain unvalidated.
 
+The original nonzero-control-word route has a coherent call/return fixture:
+four CALLD/STM parameter words at `02:3d92`, nine worker-entry words and
+seven return-tail words, all unchanged from R060. Sixteen cases cover saved
+masked/unmasked ST1 and eight replay boundaries. The call stacks `3d96`,
+the worker stacks that ST1, and its skip-body branch consumes two source
+samples before the tail pops both owned words and balances the caller SP.
+T receives parameter 6. Source and stack RAM changes after sampling must
+not affect retained values; CPU bus counters exclude those debugger-side
+mutations. Pending IRQ delivery resumes only after the caller continuation's
+first instruction. There are no duplicate stack/source reads or route Fetches
+on replay. The source words, caller continuation and vector remain fixture
+inputs; this does not execute the zero-control-word body, outer interrupt
+handler or live recorder and does not establish native speech.
+
 Staged CALL/CALLD retain a stack destination at the opcode's Access clock
 (complete target Decode), load RTN in the next clock and write the retained
 return word at the opcode's Execute clock (SPRU131G examples 7-4/5).
