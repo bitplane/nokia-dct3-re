@@ -2711,10 +2711,33 @@ and four checkpoints around literal assembly, held program read and data
 write. Mutating the literal after Fetch and source RAM after its read cannot
 retarget or change the stored word; each leg has one literal fetch, one
 program read and one data write. Long-offset forms, register/peripheral
-destinations and control-delay placement fail closed. Repeated MVPD and
-interrupt/mapping changes during its held read remain unvalidated. This
-isolates the bootstrap copy's transfer primitive without claiming that its
-65,313-iteration repeat or native startup executes staged.
+destinations and control-delay placement fail closed. Interrupt/mapping
+changes during an ordinary held read remain unvalidated.
+
+Long-immediate RPT (`f070`) now owns a retained short MVPD body. Repeat
+Decode disables acceptance, including NMI, before its literal finishes;
+complete body Decode discards younger speculative words. The first MVPD
+uses its held program read, then the stream performs one program read and
+data write per clock, with implicit source increment and encoded destination
+modification. Exactly count+1 transfers retire before a fresh continuation.
+First/steady-state bus placement is partial, not measured silicon timing.
+Other repeat bodies, nested repeats and control-delay RPT fail closed.
+
+The 128 transfer replay cases cover counts 0/1/3/15, pages 2/3, both OVLY
+states and indirect/postincrement destinations, with four checkpoints across
+capture, initial read, streaming and completion. Sixteen additional cases
+present IRQ or NMI at RPT Decode and replay with the request pending. IACK
+must follow the final write, stack continuation `9004` and restore a balanced
+stack before the changed continuation retires. Count-zero pending-interrupt
+cases drain an additional already-prefetched continuation before discarding
+it; it must not retire. No timer/return guard or atomic fallback is used.
+
+The original `bootrecstage` reset sequence also executes its full 65,313-word
+copy: observation-only taps verify every program source address, every data
+destination and value equality, then the diagnostic reaches `00:0e41`.
+This closes the reset copy, not native startup or recorder completion; the
+current unsupported SP-adjustment boundary is in
+[the MU4 contract](5510_bringup.md).
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

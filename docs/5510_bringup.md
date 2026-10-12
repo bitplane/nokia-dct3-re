@@ -2408,10 +2408,12 @@ diagnostic using the same original upload, retained NAND and provisional
 shared-RAM composition as `bootrecsave`. It enables the staged frontend
 before reset-vector execution, without firmware-PC-conditioned switching or
 atomic fallback. Existing profiles remain atomic. Reset's STM immediate to
-PMST now has staged conformance coverage. The first unsupported instruction
-is `f070` at `00:ff84` (long-immediate RPT); the serial entry
-at `00:0e41` has not executed. The terminal bootstrap-entry failure is
-expected evidence of this coverage boundary, not a passing recorder gate.
+PMST and the original RPT/MVPD copy now have staged conformance coverage.
+The serial entry at `00:0e41` is reached. The first unsupported operation
+is `6bf8 0018 03ff` at `00:0e43` (ADDM #03ff,*(SP)), immediately after
+STM #1200,SP. The debugger context at failure is `00:0e47`, not the opcode
+boundary. The terminal bootstrap-entry failure remains coverage evidence,
+not a passing recorder gate.
 
 Reproduce in a new disk-backed run directory with a copy of the retained
 `mu4nand_13/nand` seed under `nvram/mu4nand_25/nand`, then run:
@@ -2422,8 +2424,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. Repeat setup and retirement
-need independent staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. SP read/modify/write
+ownership needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
@@ -2444,8 +2446,12 @@ program-source MVPD, with retained operand words, count+1 retirements,
 per-iteration source/destination progression, exact continuation and
 save/replay. Interrupt suppression begins when RPT is decoded and includes
 NMI until the repeated instruction completes (SPRU131G 6.7). The repeat's
-first and steady-state bus phases remain to be modeled and tested; this
-read-only address decode is not native execution acceptance.
+first and steady-state bus phases remain partial. The bounded staged repeat
+cases and pending-IRQ/NMI replay are described in the CPU contract.
+Observation-only `bootrecstage` taps verify all 65,313 program reads and
+data writes, in order with matching values, before the original serial entry
+is reached. `mu4_staged_bootstrap_copy: PASS` deliberately reports
+`native_startup_complete=0`; this does not close recorder acceptance.
 The new diagnostic is intentionally not a passing save acceptance gate.
 The independent INTM-change protection fix passes pending-interrupt load,
 multiword-store and return fixtures, but the metadata diagnostic still has

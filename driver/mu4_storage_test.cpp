@@ -244,6 +244,8 @@ private:
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
 	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
+	unsigned m_staged_copy_reads = 0, m_staged_copy_writes = 0;
+	u16 m_staged_copy_word = 0;
 	unsigned native_worker_tail_ms() const { return system_bios() >= 7 ? 20000 : system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
 	void trace_native_iterator(char const *point)
 	{
@@ -1326,6 +1328,25 @@ private:
 				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
 			}
 			if (measurement_profile()) install_measurement_observers();
+			if (system_bios() == 26)
+			{
+				// Observation only: quantify the original reset copy, not just
+				// reaching the later unsupported opcode. No source-hole values assumed.
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x60, 0xff80, "staged_bootstrap_copy_source",
+					[this](offs_t at, u16 &word, u16) {
+						if (machine().side_effects_disabled() || m_staged_copy_reads == 65313 || (!m_staged_copy_reads && at != 0x60)) return;
+						if (at != 0x60 + m_staged_copy_reads) fatalerror("Staged original bootstrap copy source order");
+						++m_staged_copy_reads; m_staged_copy_word = word;
+					});
+				m_cpu->space(AS_DATA).install_write_tap(0x60, 0xff80, "staged_bootstrap_copy_destination",
+					[this](offs_t at, u16 &word, u16) {
+						if (machine().side_effects_disabled() || !m_staged_copy_reads || m_staged_copy_writes == 65313) return;
+						if (at != 0x60 + m_staged_copy_writes || m_staged_copy_reads != m_staged_copy_writes + 1 || word != m_staged_copy_word)
+							fatalerror("Staged original bootstrap copy destination/value order");
+						if (++m_staged_copy_writes == 65313)
+							logerror("mu4_staged_bootstrap_copy: PASS program_reads=65313 data_writes=65313 first=0060 last=ff80 native_startup_complete=0\n");
+					});
+			}
 			if (recorder_profile())
 			{
 				if (recorder_control_profile())

@@ -279,6 +279,14 @@ private:
 	bool m_pipeline_far_return_pending = false;
 	bool m_pipeline_long_store_pending = false;
 	bool m_pipeline_program_move_pending = false;
+	bool m_pipeline_repeat_active = false;
+	bool m_pipeline_repeat_body_latched = false;
+	bool m_pipeline_repeat_stream = false;
+	u16 m_pipeline_repeat_word = 0;
+	u16 m_pipeline_repeat_source = 0;
+	u16 m_pipeline_repeat_status = 0;
+	u16 m_pipeline_repeat_sp = 0;
+	u32 m_pipeline_repeat_address = 0;
 	u8 m_pipeline_dp_wait = 0;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;
