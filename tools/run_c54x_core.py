@@ -48,7 +48,7 @@ REQUIRED = [
     "TMS320C54x staged plain returns: PASS cases=24 forms=RET,RETE pages=2 adjacent_push=12 restore=24 duplicate_accesses=0",
     "TMS320C54x staged calls: PASS cases=84 forms=CALL,CALLD pages=2 adjacent_push=42 stm_t_delay=60 parameters=5 restore=84 duplicate_stack_writes=0",
     "TMS320C54x staged MVDK: PASS cases=108 direct=60 indirect=48 restore=108 bank_conflicts=9 source_ar_alias=12 duplicate_accesses=0",
-    "TMS320C54x staged original worker XC prefix: PASS cases=8 restore=8 composed_seven_words=4 duplicate_pushes=0",
+    "TMS320C54x staged original worker XC prefix: PASS cases=14 restore=14 composed_seven_words=4 composed_nine_words=6 duplicate_pushes=0",
     "TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1",
     "TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0",
     "TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0",

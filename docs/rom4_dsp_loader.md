@@ -2737,9 +2737,17 @@ sequential data reads, while rejected branches retain the two reads at
 clocks 8/9. Changing the tested accumulator after evaluation cannot change
 the route. Existing BCD delay-slot gates remain unchanged. This is bounded
 comparison against example 7-16, not independent silicon timing evidence;
-adjacent producer composition, multiword sequential slots and IRQ integration
-remain unvalidated. A successful seven-word prefix is not evidence that the
-original nine-word branch sequence or complete worker executes correctly.
+multiword sequential slots and IRQ integration remain unvalidated.
+Six further fixtures compose the original nine words at their original
+page-2 addresses, with neutral NOPs after the prefix and at the target.
+The adjacent LD's sampled second word is zero or one, causing BC to
+fall through or take `02:3ddb` respectively. Three checkpoints surround
+the load sample/retirement and branch decision. Source RAM changes after
+sampling and A changes after evaluation cannot alter the retained route.
+The selected target or fallthrough Fetch occurs once at clock 14; both
+outcomes retain one old-ST1 push, two source reads and two AR2 updates
+without duplicates on replay. This validates that specific adjacent producer
+composition, not the unknown worker body, return tail or native recorder.
 
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
