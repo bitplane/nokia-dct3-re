@@ -2388,8 +2388,28 @@ publications with a neutral gap; that gap does not claim to execute the
 original intervening CMPR. All 75 cases preserve register/status values and
 produce no duplicate writes on replay. Source-register producer latency,
 extended modes and physical bus placement remain unvalidated; T/TRN stores
-are limited to RAM destinations. Original CMPR and later worker arithmetic
-remain separate instruction-ownership requirements.
+are limited to RAM destinations. Later worker arithmetic remains a
+separate instruction-ownership requirement.
+
+Staged CMPR samples unsigned ARx/AR0 in Access and retains its predicate
+until Execute changes TC, without re-reading live address registers
+(SPRU172C page 4-34; SPRU131G table 7-7 Category I). The 435 replay cases
+include all four comparisons, all eight auxiliary registers and four
+unsigned boundary pairs. Mutating the registers after Access must not
+change the comparison result. Forty-eight producer controls require zero
+intervening instructions after STM/MVDK, one after POPM and two after STL
+before the new AR value becomes visible. Those controls use DP zero for
+the direct memory/register operands, rather than relying on an inherited
+data page.
+
+Three cases execute the original `8393 8193 f4ab 8c93` at
+`02:3dcb`--`02:3dce`: high/low B stores, CMPR EQ,AR3, then ST T.
+With initial AR3=`0470` and AR0=`0471`, CMPR samples `0471` in Access
+before the low-word store's Read-stage increment; its Execute result must
+stay true after the pointer advances to `0473`. Replay around Access,
+Read and Execute must preserve all three writes exactly once. This is
+bounded composition of original instructions, not completion of the
+whole worker, physical bank arbitration or native recording.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.

@@ -3288,7 +3288,7 @@ private:
 		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i)
-			program.write_word(base + 0x600 + i, i == 0 ? (conflict ? 0x8011 : 0x8060) : i == 1 ? 0x8a12 : 0xf495);
+			program.write_word(base + 0x600 + i, i == 0 ? (conflict ? 0x8011 : 0x8070) : i == 1 ? 0x8a12 : 0xf495);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -3311,11 +3311,11 @@ private:
 				expect(value == 0xbeef && m_cpu->pipeline_cycles() == 6, "POPM retains stack Read despite DAGEN bank conflict");
 				++m_pipeline_operand_reads;
 			});
-		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x11, 0x60, "pop_dagen_writes",
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x11, 0x70, "pop_dagen_writes",
 			[this, conflict](offs_t address, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				bool const pop = address == 0x12;
-				expect((pop || address == (conflict ? 0x11 : 0x60)) &&
+				expect((pop || address == (conflict ? 0x11 : 0x70)) &&
 					value == (pop ? 0xbeef : 0x7777) &&
 					m_cpu->pipeline_cycles() == (pop && conflict ? 7 : 6),
 					"Only an older DAGEN store defers POPM publication by one clock");
@@ -4521,6 +4521,72 @@ private:
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251950; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_cmpr(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const sequence = variant >= 432;
+		bool const producer = variant >= 384 && !sequence;
+		unsigned const kind = producer ? (variant - 384) / 12 : 0;
+		unsigned const gap = producer ? ((variant - 384) / 3) % 4 : 0;
+		unsigned const ar = producer ? 3 : (variant / 3) % 8;
+		unsigned const cc = producer ? 0 : (variant / 24) % 4;
+		unsigned const pair = producer || sequence ? 0 : variant / 96;
+		std::array<u16, 4> const left{0, 0, 0xffff, 0x8000}, right{0, 0xffff, 0, 0x7fff};
+		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		unsigned prefix = 0;
+		if (producer)
+		{
+			if (kind == 0 || kind == 1)
+			{
+				program.write_word(base + 0x600, kind == 0 ? 0x7713 : 0x7170);
+				program.write_word(base + 0x601, kind == 0 ? 0xbeef : 0x0013);
+				prefix = 2;
+			}
+			else { program.write_word(base + 0x600, kind == 2 ? 0x8a13 : 0x8013); prefix = 1; }
+		}
+		program.write_word(base + 0x600 + prefix + gap, 0xf4a8 | (cc << 8) | ar);
+		if (sequence)
+		{
+			// Original R060 02:3dcb..3dce, without a substitute NOP.
+			std::array<u16, 4> const words{0x8393, 0x8193, 0xf4ab, 0x8c93};
+			for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (producer ? 0xa600 : 0xa608) | (BIT(variant, 0) ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 6);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, sequence ? 0x471 : producer ? 0xbeef : right[pair]);
+		if (ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, producer ? 0x1234 : left[pair]);
+		if (sequence) m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x70, 0xbeef);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_store_writes = 0;
+		if (sequence)
+			m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x470, 0x472, "cmpr_original_stores",
+				[this](offs_t address, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					expect(m_pipeline_store_writes < 3 && address == 0x470 + m_pipeline_store_writes &&
+						value == std::array<u16, 3>{0x3344, 0x5566, 6}[m_pipeline_store_writes] &&
+						m_cpu->pipeline_cycles() == std::array<unsigned, 3>{6, 7, 9}[m_pipeline_store_writes],
+						"Original store/CMPR sequence retains all three writes and pointer updates");
+					++m_pipeline_store_writes;
+				});
+		m_phase = 251970; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -26846,13 +26912,78 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 74) { start_pipeline_register_store(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged short register stores: PASS cases=75 sources=6 address_forms=4 multi_store_cases=3 restore=75 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_cmpr(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251960)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251950;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251970)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const sequence = variant >= 432;
+			bool const producer = variant >= 384 && !sequence;
+			unsigned const kind = producer ? (variant - 384) / 12 : 0;
+			unsigned const gap = producer ? ((variant - 384) / 3) % 4 : 0;
+			unsigned const ar = producer ? 3 : (variant / 3) % 8;
+			unsigned const cc = producer ? 0 : (variant / 24) % 4;
+			unsigned const pair = producer || sequence ? 0 : variant / 96;
+			std::array<u16, 4> const left{0, 0, 0xffff, 0x8000}, right{0, 0xffff, 0, 0x7fff};
+			u16 const lhs = ar ? left[pair] : right[pair];
+			bool const conditions[] = {lhs == right[pair], lhs < right[pair], lhs > right[pair], lhs != right[pair]};
+			bool const result = sequence ? true : producer ? gap >= (kind < 2 ? 0 : kind == 2 ? 1 : 2) : conditions[cc];
+			unsigned const access = sequence ? 6 : 4 + (producer ? (kind < 2 ? 2 : 1) + gap : 0);
+			unsigned const execute = access + 2;
+			unsigned const checkpoint = access + variant % 3;
+			u64 const cycle = m_cpu->pipeline_cycles();
+			if (m_cpu->state_int(tms320c54x_device::STATE_ST0) != ((producer ? 0xa600 : 0xa608) | ((cycle >= execute ? result : BIT(variant, 0)) ? 0x1000 : 0)))
+				osd_printf_info("CMPR mismatch: case=%u cycle=%llu replay=%u st0=%04x access=%u execute=%u result=%u ar0=%04x ar3=%04x\n",
+					variant, (unsigned long long)cycle, unsigned(m_pipeline_replay), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)),
+					access, execute, unsigned(result), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((producer ? 0xa600 : 0xa608) | ((cycle >= execute ? result : BIT(variant, 0)) ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+				"CMPR samples unsigned AR operands in Access and only commits TC in Execute");
+			auto const writes_at = [](u64 clock) { return unsigned(clock >= 6) + unsigned(clock >= 7) + unsigned(clock >= 9); };
+			if (sequence)
+				expect(m_pipeline_store_writes == writes_at(cycle) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x470 + unsigned(cycle >= 5) + unsigned(cycle >= 6) + unsigned(cycle >= 8),
+					"CMPR observes the Access-time pointer, not younger store Read or final pointer");
+			if (!producer && !sequence && cycle == access)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x4321);
+				if (ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x9876);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained CMPR condition around Access and Execute");
+			}
+			if (cycle == execute + 4)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = sequence ? writes_at(checkpoint) : 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore sampled CMPR without observing later AR mutations");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251980;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				if (sequence) m_pipeline_write_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 434) { start_pipeline_cmpr(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged CMPR: PASS cases=435 conditions=4 auxiliary_registers=8 unsigned_pairs=4 producer_latency_cases=48 producers=STM,MVDK,POPM,STL original_store_sequences=3 restore=435\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251980)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251970;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

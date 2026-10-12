@@ -1930,6 +1930,15 @@ void tms320c54x_device::pipeline_step()
 		}
 		m_pipeline_bc_held = false;
 	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfcf8) == 0xf4a8)
+	{
+		// Category-I CMPR reads ARx/AR0 in Access, before older Read or
+		// Execute publications (SPRU131G table 7-7).
+		u16 const word = m_pipeline_word[3];
+		u16 const left = m_ar[word & 7], right = m_ar[0];
+		bool const conditions[] = {left == right, left < right, left > right, left != right};
+		m_pipeline_operand[3] = conditions[(word >> 8) & 3];
+	}
 	// Example 7-13 samples XC in Access, before the next word's Decode
 	// and before older Execute can change TC in this clock.
 	if (m_pipeline_valid[3] && staged_xc(m_pipeline_word[3]))
@@ -2039,7 +2048,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xfcf8) != 0xf4a8 && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2432,6 +2441,8 @@ void tms320c54x_device::pipeline_step()
 			unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
 			accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
 		}
+		else if ((m_op & 0xfcf8) == 0xf4a8)
+			m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
 		unsigned const xc_retired_words = ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
