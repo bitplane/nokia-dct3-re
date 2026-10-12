@@ -3852,8 +3852,15 @@ private:
 		m_pipeline_peripheral_case = variant;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, 0xfd20 | (BIT(variant, 1) << 9) | (BIT(variant, 2) << 4));
-		program.write_word(0x601, 0x8000); program.write_word(0x602, 0x8001);
+		bool const producer = variant >= 64;
+		unsigned const gap = producer ? (variant - 64) / 16 : 0;
+		unsigned const offset = producer ? 1 + gap : 0;
+		bool const multiword = variant >= 32 && !producer;
+		if (producer) program.write_word(0x600, BIT(variant, 0) ? 0xf4bc : 0xf5bc);
+		program.write_word(0x600 + offset, 0xfd20 | ((multiword || BIT(variant, 1)) << 9) | (BIT(variant, 2) << 4));
+		program.write_word(0x601 + offset, multiword ? 0x7600 : 0x8000);
+		program.write_word(0x602 + offset, multiword ? 0xfd30 : 0x8001);
+		if (multiword) program.write_word(0x603, 0x8001);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -3868,9 +3875,15 @@ private:
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x700, 0x701, "xc_tc_stores",
 			[this, variant](offs_t address, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
-				bool const execute = BIT(variant, 0) != BIT(variant, 2);
-				expect(word == 0x1234 && m_cpu->pipeline_cycles() == 7 + address - 0x700 &&
-					(execute || (address == 0x701 && !BIT(variant, 1))), "XC uses Access-sampled TC and rejected words never write data");
+				bool const producer = variant >= 64;
+				unsigned const gap = producer ? (variant - 64) / 16 : 0;
+				unsigned const offset = producer ? 1 + gap : 0;
+				bool const sample = producer && gap < 2 ? BIT(variant, 0) : !BIT(variant, 0);
+				bool const execute = sample == BIT(variant, 2);
+				bool const multiword = variant >= 32 && !producer;
+				expect(word == (multiword && address == 0x700 ? 0xfd30 : 0x1234) &&
+					m_cpu->pipeline_cycles() == (multiword ? 8 : 7) + offset + address - 0x700 &&
+					(execute || (address == 0x701 && (multiword || !BIT(variant, 1)))), "XC uses Access-sampled TC and rejected words never write data");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251730; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -25597,12 +25610,19 @@ private:
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const variant = m_pipeline_peripheral_case;
-			u64 const checkpoint = std::array<unsigned, 4>{3, 4, 6, 8}[variant / 8];
-			bool const execute = BIT(variant, 0) != BIT(variant, 2);
-			auto const writes_at = [execute, variant](u64 clock) { return unsigned(execute && clock >= 7) + unsigned((execute || !BIT(variant, 1)) && clock >= 8); };
+			bool const producer = variant >= 64;
+			unsigned const gap = producer ? (variant - 64) / 16 : 0;
+			unsigned const offset = producer ? 1 + gap : 0;
+			u64 const checkpoint = producer ? 4 + gap + BIT(variant, 3) : std::array<unsigned, 4>{3, 4, 6, 8}[(variant / 8) & 3];
+			bool const sample = producer && gap < 2 ? BIT(variant, 0) : !BIT(variant, 0);
+			bool const execute = sample == BIT(variant, 2);
+			auto const writes_at = [execute, variant, offset, producer](u64 clock) {
+				if (variant >= 32 && !producer) return unsigned(execute && clock >= 8) + unsigned(clock >= 9);
+				return unsigned(execute && clock >= 7 + offset) + unsigned((execute || !BIT(variant, 1)) && clock >= 8 + offset);
+			};
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_store_writes == writes_at(cycle), "XC TC/NTC preserves accepted/rejected slot ownership");
-			if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e | (!BIT(variant, 0) << 12));
-			if (cycle == 4) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e | (BIT(variant, 0) << 12));
+			if (cycle == 3 && !producer) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e | (!BIT(variant, 0) << 12));
+			if (cycle == 4 && !producer) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e | (BIT(variant, 0) << 12));
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -25619,8 +25639,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 31) { start_pipeline_xc_tc(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged XC TC sampling: PASS cases=32 forms=TC,NTC words=1,2 restore=32 access_sampled=1 rejected_writes=0\n");
+				if (variant < 127) { start_pipeline_xc_tc(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

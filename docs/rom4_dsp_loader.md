@@ -2668,10 +2668,16 @@ counter replaces rejected words with NOPs before operand decoding.
 Thirty-two cases cover both conditions and word counts, changing TC between
 Decode and Access and again after Access. Only the Access value controls the
 two following stores; rejected stores never publish, including after four
-checkpoint/restoration boundaries. This is a debugger-controlled sampling
-fixture, not proof of firmware-producer latency. Rejected multiword operands,
-conditional IRQ integration and other predicates remain unvalidated or
-unsupported. The complete worker remains unsupported.
+checkpoint/restoration boundaries. Another 32 cases use one two-word
+immediate store with the opcode-like literal `fd30`: accepted execution
+stores that literal as data, rejected execution suppresses both words, and
+the following independent store still retires. Sixty-four instruction-driven
+cases place SSBX/RSBX TC before XC with zero through three NOPs. XC observes
+the old TC with zero/one NOP and the new TC with two/three, matching the
+Access-time latency in example 7-13. All 128 cases replay saved Decode,
+sampling or retirement state without duplicate writes. General multiword
+operands, conditional IRQ integration and other predicates remain
+unvalidated or unsupported. The complete worker remains unsupported.
 
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
 now retains its source sample and destination literal in the staged frontend.
