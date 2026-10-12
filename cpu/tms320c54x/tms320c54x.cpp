@@ -772,6 +772,9 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_far_call_stack));
 	save_item(NAME(m_pipeline_compiler_sp_previous));
 	save_item(NAME(m_pipeline_compiler_sp_wait));
+	save_item(NAME(m_pipeline_idle_barrier));
+	save_item(NAME(m_pipeline_idle_resume_pending));
+	save_item(NAME(m_pipeline_idle_resume_address));
 	save_item(NAME(m_pipeline_intm_follow));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
@@ -1787,6 +1790,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_far_call_stack.fill(0);
 	m_pipeline_compiler_sp_previous = 0;
 	m_pipeline_compiler_sp_wait = 0;
+	m_pipeline_idle_barrier = m_pipeline_idle_resume_pending = false;
+	m_pipeline_idle_resume_address = 0;
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
@@ -2004,7 +2009,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || staged_absolute_load(word) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -2089,7 +2094,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word)));
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2106,6 +2111,16 @@ void tms320c54x_device::pipeline_step()
 				// XC protection counts resumed instruction words, not the
 				// abandoned sequential address beyond RETD's delay window.
 				m_pipeline_xc_end = (m_pipeline_retd_target & 0x7f0000) | u16(m_pipeline_retd_target + retd_delay_index);
+		}
+		if (m_pipeline_valid[2] && word == 0xf4e1)
+		{
+			// IDLE is a decode barrier: older slots drain, younger words
+			// are discarded and refetched only after the wake boundary.
+			m_pipeline_idle_barrier = true;
+			m_pipeline_idle_resume_address = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_address[2] + 1);
+			m_pipeline_control_address = m_pipeline_address[2];
+			m_pipeline_control_words = 1;
+			m_pipeline_valid[0] = m_pipeline_valid[1] = false;
 		}
 		if (m_pipeline_valid[2] && (fast_return || plain_return || delayed_return || far_return || branch))
 		{
@@ -2417,7 +2432,16 @@ void tms320c54x_device::pipeline_step()
 		++m_pc;
 		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
 		++m_opcode_count[m_op];
-		if (m_op == 0xf49b || m_op == 0xf69b)
+		if (m_op == 0xf4e1)
+		{
+			enter_idle(1);
+			m_pipeline_idle_barrier = false;
+			m_pipeline_idle_resume_pending = true;
+			m_pipeline_fetch_address = m_pipeline_idle_resume_address;
+			m_pipeline_valid.fill(false);
+			if (m_nmi_pending || (m_ifr & m_imr)) leave_idle();
+		}
+		else if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
 		else if (m_op == 0xfc00 || m_op == 0xf4eb || m_op == 0xfe00)
 		{
@@ -2631,13 +2655,30 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
 		m_pipeline_flush_front = false;
 	}
-	if (!m_pipeline_flush_front && !prefetch_bubble)
+	if (!m_pipeline_flush_front && !prefetch_bubble && !m_pipeline_idle_barrier && !m_pipeline_idle_resume_pending && !m_idle)
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
 		m_pipeline_valid[0] = true;
 		m_pipeline_fetch_address = (m_pipeline_fetch_address & 0x7f0000) | u16(m_pipeline_fetch_address + 1);
 	}
 	pipeline_accept_interrupt();
+}
+
+void tms320c54x_device::enter_idle(u8 mode)
+{
+	// IDLE2/3 stop peripheral clocks independently of TSS; retain PSC phase.
+	if (mode >= 2 && !(m_tcr & TIMER_TSS))
+	{
+		m_idle_timer_ticks = timer_remaining_ticks();
+		update_timer_counter();
+		m_timer->adjust(attotime::never);
+	}
+	m_idle_mode = mode;
+	// IDLE3 drops PLL lock; software must acquire it again after wake.
+	if (mode == 3) m_pll_locked = false;
+	m_peripheral_clock_stop_cb(mode >= 2);
+	m_pll_clock_stop_cb(mode == 3);
+	m_idle = true;
 }
 
 void tms320c54x_device::pipeline_delay_compiler_sp(u16 previous)
@@ -2796,21 +2837,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		// SPRU172C encodes K=2 as NN=10 and K=3 as NN=01.
 		u8 const mode = BIT(op, 9) ? 2 : BIT(op, 8) ? 3 : 1;
-		if (mode >= 2 && !(m_tcr & TIMER_TSS))
-		{
-			// Peripheral clocks stop independently of TSS; preserve prescaler phase.
-			m_idle_timer_ticks = timer_remaining_ticks();
-			update_timer_counter();
-			m_timer->adjust(attotime::never);
-		}
-		m_idle_mode = mode;
-		// SPRU131G 6.11.3 and 8.5.2: IDLE3 halts the PLL. A later
-		// software-managed DIV -> PLL entry must acquire lock again.
-		if (mode == 3)
-			m_pll_locked = false;
-		m_peripheral_clock_stop_cb(mode >= 2);
-		m_pll_clock_stop_cb(mode == 3);
-		m_idle = true;
+		enter_idle(mode);
 		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
 		return;
 	}
@@ -4792,6 +4819,13 @@ void tms320c54x_device::execute_run()
 		if (m_pipeline_frontend)
 		{
 			if (m_illegal || m_idle) { m_icount = 0; break; }
+			if (m_pipeline_idle_resume_pending)
+			{
+				m_pipeline_idle_resume_pending = false;
+				if (!m_interrupt_entry_stage && !m_pipeline_vector_pending)
+					m_pipeline_fetch_address = m_pipeline_idle_resume_address;
+				pipeline_accept_interrupt();
+			}
 			pipeline_step();
 			--m_icount;
 			continue;

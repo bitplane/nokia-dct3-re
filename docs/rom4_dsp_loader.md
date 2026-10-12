@@ -2596,8 +2596,29 @@ flag=`1` writes; all 65,535 other input words skip that setup. This is an
 exhaustive **local** predicate, not a global flag-writer or reset census.
 After wake the routine removes its local frame, restores AR1 and uses
 FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
-and returns. IDLE entry/wake ownership still needs coverage before
-claiming this complete original call executes.
+and returns. The staged IDLE1 primitive has the bounded coverage below;
+composition of this complete original call with its timer ISR remains open.
+
+Staged IDLE1 (`f4e1`) is a Decode barrier: older instructions drain,
+younger fetched words are discarded, and the continuation is fetched anew
+after wake. CPU pipeline clocks stop during the idle interval while the
+peripheral timer continues. IMR-enabled requests wake independently of
+INTM; INTM=0 accepts the ISR before continuation, whereas INTM=1 resumes
+without servicing it. Masked pending requests do not wake the CPU, and NMI
+wakes and vectors regardless of IMR/INTM (SPRU131G section 6.11.1).
+
+`check-c54x-core` covers 48 staged IDLE1 cases: external IRQ, masked IRQ
+followed by enabled IRQ, timer IRQ, INTM-blocked external/timer wake and
+NMI; source pages 0/2; and four save/restore boundaries before entry,
+during sleep and after return. The fixture changes its own continuation
+word during sleep to distinguish a fresh fetch from stale speculative
+execution. ISR cases verify continuation PC and page stack traffic; blocked
+cases retain IFR without an IACK. The saved barrier/resume state reproduces
+each leg. This verifies the declared restart/refetch model, not a measured
+silicon restart bus phase or execution of the original 44-word call.
+Staged IDLE2/3 and IDLE in a control-delay window remain fail-closed.
+The atomic frontend retains its existing IDLE1/2/3 behavior, and no handset
+or MU4 profile is promoted to staged execution by this fixture.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).
