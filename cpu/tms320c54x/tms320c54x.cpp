@@ -48,6 +48,11 @@ constexpr bool staged_program_move(u16 word)
 	return (word & 0xff00) == 0x7c00 && u8(word) < 0x98;
 }
 
+constexpr bool staged_immediate_arp(u16 word)
+{
+	return (word & 0xfff8) == 0xf4a0;
+}
+
 constexpr bool staged_mar(u16 word)
 {
 	return (word & 0xff00) == 0x6d00 &&
@@ -2153,7 +2158,7 @@ void tms320c54x_device::pipeline_step()
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_pmst = word == 0x771d;
-		if (m_pipeline_valid[2] && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !program_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2436,6 +2441,10 @@ void tms320c54x_device::pipeline_step()
 		m_sp = u16(m_sp + s8(m_pipeline_word[3]));
 		pipeline_delay_compiler_sp(previous);
 	}
+	if (m_pipeline_valid[3] && staged_immediate_arp(m_pipeline_word[3]))
+		// Tables 7-3/7-15: no latency to the following indirect consumer.
+		// Publish once after older stack reads; Access phase is partial.
+		m_st0 = (m_st0 & 0x1fff) | ((m_pipeline_word[3] & 7) << 13);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
 		// DARAM DB reads precede EB writes in the same clock (table 7-2).
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand[4]);
@@ -2678,6 +2687,8 @@ void tms320c54x_device::pipeline_step()
 			unsigned const operation = (m_op >> 9) & 3;
 			destination = (operation == 0 ? destination & operand : operation == 1 ? destination | operand : destination ^ operand) & ACC_MASK;
 		}
+		else if (staged_immediate_arp(m_op))
+			; // Access publication must not overwrite a younger indirect ARP update.
 		else if ((m_op & 0xfcf8) == 0xf4a8)
 			m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);
 		else if (staged_mar(m_op))

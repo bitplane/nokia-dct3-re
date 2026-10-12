@@ -2411,8 +2411,10 @@ atomic fallback. Existing profiles remain atomic. Reset's STM immediate to
 PMST and the original RPT/MVPD copy now have staged conformance coverage.
 The serial entry at `00:0e41` is reached. Its original STM/ADDM/ANDM prefix
 selects aligned SP=`15fe`, with bounded staged RMW replay coverage.
-The first unsupported instruction is `f4a0` at `00:0e4c` (LD #0,ARP).
-The debugger context at failure is `00:0e4e`, not the opcode boundary.
+Immediate ARP setup also has staged consumer/replay coverage. The first
+unsupported instruction is `7ef8 0011` at `00:0e66` (READA *(0011)),
+which copies program memory selected by accumulator A into AR1. The debugger
+context at failure is `00:0e68`, not the opcode boundary.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
 
@@ -2425,8 +2427,8 @@ Reproduce in a new disk-backed run directory with a copy of the retained
   -debugger none -log -nonvram_save -seconds_to_run 60
 ```
 
-Do not reuse the source seed as writable NVRAM. Immediate ARP publication
-needs staged conformance before advancing this diagnostic;
+Do not reuse the source seed as writable NVRAM. READA program-bus and AR1
+publication ownership need staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

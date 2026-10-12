@@ -5515,6 +5515,42 @@ private:
 		m_phase = 252330; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_arp(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const arp = variant % 8, encoded = BIT(variant, 3) ? 2 : 0;
+		bool const compatibility = BIT(variant, 4), advance = BIT(variant, 5);
+		unsigned const selected = compatibility && !encoded ? arp : encoded;
+		u32 const base = BIT(variant, 6) ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0xf4a0 | arp);
+		program.write_word(base + 0x601, 0x1000 | (advance ? 0x90 : 0x80) | encoded);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 8; ++i)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x420 + i * 0x10);
+			m_cpu->space(AS_DATA).write_word(0x420 + i * 0x10, 0x1100 + i);
+		}
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x420, 0x490, "arp_selected_source",
+			[this, selected](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(!m_pipeline_operand_reads && at == 0x420 + selected * 0x10 && word == 0x1100 + selected && m_cpu->pipeline_cycles() == 6,
+					"Immediate ARP has zero latency to the following compatibility consumer; encoded registers still select themselves"); ++m_pipeline_operand_reads;
+			});
+		m_phase = 252350; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -28865,13 +28901,55 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 255) { start_pipeline_sp_rmw(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged SP RMW: PASS cases=256 initial_values=4 deltas=4 sxm_states=2 pages=2 restore=256 ordered_reads=1 ordered_writes=1\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_arp(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252340)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252330;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252350)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, arp = variant % 8, encoded = BIT(variant, 3) ? 2 : 0;
+			bool const compatibility = BIT(variant, 4), advance = BIT(variant, 5);
+			unsigned const selected = compatibility && !encoded ? arp : encoded;
+			unsigned const tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = 3 + variant / 128;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged immediate ARP is distinct from compare and status-bit operations");
+			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x420 + selected * 0x10, 0x9999); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_pipeline_branch_case = m_pipeline_operand_reads;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save ARP load, selected address, auxiliary update or retained Read");
+			}
+			if (tick == 10)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1100 + selected &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | ((compatibility && encoded ? encoded : arp) << 13)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (compatibility ? 0x20 : 0)),
+					"ARP load preserves unrelated status and does not re-publish over a younger encoded indirect ARP update");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x420 + i * 0x10 + (advance && i == selected ? 1 : 0),
+					"ARP selection modifies only its owned auxiliary register once");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_pipeline_branch_case;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore ARP consumer without retargeting or repeating its auxiliary update");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252360; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 511) { start_pipeline_arp(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged immediate ARP: PASS cases=512 arp_values=8 encoded_modes=2 cmpt_states=2 postincrement_states=2 pages=2 restore=512 zero_latency=1 duplicate_reads=0 duplicate_auxiliary_updates=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252360)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252350;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

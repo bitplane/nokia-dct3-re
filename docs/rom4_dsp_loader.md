@@ -2751,6 +2751,24 @@ LDM read of the aligned result. Other ADDM register destinations stay
 fail-closed. General compiler-SP latency, concurrent stack operations and
 register-bank conflicts for this RMW form remain unvalidated; these cases
 prove the bounded original prefix, not every SP consumer hazard.
+
+Immediate LD #k,ARP (`f4a0`--`f4a7`) has no latency to its following
+indirect consumer (SPRU131G tables 7-3/7-15 and example 7-41). The staged
+model publishes ARP once in Access, after older stack reads; Execute must
+not overwrite a younger indirect instruction's ARP update. This publication
+phase remains partial. In CMPT mode encoded ARF=0 selects loaded ARP;
+nonzero ARF selects its encoded register and updates ARP. Standard mode uses
+the encoded register without that update; TI requires software to keep ARP
+zero in standard mode.
+
+The 512 replay cases cover all eight immediate values, encoded ARF=0/2,
+both CMPT states, with/without postincrement, two pages and four checkpoints
+around publication, destination selection and retained operand Read.
+Nonzero ARP in standard mode is an adversarial CPU fixture, not handset
+provisioning. Each leg verifies one source read, only the selected auxiliary
+register's update and preservation of unrelated ST0/ST1 bits. Mutation after
+Read cannot alter the loaded accumulator. General ST0-load/ARP conflicts,
+CMPT-change hazards and interrupt acceptance during publication remain open.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 
