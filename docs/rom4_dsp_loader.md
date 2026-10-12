@@ -2652,6 +2652,17 @@ untouched alternate location. Other DP producers, extended-shift category-II
 consumers, SP conflicts and immediate/RMW direct forms are not established
 by this gate. The atomic frontend and handset configurations are unchanged.
 
+The staged `LD #k9,DP` form forwards the nearest in-flight immediate DP to a
+basic direct consumer's retained Decode state, implementing the zero-latency
+contract in SPRU131G table 7-17 and example 7-44. Architectural ST0 changes
+at Execute, not early Decode. All 512 page values are tested with an adjacent
+LD, and again behind two consecutive immediate-DP producers (1,024 cases).
+Each case restores after consumer Decode but before producer retirement;
+the new page supplies the operand, while upper ST0 bits and ST1 remain
+unchanged and the old architectural DP persists until Execute. This is a
+bounded forwarding implementation, not measured silicon bus placement;
+mixed status-register producers and other DP consumer families remain open.
+
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
 foreground fetch, one mask write and marker 1, with SP back at `1000`, but

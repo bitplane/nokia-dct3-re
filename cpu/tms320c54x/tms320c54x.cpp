@@ -1860,9 +1860,10 @@ void tms320c54x_device::pipeline_step()
 		bool const far_return = (word & 0xfdfe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
+		bool const immediate_dp = (word & 0xfe00) == 0xea00;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && word != 0x4a1e && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1885,7 +1886,17 @@ void tms320c54x_device::pipeline_step()
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
 			if (short_load || direct_store)
+			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
+				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
+				// in-flight immediate DP without committing architectural ST0 early.
+				for (unsigned stage = 3; stage < 6; ++stage)
+					if (m_pipeline_valid[stage] && (m_pipeline_word[stage] & 0xfe00) == 0xea00)
+					{
+						m_pipeline_direct_status[2] = (m_pipeline_direct_status[2] & 0x4000) | (m_pipeline_word[stage] & 0x1ff);
+						break;
+					}
+			}
 			// SPRU131G 6.10.7: protection starts in Decode and covers the
 			// next complete instruction, including all its extension words.
 			m_pipeline_intm_protected[2] = m_pipeline_intm_follow || intm_bit;

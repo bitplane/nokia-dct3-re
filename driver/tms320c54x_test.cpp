@@ -3150,6 +3150,33 @@ private:
 		m_phase = 251350; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_dp_immediate(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const page = variant & 511;
+		bool const chain = BIT(variant, 9);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0xea00 | (chain ? page ^ 1 : page));
+		if (chain) program.write_word(0x601, 0xea00 | page);
+		program.write_word(0x601 + unsigned(chain), 0x107f);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600 | (page ^ 1));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(((page ^ 1) << 7) | 0x7f, 0x1111);
+		m_cpu->space(AS_DATA).write_word((page << 7) | 0x7f, 0x2222);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_phase = 251390; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -24079,7 +24106,7 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 31) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_dp_immediate(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24087,6 +24114,44 @@ private:
 		if (m_phase == 251360)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251350;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251390)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const page = m_pipeline_peripheral_case & 511;
+			unsigned const chain = BIT(m_pipeline_peripheral_case, 9);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Immediate DP stream advances without unsupported forms");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (cycle >= 6 + chain ? page : page ^ 1)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 7 + chain ? 0x2222 : 0),
+				"Immediate DP forwards to adjacent LD without early ST0 commitment or unrelated status changes");
+			if (cycle == 4 + chain && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save forwarded immediate DP before either instruction retires");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore forwarded DP with old architectural ST0");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 5 + chain; m_phase = 251400;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 1023) { start_pipeline_dp_immediate(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251400)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251390;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
