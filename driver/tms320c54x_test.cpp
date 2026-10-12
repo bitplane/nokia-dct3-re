@@ -3738,15 +3738,17 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
-		bool const conflict = variant >= 48;
-		u16 const destination = std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
-		u16 const source = conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
-		u16 const value = BIT(variant, 3) ? 0xbeef : 0x123;
+		bool const indirect = variant >= 60;
+		unsigned const move_case = indirect ? variant - 60 : variant;
+		bool const conflict = !indirect && variant >= 48;
+		u16 const destination = indirect ? std::array<u16, 4>{0x10, 0x12, 0x18, 0x700}[move_case & 3] : std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
+		u16 const source = indirect ? 0x510 : conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
+		u16 const value = BIT(move_case, 3) ? 0xbeef : 0x123;
 		unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
 		if (conflict) program.write_word(0x600, 0x8011); // Older STL uses the DAGEN bank.
-		program.write_word(0x600 + conflict, conflict ? 0x717f : 0x7131);
+		program.write_word(0x600 + conflict, indirect ? (BIT(move_case, 2) ? 0x7182 : 0x7192) : conflict ? 0x717f : 0x7131);
 		program.write_word(0x601 + conflict, destination);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -3754,7 +3756,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, conflict ? 0xa600 : 0xa608);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (!conflict && BIT(variant, 2) ? 0x4000 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, indirect ? 0x510 : 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x5678);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x40);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
@@ -25483,14 +25486,16 @@ private:
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const variant = m_pipeline_peripheral_case;
-			bool const conflict = variant >= 48;
-			u16 const destination = std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
-			u16 const source = conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
-			u16 const value = BIT(variant, 3) ? 0xbeef : 0x123;
-			u16 const initial = std::array<u16, 4>{0x1234, 0x500, 0x40, 0xaaaa}[variant & 3];
+			bool const indirect = variant >= 60;
+			unsigned const move_case = indirect ? variant - 60 : variant;
+			bool const conflict = !indirect && variant >= 48;
+			u16 const destination = indirect ? std::array<u16, 4>{0x10, 0x12, 0x18, 0x700}[move_case & 3] : std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
+			u16 const source = indirect ? 0x510 : conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
+			u16 const value = BIT(move_case, 3) ? 0xbeef : 0x123;
+			u16 const initial = indirect ? std::array<u16, 4>{0x5678, 0x510, 0x500, 0xaaaa}[move_case & 3] : std::array<u16, 4>{0x1234, 0x500, 0x40, 0xaaaa}[variant & 3];
 			unsigned const read_clock = conflict ? 6 : 5;
 			unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
-			u64 const checkpoint = conflict ? 5 + (variant - 48) / 4 : 4 + variant / 16;
+			u64 const checkpoint = indirect ? 4 + move_case / 16 : conflict ? 5 + (variant - 48) / 4 : 4 + variant / 16;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == unsigned(cycle >= read_clock) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
 				m_cpu->space(AS_DATA).read_word(destination) == (cycle >= write_clock ? value : initial) &&
@@ -25499,6 +25504,8 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
 				"MVDK copies retained unsigned data with destination-specific write timing and no status/accumulator changes");
+			if (indirect && destination != 0x12)
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 5 && !BIT(move_case, 2) ? 0x511 : 0x510), "Indirect MVDK updates its source AR once after retaining the old-address sample");
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -25517,8 +25524,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 59) { start_pipeline_direct_move(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged direct MVDK: PASS cases=60 destinations=AR2,SP,BK,RAM source_addressing=DP,CPL restore=60 bank_conflicts=9 duplicate_accesses=0\n");
+				if (variant < 107) { start_pipeline_direct_move(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVDK: PASS cases=108 direct=60 indirect=48 restore=108 bank_conflicts=9 source_ar_alias=12 duplicate_accesses=0\n");
 				start_pipeline_worker_xc(); return;
 			}
 			++m_pipeline_expected_cycle;

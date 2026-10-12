@@ -2682,7 +2682,7 @@ unvalidated or unsupported. The complete worker remains unsupported.
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
 now retains its source sample and destination literal in the staged frontend.
 The bounded subset accepts RAM sources and RAM or DAGEN destinations
-(`10`--`19`); peripheral/control transfers and indirect/repeated forms remain
+(`10`--`19`); peripheral/control transfers and extended/repeated forms remain
 excluded. Following SPRU131G section 7.5.2 and SPRU172C class 19A, the
 prototype writes DAGEN at the opcode's Read clock and RAM one clock later.
 Sixty cases cover DP/CPL source addressing, AR2/SP/BK/RAM destinations,
@@ -2694,6 +2694,19 @@ direct store to AR1; three RAM-destination controls retain ordinary write
 timing. Checkpoints straddle source sampling and deferred publication.
 General producer hazards and precise physical phase placement therefore
 remain unvalidated; this does not enable the staged frontend for native firmware.
+
+Short indirect MVDK now uses the same retained transfer. Forty-eight additional
+cases exercise `7182`/`7192` (stationary/postincrement AR2), copying to AR0,
+AR2, SP or RAM. The source is sampled at its old address once, then the
+source AR is updated before the destination is published. Twelve overlapping
+AR2-destination cases require the copied value to replace the incremented
+pointer, rather than a later increment corrupting the result. Source RAM is
+changed after sampling, and all three replay boundaries must retain the old
+word with no duplicate read/write. This makes the original `7192 0010` worker
+setup executable in isolation. Short modes below `98` use the existing
+address generator; other AR/mode combinations, producer hazards and physical
+phase placement are not established by these fixtures. Complete worker and
+native recorder execution remain separate, incomplete requirements.
 
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
