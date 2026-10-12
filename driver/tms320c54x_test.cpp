@@ -4884,6 +4884,73 @@ private:
 		m_phase = 252090; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_mu4_timer_context(unsigned variant = 0)
+	{
+		bool const sxm = BIT(variant, 0), matched = BIT(variant, 1);
+		unsigned const page = BIT(variant, 2) ? 3 : 0;
+		start_pipeline_original_context_call(1 | (sxm ? 4 : 0) | (matched ? 8 : 0), true);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		// Original uploaded lower-32K code, with the observed warm OVLY mapping.
+		for (unsigned i = 0; i < 144; ++i) program.write_word(0x3d73 + i, program.read_word(0x23d73 + i));
+		std::array<u16, 4> const vector{0x4a1e, 0xf495, 0xf882, 0x3d73};
+		for (unsigned i = 0; i < vector.size(); ++i) program.write_word(0x204c + i, vector[i]);
+		program.write_word(0x4044, 0xf4e5); // Original FRETE, not a fixture continuation.
+		u32 const foreground = (page << 16) | 0x9000;
+		for (unsigned i = 0; i < 512; ++i) program.write_word(foreground + i, 0xf495);
+		program.write_word(foreground + 0x80, 0xe966);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x2020);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4200 | (sxm ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x77);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(STATE_GENPC, foreground); m_cpu->set_pipeline_frontend(true);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 31);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_vector_acks = m_pipeline_store_writes = m_pipeline_extensions_reads = m_pipeline_drained_fetches = m_vector_reads = m_pipeline_operand_reads = m_fast_stack_reads = 0;
+		m_timer_probe_return_pc = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfe0, 0xfff, "mu4_timer_original_stack",
+			[this, page, sxm](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				std::array<u16, 18> const values{m_timer_probe_return_pc, u16(page), 0xa61b, u16(0x4a00 | (sxm ? 0x100 : 0)),
+					0x77, 0, 0, 0x5566, 0x3344, 0x22, 0x1357, 0x2468, 0x369c, 0x8888,
+					0x3d96, u16(0x800 | (sxm ? 0x100 : 0)), 0xff0f, 0x4044};
+				unsigned const index = m_pipeline_store_writes;
+				unsigned const destination = index < 2 ? 0xfff - index : index < 17 ? 0xffe - index : 0xffd;
+				if (index >= values.size() || address != destination || value != values[index])
+					osd_printf_info("MU4 timer stack mismatch: index=%u cycle=%llu address=%04x value=%04x return=%04x\n",
+						index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value, m_timer_probe_return_pc);
+				expect(index < values.size() && address == destination && value == values[index],
+					"Hardware timer, original XPC vector and handler own a balanced ordered context stack");
+				++m_pipeline_store_writes;
+			});
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0xfff, "mu4_timer_frete_reads",
+			[this, page](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_fast_stack_reads < 2 && address == 0xffe + m_fast_stack_reads && value == (m_fast_stack_reads ? m_timer_probe_return_pc : page),
+					"Original FRETE consumes saved XPC then the hardware return PC once");
+				++m_fast_stack_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x204c, 0x4044, "mu4_timer_original_route",
+			[this](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == 0x204c) { expect(value == 0x4a1e, "Timer vector uses original PSHM XPC"); ++m_pipeline_extensions_reads; }
+				if (address == 0x3d73) { expect(value == 0xeeff, "Timer enters the original context handler via FB"); ++m_pipeline_drained_fetches; }
+				if (address == 0x4044) { expect(value == 0xf4e5, "Original handler returns through FRETE"); ++m_vector_reads; }
+			});
+		m_vector_prefetch_tap = program.install_read_tap(foreground + 0x80, foreground + 0x80, "mu4_timer_resumed_foreground",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0xe966 && m_fast_stack_reads == 2 && m_vector_reads == 1, "Foreground marker is fetched after original far return");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 252110; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -27586,7 +27653,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 39) { start_pipeline_far_branch(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged FB: PASS cases=40 source_pages=2 target_pages=5 restore=40 duplicate_literal_fetches=0 duplicate_target_fetches=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mu4_timer_context(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -27594,6 +27661,62 @@ private:
 		if (m_phase == 252100)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252090;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252110)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const sxm = BIT(variant, 0), matched = BIT(variant, 1);
+			unsigned const page = BIT(variant, 2) ? 3 : 0;
+			unsigned const checkpoint = std::array<unsigned, 6>{28, 36, 55, 85, 130, 200}[variant / 8];
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer-driven original context executes without a synthetic handler jump");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_pipeline_store_case = m_pipeline_store_writes; m_pipeline_long_case = m_pipeline_extensions_reads;
+				m_pipeline_rmw_case = m_pipeline_drained_fetches; m_pipeline_return_case = m_vector_reads;
+				m_pipeline_indirect_case = m_pipeline_operand_reads; m_pipeline_register_writes = m_vector_acks; m_pipeline_branch_case = m_fast_stack_reads;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save genuine timer entry, original context and far-return foreground settlement");
+			}
+			if (cycle == 400)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_vector_acks == 1 && m_pipeline_extensions_reads == 1 && m_pipeline_drained_fetches == 1 && m_vector_reads == 1 &&
+						m_pipeline_store_writes == 18 && m_fast_stack_reads == 2 && m_pipeline_operand_reads == 1 &&
+						m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_XPC) == page &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x4200 | (sxm ? 0x100 : 0)) &&
+						m_cpu->state_int(tms320c54x_device::STATE_A) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x66 &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x369c && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 &&
+						m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469 &&
+						m_cpu->space(AS_DATA).read_word(0x511) == (matched ? 0x470 : 0) && m_cpu->space(AS_DATA).read_word(0x513) == 0x4f4,
+						"Original timer ISR restores hardware return page/PC and foreground retirement with one worker execution");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_store_case; m_pipeline_extensions_reads = m_pipeline_long_case;
+					m_pipeline_drained_fetches = m_pipeline_rmw_case; m_vector_reads = m_pipeline_return_case; m_pipeline_operand_reads = m_pipeline_indirect_case;
+					m_vector_acks = m_pipeline_register_writes; m_fast_stack_reads = m_pipeline_branch_case;
+					if (!m_vector_acks) m_timer_probe_return_pc = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original timer ISR without duplicate vector, context or return ownership");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252120;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
+				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+				if (variant < 47) { start_pipeline_mu4_timer_context(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original MU4 timer ISR: PASS cases=48 original_words=94 foreground_pages=2 sxm_states=2 cmpr_outcomes=2 restore=48 timer_vector=1 original_frete=1 foreground_retired=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252120)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252110;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
@@ -28113,6 +28236,11 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 252110)
+		{
+			expect(line == 3, "Original MU4 timer fixture acknowledges only the hardware timer source");
+			++m_vector_acks; m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN);
+		}
 		if (m_phase == 251170)
 		{
 			expect(m_pipeline_branch_case >= 8 && line == 0 && m_cpu->pipeline_cycles() == (m_pipeline_branch_case & 1 ? 10 : 12), "Branch IRQ acknowledges during its vector Fetch");

@@ -2501,8 +2501,8 @@ reserved-return store and real caller restoration instructions execute;
 there is no synthetic continuation inside this composition.
 
 This closes the original outer-handler/body composition for the supplied
-CPU fixtures. Hardware timer/IRQ entry, real worker operand provenance,
-foreground progress under recurring interrupts and coherent native
+CPU fixtures. Real worker operand provenance, foreground progress under
+recurring interrupts and coherent native
 recording remain unvalidated; handsets and MU4 still use the atomic frontend.
 
 Non-delayed staged FB retains both the seven-bit target page and its
@@ -2523,7 +2523,31 @@ the saved page/PC and clears INTM. Thus a complete timer fixture must
 include the page save and far return, not merely jump to the handler or
 stop at its reserved-return address. Static upload words do not by
 themselves validate their low-vector runtime mapping or hardware IRQ
-entry; those remain the next executable boundary.
+entry; the executable composition below covers a bounded fixture.
+
+The original timer vector, all 89 handler/worker words and original FRETE
+now execute together through a CPU-timer interrupt. The 48 replay cases
+vary foreground pages 0/3, SXM and CMPR/XC outcome across six checkpoints.
+The fixture uses the observed warm lower-32K OVLY mapping, PMST=`2020`,
+IMR bit 3, initial TIM=`001f` and PRD=`ffff`: one timer expiry followed by
+a deliberately long next period. Those are explicit CPU-conformance
+inputs, not a recovered application timer configuration.
+
+Every replay leg requires one timer IACK, one original vector/handler
+entry and one FRETE. The eighteen stack writes include the hardware PC,
+vector XPC and context saves, with FRAME's reserved return slot skipped
+until its final `4044` publication. FRETE consumes the saved XPC then
+hardware PC exactly once, returns to the original foreground page and
+clears INTM. The unmodified context restoration balances SP and preserves
+the caller's saved status/registers. A subsequent foreground marker is
+both fetched and retired (B=`66`), so the check does not equate a return
+address or speculative fetch with actual foreground execution.
+
+This proves the bounded original ISR composition with supplied CPU
+inputs; it does not prove real recorder operand provenance, recurring
+interrupt fairness, the warm application's short timer lifecycle or
+recording completion. No handset or MU4 profile is switched to the
+experimental frontend by this gate.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
