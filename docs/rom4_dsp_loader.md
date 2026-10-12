@@ -2341,6 +2341,30 @@ long-offset addressing, repeats, compiler-mode direct sources and adjacent
 producer/consumer hazards remain excluded or unvalidated for staged ADDM.
 The phase placement inherits the bounded RMW prototype, not measured silicon.
 
+Short RAM PSHD now retains its source address/value and stack destination.
+SPRU172C page 4-131 places its SP read in Decode and update in Access;
+the prototype preserves that allocation separately from the existing PSHM
+Read-owned allocation. Thirty-two cases cover DP/compiler-relative and
+stationary/postincrement AR2 sources with four save/replay boundaries.
+Six compiler-mode consumers verify table 7-9's Category-I one-clock SP
+latency: the adjacent load uses pre-push SP, while one NOP exposes updated SP.
+Six cases compose the original `6b82 0002 4b92` ADDM/PSHD sequence.
+SPRU131G table 7-2 assigns DB reads to the first DARAM half-cycle and EB
+writes to the second: PSHD samples the old word before the concurrent ADDM
+write, then pushes that retained old word while RAM holds the incremented
+value. Do not forward the new ADDM value into this source read.
+All 44 cases require one stack allocation/publication, retained samples and
+no duplicate replay accesses. PSHD preserves status and accumulator state.
+Peripheral sources, extended addressing, general stack/DAGEN conflicts and
+physical bank arbitration remain excluded or unvalidated; these fixtures do
+not execute the complete zero-control-word worker body or native recorder.
+The existing adjacent PSHM/RET fixture samples a just-written stack word in
+the same clock via the prototype's late return Read. That must be reconciled
+with table 7-2 before claiming a hardware same-address bypass. Do not copy
+that late placement into PSHD; its read-first ADDM composition is independently
+specified and gate-protected. Memory kind and bank arbitration remain a
+separate physical contract, not something an unchanged end-state proves.
+
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
 Supported compiler-mode, stack, branch/call/return and conditional-execute

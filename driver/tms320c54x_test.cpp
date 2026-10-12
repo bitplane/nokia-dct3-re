@@ -4265,6 +4265,62 @@ private:
 		m_phase = 251870; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_data_push(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const addm = variant >= 38, follower = variant >= 32 && !addm;
+		unsigned const form = variant < 32 ? variant / 8 : 2;
+		unsigned const gap = follower ? (variant - 32) & 1 : 0;
+		u16 const source = form == 1 ? 0x1020 : 0x470;
+		u16 const word = addm ? (BIT(variant - 38, 0) ? 0xffff : 0x1234) : follower ? 0xbeef : BIT(variant, 0) ? 0xbeef : 0x123;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		if (addm) { program.write_word(0x600, 0x6b82); program.write_word(0x601, 2); }
+		program.write_word(0x600 + (addm ? 2 : 0), addm ? 0x4b92 : std::array<u16, 4>{0x4b70, 0x4b20, 0x4b82, 0x4b92}[form]);
+		if (follower) program.write_word(0x601 + gap, 0x1027);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa208);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (form == 1 || follower ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(source, word); m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
+		m_cpu->space(AS_DATA).write_word(0x1027, 0x1111); m_cpu->space(AS_DATA).write_word(0x1026, 0x2222);
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x470, 0x1027, "pshd_sources",
+			[this, source, word, addm, follower, gap](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == source)
+				{
+					expect(value == word && m_cpu->pipeline_cycles() == (addm ? 6 + m_pipeline_operand_reads : 5), "PSHD retains its source once; adjacent ADDM Read precedes same-cycle Write"); ++m_pipeline_operand_reads;
+				}
+				else if (follower && (address == 0x1026 || address == 0x1027))
+				{
+					expect(address == (gap ? 0x1026 : 0x1027) && value == (gap ? 0x2222 : 0x1111) && m_cpu->pipeline_cycles() == 6 + gap, "PSHD has one-clock SP latency to a Category-I compiler-mode consumer"); ++m_pipeline_extensions_reads;
+				}
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x470, 0xfff, "pshd_publications",
+			[this, word, addm](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == 0xfff)
+				{
+					expect(value == word && m_cpu->pipeline_cycles() == (addm ? 8 : 6), "PSHD writes its retained old source to one allocated stack word"); ++m_pipeline_store_writes;
+				}
+				else if (addm && address == 0x470)
+				{
+					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_operand_reads == 2, "ADDM writes after PSHD's first-half-cycle source sample"); ++m_pipeline_register_writes;
+				}
+			});
+		m_phase = 251890; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -26356,13 +26412,64 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 767) { start_pipeline_addm(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_data_push(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251880)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251870;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251890)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			bool const addm = variant >= 38, follower = variant >= 32 && !addm;
+			unsigned const form = variant < 32 ? variant / 8 : 2;
+			unsigned const gap = follower ? (variant - 32) & 1 : 0;
+			u16 const source = form == 1 ? 0x1020 : 0x470;
+			u64 const checkpoint = addm ? 6 + (variant - 38) / 2 : follower ? 4 + (variant - 32) / 2 : 3 + ((variant >> 1) & 3);
+			auto const reads_at = [addm](u64 clock) { return addm ? unsigned(clock >= 6) + unsigned(clock >= 7) : unsigned(clock >= 5); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_extensions_reads == unsigned(follower && cycle >= 6 + gap) &&
+				m_pipeline_store_writes == unsigned(cycle >= (addm ? 8 : 6)) && m_pipeline_register_writes == unsigned(addm && cycle >= 7) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= (addm ? 6 : 4) ? 0xfff : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == ((addm || form == 3) && cycle >= (addm ? 6 : 4) ? 0x471 : 0x470) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (addm && BIT(variant - 38, 0) && cycle >= 7 ? 0xaa08 : 0xa208) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (form == 1 || follower ? 0x4000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (follower && cycle >= 7 + gap ? (gap ? 0x2222 : 0x1111) : 0x123456789aULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
+				"PSHD owns Decode/Access SP state, source sample and one stack publication without hiding consumer latency");
+			if (!addm && cycle == 5)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PSHD across address capture, allocation, source Read and stack Write");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_extensions_reads = unsigned(follower && checkpoint >= 6 + gap);
+					m_pipeline_store_writes = unsigned(checkpoint >= (addm ? 8 : 6)); m_pipeline_register_writes = unsigned(addm && checkpoint >= 7);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore PSHD without another allocation or source sample");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251900;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 43) { start_pipeline_data_push(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_read_first=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251900)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251890;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
