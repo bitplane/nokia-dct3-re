@@ -3963,6 +3963,36 @@ private:
 		m_phase = 251750; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_xc_accumulator(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = BIT(variant, 0), eq = BIT(variant, 1), nonzero = BIT(variant, 2);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0xfd44 | (b << 3) | eq | (BIT(variant, 3) << 9));
+		program.write_word(0x601, 0x8000); program.write_word(0x602, 0x8001);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1234 : nonzero ? 0x0100000000ULL : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? (nonzero ? 0x0100000000ULL : 0) : 0x3456);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x700, 0x701, "xc_accumulator_stores",
+			[this, variant, b, eq, nonzero](offs_t address, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				bool const execute = eq ? nonzero : !nonzero;
+				expect(word == (b ? 0x1234 : 0) && m_cpu->pipeline_cycles() == 7 + address - 0x700 &&
+					(execute || (address == 0x701 && !BIT(variant, 3))), "XC tests full 40-bit accumulator at Access and suppresses rejected stores");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251770; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -25736,7 +25766,7 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 127) { start_pipeline_xc_tc(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0\n");
-				start_pipeline_plain_branch(); return;
+				start_pipeline_xc_accumulator(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -25784,6 +25814,46 @@ private:
 		if (m_phase == 251760)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251750;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251770)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
+			bool const nonzero = BIT(variant, 2);
+			bool const execute = BIT(variant, 1) ? nonzero : !nonzero;
+			u64 const checkpoint = std::array<unsigned, 3>{3, 4, 6}[variant / 16];
+			auto const writes_at = [execute, variant](u64 clock) { return unsigned(execute && clock >= 7) + unsigned((execute || !BIT(variant, 3)) && clock >= 8); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_store_writes == writes_at(cycle) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa60e &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Accumulator XC retains Access outcome without status changes");
+			if (cycle == 3 || cycle == 4)
+				m_cpu->set_state_int(BIT(variant, 0) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A,
+					(cycle == 3 ? !nonzero : nonzero) ? 0x0100000000ULL : 0);
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save accumulator XC around Access sampling");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore accumulator XC retained decision and rejected slots");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251780;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 47) { start_pipeline_xc_accumulator(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged XC accumulator sampling: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ words=1,2 restore=48 access_sampled=1 rejected_writes=0\n");
+				start_pipeline_plain_branch(); return;
+			}
+			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251780)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251770;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

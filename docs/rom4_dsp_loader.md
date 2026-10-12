@@ -2684,8 +2684,17 @@ cases place SSBX/RSBX TC before XC with zero through three NOPs. XC observes
 the old TC with zero/one NOP and the new TC with two/three, matching the
 Access-time latency in example 7-13. All 128 cases replay saved Decode,
 sampling or retirement state without duplicate writes. General multiword
-operands, conditional IRQ integration and other predicates remain
-unvalidated or unsupported. The complete worker remains unsupported.
+operands and conditional IRQ integration remain unvalidated.
+The four accumulator zero/nonzero predicates are also supported in Access.
+Forty-eight cases cover AEQ/ANEQ/BEQ/BNEQ, both word counts and three replay
+boundaries. Accumulators switch between Decode and Access and switch back
+after sampling; a value nonzero only in the high accumulator bits must still
+select the nonzero condition. Accepted stores retain their publication
+clocks, rejected stores perform no writes, and ST0/ST1 are unchanged.
+This makes the return tail's exact `fd45` executable in isolation, not its
+placement within RETD. Accumulator producer latency, compound/overflow
+predicates and delayed-return/XC protection remain unvalidated or unsupported.
+The complete worker remains unsupported.
 
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
 now retains its source sample and destination literal in the staged frontend.

@@ -33,6 +33,13 @@ constexpr bool staged_move(u16 word)
 	return (word & 0xff00) == 0x7100 && u8(word) < 0x98;
 }
 
+constexpr bool staged_xc(u16 word)
+{
+	u16 const form = word & ~u16(0x0200);
+	return form == 0xfd00 || form == 0xfd20 || form == 0xfd30 ||
+		form == 0xfd44 || form == 0xfd45 || form == 0xfd4c || form == 0xfd4d;
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -1882,9 +1889,12 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Example 7-13 samples XC in Access, before the next word's Decode
 	// and before older Execute can change TC in this clock.
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfdef) == 0xfd20)
+	if (m_pipeline_valid[3] && staged_xc(m_pipeline_word[3]))
 	{
-		bool const execute = BIT(m_st0, 12) == BIT(m_pipeline_word[3], 4);
+		u16 const word = m_pipeline_word[3];
+		bool const zero = (accumulator(BIT(word, 3)) & ACC_MASK) == 0;
+		bool const execute = BIT(word, 6) ? (BIT(word, 0) ? zero : !zero) :
+			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : true;
 		m_pipeline_operand[3] = execute;
 		if (!execute) m_pipeline_xc_skip_words = BIT(m_pipeline_word[3], 9) ? 2 : 1;
 	}
@@ -1978,9 +1988,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_t = word == 0x770e;
-		bool const unconditional_xc = word == 0xfd00 || word == 0xff00;
-		bool const tc_xc = (word & 0xfdef) == 0xfd20;
-		if (m_pipeline_valid[2] && word != 0xf495 && !unconditional_xc && !tc_xc && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !staged_xc(word) && !fast_return && !plain_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1988,7 +1996,7 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		if (m_pipeline_valid[2] && (unconditional_xc || tc_xc))
+		if (m_pipeline_valid[2] && staged_xc(word))
 		{
 			// XC 1 also protects two following words (SPRU172C 4-199).
 			m_pipeline_xc_active = true;
@@ -2290,7 +2298,7 @@ void tms320c54x_device::pipeline_step()
 			unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
 			accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
 		}
-		else if (m_op != 0xfd00 && m_op != 0xff00 && (m_op & 0xfdef) != 0xfd20)
+		else if (!staged_xc(m_op))
 			execute_one(m_op);
 		unsigned const xc_retired_words = ((m_op & 0xfeff) == 0x68f8 || m_op == 0x76f8) ? 3 :
 			(staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
