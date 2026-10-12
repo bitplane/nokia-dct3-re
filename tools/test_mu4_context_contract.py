@@ -1,6 +1,7 @@
 import unittest
 
 from tools.mu4_context_contract import BASE, MASK, WITNESS, contract, decode_words, route_for_status
+from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worker_entry, worker_route
 
 
 class ContextContractTest(unittest.TestCase):
@@ -47,6 +48,32 @@ class ContextContractTest(unittest.TestCase):
         for value in (-1, 65536, 'c004', None):
             with self.assertRaises(ValueError):
                 route_for_status(value)
+
+    def test_worker_entry_branch_is_not_delayed(self):
+        result = decode_worker_entry(dict(enumerate(WORKER_WITNESS, WORKER_BASE)))
+        self.assertEqual(result['matched_words'], 9)
+        self.assertFalse(result['branch']['delayed'])
+        self.assertEqual(result['branch']['target'], '023ddb')
+        self.assertEqual(result['branch']['documented_cycles'], {'taken': 5, 'not_taken': 3})
+        self.assertEqual(result['branch']['control_coverage'],
+                         {'tested': 65536, 'enter_worker_body': 1, 'skip_worker_body': 65535})
+
+    def test_worker_route_exhaustive(self):
+        for value in range(65536):
+            self.assertEqual(worker_route(value), 'skip_worker_body' if value else 'enter_worker_body')
+        for value in (-1, 65536, '0', None):
+            with self.assertRaises(ValueError):
+                worker_route(value)
+
+    def test_worker_witness_mutation_and_absence(self):
+        for address in range(WORKER_BASE, WORKER_BASE + len(WORKER_WITNESS)):
+            words = dict(enumerate(WORKER_WITNESS, WORKER_BASE))
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_worker_entry(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_worker_entry(words)
 
 
 if __name__ == '__main__':

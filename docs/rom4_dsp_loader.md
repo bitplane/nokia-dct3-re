@@ -2716,6 +2716,20 @@ address generator; other AR/mode combinations, producer hazards and physical
 phase placement are not established by these fixtures. Complete worker and
 native recorder execution remain separate, incomplete requirements.
 
+The read-only context tool also pins all nine original worker-entry words
+`02:3dbc`--`02:3dc4`. Its non-delayed `f844 3ddb` branch skips the body at
+`02:3dc5` when the second source word loaded through AR2 is nonzero; zero
+falls through into that body. Exhaustive unsigned-word classification gives
+65,535 taken inputs and one fallthrough input, without claiming which value
+native recorder execution supplies. The first source word goes to AR0, the
+second to A, and AR2 advances twice; neither source's producer is identified
+by this bounded census. SPRU131G section 7.1.5/example 7-16 requires BC to
+take five cycles when taken and three when not taken, discarding sequential
+work only for the taken outcome. BCD's unconditional delay-slot execution
+cannot be reused for this branch. Staged BC therefore remains unsupported
+pending retained-prefetch/flush tests; a successful seven-word prefix is not
+evidence that the branch or complete worker executes correctly.
+
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
 after both samples, following SPRU172C pages 4-61--62.

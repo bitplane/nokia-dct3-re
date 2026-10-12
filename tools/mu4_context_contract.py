@@ -28,6 +28,43 @@ WITNESS = (
     0x1036, 0xF7BE, 0x8A0D, 0x8A0C, 0x8A0B, 0x8006,
     0x8A0A, 0x8A09, 0x8A08, 0x8A07, 0x8A06, 0xFC00,
 )
+WORKER_BASE = 0x23DBC
+WORKER_WITNESS = (0xFD00, 0x4A07, 0xFD00, 0xF7BB, 0x7192, 0x0010,
+                  0x1092, 0xF844, 0x3DDB)
+
+
+def worker_route(control_word):
+    if not isinstance(control_word, int) or not 0 <= control_word <= 0xFFFF:
+        raise ValueError('worker control must be an unsigned 16-bit word')
+    return 'skip_worker_body' if control_word else 'enter_worker_body'
+
+
+def decode_worker_entry(words):
+    for offset, expected in enumerate(WORKER_WITNESS):
+        address = WORKER_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'worker entry witness changed or absent at {address:06x}')
+    counts = Counter(worker_route(value) for value in range(0x10000))
+    return {
+        'matched_word_range': ['023dbc', '023dc4'],
+        'matched_words': len(WORKER_WITNESS),
+        'setup': {
+            'xc': 'two unconditional XC 1 instructions, each protecting two words',
+            'saved_register': 'ST1', 'status_update': 'SSBX INTM',
+            'first_source': 'RAM[entry AR2]', 'first_destination': 'AR0',
+            'second_source': 'RAM[(entry AR2 + 1) & ffff]',
+            'second_destination': 'A', 'final_ar2': '(entry AR2 + 2) & ffff',
+        },
+        'branch': {
+            'address': '023dc3', 'opcode': 'f844', 'condition': 'ANEQ',
+            'delayed': False, 'target': '023ddb', 'fallthrough': '023dc5',
+            'taken_when': 'second source word != 0',
+            'documented_cycles': {'taken': 5, 'not_taken': 3},
+            'control_coverage': {'tested': 65536, **dict(counts)},
+        },
+        'scope': 'nine pinned original words and exhaustive word predicate; '
+                 'no source-writer census, branch pipeline execution, full worker or recorder completion',
+    }
 
 
 def route_for_status(status):
@@ -82,7 +119,10 @@ def decode_words(words):
 def contract(source):
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise ValueError('expected original R060 InitData source')
-    return decode_words(uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22'))
+    words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22')
+    result = decode_words(words)
+    result['worker_entry'] = decode_worker_entry(words)
+    return result
 
 
 def main():
