@@ -2319,17 +2319,32 @@ RF acquisition or handset speech.
 The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
 Access, Read and Execute slots inside the existing CPU, reusing its semantic
 backend and interrupt-source/entry operations. No handset or MU4 configuration
-enables it. Executable coverage is NOP, one-word immediate loads, two-word
+enables it. The basic memory/ALU subset covers NOP, one-word immediate loads, two-word
 shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
 pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
 post-increment short indirect or three-word absolute (`f8`) operands, and
 RETF/RETFD with one-word load/NOP or two-word immediate-load delay slots.
 Two-word unconditional B/BD use the same retained-literal and redirect path.
-Direct STM immediate initialization of AR0--AR7, SP and BK is also supported;
+ADDM now shares the retained RAM read/modify/write path with ANDM/ORM.
+SPRU172C page 4-9 specifies SXM/OVM-dependent arithmetic and C/OVA updates,
+not unconditional 16-bit wrapping. The atomic and staged frontends use one
+unchanged arithmetic helper: staged Read retains the source word, address
+and immediate; Execute publishes the result and flags once. The original
+worker's `6b82 0002` form is included. There are 768 replay cases across
+DP-relative, stationary/postincrement AR2 and absolute RAM addresses, eight
+value pairs and eight SXM/OVM/sticky-OVA combinations. They include TI's
+`8007 + fff8 -> 8000` saturation example, signed/unsigned boundaries and
+carry clearing. Source RAM changes after Read cannot alter the retained
+result. Accumulators remain unchanged. Register/peripheral destinations,
+long-offset addressing, repeats, compiler-mode direct sources and adjacent
+producer/consumer hazards remain excluded or unvalidated for staged ADDM.
+The phase placement inherits the bounded RMW prototype, not measured silicon.
+
+Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
-SP-relative, other indirect and other multiword forms stop at Decode without
-atomic fallback.
+Supported compiler-mode, stack, branch/call/return and conditional-execute
+contracts are specified below. Remaining forms fail closed without atomic fallback.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
