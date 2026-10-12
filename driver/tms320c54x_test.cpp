@@ -3285,9 +3285,10 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		u32 const base = BIT(variant, 0) ? 0x20000 : 0;
-		// Original R060 aa22 words at 02:3d73..3d83; stop before f030.
+		// Original R060 aa22 words at 02:3d73..3d87; stop before fa44.
 		static constexpr u16 prefix[] = {0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
-			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c, 0xf300, 0x0001, 0x4f7c, 0x487e};
+			0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c, 0xf300, 0x0001, 0x4f7c, 0x487e,
+			0xf030, 0xc004, 0xf050, 0xc004};
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x3d73 + i, i < std::size(prefix) ? prefix[i] : 0xf495);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -3458,6 +3459,38 @@ private:
 				++m_pipeline_operand_reads;
 			});
 		m_phase = 251550; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_logical_immediate(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
+		u16 const literal = BIT(variant, 6) ? 0xf495 : 0x8001;
+		u64 const source = BIT(variant, 6) ? 0xff89abcdefULL : 0x0012345678ULL;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0xf000 | ((3 + variant / 256) << 4) | (BIT(variant, 0) << 9) | (BIT(variant, 1) << 8) | shift);
+		program.write_word(0x601, literal);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xefff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 2) << 8) | (BIT(variant, 3) << 9));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(variant, 0) ? 0x1111222233ULL : source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(variant, 0) ? source : 0x4444555566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(0x601, 0x601, "staged_logical_literal",
+			[this, literal](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == literal && m_cpu->pipeline_cycles() == 3, "Logical immediate fetches its unsigned retained literal once");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 251570; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -24574,11 +24607,11 @@ private:
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save in-flight original MU4 context prologue");
 			}
-			if (cycle == 24)
+			if (cycle == 30)
 			{
 				expect(m_pipeline_store_writes == 8 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xff7 &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x4004 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0013572469ULL &&
 					m_cpu->space(AS_DATA).read_word(0xfff) == 0xaaaa &&
 					m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469,
@@ -24595,7 +24628,7 @@ private:
 				}
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 5) { start_pipeline_mu4_prologue(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged original MU4 prologue: PASS words=17 cases=6 context_saves=8 long_word_update=1 page_zero_ldm=1 restore=6 full_handler_claim=0\n");
+				osd_printf_info("TMS320C54x staged original MU4 prologue: PASS words=21 cases=6 context_saves=8 long_word_update=1 logical_masks=2 restore=6 full_handler_claim=0\n");
 				start_pipeline_dld(); return;
 			}
 			++m_pipeline_expected_cycle;
@@ -24791,7 +24824,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 287) { start_pipeline_ldm(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged LDM: PASS cases=288 sources=9 destinations=A,B pages=2 sxm=0,1 cpl=0,1 restore=288 duplicate_reads=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_logical_immediate(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24799,6 +24832,55 @@ private:
 		if (m_phase == 251560)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251550;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251570)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const source_b = BIT(variant, 0), destination_b = BIT(variant, 1);
+			unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
+			u64 const source = BIT(variant, 6) ? 0xff89abcdefULL : 0x0012345678ULL;
+			u64 const operand = u64(BIT(variant, 6) ? 0xf495 : 0x8001) << shift;
+			u64 const result = variant / 256 == 0 ? source & operand : variant / 256 == 1 ? source | operand : source ^ operand;
+			u64 const initial_a = source_b ? 0x1111222233ULL : source;
+			u64 const initial_b = source_b ? source : 0x4444555566ULL;
+			u64 const checkpoint = BIT(variant, 7) ? 4 : 3;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 3) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 7 && !destination_b ? result : initial_a) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 7 && destination_b ? result : initial_b) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xefff &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (BIT(variant, 2) << 8) | (BIT(variant, 3) << 9)),
+				"Logical immediate uses unsigned operands without status changes or saturation");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save partial/complete logical immediate Decode");
+			}
+			if (cycle == 3) m_cpu->space(AS_PROGRAM).write_word(0x601, 0);
+			if (cycle == 9)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = 1;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore logical literal without a second program read");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251580;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_pipeline_logical_immediate(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged logical immediates: PASS cases=768 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15 restore=768 duplicate_literals=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251580)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251570;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

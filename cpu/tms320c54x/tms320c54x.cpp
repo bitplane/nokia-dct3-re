@@ -11,6 +11,12 @@ namespace {
 
 constexpr u16 ST1_BRAF = 0x8000;
 
+constexpr bool staged_immediate_alu(u16 word)
+{
+	u16 const form = word & 0xfcf0;
+	return form == 0xf000 || form == 0xf030 || form == 0xf040 || form == 0xf050;
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -1815,7 +1821,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((word & 0xfeff) == 0x68f8 || word == 0x76f8) ? 3 :
-				((word & 0xfcf0) == 0xf000 || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
+				(staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
@@ -1841,7 +1847,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if ((m_pipeline_word[2] & 0xfcf0) == 0xf000 || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -1876,14 +1882,14 @@ void tms320c54x_device::pipeline_step()
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
 		bool const immediate_dp = (word & 0xfe00) == 0xea00;
-		bool const immediate_add = (word & 0xfcf0) == 0xf000;
+		bool const immediate_alu = staged_immediate_alu(word);
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
 			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_add && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2106,11 +2112,22 @@ void tms320c54x_device::pipeline_step()
 			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
 			data_write(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
 		}
-		else if ((m_op & 0xfcf0) == 0xf000)
+		else if (staged_immediate_alu(m_op))
 		{
 			++m_pc;
-			u64 const operand = (data_operand(m_pipeline_immediate[5]) << (m_op & 15)) & ACC_MASK;
-			accumulator(BIT(m_op, 8)) = add_sub(accumulator(BIT(m_op, 9)), operand, false, BIT(m_op, 8));
+			unsigned const operation = (m_op >> 4) & 15;
+			u64 const source = accumulator(BIT(m_op, 9));
+			u64 &destination = accumulator(BIT(m_op, 8));
+			if (!operation)
+			{
+				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (m_op & 15)) & ACC_MASK;
+				destination = add_sub(source, operand, false, BIT(m_op, 8));
+			}
+			else
+			{
+				u64 const operand = u64(m_pipeline_immediate[5]) << (m_op & 15);
+				destination = operation == 3 ? source & operand : operation == 4 ? source | operand : source ^ operand;
+			}
 		}
 		else if ((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062)
 		{
@@ -2124,7 +2141,7 @@ void tms320c54x_device::pipeline_step()
 			u16(address - m_pipeline_control_address) <= 3)
 		{
 			unsigned const words = ((m_op & 0xfeff) == 0x68f8 || m_op == 0x76f8) ? 3 :
-				((m_op & 0xfcf0) == 0xf000 || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+				(staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)

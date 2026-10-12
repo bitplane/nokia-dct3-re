@@ -2721,8 +2721,18 @@ shifts 0/1/7/15, SXM/OVM settings and positive/negative boundary operands
 have 256 cases with restore during partial or complete Decode. They require
 correct carry, destination overflow and saturation; changing the literal
 after Fetch must not affect retirement. Shift-16 forms, other immediate ALU
-operations, mixed status producers and delayed-control overlap remain
+arithmetic operations, mixed status producers and delayed-control overlap remain
 outside this gate.
+
+Immediate AND/OR/XOR retain unsigned literals through the same two-word
+Decode path and leave both status registers unchanged, independently of
+SXM/OVM (SPRU172C instruction contracts). Each operation has all four
+source/destination combinations, shifts 0/1/7/15, positive/guard-negative
+sources and both partial/complete-Decode replay points: 768 cases total.
+Changing the literal after Fetch must not alter the result or cause another
+program read. The other accumulator is preserved and guard bits are not
+arithmetically saturated. Special shift-16 forms, mixed status producers
+and delayed-control overlap remain unvalidated.
 
 Direct DST retains the saturated 32-bit source after older Execute writes,
 then writes the high word and XOR-1 low word in two clocks (SPRU172C page
@@ -2746,19 +2756,20 @@ status/SP or other-accumulator change. PRD has the modeled extra clock;
 post-Read RAM changes must not affect the result. Indirect forms, preceding
 MMR producer conflicts and physical wait placement remain unvalidated.
 
-The exact original R060 AA22 prefix at `02:3d73..3d83` composes these
+The exact original R060 AA22 prefix at `02:3d73..3d87` composes these
 operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes, `ea00`, `577c`, `f300 0001`, `4f7c` and `487e`. Six executable cases cover pages 0 and 2 with checkpoints
+pushes, `ea00`, `577c`, `f300 0001`, `4f7c`, `487e`, `f030 c004` and
+`f050 c004`. Six executable cases cover pages 0 and 2 with checkpoints
 after the first retained source, status saves or a partial accumulator save.
 They require eight ordered saves of the original accumulator/status values,
 an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM
 the long-word operand loaded, incremented in B and stored back, and a page-zero
-LDM zero-extended into A. All cases
+LDM zero-extended and logically masked in A. All cases
 replay without duplicate writes. The bytes were checked through the original
 upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
 the copied prefix with NOPs, leaving the original image and firmware runs
 unchanged. It does not execute the full ISR. The next original
-instruction, `f030 c004` at `02:3d84` (immediate AND into A), remains unsupported in the
+instruction, `fa44 3d9a` at `02:3d88` (conditional branch), remains unsupported in the
 staged frontend. Native handset/recorder execution still uses the atomic core.
 
 The original four short/long-period, direct/indirect-mask streams run through
