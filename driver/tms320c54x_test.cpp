@@ -3734,6 +3734,53 @@ private:
 		m_phase = 251650; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_direct_move(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const conflict = variant >= 48;
+		u16 const destination = std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
+		u16 const source = conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
+		u16 const value = BIT(variant, 3) ? 0xbeef : 0x123;
+		unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		if (conflict) program.write_word(0x600, 0x8011); // Older STL uses the DAGEN bank.
+		program.write_word(0x600 + conflict, conflict ? 0x717f : 0x7131);
+		program.write_word(0x601 + conflict, destination);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, conflict ? 0xa600 : 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (!conflict && BIT(variant, 2) ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x40);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(source, value);
+		m_cpu->space(AS_DATA).write_word(0x700, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_mvd_source",
+			[this, value, conflict](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == (conflict ? 6 : 5), "MVDK retains its source sample once at the opcode's Read clock");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination, "staged_mvd_destination",
+			[this, value, write_clock](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == write_clock, "MVDK writes its retained value at the destination-owned clock");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251670; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -25314,7 +25361,7 @@ private:
 				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 83) { start_pipeline_call(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged calls: PASS cases=84 forms=CALL,CALLD pages=2 adjacent_push=42 stm_t_delay=60 parameters=5 restore=84 duplicate_stack_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_direct_move(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -25322,6 +25369,56 @@ private:
 		if (m_phase == 251660)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251650;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251670)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const conflict = variant >= 48;
+			u16 const destination = std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
+			u16 const source = conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
+			u16 const value = BIT(variant, 3) ? 0xbeef : 0x123;
+			u16 const initial = std::array<u16, 4>{0x1234, 0x500, 0x40, 0xaaaa}[variant & 3];
+			unsigned const read_clock = conflict ? 6 : 5;
+			unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
+			u64 const checkpoint = conflict ? 5 + (variant - 48) / 4 : 4 + variant / 16;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= read_clock) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
+				m_cpu->space(AS_DATA).read_word(destination) == (cycle >= write_clock ? value : initial) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (conflict ? 0xa600 : 0xa608) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (!conflict && BIT(variant, 2) ? 0x4000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
+				"MVDK copies retained unsigned data with destination-specific write timing and no status/accumulator changes");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVDK before/after source read or destination write");
+			}
+			if (cycle == read_clock) m_cpu->space(AS_DATA).write_word(source, 0);
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= read_clock); m_pipeline_store_writes = unsigned(checkpoint >= write_clock);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained move value without duplicate reads/writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251680;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 59) { start_pipeline_direct_move(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged direct MVDK: PASS cases=60 destinations=AR2,SP,BK,RAM source_addressing=DP,CPL restore=60 bank_conflicts=9 duplicate_accesses=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251680)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251670;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

@@ -2643,6 +2643,22 @@ and no duplicate publication on replay. The original `770e 0006` is therefore
 executable at the call boundary; general STM destinations and concurrent
 MMR-producer conflicts remain unvalidated.
 
+Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
+now retains its source sample and destination literal in the staged frontend.
+The bounded subset accepts RAM sources and RAM or DAGEN destinations
+(`10`--`19`); peripheral/control transfers and indirect/repeated forms remain
+excluded. Following SPRU131G section 7.5.2 and SPRU172C class 19A, the
+prototype writes DAGEN at the opcode's Read clock and RAM one clock later.
+Sixty cases cover DP/CPL source addressing, AR2/SP/BK/RAM destinations,
+unsigned values and restoration before/after source sampling or destination
+publication. Changing source RAM after sampling must not change the copied
+value; replay requires exactly one source read and destination write.
+Nine cases additionally require one-clock DAGEN deferral behind an older
+direct store to AR1; three RAM-destination controls retain ordinary write
+timing. Checkpoints straddle source sampling and deferred publication.
+General producer hazards and precise physical phase placement therefore
+remain unvalidated; this does not enable the staged frontend for native firmware.
+
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
 after both samples, following SPRU172C pages 4-61--62.
@@ -2865,9 +2881,9 @@ not a claim of correct interrupt-return semantics or full handler execution.
 Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
-complete status predicate. CALL/CALLD round trips are implemented, but the
-original worker path still needs its MVDK setup and callee
-instruction stream. Establish those and interrupt integration before a full
+complete status predicate. CALL/CALLD round trips and the original worker's
+setup MVDK are supported in isolation; the callee instruction stream remains
+incomplete. Establish that and interrupt integration before a full
 original-handler fixture; neither skipping
 delay effects nor a fixed interrupt delay is a substitute.
 
