@@ -2668,6 +2668,18 @@ unchanged and the old architectural DP persists until Execute. This is a
 bounded forwarding implementation, not measured silicon bus placement;
 mixed status-register producers and other DP consumer families remain open.
 
+Staged FRAME accepts all signed eight-bit offsets. The prototype updates SP
+in Access and does not apply the offset again at Execute; the immediately
+following PSHM therefore allocates from the adjusted stack, as required by
+SPRU172C page 4-60. All 256 offsets have three checkpoint/replay boundaries
+(before/after FRAME's update and after the push's source sample), giving 768
+cases. Each verifies unchanged status, one FRAME update, one push decrement
+and one retained write per leg. Access placement is a declared partial model,
+not measured silicon timing. Basic compiler-mode consumers, earlier SP
+writers, interrupt overlap and wrapping SP values remain unvalidated. The
+original MU4 prologue's `eeff` is accepted, not a claim that its full handler
+or the recorder completes.
+
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
 foreground fetch, one mask write and marker 1, with SP back at `1000`, but

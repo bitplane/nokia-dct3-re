@@ -3179,6 +3179,38 @@ private:
 		m_phase = 251390; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_frame(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		s8 const offset = variant & 255;
+		u16 const target = 0x1000 + offset - 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0xee00 | (variant & 255));
+		program.write_word(0x601, 0x4a11);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(target, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "staged_frame_push",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x5678 && m_cpu->pipeline_cycles() == 7, "FRAME's adjacent push writes its retained register to the adjusted stack");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251410; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -24146,7 +24178,7 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 1023) { start_pipeline_dp_immediate(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_frame(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -24154,6 +24186,46 @@ private:
 		if (m_phase == 251400)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251390;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251410)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			s8 const offset = m_pipeline_peripheral_case & 255;
+			u64 const checkpoint = std::array<unsigned, 3>{3, 4, 6}[m_pipeline_peripheral_case / 256];
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == unsigned(0x1000 + (cycle >= 4 ? offset : 0) - (cycle >= 6 ? 1 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0e &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
+				m_pipeline_store_writes == unsigned(cycle >= 7),
+				"FRAME applies its signed offset once before the following push without status changes");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FRAME before/after SP update or following push sample");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore FRAME and retained adjacent push without duplicate SP allocation");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251420;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 767) { start_pipeline_frame(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251420)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251410;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

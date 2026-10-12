@@ -1862,10 +1862,11 @@ void tms320c54x_device::pipeline_step()
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
 		bool const immediate_dp = (word & 0xfe00) == 0xea00;
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
+		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !direct_push && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1932,6 +1933,12 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G examples 7-2/3: the target word's Access starts target
 		// Prefetch; the following two sequential words are delay or flush slots.
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0xee00)
+	{
+		// SPRU172C 4-60: FRAME has no latency to the following stack
+		// operation. Access-owned SP update is a partial stage model.
+		m_sp = u16(m_sp + s8(m_pipeline_word[3]));
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
 	{
@@ -2015,6 +2022,8 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (m_op == 0xf073 || m_op == 0xf273)
 			++m_pc; // Target fetch was already redirected in Access.
+		else if ((m_op & 0xff00) == 0xee00)
+			; // FRAME's SP update already belongs to its Access stage.
 		else if ((m_op & 0xff00) == 0x7700)
 			++m_pc; // DAGEN write already committed in the opcode's Read stage.
 		else if ((m_op & 0xfe00) == 0x1000)
