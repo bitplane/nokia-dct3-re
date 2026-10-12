@@ -57,7 +57,8 @@ public:
 		STATE_TIM,
 		STATE_PRD,
 		STATE_TCR,
-		STATE_TRN
+		STATE_TRN,
+		STATE_RTN
 	};
 
 protected:

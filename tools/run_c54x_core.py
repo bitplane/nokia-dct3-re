@@ -46,6 +46,7 @@ REQUIRED = [
     "TMS320C54x staged memory DP: PASS pages=512 cases=1536 source_read=5 producer_execute=8 consumer_execute=9 restore=1536 duplicate_reads=0 silicon_phase_claim=0",
     "TMS320C54x staged conditional branches: PASS cases=96 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 memory_dp_delay=48 restore=96 duplicate_fetches=0 silicon_phase_claim=0",
     "TMS320C54x staged plain returns: PASS cases=24 forms=RET,RETE pages=2 adjacent_push=12 restore=24 duplicate_accesses=0",
+    "TMS320C54x staged calls: PASS cases=24 forms=CALL,CALLD pages=2 adjacent_push=12 restore=24 duplicate_stack_writes=0",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",

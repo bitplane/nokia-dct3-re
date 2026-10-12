@@ -2617,6 +2617,19 @@ isolated or adjacent-push returns and restore before/after Access or Read.
 They require one return read/pop/fetch and no sequential execution. General
 DAGEN conflicts, delayed variants and pending IRQ timing remain unvalidated.
 
+Staged CALL/CALLD retain a stack destination at the opcode's Access clock
+(complete target Decode), load RTN in the next clock and write the retained
+return word at the opcode's Execute clock (SPRU131G examples 7-4/5).
+For a call starting at Prefetch 1 these are clocks 4/5/6, with target Fetch 6.
+CALL stacks the PC after its two instruction words; CALLD includes both delay words.
+RTN is also exposed as a debugger state register without changing the MMR map.
+Twenty-four round trips cover both forms/pages, with or without an older
+PSHM, restoring after allocation, RTN setup or stack commitment. Each requires
+one call write, target fetch and callee RET read, correct delay execution and
+balanced call SP. The older push retains its own distinct stack word. General
+DAGEN conflicts, pending IRQ timing, nested in-flight controls and the original
+worker's two-word STM-to-T delay remain unvalidated by these cases.
+
 Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
 to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
 after both samples, following SPRU172C pages 4-61--62.
@@ -2839,8 +2852,10 @@ not a claim of correct interrupt-return semantics or full handler execution.
 Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
-complete status predicate. Next establish the worker-call path and interrupt
-integration before a full original-handler fixture; neither skipping
+complete status predicate. CALL/CALLD round trips are implemented, but the
+original worker path still needs its MVDK setup, STM-to-T delay and callee
+instruction stream. Establish those and interrupt integration before a full
+original-handler fixture; neither skipping
 delay effects nor a fixed interrupt delay is a substitute.
 
 The original four short/long-period, direct/indirect-mask streams run through
