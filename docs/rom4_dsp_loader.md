@@ -2854,6 +2854,23 @@ carry, destination overflow flag and OVM saturation; the other accumulator,
 SP and unrelated status bits are preserved. Each leg has one literal fetch
 and one operand read. Conditional-execute placement, preceding accumulator/
 status-writer hazards and peripheral source timing remain unvalidated.
+
+Short direct ANDM/ORM/ADDM now admit compiler addressing as well as DP
+addressing. CPL/DP belong to complete Decode; SP is sampled in Access using
+the existing basic-compiler visibility path. The effective address and Read
+operand are retained through Execute, rather than consulting live CPL/SP/DP
+again. The same retained context also applies to noncompiler direct RMW;
+absolute and indirect forms retain their existing ownership.
+
+The 768 replay cases cover three operations, two offsets, four data values,
+two immediates, both initial CPL states, two program pages and four checkpoints.
+They deliberately change CPL after Decode, SP/DP after Access, the immediate
+after Fetch and RAM after Read. Each leg still has one literal fetch, one
+operand read and one write to the original frame/page address, while the
+later context changes survive. This is a CPU ownership fixture, not a
+firmware-state intervention. General SP-producer/stack interleavings,
+memory-sourced DP forwarding, conditional-execute placement and RMW
+peripheral arbitration remain unvalidated.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

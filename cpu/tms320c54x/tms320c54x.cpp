@@ -2156,9 +2156,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 ||
 				(u8(m_pipeline_word[2]) < 0x98 && (BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))) ||
-			(staged_rmw(m_pipeline_word[2]) &&
-				(u8(m_pipeline_word[2]) == 0xf8 || (u8(m_pipeline_word[2]) < 0x98 &&
-					(BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))))
+			(staged_rmw(m_pipeline_word[2]) && (u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0x98)))
 		{
 			m_pipeline_decode_remaining = ((staged_rmw(m_pipeline_word[2]) && u8(m_pipeline_word[2]) == 0xf8) || m_pipeline_word[2] == 0x76f8) ? 2 : 1;
 			m_pipeline_decode_extension = 0;
@@ -2194,8 +2192,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 ||
 			(u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
-		bool const rmw = staged_rmw(word) &&
-			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
+		bool const rmw = staged_rmw(word) && (u8(word) == 0xf8 || u8(word) < 0x98);
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		if (m_pipeline_valid[2] && word == 0x6bf8 && m_pipeline_operand_address[2] < 0x60 && m_pipeline_operand_address[2] != 0x18)
 		{
@@ -2270,7 +2267,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (staged_short_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || program_move || read_a || data_push || data_pop)
+			if (rmw || staged_short_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || program_move || read_a || data_push || data_pop)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -2342,7 +2339,7 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || staged_program_move(m_pipeline_word[3]) || staged_read_a(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
+		staged_rmw(m_pipeline_word[3]) || staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || staged_program_move(m_pipeline_word[3]) || staged_read_a(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
@@ -2432,8 +2429,7 @@ void tms320c54x_device::pipeline_step()
 		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode);
 		bool const absolute = staged_absolute_load(m_pipeline_word[3]);
-		m_pipeline_operand_address[3] = absolute ? m_pipeline_immediate[3] : (m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[3])
-			? basic_address(3, mode) : short_smem_address(mode);
+		m_pipeline_operand_address[3] = absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
 		if (staged_short_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());

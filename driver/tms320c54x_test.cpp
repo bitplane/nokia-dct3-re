@@ -5752,6 +5752,45 @@ private:
 		m_phase = 252430; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_direct_rmw(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const operation = variant % 3, offset = (variant / 3) % 2 ? 0x20 : 0;
+		u16 const initial = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4];
+		u16 const immediate = (variant / 24) % 2 ? 0x00ff : 0xffff;
+		bool const compiler = (variant / 48) % 2;
+		u32 const base = (variant / 96) % 2 ? 0x20000 : 0;
+		u16 const target = (compiler ? 0x1000 : 0x400) + offset;
+		u16 const opcode = std::array<u16, 3>{0x6800, 0x6900, 0x6b00}[operation] | offset;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, opcode); program.write_word(base + 0x601, immediate);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(target, initial);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x400, 0x1040, "direct_rmw_source",
+			[this, target, initial](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == target && word == initial && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
+				"Direct RMW retains Decode CPL/DP and Access SP instead of live context at Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x400, 0x1040, "direct_rmw_destination",
+			[this, target, initial, immediate, operation](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				u16 const expected = operation == 0 ? initial & immediate : operation == 1 ? initial | immediate : u16(initial + immediate);
+				expect(at == target && word == expected && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7,
+					"Direct RMW writes its owned address and sampled operand once after context/RAM changes"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "direct_rmw_immediate",
+			[this, immediate](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == immediate && !m_pipeline_extensions_reads,
+				"Direct RMW retains its immediate without refetch"); ++m_pipeline_extensions_reads; });
+		m_phase = 252450; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -29343,13 +29382,69 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 2047) { start_pipeline_absolute_add(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged absolute ADD: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=AR,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_direct_rmw(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252440)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252430;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252450)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, operation = variant % 3, offset = (variant / 3) % 2 ? 0x20 : 0;
+			u16 const initial = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4], immediate = (variant / 24) % 2 ? 0x00ff : 0xffff;
+			bool const compiler = (variant / 48) % 2;
+			u32 const base = (variant / 96) % 2 ? 0x20000 : 0;
+			u16 const target = (compiler ? 0x1000 : 0x400) + offset;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 192;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Compiler and noncompiler direct RMW have explicit retained addressing");
+			if (tick == 4)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 0x4000);
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
+			}
+			if (tick == 5)
+			{
+				if (compiler) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1020);
+				else m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & ~0x1ff) | 9);
+			}
+			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(target, 0x5555); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save direct RMW captured context, address, operand or completed write");
+			}
+			if (tick == 20)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					u16 const expected = operation == 0 ? initial & immediate : operation == 1 ? initial | immediate : u16(initial + immediate);
+					expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 && m_cpu->space(AS_DATA).read_word(target) == expected &&
+						m_cpu->state_int(tms320c54x_device::STATE_SP) == (compiler ? 0x1020 : 0x1000) && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1ff) == (compiler ? 8 : 9) &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((0x900 | (compiler ? 0x4000 : 0)) ^ 0x4000),
+						"Direct RMW preserves subsequent context changes while using its original owned address and operands");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore direct RMW without resampling modified context, literal or memory");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252460; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_pipeline_direct_rmw(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged direct RMW: PASS cases=768 operations=ANDM,ORM,ADDM offsets=2 values=4 immediates=2 cpl_states=2 pages=2 restore=768 retained_context=1 duplicate_reads=0 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252460)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252450;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
