@@ -194,6 +194,7 @@ private:
 	u8 m_xc_guard = 0;
 	bool m_pipeline_xc_active = false;
 	u32 m_pipeline_xc_end = 0;
+	u8 m_pipeline_xc_skip_words = 0;
 	u8 m_intm_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;

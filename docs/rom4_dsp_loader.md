@@ -2662,9 +2662,16 @@ make a maskable IRQ pending after Decode: two following stores must retire
 before the vector is fetched once. Restoration during protection or at its
 completion preserves both stores, IFR clearance and one interrupt stack
 allocation. Multiword protected slots, NMI and protected control transfers
-remain unvalidated. Conditional forms remain unsupported, pending
-Access-time sampling, accepted/rejected slots, producer latency and two-word
-slot tests. The complete worker remains unsupported.
+remain unvalidated. The four TC/NTC conditional forms now sample TC in
+Access before older Execute and the next word's Decode. A saved skip-word
+counter replaces rejected words with NOPs before operand decoding.
+Thirty-two cases cover both conditions and word counts, changing TC between
+Decode and Access and again after Access. Only the Access value controls the
+two following stores; rejected stores never publish, including after four
+checkpoint/restoration boundaries. This is a debugger-controlled sampling
+fixture, not proof of firmware-producer latency. Rejected multiword operands,
+conditional IRQ integration and other predicates remain unvalidated or
+unsupported. The complete worker remains unsupported.
 
 Direct `MVDK Smem,dmad`, including the original worker setup `7131 0012`,
 now retains its source sample and destination literal in the staged frontend.
