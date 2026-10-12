@@ -17,6 +17,11 @@ constexpr bool staged_immediate_alu(u16 word)
 	return form == 0xf000 || form == 0xf030 || form == 0xf040 || form == 0xf050;
 }
 
+constexpr bool staged_conditional_branch(u16 word)
+{
+	return word == 0xfa44 || word == 0xfa45 || word == 0xfa4c || word == 0xfa4d;
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -1775,6 +1780,7 @@ void tms320c54x_device::pipeline_step()
 		return;
 	}
 	u8 const entry_stage = m_interrupt_entry_stage;
+	bool prefetch_bubble = false;
 	for (unsigned stage = 5; stage; --stage)
 	{
 		m_pipeline_valid[stage] = m_pipeline_valid[stage - 1];
@@ -1828,8 +1834,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((word & 0xfeff) == 0x68f8 || word == 0x76f8) ? 3 :
-				(staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+				(staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_conditional_branch(word) || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -1854,7 +1860,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if (staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -1895,7 +1901,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
 			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
 		bool const frame = (word & 0xff00) == 0xee00;
-		bool const branch = word == 0xf073 || word == 0xf273;
+		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word);
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !frame && !direct_push && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
@@ -1907,7 +1913,9 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && (fast_return || far_return || branch))
 		{
-			bool const delayed = word == 0xf69b || word == 0xf273 || (far_return && BIT(word, 9));
+			bool const delayed = word == 0xf69b || word == 0xf273 || staged_conditional_branch(word) || (far_return && BIT(word, 9));
+			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
+			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
 			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
@@ -2082,6 +2090,15 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_flush_front = false;
 			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
+		else if (staged_conditional_branch(m_op))
+		{
+			++m_pc;
+			if (m_pipeline_immediate[5])
+			{
+				m_pipeline_fetch_address = (address & 0x7f0000) | m_pipeline_operand[5];
+				m_pipeline_decode_flush = 1;
+			}
+		}
 		else if (m_op == 0xf073 || m_op == 0xf273)
 			++m_pc; // Target fetch was already redirected in Access.
 		else if ((m_op & 0xff00) == 0xee00)
@@ -2153,7 +2170,7 @@ void tms320c54x_device::pipeline_step()
 			u16(address - m_pipeline_control_address) <= 3)
 		{
 			unsigned const words = ((m_op & 0xfeff) == 0x68f8 || m_op == 0x76f8) ? 3 :
-				(staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+				(staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
@@ -2162,6 +2179,13 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]))
+	{
+		// Our complete two-word slot reaches Read at the opcode's Evaluate
+		// clock. Retain the predicate after older Execute writes (example 7-17).
+		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
+		m_pipeline_immediate[4] = BIT(m_pipeline_word[4], 0) ? zero : !zero;
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff80) == 0x4600)
 	{
 		// Class 5A takes three clocks but has zero DP-consumer latency
@@ -2205,7 +2229,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
 		m_pipeline_flush_front = false;
 	}
-	if (!m_pipeline_flush_front)
+	if (!m_pipeline_flush_front && !prefetch_bubble)
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
 		m_pipeline_valid[0] = true;

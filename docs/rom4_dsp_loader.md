@@ -2770,21 +2770,36 @@ status/SP or other-accumulator change. PRD has the modeled extra clock;
 post-Read RAM changes must not affect the result. Indirect forms, preceding
 MMR producer conflicts and physical wait placement remain unvalidated.
 
-The exact original R060 AA22 prefix at `02:3d73..3d87` composes these
-operations: `eeff`, ST0/ST1 pushes, RSBX CPL/OVM, six accumulator-part
-pushes, `ea00`, `577c`, `f300 0001`, `4f7c`, `487e`, `f030 c004` and
-`f050 c004`. Six executable cases cover pages 0 and 2 with checkpoints
-after the first retained source, status saves or a partial accumulator save.
-They require eight ordered saves of the original accumulator/status values,
-an untouched reserved stack slot, final SP `0ff7`, DP zero, cleared CPL/OVM,
-the long-word operand loaded, incremented in B and stored back, and a page-zero
-LDM zero-extended and logically masked in A. All cases
-replay without duplicate writes. The bytes were checked through the original
-upload decoder against `InitData_R060.a00`; this CPU-conformance fixture ends
-the copied prefix with NOPs, leaving the original image and firmware runs
-unchanged. It does not execute the full ISR. The next original
-instruction, `fa44 3d9a` at `02:3d88` (delayed ANEQ branch), remains unsupported in the
-staged frontend. Native handset/recorder execution still uses the atomic core.
+Staged BCD supports AEQ/ANEQ/BEQ/BNEQ. The complete two-word slot retains
+its 40-bit zero predicate in Read (the opcode's Evaluate clock), after older
+Execute writes, and uses that predicate at redirect. One empty prefetch slot
+models SPRU131G example 7-17; both delay words execute on either outcome.
+Taken branches discard the next sequential word. Ninety-six cases cover all
+four conditions, both program pages, both outcomes and three checkpoints;
+changing the selected accumulator after sampling must not change the route.
+Forty-eight cases compose a memory-to-DP delay slot and NOP, verifying its
+single source sample, held clocks and the target load through the new DP.
+Target Fetch/Execute is clock 8/12 with immediate-load delays, or 10/14 with
+the memory-DP delay. These are prototype stage observations, not silicon
+measurements. Nondelayed BC, other condition families, interrupt overlap and
+general multiword delay instructions remain unvalidated.
+
+The exact original R060 AA22 skip-worker path now composes 36 words:
+`02:3d73..3d8b` and `02:3d9a..3da4`. It saves status/accumulator context,
+increments a long-memory value, computes the status mask, executes BCD with
+the real memory-DP/NOP delays, then restores context through the common tail.
+Six executable cases cover pages 0 and 2 with checkpoints after the first
+retained source, a partial accumulator save or the POPM BL/store overlap.
+Each requires eight ordered context saves and one reserved-slot write,
+restored A/B/ST0/ST1, final SP `0fff`, the incremented long-memory value and
+return slot `0fff=4044`. The store uses the pre-POPM SP sample, not the live
+incremented SP. Replay must not duplicate writes. The bytes were checked
+through the original upload decoder against `InitData_R060.a00`; this
+CPU-conformance fixture ends the copied path with NOPs, leaving the original
+image and firmware runs unchanged. It does not execute the full ISR. The
+next original instruction is `fc00` RET at `02:3da5`, still unsupported in the
+staged frontend. The worker-call path is not executed by this fixture.
+Native handset/recorder execution still uses the atomic core.
 
 The read-only `mu4_context_contract.py` pins 51 original AA22 words through
 `02:3da5` against the R060 source identity. `487e; f030 c004; f050 c004`
@@ -2810,9 +2825,9 @@ not a claim of correct interrupt-return semantics or full handler execution.
 Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
-complete status predicate. Next validate delayed conditional-branch ownership
-and composition with the implemented memory-to-DP form before extending the original-prefix fixture;
-neither skipping delay effects nor a fixed interrupt delay is a substitute.
+complete status predicate. Next establish ordinary RET ownership and the
+worker-call path before a full original-handler fixture; neither skipping
+delay effects nor a fixed interrupt delay is a substitute.
 
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
