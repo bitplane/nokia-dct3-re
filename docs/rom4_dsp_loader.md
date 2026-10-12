@@ -2691,6 +2691,20 @@ unchanged and the old architectural DP persists until Execute. This is a
 bounded forwarding implementation, not measured silicon bus placement;
 mixed status-register producers and other DP consumer families remain open.
 
+Direct `LD Smem,DP` retains one memory sample, holds pipeline advancement
+for two additional clocks and commits the low nine bits into DP at Execute
+(SPRU172C page 4-71, class 5A). Forwarding updates younger basic direct
+operands, giving the zero-DP-latency contract in SPRU131G table 7-17 without
+early architectural ST0 commitment. All 512 page values have restore before
+Read, after Read or during the held interval (1,536 cases). Each requires
+one source read, one adjacent-consumer read and preserved upper ST0/ST1/B;
+changing source memory after Read must not affect either DP or the consumer.
+The declared prototype samples at clock 5, retires the producer at 8 and
+the consumer at 9; physical stage placement remains unvalidated. The gate
+covers a RAM source and adjacent basic LD only. Indirect/extended forms,
+peripheral-source timing, mixed producers, store consumers, interrupt overlap
+and delayed-control composition remain outside this acceptance scope.
+
 Staged FRAME accepts all signed eight-bit offsets. The prototype updates SP
 in Access and does not apply the offset again at Execute; the immediately
 following PSHM therefore allocates from the adjusted stack, as required by
@@ -2796,8 +2810,8 @@ not a claim of correct interrupt-return semantics or full handler execution.
 Reproduce the bounded original-code audit with:
 `python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00`.
 Its unit tests reject missing or changed witness words and enumerate the
-complete status predicate. Next recover the delayed conditional-branch and
-memory-to-DP ownership together before extending the original-prefix fixture;
+complete status predicate. Next validate delayed conditional-branch ownership
+and composition with the implemented memory-to-DP form before extending the original-prefix fixture;
 neither skipping delay effects nor a fixed interrupt delay is a substitute.
 
 The original four short/long-period, direct/indirect-mask streams run through
