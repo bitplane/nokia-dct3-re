@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_complete_staged_isr_alone_removes_short_timer_starvation",
+      "status": "disproven",
+      "hypothesis": "Completing the original timer vector, active worker, context restoration and FRETE in the staged frontend is sufficient to advance foreground work with PRD=1",
+      "conclusion": "The 96 recurring CPU-fixture cases execute eight original ISR returns per replay leg, with no worker-state reseeding. PRD=255 advances the retired ADDM foreground counter after the first return (representative totals 146/164 versus five); PRD=1 completes all eight returns but remains at five foreground writes with timer IFR bit 3 pending. Both naturally evolving worker-control outcomes, foreground pages and actual SXM states are covered. Replay reproduces the exact return cycle and foreground count after correcting a checker-callback scheduling error, without changing device timer semantics. This disproves ISR completion alone as the fix under the supplied standard CPU-timer workload; real DA150 clock units and the warm application's timer/mask/scheduling lifecycle remain unvalidated. Atomic handset and MU4 execution remain unchanged.",
+      "evidence": ["docs/rom4_dsp_loader.md", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "c54x_memory_logic_fixture_bit9_is_sxm",
       "status": "disproven",
       "hypothesis": "The staged logical-operation matrix's ST1 0200 toggle establishes both SXM states",

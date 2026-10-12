@@ -4951,6 +4951,56 @@ private:
 		m_phase = 252110; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_mu4_recurring_timer(unsigned variant = 0)
+	{
+		bool const short_period = BIT(variant, 3);
+		start_pipeline_mu4_timer_context(variant & 7);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
+		unsigned const page = BIT(variant, 2) ? 3 : 0;
+		u32 const foreground = (page << 16) | 0x9000;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		std::array<u16, 5> const loop{0x6bf8, 0x0700, 1, 0xf073, 0x9000};
+		for (unsigned i = 0; i < loop.size(); ++i) program.write_word(foreground + i, loop[i]);
+		program.write_word(foreground + 0x80, 0xf495);
+		m_cpu->space(AS_DATA).write_word(0x700, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, short_period ? 1 : 0xff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 31);
+		m_pipeline_replay = false; m_irq_raised = false; m_recurring_irq_end_cycle = 0;
+		m_recurring_irq_first_return_writes = ~0U;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfe0, 0xfff, "recurring_mu4_stack",
+			[this, page](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == 0xfff) expect(value == m_timer_probe_return_pc, "Each timer entry stacks its actual foreground continuation");
+				if (address == 0xffe) expect(value == page, "Each original vector saves the actual foreground page");
+				if (address == 0xffd) expect(value == 0x4044, "Each original handler publishes its FRETE return into the reserved slot");
+				++m_pipeline_store_writes;
+			});
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0xfff, "recurring_mu4_return",
+			[this, page](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				bool const pc = BIT(m_fast_stack_reads, 0);
+				expect(address == (pc ? 0xfff : 0xffe) && value == (pc ? m_timer_probe_return_pc : page),
+					"Every FRETE consumes its current saved page and PC in order");
+				++m_fast_stack_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x204c, 0x4044, "recurring_mu4_route",
+			[this](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (address == 0x204c) { expect(value == 0x4a1e, "Recurring timer uses original vector"); ++m_pipeline_extensions_reads; }
+				if (address == 0x3d73) { expect(value == 0xeeff, "Recurring timer uses original context handler"); ++m_pipeline_drained_fetches; }
+				if (address == 0x4044) { expect(value == 0xf4e5, "Recurring timer uses original far return"); ++m_vector_reads; }
+			});
+		m_vector_prefetch_tap = m_cpu->space(AS_DATA).install_write_tap(0x700, 0x700, "recurring_mu4_foreground_retirement",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == m_pipeline_operand_reads + 1, "Foreground counter changes only by an actually retired ADDM");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 252130; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -27701,15 +27751,16 @@ private:
 					m_vector_acks = m_pipeline_register_writes; m_fast_stack_reads = m_pipeline_branch_case;
 					if (!m_vector_acks) m_timer_probe_return_pc = 0;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					m_check_timer->adjust(attotime::never);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original timer ISR without duplicate vector, context or return ownership");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252120;
-					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+					m_check_timer->enable(true); return;
 				}
 				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
 				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
 				if (variant < 47) { start_pipeline_mu4_timer_context(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged original MU4 timer ISR: PASS cases=48 original_words=94 foreground_pages=2 sxm_states=2 cmpr_outcomes=2 restore=48 timer_vector=1 original_frete=1 foreground_retired=1\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mu4_recurring_timer(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -27717,6 +27768,83 @@ private:
 		if (m_phase == 252120)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252110;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252130)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			bool const sxm = BIT(variant, 0), matched = BIT(variant, 1), short_period = BIT(variant, 3);
+			unsigned const page = BIT(variant, 2) ? 3 : 0;
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const point = variant / 16;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && cycle < 6000,
+				"Recurring original timer context remains bounded without reseeding worker state");
+			if (m_vector_acks == 1 && m_fast_stack_reads == 2 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+				!BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 11) && m_recurring_irq_first_return_writes == ~0U)
+				m_recurring_irq_first_return_writes = m_pipeline_operand_reads;
+			bool const save_point = point == 0 ? cycle == 28 : point == 1 ? m_vector_acks == 1 :
+				point == 2 ? m_fast_stack_reads == 2 : point == 3 ? m_vector_acks == 3 : point == 4 ? m_fast_stack_reads == 6 : m_vector_acks == 6;
+			if (save_point && !m_irq_raised && !m_pipeline_replay)
+			{
+				m_irq_raised = true; m_recurring_irq_checkpoint_cycle = cycle;
+				m_recurring_irq_snapshot = {m_vector_acks, m_pipeline_extensions_reads, m_pipeline_drained_fetches, m_vector_reads,
+					m_fast_stack_reads, m_pipeline_store_writes, m_pipeline_operand_reads, m_timer_probe_return_pc, m_recurring_irq_first_return_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save recurring timer and evolving original worker at a real interrupt boundary");
+			}
+			bool const returned = m_vector_acks == 8 && m_vector_reads == 8 && m_fast_stack_reads == 16 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && !BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 11) &&
+				m_cpu->state_int(tms320c54x_device::STATE_XPC) == page;
+			if (returned)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					unsigned const bodies = matched ? 1 : 8;
+					u16 pointer = 0x470; for (unsigned i = 0; i < bodies; ++i) pointer = ((pointer + 4) & 0xff0f) | 0x00f0;
+					expect(m_irq_raised && m_pipeline_extensions_reads == 8 && m_pipeline_drained_fetches == 8 &&
+						m_pipeline_store_writes == 8 * 17 + bodies && m_recurring_irq_first_return_writes != ~0U &&
+						(short_period || m_pipeline_operand_reads > m_recurring_irq_first_return_writes) &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x4200 | (sxm ? 0x100 : 0)) &&
+						m_cpu->state_int(tms320c54x_device::STATE_A) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x369c && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 &&
+						m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2470 &&
+						m_cpu->space(AS_DATA).read_word(0x512) == 0xff0f + bodies * 2 && m_cpu->space(AS_DATA).read_word(0x513) == pointer &&
+						m_cpu->space(AS_DATA).read_word(0x511) == (matched ? 0x470 : 0) && m_cpu->space(AS_DATA).read_word(0x700) == m_pipeline_operand_reads,
+						"Recurring timer preserves caller context while original control/mask state evolves without forcing");
+				}
+				osd_printf_info("MU4 recurring timer observation: case=%u replay=%u prd=%u returns=8 cycle=%llu foreground_writes=%u first_return_writes=%u pending=%04x\n",
+					variant, unsigned(m_pipeline_replay), short_period ? 1 : 255, (unsigned long long)cycle, m_pipeline_operand_reads, m_recurring_irq_first_return_writes,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
+				if (!m_pipeline_replay)
+				{
+					m_recurring_irq_end_cycle = cycle; m_recurring_irq_end_writes = m_pipeline_operand_reads; m_pipeline_replay = true;
+					m_vector_acks = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_pipeline_drained_fetches = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3];
+					m_fast_stack_reads = m_recurring_irq_snapshot[4]; m_pipeline_store_writes = m_recurring_irq_snapshot[5];
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[6]; m_timer_probe_return_pc = m_recurring_irq_snapshot[7];
+					m_recurring_irq_first_return_writes = m_recurring_irq_snapshot[8];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					// Mark the executing check timer modified before restoring it.
+					// Resume at its restored deadline, not stale callback time.
+					m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore recurring interrupts without duplicate timer, stack or foreground effects");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = m_recurring_irq_checkpoint_cycle + 1; m_phase = 252140;
+					m_check_timer->enable(true); return;
+				}
+				expect(cycle == m_recurring_irq_end_cycle && m_pipeline_operand_reads == m_recurring_irq_end_writes,
+					"Recurring timer replay reproduces the exact eighth-return cycle and foreground effects");
+				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
+				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+				if (variant < 95) { start_pipeline_mu4_recurring_timer(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged recurring MU4 timer: PASS cases=96 returns_per_leg=8 periods=2 foreground_pages=2 sxm_states=2 control_outcomes=2 restore=96 exact_return_cycle=1 firmware_reseeding=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252140)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252130;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
@@ -28183,6 +28311,9 @@ private:
 	bool m_pipeline_replay = false;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
+	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
+	unsigned m_recurring_irq_first_return_writes = ~0U, m_recurring_irq_end_writes = 0;
+	u64 m_recurring_irq_checkpoint_cycle = 0, m_recurring_irq_end_cycle = 0;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
 	u16 m_timer_probe_return_pc = 0;
@@ -28236,7 +28367,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-		if (m_phase == 252110)
+		if (m_phase == 252110 || m_phase == 252130)
 		{
 			expect(line == 3, "Original MU4 timer fixture acknowledges only the hardware timer source");
 			++m_vector_acks; m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN);

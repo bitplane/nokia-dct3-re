@@ -2501,8 +2501,8 @@ reserved-return store and real caller restoration instructions execute;
 there is no synthetic continuation inside this composition.
 
 This closes the original outer-handler/body composition for the supplied
-CPU fixtures. Real worker operand provenance, foreground progress under
-recurring interrupts and coherent native
+CPU fixtures. Real worker operand provenance, application foreground
+progress under short recurring interrupts and coherent native
 recording remain unvalidated; handsets and MU4 still use the atomic frontend.
 
 Non-delayed staged FB retains both the seven-bit target page and its
@@ -2548,6 +2548,35 @@ inputs; it does not prove real recorder operand provenance, recurring
 interrupt fairness, the warm application's short timer lifecycle or
 recording completion. No handset or MU4 profile is switched to the
 experimental frontend by this gate.
+
+Recurring original-ISR coverage uses 96 cases, with eight complete timer
+returns per replay leg. It varies PRD=`00ff`/`0001`, foreground pages 0/3,
+SXM and the initial CMPR outcome, with six checkpoint classes. The
+foreground executes an absolute ADDM counter loop; a counter write is a
+retirement observation, not a fetched marker. Original worker state is
+never reseeded between entries. A successful conditional store changes
+the control word from zero to `0470`, so later entries naturally skip
+the body; the other fixture continues its original copy/mask progression.
+Every case restores caller context, increments the original tick counter
+eight times, and reproduces the exact eighth-return clock and foreground
+counter after save/restore.
+
+The period comparison is intentionally discriminating. PRD=`00ff`
+continues foreground work after the first return: representative cases
+finish with 146 or 164 writes, versus five at the first return. With
+PRD=`0001`, the original ISR still returns eight times, but the counter
+stays at five and timer IFR bit 3 remains pending. Thus completing the
+original staged ISR does **not** alone remove the short-period starvation.
+These are supplied CPU-timer workloads, not validated DA150 timer-clock
+units or proof that the real application should use either fixture rate.
+The next boundary is the original warm application's timer configuration,
+masking and scheduling lifecycle, not a guessed ISR completion message.
+
+The timed replay harness resumes through the restored checker deadline.
+Restoring a stream inside a callback and then scheduling from the cached
+pre-load callback time shifts emulated timer phase; the exact-cycle gate
+guards against that harness error. Neither device timer semantics nor
+the default atomic handset/MU4 path are changed by this fixture correction.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
 other MMR destinations and indirect STM remain excluded from this frontend.
