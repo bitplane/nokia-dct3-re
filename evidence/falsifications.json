@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_explicit_sp_publication_is_immediate_compiler_base",
+      "status": "disproven",
+      "hypothesis": "Publishing SP through staged POPM SP, STM/MVDK SP or FRAME makes the new value immediately usable by a basic compiler-mode LD/ST",
+      "conclusion": "TI SPRU131G table 7-9 distinguishes the architectural stack pointer from Category-I compiler-addressing visibility: POPM SP needs two cycles, STM/MVDK SP and FRAME need one, and a DAGEN-bank conflict adds one to POPM SP. The staged frontend now retains the prior compiler SP separately, with saved visibility-window state, while stack operations use architectural SP directly. The 320 replay cases distinguish zero through three NOPs for LD/ST, including an intermediate postincrement and deferred publication, with no duplicate reads or writes. Four additional cases execute the original POPM SP/NOP/NOP/RET idle-wrapper suffix and consume the caller return from the restored stack. This closes the tested basic consumers, not general multiword/Category-II consumers or all conflict chains; atomic handset execution remains unchanged.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "mu4_complete_staged_isr_alone_removes_short_timer_starvation",
       "status": "disproven",
       "hypothesis": "Completing the original timer vector, active worker, context restoration and FRETE in the staged frontend is sufficient to advance foreground work with PRD=1",

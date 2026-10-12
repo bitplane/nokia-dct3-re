@@ -2596,8 +2596,8 @@ flag=`1` writes; all 65,535 other input words skip that setup. This is an
 exhaustive **local** predicate, not a global flag-writer or reset census.
 After wake the routine removes its local frame, restores AR1 and uses
 FRET. Its wrapper aligns SP, performs FCALL `02:98d0`, restores CPL/SP
-and returns. POPM SP and IDLE entry/wake ownership still need coverage
-before claiming this complete original call executes.
+and returns. IDLE entry/wake ownership still needs coverage before
+claiming this complete original call executes.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).
@@ -2879,17 +2879,17 @@ phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
 preceding accumulator-producer latency are not covered by this implementation
 or gate.
 
-Staged direct POPM supports `8a06..8a17` and `8a19`: ST0/ST1, accumulator
-parts, T/TRN, AR0--AR7 and BK. It retains the stack word and increments SP
-in Read. AR0--AR7 and BK also publish in Read (SPRU131G table 7-4);
+Staged direct POPM supports `8a06..8a19`: ST0/ST1, accumulator
+parts, T/TRN, AR0--AR7, SP and BK. It retains the stack word and increments SP
+in Read. AR0--AR7, SP and BK also publish in Read (SPRU131G table 7-4);
 other supported destinations publish in Execute. An older Execute-stage
 store into the DAGEN bank defers the early publication one clock, as
 specified by table 7-5. The previous all-destinations Execute placement
 was a prototype assumption contradicted by that table, not silicon evidence.
-All 19 destinations have both program pages and three replay
+The 19 non-SP destinations have both program pages and three replay
 boundaries, giving 114 cases. Each requires one stack read/increment and
 one register write per leg, correct guard-byte masking and ST1/XF output.
-SP, XPC, other control/peripheral destinations and indirect forms are
+XPC, other control/peripheral destinations and indirect forms are
 rejected. Twelve additional replay cases compare an older STL to AR1
 with an older STL to RAM: POPM AR2 keeps its stack read/increment in
 clock 6, but only the DAGEN-bank case defers its destination write to
@@ -2899,13 +2899,39 @@ partial, not measured silicon behavior.
 
 Basic compiler-mode LD/ST retain their Access-stage SP sample separately
 from Decode-time CPL/DP. This gives the one-instruction category-I consumer
-latency after PSHM/POPM in SPRU131G table 7-9: an immediate consumer uses the old
+latency after ordinary PSHM/POPM MMR in SPRU131G table 7-9: an immediate consumer uses the old
 SP, while one intervening NOP allows the updated SP. Sixteen cases cover
 PSHM AR1/SP and POPM AR1/BL, LD/ST and both spacings, restoring after the SP
 sample and before consumer Read. Each verifies the operand or destination, untouched
-alternate address, retained push value and final SP. Other SP producers,
+alternate address, retained push value and final SP. Remaining SP producer classes,
 extended-shift category-II consumers, indirect forms and physical stage
 placement remain unvalidated. The atomic frontend is unchanged.
+
+POPM SP is distinct: it publishes the popped value instead of leaving
+the postincremented stack address, while a basic compiler-mode consumer
+requires two cycles of separation (table 7-9 Category I). STM/MVDK SP
+and FRAME require one; a DAGEN-bank conflict adds one to POPM SP.
+The staged frontend retains the prior compiler-address SP separately
+from architectural SP, including save-state registration. Stack operations
+use architectural SP directly; the compiler-address window must not
+delay them or generate another register publication.
+
+The 320 replay cases cover those four producer kinds plus conflicted
+POPM SP, basic LD/ST consumers, zero through three NOPs and two program
+pages. A popped/moved source changed after Read must not alter SP.
+They distinguish the intermediate postincrement during a deferred pop
+from both the old compiler-address base and the final popped SP. No
+extra source reads or register/store writes are permitted on replay.
+This closes the tested basic Category-I cases, not general multiword
+consumers, other SP producers or all bank-conflict chains.
+
+Four cases execute the original `8a18 f495 f495 fc00` at
+`02:3d3a`--`02:3d3d`. POPM SP restores the caller frame, then the two
+NOPs and RET consume its captured return word at that restored address.
+Changing the popped SP word and return word after their respective reads
+cannot retarget the return. The same-page caller marker retires with one
+SP publication and two data reads per leg. This is the original wrapper
+suffix, not the complete idle/wake call.
 
 Plain RET/RETE retain the stack address and increment SP in Access, sample
 the return word in Read and redirect at Execute (SPRU131G example 7-7;

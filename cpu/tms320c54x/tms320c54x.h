@@ -132,6 +132,7 @@ private:
 	void reset_pipeline();
 	void pipeline_step();
 	void pipeline_accept_interrupt();
+	void pipeline_delay_compiler_sp(u16 previous);
 	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
@@ -249,6 +250,8 @@ private:
 	std::array<u16, 6> m_pipeline_direct_sp = {};
 	std::array<u8, 6> m_pipeline_far_call_page = {};
 	std::array<u16, 6> m_pipeline_far_call_stack = {};
+	u16 m_pipeline_compiler_sp_previous = 0;
+	u8 m_pipeline_compiler_sp_wait = 0;
 	bool m_pipeline_intm_follow = false;
 	u8 m_pipeline_decode_remaining = 0;
 	u16 m_pipeline_decode_extension = 0;

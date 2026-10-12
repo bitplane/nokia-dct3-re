@@ -5095,6 +5095,109 @@ private:
 		m_phase = 252170; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_explicit_sp(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const kind = variant % 5, gap = (variant / 5) % 4;
+		bool const store = BIT(variant / 20, 0);
+		u32 const base = BIT(variant / 40, 0) ? 0x20000 : 0;
+		unsigned const words = kind == 1 || kind == 2 || kind == 4 ? 2 : 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		if (kind == 0) program.write_word(base + 0x600, 0x8a18);
+		if (kind == 1) { program.write_word(base + 0x600, 0x7718); program.write_word(base + 0x601, 0x1020); }
+		if (kind == 2) { program.write_word(base + 0x600, 0x7182); program.write_word(base + 0x601, 0x0018); }
+		if (kind == 3) program.write_word(base + 0x600, 0xee20);
+		if (kind == 4) { program.write_word(base + 0x600, 0x8081); program.write_word(base + 0x601, 0x8a18); }
+		program.write_word(base + 0x600 + words + gap, store ? 0x8020 : 0x1020);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x11);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x70);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		auto &data = m_cpu->space(AS_DATA);
+		data.write_word(0x70, 0x1020); data.write_word(0x1000, 0x1020);
+		data.write_word(0x1020, 0x1111); data.write_word(0x1040, 0x2222);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		unsigned const access = 4 + words + gap;
+		bool const new_sp = gap >= (kind == 0 ? 2 : kind == 4 ? 3 : 1);
+		u16 const address = new_sp ? 0x1040 : 0x1020;
+		m_pipeline_operand_tap = data.install_read_tap(0x70, 0x1040, "explicit_sp_sources",
+			[this, kind, store, access, address, new_sp](offs_t at, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				bool const source = at == (kind == 2 ? 0x70 : 0x1000);
+				expect(source ? (kind == 0 || kind == 2 || kind == 4) && value == 0x1020 && m_cpu->pipeline_cycles() == (kind == 4 ? 6 : 5) :
+					!store && at == address && value == (new_sp ? 0x2222 : 0x1111) && m_cpu->pipeline_cycles() == access + 1,
+					"Explicit SP source and basic compiler operand use their documented separate visibility");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = data.install_write_tap(0x18, 0x1040, "explicit_sp_publications",
+			[this, kind, store, access, address](offs_t at, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x18)
+				{
+					expect(kind != 3 && value == 0x1020 && m_cpu->pipeline_cycles() == (kind == 4 ? 7 : 5), "Explicit SP publishes once; only DAGEN conflict defers POPM");
+					++m_pipeline_register_writes;
+				}
+				else
+				{
+					expect(store && at == address && value == 0x7777 && m_cpu->pipeline_cycles() == access + 2, "Compiler store retains its old or new SP-based address");
+					++m_pipeline_store_writes;
+				}
+			});
+		m_phase = 252190; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_idle_sp_tail(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(0x23d3a + i, 0xf495); program.write_word(0x20700 + i, 0xf495); }
+		std::array<u16, 4> const words{0x8a18, 0xf495, 0xf495, 0xfc00};
+		for (unsigned i = 0; i < words.size(); ++i) program.write_word(0x23d3a + i, words[i]);
+		program.write_word(0x23d3e, 0xffff); program.write_word(0x20700, 0xe855);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0xffe);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x77);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0xffe, 0x1000); m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
+		m_cpu->set_state_int(STATE_GENPC, 0x23d3a); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_register_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0x1000, "idle_original_sp_return_sources",
+			[this](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(address == (m_pipeline_operand_reads ? 0x1000 : 0xffe) && value == (m_pipeline_operand_reads ? 0x700 : 0x1000) &&
+					m_cpu->pipeline_cycles() == (m_pipeline_operand_reads ? 8 : 5), "Original suffix pops restored SP then reads the caller return at that restored address");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x18, 0x18, "idle_original_sp_publication",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x1000 && m_cpu->pipeline_cycles() == 5, "POPM SP publishes its popped value without incrementing it afterward");
+				++m_pipeline_register_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(0x20700, 0x20700, "idle_original_sp_caller",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 10, "Original idle suffix returns to its same-page caller"); ++m_pipeline_extensions_reads;
+			});
+		m_phase = 252210; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -28035,7 +28138,7 @@ private:
 				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 79) { start_pipeline_far_call(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged FCALL/FRET: PASS cases=80 source_pages=2 target_pages=5 restore=80 stack_words=2 duplicate_stack_writes=0 duplicate_stack_reads=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_explicit_sp(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -28043,6 +28146,101 @@ private:
 		if (m_phase == 252180)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252170;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252190)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, kind = variant % 5, gap = (variant / 5) % 4;
+			bool const store = BIT(variant / 20, 0);
+			unsigned const words = kind == 1 || kind == 2 || kind == 4 ? 2 : 1, access = 4 + words + gap;
+			unsigned const publish = kind == 3 ? 4 : kind == 4 ? 7 : 5;
+			unsigned const checkpoint = std::array<unsigned, 4>{3, publish, access, access + 1}[variant / 80];
+			bool const new_sp = gap >= (kind == 0 ? 2 : kind == 4 ? 3 : 1);
+			u64 const cycle = m_cpu->pipeline_cycles();
+			auto const reads_at = [kind, store, access](u64 clock) { return unsigned((kind == 0 || kind == 2 || kind == 4) && clock >= (kind == 4 ? 6 : 5)) + unsigned(!store && clock >= access + 1); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_store_writes == unsigned(store && cycle >= access + 2) &&
+				m_pipeline_register_writes == unsigned(kind != 3 && cycle >= publish) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= publish ? 0x1020 : kind == 4 && cycle >= 6 ? 0x1001 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (!store && cycle >= access + 2 ? new_sp ? 0x2222 : 0x1111 : 0x7777) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x4800,
+				"Architectural SP and basic compiler SP advance at distinct table-7-9 boundaries");
+			if ((kind == 0 || kind == 2 || kind == 4) && cycle == (kind == 4 ? 6 : 5))
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(kind == 2 ? 0x70 : 0x1000, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save explicit SP source, publication and compiler forwarding window");
+			}
+			if (cycle == 14)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_store_writes = unsigned(store && checkpoint >= access + 2);
+					m_pipeline_register_writes = unsigned(kind != 3 && checkpoint >= publish);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore explicit SP without a duplicated pop, register write or compiler address update");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252200;
+					m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 319) { start_pipeline_explicit_sp(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged explicit SP: PASS cases=320 producers=POPM,STM,MVDK,FRAME,POPM_conflict compiler_consumers=LD,ST gap_nops=0,1,2,3 restore=320 duplicate_reads=0 duplicate_writes=0\n");
+				start_pipeline_idle_sp_tail(); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252200)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252190;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252210)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles(); unsigned const checkpoint = std::array<unsigned, 4>{5, 7, 8, 9}[m_pipeline_peripheral_case];
+			auto const reads_at = [](u64 clock) { return unsigned(clock >= 5) + unsigned(clock >= 8); };
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_register_writes == unsigned(cycle >= 5) && m_pipeline_extensions_reads == unsigned(cycle >= 10) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 7 ? 0x1001 : cycle >= 5 ? 0x1000 : 0xffe) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 14 ? 0x55 : 0x77) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+				"Original POPM SP/NOP/NOP/RET suffix restores and consumes the intended caller frame");
+			if (cycle == 5 || cycle == 8)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(cycle == 5 ? 0xffe : 0x1000, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original idle SP restoration and captured near-return word");
+			}
+			if (cycle == 16)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_register_writes = unsigned(checkpoint >= 5); m_pipeline_extensions_reads = unsigned(checkpoint >= 10);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original idle suffix without a second SP publication or return-word read");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252220;
+					m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 3) { start_pipeline_idle_sp_tail(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged original idle SP tail: PASS cases=4 original_words=4 restore=4 duplicate_reads=0 duplicate_sp_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252220)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252210;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

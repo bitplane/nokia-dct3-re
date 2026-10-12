@@ -770,6 +770,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_direct_sp));
 	save_item(NAME(m_pipeline_far_call_page));
 	save_item(NAME(m_pipeline_far_call_stack));
+	save_item(NAME(m_pipeline_compiler_sp_previous));
+	save_item(NAME(m_pipeline_compiler_sp_wait));
 	save_item(NAME(m_pipeline_intm_follow));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
@@ -1783,6 +1785,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_direct_sp.fill(0);
 	m_pipeline_far_call_page.fill(0);
 	m_pipeline_far_call_stack.fill(0);
+	m_pipeline_compiler_sp_previous = 0;
+	m_pipeline_compiler_sp_wait = 0;
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
@@ -1821,6 +1825,7 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	if (m_pipeline_compiler_sp_wait) --m_pipeline_compiler_sp_wait;
 	if (m_pipeline_dp_wait)
 	{
 		--m_pipeline_dp_wait;
@@ -2079,8 +2084,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
-		bool const direct_pop = (word & 0xff00) == 0x8a00 &&
-			((u8(word) >= 6 && u8(word) <= 0x17) || u8(word) == 0x19);
+		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x19;
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word)));
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
@@ -2150,12 +2154,19 @@ void tms320c54x_device::pipeline_step()
 			(staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 		m_pipeline_early_write_deferred[3] = older_store;
-		if (!older_store) data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3]);
+		if (u8(m_pipeline_word[3]) == 0x18) m_pipeline_direct_sp[3] = m_sp;
+		if (!older_store)
+		{
+			data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3]);
+			if (u8(m_pipeline_word[3]) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
+		}
 	}
 	if (m_pipeline_valid[4] && m_pipeline_early_write_deferred[4])
 	{
 		bool const move = staged_move(m_pipeline_word[4]);
-		data_write(move ? m_pipeline_immediate[4] : u8(m_pipeline_word[4]), move ? m_pipeline_operand[4] : m_pipeline_immediate[4]);
+		u16 const destination = move ? m_pipeline_immediate[4] : u8(m_pipeline_word[4]);
+		data_write(destination, move ? m_pipeline_operand[4] : m_pipeline_immediate[4]);
+		if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		m_pipeline_early_write_deferred[4] = false;
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf49b || m_pipeline_word[3] == 0xf69b))
@@ -2177,7 +2188,9 @@ void tms320c54x_device::pipeline_step()
 	{
 		// SPRU172C 4-60: FRAME has no latency to the following stack
 		// operation. Access-owned SP update is a partial stage model.
+		u16 const previous = m_sp;
 		m_sp = u16(m_sp + s8(m_pipeline_word[3]));
+		pipeline_delay_compiler_sp(previous);
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
 	{
@@ -2194,7 +2207,7 @@ void tms320c54x_device::pipeline_step()
 		staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
-		m_pipeline_direct_sp[3] = m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
+		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
 			? m_pipeline_immediate[4] : m_sp; // Table 7-9: one-clock Category-I latency after PSHD.
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x4b00)
 	{
@@ -2250,7 +2263,12 @@ void tms320c54x_device::pipeline_step()
 				(staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[3] = conflict;
-			if (!conflict) data_write(destination, m_pipeline_operand[3]);
+			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
+			if (!conflict)
+			{
+				data_write(destination, m_pipeline_operand[3]);
+				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
+			}
 		}
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff80) == 0x4600)
@@ -2310,11 +2328,16 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 17A: retain the stack word before destination publication.
 		// Read-owned SP increment is a partial placement model; POPM excludes
-		// SP/XPC/control destinations and POPD is bounded to RAM.
+		// XPC/control destinations and POPD is bounded to RAM.
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
 		{
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
+		}
+		if (m_pipeline_word[4] == 0x8a18)
+		{
+			m_pipeline_direct_sp[4] = m_sp;
+			pipeline_delay_compiler_sp(m_sp);
 		}
 		m_pipeline_operand[4] = data_read(m_sp++);
 		if ((m_pipeline_word[4] & 0xff00) == 0x8a00 && u8(m_pipeline_word[4]) >= 0x10 && u8(m_pipeline_word[4]) <= 0x19)
@@ -2324,7 +2347,11 @@ void tms320c54x_device::pipeline_step()
 			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[4] = conflict;
-			if (!conflict) data_write(u8(m_pipeline_word[4]), m_pipeline_operand[4]);
+			if (!conflict)
+			{
+				data_write(u8(m_pipeline_word[4]), m_pipeline_operand[4]);
+				if (u8(m_pipeline_word[4]) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
+			}
 		}
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
@@ -2461,7 +2488,10 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xff00) == 0x8a00)
 		{
 			if (u8(m_op) < 0x10 || u8(m_op) > 0x19 || m_pipeline_early_write_deferred[5])
+			{
 				data_write(u8(m_op), m_pipeline_operand[5]);
+				if (u8(m_op) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[5]);
+			}
 		}
 		else if ((m_op & 0xff00) == 0x8b00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
@@ -2608,6 +2638,15 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = (m_pipeline_fetch_address & 0x7f0000) | u16(m_pipeline_fetch_address + 1);
 	}
 	pipeline_accept_interrupt();
+}
+
+void tms320c54x_device::pipeline_delay_compiler_sp(u16 previous)
+{
+	// Table 7-9 Category-I consumers must not use a newly published SP
+	// before its compiler-addressing path is ready. Stack operations use
+	// architectural SP directly and are not stalled by this window.
+	m_pipeline_compiler_sp_previous = previous;
+	m_pipeline_compiler_sp_wait = 2;
 }
 
 void tms320c54x_device::pipeline_accept_interrupt()
