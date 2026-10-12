@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_popm_dagen_writes_only_in_execute",
+      "status": "disproven",
+      "hypothesis": "Staged POPM writes every supported MMR destination in Execute after its Read-stage stack sample",
+      "conclusion": "TI SPRU131G table 7-4 explicitly assigns POPM writes to ARx/BK to Read. Those destinations now publish with the stack sample unless an older Execute-stage store occupies the DAGEN write bank; table 7-5 requires a one-clock deferral in that case. The 114 destination/page/replay cases distinguish DAGEN Read publication from other supported destinations' Execute publication. Twelve conflict/control replay cases require one stack read and increment, exactly one older store and one POPM write, with an independently changed stack source after Read unable to alter the retained result. This is bounded manual-derived timing coverage, not measured silicon or a global producer-latency proof. Atomic firmware execution remains unchanged.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "c54x_daram_return_bypasses_same_clock_push",
       "status": "disproven",
       "hypothesis": "A staged RET/RETE/RETD stack read automatically consumes an older PSHM value written to the same DARAM address in that clock",

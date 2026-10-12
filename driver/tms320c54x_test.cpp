@@ -3273,11 +3273,55 @@ private:
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination, "staged_pop_destination",
 			[this, destination, initial](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == 6 &&
-					m_cpu->space(AS_DATA).read_word(destination) == initial, "POPM commits the retained word once at Execute, not early Read");
+				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == (destination >= 0x10 ? 5 : 6) &&
+					m_cpu->space(AS_DATA).read_word(destination) == initial, "POPM writes DAGEN in Read and other destinations in Execute");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251450; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_pop_dagen_conflict(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const conflict = variant < 6;
+		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i)
+			program.write_word(base + 0x600 + i, i == 0 ? (conflict ? 0x8011 : 0x8060) : i == 1 ? 0x8a12 : 0xf495);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1111);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1000, "pop_dagen_stack",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0xbeef && m_cpu->pipeline_cycles() == 6, "POPM retains stack Read despite DAGEN bank conflict");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x11, 0x60, "pop_dagen_writes",
+			[this, conflict](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				bool const pop = address == 0x12;
+				expect((pop || address == (conflict ? 0x11 : 0x60)) &&
+					value == (pop ? 0xbeef : 0x7777) &&
+					m_cpu->pipeline_cycles() == (pop && conflict ? 7 : 6),
+					"Only an older DAGEN store defers POPM publication by one clock");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251465; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pipeline_mu4_prologue(unsigned variant = 0)
@@ -25546,11 +25590,12 @@ private:
 			u64 const cycle = m_cpu->pipeline_cycles();
 			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
 			u16 const destination = m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
+			unsigned const write_clock = destination >= 0x10 ? 5 : 6;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0x1001 : 0x1000),
 				"POPM retains one stack read, increment and register write across replay");
-			if (cycle >= 6)
+			if (cycle >= write_clock)
 				expect(m_cpu->space(AS_DATA).read_word(destination) == (destination == 0x0a || destination == 0x0d ? 0xa5 : 0x6aa5) &&
 					m_xf_pin == bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 13)), "POPM destination applies its normal register mask and XF output");
 			if (cycle == checkpoint && !m_pipeline_replay)
@@ -25563,7 +25608,7 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
-					m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= 6);
+					m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= write_clock);
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained POPM stack source and destination commitment");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -25572,8 +25617,8 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 113) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 register_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
-				start_pipeline_mu4_prologue(); return;
+				osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 dagen_write=5 other_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
+				start_pipeline_pop_dagen_conflict(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -25581,6 +25626,54 @@ private:
 		if (m_phase == 251460)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251450;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251465)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const checkpoint = 5 + (m_pipeline_peripheral_case % 6) / 2;
+			bool const conflict = m_pipeline_peripheral_case < 6;
+			unsigned const write_clock = conflict ? 7 : 6;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 6) &&
+				m_pipeline_store_writes == unsigned(cycle >= 6) + unsigned(cycle >= write_clock) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 6 ? 0x1001 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= write_clock ? 0xbeef : 0x1234),
+				"POPM DAGEN conflict retains source, stack increment and deferred write across replay");
+			if (cycle == 6)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(0x1000, 0xdead);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save POPM bank-conflict boundary");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_operand_reads = unsigned(checkpoint >= 6);
+					m_pipeline_store_writes = unsigned(checkpoint >= 6) + unsigned(checkpoint >= write_clock);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore POPM bank-conflict boundary");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251466;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 11) { start_pipeline_pop_dagen_conflict(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged POPM DAGEN conflict: PASS cases=12 bank_conflicts=6 ram_controls=6 restore=12 duplicate_accesses=0\n");
+				start_pipeline_mu4_prologue(); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251466)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251465;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 251470)

@@ -2653,12 +2653,20 @@ or gate.
 
 Staged direct POPM supports `8a06..8a17` and `8a19`: ST0/ST1, accumulator
 parts, T/TRN, AR0--AR7 and BK. It retains the stack word and increments SP
-in Read, then writes the register in Execute (SPRU172C page 4-128, class
-17A). All 19 destinations have both program pages and three replay
+in Read. AR0--AR7 and BK also publish in Read (SPRU131G table 7-4);
+other supported destinations publish in Execute. An older Execute-stage
+store into the DAGEN bank defers the early publication one clock, as
+specified by table 7-5. The previous all-destinations Execute placement
+was a prototype assumption contradicted by that table, not silicon evidence.
+All 19 destinations have both program pages and three replay
 boundaries, giving 114 cases. Each requires one stack read/increment and
 one register write per leg, correct guard-byte masking and ST1/XF output.
 SP, XPC, other control/peripheral destinations and indirect forms are
-rejected. Read placement and mixed DAGEN/status-producer conflicts remain
+rejected. Twelve additional replay cases compare an older STL to AR1
+with an older STL to RAM: POPM AR2 keeps its stack read/increment in
+clock 6, but only the DAGEN-bank case defers its destination write to
+clock 7. Changing the stack source after Read must not change the
+retained result. General mixed DAGEN/status-producer conflicts remain
 partial, not measured silicon behavior.
 
 Basic compiler-mode LD/ST retain their Access-stage SP sample separately

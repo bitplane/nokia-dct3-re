@@ -2253,6 +2253,15 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		m_pipeline_operand[4] = data_read(m_sp++);
+		if ((m_pipeline_word[4] & 0xff00) == 0x8a00 && u8(m_pipeline_word[4]) >= 0x10 && u8(m_pipeline_word[4]) <= 0x19)
+		{
+			// Table 7-4 gives POPM DAGEN an early Read write; an older
+			// store using that register bank defers publication one clock.
+			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
+			m_pipeline_early_write_deferred[4] = conflict;
+			if (!conflict) data_write(u8(m_pipeline_word[4]), m_pipeline_operand[4]);
+		}
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
 		// DARAM DB reads precede EB writes in the same clock (table 7-2).
@@ -2377,7 +2386,10 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xffe0) == 0x4a00 || (m_op & 0xff00) == 0x4b00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if ((m_op & 0xff00) == 0x8a00)
-			data_write(u8(m_op), m_pipeline_operand[5]);
+		{
+			if (u8(m_op) < 0x10 || u8(m_op) > 0x19 || m_pipeline_early_write_deferred[5])
+				data_write(u8(m_op), m_pipeline_operand[5]);
+		}
 		else if ((m_op & 0xff00) == 0x8b00)
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 		else if (staged_store(m_op))
