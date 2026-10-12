@@ -2071,6 +2071,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
 			m_pipeline_vector_pending = false;
 		m_pipeline_intm_protected[5] = false;
+		update_xf();
 	}
 
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)

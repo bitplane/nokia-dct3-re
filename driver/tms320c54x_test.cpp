@@ -24106,6 +24106,8 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (cycle >= 6 && !st1 ? result : initial) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (cycle >= 6 && st1 ? result : initial),
 				"RSBX/SSBX modifies only its selected status bit at Execute");
+			expect(m_xf_pin == bool(BIT(cycle >= 6 && st1 ? result : initial, 13)),
+				"Staged status-bit retirement publishes XF at Execute and replay restores the pin");
 			if (cycle == 5 && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -24123,7 +24125,7 @@ private:
 				}
 				m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 127) { start_pipeline_status_bit(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128\n");
+				osd_printf_info("TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1\n");
 				start_pipeline_cpl(); return;
 			}
 			++m_pipeline_expected_cycle;

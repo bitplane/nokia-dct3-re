@@ -2579,7 +2579,7 @@ decremented stack destination, then commit the sampled value in Execute
 controls and cover all 32 direct sources in both program pages, restoring
 before Read, after Read or after Write. Each requires one source access,
 one SP decrement and one stack write per leg. PSHM SP samples the original
-SP before decrement; the original MU4 prologue's `4a06`/`4a07` accumulator
+SP before decrement; the original MU4 prologue's `4a06`/`4a07` ST0/ST1
 pushes are now accepted by this staged subset.
 Read-owned stack allocation is a declared partial stage model, not a silicon
 phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
@@ -2651,7 +2651,10 @@ the atomic backend's interrupt guard. Only the ST1 INTM forms establish
 Decode-owned follower protection. All 128 combinations of register, bit,
 set/clear and initially all-zero/all-one status are executable fixtures;
 each restores immediately before Execute and verifies both status registers
-on every observed cycle. This includes the original MU4 handler's `f6be`
+on every observed cycle. The device's XF output must match ST1 bit 13 on
+every cycle and after checkpoint restoration; staged retirement publishes
+the output through the same memoized callback as the atomic frontend.
+This includes the original MU4 handler's `f6be`
 RSBX CPL. Repeat legality and full handler execution through the staged
 subset remain unvalidated.
 
