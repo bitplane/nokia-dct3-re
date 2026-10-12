@@ -43,6 +43,11 @@ constexpr bool staged_move(u16 word)
 	return (word & 0xff00) == 0x7100 && u8(word) < 0x98;
 }
 
+constexpr bool staged_program_move(u16 word)
+{
+	return (word & 0xff00) == 0x7c00 && u8(word) < 0x98;
+}
+
 constexpr bool staged_mar(u16 word)
 {
 	return (word & 0xff00) == 0x6d00 &&
@@ -797,6 +802,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_retd_target));
 	save_item(NAME(m_pipeline_far_return_pending));
 	save_item(NAME(m_pipeline_long_store_pending));
+	save_item(NAME(m_pipeline_program_move_pending));
 	save_item(NAME(m_pipeline_dp_wait));
 	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
@@ -1815,6 +1821,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_xc_skip_words = 0;
 	m_pipeline_far_return_pending = false;
 	m_pipeline_long_store_pending = false;
+	m_pipeline_program_move_pending = false;
 	m_pipeline_dp_wait = 0;
 	m_pipeline_cycles = 0;
 }
@@ -1850,6 +1857,15 @@ void tms320c54x_device::pipeline_step()
 		// silicon phases. The first sample follows older Execute writes.
 		m_pipeline_operand_address[4] = data_read(m_sp++);
 		m_pipeline_far_return_pending = false;
+		return;
+	}
+	if (m_pipeline_program_move_pending)
+	{
+		// MVPD's extra program-bus clock holds Read and younger slots.
+		// Retain the sampled word; exact bus phase is a partial model.
+		u32 const source = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_immediate[4];
+		m_pipeline_operand[4] = m_program.read_word(physical_program_address(source));
+		m_pipeline_program_move_pending = false;
 		return;
 	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
@@ -2009,7 +2025,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || staged_absolute_load(word) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -2034,7 +2050,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if (staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || staged_absolute_load(m_pipeline_word[2]) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -2061,6 +2077,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const memory_dp = (word & 0xff80) == 0x4600;
 		bool const direct_move = staged_move(word);
+		bool const program_move = staged_program_move(word);
 		if (m_pipeline_valid[2] && direct_move && m_pipeline_immediate[2] < 0x60 &&
 			(m_pipeline_immediate[2] < 0x10 || m_pipeline_immediate[2] > 0x19))
 		{
@@ -2096,7 +2113,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_pmst = word == 0x771d;
 		if (m_pipeline_valid[2] && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !direct_mmr_load && !memory_dp && !direct_move && !program_move && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -2140,7 +2157,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (staged_short_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || data_push || data_pop)
+			if (staged_short_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || memory_dp || direct_move || program_move || data_push || data_pop)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -2212,7 +2229,7 @@ void tms320c54x_device::pipeline_step()
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
-		staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
+		staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || staged_program_move(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
@@ -2399,6 +2416,20 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (BIT(mode, 7)) indirect_modify(mode);
 	}
+	if (m_pipeline_valid[4] && staged_program_move(m_pipeline_word[4]))
+	{
+		u8 const mode = m_pipeline_word[4];
+		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (preincrement) indirect_modify(mode);
+		m_pipeline_operand_address[4] = basic_address(4, mode);
+		if (m_pipeline_operand_address[4] < 0x60)
+		{
+			logerror("%s: staged MVPD register/peripheral destination is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
+		m_pipeline_program_move_pending = true;
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x7600)
 	{
 		u8 const mode = m_pipeline_word[4];
@@ -2490,6 +2521,11 @@ void tms320c54x_device::pipeline_step()
 			// Non-DAGEN PMST retains its literal until Execute; do not
 			// inherit address-generator early publication. Phase is partial.
 			if (m_op == 0x771d) data_write(0x1d, m_pipeline_immediate[5]);
+			++m_pc;
+		}
+		else if (staged_program_move(m_op))
+		{
+			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			++m_pc;
 		}
 		else if (staged_move(m_op))
@@ -2705,7 +2741,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 	for (unsigned stage = 0; stage < 5; ++stage)
 		intm_protected |= m_pipeline_valid[stage] && m_pipeline_intm_protected[stage];
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_xc_active && !m_pipeline_control_words && !m_pipeline_long_store_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_xc_active && !m_pipeline_control_words && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);

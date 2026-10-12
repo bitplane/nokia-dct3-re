@@ -278,6 +278,7 @@ private:
 	u32 m_pipeline_retd_target = 0;
 	bool m_pipeline_far_return_pending = false;
 	bool m_pipeline_long_store_pending = false;
+	bool m_pipeline_program_move_pending = false;
 	u8 m_pipeline_dp_wait = 0;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;

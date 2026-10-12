@@ -2695,6 +2695,26 @@ The full PMST value (including IPTR), XPC, SP and ST1 reproduce without
 duplicate literal fetches or writes. IRQ/IPTR selection across an in-flight
 PMST write and execution already prefetched under another mapping remain
 unvalidated. No native production profile is promoted by these cases.
+
+Short-form MVPD (`7cxx`, destination mode below `98`) retains its absolute
+program-source literal separately from the data destination. Its Read stage
+owns destination addressing/postincrement; an extra held program-bus clock
+samples program space through the source instruction's logical page and
+current OVLY mapping. Execute writes that retained word once. SPRU172C
+pages 4-117/118 distinguish this program-to-data transfer from a data move;
+the held Read placement is a declared partial model of its extra cycle,
+not measured bus arbitration.
+
+The 128 replay cases cover DP/stack direct, indirect and postincrement
+destinations, source pages 2/3, lower/upper source regions, both OVLY states
+and four checkpoints around literal assembly, held program read and data
+write. Mutating the literal after Fetch and source RAM after its read cannot
+retarget or change the stored word; each leg has one literal fetch, one
+program read and one data write. Long-offset forms, register/peripheral
+destinations and control-delay placement fail closed. Repeated MVPD and
+interrupt/mapping changes during its held read remain unvalidated. This
+isolates the bootstrap copy's transfer primitive without claiming that its
+65,313-iteration repeat or native startup executes staged.
 Supported compiler-mode, stack, branch/call/return and conditional-execute
 contracts are specified below. Remaining forms fail closed without atomic fallback.
 

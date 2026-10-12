@@ -5373,6 +5373,51 @@ private:
 		m_phase = 252270; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_mvpd(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const mode = variant % 4;
+		u32 const base = (BIT(variant, 4) ? 3 : 2) << 16;
+		u16 const source = BIT(variant, 3) ? 0x8700 : 0x700;
+		u16 const value = BIT(variant, 2) && !BIT(variant, 3) ? 0x1111 : 0x4444;
+		u32 const physical = BIT(variant, 2) && !BIT(variant, 3) ? source : base + source;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x9000 + i, 0xf495);
+		program.write_word(base + 0x9000, 0x7c00 | (mode < 2 ? 0x20 : mode == 2 ? 0x82 : 0x92));
+		program.write_word(base + 0x9001, source);
+		program.write_word(source, 0x1111); program.write_word(base + source, 0x4444);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, BIT(variant, 2) ? 0x20 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, mode == 1 ? 0x4800 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x420);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x420, 0xffff);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x420, 0x420, "mvpd_destination",
+			[this, value](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == 8 && !m_pipeline_store_writes, "MVPD writes its retained program operand once after its extra bus clock"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_operand_tap = program.install_read_tap(physical, physical, "mvpd_program_source",
+			[this, value](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == value && m_cpu->pipeline_cycles() == 7 && !m_pipeline_operand_reads, "MVPD reads program space at the retained absolute address exactly once"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "mvpd_program_literal",
+			[this, source](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == source && !m_pipeline_extensions_reads, "MVPD does not refetch its source literal after Decode assembly"); ++m_pipeline_extensions_reads;
+			});
+		m_phase = 252290; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -28591,13 +28636,57 @@ private:
 				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 63) { start_pipeline_pmst(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_mvpd(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252280)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252270;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252290)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, mode = variant % 4;
+			u32 const base = (BIT(variant, 4) ? 3 : 2) << 16;
+			u16 const source = BIT(variant, 3) ? 0x8700 : 0x700;
+			u32 const physical = BIT(variant, 2) && !BIT(variant, 3) ? source : base + source;
+			unsigned const tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 7, 9}[variant / 32];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged short MVPD has explicit program-bus ownership");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0x321); }
+			if (tick == 7) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(physical, 0xaaaa); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick;
+				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVPD literal, held program read or retained data write");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 3 ? 0x421 : 0x420) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x400 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (mode == 1 ? 0x4800 : 0x800),
+					"MVPD's destination addressing/postincrement and sampled program word survive without duplicate bus traffic");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MVPD program read and destination without reissuing transactions");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252300; m_check_timer->enable(true); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 127) { start_pipeline_mvpd(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252300)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252290;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
