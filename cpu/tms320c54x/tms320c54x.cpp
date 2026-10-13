@@ -104,6 +104,11 @@ constexpr bool staged_accumulator_logic(u16 word)
 	return (word & 0xfce0) == 0xf080 || (word & 0xfce0) == 0xf0a0 || (word & 0xfce0) == 0xf0c0 || (word & 0xfcff) == 0xf493;
 }
 
+constexpr bool staged_accumulator_shift(u16 word)
+{
+	return (word & 0xfce0) == 0xf460 || (word & 0xfce0) == 0xf0e0;
+}
+
 constexpr bool staged_absolute_load(u16 word)
 {
 	return (word & 0xfeff) == 0x10f8;
@@ -2213,7 +2218,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_long_store = staged_dst(word);
 		// These one-word forms use only live accumulators in Execute; their
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const accumulator_logic = staged_accumulator_logic(word);
+		bool const accumulator_logic = staged_accumulator_logic(word) || staged_accumulator_shift(word);
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const memory_dp = (word & 0xff80) == 0x4600;
 		bool const direct_move = staged_move(word);
@@ -3580,6 +3585,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8(u8(op << 3)) >> 3;
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		// SPRU172C 4-155's left-carry formula disagrees with 4-156 example 2.
+		// Preserve the formula/zero-shift policy pending independent evidence.
 		if (shift)
 			m_st0 = (m_st0 & ~0x0800) |
 					(BIT(source, shift < 0 ? -shift - 1 : 39 - shift) ? 0x0800 : 0);

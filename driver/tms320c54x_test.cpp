@@ -6111,6 +6111,75 @@ private:
 		m_phase = 252590; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static std::array<u64, 3> accumulator_shift_fixture(unsigned variant, bool after)
+	{
+		bool const logical = variant % 2, sxm = (variant / 2048) % 2, ovm = (variant / 4096) % 2, carry = (variant / 8192) % 2;
+		unsigned const selector = (variant / 2) % 4, pattern = (variant / 256) % 8;
+		int const shift = int((variant / 8) % 32) - 16;
+		u64 const value = std::array<u64, 8>{0, 1, 0x007fffffffULL, 0xff80000000ULL, 0x0180000000ULL, 0xff7fffffffULL, 0x80aa001234ULL, 0xffffffff55ULL}[pattern];
+		std::array<u64, 3> expected = {selector & 2 ? 0x246813579aULL : value, selector & 2 ? value : 0x246813579aULL,
+			u64(0xa01b | (pattern & 1 ? 0x600 : 0) | (carry ? 0x800 : 0))};
+		if (after)
+		{
+			u64 result = 0;
+			int const width = logical ? 32 : 40;
+			for (int bit = 0; bit < width; ++bit)
+			{
+				int const source_bit = bit - shift;
+				bool const set = source_bit >= 0 && source_bit < width ? BIT(value, source_bit) :
+					!logical && source_bit >= 40 && sxm && BIT(value, 39);
+				if (set) result |= u64(1) << bit;
+			}
+			if (logical || shift)
+			{
+				bool const outgoing = shift && BIT(value, shift < 0 ? -shift - 1 : (logical ? 32 : 39) - shift);
+				expected[2] = (expected[2] & ~u64(0x800)) | (outgoing ? 0x800 : 0);
+			}
+			if (!logical && shift > 0)
+			{
+				s64 const number = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
+				s64 const scaled = number * (s64(1) << shift);
+				if (scaled < -2147483648LL || scaled > 2147483647LL)
+				{
+					expected[2] |= selector & 1 ? 0x200 : 0x400;
+					if (ovm) result = scaled < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+				}
+			}
+			expected[selector & 1] = result;
+		}
+		return expected;
+	}
+	void start_pipeline_accumulator_shift(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const selector = (variant / 2) % 4;
+		int const shift = int((variant / 8) % 32) - 16;
+		u16 const opcode = (variant % 2 ? 0xf0e0 : 0xf460) | (selector << 8) | (shift & 31);
+		u32 const base = selector & 1 ? 0x20000 : 0;
+		auto const initial = accumulator_shift_fixture(variant, false);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : opcode);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, initial[2]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x8c0 | (((variant / 2048) % 2) << 8) | (((variant / 4096) % 2) << 9));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, initial[0]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, initial[1]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "accumulator_shift_no_data_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Accumulator shift has no data read"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "accumulator_shift_no_data_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Accumulator shift has no memory write"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x600, base + 0x600, "accumulator_shift_opcode",
+			[this, opcode](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == opcode && !m_pipeline_extensions_reads, "Accumulator shift is fetched once across replay"); ++m_pipeline_extensions_reads; });
+		m_phase = 252610; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -30101,13 +30170,49 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 671) { start_pipeline_data_copy(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged MVKD: PASS cases=672 forms=DP,CPL,postincrement,postdecrement,preincrement,absolute,AR sources=AR1,RAM,alias,AR2 values=4 pages=2 category_i_gaps=0,1 restore=672 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_accumulator_shift(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252600)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252590;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252610)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant / 16384 ? 5 : 3;
+			auto const expected = accumulator_shift_fixture(variant, tick >= 6);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2] &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x8c0 | (((variant / 2048) % 2) << 8) | (((variant / 4096) % 2) << 9)),
+				"Staged shift owns its result, carry and sticky overflow at Execute, preserving other status");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save accumulator shift after Decode or Read");
+			}
+			if (tick == 16)
+			{
+				expect(m_pipeline_extensions_reads == 1, "Accumulator shift has one opcode fetch");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore shift without early result or duplicate fetch");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252620; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 32767) { start_pipeline_accumulator_shift(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged accumulator shifts: PASS cases=32768 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 restore=32768 duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252620)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252610;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

@@ -3018,8 +3018,31 @@ while retaining one read and one write. AR consumers with zero and one
 intervening instruction verify the old/new value boundary. Sources which
 alias their pointer and destinations which alias their source are explicit
 fixtures. Original compiler MVKD `7001` at `00:30b5` now runs; the upload
-fails closed on SFTA A,-1,A (`f47f`) at `00:323f`. Native startup, recorder
-acceptance and speech remain unproven; no atomic profile is promoted.
+passes SFTA A,-1,A (`f47f`) at `00:323f`. Native startup, recorder acceptance
+and speech remain unproven; no atomic profile is promoted.
+
+SFTA/SFTL now use the admitted one-word Execute path without data access.
+The staged fixture has 32768 save/replay cases: both operations, all four
+A/B selections, all encoded shifts (-16 through 15), eight source patterns,
+both SXM/OVM and initial carry states, and Decode/Read checkpoints. A
+bit-by-bit shift oracle plus signed-range checks validates result, carry,
+sticky overflow and saturation only at Execute, with one opcode fetch.
+SFTA right shifts sign-fill from bit 39 when SXM is set; SFTL operates on
+bits 31-0, clears guard bits and explicitly clears carry for shift zero.
+
+SFTA left carry is not a closed hardware contract: SPRU172C 4-155 specifies
+source bit `39-SHIFT`, but 4-156 example 2 (`80aa001234 << 5`) prints C=1
+where that formula gives zero. Its zero-shift carry is also not explicit in
+the descriptive cases. The existing formula/preserve-zero policy is kept
+and named in the fixture marker; passing it is conformance to that policy,
+not proof against silicon. A bounded TI-document search found the same
+manuals, not a resolving correction. Independent simulator/hardware
+evidence is still required before changing this shared arithmetic helper.
+This ambiguity does not affect the upload's negative-shift instruction.
+
+The original upload now stops on long-offset DSUB `54e6` at `00:3244`.
+General shift interrupt/control-delay composition remains unvalidated;
+opcode coverage does not establish native startup or recorder acceptance.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
