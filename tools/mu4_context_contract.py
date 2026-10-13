@@ -56,6 +56,44 @@ IDLE_WRAPPER_WITNESS = (0x4918, 0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495,
 BOOTSTRAP_BASE = 0xFF80
 BOOTSTRAP_WITNESS = (0x771D, 0xFFC8, 0x7710, 0x0060, 0xF070, 0xFF20,
                      0x7C90, 0x0060, 0x771D, 0xFFE8, 0xF880, 0x0E41)
+BOOT_MEMORY_SHIFT_BASE = 0x3291
+BOOT_MEMORY_SHIFT_WITNESS = (0x6FE6, 0x0010, 0x0D48)
+
+
+def decode_extended_shift_load(words, address):
+    """Decode LD syntax 4; address calculation and stage timing are not inferred."""
+    opcode = words.get(address)
+    if opcode is None or opcode & 0xff00 != 0x6f00 or opcode & 0xff > 0xf8:
+        raise ValueError(f'expected extended Smem opcode at {address:06x}')
+    mode = opcode & 0xff
+    extended = mode >= 0xe0
+    operation_address = address + 1 + extended
+    extension = words.get(operation_address)
+    if extension is None or extension & 0xfee0 != 0x0c40:
+        raise ValueError(f'expected LD shift extension at {operation_address:06x}')
+    literal = words.get(address + 1) if extended else None
+    if extended and literal is None:
+        raise ValueError(f'missing address extension at {address + 1:06x}')
+    shift = extension & 0x1f
+    return {
+        'address': f'{address:06x}', 'opcode': f'{opcode:04x}',
+        'operation': 'LD Smem,SHIFT,dst', 'destination': 'B' if extension & 0x100 else 'A',
+        'shift': shift - 32 if shift & 16 else shift,
+        'address_mode': f'{mode:02x}',
+        'address_extension': f'{literal:04x}' if extended else None,
+        'operation_extension_address': f'{operation_address:06x}',
+        'operation_extension': f'{extension:04x}', 'words': 3 if extended else 2,
+        'status': 'SXM extends source; OVM saturates shifted result; OVdst is affected',
+        'scope': 'instruction fields only; no DAGEN, sampling, publication or pipeline acceptance',
+    }
+
+
+def decode_boot_memory_shift(words):
+    for offset, expected in enumerate(BOOT_MEMORY_SHIFT_WITNESS):
+        address = BOOT_MEMORY_SHIFT_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'boot memory-shift witness changed or absent at {address:06x}')
+    return decode_extended_shift_load(words, BOOT_MEMORY_SHIFT_BASE)
 
 
 def decode_bootstrap_repeat(words):
@@ -307,8 +345,9 @@ def contract(source):
     result['full_worker'] = decode_full_worker(words)
     result['timer_wrapper'] = decode_timer_wrapper(words)
     result['idle_lifecycle'] = decode_idle_contract(words)
-    result['bootstrap_repeat'] = decode_bootstrap_repeat(
-        uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa55'))
+    bootstrap_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa55')
+    result['bootstrap_repeat'] = decode_bootstrap_repeat(bootstrap_words)
+    result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     return result
 
 

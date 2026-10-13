@@ -9,9 +9,47 @@ from tools.mu4_context_contract import FULL_WORKER_WITNESS, decode_full_worker
 from tools.mu4_context_contract import TIMER_VECTOR_BASE, TIMER_VECTOR_WITNESS, TIMER_RETURN_BASE, decode_timer_wrapper
 from tools.mu4_context_contract import IDLE_BASE, IDLE_WITNESS, IDLE_WRAPPER_BASE, IDLE_WRAPPER_WITNESS, decode_idle_contract, idle_route
 from tools.mu4_context_contract import BOOTSTRAP_BASE, BOOTSTRAP_WITNESS, decode_bootstrap_repeat
+from tools.mu4_context_contract import BOOT_MEMORY_SHIFT_BASE, BOOT_MEMORY_SHIFT_WITNESS, decode_boot_memory_shift, decode_extended_shift_load
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_boot_memory_shift_extension_order(self):
+        words = dict(enumerate(BOOT_MEMORY_SHIFT_WITNESS, BOOT_MEMORY_SHIFT_BASE))
+        result = decode_boot_memory_shift(words)
+        self.assertEqual(result['destination'], 'B')
+        self.assertEqual(result['shift'], 8)
+        self.assertEqual(result['address_extension'], '0010')
+        self.assertEqual(result['operation_extension_address'], '003293')
+        self.assertEqual(result['words'], 3)
+
+    def test_boot_memory_shift_witness_mutation_and_absence(self):
+        original = dict(enumerate(BOOT_MEMORY_SHIFT_WITNESS, BOOT_MEMORY_SHIFT_BASE))
+        for address in original:
+            words = original.copy()
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_boot_memory_shift(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_boot_memory_shift(words)
+
+    def test_shift_load_signed_five_bit_and_destination(self):
+        for shift in range(-16, 16):
+            for destination in range(2):
+                for opcode in (0x6f0a, 0x6f86, 0x6fe6, 0x6ff8):
+                    extension = 0x0c40 | destination << 8 | shift & 31
+                    values = [opcode, 0xf495, extension] if opcode & 0xff >= 0xe0 else [opcode, extension]
+                    result = decode_extended_shift_load(dict(enumerate(values, 0x600)), 0x600)
+                    self.assertEqual(result['shift'], shift)
+                    self.assertEqual(result['destination'], 'B' if destination else 'A')
+                    self.assertEqual(result['words'], len(values))
+
+    def test_shift_load_rejects_other_operations_and_missing_extensions(self):
+        for values in ({0: 0x6fe6, 1: 0x10, 2: 0x0d68}, {0: 0x6fe6, 2: 0x0d48},
+                       {0: 0x6fe6, 1: 0x10}, {0: 0x6ff9, 1: 0x0d48}, {0: 0x440a}):
+            with self.assertRaises(ValueError):
+                decode_extended_shift_load(values, 0)
+
     def test_bootstrap_repeat_is_program_copy_not_nop_or_constant_fill(self):
         words = dict(enumerate(BOOTSTRAP_WITNESS, BOOTSTRAP_BASE))
         result = decode_bootstrap_repeat(words)

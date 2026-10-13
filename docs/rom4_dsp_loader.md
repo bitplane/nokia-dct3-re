@@ -3446,9 +3446,15 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is the extended Smem opcode `6fe6` at `00:3291`,
-debugger context `00:3293`; its operation-extension word must be decoded
-before naming the complete instruction. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is `LD *AR6(0010),8,B` at `00:3291`, encoded
+`6fe6 0010 0d48`. Debugger context `00:3293` is its operation-extension
+word, not another opcode. The checked original AA55 contract in
+`mu4_context_contract.py` pins all three words and decodes the address
+extension before the operation extension (SPRU172C LD syntax 4).
+The signed five-bit shift is `+8`; destination is B. Unlike fixed
+shift-by-16 syntax 3, syntax 4 affects OVdst and uses OVM saturation.
+The decoder tests all 32 shifts, both destinations and short/extended
+forms, but do not prove DAGEN or execution-stage behavior. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`

@@ -2472,8 +2472,9 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction starts with extended Smem opcode `6fe6` at `00:3291`;
-its operation-extension word is not yet classified here.
+instruction is `LD *AR6(0010),8,B` at `00:3291`, encoded
+`6fe6 0010 0d48`. The original AA55 contract pins the address-extension
+then operation-extension order; shift is `+8`, destination B.
 Debugger context is `00:3293`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
@@ -2513,8 +2514,8 @@ shifted by 16 at `00:3521` has retained-source, SXM extension,
 accumulator publication and replay coverage. Unsigned memory multiply
 at `00:3523` has retained Smem/T, unsigned-product, FRCT/OVM,
 destination/flag and replay coverage. The extended Smem instruction
-at `00:3291` still needs complete extension decoding and operation-specific
-address/source/publication/replay coverage;
+at `00:3291` has checked extension decoding but still needs operation-specific
+address/source, SXM/OVM/OVB, publication and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
