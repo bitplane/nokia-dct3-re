@@ -3040,9 +3040,30 @@ manuals, not a resolving correction. Independent simulator/hardware
 evidence is still required before changing this shared arithmetic helper.
 This ambiguity does not affect the upload's negative-shift instruction.
 
-The original upload now stops on long-offset DSUB `54e6` at `00:3244`.
+The original upload passes long-offset DSUB `54e6` at `00:3244`.
 General shift interrupt/control-delay composition remains unvalidated;
 opcode coverage does not establish native startup or recorder acceptance.
+
+DSUB now retains its long-word data operand before Execute. Addressing
+reuses the extended DST path for ordinary offset, linear/circular
+preincrement and absolute forms; short indirect modifications use a
+two-word step. Complete-Decode CPL/DP and Access SP own direct operands.
+Read samples MSW at the retained address and LSW at `address ^ 1` in the
+same clock, including odd-address ordering (SPRU131G 5.6). Execute calls a
+shared, operand-only long-arithmetic helper; atomic DADD/DSUB/DRSUB and
+T variants use that same calculation without changing their bus paths.
+
+The 6912 replay cases cover nine address forms, A/B destinations, eight
+operand pairs (including TI's C16 example), both C16/SXM/OVM states,
+both parities and Decode/Read/Execute checkpoints. They verify one paired
+read, no memory write, retained values after RAM/literal/AR/SP changes,
+32-bit borrow/overflow/saturation and separate C16 lanes. The existing
+dual-mode sign-extension and overflow-retention policies remain modeled,
+not independently silicon-validated. Exact bank arbitration, peripheral
+pairs, repeats and control-delay composition are not claimed; the last
+three remain unsupported. Original `54e6` now executes and the upload
+stops on long-offset immediate ST `76e6` at `00:322e`. No native startup,
+recorder or speech acceptance follows from this opcode boundary.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP

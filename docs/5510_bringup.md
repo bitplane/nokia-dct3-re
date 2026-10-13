@@ -2437,8 +2437,10 @@ and replay coverage, including its AR1 source. Original SFTA A,-1,A
 (`f47f`) at `00:323f` is accepted, with staged
 SFTA/SFTL result/status and replay coverage. SFTA left/zero-shift carry
 remains an explicitly unvalidated policy because the TI formula/example
-disagree. The first unsupported instruction is now `54e6` at `00:3244`,
-a long-offset DSUB; its debugger context is `00:3246`, not the opcode boundary. The
+disagree. Long-offset DSUB `54e6` at `00:3244` now has staged paired-read,
+arithmetic and replay coverage. The first unsupported instruction is now
+`76e6` at `00:322e`, a long-offset immediate store; its debugger context
+is `00:3230`, not the opcode boundary. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2453,7 +2455,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:3244` needs staged conformance before advancing this diagnostic;
+`00:322e` needs staged conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
