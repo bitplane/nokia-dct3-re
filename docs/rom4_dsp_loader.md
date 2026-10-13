@@ -3119,6 +3119,22 @@ sources below `0060` outside `0008..0017` remain rejected. The stage
 assignment is a partial frontend model, not measured silicon timing;
 repeat and delayed-control bodies remain restricted separately.
 
+Memory LD T (`30xx`, SPRU172C LD syntax 1 at 4-70) publishes one
+retained Smem sample in Read, after older Execute. Retirement advances the
+instruction but never rewrites T. Signed MPY/MPYR (`20xx..23xx`) retain
+Smem and T in Read; Execute multiplies signed 16-bit inputs, applies FRCT,
+rounds MPYR by adding `8000` and clearing the low word, then applies the
+existing destination OVM/overflow handling. SXM does not reinterpret their
+signed operands. Each family has 55,296 RAM/mapped-source replay cases;
+LD T preserves both accumulators and all arithmetic flags. Changed T after
+Read distinguishes retained multiply operands from live Execute inputs.
+The additional 768 adjacent `30e1 0004; 20e1/21e1 0003` fixtures cover
+eight T values, four memory values, both destinations and FRCT/OVM across
+three restoration points. They require loader Read at clock 6, consumer
+Read at 8 and result publication at 9, with no resampling or data writes.
+These are explicit partial frontend clocks, not measured silicon interlocks;
+repeat and delayed-control bodies remain restricted separately.
+
 Unsigned memory MPYU (`24xx/25xx`, SPRU172C 4-106) retains one
 Smem sample and its unsigned T input at Read, after older Execute work.
 Execute multiplies the retained 16-bit unsigned operands, applies FRCT,
@@ -3479,8 +3495,11 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `LD *AR1(0004),T` at `00:3194`, encoded
-`30e1 0004`; debugger context is `00:3196`. The preceding
+unsupported instruction is `ADD *(0016),0,A,B` at `00:319c`, encoded
+`6ff8 0016 0d00`; debugger context is `00:31a0`. Address `0016` is
+mapped AR6, not RAM. The preceding `LD *AR1(0004),T` at `00:3194`, encoded
+`30e1 0004`, and dependent MPY at `00:3196` now have staged coverage.
+The preceding
 `STL A,-1,*AR1(0003)` at `00:313e`, encoded `6fe1 0003 0c9f`, now has
 staged store coverage. Its `0c9f` operation extension selects a low-word
 store with shift `-1`, not a load.
@@ -3588,7 +3607,7 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-Smem load into T remains incomplete.
+Smem shifted ADD remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

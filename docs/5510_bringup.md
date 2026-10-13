@@ -2472,10 +2472,13 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `LD *AR1(0004),T` at `00:3194`, encoded `30e1 0004`.
+instruction is `ADD *(0016),0,A,B` at `00:319c`, encoded
+`6ff8 0016 0d00`; its memory source is mapped AR6. The preceding
+`LD *AR1(0004),T` at `00:3194`, encoded `30e1 0004`, now has
+Read-publication and dependent-multiply coverage.
 The preceding `STL A,-1,*AR1(0003)` at `00:313e`, encoded
 `6fe1 0003 0c9f`, now has shifted-store coverage.
-Debugger context is `00:3196`, not
+Debugger context is `00:31a0`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2518,8 +2521,10 @@ at `00:3291` has checked extension decoding, retained-address/source,
 SXM/shift/status and replay coverage. The shifted store at `00:313e`
 has destination ownership, Execute-live source, saturation,
 low-word publication and replay coverage. The load into T at `00:3194`
-still needs retained address/source, T publication, dependent-multiply
-ordering and replay coverage;
+has retained address/source, T publication, dependent-multiply
+ordering and replay coverage. The ADD at `00:319c` still needs mapped
+source sampling, shifted operand, separate source/destination accumulator,
+arithmetic flags and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
