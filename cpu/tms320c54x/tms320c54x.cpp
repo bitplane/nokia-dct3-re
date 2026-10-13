@@ -2935,7 +2935,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (source < 0x60 && (source < (multiply || shifted || add_sub ? 0x08 : 0x10) || source > 0x17))
+		if (source < 0x60 && (source < (multiply || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17))
 		{
 			logerror("%s: staged %s control/peripheral source is unsupported\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB");
 			m_illegal = true; return;

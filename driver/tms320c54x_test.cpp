@@ -9228,6 +9228,56 @@ private:
 		m_phase = 253430; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	struct mapped_bitfield_fixture
+	{
+		mapped_word_arithmetic_fixture registers;
+		u16 memory, mask, st0;
+		unsigned mutation_state;
+	};
+	static mapped_bitfield_fixture mapped_bitfield_case(unsigned variant)
+	{
+		unsigned const v = variant % 576;
+		unsigned const expanded = v < 512 ? v % 8 + ((v / 8) % 4) * 32 + ((v / 32) % 4) * 128 + ((v / 128) % 2) * 512 + (v / 256) * 1024 :
+			2048 + ((v - 512) % 4) * 4 + (((v - 512) / 4) % 2) * 16 + (((v - 512) / 8) % 2) * 32 + (((v - 512) / 16) % 2) * 64 + ((v - 512) / 32) * 128;
+		auto f = mapped_word_arithmetic_case(expanded);
+		unsigned const reg = f.address - 8;
+		u16 const memory = f.prefix ? ((v - 512) / 32 ? 1 : 0) : f.memory;
+		if (f.prefix) f.after_a = memory;
+		unsigned const mutation_state = f.prefix ? 0 : reg < 3 ? tms320c54x_device::STATE_A : reg < 6 ? tms320c54x_device::STATE_B :
+			reg == 6 ? tms320c54x_device::STATE_T : tms320c54x_device::STATE_TRN;
+		++f.read_cycle; // BITF owns one additional mask word.
+		return {f, memory, std::array<u16, 4>{0, 1, 0x7f, 0xffff}[(variant / 576) % 4],
+			u16((f.st0 & ~u16(0x1000)) | (((variant / 2304) % 2) ? 0x1000 : 0)), mutation_state};
+	}
+	void start_pipeline_mapped_bitfield(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const c = mapped_bitfield_case(variant); auto const &f = c.registers; auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.prefix) program.write_word(f.base + 0x600, 0xe800 | u16(f.after_a));
+		program.write_word(f.base + 0x600 + f.prefix, 0x6100 | (f.absolute ? 0xf8 : f.address));
+		program.write_word(f.base + 0x601 + f.prefix, f.absolute ? f.address : c.mask);
+		if (f.absolute) program.write_word(f.base + 0x602 + f.prefix, c.mask);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, c.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mapped_bitfield_read",
+			[this, c](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
+				expect(address == c.registers.address && value == c.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == c.registers.read_cycle, "Mapped BITF retains one real register sample, including AL producers"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mapped_bitfield_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Mapped BITF writes no data memory"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + 0x601 + f.prefix + f.absolute, "mapped_bitfield_literals",
+			[this, c](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < 1 + unsigned(c.registers.absolute) && address == c.registers.base + 0x601 + c.registers.prefix + m_pipeline_extensions_reads &&
+					value == (c.registers.absolute && !m_pipeline_extensions_reads ? c.registers.address : c.mask), "Mapped BITF retains address before mask without extension refetch"); ++m_pipeline_extensions_reads; });
+		m_phase = 253450; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -9238,6 +9288,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "mapped-bitf"))
+		{
+			start_pipeline_mapped_bitfield(); return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "mapped-word"))
 		{
 			start_pipeline_mapped_word_arithmetic(); return;
@@ -34380,13 +34434,53 @@ private:
 				if (variant < 6911) { start_pipeline_mapped_word_arithmetic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "mapped-word")) throw emu_fatalerror(0, "TMS320C54x isolated mapped word arithmetic complete");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_mapped_bitfield(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253440)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253430; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253450)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const c = mapped_bitfield_case(variant); auto const &f = c.registers;
+			unsigned const checkpoint = f.read_cycle - 1 + variant / 4608;
+			if (tick == f.read_cycle && c.mutation_state) m_cpu->set_state_int(c.mutation_state, c.mutation_state == tms320c54x_device::STATE_A || c.mutation_state == tms320c54x_device::STATE_B ? 0x012345abcdULL : 0x2222);
+			u64 a = f.prefix && tick >= 6 ? f.after_a : f.a, b = f.b;
+			if (tick >= f.read_cycle) { if (c.mutation_state == tms320c54x_device::STATE_A) a = 0x012345abcdULL; if (c.mutation_state == tms320c54x_device::STATE_B) b = 0x012345abcdULL; }
+			u16 const st0 = tick > f.read_cycle ? (c.st0 & ~u16(0x1000)) | ((c.memory & c.mask) ? 0x1000 : 0) : c.st0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_T ? 0x2222 : f.t) &&
+				m_cpu->state_int(tms320c54x_device::STATE_TRN) == (tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_TRN ? 0x2222 : f.trn), "Mapped BITF changes only TC in Execute using its retained source and mask");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped BITF before/after source Read or TC publication");
+			}
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 + unsigned(f.absolute), "Mapped BITF has one source read and owns every extension exactly once");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped BITF without rereading changed source registers or refetching its mask");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253460; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 13823) { start_pipeline_mapped_bitfield(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "mapped-bitf")) throw emu_fatalerror(0, "TMS320C54x isolated mapped BITF complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253460)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253450; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -35499,6 +35593,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(5, "rmw-forward", "Staged same-address RMW forwarding")
 	ROM_SYSTEM_BIOS(6, "negate", "Staged accumulator NEG conformance")
 	ROM_SYSTEM_BIOS(7, "mapped-word", "Staged accumulator/T/TRN memory arithmetic")
+	ROM_SYSTEM_BIOS(8, "mapped-bitf", "Staged accumulator/T/TRN bitfield tests")
 ROM_END
 
 ROM_START(tms54rom4)

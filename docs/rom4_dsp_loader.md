@@ -3630,11 +3630,27 @@ OVM saturation, 32/40-bit boundary patterns and immediate-load producers
 without data-memory accesses or frontend fallback (SPRU172C 4-119/4-120).
 The current one-second observation enters loader `3538` with descriptor
 zero after 4,612 NAND reads and reads block count `0010`. Its mapped AL
-subtraction (`09f8 0008` at `00:2f46`) now executes. The next stop is
-mapped AL in `BITF *(0008),0001` (`61f8 0008 0001` at `00:2fa5`),
-in the DMA-completion polling sequence. The preceding load reads DMPREC;
-BITF itself reads AL, not a DMA peripheral. Live PC `002faa` is not its
-opcode address. Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
+subtraction (`09f8 0008` at `00:2f46`) and mapped AL BITF
+(`61f8 0008 0001` at `00:2fa5`) now execute. The preceding load reads
+DMPREC; BITF itself reads AL, not a DMA peripheral. Mapped BITF has
+13,824 replay cases for the eight accumulator/T/TRN words, four masks,
+two initial TC states, direct/absolute forms and AL producers, with one
+retained source read and no data writes. Only TC changes in Execute;
+zero mask clears it (SPRU172C 4-28/4-29).
+The run reaches resident `02:6d62`, stopping at `STM #lk,IMR` (`7700`
+at `02:6d64`). But the read-only comparison before resident execution
+finds 40,657 mismatches among 48,261 program words: first `02:8e8b`,
+actual `826c`, expected `0001`. It excludes 3,660 data words from the
+51,921-word source and uses the configured common-window mapping without
+claiming physical bank identity. Correct resident transfer is unproven;
+a fresh atomic `bootrecsave` control with the same NAND/shared-memory
+profile matches every compared program word. The first staged divergence
+is record 434, word 11, file offset `4000` (16 KiB): its first five wrong
+words match byte-swapped source bytes at `3fda`, one 38-byte record earlier.
+The staged loader's first boundary/stale-data discrepancy needs investigation
+rather than treating entry or the mask-write stop as proof of a complete
+load. This witness does not yet identify the faulty instruction or cache.
+Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word
 latency from the long-offset zero-gap case (SPRU131G table 7-28).

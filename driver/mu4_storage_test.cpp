@@ -224,6 +224,7 @@ private:
 	unsigned m_native_bootstrap_paths[10] = {};
 	unsigned m_native_descriptor_reads = 0;
 	unsigned m_native_descriptor_writes = 0;
+	bool m_native_bootstrap_program_checked = false;
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -1193,6 +1194,51 @@ private:
 	{
 		m_cpu->space(AS_DATA).write_word(0x2000 + offset, value);
 	}
+	void observe_bootstrap_resident_program()
+	{
+		auto const disable = machine().disable_side_effects();
+		auto word = [this](unsigned offset) -> u16
+		{
+			if (offset + 1 >= m_segment.length()) fatalerror("MU4 resident source bounds");
+			return (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
+		};
+		unsigned segment = 0;
+		while (word(segment) != 0xaa22) segment += 10 + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+		unsigned cursor = segment + 6, total = 0, data_words = 0;
+		unsigned const end = cursor + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+		std::map<offs_t, u16> expected;
+		while (word(cursor))
+		{
+			unsigned const count = word(cursor);
+			u32 const destination = (u32(word(cursor + 2)) << 16) | word(cursor + 4);
+			cursor += 6;
+			if (cursor + count * 2 > end) fatalerror("MU4 resident section bounds");
+			if (destination > 0xffff)
+			{
+				// Original loader's common-window canonicalization; this checks
+				// the configured mapping, not physical DA150 RAM-bank identity.
+				u32 const address = (destination & 0x8000) ? destination : destination & 0xffff;
+				for (unsigned i = 0; i < count; ++i)
+					expected[(address & 0x7f0000) | u16(address + i)] = word(cursor + i * 2);
+			}
+			else data_words += count;
+			cursor += count * 2; total += count;
+		}
+		if (cursor + 2 != end || total != 51921) fatalerror("MU4 resident source coverage mismatch");
+		unsigned mismatches = 0;
+		for (auto const &[address, value] : expected)
+		{
+			u16 const actual = m_cpu->space(AS_PROGRAM).read_word(address);
+			if (actual != value)
+			{
+				if (mismatches < 8) logerror("mu4_original_resident_program_mismatch: address=%06x actual=%04x expected=%04x\n", unsigned(address), actual, value);
+				++mismatches;
+			}
+		}
+		m_native_bootstrap_program_checked = true;
+		logerror("mu4_original_resident_program: %s checked_words=%u mismatch_words=%u excluded_data_words=%u source_words=%u before_resident_execution=1 physical_mapping=unvalidated full_boot=0\n",
+			mismatches ? "MISMATCH" : "PASS", unsigned(expected.size()), mismatches, data_words, total);
+	}
 	void verify_recorder_overlay()
 	{
 		auto const disable = machine().disable_side_effects();
@@ -1433,7 +1479,11 @@ private:
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x0e41, 0x0e41, "mu4_original_bootstrap_entry",
 				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_bootstrap_entries; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_original_bootstrap_resident",
-				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && (m_cpu->pc() & 0xffff) == address + 1) ++m_native_bootstrap_resident_entries; });
+				[this](offs_t address, u16 &, u16) {
+					if (machine().side_effects_disabled() || (m_cpu->pc() & 0xffff) != address + 1) return;
+					++m_native_bootstrap_resident_entries;
+					if ((system_bios() == 25 || system_bios() == 26) && !m_native_bootstrap_program_checked) observe_bootstrap_resident_program();
+				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
 				[this](offs_t address, u16 &, u16)
 				{

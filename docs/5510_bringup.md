@@ -2479,12 +2479,37 @@ semantics. The current one-second observation enters loader `3538` with
 index zero after 4,612 NAND reads, correct name/extension and length, then
 reads the first file-backed block count `0010`. `SUB *(0008),B`
 (`09f8 0008` at `00:2f46`) now consumes mapped AL and the run reaches
-the original DMA-completion polling sequence. The next restriction is
-`BITF *(0008),0001`, encoded `61f8 0008 0001` at `00:2fa5`;
-its mapped AL source is not yet admitted by the bitfield whitelist.
-The prior `1081` instruction reads DMPREC through AR1, but BITF itself
-does not read the DMA peripheral. Live stopping PC `002faa` is not its
-opcode address. Neither resident transfer nor recording is accepted.
+the original DMA-completion polling sequence. `BITF *(0008),0001`
+(`61f8 0008 0001` at `00:2fa5`) now reads its mapped AL source after
+the preceding DMPREC load. The run reaches resident `02:6d62` and stops
+on unsupported `STM #lk,IMR` (`7700` at `02:6d64`, live PC `026d66`).
+This entry is not a correct-transfer acceptance: a side-effect-free
+comparison at the first resident Fetch checks all 48,261 program words
+from the original `aa22` section stream and finds 40,657 mismatches.
+The first is `02:8e8b`, actual `826c`, expected `0001`. The source has
+51,921 words in total; 3,660 data words are explicitly excluded from
+this program-only observation. The configured common-window mapping
+is used, not asserted as physical DA150 bank identity. A separate fresh
+atomic `bootrecsave` run with the same retained NAND and shared-memory
+profile matches all 48,261 program words, with zero mismatches. Therefore
+the discrepancy is staged execution/loading, not a mismatch shared by
+the reference mapping. First divergence is word 11 of source record 434
+(destination `02:8e80`, 16 words), file byte offset `4000`. The first five
+bad words, byte-swapped, match the original sequence at `3fda`, exactly
+one 38-byte record earlier. This is a boundary/stale-data witness, not
+proof of a specific cache or byte-swap defect. Investigate that first
+16-KiB divergence before prioritizing later resident opcodes; neither
+staged transfer, full boot nor recording is accepted.
+
+Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
+control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
+13,824 replay cases: eight register sources, four masks including zero,
+both initial TC states, direct/absolute forms and 1,536 AL-producer cases.
+It captures one source in Read and changes only TC in Execute according
+to whether any masked bit is nonzero (SPRU172C 4-28/4-29). Source changes
+after Read cannot change the result, and every address/mask extension is
+owned once. The producer cases use zero/one values for the status-bit
+question without synthesizing a DMA status or completing a transfer.
 
 Mapped memory ADD/SUB now admits AL/AH/AG, BL/BH/BG and T/TRN, using
 one retained Read sample through their existing register map. Controls,
