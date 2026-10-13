@@ -3317,13 +3317,21 @@ direct/absolute addressing, change the source register after Read, and restore
 before/after that sample. Each leg reads once, performs no data write, and
 preserves the other accumulator and unrelated status.
 
-Protected arithmetic needs a separate retirement audit: the legacy absolute-
-ADD predicate is excluded from the new memory-arithmetic predicate, but the
-XC retired-word classifier does not separately include it as a two-word
-operation. An accepted XC followed by absolute ADD can therefore miss its
-protected-window endpoint. This static finding requires an IRQ/replay fixture
-and correction before claiming protected absolute-ADD composition; ordinary
-unprotected absolute-ADD replay is covered by the matrix above.
+Protected absolute ADD is explicitly classified as two words at retirement,
+despite retaining its separate legacy decode/arithmetic path. Omitting it
+missed XC's protected-window endpoint: the bounded pre-fix fixture read the
+operand but observed zero vector fetches, acknowledgements or stack writes
+by clock 36. The correction affects word accounting, not arithmetic or memory
+sampling. The mirrored control-retirement classifier uses the same correction.
+
+The 32 IRQ/replay cases cover XC1/XC2, absolute ADD and long-offset SUB,
+both accumulators, two program pages and checkpoints before/after retirement.
+An input-line edge is delivered before saving, with IFR owning the request.
+After the full arithmetic instruction retires, each leg must acknowledge and
+fetch one IRQ vector, save/restore XPC and the return address, execute the
+continuation and reach IDLE with balanced SP. The data source is read once;
+only the interrupt frame writes RAM. Other multiword protected-instruction
+families still require their own retirement/composition coverage.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles
