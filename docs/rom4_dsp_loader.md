@@ -3630,6 +3630,20 @@ spacing rule; the requested block spans `00:32f0`--`00:32f4`.
 Loop execution, endpoint handling and block-repeat interrupt behavior
 remain unaccepted. Zero-gap LDM cases test the declared pipeline
 projection, not silicon forwarding or RPTB latency.
+
+The static setup contract follows SPRU172C's RPTB[D] entry: two instruction
+words, RSA=`PC+2` (RPTB) or `PC+4` (RPTBD), REA=the literal last word,
+nominal four/two cycles respectively, BRC+1 executions, and interruptible
+blocks. RPTBD executes two delay words and is not single-repeatable.
+SPRU131G sections 6.8/7.5.8 place BRC decrement at the last block
+instruction's Decode stage. The atomic frontend's post-instruction
+`REA+1` check is therefore not sufficient evidence for staged timing.
+Staged acceptance needs retained endpoint decisions before younger
+fall-through work executes, interruption/resumption with BRC/RSA/REA/BRAF,
+multiword endpoints, BRC=0, and save/restore across the loop boundary.
+Software BRC/BRAF modifications have separate five/six-word latencies
+(tables 7-3/7-25), not ordinary Execute forwarding. The context tool's
+setup arithmetic tests do not prove these runtime requirements.
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.

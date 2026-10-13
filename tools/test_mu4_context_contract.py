@@ -11,9 +11,29 @@ from tools.mu4_context_contract import IDLE_BASE, IDLE_WITNESS, IDLE_WRAPPER_BAS
 from tools.mu4_context_contract import BOOTSTRAP_BASE, BOOTSTRAP_WITNESS, decode_bootstrap_repeat
 from tools.mu4_context_contract import BOOT_MEMORY_SHIFT_BASE, BOOT_MEMORY_SHIFT_WITNESS, decode_boot_memory_shift, decode_extended_shift_load
 from tools.mu4_context_contract import BOOT_BLOCK_REPEAT_BASE, BOOT_BLOCK_REPEAT_WITNESS, decode_boot_block_repeat
+from tools.mu4_context_contract import decode_block_repeat_setup
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_block_repeat_architectural_setup(self):
+        for opcode, words, cycles in ((0xF072, 2, 4), (0xF272, 4, 2)):
+            for address in (0, 0x32EE, 0xFFFF, 0x12FFFF, 0x7FFFFF):
+                result = decode_block_repeat_setup(opcode, 0x32F4, address)
+                self.assertEqual(result['rsa'], (address + words) & 0xFFFF)
+                self.assertEqual(result['rea'], 0x32F4)
+                self.assertEqual(result['delay_words'], words - 2)
+                self.assertEqual(result['nominal_cycles'], cycles)
+                self.assertTrue(result['interruptible'])
+                self.assertFalse(result['repeatable'])
+                self.assertEqual(result['counter_phase'], 'last block instruction Decode')
+
+    def test_block_repeat_setup_rejects_invalid_forms(self):
+        for arguments in ((0xF070, 0, 0), (0xF072, -1, 0),
+                          (0xF272, 0x10000, 0), (0xF072, 0, -1),
+                          (0xF072, 0, 0x800000)):
+            with self.assertRaises(ValueError):
+                decode_block_repeat_setup(*arguments)
+
     def test_block_repeat_store_spacing_and_bounds(self):
         result = decode_boot_block_repeat(dict(enumerate(BOOT_BLOCK_REPEAT_WITNESS, BOOT_BLOCK_REPEAT_BASE)))
         self.assertEqual(result['store']['operation'], 'STLM B,BRC')

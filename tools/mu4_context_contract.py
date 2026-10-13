@@ -63,6 +63,29 @@ BOOT_BLOCK_REPEAT_WITNESS = (0x891A, 0xF495, 0xF072, 0x32F4,
                              0x1386, 0xF678, 0xF3E8, 0xF1A0, 0x8196)
 
 
+def decode_block_repeat_setup(opcode, literal, address):
+    """SPRU172C RPTB[D] register geometry, not a pipeline simulation."""
+    if opcode not in (0xF072, 0xF272):
+        raise ValueError('expected RPTB or RPTBD')
+    if not 0 <= literal <= 0xFFFF or not 0 <= address <= 0x7FFFFF:
+        raise ValueError('block-repeat operand or address out of range')
+    delayed = opcode == 0xF272
+    return {
+        'operation': 'RPTBD' if delayed else 'RPTB',
+        'rsa': (address + (4 if delayed else 2)) & 0xFFFF,
+        'rea': literal,
+        'delay_words': 2 if delayed else 0,
+        'instruction_words': 2,
+        'nominal_cycles': 2 if delayed else 4,
+        'interruptible': True,
+        'repeatable': False,
+        'count_rule': 'BRC+1 block executions',
+        'counter_phase': 'last block instruction Decode',
+        'source': 'SPRU172C RPTB[D]; SPRU131G sections 6.8 and 7.5.8',
+        'scope': 'static architectural contract; no staged execution acceptance',
+    }
+
+
 def decode_boot_block_repeat(words):
     for offset, expected in enumerate(BOOT_BLOCK_REPEAT_WITNESS):
         address = BOOT_BLOCK_REPEAT_BASE + offset
@@ -72,6 +95,7 @@ def decode_boot_block_repeat(words):
         'store': {'address': '0032ec', 'operation': 'STLM B,BRC', 'opcode': '891a'},
         'latency_word': {'address': '0032ed', 'operation': 'NOP', 'opcode': 'f495'},
         'setup': {'address': '0032ee', 'operation': 'RPTB', 'opcode': 'f072', 'end_literal': '32f4'},
+        'setup_contract': decode_block_repeat_setup(0xF072, 0x32F4, 0x32EE),
         'block': {'first_word': '0032f0', 'last_word': '0032f4',
                   'words': [f'{word:04x}' for word in BOOT_BLOCK_REPEAT_WITNESS[4:]]},
         'scope': 'nine pinned original AA55 words; spacing satisfies SPRU131G table 7-3 category 9; '
