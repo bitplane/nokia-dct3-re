@@ -3197,6 +3197,29 @@ three remain unsupported. Original `54e6` now executes and the upload
 passes long-offset immediate ST `76e6` at `00:322e`. No native startup,
 recorder or speech acceptance follows from this opcode boundary.
 
+DADD (`5000`--`5300` families) shares that retained-pair/address path,
+but bit 9 independently selects its source accumulator and bit 8 its
+destination. Execute reads the selected original source and adds the
+captured memory pair; it does not use an unrelated destination value.
+The new 13824 replay cases cover all four A/B selections, nine address
+forms, eight source/memory pairs, C16/SXM/OVM and both parities. Direct
+offsets 4/5 include exact `5304` under compiler-relative addressing.
+Fixtures change AR/SP after Access, literals after Decode and RAM after
+Read, then restore in Decode, Read or Execute; each leg requires one
+ordered pair, no memory writes and unchanged unselected accumulator.
+
+Ordinary mode extends the memory high word under SXM, computes full
+40-bit addition, low-32 carry, sticky destination overflow and OVM
+saturation. The modeled C16 path adds independent low/high 16-bit lanes,
+does not propagate low carry into high, extends the high result into
+guard bits and derives carry from the high lane. It retains overflow
+and does not clamp the independent lanes under OVM, as in the existing
+long-arithmetic model. Those dual-mode flag policies and paired Read
+phase remain not independently silicon-validated. The matrix uses encoded
+AR1/AR6 and BK=16; other modifiers/compatibility ARP, producer/status
+conflicts and physical bank arbitration remain outside it. Register/
+peripheral pairs and control-delay placement fail closed.
+
 Long-offset immediate ST now consumes offset then value as a retained
 three-word operation. Its Read-owned destination calculation shares the
 same offset/preincrement/circular helper as atomic addressing and staged
@@ -3334,20 +3357,21 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 1040 reads and fifteen strobes,
-with AR0=`0007`, AR1=`3aea`, AR2=`0000`. After the first row, two further
+The stop summary counts 1048 reads and fifteen strobes,
+with AR0=`000b`, AR1=`3aea`, AR2=`0008`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 528 bytes are outside the bounded capture and remain
+The additional 536 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is long-word DADD (`DADD Lmem,B,B`), `5304` at
-`00:30fa`, debugger context `00:30fc`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is unsigned memory load (LDU), `12e1` at
+`00:3114`, debugger context `00:3116`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
-register SUB `f620` at `00:321c` and register LD `f540` at `00:30f7`
+register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
+and long-word DADD `5304` at `00:30fa`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3434,8 +3458,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD, long-offset BANZ, immediate SUB, register SUB and register LD now
-have staged coverage; subsequent long-word DADD remains incomplete.
+DLD, long-offset BANZ, immediate SUB, register SUB, register LD and DADD
+now have staged coverage; subsequent LDU remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

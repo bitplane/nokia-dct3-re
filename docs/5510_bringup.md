@@ -2460,9 +2460,9 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 1040 NAND byte reads and fifteen strobes, with
-AR0=`0007`, AR1=`3aea`, AR2=`0000`. Two further commands `00` with address
-bytes `00,20,00,00` select row 32; the additional 528 bytes are outside
+The stopped-run summary counts 1048 NAND byte reads and fifteen strobes, with
+AR0=`000b`, AR1=`3aea`, AR2=`0008`. Two further commands `00` with address
+bytes `00,20,00,00` select row 32; the additional 536 bytes are outside
 the bounded capture and remain unverified. The first-page comparison
 verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
@@ -2472,8 +2472,8 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is long-word DADD (`DADD Lmem,B,B`) `5304` at `00:30fa`;
-debugger context is `00:30fc`, not
+instruction is unsigned memory load (LDU) `12e1` at `00:3114`;
+debugger context is `00:3116`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2503,8 +2503,9 @@ Register SUB at `00:321c` has source/destination, signed-shift, arithmetic-flag
 and replay coverage, including ASM forms and preceding-load composition.
 Register LD at `00:30f7` has shifted-source, publication and replay coverage,
 including ASM forms and carry preservation. Long-word DADD at `00:30fa`
-needs retained paired reads, source/destination, arithmetic-flag and replay
-coverage;
+has paired-read, source/destination, arithmetic-flag and replay coverage
+for ordinary and C16 modes. LDU at `00:3114` needs retained memory operand,
+unsigned extension, address ownership and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

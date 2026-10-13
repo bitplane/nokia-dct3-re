@@ -6209,7 +6209,7 @@ private:
 		m_phase = 252610; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	struct dsub_fixture
+	struct long_pair_fixture_data
 	{
 		unsigned form, reg, read_cycle;
 		u16 address, next_ar, literal, opcode, st0, st1;
@@ -6217,8 +6217,9 @@ private:
 		u32 memory;
 		u16 result_st0;
 	};
-	static dsub_fixture long_subtract_fixture(unsigned variant)
+	static long_pair_fixture_data long_pair_fixture(unsigned variant)
 	{
+		if (variant >= 6912) return long_add_fixture(variant - 6912);
 		unsigned const form = variant % 9, destination = (variant / 9) % 2, pattern = (variant / 18) % 8;
 		bool const dual = (variant / 144) % 2, sxm = (variant / 288) % 2, ovm = (variant / 576) % 2, odd = (variant / 1152) % 2;
 		unsigned const reg = odd ? 6 : 1;
@@ -6254,11 +6255,35 @@ private:
 		return {form, reg, form >= 5 ? 6U : 5U, address, next_ar, form == 8 ? address : u16(offset),
 			u16(0x5400 | (destination << 8) | mode), st0, st1, source, result, memory, result_st0};
 	}
-	void start_pipeline_long_subtract(unsigned variant = 0)
+	static long_pair_fixture_data long_add_fixture(unsigned variant)
+	{
+		unsigned const v = variant % 4608, form = v % 9, selector = (v / 9) % 4, pattern = (v / 36) % 8, flags = (v / 288) % 8;
+		bool const dual = flags & 1, sxm = flags & 2, ovm = flags & 4, odd = (v / 2304) % 2;
+		auto f = long_pair_fixture(form + 9 * (selector & 1) + 18 * pattern + 144 * dual + 288 * sxm + 576 * ovm + 1152 * odd);
+		f.opcode = 0x5000 | ((selector >> 1) << 9) | ((selector & 1) << 8) | (f.opcode & 0xff);
+		if (form < 2) { f.opcode += 2; f.address += 2; }
+		if (dual)
+		{
+			s64 const left_high = sxm ? s16(f.source >> 16) : u16(f.source >> 16), right_high = sxm ? s16(f.memory >> 16) : u16(f.memory >> 16);
+			f.result = ((u64(left_high + right_high) & 0xffffff) << 16) | u16(u16(f.source) + u16(f.memory));
+			f.result_st0 = (f.st0 & ~0x800) | (u32(u16(f.source >> 16)) + u16(f.memory >> 16) > 0xffff ? 0x800 : 0);
+		}
+		else
+		{
+			s64 const left = BIT(f.source, 39) ? s64(f.source) - (s64(1) << 40) : s64(f.source);
+			s64 const right = sxm && BIT(f.memory, 31) ? s64(f.memory) - (s64(1) << 32) : s64(f.memory);
+			s64 const sum = left + right;
+			bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
+			f.result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
+			f.result_st0 = (f.st0 & ~0x800) | (u64(u32(f.source)) + f.memory > 0xffffffffULL ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
+		}
+		return f;
+	}
+	void start_pipeline_long_pair(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = long_subtract_fixture(variant);
-		bool const destination = BIT(f.opcode, 8);
+		auto const f = long_pair_fixture(variant);
+		bool const source = (f.opcode & 0xfc00) == 0x5000 ? BIT(f.opcode, 9) : BIT(f.opcode, 8);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : f.opcode);
@@ -6271,8 +6296,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, (f.form == 7 ? 0x1007 : 0x1000) + (f.reg == 6));
 		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, destination ? 0x246813579aULL : f.source);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, destination ? f.source : 0x246813579aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, source ? 0x246813579aULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, source ? f.source : 0x246813579aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, u16(f.memory >> 16));
@@ -6283,12 +6308,12 @@ private:
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
 				expect(m_pipeline_operand_reads < 2 && at == (f.address ^ m_pipeline_operand_reads) &&
 					word == (m_pipeline_operand_reads ? u16(f.memory) : u16(f.memory >> 16)) && m_cpu->pipeline_cycles() == f.read_cycle,
-					"DSUB samples its retained MSW/LSW pair once in parity-defined order"); ++m_pipeline_operand_reads; });
+					"Long arithmetic samples its retained MSW/LSW pair once in parity-defined order"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "dsub_no_memory_write",
-			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "DSUB does not write data memory"); });
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Long arithmetic does not write data memory"); });
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "dsub_offset",
 			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 5) return;
-				expect(word == f.literal && !m_pipeline_extensions_reads, "DSUB retains its extension once"); ++m_pipeline_extensions_reads; });
+				expect(word == f.literal && !m_pipeline_extensions_reads, "Long arithmetic retains its extension once"); ++m_pipeline_extensions_reads; });
 		m_phase = 252630; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -31503,7 +31528,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 32767) { start_pipeline_accumulator_shift(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged accumulator shifts: PASS cases=32768 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 restore=32768 duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0\n");
-				start_pipeline_long_subtract(); return;
+				start_pipeline_long_pair(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -31515,14 +31540,16 @@ private:
 		if (m_phase == 252630)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = long_subtract_fixture(variant);
+			auto const f = long_pair_fixture(variant);
 			bool const destination = BIT(f.opcode, 8), retired = tick >= f.read_cycle + 1;
-			unsigned const checkpoint = f.read_cycle - 2 + std::array<unsigned, 3>{0, 2, 3}[variant / 2304];
+			bool const source = (f.opcode & 0xfc00) == 0x5000 ? BIT(f.opcode, 9) : destination;
+			u64 const initial_a = source ? 0x246813579aULL : f.source, initial_b = source ? f.source : 0x246813579aULL;
+			unsigned const checkpoint = f.read_cycle - 2 + std::array<unsigned, 3>{0, 2, 3}[variant < 6912 ? variant / 2304 : (variant - 6912) / 4608];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_cpu->state_int(destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (retired ? f.result : f.source) &&
-				m_cpu->state_int(destination ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x246813579aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (retired && !destination ? f.result : initial_a) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (retired && destination ? f.result : initial_b) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (retired ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
-				"DSUB publishes full/dual-lane result and modeled carry/overflow only at Execute");
+				"Long arithmetic publishes full/dual-lane result and modeled carry/overflow only at Execute");
 			if (tick == f.read_cycle - 2 && f.form >= 5)
 			{
 				auto const disable = machine().disable_side_effects();
@@ -31556,8 +31583,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252640; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 6911) { start_pipeline_long_subtract(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged DSUB: PASS cases=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6912 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
+				if (variant == 6911) osd_printf_info("TMS320C54x staged DSUB: PASS cases=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6912 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
+				if (variant < 20735) { start_pipeline_long_pair(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged DADD: PASS cases=13824 address_forms=9 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=13824 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_long_immediate_store(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
