@@ -2460,9 +2460,9 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 3422 NAND byte reads and thirty-five strobes, with
-AR0=`00ae`, AR1=`36b0`, AR2=`0000`. Two further observed commands `00` with address
-bytes `00,20,00,00` select row 32; the additional 2910 bytes are outside
+The stopped-run summary counts 3586 NAND byte reads and forty strobes, with
+AR0=`0000`, AR1=`0001`, AR2=`0000`. Two further observed commands `00` with address
+bytes `00,20,00,00` select row 32; the additional 3074 bytes are outside
 the bounded capture and remain unverified. The first-page comparison
 verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
@@ -2472,10 +2472,12 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `MPY #lk,A`, `f066` at `00:2eda`. STLM A,T,
+instruction is `STLM B,BRC`, `891a` at `00:32ec`. Immediate
+`MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
+arithmetic and producer/restoration coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication, saturation and consumer/replay
-coverage. Unsupported Decode can stop the older store before Execute;
-the runtime PC alone does not prove its retirement. Repeated
+coverage. Unsupported Decode can stop older Execute; the runtime PC alone
+does not prove retirement of instructions still in the pipeline. Repeated
 `ST #lk,*AR1+`, `7691` at `00:08ea`, now has short-memory store
 retention, two-clock cadence and interrupt/restoration coverage. BANZD,
 `6e87` at `00:0a50`, now has short-indirect delayed-branch coverage.
@@ -2490,7 +2492,7 @@ is mapped AR6. The preceding
 Read-publication and dependent-multiply coverage.
 The preceding `STL A,-1,*AR1(0003)` at `00:313e`, encoded
 `6fe1 0003 0c9f`, now has shifted-store coverage.
-Debugger context is `00:2edc`, not
+Debugger context is `00:32ee`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2548,8 +2550,10 @@ ownership, pending-IRQ ordering and restoration coverage. STLM A,T at
 `00:2ed8` has source/saturation ownership, T publication,
 dependent-instruction ordering and replay coverage. Zero-gap T consumers
 are explicitly outside TI's allowed STLM latency; the model does not claim
-hardware forwarding. Immediate MPY at `00:2eda` still needs retained literal/T,
-FRCT/OVM, destination/overflow and replay coverage;
+hardware forwarding. Immediate MPY at `00:2eda` has retained literal/T,
+FRCT/OVM, destination/overflow and replay coverage. STLM B,BRC at
+`00:32ec` still needs source/saturation ownership, BRC publication,
+block-repeat consumer latency and restoration coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

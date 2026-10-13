@@ -3206,6 +3206,23 @@ sources below `0060` outside `0008..0017` remain rejected. The stage
 assignment is a partial frontend model, not measured silicon timing;
 repeat and delayed-control bodies remain restricted separately.
 
+Immediate MPY (`f066/f166`, SPRU172C MPY syntax 4, class 2) retains one
+literal in Decode and signed T in Read before older Execute. Execute forms
+the signed 16x16 product, applies FRCT and publishes through the shared
+destination overflow/OVM helper; it does not rewrite T or access data memory.
+The 86,016 replay cases include 12,288 isolated operations with 64 value
+pairs, both destinations, FRCT/OVM/SXM/SMUL and two program pages.
+The 73,728 producer cases add both STLM sources/destinations, SST and
+`0..2` intervening NOPs. Gap-zero STLM consumers remain an out-of-contract
+stage projection; the defined spacing cases are distinguished from them.
+Opcode-shaped literals are poisoned after Decode and T changes after Read;
+complete-Decode, Access and Read snapshots check one literal fetch and no
+data accesses except the optional producer's single register write. Source
+and destination differ independently in the producer matrix. SXM does not
+reinterpret the multiply's signed operands; SMUL's pre-MAC/MAS saturation
+does not apply to this standalone multiply. Physical bank/interlock timing,
+repeat bodies and delayed-control slots remain unvalidated/restricted.
+
 Direct STLM now admits T/TRN (`880e/890e/880f/890f`) in addition to
 the covered AR destinations. It ignores DP/CPL, publishes the saturated low
 source word in Execute and does not read its destination. SST handling is
@@ -3593,20 +3610,22 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 3422 reads and thirty-five strobes,
-with AR0=`00ae`, AR1=`36b0`, AR2=`0000`. After the first row, two further
+The stop summary counts 3586 reads and forty strobes,
+with AR0=`0000`, AR1=`0001`, AR2=`0000`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 2910 bytes are outside the bounded capture and remain
+The additional 3074 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `MPY #lk,A`, `f066` at `00:2eda`;
-debugger context is `00:2edc`, not the retained opcode address. STLM A,T,
+unsupported instruction is `STLM B,BRC`, `891a` at `00:32ec`;
+debugger context is `00:32ee`, not the retained opcode address.
+`MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
+arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.
-Unsupported Decode can still stop older Execute, so this particular run
-does not alone prove the preceding store retired. Repeated
+Unsupported Decode can still stop older Execute; the final PC is not
+retirement proof for instructions still in the pipeline. Repeated
 `ST #lk,*AR1+`, `7691` at `00:08ea`, now has retained-literal,
 two-clock stream and pending-IRQ/restoration coverage. BANZD,
 `6e87` at `00:0a50`, now has short-indirect delayed-branch coverage.
@@ -3728,7 +3747,7 @@ LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
 single-step and short-memory repeated SUBC now have coverage;
 short-indirect BANZD and short-memory repeated immediate stores now have
-coverage; the subsequent immediate multiply remains incomplete.
+coverage; the subsequent accumulator-to-BRC MMR store remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
