@@ -3075,6 +3075,29 @@ arithmetic at `8 + gap`. This is not silicon phase evidence; mixed status
 producers, wider operand conflicts, repeat and delayed-control/interrupt
 composition remain unvalidated.
 
+Shifted register LD (`f440` family and ASM-selected `f482`, with source/
+destination selectors) uses the known one-word register-only Execute path.
+It overwrites the destination with the shifted original source rather than
+combining the two accumulators. Right shifts sign-fill from bit 39 under
+SXM and otherwise zero-fill, without adding overflow or applying OVM.
+Nonnegative shifts, including zero, check the full signed source/shift
+against the signed-32 range before 40-bit truncation, set sticky destination
+overflow and saturate under OVM. Thus `LD A,0,B` may saturate an out-of-range
+guard value; it is not an unconditional raw copy. Carry is preserved.
+
+The 196608 standalone replay cases cover all signed shifts -16--15, four
+A/B selections, both shift sources, eight source/destination patterns,
+sixteen SXM/OVM/carry/sticky-overflow states, two pages and Decode/Access/Read
+saves. A bit-level shift oracle and signed full-width overflow calculation
+are independent of the CPU helper. Another 144 signed-load producer/replay
+cases cover zero/one/two NOP gaps and drainage to IDLE. The shared register-ALU
+fixture still runs the separate ADD/SUB matrix with its different flag
+contract. LD publishes at clock 6 standalone and `8 + gap` after the load
+producer in this partial model. No data-memory access, extension fetch or
+duplicate opcode is permitted. Mixed status producers, silicon source-read
+phases, wider operand conflicts and repeat/control/interrupt composition
+remain unvalidated.
+
 The isolated core runner permits five emulated seconds as a finite stop
 bound for the full matrix. Reaching that bound is not acceptance: all
 required markers and the intentional test-completion exit are mandatory,
@@ -3320,11 +3343,11 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is register LD (`LD A,0,B`), `f540` at
-`00:30f7`, debugger context `00:30f9`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is long-word DADD (`DADD Lmem,B,B`), `5304` at
+`00:30fa`, debugger context `00:30fc`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
-and register SUB `f620` at `00:321c`
+register SUB `f620` at `00:321c` and register LD `f540` at `00:30f7`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3411,8 +3434,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD, long-offset BANZ, immediate SUB and register SUB now have staged
-coverage; subsequent register LD remains incomplete.
+DLD, long-offset BANZ, immediate SUB, register SUB and register LD now
+have staged coverage; subsequent long-word DADD remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

@@ -2472,8 +2472,8 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is register LD (`LD A,0,B`) `f540` at `00:30f7`;
-debugger context is `00:30f9`, not
+instruction is long-word DADD (`DADD Lmem,B,B`) `5304` at `00:30fa`;
+debugger context is `00:30fc`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2501,7 +2501,10 @@ Immediate SUB at `00:3216` has retained-literal, arithmetic-flag and
 replay coverage, including shift-16 and preceding-load composition.
 Register SUB at `00:321c` has source/destination, signed-shift, arithmetic-flag
 and replay coverage, including ASM forms and preceding-load composition.
-Register LD at `00:30f7` needs shifted-source, publication and replay coverage;
+Register LD at `00:30f7` has shifted-source, publication and replay coverage,
+including ASM forms and carry preservation. Long-word DADD at `00:30fa`
+needs retained paired reads, source/destination, arithmetic-flag and replay
+coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
