@@ -2460,9 +2460,9 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 1550 NAND byte reads and twenty strobes, with
-AR0=`0005`, AR1=`3aea`, AR2=`0002`. Two further observed commands `00` with address
-bytes `00,20,00,00` select row 32; the additional 1038 bytes are outside
+The stopped-run summary counts 1572 NAND byte reads and twenty strobes, with
+AR0=`0011`, AR1=`3aea`, AR2=`0010`. Two further observed commands `00` with address
+bytes `00,20,00,00` select row 32; the additional 1060 bytes are outside
 the bounded capture and remain unverified. The first-page comparison
 verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
@@ -2472,10 +2472,10 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `STL A,-1,*AR1(0003)` at `00:313e`, encoded
-`6fe1 0003 0c9f`. The operation extension selects a low-word shifted store,
-which is rejected separately from the now-covered memory-load operation.
-Debugger context is `00:3142`, not
+instruction is `LD *AR1(0004),T` at `00:3194`, encoded `30e1 0004`.
+The preceding `STL A,-1,*AR1(0003)` at `00:313e`, encoded
+`6fe1 0003 0c9f`, now has shifted-store coverage.
+Debugger context is `00:3196`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2516,8 +2516,10 @@ at `00:3523` has retained Smem/T, unsigned-product, FRCT/OVM,
 destination/flag and replay coverage. The extended Smem instruction
 at `00:3291` has checked extension decoding, retained-address/source,
 SXM/shift/status and replay coverage. The shifted store at `00:313e`
-still needs destination ownership, accumulator sampling, saturation,
-low-word publication and replay coverage;
+has destination ownership, Execute-live source, saturation,
+low-word publication and replay coverage. The load into T at `00:3194`
+still needs retained address/source, T publication, dependent-multiply
+ordering and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

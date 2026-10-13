@@ -3072,6 +3072,23 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Variable-shift STL/STH (`6fxx` with `0c80/0d80` or `0c60/0d60`
+operation extension, SPRU172C syntax 4 classes 11A/11B) retain address
+then operation extensions. Read presents the destination and updates its
+pointer once; Execute uses the live source accumulator, applies the signed
+five-bit shift, applies SST with SXM, and writes the selected low/high word.
+There is no destination read or arithmetic-status update. This follows the
+existing store frontend's partial Read-EAB/Execute-EB placement, not measured
+silicon operand timing. The 172,032 replay cases cover seven long-offset/
+absolute forms (AR1/AR6, offset/no-update, preincrement, circular and absolute),
+four offsets, both sources, both word halves, all 32 shifts, SST/SXM and
+four guarded/sign-boundary accumulator patterns. Extension poisoning,
+changed pointers after Read and changed source before Execute distinguish
+address retention from live-source sampling; Decode/Read/Execute snapshots
+check one write and no repeated pointer update. Short forms are admitted
+but not covered by this matrix; mapped/peripheral destinations, repeat
+bodies and control-delay slots remain rejected.
+
 Variable-shift memory LD (`6fxx` plus `0c40/0d40` operation extension,
 SPRU172C LD syntax 4) retains the address-extension word, when present,
 before the operation extension. Access owns DAGEN and Read samples memory
@@ -3083,8 +3100,9 @@ changed sources/pointers check retention and single publication. The 16-bit
 source and shift range `-16..15` cannot exceed signed 32-bit range on a
 left shift, so these fixtures check preservation of existing overflow flags
 rather than claiming an unreachable new overflow. Mapped `0008..0017`
-sources are permitted but are not covered by this matrix. Other `6fxx`
-operation extensions, repeat bodies and control-delay slots remain rejected.
+sources are permitted but are not covered by this matrix. The shifted
+store extensions have separate coverage; other `6fxx` operation extensions,
+repeat bodies and control-delay slots remain rejected.
 The stage assignment remains a partial frontend model, not measured timing.
 
 Memory LD shifted by 16 (`44xx/45xx`, SPRU172C LD syntax 3) shares
@@ -3452,18 +3470,20 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 1550 reads and twenty strobes,
-with AR0=`0005`, AR1=`3aea`, AR2=`0002`. After the first row, two further
+The stop summary counts 1572 reads and twenty strobes,
+with AR0=`0011`, AR1=`3aea`, AR2=`0010`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 1038 bytes are outside the bounded capture and remain
+The additional 1060 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `STL A,-1,*AR1(0003)` at `00:313e`, encoded
-`6fe1 0003 0c9f`; debugger context is `00:3142`. Its `0c9f` operation
-extension selects a low-word store with shift `-1`, not a load.
+unsupported instruction is `LD *AR1(0004),T` at `00:3194`, encoded
+`30e1 0004`; debugger context is `00:3196`. The preceding
+`STL A,-1,*AR1(0003)` at `00:313e`, encoded `6fe1 0003 0c9f`, now has
+staged store coverage. Its `0c9f` operation extension selects a low-word
+store with shift `-1`, not a load.
 `LD *AR6(0010),8,B` at `00:3291`, encoded `6fe6 0010 0d48`, now has
 staged coverage. The checked original AA55 contract in
 `mu4_context_contract.py` pins all three words and decodes the address
@@ -3568,7 +3588,7 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-Smem shifted store remains incomplete.
+Smem load into T remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
