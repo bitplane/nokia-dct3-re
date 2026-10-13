@@ -3160,6 +3160,14 @@ The staged-only, first-16-strobes observer in the MU4 I/O handler records
 byte `00`, HD012=`1`, direction=`7`, ready=`1`: a retired NAND command
 strobe with CLE high and CE low. No device state or response is synthesized
 by that observer. The next unsupported instruction is `9634` at `00:2fc3`.
+SPRU172C page 4-21 assigns `96xx` to `BIT Xmem,BITC`, not ADD/SUB.
+For `9634`, Xmem selects unmodified AR5 and BITC=4 selects memory bit 11;
+only ST0.TC is changed. The atomic decoder already implements this operation.
+Staged acceptance requires a captured Xmem address, one retained memory read,
+TC publication at Execute, and an adjacent `XC 1,NTC` (`fd20`) composition
+test that establishes the consumer's actual visibility window. Checkpoints
+before and after the read must replay without duplicate reads or pointer
+updates. Accumulator arithmetic tests cannot establish this contract.
 This adds real I/O-retirement evidence but not native NAND read, recorder,
 startup or speech acceptance. Existing atomic profiles remain unchanged.
 
