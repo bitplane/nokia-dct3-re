@@ -20,7 +20,12 @@ constexpr bool staged_immediate_alu(u16 word)
 constexpr bool staged_conditional_branch(u16 word)
 {
 	return word == 0xfa44 || word == 0xfa45 || word == 0xfa4c || word == 0xfa4d ||
-		word == 0xf844 || word == 0xf845 || word == 0xf84c || word == 0xf84d;
+		word == 0xf844 || word == 0xf845 || word == 0xf84c || word == 0xf84d || (word & 0xfdfe) == 0xf802;
+}
+
+constexpr bool staged_bio_branch(u16 word)
+{
+	return (word & 0xfdfe) == 0xf802;
 }
 
 constexpr bool staged_call(u16 word)
@@ -2170,7 +2175,8 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && !BIT(m_pipeline_word[4], 9))
 	{
 		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
-		bool const taken = BIT(m_pipeline_word[4], 0) ? zero : !zero;
+		bool const taken = staged_bio_branch(m_pipeline_word[4])
+			? (BIT(m_pipeline_word[4], 0) ? !m_bio_in_cb() : bool(m_bio_in_cb())) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
 		m_pipeline_immediate[4] = taken;
 		if (taken)
 		{
@@ -2186,6 +2192,10 @@ void tms320c54x_device::pipeline_step()
 		}
 		m_pipeline_bc_held = false;
 	}
+	if (m_pipeline_valid[4] && staged_bio_branch(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
+		// BIO is a physical line, sampled once in Read for BC and BCD
+		// (SPRU131G 8.3.1), not at later delay-word retirement.
+		m_pipeline_immediate[4] = BIT(m_pipeline_word[4], 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfcf8) == 0xf4a8)
 	{
 		// Category-I CMPR reads ARx/AR0 in Access, before older Read or
@@ -3014,7 +3024,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && (staged_call(m_pipeline_word[4]) || staged_far_call(m_pipeline_word[4])))
 		// The opcode's Execute precedes the complete two-word slot's Execute.
 		m_data.write_word(m_pipeline_operand_address[4], m_pipeline_immediate[4]);
-	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
+	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && !staged_bio_branch(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
 	{
 		// Our complete two-word slot reaches Read at the opcode's Evaluate
 		// clock. Retain the predicate after older Execute writes (example 7-17).

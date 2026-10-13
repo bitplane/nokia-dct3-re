@@ -3085,10 +3085,33 @@ not extensions of an already decoded instruction. The call matrix now has
 132 replay cases with nine STM-T parameters, including `76e6`, `4ee6`,
 `7001` and `54e6`, inside valid CALLD delay slots. The unchanged call/stack
 and retained-parameter results protect that ownership rule while actual
-unsupported instructions still fail closed. Original startup now stops on
-BIO-conditioned BC `f803` at `00:2fca`. Its condition timing and the bench's
-BIO input contract need investigation; a new opcode boundary alone proves
-neither native startup nor physical input ownership.
+unsupported instructions still fail closed. Original startup passes
+BIO-conditioned BC `f803` at `00:2fca`; a new opcode boundary alone proves
+neither native startup nor physical timing.
+
+Staged BC/BCD admit BIO and NBIO via the CPU's existing board-supplied
+line callback. BIO is low-active and NBIO high-active (SPRU172C condition
+codes); SPRU131G 8.3.1 places branch sampling in Read. Both forms sample
+once in the retained operation's Read, before Execute, and store the outcome
+across branch/delay retirement. Delayed accumulator predicates retain their
+separate existing Evaluate path; BIO is not sampled through that path again.
+The retained-slot clock alignment is still a partial model, not measured
+silicon phase placement.
+
+The 256 replay cases cover plain/delayed forms, both conditions, initial
+low/high levels, static/change-after-Decode/change-before-Read/change-after-
+Read inputs, two pages and four checkpoints. They verify one line callback,
+one literal fetch, the selected target and real execution/suppression of
+delay markers, with unchanged status. Fixtures explicitly wake between
+IDLE endpoints and restore their external input observation state; no
+handset firmware state is changed.
+
+MU4 already connects NAND R/B to the bench's `m_ready` and `bio_in_cb`,
+backed by the recovered schematic. The original staged upload now consumes
+that live model output without forcing it, passes `f803`, and stops at
+MVMM SP,AR5 (`e785`) at `00:2fbe`. Interrupt/held-peripheral composition of
+these branches remains unvalidated. This is bounded startup coverage, not
+native recorder acceptance or a physical-board proof.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP

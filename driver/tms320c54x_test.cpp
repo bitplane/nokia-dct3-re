@@ -2125,7 +2125,15 @@ private:
 		m_phase = 6220 + index * 3;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
-	int bio_r() { return m_bio_level; }
+	int bio_r()
+	{
+		if (m_phase == 252670)
+		{
+			expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "BIO branch samples its line exactly once at retained Read");
+			++m_pipeline_register_writes;
+		}
+		return m_bio_level;
+	}
 	struct rounded_multiply_case
 	{
 		u16 opcode, t, memory, status;
@@ -6312,6 +6320,38 @@ private:
 				expect(m_pipeline_extensions_reads < 2 && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
 					word == (m_pipeline_extensions_reads ? f.value : f.offset), "Long immediate ST fetches offset then value exactly once"); ++m_pipeline_extensions_reads; });
 		m_phase = 252650; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_bio_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		bool const low = variant % 2, delayed = (variant / 2) % 2, initial = (variant / 4) % 2;
+		unsigned const transition = (variant / 8) % 4;
+		bool const sampled = transition == 1 || transition == 2 ? !initial : initial, taken = low ? !sampled : sampled;
+		u32 const base = (variant / 32) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, 0xf802 | low | (delayed << 9)); program.write_word(base + 0x601, 0x700);
+		program.write_word(base + 0x602, 0xe811); program.write_word(base + 0x603, 0xe922); program.write_word(base + 0x604, 0xf4e1);
+		program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_bio_level = initial;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_register_writes = m_pipeline_extensions_reads = m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "bio_branch_target",
+			[this, taken](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				expect(taken && !m_pipeline_operand_reads, "Only the BIO-selected target is fetched, once"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "bio_branch_address",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == 0x700 && !m_pipeline_extensions_reads, "BIO branch retains its target literal across input changes"); ++m_pipeline_extensions_reads; });
+		m_phase = 252670; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -30453,13 +30493,61 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 6143) { start_pipeline_long_immediate_store(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_bio_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252660)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252650;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252670)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, transition = (variant / 8) % 4;
+			bool const low = variant % 2, delayed = (variant / 2) % 2, initial = (variant / 4) % 2;
+			bool const sampled = transition == 1 || transition == 2 ? !initial : initial, taken = low ? !sampled : sampled;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 6, 8}[variant / 64];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BIO branch retains a physical input predicate, not accumulator state");
+			if ((transition == 1 && tick == 4) || (transition == 2 && tick == 5) || (transition == 3 && tick == 6)) m_bio_level = !initial;
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_register_writes, m_pipeline_extensions_reads, m_pipeline_operand_reads, unsigned(m_bio_level)};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BIO branch before/after line sample or delay retirement");
+			}
+			if (tick == 20)
+			{
+				bool const success = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_register_writes == 1 && m_pipeline_extensions_reads == 1 &&
+					m_pipeline_operand_reads == unsigned(taken) && m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed || !taken ? 0x22 : 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800;
+				if (!success) osd_printf_info("Staged BIO failure: case=%u replay=%u taken=%u cycle=%llu idle=%u a=%010llx b=%010llx line_reads=%u literal_reads=%u target_reads=%u\n",
+					variant, m_pipeline_replay, taken, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+					m_pipeline_register_writes, m_pipeline_extensions_reads, m_pipeline_operand_reads);
+				expect(success,
+					"BIO/NBIO use active-low/high Read sample and preserve actual plain/delayed execution despite later pin changes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_register_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[2]; m_bio_level = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BIO branch without a duplicate callback or target fetch");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252680; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 255) { start_pipeline_bio_branch(variant + 1); return; }
+				m_bio_level = 1;
+				osd_printf_info("TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0\n");
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252680)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252670;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
