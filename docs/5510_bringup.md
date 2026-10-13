@@ -2562,6 +2562,11 @@ endpoint and interrupt semantics remain unaccepted;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
+The original five-word byte-swap body now has isolated staged execution
+and 1,536 save-state replay cases. This excludes RPTB and back-to-back
+iteration joins; the exact coverage and reproduction command live in
+[the native loader contract](rom4_dsp_loader.md).
+
 The context tool also pins the 12-word AA55 reset sequence at
 `00:ff80`--`00:ff8b`: PMST=`ffc8`, AR0=`0060`, `RPT #ff20`,
 `MVPD 0060,*AR0+`, PMST=`ffe8`, then `FB 00:0e41`. This is a

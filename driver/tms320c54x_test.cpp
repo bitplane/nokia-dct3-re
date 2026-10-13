@@ -8022,6 +8022,37 @@ private:
 				expect(at == (f.brc ? 0x1a : 0x0e + f.trn) && word == f.stored && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6, "STLM publishes its Execute-live saturated source once independent of DP/CPL"); ++m_pipeline_store_writes; });
 		m_phase = 253270; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static u16 swap_body_source(unsigned variant)
+	{
+		static constexpr u16 values[] = {0, 1, 0xff, 0x100, 0x101, 0x7f80, 0x8000, 0xffff,
+			0x1234, 0xabcd, 0x5500, 0x00aa, 0xff00, 0x00ff, 0x8080, 0x7fff};
+		return values[variant & 15];
+	}
+	void start_pipeline_swap_body(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 256 ? 0x20000 : 0;
+		u16 const flags = (variant >> 4) & 15, source = swap_body_source(variant);
+		static constexpr u16 words[] = {0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, i < std::size(words) ? words[i] : 0xf495);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, variant & 1); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xe08);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0) | ((flags & 4) ? 0x40 : 0) | ((flags & 8) ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000000ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x5000); m_cpu->space(AS_DATA).write_word(0x5000, source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "original_swap_body_read",
+			[this, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x5000 && word == source && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Original byte-swap body retains one unsigned Read sample"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "original_swap_body_write",
+			[this, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x5000 && word == u16((source << 8) | (source >> 8)) && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 10, "Original byte-swap body writes one transformed word in Execute"); ++m_pipeline_store_writes; });
+		m_phase = 253310; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct immediate_multiply_fixture
 	{
 		bool producer, source, destination;
@@ -8957,6 +8988,12 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") &&
+				!strcmp(machine().options().bios(), "swap-body"))
+		{
+			start_pipeline_swap_body();
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") &&
 				!strcmp(machine().options().bios(), "timer"))
 		{
@@ -33772,13 +33809,62 @@ private:
 				if (variant == 12287) osd_printf_info("TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 				if (variant < 15359) { start_pipeline_stlm_t(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged STLM BRC: PASS cases=3072 sources=2 patterns=8 flags=16 gaps=0,1,2,3 restore=3072 register_write=Execute ldm_sample=Read block_repeat_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_swap_body(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253280)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253270; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253310)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u16 const source = swap_body_source(variant), flags = (variant >> 4) & 15;
+			u16 const st1 = 0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0) | ((flags & 4) ? 0x40 : 0) | ((flags & 8) ? 0x4000 : 0);
+			u64 const b = tick >= 9 ? (u32(source) << 8) | (source >> 8) : tick >= 8 ? u32(source) << 8 : tick >= 6 ? source : 0xff80000000ULL;
+			u16 const st0 = tick >= 8 ? 0x608 : tick >= 7 ? 0x608 | ((source & 0x80) ? 0x800 : 0) : 0xe08;
+			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || m_cpu->state_int(tms320c54x_device::STATE_A) != (tick >= 7 ? source >> 8 : 0xdead) ||
+				m_cpu->state_int(tms320c54x_device::STATE_B) != b || m_cpu->state_int(tms320c54x_device::STATE_AR6) != (tick >= 9 ? 0x5001 : 0x5000) ||
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) != st0 || m_cpu->state_int(tms320c54x_device::STATE_ST1) != st1)
+				osd_printf_info("Swap body mismatch: case=%u tick=%u source=%04x a=%010llx b=%010llx ar6=%04x st0=%04x st1=%04x expected_b=%010llx expected_st0=%04x\n",
+					variant, tick, source, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), (unsigned long long)b, st0);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (tick >= 7 ? source >> 8 : 0xdead) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_AR6) == (tick >= 9 ? 0x5001 : 0x5000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1,
+				"Original byte-swap body preserves dependent accumulator order and modifies AR6 once in store Read");
+			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x5000, 0xdead); }
+			if (tick == std::array<unsigned, 3>{3, 5, 9}[variant / 512] && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original byte-swap body before/after Read or before store Execute");
+			}
+			if (tick == 18)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 &&
+						m_cpu->space(AS_DATA).read_word(0x5000) == u16((source << 8) | (source >> 8)), "Original byte-swap body reaches IDLE with one retained read and one write");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original body without duplicate reads, writes or pointer modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253320; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_pipeline_swap_body(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original swap body: PASS cases=1536 patterns=16 flags=16 pages=2 restore=1536 read=Read write=Execute ar6_update=Read duplicate_reads=0 duplicate_writes=0 block_repeat_claim=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "swap-body"))
+					throw emu_fatalerror(0, "TMS320C54x isolated swap body complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253320)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253310; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -34885,6 +34971,7 @@ ROM_END
 ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(0, "core", "Core conformance tests")
 	ROM_SYSTEM_BIOS(1, "timer", "Timer interrupt boundary observation (not fidelity acceptance)")
+	ROM_SYSTEM_BIOS(2, "swap-body", "Original MU4 byte-swap body (not block-repeat acceptance)")
 ROM_END
 
 ROM_START(tms54rom4)

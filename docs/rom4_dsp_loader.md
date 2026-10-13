@@ -3654,6 +3654,31 @@ AR6 advances once per executed block. The context-tool desk check covers
 all 65,536 source words independently using byte serialization; it does
 not execute this loop or prove its source range, BRC value, final buffer,
 flags, pipeline timing or native startup. Those remain runtime obligations.
+
+The isolated staged CPU body fixture (`tms54test -bios swap-body`) now
+executes those five words without RPTB in 1,536 cases: sixteen input
+patterns, sixteen SXM/OVM/FRCT/CPL combinations, two program pages and
+three save points. It poisons the source after the single Read sample,
+checks dependent A/B results and carry, and restores before/after Read
+and before the store. One read, one write and one AR6 increment survive
+each replay. Store address/AR6 publication is in the current frontend's
+Read phase, and the write is in Execute; this remains a model phase,
+not recovered silicon timing. The full core runner requires this marker.
+Acceptance covers one body execution only: a back-to-back body join must
+also preserve the preceding STL postincrement before the next LDU
+captures its address. RPTB iteration control cannot supply an artificial
+gap to conceal that data-path obligation.
+
+Reproduce the isolated fixture in a disk-backed working directory:
+
+```sh
+/absolute/path/to/mame tms54test -bios swap-body -video none -sound none \
+  -nothrottle -noreadconfig -log -seconds_to_run 5
+```
+
+Require the single `staged original swap body: PASS cases=1536` marker and
+terminal `Fatal error: TMS320C54x isolated swap body complete` (exit 3).
+Another exit-3 exception is failure, not completion.
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.
