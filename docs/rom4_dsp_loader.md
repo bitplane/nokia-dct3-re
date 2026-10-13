@@ -3049,6 +3049,37 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Register ADD/SUB admits the one-word encoded-shift forms (`f400/f420`
+families) and ASM-selected forms (`f480/f481` with source/destination
+selectors). These known register-only operations use the existing atomic
+arithmetic semantics at staged Execute; they fetch no operand and perform
+no control redirect. Unknown families still fail closed in Decode.
+Register SUB computes destination minus shifted source, unlike immediate
+SUB's source-minus-literal form. Aliasing uses the original source and
+destination values. Right shifts fill from bit 39 under SXM and otherwise
+zero-fill; left shifts discard bits above the 40-bit accumulator. Carry
+is computed before OVM saturation and destination overflow is sticky.
+The unselected accumulator and other status fields are preserved.
+
+The 196608 standalone replay cases cover ADD/SUB, all four A/B selections,
+every signed shift -16--15, both shift sources, eight independent A/B
+patterns, eight SXM/OVM/sticky-overflow states and two pages. A bit-level
+shift oracle is independent of the CPU helper. Encoded-shift fixtures set
+ASM to an unrelated -13, while ASM fixtures use its signed five-bit value.
+Saves during Decode, Access or Read require one opcode fetch, no data
+access and publication only at Execute, clock 6 in this partial model.
+Another 288 producer/replay cases compose a signed immediate load and
+register ADD/SUB through zero, one or two NOPs, checking aliasing, retained
+load literals and drainage to IDLE. Load publishes at clock 7 and register
+arithmetic at `8 + gap`. This is not silicon phase evidence; mixed status
+producers, wider operand conflicts, repeat and delayed-control/interrupt
+composition remain unvalidated.
+
+The isolated core runner permits five emulated seconds as a finite stop
+bound for the full matrix. Reaching that bound is not acceptance: all
+required markers and the intentional test-completion exit are mandatory,
+and a normal exit is rejected even if it contains PASS markers.
+
 Accumulator AND/OR/XOR register forms now retire in Execute using the
 existing one-word arithmetic semantics. They read no memory, consume no
 extension and change no flags. SPRU172C 4-11/4-123/4-201 specifies a logical
@@ -3280,19 +3311,20 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 548 reads and ten strobes,
-with AR0=`0011`, AR1=`0007`, AR2=`0011`. After the first row, command
-`00` and address bytes `00,20,00,00` start a second read at row 32.
-The additional 36 bytes are outside the bounded capture and remain
+The stop summary counts 1040 reads and fifteen strobes,
+with AR0=`0007`, AR1=`3aea`, AR2=`0000`. After the first row, two further
+commands `00` with address bytes `00,20,00,00` select row 32.
+The additional 528 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is register SUB (`SUB B,0,A`), `f620` at
-`00:321c`, debugger context `00:321e`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is register LD (`LD A,0,B`), `f540` at
+`00:30f7`, debugger context `00:30f9`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
-long-offset BANZ `6ce2` at `00:30df` and immediate SUB `f010` at `00:3216`
+long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
+and register SUB `f620` at `00:321c`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3379,8 +3411,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD, long-offset BANZ and immediate SUB now have staged coverage;
-subsequent register SUB remains incomplete.
+DLD, long-offset BANZ, immediate SUB and register SUB now have staged
+coverage; subsequent register LD remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

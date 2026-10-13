@@ -185,6 +185,11 @@ constexpr bool staged_accumulator_shift(u16 word)
 	return (word & 0xfce0) == 0xf460 || (word & 0xfce0) == 0xf0e0;
 }
 
+constexpr bool staged_accumulator_arithmetic(u16 word)
+{
+	return (word & 0xfce0) == 0xf400 || (word & 0xfce0) == 0xf420 || (word & 0xfcfe) == 0xf480;
+}
+
 constexpr bool staged_absolute_load(u16 word)
 {
 	return (word & 0xfeff) == 0x10f8;
@@ -2401,7 +2406,7 @@ void tms320c54x_device::pipeline_step()
 		bool const long_subtract = staged_dsub(word);
 		// These one-word forms use only live accumulators in Execute; their
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const accumulator_logic = staged_accumulator_logic(word) || staged_accumulator_shift(word);
+		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word);
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = (word & 0xff80) == 0x4600;
@@ -2443,7 +2448,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_pmst = word == 0x771d;
 		if (m_pipeline_valid[2] && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_subtract && !accumulator_logic && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
+			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_subtract && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);

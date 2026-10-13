@@ -2460,9 +2460,9 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 548 NAND byte reads and ten strobes, with
-AR0=`0011`, AR1=`0007`, AR2=`0011`. A second command `00` with address
-bytes `00,20,00,00` starts row 32; its additional 36 bytes are outside
+The stopped-run summary counts 1040 NAND byte reads and fifteen strobes, with
+AR0=`0007`, AR1=`3aea`, AR2=`0000`. Two further commands `00` with address
+bytes `00,20,00,00` select row 32; the additional 528 bytes are outside
 the bounded capture and remain unverified. The first-page comparison
 verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
@@ -2472,8 +2472,8 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is register SUB (`SUB B,0,A`) `f620` at `00:321c`;
-debugger context is `00:321e`, not
+instruction is register LD (`LD A,0,B`) `f540` at `00:30f7`;
+debugger context is `00:30f9`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2499,8 +2499,9 @@ the extended forms. Long-offset BANZ at `00:30df` has retained offset/target,
 resolved-address predicate, pointer-modification and replay coverage.
 Immediate SUB at `00:3216` has retained-literal, arithmetic-flag and
 replay coverage, including shift-16 and preceding-load composition.
-Register SUB at `00:321c` needs source/destination ownership, signed shift,
-arithmetic-flag and replay coverage;
+Register SUB at `00:321c` has source/destination, signed-shift, arithmetic-flag
+and replay coverage, including ASM forms and preceding-load composition.
+Register LD at `00:30f7` needs shifted-source, publication and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
