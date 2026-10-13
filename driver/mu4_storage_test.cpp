@@ -1145,6 +1145,9 @@ private:
 		// ADD_H is held enabled by this fixture; U202's lower 14 address bits alias.
 		if ((m_direction & 7) != 7) fatalerror("MU4 storage: strobe before GPIO outputs enabled");
 		m_writes.push_back((u16(m_gpio & 7) << 8) | (value & 0xff));
+		if (system_bios() == 26 && m_writes.size() <= 16)
+			logerror("mu4_staged_nand_strobe: offset=%04x byte=%02x hd012=%x direction=%x ready=%u observation_only=1\n",
+				unsigned(offset), value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		if (BIT(m_gpio, 2)) return;
 		if (recorder_profile() && m_recorder_loader_calls)
 		{

@@ -58,7 +58,8 @@ public:
 		STATE_PRD,
 		STATE_TCR,
 		STATE_TRN,
-		STATE_RTN
+		STATE_RTN,
+		STATE_RC
 	};
 
 protected:

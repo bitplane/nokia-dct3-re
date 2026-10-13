@@ -6464,6 +6464,49 @@ private:
 		m_phase = 252730; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_repeat_nop(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const long_form = variant % 2;
+		unsigned const count = std::array<unsigned, 5>{0, 1, 3, 32, 255}[(variant / 2) % 5], interrupt = (variant / 10) % 3;
+		u32 const base = (variant / 30) % 2 ? 0x20000 : 0, body = base + (long_form ? 0x602 : 0x601), continuation = body + 1;
+		unsigned const last = (long_form ? 8 : 7) + count;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, long_form ? 0xf070 : 0xec00 | count);
+		if (long_form) program.write_word(base + 0x601, count);
+		program.write_word(body, 0xf495); program.write_word(continuation, 0xe855); program.write_word(continuation + 1, 0xf4e1);
+		if (interrupt)
+		{
+			// With OVLY clear, vectors inherit XPC even for NMI's low slot 4.
+			u32 const vector = base + (interrupt == 2 ? 4 : 0x40);
+			program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt == 1 ? 0 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt == 1 ? 1 : 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
+		m_pipeline_operand_tap = program.install_read_tap(body, body, "repeat_nop_body",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == 0xf495 && !m_pipeline_operand_reads, "Repeated NOP body is fetched once, not reread from poisoned program memory"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(continuation, continuation, "repeat_nop_continuation",
+			[this, last](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == (m_pipeline_extensions_reads ? 0xe866 : 0xe855) && (!m_pipeline_extensions_reads || m_cpu->pipeline_cycles() > last),
+					"Repeat discards speculative continuation and refetches after its final NOP"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_nop_no_data_write",
+			[this, interrupt, last](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				expect(interrupt && m_cpu->pipeline_cycles() > last && at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2,
+					"Repeated NOP has no data write; only a later interrupt can write its stack"); ++m_pipeline_store_writes; });
+		m_phase = 252750; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -30749,13 +30792,77 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 47) { start_pipeline_mvmm_producer(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged MVMM producers: PASS cases=48 producers=STM,STLM gap_nops=0,1,2,3 pages=2 restore=48 duplicate_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_repeat_nop(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252740)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252730;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252750)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const long_form = variant % 2;
+			unsigned const count = std::array<unsigned, 5>{0, 1, 3, 32, 255}[(variant / 2) % 5], interrupt = (variant / 10) % 3;
+			unsigned const first = long_form ? 8 : 7, last = first + count;
+			u32 const base = (variant / 30) % 2 ? 0x20000 : 0, body = base + (long_form ? 0x602 : 0x601);
+			unsigned const checkpoint = std::array<unsigned, 4>{3, first, first + count / 2, last}[variant / 60];
+			unsigned const remaining = tick < first - 1 ? 0 : tick <= first ? count : tick <= last ? last - tick : 0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_RC) == remaining,
+				"RPT count loads once, first NOP retains count, and each further NOP consumes one saved counter clock");
+			// Input-line changes synchronize through MAME. Queue before Decode
+			// so the cycle-3 checkpoint saves a latched event, not an unsaved queue.
+			if (interrupt && tick == 2) { int const line = interrupt == 2 ? INPUT_LINE_NMI : 0; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+			if (interrupt == 1 && tick == 3) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 1, "Repeat Decode checkpoint owns a delivered pending IRQ");
+			if (tick < last) expect(!m_vector_acks && !m_pipeline_store_writes, "RPT suppresses IRQ and NMI until its count+1 NOP body completes");
+			if (tick == (long_form ? 4 : 3))
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word(body, 0xe811);
+			}
+			if (tick == (long_form ? 5 : 4))
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(body + 1, 0xe866);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeat Decode, first/middle/final NOP with pending interrupt");
+			}
+			if (tick == last + 30)
+			{
+				bool const success = m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == (interrupt && !count ? 3 : 2) &&
+					m_pipeline_store_writes == (interrupt ? 2 : 0) && m_vector_acks == unsigned(bool(interrupt)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x66 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000;
+				if (!success) osd_printf_info("Staged RPT NOP failure: case=%u replay=%u count=%u interrupt=%u cycle=%llu idle=%u a=%010llx b=%010llx sp=%04x body_reads=%u continuation_reads=%u stack_writes=%u acks=%u\n",
+					variant, m_pipeline_replay, count, interrupt, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes, m_vector_acks);
+				expect(success,
+					"Repeated NOP preserves its body, completes exact duration and returns any deferred interrupt to its fresh continuation");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
+					m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeat counter/body/interrupt without restarting the loop");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252760; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 239) { start_pipeline_repeat_nop(variant + 1); return; }
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				osd_printf_info("TMS320C54x staged repeat NOP: PASS cases=240 forms=short,long counts=0,1,3,32,255 sources=none,IRQ,NMI pages=2 restore=240 count_plus_one=1 counter_each_clock=1 duplicate_body_fetches=0 deferred_interrupts=1\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252760)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252750;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
@@ -31280,6 +31387,14 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 252750)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, interrupt = (variant / 10) % 3;
+			unsigned const count = std::array<unsigned, 5>{0, 1, 3, 32, 255}[(variant / 2) % 5], first = variant % 2 ? 8 : 7;
+			expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > first + count &&
+				m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (variant % 2 ? 0x603 : 0x602) && !m_vector_acks,
+				"NOP repeat acknowledges its original pending source only after the final body and stacks the fresh continuation"); ++m_vector_acks;
+		}
 		if (m_phase == 252410 && m_pipeline_peripheral_case >= 384)
 		{
 			unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[m_pipeline_peripheral_case % 4];

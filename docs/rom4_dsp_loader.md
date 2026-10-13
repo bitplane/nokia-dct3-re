@@ -3132,10 +3132,36 @@ Execute publication and MVMM Decode sampling. All preserve the retained
 sample through replay. Wider stack/interrupt and register-bank contention
 compositions remain unvalidated; repeat MVMM remains unsupported.
 
-The original upload now stops on short RPT #32 (`ec20`) at `00:2fc1`.
-The previous PORTW to NAND may not retire before unsupported Decode stops
-the pipeline; advancing this opcode boundary alone is not NAND-I/O proof,
-native startup acceptance or speech validation.
+The original upload passes short RPT #32 (`ec20`) at `00:2fc1`. An opcode
+boundary alone remains insufficient to prove older I/O retirement, native
+startup acceptance or speech validation.
+
+Short immediate RPT now loads its encoded eight-bit count at Execute and
+activates interrupt protection in Decode. NOP is a supported retained body
+for short/long RPT: the first instruction takes its normal frontend path,
+then each stream clock retires one further NOP and decrements RC without
+program/data refetch or pointer modification. Count zero still executes
+the body once. The existing saved counter is exposed as debugger state
+`RC`; no new repeat-runtime state or firmware intervention is introduced.
+
+The 240 replay cases cover both immediate forms, counts 0/1/3/32/255,
+no interrupt/IRQ/NMI, two program pages and four checkpoints. They check
+RC every clock, poison the already fetched body and speculative
+continuation, and verify one body fetch, fresh continuation, deferred
+acknowledgement and balanced interrupt return. With OVLY clear, even the
+NMI vector's low slot inherits XPC, so each fixture's ISR is placed in its
+active page. Input edges are queued before the Decode checkpoint; the
+maskable fixture asserts that IFR already owns the event before saving.
+Saving an undelivered MAME input synchronization request is not a test of
+saved CPU interrupt state. Short-repeat transfer-body composition and wider
+peripheral/HOLD interactions remain unvalidated; other bodies fail closed.
+
+The staged-only, first-16-strobes observer in the MU4 I/O handler records
+byte `00`, HD012=`1`, direction=`7`, ready=`1`: a retired NAND command
+strobe with CLE high and CE low. No device state or response is synthesized
+by that observer. The next unsupported instruction is `9634` at `00:2fc3`.
+This adds real I/O-retirement evidence but not native NAND read, recorder,
+startup or speech acceptance. Existing atomic profiles remain unchanged.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
