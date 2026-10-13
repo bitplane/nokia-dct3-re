@@ -131,7 +131,7 @@ constexpr bool staged_absolute_add(u16 word)
 
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || (word & 0xfe00) == 0x1e00) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -1645,6 +1645,18 @@ u64 tms320c54x_device::shifted_load(u64 source, int shift, bool destination_b)
 	return (source << shift) & ACC_MASK;
 }
 
+u64 tms320c54x_device::conditional_subtract(u64 source, u16 memory, bool destination_b)
+{
+	const u64 divisor = data_operand(memory);
+	const s64 difference = (s64(source << 24) >> 24) - (s64(divisor << 24) >> 24) * 0x8000;
+	const bool subtract = difference >= 0;
+	// SUBC's ALU result supplies overflow; OVM must not saturate its quotient step.
+	if (difference < -2147483648LL || difference > 2147483647LL)
+		m_st0 |= destination_b ? 0x0200 : 0x0400;
+	m_st0 = (m_st0 & ~u16(0x0800)) | (subtract ? 0x0800 : 0);
+	return (subtract ? (u64(difference) << 1) | 1 : source << 1) & ACC_MASK;
+}
+
 u64 tms320c54x_device::add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry)
 {
 	const bool carry = subtract ? u32(source) >= u32(operand) :
@@ -2381,7 +2393,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
-			if (!m_pipeline_decode_remaining && (staged_shifted_smem(word) || staged_t_memory_operation(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_accumulator_store(word) || staged_extended_dst(word) || staged_data_copy(word) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && ((word & 0xfe00) == 0x1e00 || staged_shifted_smem(word) || staged_t_memory_operation(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_accumulator_store(word) || staged_extended_dst(word) || staged_data_copy(word) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported\n", machine().describe_context());
 				m_illegal = true; return;
@@ -3271,7 +3283,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_smem_arithmetic(m_op))
 		{
 			u64 &destination = accumulator(BIT(m_op, 8));
-			destination = add_sub(destination, data_operand(m_pipeline_operand[5]), BIT(m_op, 11), BIT(m_op, 8));
+			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) : add_sub(destination, data_operand(m_pipeline_operand[5]), BIT(m_op, 11), BIT(m_op, 8));
 			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
 		}
 		else if (staged_absolute_add(m_op))
@@ -4236,13 +4248,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1f00: // SUBC Smem, B
 	{
 		u64 &source = accumulator(BIT(op, 8));
-		const u64 divisor = data_operand(alu_smem());
-		const s64 difference = (s64(source << 24) >> 24) -
-				(s64(divisor << 24) >> 24) * 0x8000;
-		const bool subtract = difference >= 0;
-		source = (subtract ? (u64(difference) << 1) | 1 : source << 1) &
-				ACC_MASK;
-		m_st0 = (m_st0 & ~u16(0x0800)) | (subtract ? 0x0800 : 0);
+		source = conditional_subtract(source, alu_smem(), BIT(op, 8));
 		return;
 	}
 	case 0x2000: case 0x2100: // MPY Smem, A/B

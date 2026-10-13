@@ -2472,7 +2472,9 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `SUBC Smem,A`, `1e02` at `00:352f`.
+operation is repeated `SUBC Smem,A`, `1e02` at `00:352f`, behind
+`RPT #15` (`ec0f` at `00:352e`). Single-step SUBC is covered; the
+repeat-body rejection occurs before Execute and proves no quotient iteration.
 `ADD *(0016),0,A,B` at `00:319c`, encoded
 `6ff8 0016 0d00`, now has staged arithmetic coverage; its memory source
 is mapped AR6. The preceding
@@ -2526,9 +2528,12 @@ low-word publication and replay coverage. The load into T at `00:3194`
 has retained address/source, T publication, dependent-multiply
 ordering and replay coverage. The ADD at `00:319c` has mapped
 source sampling, shifted operand, separate source/destination accumulator,
-arithmetic flags and replay coverage. SUBC at `00:352f` still needs
-retained source/address, conditional-subtract/shift behavior, carry ownership
-and replay coverage;
+arithmetic flags and replay coverage. Single-step SUBC has retained
+source/address, conditional-subtract/shift, carry and replay coverage.
+Its ALU-difference overflow projection is explicitly unvalidated at the
+silicon boundary. Repeated SUBC at `00:352f` still needs sixteen-step
+quotient/remainder behavior, repeat ownership, IRQ ordering and restoration
+coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

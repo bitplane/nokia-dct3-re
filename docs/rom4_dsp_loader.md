@@ -3072,6 +3072,26 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+SUBC (`1exx/1fxx`, [SPRU172C 4-192](https://www.ti.com/lit/ug/spru172c/spru172c.pdf))
+has single-step staged coverage. Access retains the source address, Read
+samples one memory word and Execute performs the conditional division step
+through the helper shared with atomic execution. SXM extends the divisor;
+the ALU difference is `src - divisor*32768`. A nonnegative difference yields
+`difference*2+1` and C=1; a negative difference yields `src*2` and C=0.
+The result wraps to 40 bits without OVM saturation. The helper now projects
+sticky OVsrc from the ALU difference being outside signed 32-bit range;
+this follows the core's common ALU-overflow model but the exact SUBC
+overflow-edge mechanism remains unvalidated against silicon. This replaces
+the atomic path's complete omission of OVsrc, not a claim of final fidelity.
+The 30,720 replay cases cover six RAM forms with AR1/AR6, all eight mapped
+AR sources, both accumulators, 64 dividend/divisor pairs and SXM/OVM.
+TI's intended division domain uses positive dividends and divisors; negative
+or guarded fixture values test the declared model, not validated division use.
+Changed RAM/pointers and Execute-live accumulator inputs distinguish operand
+ownership; Decode/Access/Read snapshots check one read and no data writes.
+Other addressing forms and mapped accumulator/T/TRN inputs remain outside
+this matrix. Control-delay and repeated SUBC bodies remain rejected.
+
 Variable-shift memory ADD/SUB (`6fxx` with operation-extension masks
 `0c00/0c20`, SPRU172C extended Smem arithmetic) retains ordered address
 and operation extensions. Access owns DAGEN; Read samples memory once.
@@ -3513,8 +3533,11 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `SUBC Smem,A`, `1e02` at `00:352f`;
-debugger context is `00:3531`. `ADD *(0016),0,A,B` at `00:319c`, encoded
+unsupported operation is repeated `SUBC Smem,A`, `1e02` at `00:352f`,
+behind `RPT #15` (`ec0f` at `00:352e`); debugger context is `00:3531`.
+Single-step SUBC now has staged coverage, but the repeat-body rejection
+occurs before Execute: this run does not prove any quotient iteration.
+`ADD *(0016),0,A,B` at `00:319c`, encoded
 `6ff8 0016 0d00`, now has staged coverage. Address `0016` is
 mapped AR6, not RAM. The preceding `LD *AR1(0004),T` at `00:3194`, encoded
 `30e1 0004`, and dependent MPY at `00:3196` now have staged coverage.
@@ -3626,7 +3649,7 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-Smem conditional subtract (SUBC) remains incomplete.
+single-step SUBC now has coverage; repeated SUBC remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
