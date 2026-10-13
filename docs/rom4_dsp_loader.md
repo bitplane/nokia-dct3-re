@@ -3644,6 +3644,16 @@ multiword endpoints, BRC=0, and save/restore across the loop boundary.
 Software BRC/BRAF modifications have separate five/six-word latencies
 (tables 7-3/7-25), not ordinary Execute forwarding. The context tool's
 setup arithmetic tests do not prove these runtime requirements.
+
+The original block has a concrete data oracle: `1386` is
+`LDU *AR6,B`; `f678` is `SFTA B,-8,A`; `f3e8` is
+`SFTL B,8,B`; `f1a0` is `OR A,0,B`; `8196` is `STL B,*AR6+`.
+The unsigned load bounds B to 16 bits, so the stored low word is
+`((source << 8) | (source >> 8)) & ffff`, an in-place byte swap.
+AR6 advances once per executed block. The context-tool desk check covers
+all 65,536 source words independently using byte serialization; it does
+not execute this loop or prove its source range, BRC value, final buffer,
+flags, pipeline timing or native startup. Those remain runtime obligations.
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.

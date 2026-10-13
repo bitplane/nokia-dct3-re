@@ -42,6 +42,19 @@ class ContextContractTest(unittest.TestCase):
         self.assertEqual(result['block']['first_word'], '0032f0')
         self.assertEqual(result['block']['last_word'], '0032f4')
         self.assertEqual(result['block']['words'], ['1386', 'f678', 'f3e8', 'f1a0', '8196'])
+        self.assertEqual(result['block']['instructions'],
+                         ['LDU *AR6,B', 'SFTA B,-8,A', 'SFTL B,8,B',
+                          'OR A,0,B', 'STL B,*AR6+'])
+
+    def test_original_block_byte_swap_desk_arithmetic(self):
+        # Unsigned LD bounds B to 16 bits; guard/sign and saturation cannot
+        # change this body's low-word result. This is not a CPU test.
+        for source in range(0x10000):
+            a = source >> 8
+            b = ((source << 8) & 0xFFFFFFFF) | a
+            stored = b & 0xFFFF
+            expected = int.from_bytes(source.to_bytes(2, 'little'), 'big')
+            self.assertEqual(stored, expected)
 
     def test_block_repeat_witness_mutation_and_absence(self):
         original = dict(enumerate(BOOT_BLOCK_REPEAT_WITNESS, BOOT_BLOCK_REPEAT_BASE))

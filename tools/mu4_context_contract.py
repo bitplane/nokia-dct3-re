@@ -97,7 +97,13 @@ def decode_boot_block_repeat(words):
         'setup': {'address': '0032ee', 'operation': 'RPTB', 'opcode': 'f072', 'end_literal': '32f4'},
         'setup_contract': decode_block_repeat_setup(0xF072, 0x32F4, 0x32EE),
         'block': {'first_word': '0032f0', 'last_word': '0032f4',
-                  'words': [f'{word:04x}' for word in BOOT_BLOCK_REPEAT_WITNESS[4:]]},
+                  'words': [f'{word:04x}' for word in BOOT_BLOCK_REPEAT_WITNESS[4:]],
+                  'instructions': ['LDU *AR6,B', 'SFTA B,-8,A',
+                                   'SFTL B,8,B', 'OR A,0,B', 'STL B,*AR6+'],
+                  'data_result': 'swap the two bytes of each unsigned 16-bit source word in place',
+                  'pointer_result': 'AR6 advances once per block execution',
+                  'source': 'SPRU172C LDU, SFTA, SFTL, OR syntax 4, STL syntax 1',
+                  'scope': 'instruction decode and desk arithmetic only; no executed block acceptance'},
         'scope': 'nine pinned original AA55 words; spacing satisfies SPRU131G table 7-3 category 9; '
                  'no staged block-repeat execution, iterations, interrupt or endpoint acceptance',
     }
