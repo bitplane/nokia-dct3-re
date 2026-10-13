@@ -3005,6 +3005,29 @@ unchanged non-ARP status and an unchanged unselected accumulator. Arbitrary
 circular-region provenance, operand-bank conflicts, XC/interrupt composition
 and silicon phase fidelity remain unvalidated.
 
+Unsigned memory load LDU (`12xx/13xx`) shares the retained LD address/
+Read path, but Execute always publishes the raw 16-bit sample with all
+upper accumulator bits clear, independently of SXM and OVM. The existing
+signed LD short-mode limits remain unchanged. LDU admits direct DP/CPL,
+all twelve short-indirect modifiers and the offset/absolute forms; other
+control/peripheral sources fail closed before Read, while mapped AR0--AR7
+are explicitly covered. Extended control-delay placement and repeats
+remain unsupported.
+
+The 55296 RAM replay cases cover eighteen address forms, eight encoded
+registers, both destinations, eight values including `8000,ffff,f495`,
+SXM/OVM, compatibility mode and Decode/Access/Read saves. Another 2304
+cases cover each mapped AR source through direct, absolute and ordinary
+offset addressing, including an address/source-register alias. The shared
+signed-load matrix remains a separate acceptance marker. Fixtures change
+the literal after Decode, AR/SP/BK after Access and the source after Read;
+each replay requires one source read, no data writes and no literal refetch.
+Every fixture tick checks that only Access-owned ARP changes before Execute,
+and that the accumulator publishes at clock 6 for short or 7 for extended
+forms in this partial frontend model. These checks are not silicon timing
+evidence. Physical memory-bank arbitration, mixed status/producer hazards
+and wider control/interrupt composition remain unvalidated.
+
 Indirect DLD A/B (`56xx/57xx`) admits short MOD 0--11 and long
 offset/absolute MOD 12--15. Decode retains an extended operand literal;
 Access applies the shared long-word address helper or short pointer step
@@ -3366,12 +3389,12 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is unsigned memory load (LDU), `12e1` at
-`00:3114`, debugger context `00:3116`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is MPYA, `310b` at `00:3520`, debugger context
+`00:3522`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
-and long-word DADD `5304` at `00:30fa`
+long-word DADD `5304` at `00:30fa` and LDU `12e1` at `00:3114`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3458,8 +3481,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD, long-offset BANZ, immediate SUB, register SUB, register LD and DADD
-now have staged coverage; subsequent LDU remains incomplete.
+DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
+LDU now have staged coverage; subsequent MPYA remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

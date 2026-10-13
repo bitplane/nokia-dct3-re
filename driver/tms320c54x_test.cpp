@@ -7193,18 +7193,40 @@ private:
 		f.result_st0 = compatibility && reg && form != 3 ? (f.st0 & 0x1fff) | (reg << 13) : f.st0;
 		return f;
 	}
+	static memory_arithmetic_fixture unsigned_load_case(unsigned variant)
+	{
+		if (variant >= 55296)
+		{
+			unsigned const v = (variant - 55296) % 768, source = v % 8, destination = (v / 8) % 2, pattern = (v / 16) % 4, flags = (v / 64) % 4, kind = (v / 256) % 3;
+			u16 const memory = source == 7 ? 0x5007 : std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern];
+			u16 const st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0), address = 0x10 + source;
+			u16 const mode = kind == 0 ? address : kind == 1 ? 0xf8 : 0xe7;
+			return {kind == 0 ? 0U : kind == 1 ? 17U : 14U, 7, 7, kind == 0 ? 5U : 6U,
+				u16(0x1200 | (destination << 8) | mode), u16(kind == 2 ? 0xb009 + source : address), address, 0x5007,
+				memory, 0x1800, st1, 0x1800, 0xdeadbeefULL, memory};
+		}
+		unsigned const v = variant % 18432, form = v % 18, reg = (v / 18) % 8, destination = (v / 144) % 2;
+		unsigned const pattern = (v / 288) % 8, flags = (v / 2304) % 4, compatibility = (v / 9216) % 2;
+		auto f = memory_arithmetic_case(form + 18 * reg + 144 * destination + 576 * pattern + 4608 * flags + 18432 * compatibility);
+		f.opcode |= 0x1200;
+		f.memory = std::array<u16, 8>{0, 1, 0x7fff, 0x8000, 0xffff, 0xf495, 0xff, 0xff00}[pattern];
+		f.result = f.memory;
+		f.result_st0 = compatibility && reg && form >= 2 && form != 17 ? (f.st0 & 0x1fff) | (reg << 13) : f.st0;
+		return f;
+	}
 	void start_pipeline_offset_load(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = offset_load_case(variant);
+		auto const f = variant >= 12672 ? unsigned_load_case(variant - 12672) : offset_load_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x600, f.opcode); program.write_word(base + 0x601, f.literal);
+		program.write_word(base + 0x600, f.opcode); if (f.form >= 14) program.write_word(base + 0x601, f.literal);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
@@ -7215,13 +7237,13 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "offset_load_sample",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
-					"Long-offset LD samples one retained RAM or AR word in Read"); ++m_pipeline_operand_reads; });
+				expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
+					"Memory load samples one retained RAM or AR word in Read"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "offset_load_no_write",
 			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Long-offset LD publishes only its accumulator"); });
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "offset_load_literal",
-			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(word == f.literal && !m_pipeline_extensions_reads, "Long-offset LD fetches its retained offset/address once"); ++m_pipeline_extensions_reads; });
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 14) return;
+				expect(word == f.literal && !m_pipeline_extensions_reads, "Memory load fetches its retained offset/address once"); ++m_pipeline_extensions_reads; });
 		m_phase = 253050; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -32575,22 +32597,32 @@ private:
 		if (m_phase == 253050)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = offset_load_case(variant);
-			unsigned const checkpoint = std::array<unsigned, 3>{3, 5, 6}[variant < 12288 ? variant / 4096 : (variant - 12288) / 128];
+			bool const unsigned_load = variant >= 12672;
+			unsigned const model_variant = unsigned_load ? variant - 12672 : variant;
+			auto const f = unsigned_load ? unsigned_load_case(model_variant) : offset_load_case(variant);
+			unsigned const checkpoint_index = unsigned_load ? (model_variant < 55296 ? model_variant / 18432 : (model_variant - 55296) / 768) :
+				(variant < 12288 ? variant / 4096 : (variant - 12288) / 128);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[checkpoint_index];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset LD has staged operand ownership");
-			if (tick == 4)
+			bool const retired = tick >= f.read_cycle + 1;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : retired ? f.result : f.source) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? retired ? f.result : f.source : 0x123456789aULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= f.read_cycle - 1 ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
+				"Memory load publishes only in Execute and changes only the Access-owned ARP before retirement");
+			if (tick == 4 && f.form >= 14)
 			{
 				auto const disable = machine().disable_side_effects();
 				m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
 			}
-			if (tick == 5)
+			if (tick == f.read_cycle - 1)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar,
 					"Long-offset LD applies its selected linear/circular pointer modification once in Access");
-				if (variant < 12288 || f.address != 0x17) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+				if (f.address != 0x17) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2222);
 				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
 			}
-			if (tick == 6)
+			if (tick == f.read_cycle)
 			{
 				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead);
 			}
@@ -32602,7 +32634,7 @@ private:
 			}
 			if (tick == 18)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL),
@@ -32616,8 +32648,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253060; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 12671) { start_pipeline_offset_load(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 12671) osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant < 70271) { start_pipeline_offset_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_indirect_dld(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

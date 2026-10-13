@@ -190,14 +190,20 @@ constexpr bool staged_accumulator_arithmetic(u16 word)
 	return (word & 0xfce0) == 0xf400 || (word & 0xfce0) == 0xf420 || (word & 0xfcfe) == 0xf480;
 }
 
+constexpr bool staged_memory_load(u16 word)
+{
+	return (word & 0xfc00) == 0x1000 && u8(word) <= 0xf8 &&
+		(BIT(word, 9) || u8(word) < 0xa0 || u8(word) >= 0xe0);
+}
+
 constexpr bool staged_absolute_load(u16 word)
 {
-	return (word & 0xfeff) == 0x10f8;
+	return staged_memory_load(word) && u8(word) == 0xf8;
 }
 
 constexpr bool staged_offset_load(u16 word)
 {
-	return (word & 0xfe00) == 0x1000 && u8(word) >= 0xe0 && u8(word) < 0xf8;
+	return staged_memory_load(word) && u8(word) >= 0xe0 && u8(word) < 0xf8;
 }
 
 constexpr bool staged_xc(u16 word)
@@ -2161,7 +2167,7 @@ void tms320c54x_device::pipeline_step()
 		return;
 	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
-		((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_port_write(m_pipeline_word[3]) || staged_short_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || (m_pipeline_word[3] & 0xff80) == 0x4600) &&
+		(staged_memory_load(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_short_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || (m_pipeline_word[3] & 0xff80) == 0x4600) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		(staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
@@ -2398,8 +2404,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		// Register/immediate loads, short loads, DP stores and bounded RMW forms.
 		// Other memory/control forms need Access/Read/redirect ownership first.
-		bool const short_load = staged_offset_load(word) || staged_absolute_load(word) || ((word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
-			(BIT(word, 7) || u8(word) < 0x80));
+		bool const short_load = staged_memory_load(word);
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
 		bool const direct_long_load = staged_dld(word);
 		bool const direct_long_store = staged_dst(word);
@@ -2575,7 +2580,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && (staged_data_copy(m_pipeline_word[3]) || staged_long_arithmetic(m_pipeline_word[3])))
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
 			? m_pipeline_immediate[4] : m_sp;
-	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
+	if (m_pipeline_valid[3] && (staged_memory_load(m_pipeline_word[3]) ||
 		(m_pipeline_word[3] & 0xff00) == 0x7600 || staged_bitfield(m_pipeline_word[3]) || staged_smem_arithmetic(m_pipeline_word[3]) || staged_port_read(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || staged_short_logic(m_pipeline_word[3]) || staged_store(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x5600 || (m_pipeline_word[3] & 0xfe80) == 0x4e00 || (m_pipeline_word[3] & 0xff80) == 0x4600 || staged_move(m_pipeline_word[3]) || staged_program_move(m_pipeline_word[3]) || staged_read_a(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xff00) == 0x8b00))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
@@ -2712,7 +2717,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
-	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[3]) ||
+	if (m_pipeline_valid[3] && (staged_memory_load(m_pipeline_word[3]) || staged_short_logic(m_pipeline_word[3]) ||
 		(staged_rmw(m_pipeline_word[3]) && u8(m_pipeline_word[3]) != 0xf8)))
 	{
 		u8 const mode = m_pipeline_word[3];
@@ -2724,6 +2729,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = offset_load ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_immediate[3])) :
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_operand_address[3])) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
+		if (staged_memory_load(m_pipeline_word[3]) && BIT(m_pipeline_word[3], 9) && m_pipeline_operand_address[3] < 0x60 &&
+			(m_pipeline_operand_address[3] < 0x10 || m_pipeline_operand_address[3] > 0x17))
+		{
+			logerror("%s: staged LDU control/peripheral source is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		if (offset_load && m_pipeline_operand_address[3] < 0x60 &&
 			(m_pipeline_operand_address[3] < 0x10 || m_pipeline_operand_address[3] > 0x17))
 		{
@@ -2809,7 +2820,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged absolute ADD control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe00) == 0x1000 || staged_short_logic(m_pipeline_word[4]) ||
+	if (m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
 		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_port_read(m_pipeline_word[4]))
@@ -3081,9 +3092,9 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_move(m_op))
 			m_pc += staged_extended_move(m_op) ? 2 : 1; // Retained move already committed at its owned write clock.
-		else if ((m_op & 0xfe00) == 0x1000)
+		else if (staged_memory_load(m_op))
 		{
-			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
+			accumulator(BIT(m_op, 8)) = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
 			if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xfe80) == 0x4800)
@@ -3265,7 +3276,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[stage];
 			if (!m_pipeline_valid[stage] || BIT(word, 7) ||
-				((word & 0xfe00) != 0x1000 && (word & 0xfc80) != 0x8000 &&
+				(!staged_memory_load(word) && (word & 0xfc80) != 0x8000 &&
 				 (word & 0xfe80) != 0x5600 && (word & 0xfe80) != 0x4e00 && (word & 0xff80) != 0x4600)) continue;
 			m_pipeline_direct_status[stage] = (m_pipeline_direct_status[stage] & 0x4000) | (m_pipeline_operand[4] & 0x1ff);
 			if (stage == 3) m_pipeline_operand_address[stage] = basic_address(stage, u8(word));
