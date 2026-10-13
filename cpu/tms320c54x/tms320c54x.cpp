@@ -104,9 +104,14 @@ constexpr bool staged_read_a(u16 word)
 	return (word & 0xff00) == 0x7e00 && (u8(word) < 0x98 || u8(word) == 0xf8);
 }
 
+constexpr bool staged_extended_banz(u16 word)
+{
+	return (word & 0xff00) == 0x6c00 && u8(word) >= 0xe0 && u8(word) < 0xf8;
+}
+
 constexpr bool staged_banz(u16 word)
 {
-	return (word & 0xff00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98;
+	return ((word & 0xff00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98) || staged_extended_banz(word);
 }
 
 constexpr unsigned staged_repeat_body_words(u16 word)
@@ -2224,13 +2229,15 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[3] && staged_banz(m_pipeline_word[3]))
 	{
-		// Class 29A tests the selected AR before its encoded modification.
+		// Class 29A short forms test AR before modification. Long forms
+		// test the resolved offset address, with MOD 13/14 premodification.
 		// Access redirect gives taken/not-taken paths their two-clock gap;
 		// this stage placement remains a partial model, not silicon timing.
 		u8 const mode = m_pipeline_word[3];
-		bool const taken = m_ar[indirect_ar(mode)] != 0;
+		bool const extended = staged_extended_banz(m_pipeline_word[3]);
+		bool const taken = (extended ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_operand_address[3])) : m_ar[indirect_ar(mode)]) != 0;
 		m_pipeline_immediate[3] = taken;
-		indirect_modify(mode);
+		if (!extended) indirect_modify(mode);
 		if (taken)
 		{
 			m_pipeline_valid[2] = false;
@@ -2365,7 +2372,7 @@ void tms320c54x_device::pipeline_step()
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0x98 || staged_extended_immediate_store(m_pipeline_word[2]))) ||
 			(staged_rmw(m_pipeline_word[2]) && (staged_extended_rmw(m_pipeline_word[2]) || u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0x98)))
 		{
-			m_pipeline_decode_remaining = (staged_extended_bitfield(m_pipeline_word[2]) || (staged_rmw(m_pipeline_word[2]) && (staged_extended_rmw(m_pipeline_word[2]) || u8(m_pipeline_word[2]) == 0xf8)) || staged_extended_move(m_pipeline_word[2]) || staged_extended_immediate_store(m_pipeline_word[2]) || m_pipeline_word[2] == 0x70f8 || m_pipeline_word[2] == 0x74f8 || m_pipeline_word[2] == 0x75f8 || m_pipeline_word[2] == 0x76f8) ? 2 : 1;
+			m_pipeline_decode_remaining = (staged_extended_banz(m_pipeline_word[2]) || staged_extended_bitfield(m_pipeline_word[2]) || (staged_rmw(m_pipeline_word[2]) && (staged_extended_rmw(m_pipeline_word[2]) || u8(m_pipeline_word[2]) == 0xf8)) || staged_extended_move(m_pipeline_word[2]) || staged_extended_immediate_store(m_pipeline_word[2]) || m_pipeline_word[2] == 0x70f8 || m_pipeline_word[2] == 0x74f8 || m_pipeline_word[2] == 0x75f8 || m_pipeline_word[2] == 0x76f8) ? 2 : 1;
 			m_pipeline_decode_extension = 0;
 			m_pipeline_decode_word = m_pipeline_word[2];
 			m_pipeline_decode_address = m_pipeline_address[2];
@@ -2476,7 +2483,7 @@ void tms320c54x_device::pipeline_step()
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
-			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
+			m_pipeline_control_words = (staged_extended_banz(word) ? 3 : branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) || staged_banz(word) ? 0 : 2;
 			if (plain_return || (far_return && !delayed)) m_pipeline_flush_front = true;
@@ -3020,7 +3027,7 @@ void tms320c54x_device::pipeline_step()
 			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
 		else if (staged_banz(m_op))
-			++m_pc; // Predicate, AR modification and target ownership belong to Access.
+			m_pc += staged_extended_banz(m_op) ? 2 : 1; // Predicate, AR modification and target ownership belong to Access.
 		else if (staged_conditional_branch(m_op))
 		{
 			++m_pc;
@@ -3203,7 +3210,7 @@ void tms320c54x_device::pipeline_step()
 			execute_one(m_op);
 		if (m_op == 0xf495 && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
 			pipeline_begin_repeat_stream();
-		unsigned const xc_retired_words = staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_dsub(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
+		unsigned const xc_retired_words = staged_extended_banz(m_op) || staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_banz(m_op) || staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_dsub(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 			(staged_far_call(m_op) || staged_absolute_load(m_op) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
 			u16(m_pipeline_xc_end - address) < xc_retired_words)
@@ -3211,7 +3218,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
 			u16(address - m_pipeline_control_address) <= 3)
 		{
-			unsigned const words = staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_dsub(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
+			unsigned const words = staged_extended_banz(m_op) || staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_banz(m_op) || staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_dsub(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 				(staged_far_call(m_op) || staged_absolute_load(m_op) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}

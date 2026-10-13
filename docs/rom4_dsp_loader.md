@@ -3027,6 +3027,28 @@ silicon phase timing. Register/peripheral pairs and extended control-delay
 placement fail closed; arbitrary BK regions and short control-delay,
 XC/interrupt and source-bank conflict compositions remain unvalidated.
 
+Long-offset BANZ (`6cxx`, modes `e0..f7`) is a three-word branch:
+opcode, signed offset, then same-page target. It is not a memory RMW
+instruction. Decode retains both literals separately. Access tests the
+resolved offset address for zero, with ordinary offsets leaving AR
+unchanged and linear/circular premodification updating AR once. Thus an
+ordinary `AR=1, offset=-1` falls through while retaining AR=1. No data
+memory is read or written. The retained decision redirects taken paths
+to the original target even if AR/BK or the program literals subsequently
+change. Instruction extent is three words for control and retirement
+bookkeeping; existing two-word short BANZ remains covered independently.
+
+The 2304 replay cases cover all three offset forms, eight registers, eight
+initial-AR/offset pairs, compatibility mode, two program pages and saves
+after the first literal, complete Decode or the Access decision. They
+cover zero/nonzero resolved addresses, 16-bit wrap, circular wrap and
+opcode-shaped offset `f495`. Taken paths fetch the retained target once
+at clock 7 in this partial frontend model; not-taken paths execute the
+fallthrough markers without fetching the target. Predicate/redirect phase
+timing is not silicon-validated. BANZD, broader short-modifier coverage,
+arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
+remain outside this fixture matrix.
+
 Accumulator AND/OR/XOR register forms now retire in Execute using the
 existing one-word arithmetic semantics. They read no memory, consume no
 extension and change no flags. SPRU172C 4-11/4-123/4-201 specifies a logical
@@ -3259,14 +3281,15 @@ at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
 The stop summary counts 512 reads and five strobes,
-with AR0=`00ff`, AR1=`3aea`, AR2=`00e4`. This validates device-read data,
+with AR0=`00ff`, AR1=`0010`, AR2=`aa55`. This validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is long-offset XORM, `6ce2` at `00:30df`, debugger context
-`00:30e1`. Short-indirect DST `4e81` at `00:30c6`, long-offset
-LD `10e1` at `00:30c7` and short-indirect DLD `5681` at `00:30d3`
+unsupported instruction is immediate SUB (`SUB #lk,A`), `f010` at
+`00:3216`, debugger context `00:3218`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
+and long-offset BANZ `6ce2` at `00:30df`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3353,7 +3376,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD now have staged coverage; subsequent long-offset XORM remains incomplete.
+DLD and long-offset BANZ now have staged coverage; subsequent immediate
+SUB remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

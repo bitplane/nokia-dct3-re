@@ -7248,6 +7248,60 @@ private:
 		m_phase = 253070; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct extended_banz_fixture
+	{
+		unsigned form, reg, selected;
+		u16 initial, offset, resolved, next_ar;
+		u32 base;
+	};
+	static extended_banz_fixture extended_banz_case(unsigned variant)
+	{
+		unsigned const v = variant % 768, form = v % 3, reg = (v / 3) % 8, pattern = (v / 24) % 8;
+		bool const compatibility = (v / 192) % 2;
+		u16 const initial = std::array<u16, 8>{0, 1, 0xffff, 0, 1, 0x1234, 7, 0x8000}[pattern];
+		s16 const offset = std::array<s16, 8>{0, -1, 1, 1, 0, s16(0xf495), 17, s16(0x8000)}[pattern];
+		int const slot = (int(initial & 31) + offset) % 16;
+		u16 const resolved = form == 2 ? (initial & ~31) | (slot < 0 ? slot + 16 : slot) : u16(initial + offset);
+		return {form, reg, compatibility && !reg ? 3U : reg, initial, u16(offset), resolved, form ? resolved : initial,
+			(v / 384) % 2 ? 0x20000U : 0U};
+	}
+	void start_pipeline_extended_banz(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_banz_case(variant);
+		bool const compatibility = (variant / 192) % 2;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
+		program.write_word(f.base + 0x600, 0x6c00 | (0xe0 + f.form * 8 + f.reg));
+		program.write_word(f.base + 0x601, f.offset); program.write_word(f.base + 0x602, 0x700);
+		program.write_word(f.base + 0x603, 0xe811); program.write_word(f.base + 0x604, 0xe922);
+		program.write_word(f.base + 0x700, 0xe844); program.write_word(f.base + 0x740, 0xe866);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, compatibility ? 0x6608 : 0x608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0));
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == f.selected ? f.initial : 0x410 + ar * 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_banz_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ tests a resolved address without reading data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_banz_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ modifies its AR without a data-memory write"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x602, "extended_banz_literals",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < 2 && at == f.base + 0x601 + m_pipeline_extensions_reads &&
+					word == (m_pipeline_extensions_reads ? 0x700 : f.offset), "BANZ retains offset then target, including opcode-shaped offsets"); ++m_pipeline_extensions_reads; });
+		m_vector_prefetch_tap = program.install_read_tap(f.base + 0x700, f.base + 0x700, "extended_banz_target",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(f.resolved && word == 0xe844 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7,
+					"Taken long-offset BANZ fetches its retained same-page target once"); ++m_pipeline_operand_reads; });
+		m_phase = 253090; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -32424,13 +32478,67 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 24575) { start_pipeline_indirect_dld(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=24576 forms=16 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=24576 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_extended_banz(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253080)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253070;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253090)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = extended_banz_case(variant);
+			bool const compatibility = (variant / 192) % 2;
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 6}[variant / 768];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset BANZ owns its predicate, offset and target");
+			if (tick == 5)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xbeef); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0x740);
+			}
+			if (tick == 6)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar,
+					"Long-offset BANZ tests the computed address, preserving ordinary AR or applying premodification once");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.resolved ? 0 : 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZ after first literal, complete Decode or Access decision");
+			}
+			if (tick == 18)
+			{
+				u16 const st0 = compatibility && f.reg ? (0x6608 & ~0xe000) | (f.reg << 13) : compatibility ? 0x6608 : 0x608;
+				expect(m_pipeline_extensions_reads == 2 && m_pipeline_operand_reads == unsigned(f.resolved != 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.resolved ? 0x44 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (f.resolved ? 0 : 0x22) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (compatibility ? 0x20 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == (f.resolved ? 0 : 1),
+					"BANZ retains its predicate and target despite later AR/BK/literal changes, without data-memory access or flag changes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BANZ without target refetch or duplicate pointer modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253100; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 2303) { start_pipeline_extended_banz(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253100)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253090;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
