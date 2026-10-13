@@ -2499,9 +2499,24 @@ zero-length loader read. Therefore directory metadata is initially
 populated but already malformed; do not diagnose this as a descriptor
 that was simply never written. The byte-reader/caller ordering and eventual
 overwrite remain to be isolated. In particular, adjacent `ADDM #1,*SP(2)`
-and `LD *SP(2),A` occur between name-byte calls; their dependency is a
-candidate to test, not an established CPU defect or permission to reorder
-all memory accesses. Neither startup nor recording is accepted. Immediate
+and `LD *SP(2),A` occur between name-byte calls. A one-second read-only
+capture confirms the modeled stale dependency at stack address `15de`:
+cycle 192385 reads `0000` for the increment; cycle 192386 reads `0000`
+for the follower before writing `0001`. The next pair similarly reads
+`0001` at cycles 192489/192490 before writing `0002`; the pattern repeats
+at directory offsets `0020`, `0040`, and later entries. Program PC in
+these records is a live pipeline observation, not the owner of every bus
+access. The startup stack differs from the loader's later `3aea` stack:
+original `0e41..0e48` selects `1200`, adds `03ff`, then aligns it.
+This identifies the stale offset in the current model, not physical
+DA150 RAM-bank ownership or a general write-before-read rule.
+[TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf), sections
+7.3/7.4, distinguishes dual-access and single-access arbitration;
+section 7.4 delays a conflicting single-access operand read. The next
+CPU correction needs a focused increment/load dependency test and an
+explicitly bounded arbitration contract rather than changing every Read
+sample or inventing a board memory class. Neither startup nor recording
+is accepted. Immediate
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/restoration coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication, saturation and consumer/replay

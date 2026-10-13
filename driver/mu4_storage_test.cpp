@@ -224,6 +224,7 @@ private:
 	unsigned m_native_bootstrap_paths[10] = {};
 	unsigned m_native_descriptor_reads = 0;
 	unsigned m_native_descriptor_writes = 0;
+	unsigned m_native_directory_offset_events = 0;
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -1481,6 +1482,26 @@ private:
 					++m_native_descriptor_writes;
 					logerror("mu4_original_descriptor_write: address=%04x value=%04x pc=%06x nand_reads=%u\n",
 						unsigned(address), value, unsigned(m_cpu->pc()), m_data_reads);
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0x0000, 0xffff, "mu4_original_directory_offset_reads",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled() || m_native_directory_offset_events >= 32 ||
+						m_cpu->pc() < 0x0ab2 || m_cpu->pc() > 0x0ac3 ||
+						address != u16(m_cpu->state_int(tms320c54x_device::STATE_SP) + 2)) return;
+					++m_native_directory_offset_events;
+					logerror("mu4_original_directory_offset: read address=%04x value=%04x pc=%06x cycle=%llu\n",
+						unsigned(address), value, unsigned(m_cpu->pc()), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0x0000, 0xffff, "mu4_original_directory_offset_writes",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled() || m_native_directory_offset_events >= 32 ||
+						m_cpu->pc() < 0x0ab2 || m_cpu->pc() > 0x0ac3 ||
+						address != u16(m_cpu->state_int(tms320c54x_device::STATE_SP) + 2)) return;
+					++m_native_directory_offset_events;
+					logerror("mu4_original_directory_offset: write address=%04x value=%04x pc=%06x cycle=%llu\n",
+						unsigned(address), value, unsigned(m_cpu->pc()), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
