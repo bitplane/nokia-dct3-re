@@ -2992,8 +2992,34 @@ SPRU172C 4-32 specifies the full 40-bit ones complement of the selected
 source into the selected destination. Its 64 replay cases cover four A/B
 selections, four operand pairs, both SXM states and Decode/Read checkpoints;
 the bitwise oracle checks the result and preserved status every clock.
-The original upload now fails closed at compiler direct MVKD `7001` at
-`00:30b5`. This does not establish native startup completion.
+The original upload passes CMPL without establishing native startup completion.
+
+MVKD now retains its immediate data-source address and separately owned
+Smem destination. Short DP/CPL, plain/postincrement/postdecrement/
+preincrement indirect and absolute destinations are supported. Absolute
+Decode consumes destination then source, not PORTW's source then port.
+Source and destination are RAM or AR0-AR7; other control/peripheral operands,
+long offsets, repeated MVKD and control-delay placement remain unsupported.
+
+Read samples the source once, after Access's encoded pointer modification.
+Thus a literal AR source which also addresses the destination must expose
+the modified AR, not a stale sample. RAM publishes in the complete slot's
+Execute. AR publication belongs to the opcode's Execute (the complete
+two-word slot's Read), satisfying SPRU131G table 7-7's one-gap Category-I
+latency. A first implementation using the RAM publication clock failed the
+CMPR one-gap consumer test and was corrected; this is a CPU conformance
+constraint, not a firmware-timing workaround. Precise bank/bus placement
+remains partial, with no claim of physical silicon measurement.
+
+The 672 replay cases cover seven destination forms, AR1/RAM/same-address/
+AR2 sources, four values, two pages and three checkpoints. They poison
+literal/CPL after Decode, SP/DP after Access and source/pointer after Read,
+while retaining one read and one write. AR consumers with zero and one
+intervening instruction verify the old/new value boundary. Sources which
+alias their pointer and destinations which alias their source are explicit
+fixtures. Original compiler MVKD `7001` at `00:30b5` now runs; the upload
+fails closed on SFTA A,-1,A (`f47f`) at `00:323f`. Native startup, recorder
+acceptance and speech remain unproven; no atomic profile is promoted.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
