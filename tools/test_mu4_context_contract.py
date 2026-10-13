@@ -10,9 +10,30 @@ from tools.mu4_context_contract import TIMER_VECTOR_BASE, TIMER_VECTOR_WITNESS, 
 from tools.mu4_context_contract import IDLE_BASE, IDLE_WITNESS, IDLE_WRAPPER_BASE, IDLE_WRAPPER_WITNESS, decode_idle_contract, idle_route
 from tools.mu4_context_contract import BOOTSTRAP_BASE, BOOTSTRAP_WITNESS, decode_bootstrap_repeat
 from tools.mu4_context_contract import BOOT_MEMORY_SHIFT_BASE, BOOT_MEMORY_SHIFT_WITNESS, decode_boot_memory_shift, decode_extended_shift_load
+from tools.mu4_context_contract import BOOT_BLOCK_REPEAT_BASE, BOOT_BLOCK_REPEAT_WITNESS, decode_boot_block_repeat
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_block_repeat_store_spacing_and_bounds(self):
+        result = decode_boot_block_repeat(dict(enumerate(BOOT_BLOCK_REPEAT_WITNESS, BOOT_BLOCK_REPEAT_BASE)))
+        self.assertEqual(result['store']['operation'], 'STLM B,BRC')
+        self.assertEqual(result['latency_word']['operation'], 'NOP')
+        self.assertEqual(result['setup']['end_literal'], '32f4')
+        self.assertEqual(result['block']['first_word'], '0032f0')
+        self.assertEqual(result['block']['last_word'], '0032f4')
+        self.assertEqual(result['block']['words'], ['1386', 'f678', 'f3e8', 'f1a0', '8196'])
+
+    def test_block_repeat_witness_mutation_and_absence(self):
+        original = dict(enumerate(BOOT_BLOCK_REPEAT_WITNESS, BOOT_BLOCK_REPEAT_BASE))
+        for address in original:
+            words = original.copy()
+            words[address] ^= 1
+            with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                decode_boot_block_repeat(words)
+            del words[address]
+            with self.assertRaises(ValueError):
+                decode_boot_block_repeat(words)
+
     def test_boot_memory_shift_extension_order(self):
         words = dict(enumerate(BOOT_MEMORY_SHIFT_WITNESS, BOOT_MEMORY_SHIFT_BASE))
         result = decode_boot_memory_shift(words)

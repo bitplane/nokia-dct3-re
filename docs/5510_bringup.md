@@ -2472,7 +2472,7 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `STLM B,BRC`, `891a` at `00:32ec`. Immediate
+instruction is `RPTB`, `f072` at `00:32ee`. Immediate
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/restoration coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication, saturation and consumer/replay
@@ -2492,7 +2492,7 @@ is mapped AR6. The preceding
 Read-publication and dependent-multiply coverage.
 The preceding `STL A,-1,*AR1(0003)` at `00:313e`, encoded
 `6fe1 0003 0c9f`, now has shifted-store coverage.
-Debugger context is `00:32ee`, not
+Debugger context is `00:32f0`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2552,8 +2552,13 @@ dependent-instruction ordering and replay coverage. Zero-gap T consumers
 are explicitly outside TI's allowed STLM latency; the model does not claim
 hardware forwarding. Immediate MPY at `00:2eda` has retained literal/T,
 FRCT/OVM, destination/overflow and replay coverage. STLM B,BRC at
-`00:32ec` still needs source/saturation ownership, BRC publication,
-block-repeat consumer latency and restoration coverage;
+`00:32ec` now has 3,072 replay cases covering source/saturation ownership,
+Execute BRC publication and retained LDM reads. The context tool pins
+`891a f495 f072 32f4 1386 f678 f3e8 f1a0 8196`: the NOP before
+RPTB satisfies SPRU131G table 7-3 category 9, and the block spans
+`00:32f0`--`00:32f4`. Zero-gap LDM results are a declared pipeline
+projection, not a silicon forwarding claim. Block-repeat execution,
+endpoint and interrupt semantics remain unaccepted;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

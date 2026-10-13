@@ -7966,9 +7966,17 @@ private:
 		u16 stored, consumed, memory, st0, st1, pmst, result_st0, consumer;
 		u64 value, result;
 		u32 base;
+		bool brc = false;
 	};
 	static stlm_t_fixture stlm_t_case(unsigned variant)
 	{
+		if (variant >= 12288)
+		{
+			auto f = stlm_t_case(9216 + variant - 12288);
+			f.brc = true; f.consumed = f.gap ? f.stored : 0x55aa;
+			f.result = f.consumed; f.consumer = 0x481a | ((!f.source) << 8);
+			return f;
+		}
 		bool const trn = variant >= 9216;
 		unsigned const v = trn ? (variant - 9216) % 1024 : variant % 3072;
 		bool const source = v % 2; unsigned const pattern = (v / 2) % 8, flags = (v / 16) % 16, gap = (v / 256) % 4, kind = trn ? 0 : (v / 1024) % 3;
@@ -7995,22 +8003,23 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = stlm_t_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0x880e | (f.source << 8) | f.trn); program.write_word(f.base + 0x601 + f.gap, f.consumer);
+		program.write_word(f.base + 0x600, (f.brc ? 0x881a : 0x880e | f.trn) | (f.source << 8)); program.write_word(f.base + 0x601 + f.gap, f.consumer);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : 0x1111); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? 0x1111 : 0xdead);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0x55aa);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x5000); m_cpu->space(AS_DATA).write_word(0x5000, f.memory);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_t_consumer",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(at == (f.trn ? 0x0f : 0x5000) && word == (f.trn ? f.consumed : f.memory) && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle, "STLM has no destination read and its consumer samples once in Read"); ++m_pipeline_operand_reads; });
+				expect(at == (f.brc ? 0x1a : f.trn ? 0x0f : 0x5000) && word == (f.trn ? f.consumed : f.memory) && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle, "STLM has no destination read and its consumer samples once in Read"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_t_publication",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(at == 0x0e + f.trn && word == f.stored && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6, "STLM T/TRN publishes its Execute-live saturated source once independent of DP/CPL"); ++m_pipeline_store_writes; });
+				expect(at == (f.brc ? 0x1a : 0x0e + f.trn) && word == f.stored && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6, "STLM publishes its Execute-live saturated source once independent of DP/CPL"); ++m_pipeline_store_writes; });
 		m_phase = 253270; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	struct immediate_multiply_fixture
@@ -33727,22 +33736,24 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			auto const f = stlm_t_case(variant);
+			int const target_state = f.brc ? tms320c54x_device::STATE_BRC : f.trn ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T;
 			u64 const source = tick >= 6 ? f.value : 0x1111, destination = tick > f.read_cycle ? f.result : 0xdead;
-			u16 const target = tick > f.read_cycle ? 0xbeef : tick >= 6 ? f.stored : f.trn ? 0x1357 : 0x9abc;
+			u16 const target = tick > f.read_cycle ? 0xbeef : tick >= 6 ? f.stored : f.brc ? 0x55aa : f.trn ? 0x1357 : 0x9abc;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source ? destination : source) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source ? source : destination) &&
-				m_cpu->state_int(f.trn ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T) == target &&
+				m_cpu->state_int(target_state) == target &&
 				m_cpu->state_int(f.trn ? tms320c54x_device::STATE_T : tms320c54x_device::STATE_TRN) == (f.trn ? 0x9abc : 0x1357) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > f.read_cycle ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
 				"STLM T/TRN publishes in Execute and its consumer retains the earlier Read value without store forwarding");
 			if (tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
+			if (f.brc) expect(m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x1357, "STLM BRC does not alter TRN");
 			if (tick == f.read_cycle)
 			{
 				auto const disable = machine().disable_side_effects();
 				if (!f.trn) m_cpu->space(AS_DATA).write_word(0x5000, 0xdead);
-				m_cpu->set_state_int(f.trn ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T, 0xbeef);
+				m_cpu->set_state_int(target_state, 0xbeef);
 			}
-			unsigned const checkpoint_index = f.trn ? (variant - 9216) / 1024 : variant / 3072;
+			unsigned const checkpoint_index = f.brc ? (variant - 12288) / 1024 : f.trn ? (variant - 9216) / 1024 : variant / 3072;
 			if (tick == std::array<unsigned, 3>{3, 5, f.read_cycle}[checkpoint_index] && !m_pipeline_replay)
 			{
 				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
@@ -33758,8 +33769,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253280; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 12287) { start_pipeline_stlm_t(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				if (variant == 12287) osd_printf_info("TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				if (variant < 15359) { start_pipeline_stlm_t(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged STLM BRC: PASS cases=3072 sources=2 patterns=8 flags=16 gaps=0,1,2,3 restore=3072 register_write=Execute ldm_sample=Read block_repeat_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_immediate_multiply(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

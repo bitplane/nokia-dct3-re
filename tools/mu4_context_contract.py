@@ -58,6 +58,25 @@ BOOTSTRAP_WITNESS = (0x771D, 0xFFC8, 0x7710, 0x0060, 0xF070, 0xFF20,
                      0x7C90, 0x0060, 0x771D, 0xFFE8, 0xF880, 0x0E41)
 BOOT_MEMORY_SHIFT_BASE = 0x3291
 BOOT_MEMORY_SHIFT_WITNESS = (0x6FE6, 0x0010, 0x0D48)
+BOOT_BLOCK_REPEAT_BASE = 0x32EC
+BOOT_BLOCK_REPEAT_WITNESS = (0x891A, 0xF495, 0xF072, 0x32F4,
+                             0x1386, 0xF678, 0xF3E8, 0xF1A0, 0x8196)
+
+
+def decode_boot_block_repeat(words):
+    for offset, expected in enumerate(BOOT_BLOCK_REPEAT_WITNESS):
+        address = BOOT_BLOCK_REPEAT_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'boot block-repeat witness changed or absent at {address:06x}')
+    return {
+        'store': {'address': '0032ec', 'operation': 'STLM B,BRC', 'opcode': '891a'},
+        'latency_word': {'address': '0032ed', 'operation': 'NOP', 'opcode': 'f495'},
+        'setup': {'address': '0032ee', 'operation': 'RPTB', 'opcode': 'f072', 'end_literal': '32f4'},
+        'block': {'first_word': '0032f0', 'last_word': '0032f4',
+                  'words': [f'{word:04x}' for word in BOOT_BLOCK_REPEAT_WITNESS[4:]]},
+        'scope': 'nine pinned original AA55 words; spacing satisfies SPRU131G table 7-3 category 9; '
+                 'no staged block-repeat execution, iterations, interrupt or endpoint acceptance',
+    }
 
 
 def decode_extended_shift_load(words, address):
@@ -348,6 +367,7 @@ def contract(source):
     bootstrap_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa55')
     result['bootstrap_repeat'] = decode_bootstrap_repeat(bootstrap_words)
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
+    result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     return result
 
 

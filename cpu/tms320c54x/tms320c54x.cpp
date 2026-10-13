@@ -266,7 +266,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && u8(word) >= 0x0e && u8(word) <= 0x17;
+	return (word & 0xfe00) == 0x8800 && ((u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x1a);
 }
 
 constexpr bool staged_extended_dst(u16 word)

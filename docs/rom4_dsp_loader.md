@@ -3619,8 +3619,17 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `STLM B,BRC`, `891a` at `00:32ec`;
-debugger context is `00:32ee`, not the retained opcode address.
+unsupported instruction is `RPTB`, `f072` at `00:32ee`;
+debugger context is `00:32f0`, not the retained opcode address.
+STLM B,BRC at `00:32ec` now has 3,072 staged replay cases covering
+Execute publication, saturation, both accumulator sources and retained
+LDM reads. The context tool pins the original nine-word sequence:
+`891a f495 f072 32f4 1386 f678 f3e8 f1a0 8196`.
+Its intervening NOP satisfies SPRU131G table 7-3 category 9's BRC-store
+spacing rule; the requested block spans `00:32f0`--`00:32f4`.
+Loop execution, endpoint handling and block-repeat interrupt behavior
+remain unaccepted. Zero-gap LDM cases test the declared pipeline
+projection, not silicon forwarding or RPTB latency.
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.
