@@ -2474,8 +2474,26 @@ now has retained-predicate and producer/replay coverage. Counter ADDM
 RPTB `f072` at `00:32ee` now executes. The current one-second original
 bootstrap observation constructs `MCUSI16 .BIN` at descriptor `36b0`,
 with length words `36c2=0001`, `36c3=e1e8`, matching the atomic reference.
-The next stop is unsupported staged `f484` at `00:0e35`, after 2,564
-NAND reads. Neither resident transfer nor recording is accepted.
+NEG `f484` at `00:0e35` now executes with one-word Execute-owned
+semantics. The current one-second observation enters loader `3538` with
+index zero after 4,612 NAND reads, correct name/extension and length, then
+reads the first file-backed block count `0010`. The next restriction is
+`SUB *(0008),B`, encoded `09f8 0008` at `00:2f46`: its source is the
+mapped AL register, below the staged arithmetic source whitelist. The
+live stopping PC `002f4a` is not the opcode's address. Neither resident
+transfer nor recording is accepted.
+
+The isolated `tms54test -bios negate` fixture requires 13,824 cases with
+save/replay, all A/B source/destination combinations, 16 patterns including
+32/40-bit extrema, 32 initial status combinations, two pages and 1,536
+immediate-load producer cases. It checks carry only for zero, sticky
+destination overflow, OVM saturation, unrelated accumulator/status
+preservation, one opcode fetch and no data-memory access. The source is
+live in Execute, including after a preceding producer. Arithmetic uses
+the same one-word helper as the atomic interpreter without changing
+frontend mode. Repeated NEG and measured silicon pipeline phases remain
+outside this acceptance scope. The instruction contract is TI SPRU172C
+pages 4-119/4-120.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

@@ -9100,6 +9100,62 @@ private:
 		m_phase = 253390; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	struct negate_fixture
+	{
+		u64 a, b, source, result;
+		u16 opcode, st0, result_st0, st1;
+		u32 base;
+		unsigned prefix;
+	};
+	static negate_fixture negate_case(unsigned variant)
+	{
+		unsigned const v = variant % 4608;
+		bool const producer = v >= 4096;
+		unsigned const p = producer ? v - 4096 : v;
+		unsigned const selectors = producer ? p & 3 : (p >> 4) & 3;
+		unsigned const flags = producer ? (p >> 2) & 31 : (p >> 6) & 31;
+		bool const source_b = BIT(selectors, 1), destination_b = BIT(selectors, 0);
+		static constexpr u64 patterns[] = {0, 1, 0xffffffffffULL, 0xfffffffffeULL,
+			0x007fffffffULL, 0xff80000000ULL, 0xff80000001ULL, 0x0080000000ULL,
+			0x0080000001ULL, 0x8000000000ULL, 0x7fffffffffULL, 0x0100000000ULL,
+			0xff00000000ULL, 0x0123456789ULL, 0xff12345678ULL, 0x000000ffffULL};
+		u64 const initial = patterns[producer ? 3 : p & 15];
+		u64 const source = producer ? (BIT(p, 8) ? 5 : 0) : initial;
+		s64 const signed_source = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
+		s64 const negated = -signed_source;
+		bool const overflow = negated < -0x80000000LL || negated > 0x7fffffffLL;
+		u64 const result = u64(overflow && BIT(flags, 0) ? std::clamp(negated, s64(-0x80000000LL), s64(0x7fffffffLL)) : negated) & 0xffffffffffULL;
+		u16 const st0 = 0x101b | (BIT(flags, 1) ? 0x400 : 0) | (BIT(flags, 2) ? 0x200 : 0) | (BIT(flags, 3) ? 0x800 : 0);
+		u16 const result_st0 = (st0 & ~u16(0x800)) | (!source ? 0x800 : 0) | (overflow ? destination_b ? 0x200 : 0x400 : 0);
+		return {source_b ? 0x123456789aULL : initial, source_b ? initial : 0x2233445566ULL,
+			source, result, u16(0xf484 | (selectors << 8)), st0, result_st0,
+			u16(0x800 | (BIT(flags, 0) ? 0x200 : 0) | (BIT(flags, 4) ? 0x100 : 0)),
+			u32(BIT(p, producer ? 7 : 11) ? 0x20000 : 0), unsigned(producer)};
+	}
+	void start_pipeline_negate(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = negate_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.prefix) program.write_word(f.base + 0x600, (BIT(f.opcode, 9) ? 0xe900 : 0xe800) | u16(f.source));
+		program.write_word(f.base + 0x600 + f.prefix, f.opcode);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_extensions_reads = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600 + f.prefix, f.base + 0x600 + f.prefix, "negate_opcode",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == f.opcode && !m_pipeline_extensions_reads, "NEG owns one opcode fetch without hidden extensions"); ++m_pipeline_extensions_reads; });
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "negate_no_memory_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Register NEG performs no data-memory read"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "negate_no_memory_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Register NEG performs no data-memory write"); });
+		m_phase = 253410; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -9110,6 +9166,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "negate"))
+		{
+			start_pipeline_negate(); return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "rmw-forward"))
 		{
 			start_pipeline_rmw_forward(); return;
@@ -34167,13 +34227,50 @@ private:
 				if (variant < 767) { start_pipeline_rmw_forward(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "rmw-forward")) throw emu_fatalerror(0, "TMS320C54x isolated RMW forwarding complete");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_negate(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253400)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253390; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253410)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = negate_case(variant); unsigned const checkpoint = std::array<unsigned, 3>{3 + f.prefix, 5 + f.prefix, 6 + f.prefix}[variant / 4608];
+			u64 a = f.a, b = f.b;
+			if (f.prefix && tick >= 6) (BIT(f.opcode, 9) ? b : a) = f.source;
+			if (tick >= 6 + f.prefix) (BIT(f.opcode, 8) ? b : a) = f.result;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 + f.prefix ? f.result_st0 : f.st0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "NEG publishes its live Execute source, destination, carry and sticky overflow once");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save NEG before Execute, after producer or after retirement");
+			}
+			if (tick == 12)
+			{
+				expect(m_pipeline_extensions_reads == 1, "NEG replay does not refetch its opcode");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore NEG without duplicate publications or operand fetches");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253420; m_check_timer->enable(true); return;
+				}
+				m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 13823) { start_pipeline_negate(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged NEG: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "negate")) throw emu_fatalerror(0, "TMS320C54x isolated NEG complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253420)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253410; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -35284,6 +35381,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(3, "swap-join", "Consecutive MU4 byte-swap bodies (not block-repeat acceptance)")
 	ROM_SYSTEM_BIOS(4, "rptb", "Staged straight-line RPTB conformance")
 	ROM_SYSTEM_BIOS(5, "rmw-forward", "Staged same-address RMW forwarding")
+	ROM_SYSTEM_BIOS(6, "negate", "Staged accumulator NEG conformance")
 ROM_END
 
 ROM_START(tms54rom4)

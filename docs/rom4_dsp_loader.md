@@ -3624,8 +3624,15 @@ MVDK `71e6` at `00:326b` are now accepted by the staged decoder.
 RPTB `f072` at `00:32ee` now executes.
 Same-address RMW forwarding now lets the unchanged directory builder
 construct `MCUSI16 .BIN` with descriptor length `0001:e1e8`, matching the
-atomic reference. The current one-second observation stops at unsupported
-NEG `f484`, address `00:0e35`, after 2,564 NAND reads. The former malformed
+atomic reference. NEG `f484` at `00:0e35` now has 13,824 staged replay
+cases, covering all source/destination selectors, carry, sticky overflow,
+OVM saturation, 32/40-bit boundary patterns and immediate-load producers
+without data-memory accesses or frontend fallback (SPRU172C 4-119/4-120).
+The current one-second observation enters loader `3538` with descriptor
+zero after 4,612 NAND reads and reads block count `0010`. The next stop is
+the source restriction on `SUB *(0008),B` (`09f8 0008` at `00:2f46`),
+which needs a mapped AL operand. Live PC `002f4a` is not its opcode address.
+Repeated NEG and measured silicon phases remain unvalidated. The former malformed
 names/zero-length loader retry tail is superseded. Board boot, resident
 transfer, music decoding and recording remain unaccepted.
 The scoped bypass uses retained RMW operands, preserves EB/flag timing and
