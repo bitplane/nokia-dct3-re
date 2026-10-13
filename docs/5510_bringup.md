@@ -2472,8 +2472,8 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is LD Smem,16,A `440a` at `00:3521`;
-debugger context is `00:3523`, not
+instruction is MPYU Smem,A `240b` at `00:3523`;
+debugger context is `00:3525`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2508,8 +2508,10 @@ for ordinary and C16 modes. LDU at `00:3114` has retained-operand,
 unsigned-extension, address-ownership and publication/replay coverage.
 Memory MPYA at `00:3520` has retained-source, signed A-high multiplier,
 Read-owned T, Execute-owned B/flags and replay coverage. Memory LD
-shifted by 16 at `00:3521` still needs retained source, shift/extension,
-accumulator/flag publication and replay coverage;
+shifted by 16 at `00:3521` has retained-source, SXM extension,
+accumulator publication and replay coverage. Unsigned memory multiply
+at `00:3523` still needs operand/T ownership, unsigned product,
+FRCT/OVM behavior, accumulator/flag publication and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

@@ -7214,10 +7214,23 @@ private:
 		f.result_st0 = compatibility && reg && form >= 2 && form != 17 ? (f.st0 & 0x1fff) | (reg << 13) : f.st0;
 		return f;
 	}
+	static memory_arithmetic_fixture shifted_memory_load_case(unsigned variant)
+	{
+		auto f = unsigned_load_case(variant);
+		f.opcode = (f.opcode & 0x01ff) | 0x4400;
+		s64 const value = BIT(f.st1, 8) ? s16(f.memory) : f.memory;
+		f.result = u64(value * 0x10000) & 0xffffffffffULL;
+		return f;
+	}
+	static memory_arithmetic_fixture staged_load_case(unsigned variant)
+	{
+		return variant >= 70272 ? shifted_memory_load_case(variant - 70272) :
+			variant >= 12672 ? unsigned_load_case(variant - 12672) : offset_load_case(variant);
+	}
 	void start_pipeline_offset_load(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = variant >= 12672 ? unsigned_load_case(variant - 12672) : offset_load_case(variant);
+		auto const f = staged_load_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -32670,8 +32683,8 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const unsigned_load = variant >= 12672;
-			unsigned const model_variant = unsigned_load ? variant - 12672 : variant;
-			auto const f = unsigned_load ? unsigned_load_case(model_variant) : offset_load_case(variant);
+			unsigned const model_variant = variant >= 70272 ? variant - 70272 : unsigned_load ? variant - 12672 : variant;
+			auto const f = staged_load_case(variant);
 			unsigned const checkpoint_index = unsigned_load ? (model_variant < 55296 ? model_variant / 18432 : (model_variant - 55296) / 768) :
 				(variant < 12288 ? variant / 4096 : (variant - 12288) / 128);
 			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[checkpoint_index];
@@ -32721,8 +32734,9 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant == 12671) osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				if (variant < 70271) { start_pipeline_offset_load(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 70271) osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant < 127871) { start_pipeline_offset_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged memory LD shift16: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_indirect_dld(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

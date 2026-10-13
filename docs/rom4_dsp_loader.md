@@ -3072,6 +3072,20 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Memory LD shifted by 16 (`44xx/45xx`, SPRU172C LD syntax 3) shares
+the retained memory-load address and Read path. Execute sign-extends
+according to SXM, shifts by 16 and masks to 40 bits, without changing
+OVdst, carry or other status flags. Its 57,600 replay cases cover 18 RAM
+address forms, all AR selectors, both accumulators, eight memory values,
+SXM/OVM combinations, compatibility addressing and mapped AR sources.
+Snapshots at Decode, Access and Read check one sample, one address update
+and no data writes; source/literal/pointer changes after their sampling
+boundaries must not alter the result. Mapped accumulator/T/TRN sources
+are permitted but are not covered by that matrix. Control/peripheral
+sources below `0060` outside `0008..0017` remain rejected. The stage
+assignment is a partial frontend model, not measured silicon timing;
+repeat and delayed-control bodies remain restricted separately.
+
 Memory MPYA/MASA/MACA/MACAR (`31xx/33xx/35xx/37xx`) retain one Smem
 sample through Read and use a shared operand-only arithmetic helper at
 Execute. The multiplier uses signed A bits 32--16 as a 17-bit value and
@@ -3419,13 +3433,13 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is LD Smem,16,A, `440a` at `00:3521`, debugger context
-`00:3523`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is MPYU Smem,A, `240b` at `00:3523`, debugger context
+`00:3525`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
 long-word DADD `5304` at `00:30fa`, LDU `12e1` at `00:3114`
-and MPYA `310b` at `00:3520`
+MPYA `310b` at `00:3520` and LD Smem,16,A `440a` at `00:3521`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3513,8 +3527,8 @@ upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
-LDU and memory MPYA now have staged coverage; subsequent memory LD
-shifted by 16 remains incomplete.
+LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
+subsequent unsigned memory multiply remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

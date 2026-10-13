@@ -202,8 +202,9 @@ constexpr bool staged_accumulator_arithmetic(u16 word)
 
 constexpr bool staged_memory_load(u16 word)
 {
-	return (word & 0xfc00) == 0x1000 && u8(word) <= 0xf8 &&
-		(BIT(word, 9) || u8(word) < 0xa0 || u8(word) >= 0xe0);
+	return (((word & 0xfc00) == 0x1000 &&
+		(BIT(word, 9) || u8(word) < 0xa0 || u8(word) >= 0xe0)) ||
+		(word & 0xfe00) == 0x4400) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_absolute_load(u16 word)
@@ -2750,14 +2751,15 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = offset_load ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_immediate[3])) :
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_operand_address[3])) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
-		if (staged_memory_load(m_pipeline_word[3]) && BIT(m_pipeline_word[3], 9) && m_pipeline_operand_address[3] < 0x60 &&
-			(m_pipeline_operand_address[3] < 0x10 || m_pipeline_operand_address[3] > 0x17))
+		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
+		if (staged_memory_load(m_pipeline_word[3]) && (BIT(m_pipeline_word[3], 9) || shifted_load) && m_pipeline_operand_address[3] < 0x60 &&
+			(m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
 		{
-			logerror("%s: staged LDU control/peripheral source is unsupported\n", machine().describe_context());
+			logerror("%s: staged memory load control/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (offset_load && m_pipeline_operand_address[3] < 0x60 &&
-			(m_pipeline_operand_address[3] < 0x10 || m_pipeline_operand_address[3] > 0x17))
+			(m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
 		{
 			logerror("%s: staged long-offset LD control/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -3116,7 +3118,8 @@ void tms320c54x_device::pipeline_step()
 			m_pc += staged_extended_move(m_op) ? 2 : 1; // Retained move already committed at its owned write clock.
 		else if (staged_memory_load(m_op))
 		{
-			accumulator(BIT(m_op, 8)) = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			u64 const value = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
 			if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xfe80) == 0x4800)
