@@ -2467,7 +2467,7 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is long-offset LD `10e1` at `00:30c7`; debugger context is `00:30c9`, not
+instruction is short-indirect DLD `5681` at `00:30d3`; debugger context is `00:30d5`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2486,7 +2486,9 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 Do not reuse the source seed as writable NVRAM. The instruction contract at
 `00:30c6` now has short-indirect DST address/modification, two-write publication
 and replay conformance across all twelve short modes. The next instruction
-at `00:30c7` needs staged long-offset LD source/address and replay conformance;
+at `00:30c7` has long-offset LD source/address and replay conformance.
+Short-indirect DLD at `00:30d3` needs retained paired reads, pointer
+modification, accumulator publication and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

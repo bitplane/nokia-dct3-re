@@ -2984,6 +2984,27 @@ general bank arbitration and circular-region provenance remain unvalidated;
 the first two fail closed. The original upload passes `4ee1` at `00:309b`,
 still without native startup/recorder acceptance or atomic fallback.
 
+Zero-shift long-offset LD A/B (`10xx/11xx`, modes `e0..f7`) retains
+the signed offset in Decode. Access uses the shared ordinary-offset,
+linear-premodify or circular-premodify helper once; Read samples RAM or
+AR0--AR7 once; Execute sign-extends according to SXM and publishes only
+the selected accumulator. The existing absolute `f8` path is unchanged.
+The offset literal adds one clock: Read is clock 6 and Execute clock 7
+in this partial frontend model. These are declared stage placements, not
+measured silicon timings. New offset forms reject other control/peripheral
+sources and control-delay placement before any source read.
+
+The 12288 RAM replay cases cover the three offset forms plus absolute,
+eight encoded registers, both accumulators, eight offsets/patterns,
+SXM/OVM and compatibility mode. Another 384 cases resolve an ordinary
+offset into each mapped AR source under both SXM states and both destinations,
+including a source/address-register alias. Fixtures change the literal after
+Decode, the selected pointer/BK after Access and the source word after Read;
+replays after Decode, Access or Read require one source read, no data writes,
+unchanged non-ARP status and an unchanged unselected accumulator. Arbitrary
+circular-region provenance, operand-bank conflicts, XC/interrupt composition
+and silicon phase fidelity remain unvalidated.
+
 Accumulator AND/OR/XOR register forms now retire in Execute using the
 existing one-word arithmetic semantics. They read no memory, consume no
 extension and change no flags. SPRU172C 4-11/4-123/4-201 specifies a logical
@@ -3218,8 +3239,9 @@ by the capped prefix, and this is not a complete 512-byte page transfer.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is long-offset LD, `10e1` at `00:30c7`, debugger context
-`00:30c9`. Short-indirect DST `4e81` at `00:30c6` now decodes, but
+unsupported instruction is short-indirect DLD, `5681` at `00:30d3`, debugger context
+`00:30d5`. Short-indirect DST `4e81` at `00:30c6` and long-offset
+LD `10e1` at `00:30c7` now decode, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
@@ -3304,8 +3326,8 @@ changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
-The following BITF and short-indirect DST now have staged coverage;
-subsequent long-offset LD remains incomplete. This is bounded transfer
+The following BITF, short-indirect DST and long-offset LD now have staged
+coverage; subsequent short-indirect DLD remains incomplete. This is bounded transfer
 coverage, not startup acceptance.
 
 Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their

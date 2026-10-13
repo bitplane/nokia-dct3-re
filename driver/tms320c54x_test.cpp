@@ -7148,6 +7148,58 @@ private:
 		m_phase = 253030; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static memory_arithmetic_fixture offset_load_case(unsigned variant)
+	{
+		if (variant >= 12288)
+		{
+			unsigned const v = (variant - 12288) % 128, source = v % 8, destination = (v / 8) % 2, pattern = (v / 16) % 4;
+			bool const sxm = (v / 64) % 2;
+			u16 const memory = source == 7 ? 0x5007 : std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern];
+			u16 const st1 = 0x800 | (sxm ? 0x100 : 0);
+			u64 const result = u64(sxm ? s64(s16(memory)) : memory) & 0xffffffffffULL;
+			return {14, 7, 7, 6, u16(0x10e7 | (destination << 8)), u16(0xb009 + source), u16(0x10 + source), 0x5007,
+				memory, 0x1804, st1, 0x1804, 0xdeadbeefULL, result};
+		}
+		unsigned const v = variant % 4096, form = v % 4, reg = (v / 4) % 8, destination = (v / 32) % 2;
+		unsigned const pattern = (v / 64) % 8, flags = (v / 512) % 4, compatibility = (v / 2048) % 2;
+		auto f = memory_arithmetic_case(14 + form + 18 * reg + 144 * destination + 576 * pattern + 4608 * flags + 18432 * compatibility);
+		f.opcode |= 0x1000;
+		f.result = u64(flags & 1 ? s64(s16(f.memory)) : f.memory) & 0xffffffffffULL;
+		f.result_st0 = compatibility && reg && form != 3 ? (f.st0 & 0x1fff) | (reg << 13) : f.st0;
+		return f;
+	}
+	void start_pipeline_offset_load(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = offset_load_case(variant);
+		u32 const base = f.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, f.opcode); program.write_word(base + 0x601, f.literal);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, f.memory);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "offset_load_sample",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
+					"Long-offset LD samples one retained RAM or AR word in Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "offset_load_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Long-offset LD publishes only its accumulator"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "offset_load_literal",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == f.literal && !m_pipeline_extensions_reads, "Long-offset LD fetches its retained offset/address once"); ++m_pipeline_extensions_reads; });
+		m_phase = 253050; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -32209,13 +32261,68 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				if (variant < 95) { start_pipeline_bitfield_ar7(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged mapped BITF branch: PASS cases=96 source=AR7 masks=0001,007f conditions=TC,NTC initial_tc=2 restore=96 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_offset_load(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253040)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253030;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253050)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = offset_load_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, 5, 6}[variant < 12288 ? variant / 4096 : (variant - 12288) / 128];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset LD has staged operand ownership");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
+			}
+			if (tick == 5)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar,
+					"Long-offset LD applies its selected linear/circular pointer modification once in Access");
+				if (variant < 12288 || f.address != 0x17) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			}
+			if (tick == 6)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save long-offset LD during Decode, Access or retained Read");
+			}
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL),
+					"Long-offset LD uses its retained sample and SXM without arithmetic flag changes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore long-offset LD without resampling or duplicate pointer modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253060; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 12671) { start_pipeline_offset_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253060)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253050;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
