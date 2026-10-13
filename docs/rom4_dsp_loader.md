@@ -3088,6 +3088,22 @@ These are partial frontend timings, not measured class-29 silicon timing.
 Long-offset/preincrement/circular BANZD and new pending-IRQ cases are not
 covered by this matrix; unsupported delayed addressing forms stay rejected.
 
+Short-memory immediate ST repeat bodies (`76xx`, modes below `98`) retain
+one opcode and literal. ST is not in SPRU131G table 6-17's accelerated-repeat
+list; its declared stream therefore retains separate address and write clocks
+for each subsequent iteration. The address clock captures EAB and updates the
+selected pointer once, and the write clock publishes the original literal and
+consumes one repeat count. Pending address/phase are saved explicitly. The
+38,400 replay cases cover DP, CPL, stationary AR1, postincrement and
+postdecrement; short/long RPT; counts `0,1,15,32,255`; literals
+`0000/0001/8000/ffff`; SST/SXM/OVM; two program pages and none/IRQ/NMI.
+They require count+1 writes, one opcode/literal fetch after poisoning, no
+destination reads, unchanged accumulators/ST0, correct half-iteration
+pointer/counter ownership, deferred interrupt return and restoration before,
+between or after writes. Long-offset/absolute, preincrement and
+circular/bit-reversed repeated ST forms remain rejected, as do mapped/
+peripheral destinations. Clock placement is partial, not measured silicon.
+
 SUBC (`1exx/1fxx`, [SPRU172C 4-192](https://www.ti.com/lit/ug/spru172c/spru172c.pdf))
 has single-step staged coverage. Access retains the source address, Read
 samples one memory word and Execute performs the conditional division step
@@ -3558,7 +3574,7 @@ at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
 The stop summary counts 3422 reads and thirty-five strobes,
-with AR0=`00ae`, AR1=`3745`, AR2=`0000`. After the first row, two further
+with AR0=`00ae`, AR1=`36b0`, AR2=`0000`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
 The additional 2910 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
@@ -3566,8 +3582,10 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported operation is repeated `ST #lk,*AR1+`, `7691` at `00:08ea`;
-debugger context is `00:08ed`, not the retained opcode address. BANZD,
+unsupported instruction is `STLM A,T`, `880e` at `00:2ed8`;
+debugger context is `00:2eda`, not the retained opcode address. Repeated
+`ST #lk,*AR1+`, `7691` at `00:08ea`, now has retained-literal,
+two-clock stream and pending-IRQ/restoration coverage. BANZD,
 `6e87` at `00:0a50`, now has short-indirect delayed-branch coverage.
 The repeated `SUBC Smem,A`, `1e02`
 behind `RPT #15` (`ec0f` at `00:352e`), now has staged repeat coverage.
@@ -3686,8 +3704,8 @@ DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
 single-step and short-memory repeated SUBC now have coverage;
-short-indirect BANZD now has coverage; the subsequent repeated immediate
-store remains incomplete.
+short-indirect BANZD and short-memory repeated immediate stores now have
+coverage; the subsequent accumulator-to-T MMR store remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

@@ -7820,7 +7820,7 @@ private:
 				expect(word == (operation ? f.extension : o.literal) && m_pipeline_extensions_reads == unsigned(operation && o.form >= 14), "Shifted arithmetic retains ordered address and operation extensions"); ++m_pipeline_extensions_reads; });
 		m_phase = 253210; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	struct repeat_subc_fixture
+	struct memory_repeat_fixture
 	{
 		bool long_form, destination;
 		unsigned count, interrupt, flags, form, pattern;
@@ -7828,8 +7828,17 @@ private:
 		u16 opcode, divisor;
 		u64 dividend;
 	};
-	static repeat_subc_fixture repeat_subc_case(unsigned variant)
+	static memory_repeat_fixture memory_repeat_case(unsigned variant)
 	{
+		if (variant >= 46080)
+		{
+			unsigned const v = (variant - 46080) % 9600, pattern = (v / 10) % 4;
+			bool const long_form = v % 2; unsigned const form = std::array<unsigned, 5>{0, 1, 2, 3, 5}[(v / 1920) % 5];
+			u32 const base = (v / 120) % 2 ? 0x20000 : 0;
+			return {long_form, false, std::array<unsigned, 5>{0, 1, 15, 32, 255}[(v / 2) % 5], (v / 40) % 3, (v / 240) % 8, form, pattern, base,
+				base + (long_form ? 0x602 : 0x601), u16(0x7600 | std::array<u16, 6>{2, 2, 0x91, 0x81, 0x99, 0x89}[form]),
+				std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern], 0};
+		}
 		unsigned const v = variant % 5760;
 		bool const long_form = v % 2, destination = (v / 10) % 2;
 		unsigned const count = std::array<unsigned, 5>{0, 1, 15, 32, 255}[(v / 2) % 5], pattern = (v / 20) % 4;
@@ -7843,7 +7852,7 @@ private:
 			std::array<u16, 4>{7, 1, 0x1234, 0xffff}[pattern],
 			std::array<u64, 4>{0x41, 0x7fff, 0x12345678, 0x1fffffff}[pattern]};
 	}
-	static std::array<u64, 2> repeat_subc_result(repeat_subc_fixture const &f, unsigned iterations)
+	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations)
 	{
 		u64 accumulator = f.dividend; u16 flags = 0x1804;
 		for (unsigned i = 0; i < iterations; ++i)
@@ -7858,18 +7867,22 @@ private:
 		}
 		return {accumulator, flags};
 	}
-	void start_pipeline_repeat_subc(unsigned variant = 0)
+	void start_pipeline_memory_repeat(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = repeat_subc_case(variant); unsigned const last = (f.long_form ? 8 : 7) + f.count;
+		auto const f = memory_repeat_case(variant); unsigned const last = (f.long_form ? 8 : 7) + f.count;
+		bool const store = variant >= 46080;
+		unsigned const final_write = (f.long_form ? 9 : 8) + 2 * f.count;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.long_form ? 0xf070 : 0xec00 | f.count);
 		if (f.long_form) program.write_word(f.base + 0x601, f.count);
-		program.write_word(f.body, f.opcode); program.write_word(f.body + 2, 0xf4e1);
+		program.write_word(f.body, f.opcode);
+		if (store) program.write_word(f.body + 1, f.divisor);
+		program.write_word(f.body + (store ? 3 : 2), 0xf4e1);
 		if (f.interrupt) { u32 const vector = f.base + (f.interrupt == 2 ? 4 : 0x40); program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, store && (f.flags & 4) ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (f.interrupt == 1 ? 0 : 0x800) | (f.flags & 1 ? 0x100 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.form == 1 ? 0x4000 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, f.form == 4 ? 0x1ff : f.form == 5 ? 0x400 : 0x200);
@@ -7878,17 +7891,27 @@ private:
 		for (unsigned at = 0x100; at <= 0x400; ++at) m_cpu->space(AS_DATA).write_word(at, f.divisor);
 		m_cpu->space(AS_DATA).write_word(0x1002, f.divisor);
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_vector_acks = m_pipeline_store_case = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x100, 0x1002, "repeat_subc_reads",
-			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				if (at >= 0xffe && at <= 0xfff && f.interrupt) { expect(m_cpu->pipeline_cycles() > (f.long_form ? 8U : 7U) + f.count, "Interrupt stack reads follow the final quotient step"); return; }
+			[this, f, store, final_write](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (at >= 0xffe && at <= 0xfff && f.interrupt) { expect(m_cpu->pipeline_cycles() > (store ? final_write : (f.long_form ? 8U : 7U) + f.count), "Interrupt stack reads follow the final repeated operation"); return; }
+				if (store) { expect(false, "Repeated immediate stores do not read their destination"); return; }
 				u16 const address = f.form == 0 ? 0x202 : f.form == 1 ? 0x1002 : f.form == 5 ? 0x400 - m_pipeline_operand_reads : f.form == 2 || f.form == 4 ? 0x200 + m_pipeline_operand_reads : 0x200;
 				unsigned const first = f.long_form ? 8 : 7;
 				expect(at == address && word == f.divisor && m_pipeline_operand_reads <= f.count && m_cpu->pipeline_cycles() == (!m_pipeline_operand_reads ? first - 1 : first + m_pipeline_operand_reads), "Repeated SUBC reads each divisor through the iteration-owned address"); ++m_pipeline_operand_reads; });
 		m_vector_prefetch_tap = program.install_read_tap(f.body, f.body, "repeat_subc_body",
 			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.opcode && !m_pipeline_extensions_reads, "Repeated SUBC fetches its opcode once"); ++m_pipeline_extensions_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_subc_stack_only",
-			[this, f, last](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(f.interrupt && m_cpu->pipeline_cycles() > last && at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2, "SUBC never writes data; deferred interrupt owns its stack writes"); ++m_pipeline_store_writes; });
+			[this, f, last, store, final_write](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (store && !(at >= 0xffe && at <= 0xfff))
+				{
+					u16 const address = f.form == 0 ? 0x202 : f.form == 1 ? 0x1002 : f.form == 5 ? 0x400 - m_pipeline_operand_reads : f.form == 2 ? 0x200 + m_pipeline_operand_reads : 0x200;
+					expect(at == address && word == f.divisor && m_pipeline_operand_reads <= f.count && m_cpu->pipeline_cycles() == (f.long_form ? 9U : 8U) + 2 * m_pipeline_operand_reads, "Repeated ST writes the retained literal once at each two-clock destination"); ++m_pipeline_operand_reads; return;
+				}
+				expect(f.interrupt && m_cpu->pipeline_cycles() > (store ? final_write : last) && at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2, "Deferred interrupt owns only post-repeat stack writes"); ++m_pipeline_store_writes; });
+		if (store)
+			m_pipeline_fetch_tap = program.install_read_tap(f.body + 1, f.body + 1, "repeat_store_literal",
+				[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.divisor && !m_pipeline_store_case, "Repeated immediate store retains its literal once"); ++m_pipeline_store_case; });
 		m_phase = 253230; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	struct banzd_fixture
@@ -33447,7 +33470,7 @@ private:
 				if (variant == 245759) osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant < 276479) { start_pipeline_shifted_arithmetic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=18432 mapped_ar_cases=12288 value_pairs=64 sxm_ovm=4 accumulators=2 restore=30720 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				start_pipeline_repeat_subc(); return;
+				start_pipeline_memory_repeat(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -33458,7 +33481,45 @@ private:
 		if (m_phase == 253230)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = repeat_subc_case(variant); unsigned const first = f.long_form ? 8 : 7, last = first + f.count;
+			auto const f = memory_repeat_case(variant); unsigned const first = f.long_form ? 8 : 7, last = first + f.count;
+			if (variant >= 46080)
+			{
+				unsigned const first_write = first + 1, last_write = first_write + 2 * f.count;
+				unsigned const writes = tick < first_write ? 0 : std::min((tick - first_write) / 2 + 1, f.count + 1);
+				unsigned const addresses = tick < first_write - 1 ? 0 : std::min((tick - first_write + 1) / 2 + 1, f.count + 1);
+				unsigned const remaining = tick < first_write - 2 ? 0 : f.count - (writes ? writes - 1 : 0);
+				u16 const ar = f.form == 2 ? 0x200 + addresses : f.form == 5 ? 0x400 - addresses : 0x200;
+				expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_RC) == remaining && m_pipeline_operand_reads == writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == ar && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804,
+					"Repeated ST separates address/pointer ownership from the following literal-write/count clock");
+				if (f.interrupt && tick == 2) { int const line = f.interrupt == 2 ? INPUT_LINE_NMI : 0; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+				if (tick < last_write) expect(!m_vector_acks && !m_pipeline_store_writes, "Repeated store defers IRQ/NMI until its final write");
+				if (tick == (f.long_form ? 4 : 3)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body, 0xe811); }
+				if (tick == (f.long_form ? 6 : 5)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body + 1, 0xdead); }
+				unsigned const checkpoint = std::array<unsigned, 4>{3, first_write - 1, first_write + f.count, last_write}[(variant - 46080) / 9600];
+				if (tick == checkpoint && !m_pipeline_replay)
+				{
+					m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes, m_vector_acks, m_pipeline_store_case};
+					m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated store before/after address or data publication");
+				}
+				if (tick == last_write + 30)
+				{
+					expect(m_pipeline_operand_reads == f.count + 1 && m_pipeline_extensions_reads == 1 && m_pipeline_store_case == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_vector_acks == unsigned(bool(f.interrupt)) && m_pipeline_store_writes == (f.interrupt ? 2 : 0) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == ((f.flags & 4) ? 1 : 0),
+						"Repeated ST finishes count+1 two-clock writes with one retained opcode/literal and deferred interrupt return");
+					if (!m_pipeline_replay)
+					{
+						m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3]; m_pipeline_store_case = m_recurring_irq_snapshot[4];
+						m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained literal/pending address/count without duplicate store or pointer update");
+						m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253240; m_check_timer->enable(true); return;
+					}
+					m_pipeline_operand_tap.remove(); m_vector_prefetch_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+					if (variant < 84479) { start_pipeline_memory_repeat(variant + 1); return; }
+					m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+					osd_printf_info("TMS320C54x staged repeat immediate ST: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 values=4 sst_sxm_ovm=8 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 literal_fetches=1 body_fetches=1 destination_reads=0 cycles_each=2 silicon_phase_claim=0\n");
+					start_pipeline_banzd(); return;
+				}
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
 			unsigned const completed = tick < first ? 0 : std::min(tick - first + 1, f.count + 1);
 			auto const expected = repeat_subc_result(f, completed);
 			unsigned const remaining = tick < first - 1 ? 0 : tick <= first ? f.count : tick <= last ? last - tick : 0;
@@ -33489,10 +33550,10 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253240; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_vector_prefetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 46079) { start_pipeline_repeat_subc(variant + 1); return; }
+				if (variant < 46079) { start_pipeline_memory_repeat(variant + 1); return; }
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				osd_printf_info("TMS320C54x staged repeat SUBC: PASS cases=46080 forms=6 rpt=short,long counts=0,1,15,32,255 sources=none,IRQ,NMI pages=2 restore=46080 count_plus_one=1 divisor_reads_each_iteration=1 duplicate_body_fetches=0 silicon_phase_claim=0\n");
-				start_pipeline_banzd(); return;
+				start_pipeline_memory_repeat(46080); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -34072,9 +34133,11 @@ void tms320c54x_test_state::test(machine_config &config)
 		}
 		if (m_phase == 253230)
 		{
-			auto const f = repeat_subc_case(m_pipeline_peripheral_case);
-			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > (f.long_form ? 8U : 7U) + f.count && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + 1) && !m_vector_acks, "SUBC repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
+			auto const f = memory_repeat_case(m_pipeline_peripheral_case);
+			bool const store = m_pipeline_peripheral_case >= 46080;
+			unsigned const last = store ? (f.long_form ? 9 : 8) + 2 * f.count : (f.long_form ? 8 : 7) + f.count;
+			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > last && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + (store ? 2 : 1)) && !m_vector_acks, "Memory repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
 		}
 		if (m_phase == 252750)
 		{
