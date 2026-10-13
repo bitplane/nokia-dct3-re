@@ -8053,6 +8053,31 @@ private:
 				expect(at == 0x5000 && word == u16((source << 8) | (source >> 8)) && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 10, "Original byte-swap body writes one transformed word in Execute"); ++m_pipeline_store_writes; });
 		m_phase = 253310; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_swap_join(unsigned variant = 0)
+	{
+		start_pipeline_swap_body(variant % 512);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		u32 const base = variant & 256 ? 0x20000 : 0;
+		u16 const first = swap_body_source(variant), second = first ^ 0x5a3c;
+		static constexpr u16 words[] = {0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196};
+		for (unsigned i = 0; i < 10; ++i) m_cpu->space(AS_PROGRAM).write_word(base + 0x600 + i, words[i % 5]);
+		m_cpu->space(AS_PROGRAM).write_word(base + 0x60a, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x5001, second);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "original_swap_join_read",
+			[this, first, second](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const index = m_pipeline_operand_reads;
+				if (index >= 2 || at != 0x5000 + index || word != (index ? second : first))
+					osd_printf_info("Swap join read mismatch: index=%u address=%04x word=%04x cycle=%llu\n", index, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles());
+				expect(index < 2 && at == 0x5000 + index && word == (index ? second : first) && m_cpu->pipeline_cycles() == 5 + index * 5,
+					"Consecutive original bodies read successive words without an artificial loop gap"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "original_swap_join_write",
+			[this, first, second](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const index = m_pipeline_store_writes; u16 const source = index ? second : first;
+				expect(index < 2 && at == 0x5000 + index && word == u16((source << 8) | (source >> 8)) && m_cpu->pipeline_cycles() == 10 + index * 5,
+					"Consecutive original bodies write successive byte-swapped words once"); ++m_pipeline_store_writes; });
+		m_phase = 253330; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	struct immediate_multiply_fixture
 	{
 		bool producer, source, destination;
@@ -8988,6 +9013,12 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") &&
+				!strcmp(machine().options().bios(), "swap-join"))
+		{
+			start_pipeline_swap_join();
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") &&
 				!strcmp(machine().options().bios(), "swap-body"))
 		{
@@ -33858,13 +33889,54 @@ private:
 				osd_printf_info("TMS320C54x staged original swap body: PASS cases=1536 patterns=16 flags=16 pages=2 restore=1536 read=Read write=Execute ar6_update=Read duplicate_reads=0 duplicate_writes=0 block_repeat_claim=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "swap-body"))
 					throw emu_fatalerror(0, "TMS320C54x isolated swap body complete");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_swap_join(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253320)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253310; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253330)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			if (tick == 5 || tick == 10)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(tick == 5 ? 0x5000 : 0x5001, 0xdead);
+			}
+			if (tick == std::array<unsigned, 3>{3, 9, 10}[variant / 512] && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original body join before Read, after postincrement or after overlapping read/write");
+			}
+			if (tick == 24)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					u16 const first = swap_body_source(variant), second = first ^ 0x5a3c;
+					expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+						m_pipeline_operand_reads == 2 && m_pipeline_store_writes == 2 && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x5002 &&
+						m_cpu->space(AS_DATA).read_word(0x5000) == u16((first << 8) | (first >> 8)) &&
+						m_cpu->space(AS_DATA).read_word(0x5001) == u16((second << 8) | (second >> 8)), "Two original bodies preserve adjacent source words through save-state replay");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore consecutive bodies without repeating address updates or bus transactions");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253340; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_pipeline_swap_join(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original swap join: PASS cases=1536 patterns=16 flags=16 pages=2 restore=1536 bodies=2 gap_words=0 reads=2 writes=2 ar6_updates=2 block_repeat_claim=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "swap-join")) throw emu_fatalerror(0, "TMS320C54x isolated swap join complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253340)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253330; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -34972,6 +35044,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(0, "core", "Core conformance tests")
 	ROM_SYSTEM_BIOS(1, "timer", "Timer interrupt boundary observation (not fidelity acceptance)")
 	ROM_SYSTEM_BIOS(2, "swap-body", "Original MU4 byte-swap body (not block-repeat acceptance)")
+	ROM_SYSTEM_BIOS(3, "swap-join", "Consecutive MU4 byte-swap bodies (not block-repeat acceptance)")
 ROM_END
 
 ROM_START(tms54rom4)

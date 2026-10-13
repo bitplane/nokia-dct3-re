@@ -2563,8 +2563,9 @@ passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
 The original five-word byte-swap body now has isolated staged execution
-and 1,536 save-state replay cases. This excludes RPTB and back-to-back
-iteration joins; the exact coverage and reproduction command live in
+and 1,536 save-state replay cases, plus another 1,536 cases for two
+consecutive zero-gap bodies. This excludes RPTB control flow;
+the exact coverage and reproduction command live in
 [the native loader contract](rom4_dsp_loader.md).
 
 The context tool also pins the 12-word AA55 reset sequence at

@@ -3664,10 +3664,18 @@ and before the store. One read, one write and one AR6 increment survive
 each replay. Store address/AR6 publication is in the current frontend's
 Read phase, and the write is in Execute; this remains a model phase,
 not recovered silicon timing. The full core runner requires this marker.
-Acceptance covers one body execution only: a back-to-back body join must
-also preserve the preceding STL postincrement before the next LDU
-captures its address. RPTB iteration control cannot supply an artificial
-gap to conceal that data-path obligation.
+
+The zero-gap join fixture (`tms54test -bios swap-join`) executes two
+consecutive copies in another 1,536 replay cases. It reads successive
+words at clocks 5/10, writes their byte-swapped results at clocks 10/15,
+and advances AR6 twice. Both sources are poisoned after their respective
+Read samples. Save points cover pre-Read, the first postincrement, and
+the overlapping first write/second read. The older STL's implicit DAGEN
+update must precede the younger LDU's same-clock Access: resolving them
+in the opposite order rereads the first address. Store data publication
+still belongs to Execute; explicit MMR-store forwarding is unchanged.
+These checks prove the straight-line iteration join without inserting a
+gap, not RPTB count, endpoint, interrupt or control-flow behavior.
 
 Reproduce the isolated fixture in a disk-backed working directory:
 
@@ -3679,6 +3687,10 @@ Reproduce the isolated fixture in a disk-backed working directory:
 Require the single `staged original swap body: PASS cases=1536` marker and
 terminal `Fatal error: TMS320C54x isolated swap body complete` (exit 3).
 Another exit-3 exception is failure, not completion.
+
+For the join, use `-bios swap-join` and require its single
+`staged original swap join: PASS cases=1536` marker and terminal
+`Fatal error: TMS320C54x isolated swap join complete` (exit 3).
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/replay coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication and consumer/replay coverage.

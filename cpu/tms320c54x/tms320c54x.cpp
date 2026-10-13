@@ -2670,6 +2670,30 @@ void tms320c54x_device::pipeline_step()
 		u16 const status = m_pipeline_direct_status[stage];
 		return BIT(status, 14) ? u16(m_pipeline_direct_sp[stage] + mode) : u16((status & 0x1ff) << 7) | mode;
 	};
+	// Resolve an older store's implicit DAGEN update before a younger
+	// memory Access consumes the same AR. The data write remains in Execute.
+	// This is address ordering, not forwarding an explicit MMR store.
+	if (m_pipeline_valid[4] && staged_store(m_pipeline_word[4]))
+	{
+		u8 const mode = m_pipeline_word[4];
+		if (staged_extended_accumulator_store(m_pipeline_word[4]))
+		{
+			m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] :
+				long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_immediate[4]));
+			if (m_pipeline_operand_address[4] < 0x60)
+			{
+				logerror("%s: staged long-offset accumulator store register/peripheral destination is unsupported\n", machine().describe_context());
+				m_illegal = true; return;
+			}
+		}
+		else m_pipeline_operand_address[4] = basic_address(4, mode);
+		if ((m_pipeline_word[4] & 0xfe00) == 0x8c00 && m_pipeline_operand_address[4] < 0x60)
+		{
+			logerror("%s: staged T/TRN store register/peripheral destination is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (BIT(mode, 7) && !staged_extended_accumulator_store(m_pipeline_word[4])) indirect_modify(mode);
+	}
 	if (m_pipeline_valid[3] && staged_accumulator_mmr_store(m_pipeline_word[3]))
 		m_pipeline_operand_address[3] = u8(m_pipeline_word[3]);
 	if (m_pipeline_valid[3] && (staged_data_copy(m_pipeline_word[3]) || staged_long_arithmetic(m_pipeline_word[3])))
@@ -3021,27 +3045,6 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode);
-	}
-	if (m_pipeline_valid[4] && staged_store(m_pipeline_word[4]))
-	{
-		u8 const mode = m_pipeline_word[4];
-		if (staged_extended_accumulator_store(m_pipeline_word[4]))
-		{
-			m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] :
-				long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_immediate[4]));
-			if (m_pipeline_operand_address[4] < 0x60)
-			{
-				logerror("%s: staged long-offset accumulator store register/peripheral destination is unsupported\n", machine().describe_context());
-				m_illegal = true; return;
-			}
-		}
-		else m_pipeline_operand_address[4] = basic_address(4, mode);
-		if ((m_pipeline_word[4] & 0xfe00) == 0x8c00 && m_pipeline_operand_address[4] < 0x60)
-		{
-			logerror("%s: staged T/TRN store register/peripheral destination is unsupported\n", machine().describe_context());
-			m_illegal = true; return;
-		}
-		if (BIT(mode, 7) && !staged_extended_accumulator_store(m_pipeline_word[4])) indirect_modify(mode);
 	}
 	if (m_pipeline_valid[4] && m_pipeline_word[4] == 0x47f8)
 	{
