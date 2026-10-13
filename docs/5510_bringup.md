@@ -2507,9 +2507,17 @@ both cluster fields at 3. The initial cluster comparison reads 3 and 3
 in both engines. The staged next-cluster helper `343a` subsequently
 returns `0fff`, whereas atomic returns 4. Earlier fetch snapshots in
 offset helper `345c`, at `3482`, already differ (atomic A=2, staged A=0).
-Fetch snapshots are not retired-instruction operand evidence: localize
-the offset computation's reads/writes before attributing a CPU defect.
-Investigate this FAT lookup divergence before prioritizing later resident
+An actual mapped-AL read tap now isolates the difference: `MPY #3,A`
+(`f066 0003`, `3479..347a`) is immediately followed by `LDM AL,A`
+(`4808`, `347b`) and `SFTA A,-2,A` (`f47e`, `347c`). Atomic reads AL=9;
+staged reads AL=3, the pre-multiply value, giving offset 0 instead of 2.
+SPRU131G table 7-28 explicitly assigns zero required gap to a two-word
+direct accumulator producer followed by a mapped accumulator consumer.
+The staged Read-before-Execute ordering violates that composition. The
+correction must retain operand/save-state ownership and the documented
+one-word producer latency; globally moving all reads after Execute is not
+justified. No CPU behavior has yet been changed for this witness.
+Investigate this mapped-operand ordering before prioritizing later resident
 opcodes; neither staged transfer, full boot nor recording is accepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining

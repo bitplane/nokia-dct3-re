@@ -1595,7 +1595,7 @@ private:
 						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128 || m_cpu->pc() != address + 1) return;
 						switch (address)
 						{
-						case 0x343a: case 0x344e: case 0x3458: case 0x3482: case 0x348c:
+						case 0x343a: case 0x344e: case 0x3458: case 0x347b: case 0x347c: case 0x347d: case 0x3482: case 0x348c:
 						case 0x34a2: case 0x34c6: case 0x34dc: case 0x34e1: case 0x34ea: case 0x34f4: case 0x3512:
 							break;
 						default: return;
@@ -1606,6 +1606,14 @@ private:
 							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)) & 0xffffffffffULL,
 							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
+					});
+				m_cpu->space(AS_DATA).install_read_tap(0x0008, 0x0008, "mu4_file_boundary_fat_al",
+					[this](offs_t, u16 &value, u16) {
+						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128 ||
+							m_cpu->pc() < 0x3478 || m_cpu->pc() > 0x3482) return;
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_fat_al_read: value=%04x context_pc=%06x cycle=%llu\n", value,
+							unsigned(m_cpu->pc()), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
 					});
 			}
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x3acf2, 0x3acf2, "mu4_original_bootstrap_dispatch",

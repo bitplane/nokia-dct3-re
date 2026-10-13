@@ -3654,9 +3654,15 @@ staged resets the cursor without advancing either field. Their initial
 cluster comparison reads equal values, but next-cluster helper `343a`
 returns `0fff` staged versus 4 atomic. Offset helper `345c` has an earlier
 fetch-snapshot discrepancy at `3482` (A=0 staged versus 2 atomic).
-Snapshots do not establish retired operand values. The next question is
-the offset calculation's actual read/write composition, not a fabricated
-next-cluster response or support for later resident opcodes. Resident
+Snapshots do not establish retired operand values. A subsequent actual
+mapped read observation establishes AL=3 staged versus AL=9 atomic at
+`LDM AL,A` (`347b`), immediately following two-word `MPY #3,A`
+(`3479..347a`). `SFTA A,-2,A` then gives offset 0 instead of 2.
+SPRU131G table 7-28 requires no gap for this two-word producer/consumer
+composition, unlike a one-word producer with a short mapped consumer.
+The remaining correction is staged mapped-operand ordering, preserving
+the one-word restriction and retained replay semantics; no filesystem
+response or cluster state should be synthesized. Resident
 entry and the mask-write stop remain insufficient proof of complete load.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
