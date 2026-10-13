@@ -222,6 +222,7 @@ private:
 	unsigned m_native_reset_settings_mask = 0;
 	unsigned m_native_bootstrap_entries = 0, m_native_bootstrap_resident_entries = 0;
 	unsigned m_native_bootstrap_paths[10] = {};
+	unsigned m_native_descriptor_reads = 0;
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -1449,6 +1450,7 @@ private:
 							auto const disable = machine().disable_side_effects();
 							auto &data = m_cpu->space(AS_DATA);
 							unsigned const index = u16(m_cpu->state_int(tms320c54x_device::STATE_A));
+							// Fetch-time A is a snapshot, not the loader's consumed argument.
 							// Original aa55 loader 2eda multiplies the index by 44 decimal.
 							unsigned const descriptor = 0x36b0 + index * 0x2c;
 							logerror("mu4_original_bootstrap_loader: name=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x ext=%04x,%04x,%04x length=%04x,%04x vector=%04x,%04x index=%u\n",
@@ -1458,6 +1460,18 @@ private:
 								m_cpu->space(AS_PROGRAM).read_word(0x2000), m_cpu->space(AS_PROGRAM).read_word(0x2001), index);
 						}
 					}
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0x36b0, 0x4cdf, "mu4_original_descriptor_reads",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled() || m_native_descriptor_reads >= 32 ||
+						m_cpu->pc() < 0x2ed4 || m_cpu->pc() > 0x2fa8) return;
+					// Record real data-bus reads, not fields inferred from a prefetched PC.
+					++m_native_descriptor_reads;
+					logerror("mu4_original_descriptor_read: address=%04x value=%04x pc=%06x ar1=%04x t=%04x\n",
+						unsigned(address), value, unsigned(m_cpu->pc()),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_T)));
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });

@@ -2474,8 +2474,17 @@ now has retained-predicate and producer/replay coverage. Counter ADDM
 RPTB `f072` at `00:32ee` now executes. The 20-second diagnostic tail
 reports bootstrap entry_count=1, resident_count=0, PC=`00:307e`,
 ST1=`6900`, IMR=`0000`, IFR=`0008`, flag `374d`=`0000`, and
-37,019,530 NAND reads. Loader filename/descriptor fields remain zero at
-index 128; recorder dispatch/loader/response and native storage writes
+37,019,530 NAND reads. A bounded data-bus observer independently establishes
+the first loader's descriptor-zero length reads: `36c2=0000` and
+`36c3=0000`, with AR1=`36b0`, T=`0000`, observed PC=`002ee6`.
+Later invocations read `4cc2=0000` and `4cc3=0000`, with AR1=`4cb0`,
+T=`0080`: descriptor 128 is also consumed, but it is not the first failure.
+These are actual data reads; the older program-Fetch tap's A snapshot alone
+cannot establish an instruction's consumed argument or retirement.
+The observer is read-only, limited to 32 reads in the loader's program
+neighborhood, and also records unrelated stack reads in that interval;
+those must not be interpreted as descriptor fields.
+Recorder dispatch/loader/response and native storage writes
 remain zero. The terminal failure is `MU4 original recorder command did
 not reach the native overlay loader`, not an unsupported opcode.
 The uncaptured 37,019,018 reads and the resulting firmware buffer are
