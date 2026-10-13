@@ -3090,7 +3090,24 @@ or guarded fixture values test the declared model, not validated division use.
 Changed RAM/pointers and Execute-live accumulator inputs distinguish operand
 ownership; Decode/Access/Read snapshots check one read and no data writes.
 Other addressing forms and mapped accumulator/T/TRN inputs remain outside
-this matrix. Control-delay and repeated SUBC bodies remain rejected.
+this matrix. Control-delay SUBC remains rejected.
+
+Short-memory SUBC repeat bodies now use the retained repeat stream after
+the first staged iteration. Each subsequent clock reads the current divisor,
+updates the selected pointer once, applies the shared conditional-subtract
+helper and consumes one repeat count. The opcode is fetched once; DP/CPL
+context is retained, and interrupts remain pending until count+1 executions
+complete. The 46,080 replay cases cover DP, CPL, stationary AR1,
+postincrement, preincrement and postdecrement; short/long RPT; counts
+`0,1,15,32,255`; both accumulators; four dividend/divisor pairs; SXM/OVM;
+two program pages and none/IRQ/NMI inputs. Decode/first/middle/final
+snapshots check arithmetic at every iteration, one divisor read per iteration,
+no opcode refetch after poisoning, correct pointer footprint, deferred IRQ
+return address and only interrupt-owned stack writes. TI's independent
+65/7 example must produce `00020009` after sixteen iterations. Long-offset,
+circular/bit-reversed and mapped/peripheral repeated sources remain rejected.
+These checks establish the declared repeat model, not silicon timing or the
+unresolved SUBC overflow-edge behavior.
 
 Variable-shift memory ADD/SUB (`6fxx` with operation-extension masks
 `0c00/0c20`, SPRU172C extended Smem arithmetic) retains ordered address
@@ -3524,19 +3541,20 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 1572 reads and twenty strobes,
-with AR0=`0011`, AR1=`3aea`, AR2=`0010`. After the first row, two further
+The stop summary counts 2398 reads and twenty-five strobes,
+with AR0=`00ae`, AR1=`36b0`, AR2=`0000`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 1060 bytes are outside the bounded capture and remain
+The additional 1886 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported operation is repeated `SUBC Smem,A`, `1e02` at `00:352f`,
-behind `RPT #15` (`ec0f` at `00:352e`); debugger context is `00:3531`.
-Single-step SUBC now has staged coverage, but the repeat-body rejection
-occurs before Execute: this run does not prove any quotient iteration.
+unsupported instruction is BANZD, `6e87` at `00:0a50`;
+debugger context is `00:0a52`. The repeated `SUBC Smem,A`, `1e02`
+behind `RPT #15` (`ec0f` at `00:352e`), now has staged repeat coverage.
+The observed runtime reaches a different program range, but this does not
+identify or validate the complete loaded firmware buffer or startup.
 `ADD *(0016),0,A,B` at `00:319c`, encoded
 `6ff8 0016 0d00`, now has staged coverage. Address `0016` is
 mapped AR6, not RAM. The preceding `LD *AR1(0004),T` at `00:3194`, encoded
@@ -3649,7 +3667,8 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-single-step SUBC now has coverage; repeated SUBC remains incomplete.
+single-step and short-memory repeated SUBC now have coverage;
+the subsequent delayed pointer-count branch remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

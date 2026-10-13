@@ -7820,6 +7820,77 @@ private:
 				expect(word == (operation ? f.extension : o.literal) && m_pipeline_extensions_reads == unsigned(operation && o.form >= 14), "Shifted arithmetic retains ordered address and operation extensions"); ++m_pipeline_extensions_reads; });
 		m_phase = 253210; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeat_subc_fixture
+	{
+		bool long_form, destination;
+		unsigned count, interrupt, flags, form, pattern;
+		u32 base, body;
+		u16 opcode, divisor;
+		u64 dividend;
+	};
+	static repeat_subc_fixture repeat_subc_case(unsigned variant)
+	{
+		unsigned const v = variant % 5760;
+		bool const long_form = v % 2, destination = (v / 10) % 2;
+		unsigned const count = std::array<unsigned, 5>{0, 1, 15, 32, 255}[(v / 2) % 5], pattern = (v / 20) % 4;
+		unsigned const interrupt = (v / 80) % 3, flags = (v / 480) % 4, form = (v / 1920) % 3;
+		// A second variant bank adds stationary/preincrement/postdecrement.
+		unsigned const mode_form = form + (variant % 11520 >= 5760 ? 3 : 0);
+		u32 const base = (v / 240) % 2 ? 0x20000 : 0;
+		u16 const mode = std::array<u16, 6>{2, 2, 0x91, 0x81, 0x99, 0x89}[mode_form];
+		return {long_form, destination, count, interrupt, flags, mode_form, pattern, base,
+			base + (long_form ? 0x602 : 0x601), u16(0x1e00 | (destination << 8) | mode),
+			std::array<u16, 4>{7, 1, 0x1234, 0xffff}[pattern],
+			std::array<u64, 4>{0x41, 0x7fff, 0x12345678, 0x1fffffff}[pattern]};
+	}
+	static std::array<u64, 2> repeat_subc_result(repeat_subc_fixture const &f, unsigned iterations)
+	{
+		u64 accumulator = f.dividend; u16 flags = 0x1804;
+		for (unsigned i = 0; i < iterations; ++i)
+		{
+			s64 const dividend = BIT(accumulator, 39) ? s64(accumulator) - (s64(1) << 40) : s64(accumulator);
+			s64 const divisor = f.flags & 1 ? s16(f.divisor) : s64(f.divisor);
+			s64 const difference = dividend - divisor * 32768;
+			bool const subtract = difference >= 0;
+			flags = (flags & ~0x800) | (subtract ? 0x800 : 0);
+			if (difference < -2147483648LL || difference > 2147483647LL) flags |= f.destination ? 0x200 : 0x400;
+			accumulator = u64(subtract ? difference * 2 + 1 : dividend * 2) & 0xffffffffffULL;
+		}
+		return {accumulator, flags};
+	}
+	void start_pipeline_repeat_subc(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = repeat_subc_case(variant); unsigned const last = (f.long_form ? 8 : 7) + f.count;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.long_form ? 0xf070 : 0xec00 | f.count);
+		if (f.long_form) program.write_word(f.base + 0x601, f.count);
+		program.write_word(f.body, f.opcode); program.write_word(f.body + 2, 0xf4e1);
+		if (f.interrupt) { u32 const vector = f.base + (f.interrupt == 2 ? 4 : 0x40); program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5); }
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (f.interrupt == 1 ? 0 : 0x800) | (f.flags & 1 ? 0x100 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.form == 1 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, f.form == 4 ? 0x1ff : f.form == 5 ? 0x400 : 0x200);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.destination ? 0x1234 : f.dividend); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.destination ? f.dividend : 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.interrupt == 1 ? 1 : 0);
+		for (unsigned at = 0x100; at <= 0x400; ++at) m_cpu->space(AS_DATA).write_word(at, f.divisor);
+		m_cpu->space(AS_DATA).write_word(0x1002, f.divisor);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x100, 0x1002, "repeat_subc_reads",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (at >= 0xffe && at <= 0xfff && f.interrupt) { expect(m_cpu->pipeline_cycles() > (f.long_form ? 8U : 7U) + f.count, "Interrupt stack reads follow the final quotient step"); return; }
+				u16 const address = f.form == 0 ? 0x202 : f.form == 1 ? 0x1002 : f.form == 5 ? 0x400 - m_pipeline_operand_reads : f.form == 2 || f.form == 4 ? 0x200 + m_pipeline_operand_reads : 0x200;
+				unsigned const first = f.long_form ? 8 : 7;
+				expect(at == address && word == f.divisor && m_pipeline_operand_reads <= f.count && m_cpu->pipeline_cycles() == (!m_pipeline_operand_reads ? first - 1 : first + m_pipeline_operand_reads), "Repeated SUBC reads each divisor through the iteration-owned address"); ++m_pipeline_operand_reads; });
+		m_vector_prefetch_tap = program.install_read_tap(f.body, f.body, "repeat_subc_body",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.opcode && !m_pipeline_extensions_reads, "Repeated SUBC fetches its opcode once"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_subc_stack_only",
+			[this, f, last](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(f.interrupt && m_cpu->pipeline_cycles() > last && at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2, "SUBC never writes data; deferred interrupt owns its stack writes"); ++m_pipeline_store_writes; });
+		m_phase = 253230; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -33331,13 +33402,58 @@ private:
 				if (variant == 245759) osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant < 276479) { start_pipeline_shifted_arithmetic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=18432 mapped_ar_cases=12288 value_pairs=64 sxm_ovm=4 accumulators=2 restore=30720 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_repeat_subc(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253220)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253210; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253230)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = repeat_subc_case(variant); unsigned const first = f.long_form ? 8 : 7, last = first + f.count;
+			unsigned const completed = tick < first ? 0 : std::min(tick - first + 1, f.count + 1);
+			auto const expected = repeat_subc_result(f, completed);
+			unsigned const remaining = tick < first - 1 ? 0 : tick <= first ? f.count : tick <= last ? last - tick : 0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_RC) == remaining &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? 0x1234 : expected[0]) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? expected[0] : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[1], "Repeat SUBC preserves per-iteration arithmetic and exact counter ownership");
+			unsigned const reads = tick < first - 1 ? 0 : tick < first ? 1 : completed;
+			expect(m_pipeline_operand_reads == reads, "Repeated SUBC samples one divisor per completed iteration");
+			if (f.interrupt && tick == 2) { int const line = f.interrupt == 2 ? INPUT_LINE_NMI : 0; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+			if (tick < last) expect(!m_vector_acks && !m_pipeline_store_writes, "Repeat SUBC defers interrupt entry until the final quotient step");
+			if (tick == (f.long_form ? 4 : 3)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body, 0xe811); }
+			unsigned const checkpoint = std::array<unsigned, 4>{3, first, first + f.count / 2, last}[variant / 11520];
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated division at Decode, first, middle or final iteration");
+			}
+			if (tick == last + 30)
+			{
+				u16 const ar = f.form == 4 || f.form == 2 ? 0x200 + f.count + (f.form == 2) : f.form == 5 ? 0x400 - f.count - 1 : 0x200;
+				expect(m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_vector_acks == unsigned(bool(f.interrupt)) && m_pipeline_store_writes == (f.interrupt ? 2 : 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == ar, "Repeated SUBC finishes through its saved continuation with only deferred interrupt stack writes");
+				if (!f.pattern && f.count == 15) expect(expected[0] == 0x20009, "TI SUBC division example produces remainder 2 and quotient 9 for 65/7");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeat body, division counter, address and pending IRQ without restarting");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253240; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_vector_prefetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 46079) { start_pipeline_repeat_subc(variant + 1); return; }
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				osd_printf_info("TMS320C54x staged repeat SUBC: PASS cases=46080 forms=6 rpt=short,long counts=0,1,15,32,255 sources=none,IRQ,NMI pages=2 restore=46080 count_plus_one=1 divisor_reads_each_iteration=1 duplicate_body_fetches=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253240)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253230; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -33865,6 +33981,12 @@ void tms320c54x_test_state::test(machine_config &config)
 		{
 			expect(line == 0 && !m_vector_acks && m_cpu->pipeline_cycles() > 8,
 				"Protected arithmetic acknowledges one pending IRQ only after retirement"); ++m_vector_acks;
+		}
+		if (m_phase == 253230)
+		{
+			auto const f = repeat_subc_case(m_pipeline_peripheral_case);
+			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > (f.long_form ? 8U : 7U) + f.count && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + 1) && !m_vector_acks, "SUBC repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
 		}
 		if (m_phase == 252750)
 		{

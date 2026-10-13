@@ -116,7 +116,7 @@ constexpr bool staged_banz(u16 word)
 
 constexpr unsigned staged_repeat_body_words(u16 word)
 {
-	return word == 0xf495 || (staged_read_a(word) && u8(word) != 0xf8) ? 1 : 2;
+	return word == 0xf495 || ((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0) || (staged_read_a(word) && u8(word) != 0xf8) ? 1 : 2;
 }
 
 constexpr bool staged_short_repeat(u16 word)
@@ -2143,10 +2143,23 @@ void tms320c54x_device::pipeline_step()
 	++m_pipeline_cycles;
 	if (m_pipeline_repeat_stream)
 	{
-		// SPRU131G 6.7: MVPD becomes single-cycle after its first iteration.
-		// Program read precedes data write; shared-bus placement is partial.
+		// Retained repeat bodies use a partial single-clock stream after the
+		// first staged iteration. MVPD's cadence is described in SPRU131G 6.7.
 		++m_rpt_iteration;
-		if (m_pipeline_repeat_word != 0xf495)
+		if ((m_pipeline_repeat_word & 0xfe00) == 0x1e00)
+		{
+			u8 const mode = m_pipeline_repeat_word;
+			bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
+			if (preincrement) indirect_modify(mode);
+			u16 const address = BIT(mode, 7) ? short_smem_address(mode) : BIT(m_pipeline_repeat_status, 14)
+				? u16(m_pipeline_repeat_sp + mode) : u16((m_pipeline_repeat_status & 0x1ff) << 7) | mode;
+			if (address < 0x60) { logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+			u16 const value = m_data.read_word(address);
+			u64 &source = accumulator(BIT(m_pipeline_repeat_word, 8));
+			source = conditional_subtract(source, value, BIT(m_pipeline_repeat_word, 8));
+			if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
+		}
+		else if (m_pipeline_repeat_word != 0xf495)
 		{
 			u8 const mode = m_pipeline_repeat_word;
 			bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
@@ -2516,7 +2529,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && m_pipeline_repeat_active && word != 0xf070 && word != 0x47f8 && !short_repeat && !m_pipeline_repeat_body_latched)
 		{
-			if (!program_move && !read_a && word != 0xf495) { logerror("%s: staged repeat body %04x is unsupported\n", machine().describe_context(), word); m_illegal = true; return; }
+			if (!program_move && !read_a && word != 0xf495 && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x is unsupported\n", machine().describe_context(), word); m_illegal = true; return; }
 			m_pipeline_repeat_body_latched = true;
 			m_pipeline_repeat_address = m_pipeline_address[2];
 			m_pipeline_valid[0] = m_pipeline_valid[1] = false;
@@ -2826,6 +2839,11 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode), s16(literal))) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if ((m_pipeline_word[3] & 0xfe00) == 0x1e00 && m_pipeline_repeat_active && source < 0x60)
+		{
+			logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		if (source < 0x60 && (source < (multiply || shifted ? 0x08 : 0x10) || source > 0x17))
 		{
 			logerror("%s: staged %s control/peripheral source is unsupported\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB");
@@ -3333,7 +3351,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
-		if (m_op == 0xf495 && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+		if ((m_op == 0xf495 || (m_op & 0xfe00) == 0x1e00) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
 			pipeline_begin_repeat_stream();
 		unsigned const xc_retired_words = (staged_shifted_smem(m_op) && u8(m_op) >= 0xe0) || staged_extended_banz(m_op) || staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_banz(m_op) || staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_t_memory_operation(m_op) || staged_shifted_smem(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_long_arithmetic(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 			(staged_far_call(m_op) || staged_absolute_load(m_op) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;

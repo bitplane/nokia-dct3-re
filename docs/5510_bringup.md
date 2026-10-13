@@ -2460,9 +2460,9 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 1572 NAND byte reads and twenty strobes, with
-AR0=`0011`, AR1=`3aea`, AR2=`0010`. Two further observed commands `00` with address
-bytes `00,20,00,00` select row 32; the additional 1060 bytes are outside
+The stopped-run summary counts 2398 NAND byte reads and twenty-five strobes, with
+AR0=`00ae`, AR1=`36b0`, AR2=`0000`. Two further observed commands `00` with address
+bytes `00,20,00,00` select row 32; the additional 1886 bytes are outside
 the bounded capture and remain unverified. The first-page comparison
 verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
@@ -2472,9 +2472,10 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-operation is repeated `SUBC Smem,A`, `1e02` at `00:352f`, behind
-`RPT #15` (`ec0f` at `00:352e`). Single-step SUBC is covered; the
-repeat-body rejection occurs before Execute and proves no quotient iteration.
+instruction is BANZD, `6e87` at `00:0a50`. Short-memory repeated
+`SUBC Smem,A`, `1e02` behind `RPT #15` at `00:352e`, is now covered.
+The runtime reaches a different program range; that is not proof of the
+complete loaded image or startup acceptance.
 `ADD *(0016),0,A,B` at `00:319c`, encoded
 `6ff8 0016 0d00`, now has staged arithmetic coverage; its memory source
 is mapped AR6. The preceding
@@ -2482,7 +2483,7 @@ is mapped AR6. The preceding
 Read-publication and dependent-multiply coverage.
 The preceding `STL A,-1,*AR1(0003)` at `00:313e`, encoded
 `6fe1 0003 0c9f`, now has shifted-store coverage.
-Debugger context is `00:3531`, not
+Debugger context is `00:0a52`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2531,9 +2532,10 @@ source sampling, shifted operand, separate source/destination accumulator,
 arithmetic flags and replay coverage. Single-step SUBC has retained
 source/address, conditional-subtract/shift, carry and replay coverage.
 Its ALU-difference overflow projection is explicitly unvalidated at the
-silicon boundary. Repeated SUBC at `00:352f` still needs sixteen-step
-quotient/remainder behavior, repeat ownership, IRQ ordering and restoration
-coverage;
+silicon boundary. Repeated SUBC now has sixteen-step quotient/remainder,
+repeat ownership, IRQ ordering and restoration coverage. BANZD at `00:0a50`
+still needs retained target/count, pointer-update ownership, delay-slot
+execution and restoration coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
