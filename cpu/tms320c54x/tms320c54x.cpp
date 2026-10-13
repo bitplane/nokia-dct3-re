@@ -224,7 +224,7 @@ constexpr bool staged_extended_dst(u16 word)
 
 constexpr bool staged_dst(u16 word)
 {
-	return (word & 0xfe80) == 0x4e00 || staged_extended_dst(word);
+	return (word & 0xfe00) == 0x4e00 && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_dsub(u16 word)
@@ -2670,7 +2670,7 @@ void tms320c54x_device::pipeline_step()
 		else
 		{
 			u8 const mode = m_pipeline_word[3];
-			bool const modifying = staged_dsub(m_pipeline_word[3]) && BIT(mode, 7);
+			bool const modifying = (staged_dst(m_pipeline_word[3]) || staged_dsub(m_pipeline_word[3])) && BIT(mode, 7);
 			bool const preincrement = modifying && (mode & 0x78) == 0x18;
 			if (preincrement) indirect_modify(mode, true);
 			m_pipeline_operand_address[3] = basic_address(3, mode);

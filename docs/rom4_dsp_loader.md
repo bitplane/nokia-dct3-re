@@ -2960,6 +2960,19 @@ clock writes the low word at `address ^ 1`, preserving odd-address ordering
 (SPRU172C 4-47). The extra extension word adds one clock to the existing
 two-write path. Stage placement remains partial, not measured silicon.
 
+Short-indirect DST A/B uses the same retained pair and two-write path.
+Access applies MOD 0--11 once: linear increment/decrement and circular
+unit steps are two words, while AR0-indexed and reverse-carry steps retain
+their index semantics. The first write is clock 6 and the paired write is
+clock 7 in this partial frontend model. Another 9216 replay cases cover
+all twelve modes, eight encoded registers, both accumulators, even/odd
+addresses, CMPT and SST, with signed-store source patterns and BK=16.
+They poison AR/BK after Access and the accumulator after Read, and restore
+after Decode, source capture or the first write. No destination reads,
+duplicate pointer updates or duplicate writes are permitted. Unsigned
+saturation, arbitrary BK regions and control-delay compositions for these
+new short forms remain outside this fixture matrix.
+
 The 3072 replay cases cover four address forms, eight encoded registers,
 both accumulators, four offsets/patterns, both compatibility and SST states,
 and checkpoints after Decode, Read or the first write. They change the
@@ -3205,8 +3218,9 @@ by the capped prefix, and this is not a complete 512-byte page transfer.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is short-indirect DST, `4e81` at `00:30c6`, debugger context
-`00:30c8`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is long-offset LD, `10e1` at `00:30c7`, debugger context
+`00:30c9`. Short-indirect DST `4e81` at `00:30c6` now decodes, but
+unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3290,8 +3304,9 @@ changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
-The following BITF now has staged coverage; subsequent short-indirect DST
-remains incomplete. This is bounded transfer coverage, not startup acceptance.
+The following BITF and short-indirect DST now have staged coverage;
+subsequent long-offset LD remains incomplete. This is bounded transfer
+coverage, not startup acceptance.
 
 Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their
 memory operand through Read and use the established 40-bit arithmetic

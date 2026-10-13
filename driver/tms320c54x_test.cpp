@@ -5961,6 +5961,24 @@ private:
 	};
 	static dst_extended_fixture extended_dst_fixture(unsigned variant)
 	{
+		if (variant >= 3072)
+		{
+			unsigned const v = (variant - 3072) % 3072;
+			unsigned const reg = v % 8, source = (v / 8) % 2, mode = (v / 16) % 12, pattern = (v / 192) % 4;
+			bool const compatibility = (v / 768) % 2, sst = (v / 1536) % 2;
+			unsigned const selected = compatibility && !reg ? 3 : reg;
+			u16 const initial = 0x1007 + (pattern & 1), index = selected ? 3 : initial;
+			auto reverse = [](u16 word) { u16 result = 0; for (unsigned i = 0; i < 16; ++i) result |= ((word >> i) & 1) << (15 - i); return result; };
+			int const delta = mode == 1 || mode == 8 ? -2 : mode == 2 || mode == 3 || mode == 10 ? 2 : mode == 5 || mode == 9 ? -int(index) : int(index);
+			u16 next = initial;
+			if (mode == 4 || mode == 7) next = reverse(u16(reverse(initial) + (mode == 4 ? -int(reverse(index)) : int(reverse(index)))));
+			else if (mode >= 8) { int const slot = (int(initial & 15) + delta) % 16; next = (initial & ~15) + (slot < 0 ? slot + 16 : slot); }
+			else if (mode) next = initial + delta;
+			u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
+			s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
+			u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
+			return {reg, selected, source, 4 + mode, initial, u16(mode == 3 ? next : initial), next, value, stored};
+		}
 		unsigned const reg = variant % 8, source = (variant / 8) % 2, kind = (variant / 16) % 4, pattern = (variant / 64) % 4;
 		bool const compatibility = (variant / 256) % 2, sst = (variant / 512) % 2;
 		unsigned const selected = compatibility && !reg ? 3 : reg;
@@ -5978,19 +5996,22 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = extended_dst_fixture(variant);
+		bool const short_form = variant >= 3072;
+		unsigned const flags = short_form ? (variant - 3072) % 3072 : variant;
 		u32 const base = f.reg & 1 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x600, 0x4e00 | (f.source << 8) | (f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg));
-		program.write_word(base + 0x601, f.literal);
+		program.write_word(base + 0x600, 0x4e00 | (f.source << 8) | (short_form ? 0x80 + (f.kind - 4) * 8 + f.reg : f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg));
+		if (!short_form) program.write_word(base + 0x601, f.literal);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 512) % 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (flags / (short_form ? 1536 : 512)) % 2);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6608);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900 | (((variant / 256) % 2) << 5));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900 | (((flags / (short_form ? 768 : 256)) % 2) << 5));
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : f.value);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? f.value : 0xdead);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x1007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, short_form ? f.literal : 0x1007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -6001,11 +6022,11 @@ private:
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_dst_no_operand_read",
 			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "DST does not read either destination word"); });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x60, 0xffff, "extended_dst_pair",
-			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+			[this, f, short_form](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
 				expect(m_pipeline_store_writes < 2 && at == (f.address ^ m_pipeline_store_writes) &&
-					word == (m_pipeline_store_writes ? u16(f.stored) : u16(f.stored >> 16)) && m_cpu->pipeline_cycles() == 7 + m_pipeline_store_writes,
+					word == (m_pipeline_store_writes ? u16(f.stored) : u16(f.stored >> 16)) && m_cpu->pipeline_cycles() == (short_form ? 6 : 7) + m_pipeline_store_writes,
 					"Extended DST retains its original address and saturated pair across two owned write clocks"); ++m_pipeline_store_writes; });
-		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "extended_dst_literal",
+		if (!short_form) m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "extended_dst_literal",
 			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
 				expect(word == f.literal && !m_pipeline_extensions_reads, "DST long offset/address is fetched once, including opcode-shaped literals"); ++m_pipeline_extensions_reads; });
 		m_phase = 252550; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -30977,22 +30998,24 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			auto const f = extended_dst_fixture(variant);
-			unsigned const checkpoint = std::array<unsigned, 3>{4, 6, 7}[variant / 1024];
+			bool const short_form = variant >= 3072;
+			unsigned const checkpoint = short_form ? std::array<unsigned, 3>{3, 5, 6}[(variant - 3072) / 3072] : std::array<unsigned, 3>{4, 6, 7}[variant / 1024];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Extended DST owns its retained address and both writes");
-			if (tick == 4)
+			if (tick == 4 && !short_form)
 			{
 				auto const disable = machine().disable_side_effects();
 				m_cpu->space(AS_PROGRAM).write_word((f.reg & 1 ? 0x20000 : 0) + 0x601, 0xdead);
 			}
-			if (tick == 5)
+			if (tick == (short_form ? 4 : 5))
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar, "Long DST applies preincrement/circular modification once in Access");
-				u16 const st0 = (variant / 256) % 2 && f.reg && f.kind != 3 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
+				bool const compatibility = short_form ? ((variant - 3072) / 768) % 2 : (variant / 256) % 2;
+				u16 const st0 = compatibility && f.reg && f.kind != 3 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0, "Long DST uses standard ARF or compatibility ARP ownership without DP/CPL addressing");
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2000);
 				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
 			}
-			if (tick == 6) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0);
+			if (tick == (short_form ? 5 : 6)) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0);
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
@@ -31003,7 +31026,7 @@ private:
 			{
 				{
 					auto const disable = machine().disable_side_effects();
-					expect(m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 1 &&
+					expect(m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == (short_form ? 0 : 1) &&
 						m_cpu->space(AS_DATA).read_word(f.address) == u16(f.stored >> 16) && m_cpu->space(AS_DATA).read_word(f.address ^ 1) == u16(f.stored) &&
 						m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
 						"DST retains both source words and destination despite later accumulator/AR/literal changes");
@@ -31016,8 +31039,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252560; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 3071) { start_pipeline_extended_dst(variant + 1); return; }
+				if (variant < 12287) { start_pipeline_extended_dst(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_accumulator_logic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
