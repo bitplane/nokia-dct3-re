@@ -7891,6 +7891,51 @@ private:
 			[this, f, last](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(f.interrupt && m_cpu->pipeline_cycles() > last && at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2, "SUBC never writes data; deferred interrupt owns its stack writes"); ++m_pipeline_store_writes; });
 		m_phase = 253230; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct banzd_fixture
+	{
+		unsigned encoded, selected, modification;
+		bool compatibility, two_word;
+		u16 value, next_ar;
+		u32 base;
+	};
+	static banzd_fixture banzd_case(unsigned variant)
+	{
+		unsigned const v = variant % 768, encoded = (v / 4) % 8, modification = (v / 32) % 3;
+		bool const compatibility = (v / 96) % 2, two_word = (v / 384) % 2;
+		u16 const value = std::array<u16, 4>{0, 1, 0xffff, 0x8000}[v % 4];
+		return {encoded, compatibility && !encoded ? 3U : encoded, modification, compatibility, two_word,
+			value, u16(value + (modification == 1 ? -1 : modification == 2 ? 1 : 0)), (v / 192) % 2 ? 0x20000U : 0};
+	}
+	void start_pipeline_banzd(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = banzd_case(variant);
+		u16 const opcode = 0x6e00 | (f.modification == 0 ? 0x80 : f.modification == 1 ? 0x88 : 0x90) | f.encoded;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
+		program.write_word(f.base + 0x600, opcode); program.write_word(f.base + 0x601, 0x700);
+		program.write_word(f.base + 0x602, f.two_word ? 0xf020 : 0xe811); program.write_word(f.base + 0x603, f.two_word ? 0x33 : 0xe922);
+		program.write_word(f.base + 0x604, 0xe866); program.write_word(f.base + 0x605, 0xf4e1);
+		program.write_word(f.base + 0x700, 0xe844); program.write_word(f.base + 0x701, 0xf4e1);
+		program.write_word(f.base + 0x740, 0xe8aa);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.compatibility ? 0x6608 : 0x608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == f.selected ? f.value : 0x410 + ar * 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "banzd_no_data_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZD and its register delay slots do not read data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "banzd_no_data_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZD and its register delay slots do not write data memory"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "banzd_target_literal",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == 0x700 && !m_pipeline_extensions_reads, "BANZD retains its target literal once"); ++m_pipeline_extensions_reads; });
+		m_vector_prefetch_tap = program.install_read_tap(f.base + 0x700, f.base + 0x700, "banzd_target_fetch",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.value && word == 0xe844 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6, "Taken BANZD fetches the retained target while delay words drain"); ++m_pipeline_operand_reads; });
+		m_phase = 253250; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -33447,13 +33492,56 @@ private:
 				if (variant < 46079) { start_pipeline_repeat_subc(variant + 1); return; }
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				osd_printf_info("TMS320C54x staged repeat SUBC: PASS cases=46080 forms=6 rpt=short,long counts=0,1,15,32,255 sources=none,IRQ,NMI pages=2 restore=46080 count_plus_one=1 divisor_reads_each_iteration=1 duplicate_body_fetches=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_banzd(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253240)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253230; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253250)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = banzd_case(variant);
+			u64 const a = tick >= 10 ? f.value ? 0x44 : 0x66 : f.two_word ? tick >= 9 ? 0x33 : 0 : tick >= 8 ? 0x11 : 0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (!f.two_word && tick >= 9 ? 0x22 : 0x1234), "BANZD executes its two delay words once before the selected continuation");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0x740); }
+			if (tick == 5)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x410 + ar * 0x10), "BANZD tests the pre-modification count and changes only its selected AR in Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+			}
+			if (tick == std::array<unsigned, 4>{4, 5, 8, 9}[variant / 768] && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZD target/predicate or draining delay words");
+			}
+			if (tick == 22)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(bool(f.value)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | (f.compatibility ? f.selected << 13 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+					"BANZD preserves its captured target/count through changed AR/literal and restores without duplicate modification");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed count branch without refetching target or repeating delay words");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253260; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 3071) { start_pipeline_banzd(variant + 1); return; }
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				osd_printf_info("TMS320C54x staged BANZD: PASS cases=3072 registers=8 values=4 modifications=3 cmpt_states=2 pages=2 delay_forms=two_single,one_double restore=3072 duplicate_target_fetches=0 data_accesses=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253260)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253250; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{

@@ -3072,6 +3072,22 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Short-indirect BANZD (`6e80..6e97`, SPRU172C BANZ[D] 4-16) shares
+BANZ's Access-owned pre-modification count, selected AR update and retained
+same-page target. A taken delayed branch redirects Prefetch without flushing
+the two delay words; a not-taken branch retains its sequential continuation.
+The existing control-delay fence covers the branch and both delay words.
+The 3,072 replay cases cover all eight AR selectors, values `0/1/ffff/8000`,
+stationary/postdecrement/postincrement modes, CMPT, two program pages and
+both two one-word instructions and one two-word instruction in the delay.
+Target poisoning after Decode and count changes after Access must not alter
+the outcome. Delay effects publish before the chosen continuation; snapshots
+cover retained target/count and both delay-publication clocks. Tests require
+one target fetch when taken, no data accesses and no repeated AR update.
+These are partial frontend timings, not measured class-29 silicon timing.
+Long-offset/preincrement/circular BANZD and new pending-IRQ cases are not
+covered by this matrix; unsupported delayed addressing forms stay rejected.
+
 SUBC (`1exx/1fxx`, [SPRU172C 4-192](https://www.ti.com/lit/ug/spru172c/spru172c.pdf))
 has single-step staged coverage. Access retains the source address, Read
 samples one memory word and Execute performs the conditional division step
@@ -3541,17 +3557,19 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 2398 reads and twenty-five strobes,
-with AR0=`00ae`, AR1=`36b0`, AR2=`0000`. After the first row, two further
+The stop summary counts 3422 reads and thirty-five strobes,
+with AR0=`00ae`, AR1=`3745`, AR2=`0000`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 1886 bytes are outside the bounded capture and remain
+The additional 2910 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is BANZD, `6e87` at `00:0a50`;
-debugger context is `00:0a52`. The repeated `SUBC Smem,A`, `1e02`
+unsupported operation is repeated `ST #lk,*AR1+`, `7691` at `00:08ea`;
+debugger context is `00:08ed`, not the retained opcode address. BANZD,
+`6e87` at `00:0a50`, now has short-indirect delayed-branch coverage.
+The repeated `SUBC Smem,A`, `1e02`
 behind `RPT #15` (`ec0f` at `00:352e`), now has staged repeat coverage.
 The observed runtime reaches a different program range, but this does not
 identify or validate the complete loaded firmware buffer or startup.
@@ -3668,7 +3686,8 @@ DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
 single-step and short-memory repeated SUBC now have coverage;
-the subsequent delayed pointer-count branch remains incomplete.
+short-indirect BANZD now has coverage; the subsequent repeated immediate
+store remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

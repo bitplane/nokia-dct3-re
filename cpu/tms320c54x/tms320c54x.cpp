@@ -111,7 +111,7 @@ constexpr bool staged_extended_banz(u16 word)
 
 constexpr bool staged_banz(u16 word)
 {
-	return ((word & 0xff00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98) || staged_extended_banz(word);
+	return ((word & 0xfd00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98) || staged_extended_banz(word);
 }
 
 constexpr unsigned staged_repeat_body_words(u16 word)
@@ -2304,8 +2304,8 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 29A short forms test AR before modification. Long forms
 		// test the resolved offset address, with MOD 13/14 premodification.
-		// Access redirect gives taken/not-taken paths their two-clock gap;
-		// this stage placement remains a partial model, not silicon timing.
+		// Undelayed redirects discard fall-through words; delayed redirects
+		// preserve both delay words. Placement remains a partial timing model.
 		u8 const mode = m_pipeline_word[3];
 		bool const extended = staged_extended_banz(m_pipeline_word[3]);
 		bool const taken = (extended ? long_offset_address(mode, indirect_ar(mode), s16(m_pipeline_operand_address[3])) : m_ar[indirect_ar(mode)]) != 0;
@@ -2313,8 +2313,11 @@ void tms320c54x_device::pipeline_step()
 		if (!extended) indirect_modify(mode);
 		if (taken)
 		{
-			m_pipeline_valid[2] = false;
-			m_pipeline_decode_flush = 1;
+			if (!BIT(m_pipeline_word[3], 9))
+			{
+				m_pipeline_valid[2] = false;
+				m_pipeline_decode_flush = 1;
+			}
 			m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
 		}
 	}
@@ -2529,7 +2532,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && m_pipeline_repeat_active && word != 0xf070 && word != 0x47f8 && !short_repeat && !m_pipeline_repeat_body_latched)
 		{
-			if (!program_move && !read_a && word != 0xf495 && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x is unsupported\n", machine().describe_context(), word); m_illegal = true; return; }
+			if (!program_move && !read_a && word != 0xf495 && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
 			m_pipeline_repeat_body_latched = true;
 			m_pipeline_repeat_address = m_pipeline_address[2];
 			m_pipeline_valid[0] = m_pipeline_valid[1] = false;
@@ -2556,7 +2559,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && (fast_return || plain_return || delayed_return || far_return || branch))
 		{
-			bool const delayed = delayed_return || word == 0xf69b || word == 0xf273 || word == 0xf274 || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
+			bool const delayed = delayed_return || word == 0xf69b || word == 0xf273 || word == 0xf274 || (staged_banz(word) && BIT(word, 9)) || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
