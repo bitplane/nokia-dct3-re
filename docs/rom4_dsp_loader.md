@@ -3637,9 +3637,9 @@ DMPREC; BITF itself reads AL, not a DMA peripheral. Mapped BITF has
 two initial TC states, direct/absolute forms and AL producers, with one
 retained source read and no data writes. Only TC changes in Execute;
 zero mask clears it (SPRU172C 4-28/4-29).
-That observation reaches resident `02:6d62`, stopping at `STM #lk,IMR` (`7700`
-at `02:6d64`). But the read-only comparison before resident execution
-finds 40,657 mismatches among 48,261 program words: first `02:8e8b`,
+That pre-correction observation reached resident `02:6d62`, stopping at
+`STM #lk,IMR` (`7700` at `02:6d64`). Its read-only program comparison
+found 40,657 mismatches among 48,261 words: first `02:8e8b`,
 actual `826c`, expected `0001`. It excludes 3,660 data words from the
 51,921-word source and uses the configured common-window mapping without
 claiming physical bank identity. Correct resident transfer is unproven;
@@ -3666,15 +3666,23 @@ The isolated `mpy-mapped` fixture passes 3,072 saved-state replays over
 six accumulator words, both source/destination accumulators, signed
 patterns, FRCT/OVM and zero/one-word gaps, including mutations after T
 and mapped-word capture. The unmodified CPU fails the same fixture.
-The current original-bootstrap run instead stops at unsupported
-long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`, live PC `0033ac`),
-before reaching the former resident comparison. At that stop a read-only
-snapshot has AR1=`36b0`, AR2=`0004` and descriptor cluster fields still
-3: the lookup found cluster 4, but its move into `36c6` cannot execute.
-The complete C54x conformance run and native 5110 save-state gate pass.
-Class-19 three-word
-move support and a fresh complete resident comparison are next; correct
-transfer remains unaccepted. No filesystem or cluster state is synthesized.
+Long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`) now retains offset,
+source, destination and pointer modification through the existing move
+path, publishing the recovered cluster value into `36c6` organically.
+Its 19,200-case isolated replay fixture covers 25 destination forms,
+four offsets, selected-AR/AR2/RAM/alias sources, four values, both
+compatibility states and two program pages, with one read, one write and
+two ordered extension fetches. Snapshots cover partial Decode, retained
+Read and completed write (SPRU172C 4-113).
+The full C54x conformance runner and native 5110 save-state gate pass.
+The current original bootstrap reaches resident `02:6d62`; all 48,261
+compared program words match, including the former 16-KiB crossing.
+The next unsupported instruction is `STM #lk,IMR` (`7700` at `02:6d64`,
+live PC `026d66`). This verifies program loading only: the audit excludes
+3,660 data words and physical bank identity remains unvalidated. The
+next requirements are the remaining data audit and retained mask-write/
+interrupt execution. No filesystem or cluster state is synthesized;
+full resident transfer and boot remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

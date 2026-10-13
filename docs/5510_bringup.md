@@ -2483,10 +2483,11 @@ the original DMA-completion polling sequence. `BITF *(0008),0001`
 (`61f8 0008 0001` at `00:2fa5`) now reads its mapped AL source after
 the preceding DMPREC load. That observation reaches resident `02:6d62` and stops
 on unsupported `STM #lk,IMR` (`7700` at `02:6d64`, live PC `026d66`).
-This entry is not a correct-transfer acceptance: a side-effect-free
-comparison at the first resident Fetch checks all 48,261 program words
-from the original `aa22` section stream and finds 40,657 mismatches.
-The first is `02:8e8b`, actual `826c`, expected `0001`. The source has
+That pre-correction entry was not a correct-transfer acceptance: a
+side-effect-free comparison at the first resident Fetch checked all
+48,261 program words from the original `aa22` section stream and found
+40,657 mismatches. The first was `02:8e8b`, actual `826c`, expected
+`0001`. The source has
 51,921 words in total; 3,660 data words are explicitly excluded from
 this program-only observation. The configured common-window mapping
 is used, not asserted as physical DA150 bank identity. A separate fresh
@@ -2521,19 +2522,31 @@ over AL/AH/AG, BL/BH/BG, both producer/consumer accumulators, signed
 operand patterns, FRCT/OVM, and zero/one-word gaps. It rejects the old
 ordering, poisons T after its capture and the producer accumulator after
 the consumer Read, and requires one mapped read and one literal fetch.
-The current one-second original bootstrap stops earlier, on unsupported
-long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`, live PC `0033ac`),
-in the cluster-control path. This is a changed software frontier, not
-proof that every transferred word is now correct. A read-only snapshot
-at this stop shows AR1=`36b0`, AR2=`0004`, A=`0003`, B=`0001`,
-`36c4=0003`, `36c5=0000`, `36c6=0003`. The next cluster has been
-recovered into AR2; the unsupported move would copy mapped AR2 (`0012`)
-to `*AR1(0016)` (`36c6`). No descriptor field was injected. The full
-C54x conformance runner and native 5110 save-state gate both pass.
-The next requirement
-is retained source/destination/extension execution for this class-19
-three-word move (SPRU172C 4-113), then re-run the full resident comparison.
-Neither staged transfer, full boot nor recording is accepted.
+Long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`) now executes through
+the same retained move path. It copies the recovered next-cluster value
+from mapped AR2 (`0012`) into `*AR1(0016)` (`36c6`) without injecting a
+descriptor field. Its two extensions retain offset-before-source order;
+Access owns the resolved destination and any pointer modification, Read
+owns one source sample, and the existing write phase owns publication.
+`tms54test -bios long-mvkd` passes 19,200 saved-state replays covering
+25 forms, four offsets, selected-AR/AR2/RAM/alias sources, four values,
+two compatibility states and two program pages. Snapshots cover partial
+Decode, retained Read and completed write; later literal/source/pointer
+mutations cannot retarget or duplicate the move (SPRU172C 4-113).
+The full C54x conformance runner and native 5110 save-state gate pass.
+
+The current one-second original bootstrap reaches resident `02:6d62`
+with all 48,261 compared program words correct, zero mismatches. The
+16-KiB crossing record now has all 16 correct words. The program audit
+still excludes 3,660 data words and retains the configured-mapping scope
+above. The next unsupported instruction is `STM #lk,IMR` (`7700` at
+`02:6d64`, live PC `026d66`). Correct program loading is verified;
+complete AA22 data transfer, physical banking, full boot and recording
+remain unaccepted. The AA22 data inventory has 3,660 unique destinations
+(`007c..c281`), including four low register-window writes at `007c..007f`
+with values `0000,0000,4000,017b`; do not treat their live values as RAM.
+Audit the remaining data transfer and implement the
+retained mask-write/interrupt contract before claiming resident execution.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
