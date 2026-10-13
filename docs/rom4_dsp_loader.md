@@ -3202,8 +3202,8 @@ ready=`1`; these match retained NAND row 1's first four bytes at raw offset
 `528`. The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is long-offset ADDM, `6be6` at `00:3277`, debugger context
-`00:3279`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is long-offset SUB Smem,A, `08e6` at `00:327c`, debugger context
+`00:327e`. Unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3264,6 +3264,30 @@ control. The latter changes debug CPU state in a firmware-free conformance
 fixture, never the original upload. Tests assert one target-literal fetch,
 one taken-target fetch, real delay-slot effects, the selected continuation,
 unchanged unrelated flags and one BIT memory read where applicable.
+
+Long-offset ADDM/ANDM/ORM now retain the offset and immediate as separate
+Decode operands. Access uses the shared long-offset helper and records one
+RAM address; Read retains the source word; Execute performs one write at
+that same address. Ordinary/preincrement/circular modes `e0..f7` use the
+existing three-word absolute grammar without treating the offset as a second
+instruction. ADDM reuses the established SXM/OVM, bit-32 carry and sticky
+OVA behavior; ANDM/ORM preserve arithmetic flags. No atomic arithmetic or
+short/absolute publication rule is changed. New long-offset operands below
+`0060` fail closed before the memory read. Repeat bodies, control-delay
+slots and broader producer/peripheral arbitration remain unvalidated.
+Class-18 Access/Read/Execute placement remains a partial stage model.
+
+The 153,600 replay cases cover the three operations, 24 long-offset forms
+plus absolute addressing, four offsets, eight value pairs and eight
+SXM/OVM/initial-OVA combinations, both compatibility states and four
+checkpoints. They reuse independent address and arithmetic fixture calculations;
+register-6 cases use the high program page. Opcode-shaped offset retention,
+BK=16 circular wrap, compatibility ARP, changed pointers after Access and
+changed RAM after Read are checked. Each leg must read and write once with
+the expected operation-specific flags and unchanged accumulators. The original
+upload now decodes counter ADDM `6be6` at `00:3277` before stopping at the
+following long-offset SUB; this remains bounded coverage, not full loop or
+startup acceptance.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

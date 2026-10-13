@@ -2463,8 +2463,9 @@ page read or startup. `80e6` at `00:3269` now has staged long-offset
 STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
 DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
-now has retained-predicate and producer/replay coverage. The first unsupported
-instruction is `6be6` at `00:3277` (long-offset ADDM); debugger context is `00:3279`, not
+now has retained-predicate and producer/replay coverage. Counter ADDM
+`6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
+instruction is `08e6` at `00:327c` (long-offset SUB Smem,A); debugger context is `00:327e`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2481,7 +2482,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:3277` needs staged long-offset ADDM address/read/write and replay conformance before advancing this diagnostic;
+`00:327c` needs staged memory-SUB address/read, arithmetic/status and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
