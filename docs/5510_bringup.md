@@ -2460,10 +2460,12 @@ device-boundary observer records bytes `fa,33`, with CLE/ALE/CE low and
 ready high; they match the first two bytes of retained NAND row 1 (raw
 offset `528`). This establishes two actual data reads, not a completed
 page read or startup. `80e6` at `00:3269` now has staged long-offset
-STL conformance. The first unsupported instruction is adjacent MVDK
-`71e6` at `00:326b`; debugger context is `00:326d`, not the opcode
-boundary. An unsupported Decode can stop an older store before Execute,
-so this frontier move does not independently prove the original STL retired. The
+STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
+DAGEN-publication and replay coverage, including a coherent fixture of the
+preceding STL and immediate AR consumer. The first unsupported instruction
+is `f820` at `00:3270` (`BC NTC`); debugger context is `00:3272`, not
+the opcode boundary. Unsupported Decode can stop older Execute work, so
+later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2478,7 +2480,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:326b` needs staged long-offset MVDK source/address, register-destination publication and replay conformance before advancing this diagnostic;
+`00:3270` needs staged TC/NTC branch sampling, redirect and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

@@ -6649,6 +6649,80 @@ private:
 		m_phase = 252810; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_long_move(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const compatibility = (variant / 4800) % 2;
+		auto const f = long_accumulator_store_fixture((variant % 100) + (compatibility ? 6400 : 0));
+		unsigned const destination_kind = (variant / 100) % 12;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 1200) % 4];
+		u16 const destination = destination_kind < 10 ? 0x10 + destination_kind : destination_kind == 10 ? 0xf495 : f.address;
+		u32 const base = f.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x7100 | u8(f.opcode));
+		program.write_word(base + 0x601, f.literal); program.write_word(base + 0x602, destination);
+		if (destination_kind < 8) program.write_word(base + 0x603, 0xf4a8 | destination_kind);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, value);
+		if (destination_kind == 10) m_cpu->space(AS_DATA).write_word(destination, 0xdead);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "long_mvdk_source",
+			[this, f, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
+					"Long MVDK samples its addressed source once before aliasing destination publication"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "long_mvdk_destination",
+			[this, destination, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == destination && word == value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (destination < 0x60 ? 6 : 7),
+					"Long MVDK writes once at its DAGEN/RAM publication clock"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x602, "long_mvdk_literals",
+			[this, f, destination](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < 2 && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
+					word == (m_pipeline_extensions_reads ? destination : f.literal), "Long MVDK retains source offset before destination literal"); ++m_pipeline_extensions_reads; });
+		m_phase = 252830; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_original_long_move(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const value = variant % 2 ? 0x1000 : 0x1234;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(0x600 + i, 0xf495);
+		std::array<u16, 6> const words{0x80e6, 0x0010, 0x71e6, 0x0011, 0x0012, 0xf4aa};
+		for (unsigned i = 0; i < words.size(); ++i) program.write_word(0x600 + i, words[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x33fa); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1122);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1010, 0xdead); m_cpu->space(AS_DATA).write_word(0x1011, value);
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "original_long_move_source",
+			[this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x1011 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 8,
+					"Original MVDK offset 0011 reads after the preceding STL offset 0010 write"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "original_long_move_writes",
+			[this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_store_writes < 2 && (at == 0x1010 ? word == 0x33fa && m_cpu->pipeline_cycles() == 7 && !m_pipeline_store_writes :
+					at == 0x12 && word == value && m_cpu->pipeline_cycles() == 8 && m_pipeline_store_writes == 1),
+					"Original pair retires the STL and AR2 publication once at their owned clocks"); ++m_pipeline_store_writes; });
+		m_phase = 252850; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -31168,13 +31242,116 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 38399) { start_pipeline_long_accumulator_store(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged long STL/STH: PASS cases=38400 forms=25 offsets=4 selectors=4 sst_sxm=4 patterns=4 compatibility=2 restore=38400 duplicate_writes=0 destination_reads=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_long_move(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252820)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252810;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252830)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, destination_kind = (variant / 100) % 12;
+			bool const compatibility = (variant / 4800) % 2;
+			auto const f = long_accumulator_store_fixture((variant % 100) + (compatibility ? 6400 : 0));
+			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 1200) % 4];
+			u16 const destination = destination_kind < 10 ? 0x10 + destination_kind : destination_kind == 10 ? 0xf495 : f.address;
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 6, 7}[variant / 9600];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset MVDK has staged ownership");
+			if (tick == 5)
+			{
+				auto const disable = machine().disable_side_effects();
+				u32 const base = f.reg == 6 ? 0x20000 : 0;
+				m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xdead);
+			}
+			if (tick == 6)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0x7777);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save long MVDK during Decode or before/after publication");
+			}
+			if (tick == 16)
+			{
+				u16 st0 = compatibility && f.reg && f.kind != 3 ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0;
+				if (destination_kind < 8)
+				{
+					u16 const ar0 = destination_kind == 0 ? value : f.selected == 0 ? f.next_ar : 0x1007;
+					st0 = (st0 & ~0x1000) | (value == ar0 ? 0x1000 : 0);
+				}
+				for (unsigned ar = 0; ar < 8; ++ar)
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (destination == 0x10 + ar ? value : ar == f.selected ? f.next_ar : 0x1007),
+						"MVDK address modification precedes aliasing destination publication and is not replayed twice");
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 &&
+						m_cpu->space(AS_DATA).read_word(destination) == value && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == (destination_kind == 8 ? value : 0x1200) &&
+						m_cpu->state_int(tms320c54x_device::STATE_BK) == (destination_kind == 9 ? value : 16) &&
+						m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
+						"MVDK preserves unsigned values and exposes early AR publication to the immediate CMPR consumer");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore long MVDK without source resampling or duplicate writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252840; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 38399) { start_pipeline_long_move(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged long MVDK: PASS cases=38400 forms=25 offsets=4 destinations=12 values=4 compatibility=2 restore=38400 source_alias=1 zero_gap_cmpr=1 duplicate_reads=0 duplicate_writes=0\n");
+				start_pipeline_original_long_move(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252840)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252830;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252850)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u16 const value = variant % 2 ? 0x1000 : 0x1234;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 7, 8, 9}[variant / 2];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original STL/MVDK pair has coherent staged ownership");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original STL/MVDK pair across its two retirement boundaries");
+			}
+			if (tick == 16)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 2 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == value &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | (variant % 2 ? 0x1000 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x33fa && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1122,
+					"Original pair retires both writes and the immediate AR2 consumer without changing the pointer or accumulator");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original pair without repeating either write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252860; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 7) { start_pipeline_original_long_move(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252860)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252850;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

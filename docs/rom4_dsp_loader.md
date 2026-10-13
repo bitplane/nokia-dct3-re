@@ -3200,11 +3200,11 @@ The original upload now retires PORTR `74f8` at `00:302f`. The capped
 NAND read observer records `fa,33` with HD012=`0`, direction=`7` and
 ready=`1`; these match retained NAND row 1's first two bytes at raw offset
 `528`. The observer returns the single existing device read, never a second
-read or a synthesized reply. STL A `80e6` at `00:3269` is now accepted
-by the staged decoder. The next unsupported instruction is adjacent MVDK
-`71e6` at `00:326b`, debugger context `00:326d`. Since unsupported Decode
-can stop before an older Execute, this original-run boundary alone is not
-proof that the STL's RAM write retired.
+read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
+MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
+unsupported instruction is `BC NTC`, `f820` at `00:3270`, debugger context
+`00:3272`. Unsupported Decode can stop older Execute work; later PC
+observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
 Decode retains one offset/absolute literal; Read presents the destination
@@ -3226,10 +3226,33 @@ are checked. Poisoning the retained literal, changing the AR after Read,
 and changing the source before Execute test the address/source boundaries.
 Every leg must write once without reading the destination, preserve
 unselected registers/status, and restore without duplicate pointer updates.
-This adds real I/O-retirement evidence but not native NAND read, recorder,
-startup or speech acceptance. Existing atomic profiles remain unchanged.
+Extended MVDK admits `71xx` source modes `e0..f8` as three-word operations:
+source offset/absolute address precedes the destination literal. Its complete
+slot's Access computes and modifies the source address once, retains one RAM
+sample, and follows the existing early DAGEN publication/defer machinery.
+RAM destinations publish the retained word in Read after older Execute;
+Execute advances past both extension words without another write. Only RAM
+sources and RAM/AR0-AR7/SP/BK destinations are accepted. Peripheral/MMR
+sources, control destinations, repeat bodies, control-delay slots, extended
+bank-conflict cases and compiler-SP consumer composition remain unvalidated.
+Class-19 bus placement is partial, not independently measured silicon timing.
 
-Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
+The 38,400 replay cases use the independently calculated 25 source forms
+and four offsets from the accumulator-store fixture, twelve destination
+classes, four unsigned values, both compatibility states and four checkpoints.
+They cover BK=16 circular wrap, high-page register-6 cases, source-pointer
+and RAM aliases, and zero-gap CMPR consumption of the early AR publication.
+Literal/source poisoning must not change the retained operands; every leg
+must read and write once, preserve accumulators and avoid duplicate pointer
+updates. Eight paired fixtures use the original `80e6,0010,71e6,0011,0012`
+words: STL writes at clock 7, MVDK reads and publishes AR2 at 8, and an
+immediate CMPR sees the new AR2. Four checkpoints replay both writes once.
+
+This establishes bounded CPU and real I/O-retirement evidence, not complete
+NAND-page, recorder, startup or speech acceptance. Existing atomic profiles
+remain unchanged.
+
+The frontend's firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
 decrement at 5, vector Fetch/IACK and the older decoded foreground instruction's
 Execute at 6, continuation stack write at 7, and first ISR Execute at 10.
