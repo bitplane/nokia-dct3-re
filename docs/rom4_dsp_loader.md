@@ -3108,10 +3108,34 @@ handset firmware state is changed.
 
 MU4 already connects NAND R/B to the bench's `m_ready` and `bio_in_cb`,
 backed by the recovered schematic. The original staged upload now consumes
-that live model output without forcing it, passes `f803`, and stops at
+that live model output without forcing it and passes `f803` and
 MVMM SP,AR5 (`e785`) at `00:2fbe`. Interrupt/held-peripheral composition of
 these branches remains unvalidated. This is bounded startup coverage, not
 native recorder acceptance or a physical-board proof.
+
+MVMM admits exactly AR0-AR7/SP source/destination encodings. SPRU172C
+4-116 explicitly places the source read in Decode and destination write
+in Access. The staged implementation retains the source once and orders
+Access publication before a younger Decode sample, after older publications.
+This preserves immediate destination visibility and the older producer's
+required source latency. Execute does not reread or rewrite the registers.
+SP writes use the existing compiler-addressing visibility window rather
+than delaying the architectural SP update.
+
+The 1944 all-pairs replay cases cover all 81 register pairs, four values,
+two pages and Decode/Access/consumer checkpoints. They change the source
+after Decode and verify one read/write plus zero-gap AR consumption.
+Another 24 cases verify normal DP and compiler SP consumers with zero/one
+intervening NOP. The 48 producer-chain cases verify STM's zero latency and
+STLM's two-gap Category-I source latency, including simultaneous older
+Execute publication and MVMM Decode sampling. All preserve the retained
+sample through replay. Wider stack/interrupt and register-bank contention
+compositions remain unvalidated; repeat MVMM remains unsupported.
+
+The original upload now stops on short RPT #32 (`ec20`) at `00:2fc1`.
+The previous PORTW to NAND may not retire before unsupported Decode stops
+the pipeline; advancing this opcode boundary alone is not NAND-I/O proof,
+native startup acceptance or speech validation.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP

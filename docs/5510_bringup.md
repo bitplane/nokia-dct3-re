@@ -2443,9 +2443,11 @@ disagree. Long-offset DSUB `54e6` at `00:3244` now has staged paired-read,
 arithmetic and replay coverage. Long-offset immediate ST `76e6` at
 `00:322e` now owns its offset/value words and cached destination.
 BIO-conditioned BC `f803` at `00:2fca` now samples the bench's existing
-NAND R/B attachment without overriding its level. The first unsupported
-instruction is now `e785` at `00:2fbe` (MVMM SP,AR5); its debugger context
-is `00:2fc0`, not the opcode boundary. The
+NAND R/B attachment without overriding its level. MVMM SP,AR5 (`e785`) at
+`00:2fbe` now has Decode-source/Access-publication and source/consumer
+latency coverage. The first unsupported instruction is now `ec20` at
+`00:2fc1` (RPT #32); its debugger context is `00:2fc3`, not the opcode
+boundary. This does not prove the preceding PORTW to NAND retired. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2460,7 +2462,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:2fbe` needs staged register-transfer conformance before advancing this diagnostic;
+`00:2fc1` needs short-repeat/body conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

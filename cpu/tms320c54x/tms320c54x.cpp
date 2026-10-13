@@ -166,6 +166,11 @@ constexpr bool staged_extended_immediate_store(u16 word)
 	return (word & 0xff00) == 0x7600 && u8(word) >= 0xe0 && u8(word) < 0xf8;
 }
 
+constexpr bool staged_mmr_move(u16 word)
+{
+	return (word & 0xff00) == 0xe700 && ((word >> 4) & 15) <= 8 && (word & 15) <= 8;
+}
+
 u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 {
 	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
@@ -2289,6 +2294,7 @@ void tms320c54x_device::pipeline_step()
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
 		bool const accumulator_logic = staged_accumulator_logic(word) || staged_accumulator_shift(word);
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
+		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = (word & 0xff80) == 0x4600;
 		bool const direct_move = staged_move(word);
 		bool const data_copy = staged_data_copy(word);
@@ -2327,7 +2333,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_pmst = word == 0x771d;
 		if (m_pipeline_valid[2] && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_t && !immediate_pmst && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_subtract && !accumulator_logic && !direct_mmr_load && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
+			(word & 0xff00) != 0xe900 && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_subtract && !accumulator_logic && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -2856,6 +2862,8 @@ void tms320c54x_device::pipeline_step()
 			++m_pc; // Target fetch was already redirected in Access.
 		else if ((m_op & 0xff00) == 0xee00)
 			; // FRAME's SP update already belongs to its Access stage.
+		else if (staged_mmr_move(m_op))
+			; // MVMM's retained Decode read and Access write are already complete.
 		else if ((m_op & 0xff00) == 0x7700)
 		{
 			// Non-DAGEN PMST retains its literal until Execute; do not
@@ -3074,6 +3082,18 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
 		m_pipeline_flush_front = false;
 	}
+	// SPRU172C 4-116: MVMM reads in Decode and writes in Access.
+	// Order both after older publications; forward an Access write to a
+	// younger Decode read without resampling the older move's operand.
+	if (m_pipeline_valid[3] && staged_mmr_move(m_pipeline_word[3]))
+	{
+		u16 const destination = 0x10 + (m_pipeline_word[3] & 15);
+		u16 const previous_sp = m_sp;
+		data_write(destination, m_pipeline_operand[3]);
+		if (destination == 0x18) pipeline_delay_compiler_sp(previous_sp);
+	}
+	if (m_pipeline_valid[2] && staged_mmr_move(m_pipeline_word[2]))
+		m_pipeline_operand[2] = data_read(0x10 + ((m_pipeline_word[2] >> 4) & 15));
 	if (!m_pipeline_flush_front && !prefetch_bubble && !m_pipeline_idle_barrier && !m_pipeline_idle_resume_pending && !m_pipeline_repeat_body_latched && !m_idle)
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
