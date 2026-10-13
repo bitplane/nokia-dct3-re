@@ -22,10 +22,15 @@ constexpr bool staged_immediate_alu(u16 word)
 	return form == 0xf000 || form == 0xf030 || form == 0xf040 || form == 0xf050;
 }
 
+constexpr bool staged_tc_branch(u16 word)
+{
+	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30;
+}
+
 constexpr bool staged_conditional_branch(u16 word)
 {
 	return word == 0xfa44 || word == 0xfa45 || word == 0xfa4c || word == 0xfa4d ||
-		word == 0xf844 || word == 0xf845 || word == 0xf84c || word == 0xf84d || (word & 0xfdfe) == 0xf802;
+		word == 0xf844 || word == 0xf845 || word == 0xf84c || word == 0xf84d || (word & 0xfdfe) == 0xf802 || staged_tc_branch(word);
 }
 
 constexpr bool staged_bio_branch(u16 word)
@@ -2210,7 +2215,8 @@ void tms320c54x_device::pipeline_step()
 	{
 		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
 		bool const taken = staged_bio_branch(m_pipeline_word[4])
-			? (BIT(m_pipeline_word[4], 0) ? !m_bio_in_cb() : bool(m_bio_in_cb())) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
+			? (BIT(m_pipeline_word[4], 0) ? !m_bio_in_cb() : bool(m_bio_in_cb())) : staged_tc_branch(m_pipeline_word[4])
+			? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
 		m_pipeline_immediate[4] = taken;
 		if (taken)
 		{
@@ -3127,7 +3133,7 @@ void tms320c54x_device::pipeline_step()
 		// Our complete two-word slot reaches Read at the opcode's Evaluate
 		// clock. Retain the predicate after older Execute writes (example 7-17).
 		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
-		m_pipeline_immediate[4] = BIT(m_pipeline_word[4], 0) ? zero : !zero;
+		m_pipeline_immediate[4] = staged_tc_branch(m_pipeline_word[4]) ? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff80) == 0x4600)
 	{

@@ -2456,14 +2456,15 @@ The original run retires five NAND strobes: command byte `00` with CLE high,
 then address bytes `00,01,00,00` with ALE high; CE remains low and direction
 is `7`. The write sequence alone is not evidence of a completed NAND read.
 PORTR `74f8` at `00:302f` now reads port `4000` into AL. The capped
-device-boundary observer records bytes `fa,33`, with CLE/ALE/CE low and
-ready high; they match the first two bytes of retained NAND row 1 (raw
-offset `528`). This establishes two actual data reads, not a completed
+device-boundary observer records bytes `fa,33,c0,8e`, with CLE/ALE/CE low and
+ready high; they match the first four bytes of retained NAND row 1 (raw
+offset `528`). This establishes four actual data reads, not a completed
 page read or startup. `80e6` at `00:3269` now has staged long-offset
 STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
 DAGEN-publication and replay coverage, including a coherent fixture of the
-preceding STL and immediate AR consumer. The first unsupported instruction
-is `f820` at `00:3270` (`BC NTC`); debugger context is `00:3272`, not
+preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
+now has retained-predicate and producer/replay coverage. The first unsupported
+instruction is `6be6` at `00:3277` (long-offset ADDM); debugger context is `00:3279`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2480,7 +2481,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:3270` needs staged TC/NTC branch sampling, redirect and replay conformance before advancing this diagnostic;
+`00:3277` needs staged long-offset ADDM address/read/write and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

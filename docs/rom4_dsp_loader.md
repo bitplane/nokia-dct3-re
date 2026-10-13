@@ -3197,13 +3197,13 @@ read, one I/O read, one data write, unchanged status/unselected accumulator
 lanes and no duplicate pointer update after restoration.
 
 The original upload now retires PORTR `74f8` at `00:302f`. The capped
-NAND read observer records `fa,33` with HD012=`0`, direction=`7` and
-ready=`1`; these match retained NAND row 1's first two bytes at raw offset
+NAND read observer records `fa,33,c0,8e` with HD012=`0`, direction=`7` and
+ready=`1`; these match retained NAND row 1's first four bytes at raw offset
 `528`. The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `BC NTC`, `f820` at `00:3270`, debugger context
-`00:3272`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is long-offset ADDM, `6be6` at `00:3277`, debugger context
+`00:3279`. Unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3247,6 +3247,23 @@ must read and write once, preserve accumulators and avoid duplicate pointer
 updates. Eight paired fixtures use the original `80e6,0010,71e6,0011,0012`
 words: STL writes at clock 7, MVDK reads and publishes AR2 at 8, and an
 immediate CMPR sees the new AR2. Four checkpoints replay both writes once.
+
+TC/NTC BC and BCD (`f820/f830/fa20/fa30`) retain their predicate in the
+complete slot's Read, corresponding to the opcode's Evaluate clock in
+SPRU131G examples 7-16/17. Plain forms use the existing held-word/redirect
+path; delayed forms use the existing late Evaluate path after older Execute.
+Later delay-slot TC changes cannot reselect the destination. No new CPU
+state or atomic fallback is introduced. Phase placement remains the partial
+frontend model; overflow/carry and other conditional-branch families remain
+outside this acceptance scope.
+
+The 1,536 replay cases cover both forms/conditions/outcomes, BIT, CMPR-EQ,
+status-bit and CMPR-LT producers (including the original `f5aa` family),
+zero/one/two gaps, two pages, four checkpoints and a post-Evaluate TC-change
+control. The latter changes debug CPU state in a firmware-free conformance
+fixture, never the original upload. Tests assert one target-literal fetch,
+one taken-target fetch, real delay-slot effects, the selected continuation,
+unchanged unrelated flags and one BIT memory read where applicable.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

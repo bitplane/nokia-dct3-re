@@ -6723,6 +6723,52 @@ private:
 		m_phase = 252850; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_tc_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const tc = variant % 2, delayed = (variant / 2) % 2, value = (variant / 4) % 2;
+		unsigned const producer = (variant / 8) % 4, gap = (variant / 32) % 3;
+		u32 const base = (variant / 96) % 2 ? 0x20000 : 0;
+		bool const taken = value == tc;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, std::array<u16, 4>{0x9634, 0xf4aa, u16(value ? 0xf5bc : 0xf4bc), 0xf5aa}[producer]);
+		program.write_word(base + 0x601 + gap, 0xf820 | (tc << 4) | (delayed << 9));
+		program.write_word(base + 0x602 + gap, 0x700);
+		program.write_word(base + 0x603 + gap, value ? 0xf4bc : 0xf5bc); // Opposite TC after branch evaluation.
+		program.write_word(base + 0x604 + gap, 0xe922);
+		program.write_word(base + 0x605 + gap, 0xe811); program.write_word(base + 0x606 + gap, 0xf4e1);
+		program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (value ? 0 : 0x1000));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1200);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, producer == 3 ? (value ? 0x11ff : 0x1200) : value ? 0x1200 : 0x1201);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, value ? 0x0800 : 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "tc_branch_target",
+			[this, taken, delayed, gap](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				expect(taken && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (delayed ? 9 : 8) + gap,
+					"TC branch target is fetched once through its retained decision and conditional bubble"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x602 + gap, base + 0x602 + gap, "tc_branch_literal",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == 0x700 && !m_pipeline_extensions_reads, "TC branch retains its target literal once"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "tc_branch_bit_source",
+			[this, producer, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(!producer && at == 0x1000 && word == (value ? 0x0800 : 0) && !m_pipeline_register_writes && m_cpu->pipeline_cycles() == 5,
+					"Only the BIT producer has one memory sample before TC publication"); ++m_pipeline_register_writes; });
+		m_operand_data_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "tc_branch_no_data_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "TC branch and its register producers do not write data memory"); });
+		m_phase = 252870; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -31345,13 +31391,61 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 7) { start_pipeline_original_long_move(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_tc_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252860)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252850;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252870)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const tc = variant % 2, delayed = (variant / 2) % 2, value = (variant / 4) % 2, poison = variant / 768;
+			unsigned const producer = (variant / 8) % 4, gap = (variant / 32) % 3;
+			bool const taken = value == tc;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 7, 10}[(variant / 192) % 4] + gap;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "TC/NTC conditional branches have staged ownership");
+			if (poison && tick == 7 + gap)
+				// CPU conformance mutation after Evaluate, never a native-boot hook.
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, m_cpu->state_int(tms320c54x_device::STATE_ST0) ^ 0x1000);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_register_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TC branch before/after evaluation and delay execution");
+			}
+			if (tick == 32)
+			{
+				bool const final_tc = delayed || !taken || poison ? !value : value;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(taken) &&
+					m_pipeline_extensions_reads == 1 && m_pipeline_register_writes == unsigned(!producer) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed || !taken ? 0x22 : 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (final_tc ? 0x1000 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1000,
+					"TC branch consumes the published condition once; delay writes and later TC mutation cannot change the retained redirect");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TC decision/held word without duplicate target or source fetches");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252880; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_pipeline_tc_branch(variant + 1); return; }
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				osd_printf_info("TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252880)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252870;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
