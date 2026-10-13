@@ -3629,9 +3629,17 @@ cases, covering all source/destination selectors, carry, sticky overflow,
 OVM saturation, 32/40-bit boundary patterns and immediate-load producers
 without data-memory accesses or frontend fallback (SPRU172C 4-119/4-120).
 The current one-second observation enters loader `3538` with descriptor
-zero after 4,612 NAND reads and reads block count `0010`. The next stop is
-the source restriction on `SUB *(0008),B` (`09f8 0008` at `00:2f46`),
-which needs a mapped AL operand. Live PC `002f4a` is not its opcode address.
+zero after 4,612 NAND reads and reads block count `0010`. Its mapped AL
+subtraction (`09f8 0008` at `00:2f46`) now executes. The next stop is
+mapped AL in `BITF *(0008),0001` (`61f8 0008 0001` at `00:2fa5`),
+in the DMA-completion polling sequence. The preceding load reads DMPREC;
+BITF itself reads AL, not a DMA peripheral. Live PC `002faa` is not its
+opcode address. Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
+BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
+Read values. Producer cases distinguish the short-consumer one-word
+latency from the long-offset zero-gap case (SPRU131G table 7-28).
+Controls, peripherals and mapped SUBC remain excluded. Physical bus
+phases and bank contention are not established by these fixtures.
 Repeated NEG and measured silicon phases remain unvalidated. The former malformed
 names/zero-length loader retry tail is superseded. Board boot, resident
 transfer, music decoding and recording remain unaccepted.

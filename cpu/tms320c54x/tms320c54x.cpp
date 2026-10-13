@@ -2922,6 +2922,7 @@ void tms320c54x_device::pipeline_step()
 		bool const bitfield = staged_bitfield(m_pipeline_word[3]);
 		bool const shifted = staged_shifted_smem(m_pipeline_word[3]);
 		bool const multiply = staged_t_memory_operation(m_pipeline_word[3]);
+		bool const add_sub = staged_smem_arithmetic(m_pipeline_word[3]) && (m_pipeline_word[3] & 0xfe00) != 0x1e00;
 		bool const extended = (shifted && mode >= 0xe0) || staged_extended_smem_arithmetic(m_pipeline_word[3]) || staged_extended_bitfield(m_pipeline_word[3]) || staged_extended_t_memory_operation(m_pipeline_word[3]);
 		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode);
@@ -2934,7 +2935,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (source < 0x60 && (source < (multiply || shifted ? 0x08 : 0x10) || source > 0x17))
+		if (source < 0x60 && (source < (multiply || shifted || add_sub ? 0x08 : 0x10) || source > 0x17))
 		{
 			logerror("%s: staged %s control/peripheral source is unsupported\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB");
 			m_illegal = true; return;
@@ -2980,7 +2981,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_operand_address[3] = m_pipeline_immediate[3];
 		u16 const source = m_pipeline_operand_address[3];
-		if (source < 0x60 && (source < 0x10 || source > 0x17))
+		if (source < 0x60 && (source < 0x08 || source > 0x17))
 		{
 			logerror("%s: staged absolute ADD control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

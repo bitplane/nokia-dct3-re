@@ -9156,6 +9156,78 @@ private:
 		m_phase = 253410; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	struct mapped_word_arithmetic_fixture
+	{
+		u64 a, b, after_a, after_b, result;
+		u16 t, trn, address, memory, opcode, st0, st1, result_st0;
+		u32 base;
+		unsigned prefix, read_cycle, mutation_state;
+		bool absolute;
+	};
+	static mapped_word_arithmetic_fixture mapped_word_arithmetic_case(unsigned variant)
+	{
+		unsigned const v = variant % 2304;
+		bool const producer = v >= 2048;
+		unsigned const p = producer ? v - 2048 : v;
+		unsigned const reg = producer ? 0 : p % 8, selector = producer ? p % 4 : (p / 8) % 4;
+		unsigned const flags = producer ? (p / 4) % 4 : (p / 32) % 4, pattern = producer ? (p / 128) % 2 : (p / 128) % 4;
+		bool const absolute = producer ? (p / 16) % 2 : (p / 512) % 2;
+		bool const page = producer ? (p / 32) % 2 : (p / 1024) % 2, gap = producer && (p / 64) % 2;
+		bool const subtract = selector >= 2, destination_b = selector & 1, sxm = flags & 1, ovm = flags & 2;
+		u64 const a = producer ? 0x1234568001ULL : std::array<u64, 4>{0x20, 0xff80008000ULL, 0x007fffffff, 0x8000000000ULL}[pattern];
+		u64 const b = producer ? 0x1e1e2 : std::array<u64, 4>{0x1e1e2, 0x0040000001, 0xff80000000ULL, 0x7fffffffffULL}[pattern];
+		u16 const t = std::array<u16, 4>{0x20, 0x8000, 0xffff, 0x7f}[pattern], trn = std::array<u16, 4>{0x10, 0xffff, 0x8000, 0xff}[pattern];
+		u16 const produced = pattern ? 0x20 : 0;
+		u64 const sample_a = producer && (absolute || gap) ? produced : a;
+		u16 const memory = reg < 3 ? u16(sample_a >> (reg * 16)) : reg < 6 ? u16(b >> ((reg - 3) * 16)) : reg == 6 ? t : trn;
+		u64 after_a = producer ? produced : a, after_b = b;
+		unsigned mutation_state = 0;
+		if (!producer)
+		{
+			if (reg < 3 && destination_b) { after_a = 0x012345abcdULL; mutation_state = tms320c54x_device::STATE_A; }
+			else if (reg >= 3 && reg < 6 && !destination_b) { after_b = 0x012345abcdULL; mutation_state = tms320c54x_device::STATE_B; }
+			else if (reg >= 6) mutation_state = reg == 6 ? tms320c54x_device::STATE_T : tms320c54x_device::STATE_TRN;
+		}
+		u64 const accumulator = destination_b ? after_b : after_a;
+		s64 const left = BIT(accumulator, 39) ? s64(accumulator) - (s64(1) << 40) : s64(accumulator);
+		s64 const right = sxm ? s16(memory) : s64(memory), sum = subtract ? left - right : left + right;
+		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
+		bool const carry = subtract ? u32(accumulator) >= u32(right) : u64(u32(accumulator)) + u32(right) > 0xffffffffULL;
+		u16 const st0 = 0x1800, result_st0 = (st0 & ~u16(0x800)) | (carry ? 0x800 : 0) | (overflow ? destination_b ? 0x200 : 0x400 : 0);
+		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
+		unsigned const prefix = producer ? 1 + unsigned(gap) : 0;
+		return {a, b, after_a, after_b, result, t, trn, u16(8 + reg), memory,
+			u16((subtract ? 0x800 : 0) | (destination_b ? 0x100 : 0) | (absolute ? 0xf8 : 8 + reg)),
+			st0, u16(0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0)), result_st0,
+			u32(page ? 0x20000 : 0), prefix, (absolute ? 6U : 5U) + prefix, mutation_state, absolute};
+	}
+	void start_pipeline_mapped_word_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = mapped_word_arithmetic_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.prefix) program.write_word(f.base + 0x600, 0xe800 | u16(f.after_a));
+		program.write_word(f.base + 0x600 + f.prefix, f.opcode);
+		if (f.absolute) program.write_word(f.base + 0x601 + f.prefix, f.address);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mapped_word_arithmetic_read",
+			[this, f](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
+				expect(address == f.address && value == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle, "Mapped word arithmetic samples its real register in Read, including producer latency"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mapped_word_arithmetic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Mapped word arithmetic does not publish through data memory"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + 0x601 + f.prefix, "mapped_word_arithmetic_literal",
+			[this, f](offs_t, u16 &value, u16) { if (machine().side_effects_disabled() || !f.absolute) return;
+				expect(value == f.address && !m_pipeline_extensions_reads, "Mapped word arithmetic retains its absolute address once"); ++m_pipeline_extensions_reads; });
+		m_phase = 253430; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -9166,6 +9238,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "mapped-word"))
+		{
+			start_pipeline_mapped_word_arithmetic(); return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "negate"))
 		{
 			start_pipeline_negate(); return;
@@ -34264,13 +34340,53 @@ private:
 				if (variant < 13823) { start_pipeline_negate(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged NEG: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "negate")) throw emu_fatalerror(0, "TMS320C54x isolated NEG complete");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_mapped_word_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253420)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253410; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253430)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = mapped_word_arithmetic_case(variant); unsigned const checkpoint = f.read_cycle - 1 + variant / 2304;
+			if (tick == f.read_cycle && f.mutation_state) m_cpu->set_state_int(f.mutation_state, f.mutation_state == tms320c54x_device::STATE_A || f.mutation_state == tms320c54x_device::STATE_B ? 0x012345abcdULL : 0x2222);
+			u64 a = f.a, b = f.b;
+			if (f.prefix && tick >= 6) a = f.after_a;
+			if (tick >= f.read_cycle) { if (f.mutation_state == tms320c54x_device::STATE_A) a = f.after_a; if (f.mutation_state == tms320c54x_device::STATE_B) b = f.after_b; }
+			if (tick > f.read_cycle) (BIT(f.opcode, 8) ? b : a) = f.result;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > f.read_cycle ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick >= f.read_cycle && f.mutation_state == tms320c54x_device::STATE_T ? 0x2222 : f.t) &&
+				m_cpu->state_int(tms320c54x_device::STATE_TRN) == (tick >= f.read_cycle && f.mutation_state == tms320c54x_device::STATE_TRN ? 0x2222 : f.trn), "Mapped word ADD/SUB retains Read operands, honors accumulator latency and publishes arithmetic only in Execute");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped word arithmetic before/after Read or Execute");
+			}
+			if (tick == 16)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.absolute), "Mapped word arithmetic has one source sample and no literal refetch");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped word arithmetic without resampling the changed register");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253440; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 6911) { start_pipeline_mapped_word_arithmetic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "mapped-word")) throw emu_fatalerror(0, "TMS320C54x isolated mapped word arithmetic complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253440)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253430; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -35382,6 +35498,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(4, "rptb", "Staged straight-line RPTB conformance")
 	ROM_SYSTEM_BIOS(5, "rmw-forward", "Staged same-address RMW forwarding")
 	ROM_SYSTEM_BIOS(6, "negate", "Staged accumulator NEG conformance")
+	ROM_SYSTEM_BIOS(7, "mapped-word", "Staged accumulator/T/TRN memory arithmetic")
 ROM_END
 
 ROM_START(tms54rom4)

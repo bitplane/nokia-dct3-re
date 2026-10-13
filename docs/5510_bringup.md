@@ -2477,11 +2477,27 @@ with length words `36c2=0001`, `36c3=e1e8`, matching the atomic reference.
 NEG `f484` at `00:0e35` now executes with one-word Execute-owned
 semantics. The current one-second observation enters loader `3538` with
 index zero after 4,612 NAND reads, correct name/extension and length, then
-reads the first file-backed block count `0010`. The next restriction is
-`SUB *(0008),B`, encoded `09f8 0008` at `00:2f46`: its source is the
-mapped AL register, below the staged arithmetic source whitelist. The
-live stopping PC `002f4a` is not the opcode's address. Neither resident
-transfer nor recording is accepted.
+reads the first file-backed block count `0010`. `SUB *(0008),B`
+(`09f8 0008` at `00:2f46`) now consumes mapped AL and the run reaches
+the original DMA-completion polling sequence. The next restriction is
+`BITF *(0008),0001`, encoded `61f8 0008 0001` at `00:2fa5`;
+its mapped AL source is not yet admitted by the bitfield whitelist.
+The prior `1081` instruction reads DMPREC through AR1, but BITF itself
+does not read the DMA peripheral. Live stopping PC `002faa` is not its
+opcode address. Neither resident transfer nor recording is accepted.
+
+Mapped memory ADD/SUB now admits AL/AH/AG, BL/BH/BG and T/TRN, using
+one retained Read sample through their existing register map. Controls,
+peripheral sources and mapped SUBC retain their exclusions. The mandatory
+`tms54test -bios mapped-word` fixture has 6,912 save/replay cases covering
+eight registers, four add/subtract/destination selectors, direct/absolute
+forms, signed/unsigned operands, OVM, accumulator aliases, changed source
+registers and two program pages. Its 768 producer cases pin SPRU131G
+table 7-28: a short mapped AL consumer sees the previous value after an
+adjacent one-word accumulator load; one NOP exposes the new value. The
+long-offset consumer has no such gap requirement. Register sampling and
+flag publication stay separate; no RAM write or frontend fallback is used.
+These are bounded CPU contracts, not measured DA150 bus phases.
 
 The isolated `tms54test -bios negate` fixture requires 13,824 cases with
 save/replay, all A/B source/destination combinations, 16 patterns including
