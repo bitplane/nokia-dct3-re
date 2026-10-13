@@ -7302,6 +7302,71 @@ private:
 		m_phase = 253090; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct immediate_arithmetic_fixture
+	{
+		unsigned selector, shift, flags, gap, execute_cycle;
+		bool producer, add;
+		u16 opcode, literal, st0, st1, result_st0;
+		u64 source, result;
+		u32 base;
+	};
+	static immediate_arithmetic_fixture immediate_arithmetic_case(unsigned variant)
+	{
+		bool const producer = variant >= 27648;
+		unsigned const v = producer ? (variant - 27648) % 48 : variant % 9216;
+		bool const add = !producer && v >= 8704;
+		unsigned const u = add ? v - 8704 : v;
+		unsigned const shift = producer ? 0 : add ? 16 : u % 17;
+		unsigned const selector = producer || add ? u % 4 : (u / 17) % 4;
+		unsigned const pattern = producer ? (u / 4) % 4 : add ? (u / 4) % 8 : (u / 68) % 8;
+		unsigned const flags = producer ? 1 : add ? (u / 32) % 8 : (u / 544) % 8;
+		unsigned const gap = producer ? (u / 16) % 3 : 0;
+		u16 const literal = producer ? 1 : std::array<u16, 8>{1, 1, 0xffff, 1, 0x8000, 0xffff, 0xf495, 0xffff}[pattern];
+		u64 const source = producer ? u64(s64(s16(std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern]))) & 0xffffffffffULL :
+			std::array<u64, 8>{0, 0xffffffff, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x56783933, 0x80aa001234ULL}[pattern];
+		u16 const st0 = 0x1804 | (flags & 4 ? 0x600 : 0), st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0);
+		s64 const left = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
+		s64 const right = (flags & 1 ? s64(s16(literal)) : s64(literal)) * (s64(1) << shift);
+		s64 const sum = add ? left + right : left - right;
+		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
+		bool const carry = add ? u64(u32(source)) + u32(right) > 0xffffffffULL : u32(source) >= u32(right);
+		u16 const result_st0 = (st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
+		u64 const result = u64((flags & 2) && overflow ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
+		u16 const opcode = (shift == 16 ? 0xf060 | !add : add ? 0xf000 : 0xf010) | ((selector >> 1) << 9) | ((selector & 1) << 8) | (shift == 16 ? 0 : shift);
+		u32 const base = (producer ? selector & 1 : add ? (u / 256) % 2 : (u / 4352) % 2) ? 0x20000 : 0;
+		return {selector, shift, flags, gap, producer ? 9 + gap : 7, producer, add, opcode, literal, st0, st1, result_st0, source, result, base};
+	}
+	void start_pipeline_immediate_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = immediate_arithmetic_case(variant);
+		u32 const sub_pc = f.base + 0x600 + (f.producer ? 2 + f.gap : 0);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.producer) { program.write_word(f.base + 0x600, 0xf020 | ((f.selector >> 1) << 8)); program.write_word(f.base + 0x601, f.source); }
+		program.write_word(sub_pc, f.opcode); program.write_word(sub_pc + 1, f.literal);
+		if (f.producer) program.write_word(sub_pc + 2, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.producer || (f.selector & 2) ? 0x1111222233ULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.producer || !(f.selector & 2) ? 0x4444555566ULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "immediate_arithmetic_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Immediate arithmetic does not read data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "immediate_arithmetic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Immediate arithmetic modifies only accumulator/status"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, sub_pc + 1, "immediate_arithmetic_literal",
+			[this, f, sub_pc](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled() || (at != f.base + 0x601 && at != sub_pc + 1)) return;
+				bool const producer_literal = f.producer && !m_pipeline_extensions_reads;
+				expect(at == (producer_literal ? f.base + 0x601 : sub_pc + 1) && word == (producer_literal ? u16(f.source) : f.literal) &&
+					m_pipeline_extensions_reads < (f.producer ? 2U : 1U), "Immediate arithmetic retains each literal once, without executing opcode-shaped data"); ++m_pipeline_extensions_reads; });
+		m_phase = 253110; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -32532,13 +32597,65 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 2303) { start_pipeline_extended_banz(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_immediate_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253100)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253090;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253110)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = immediate_arithmetic_case(variant);
+			unsigned const checkpoint = f.producer ? std::array<unsigned, 3>{5 + f.gap, 6 + f.gap, 8 + f.gap}[(variant - 27648) / 48] :
+				std::array<unsigned, 3>{3, 4, 6}[variant / 9216];
+			u64 const original_a = f.producer || (f.selector & 2) ? 0x1111222233ULL : f.source;
+			u64 const original_b = f.producer || !(f.selector & 2) ? 0x4444555566ULL : f.source;
+			u64 const initial_a = f.producer && tick >= 7 && !(f.selector & 2) ? f.source : original_a;
+			u64 const initial_b = f.producer && tick >= 7 && (f.selector & 2) ? f.source : original_b;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (tick >= f.execute_cycle && !(f.selector & 1) ? f.result : initial_a) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (tick >= f.execute_cycle && (f.selector & 1) ? f.result : initial_b) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= f.execute_cycle ? f.result_st0 : f.st0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
+				"Immediate SUB and shift-16 ADD retire once with 40-bit source, SXM, carry, sticky destination overflow and OVM semantics");
+			if (tick == 4 || (f.producer && tick == 6 + f.gap))
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
+				if (f.producer && tick == 6 + f.gap) m_cpu->space(AS_PROGRAM).write_word(f.base + 0x603 + f.gap, 0xbeef);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save immediate arithmetic in partial/complete Decode or Read");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_extensions_reads == (f.producer ? 2U : 1U), "Immediate arithmetic consumes each source literal once");
+				if (f.producer) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "The load-to-SUB producer fixture drains to IDLE");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore immediate arithmetic without literal refetch or premature publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253120; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				if (variant < 27791) { start_pipeline_immediate_arithmetic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged immediate arithmetic: PASS sub_cases=26112 add16_cases=1536 producer_cases=144 selectors=4 shifts=0..16 patterns=8 status_states=8 pages=2 restore=27792 duplicate_literals=0 data_accesses=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253120)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253110;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

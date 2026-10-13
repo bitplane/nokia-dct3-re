@@ -19,7 +19,7 @@ constexpr bool staged_xmem_bit(u16 word)
 constexpr bool staged_immediate_alu(u16 word)
 {
 	u16 const form = word & 0xfcf0;
-	return form == 0xf000 || form == 0xf030 || form == 0xf040 || form == 0xf050;
+	return form == 0xf000 || form == 0xf010 || form == 0xf030 || form == 0xf040 || form == 0xf050 || (word & 0xfcfe) == 0xf060;
 }
 
 constexpr bool staged_tc_branch(u16 word)
@@ -3171,13 +3171,14 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_immediate_alu(m_op))
 		{
 			++m_pc;
-			unsigned const operation = (m_op >> 4) & 15;
+			bool const high_arithmetic = (m_op & 0xfcfe) == 0xf060;
+			unsigned const operation = high_arithmetic ? BIT(m_op, 0) : (m_op >> 4) & 15;
 			u64 const source = accumulator(BIT(m_op, 9));
 			u64 &destination = accumulator(BIT(m_op, 8));
-			if (!operation)
+			if (operation <= 1)
 			{
-				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (m_op & 15)) & ACC_MASK;
-				destination = add_sub(source, operand, false, BIT(m_op, 8));
+				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (high_arithmetic ? 16 : m_op & 15)) & ACC_MASK;
+				destination = add_sub(source, operand, operation == 1, BIT(m_op, 8));
 			}
 			else
 			{

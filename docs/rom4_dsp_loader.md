@@ -3280,16 +3280,19 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 512 reads and five strobes,
-with AR0=`00ff`, AR1=`0010`, AR2=`aa55`. This validates device-read data,
+The stop summary counts 548 reads and ten strobes,
+with AR0=`0011`, AR1=`0007`, AR2=`0011`. After the first row, command
+`00` and address bytes `00,20,00,00` start a second read at row 32.
+The additional 36 bytes are outside the bounded capture and remain
+unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is immediate SUB (`SUB #lk,A`), `f010` at
-`00:3216`, debugger context `00:3218`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is register SUB (`SUB B,0,A`), `f620` at
+`00:321c`, debugger context `00:321e`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
-and long-offset BANZ `6ce2` at `00:30df`
+long-offset BANZ `6ce2` at `00:30df` and immediate SUB `f010` at `00:3216`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3376,8 +3379,8 @@ the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
-DLD and long-offset BANZ now have staged coverage; subsequent immediate
-SUB remains incomplete.
+DLD, long-offset BANZ and immediate SUB now have staged coverage;
+subsequent register SUB remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
@@ -4114,9 +4117,38 @@ read (SPRU172C page 4-4, syntax 7). All source/destination combinations,
 shifts 0/1/7/15, SXM/OVM settings and positive/negative boundary operands
 have 256 cases with restore during partial or complete Decode. They require
 correct carry, destination overflow and saturation; changing the literal
-after Fetch must not affect retirement. Shift-16 forms, other immediate ALU
-arithmetic operations, mixed status producers and delayed-control overlap remain
-outside this gate.
+after Fetch must not affect retirement. The additional SUB/shift-16 matrix
+below covers the other arithmetic forms; mixed status producers and
+delayed-control overlap remain unvalidated.
+
+Immediate SUB (`f010` family, shifts 0--15) and the separate shift-16
+ADD/SUB encodings (`f060/f061` with source/destination selectors) use
+the same retained-literal path. Execute extends the 16-bit literal under
+SXM, shifts it, then uses the shared 40-bit arithmetic helper without
+fetching program or data memory. SUB computes selected source minus
+operand, not selected destination minus operand; source/destination
+aliasing reads the original source. Carry reflects the low-32-bit
+operation before OVM saturation, and destination overflow is sticky.
+The unselected accumulator, other overflow bit and remaining status
+fields are preserved.
+
+The new matrix has 26112 SUB cases across shifts 0--16, all four A/B
+selections, eight source/literal patterns, eight SXM/OVM/sticky-overflow
+states, two pages and saves during partial Decode, complete Decode or
+Read. Another 1536 cases cover shift-16 ADD. Opcode-shaped literal `f495`,
+40-bit guard/sign boundaries, borrow/carry and saturation are included.
+Fixtures change the program literal after Decode and assert publication
+only at Execute, clock 7 in this partial frontend model, with one literal
+fetch and no data-memory access on each replay.
+
+Another 144 firmware-free producer/replay cases compose a two-word
+signed immediate load with SUB through zero, one or two intervening NOPs,
+all four A/B selections and source values `0,1,8000,ffff`. They verify
+that SUB sees the load's Execute publication and that the sequence drains
+to IDLE without literal refetch. Load publishes at clock 7 and SUB at
+clock `9 + gap` in this model. These fixtures do not validate silicon
+source-read phases, mixed status producers, wider producer conflicts or
+delayed-control overlap.
 
 Immediate AND/OR/XOR retain unsigned literals through the same two-word
 Decode path and leave both status registers unchanged, independently of

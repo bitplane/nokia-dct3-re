@@ -2460,8 +2460,11 @@ device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
 with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stopped-run summary counts 512 NAND byte reads and five strobes, with
-AR0=`00ff`, AR1=`0010`, AR2=`aa55`. This verifies device-read data, not
+The stopped-run summary counts 548 NAND byte reads and ten strobes, with
+AR0=`0011`, AR1=`0007`, AR2=`0011`. A second command `00` with address
+bytes `00,20,00,00` starts row 32; its additional 36 bytes are outside
+the bounded capture and remain unverified. The first-page comparison
+verifies device-read data, not
 the firmware buffer, spare-area handling or startup.
 `80e6` at `00:3269` now has staged long-offset
 STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
@@ -2469,8 +2472,8 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is immediate SUB (`SUB #lk,A`) `f010` at `00:3216`;
-debugger context is `00:3218`, not
+instruction is register SUB (`SUB B,0,A`) `f620` at `00:321c`;
+debugger context is `00:321e`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2494,8 +2497,10 @@ Short-indirect DLD at `00:30d3` has retained paired-read, pointer-modification,
 accumulator-publication and replay coverage, including all short modes and
 the extended forms. Long-offset BANZ at `00:30df` has retained offset/target,
 resolved-address predicate, pointer-modification and replay coverage.
-Immediate SUB at `00:3216` needs retained literal, arithmetic flags and
-replay coverage;
+Immediate SUB at `00:3216` has retained-literal, arithmetic-flag and
+replay coverage, including shift-16 and preceding-load composition.
+Register SUB at `00:321c` needs source/destination ownership, signed shift,
+arithmetic-flag and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
