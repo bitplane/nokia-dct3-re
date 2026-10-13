@@ -7728,6 +7728,76 @@ private:
 				expect(at == (m_pipeline_extensions_reads ? 0x603 : 0x601) && word == (m_pipeline_extensions_reads ? 3 : 4), "LD T/MPY retains independent address extensions"); ++m_pipeline_extensions_reads; });
 		m_phase = 253190; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct shifted_arithmetic_fixture
+	{
+		memory_arithmetic_fixture operand;
+		u16 extension, result_st0;
+		u64 a, b, result;
+	};
+	static shifted_arithmetic_fixture shifted_arithmetic_case(unsigned variant)
+	{
+		bool const mapped = variant >= 147456;
+		unsigned const v = mapped ? (variant - 147456) % 32768 : variant % 49152;
+		unsigned const selector = mapped ? (v / 8) % 8 : (v / 12) % 8;
+		unsigned const pattern = mapped ? (v / 64) % 4 : (v / 96) % 4;
+		unsigned const flags = mapped ? (v / 256) % 4 : (v / 384) % 4;
+		int const shift = int(mapped ? (v / 1024) % 32 : (v / 1536) % 32) - 16;
+		auto o = memory_arithmetic_case(std::array<unsigned, 6>{0, 1, 4, 14, 15, 17}[v % 6] + 18 * ((v / 6) % 2 ? 6 : 1) + 576 * pattern + 4608 * flags);
+		o.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern];
+		o.opcode = 0x6f00 | u8(o.opcode); ++o.read_cycle;
+		if (mapped)
+		{
+			o.form = 17; o.reg = o.selected = 1; o.address = 0x10 + v % 8; o.literal = o.address;
+			o.opcode = 0x6ff8; o.read_cycle = 7; o.st1 &= ~0x4000;
+		}
+		u64 const a = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL}[pattern];
+		u64 const b = std::array<u64, 4>{0xffffffffffULL, 0xff7fffffffULL, 0x12345678, 0xff80000000ULL}[pattern];
+		u64 const source = selector & 2 ? b : a;
+		s64 const value = flags & 1 ? s16(o.memory) : s64(o.memory);
+		u64 const memory = u64(value) & 0xffffffffffULL;
+		u64 const shifted = shift >= 0 ? (memory << shift) & 0xffffffffffULL : flags & 1 ? u64(value >> -shift) & 0xffffffffffULL : memory >> -shift;
+		s64 const left = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
+		s64 const right = BIT(shifted, 39) ? s64(shifted) - (s64(1) << 40) : s64(shifted);
+		s64 const sum = selector & 4 ? left - right : left + right;
+		bool const carry = selector & 4 ? u32(source) >= u32(shifted) : u64(u32(source)) + u32(shifted) > 0xffffffffULL;
+		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
+		u16 const st0 = (o.st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? selector & 1 ? 0x200 : 0x400 : 0);
+		u64 const result = u64(overflow && (flags & 2) ? std::clamp(sum, s64(-2147483648LL), s64(2147483647LL)) : sum) & 0xffffffffffULL;
+		return {o, u16(0x0c00 | ((selector & 3) << 8) | ((selector & 4) << 3) | (shift & 31)), st0, a, b, result};
+	}
+	void start_pipeline_shifted_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = shifted_arithmetic_case(variant); auto const &o = f.operand;
+		u32 const base = o.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, o.opcode);
+		if (o.form >= 14) program.write_word(base + 0x601, o.literal);
+		program.write_word(base + 0x601 + (o.form >= 14), f.extension);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1122); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x3344);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, o.memory);
+		else m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.address - 0x10, o.memory);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shifted_arithmetic_read",
+			[this, o](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == o.address && word == o.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == o.read_cycle, "Shifted ADD/SUB samples one retained RAM or mapped AR source"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shifted_arithmetic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Shifted ADD/SUB has no data writes"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601 + (o.form >= 14), "shifted_arithmetic_extensions",
+			[this, f, o, base](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				bool const operation = at == base + 0x601 + (o.form >= 14);
+				expect(word == (operation ? f.extension : o.literal) && m_pipeline_extensions_reads == unsigned(operation && o.form >= 14), "Shifted arithmetic retains ordered address and operation extensions"); ++m_pipeline_extensions_reads; });
+		m_phase = 253210; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -33180,13 +33250,70 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 767) { start_pipeline_t_multiply_pair(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged LD T multiply pair: PASS cases=768 restore=768 t_read=6 multiply_read=8 publication=9 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_shifted_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253200)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253190; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253210)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = shifted_arithmetic_case(variant); auto const &o = f.operand;
+			bool const destination = BIT(f.extension, 8), retired = tick > o.read_cycle;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (retired ? destination ? f.a : f.result : 0x1122) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (retired ? destination ? f.result : f.b : 0x3344) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (retired ? f.result_st0 : o.st0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9abc,
+				"Shifted ADD/SUB publishes only selected accumulator and arithmetic flags in Execute");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
+				if (o.form >= 14) m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x602, 0xdead);
+			}
+			if (tick == o.read_cycle - 1 && o.address >= 0x60)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == o.next_ar, "Shifted arithmetic modifies its selected pointer once in Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.selected, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2222);
+			}
+			if (tick == o.read_cycle)
+			{
+				auto const disable = machine().disable_side_effects();
+				if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, 0xdead);
+				else m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.address - 0x10, 0xdead);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+			}
+			unsigned const checkpoint_index = variant < 147456 ? variant / 49152 : (variant - 147456) / 32768;
+			unsigned const checkpoint = std::array<unsigned, 3>{o.form >= 14 ? 4U : 3U, o.read_cycle - 1, o.read_cycle}[checkpoint_index];
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save shifted arithmetic through Decode, Access or Read");
+			}
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 + unsigned(o.form >= 14), "Shifted arithmetic neither resamples nor repeats extension fetches");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore shifted arithmetic without duplicating sampling or publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253220; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 245759) { start_pipeline_shifted_arithmetic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253220)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253210; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{

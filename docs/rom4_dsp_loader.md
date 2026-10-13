@@ -3072,6 +3072,24 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Variable-shift memory ADD/SUB (`6fxx` with operation-extension masks
+`0c00/0c20`, SPRU172C extended Smem arithmetic) retains ordered address
+and operation extensions. Access owns DAGEN; Read samples memory once.
+Execute extends according to SXM, applies the signed five-bit shift without
+independent shift flags, and adds/subtracts into the selected destination
+using the live source accumulator and the shared carry/OVM/overflow helper.
+The 245,760 replay cases cover ADD/SUB with all four source/destination
+pairs, all 32 shifts, SXM/OVM and four memory/guarded-accumulator patterns.
+RAM cases cover DP, CPL, postincrement, long offset/no-update,
+long preincrement and absolute forms with AR1/AR6; mapped cases cover all
+eight AR registers via absolute addresses. Changed pointers and poisoned
+extensions test address retention; changed memory after Read tests sampling;
+changed accumulators between Read and Execute test live-source ownership.
+Decode/Access/Read snapshots check no duplicate reads or data writes.
+Other allowed addressing modes and mapped accumulator/T/TRN sources are
+not covered by this matrix; producer interlocks, physical bank timing,
+repeat bodies and control-delay slots remain unvalidated/restricted.
+
 Variable-shift STL/STH (`6fxx` with `0c80/0d80` or `0c60/0d60`
 operation extension, SPRU172C syntax 4 classes 11A/11B) retain address
 then operation extensions. Read presents the destination and updates its
@@ -3101,7 +3119,7 @@ source and shift range `-16..15` cannot exceed signed 32-bit range on a
 left shift, so these fixtures check preservation of existing overflow flags
 rather than claiming an unreachable new overflow. Mapped `0008..0017`
 sources are permitted but are not covered by this matrix. The shifted
-store extensions have separate coverage; other `6fxx` operation extensions,
+store and arithmetic extensions have separate coverage; other `6fxx` operation extensions,
 repeat bodies and control-delay slots remain rejected.
 The stage assignment remains a partial frontend model, not measured timing.
 
@@ -3495,8 +3513,9 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `ADD *(0016),0,A,B` at `00:319c`, encoded
-`6ff8 0016 0d00`; debugger context is `00:31a0`. Address `0016` is
+unsupported instruction is `SUBC Smem,A`, `1e02` at `00:352f`;
+debugger context is `00:3531`. `ADD *(0016),0,A,B` at `00:319c`, encoded
+`6ff8 0016 0d00`, now has staged coverage. Address `0016` is
 mapped AR6, not RAM. The preceding `LD *AR1(0004),T` at `00:3194`, encoded
 `30e1 0004`, and dependent MPY at `00:3196` now have staged coverage.
 The preceding
@@ -3607,7 +3626,7 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-Smem shifted ADD remains incomplete.
+Smem conditional subtract (SUBC) remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

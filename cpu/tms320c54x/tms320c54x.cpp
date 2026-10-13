@@ -217,6 +217,11 @@ constexpr bool staged_shifted_memory_store(u16 word, u16 extension)
 	return staged_shifted_smem(word) && ((extension & 0xfee0) == 0x0c60 || (extension & 0xfee0) == 0x0c80);
 }
 
+constexpr bool staged_shifted_memory_arithmetic(u16 extension)
+{
+	return (extension & 0xfce0) == 0x0c00 || (extension & 0xfce0) == 0x0c20;
+}
+
 constexpr bool staged_absolute_load(u16 word)
 {
 	return staged_memory_load(word) && u8(word) == 0xf8;
@@ -2475,7 +2480,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_dp = (word & 0xfe00) == 0xea00;
 		bool const immediate_alu = staged_immediate_alu(word);
 		bool const smem_arithmetic = staged_smem_arithmetic(word) || staged_t_memory_operation(word) || staged_shifted_smem(word);
-		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_pipeline_immediate[2]))
+		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_pipeline_immediate[2]) && !staged_shifted_memory_arithmetic(m_pipeline_immediate[2]))
 		{
 			logerror("%s: unsupported staged Smem extension %04x/%04x\n", machine().describe_context(), word, m_pipeline_immediate[2]);
 			m_illegal = true; return;
@@ -3237,6 +3242,12 @@ void tms320c54x_device::pipeline_step()
 				u64 const source = accumulator(BIT(extension, 8));
 				u64 const value = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) : (source << shift) & ACC_MASK;
 				data_write(m_pipeline_operand_address[5], u16(saturated_store(value) >> ((extension & 0xfee0) == 0x0c60 ? 16 : 0)));
+			}
+			else if (staged_shifted_memory_arithmetic(extension))
+			{
+				u64 const operand = data_operand(m_pipeline_operand[5]);
+				u64 const shifted = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(operand, -shift) : operand >> -shift) : (operand << shift) & ACC_MASK;
+				accumulator(BIT(extension, 8)) = add_sub(accumulator(BIT(extension, 9)), shifted, BIT(extension, 5), BIT(extension, 8));
 			}
 			else accumulator(BIT(extension, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), shift, BIT(extension, 8));
 			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
