@@ -2488,8 +2488,20 @@ Recorder dispatch/loader/response and native storage writes
 remain zero. The terminal failure is `MU4 original recorder command did
 not reach the native overlay loader`, not an unsupported opcode.
 The uncaptured 37,019,018 reads and the resulting firmware buffer are
-unverified. The next boundary is directory-buffer construction and
-consumption; neither startup nor recording is accepted. Immediate
+unverified. A bounded descriptor-write observer (64 real data-bus writes
+after NAND traffic begins) narrows directory construction: the first name
+is written as `MMCUSI16`, rather than `MCUSI16 `; the next as `MMP3SI16`,
+rather than `MP3SI16 `. The first extension begins `20,42,49` rather than
+`42,49,4e`, and the first length publication is `36c2=e1e8`, `36c3=0003`,
+rather than the reference `0001:e1e8` double-word. These writes occur in
+the original directory builder around `0ab1..0b55`, before the later
+zero-length loader read. Therefore directory metadata is initially
+populated but already malformed; do not diagnose this as a descriptor
+that was simply never written. The byte-reader/caller ordering and eventual
+overwrite remain to be isolated. In particular, adjacent `ADDM #1,*SP(2)`
+and `LD *SP(2),A` occur between name-byte calls; their dependency is a
+candidate to test, not an established CPU defect or permission to reorder
+all memory accesses. Neither startup nor recording is accepted. Immediate
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/restoration coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication, saturation and consumer/replay

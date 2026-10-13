@@ -223,6 +223,7 @@ private:
 	unsigned m_native_bootstrap_entries = 0, m_native_bootstrap_resident_entries = 0;
 	unsigned m_native_bootstrap_paths[10] = {};
 	unsigned m_native_descriptor_reads = 0;
+	unsigned m_native_descriptor_writes = 0;
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -1472,6 +1473,14 @@ private:
 						unsigned(address), value, unsigned(m_cpu->pc()),
 						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
 						unsigned(m_cpu->state_int(tms320c54x_device::STATE_T)));
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0x36b0, 0x36db, "mu4_original_descriptor_writes",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled() || !m_data_reads || m_native_descriptor_writes >= 64) return;
+					++m_native_descriptor_writes;
+					logerror("mu4_original_descriptor_write: address=%04x value=%04x pc=%06x nand_reads=%u\n",
+						unsigned(address), value, unsigned(m_cpu->pc()), m_data_reads);
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
