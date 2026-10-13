@@ -3199,14 +3199,14 @@ lanes and no duplicate pointer update after restoration.
 The original upload now retires PORTR `74f8` at `00:302f`. The capped
 NAND read observer records a capped 16-byte prefix with HD012=`0`, direction=`7`
 and ready=`1`; `fa33c08ed0bc007c8bf45007501ffbfc` matches retained NAND row 1
-at raw offset `528`. The stop summary counts 452 reads and five strobes,
-with AR0/AR1=`00e1`, AR2=`0000`. The full 452-byte sequence is not captured
+at raw offset `528`. The stop summary counts 458 reads and five strobes,
+with AR0=`00e4`, AR1=`3aea`, AR2=`00e3`. The full 458-byte sequence is not captured
 by the capped prefix, and this is not a complete 512-byte page transfer.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is BITF, `61f8` at `00:3283`, debugger context
-`00:3285`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is short-indirect DST, `4e81` at `00:30c6`, debugger context
+`00:30c8`. Unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3290,8 +3290,8 @@ changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
-The next BITF boundary remains incomplete; this is bounded transfer coverage,
-not startup acceptance.
+The following BITF now has staged coverage; subsequent short-indirect DST
+remains incomplete. This is bounded transfer coverage, not startup acceptance.
 
 Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their
 memory operand through Read and use the established 40-bit arithmetic
@@ -3354,6 +3354,27 @@ LDM/long-offset-SUB/AGT fixtures use counts `0,1,2,65535`: the source reads
 occur at clocks 5/7, SUB retires before evaluation, and taken targets fetch
 at 10. Three checkpoints replay negative/zero/positive outcomes without
 duplicate reads or writes.
+
+BITF `61xx` retains its immediate mask separately from its source address.
+Direct/short-indirect forms are two words; long-offset/absolute forms retain
+the address extension before the mask and are three words (SPRU172C 4-22).
+They share the existing captured-address machinery with memory arithmetic;
+Read samples one RAM/mapped-AR word, Execute changes only TC according to
+`(source & mask) != 0`. RAM and AR0-AR7 sources are accepted; control/peripheral,
+repeat, protected/control-delay and broader producer compositions remain
+unvalidated. Stage placement remains partial, not measured silicon timing.
+
+The 55,296 RAM replay cases cover 18 address forms, eight encoded registers,
+eight word/mask pairs (zero, bit 15 and opcode-shaped masks included), both
+initial TC states, four SXM/OVM combinations, both compatibility states and
+three checkpoints. Literal, pointer and post-Read RAM poisoning must not
+change the result. Tests assert one read, no data writes, TC-only status
+publication and unchanged accumulators. Ninety-six mapped-AR7 cases cover
+immediate TC/NTC consumers, both initial TC values and three checkpoints;
+source reads occur at 7, TC publishes at 8 and taken targets fetch at 10.
+They include the exact upload sequence `61f8,0017,0001`; `007f` is an additional
+conformance mask, not the original literal. The register changes after Read
+must not be resampled, and neither leg may duplicate the source/target read.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

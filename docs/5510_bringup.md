@@ -2459,7 +2459,7 @@ PORTR `74f8` at `00:302f` now reads port `4000` into AL. The capped
 device-boundary observer records the first 16 bytes
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
 they match retained NAND row 1 at raw offset `528`. The stopped-run summary
-counts 452 NAND byte reads and five strobes, with AR0/AR1=`00e1`, AR2=`0000`.
+counts 458 NAND byte reads and five strobes, with AR0=`00e4`, AR1=`3aea`, AR2=`00e3`.
 This is not a full 512-byte page read, buffered-page verification or startup.
 `80e6` at `00:3269` now has staged long-offset
 STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
@@ -2467,7 +2467,7 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is BITF `61f8` at `00:3283`; debugger context is `00:3285`, not
+instruction is short-indirect DST `4e81` at `00:30c6`; debugger context is `00:30c8`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2484,7 +2484,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:3283` needs staged BITF source/mask retention, TC publication and replay conformance before advancing this diagnostic;
+`00:30c6` needs staged short-indirect DST address/modification, two-write publication and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

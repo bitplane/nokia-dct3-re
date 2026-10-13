@@ -7046,6 +7046,87 @@ private:
 		m_phase = 252990; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static std::array<u16, 2> bitfield_inputs(unsigned variant)
+	{
+		return std::array<std::array<u16, 2>, 8>{{{0xffff, 0}, {1, 1}, {0x80, 0x7f}, {0x7f, 0x7f},
+			{0x8000, 0x8000}, {0x8000, 0x7fff}, {0xffff, 0xf495}, {0, 0xffff}}}[(variant / 144) % 8];
+	}
+	static memory_arithmetic_fixture bitfield_address_case(unsigned variant)
+	{
+		return memory_arithmetic_case(variant % 144 + ((variant / 144) % 8) * 576 +
+			((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432);
+	}
+	void start_pipeline_bitfield(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant);
+		bool const extended = f.form >= 14;
+		u32 const base = f.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x6100 | u8(f.opcode));
+		program.write_word(base + 0x601, extended ? f.literal : input[1]);
+		if (extended) program.write_word(base + 0x602, input[1]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (f.st0 & ~0x1000) | (((variant / 1152) % 2) ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, input[0]);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitfield_sample",
+			[this, f, input](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == input[0] && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle + 1,
+					"BITF retains one source word through its captured address in Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitfield_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITF must not write its memory operand"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + (extended ? 0x602 : 0x601), "bitfield_literals",
+			[this, f, input, extended](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < (extended ? 2 : 1) && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
+					word == (extended && !m_pipeline_extensions_reads ? f.literal : input[1]), "BITF retains offset/address before its distinct mask literal"); ++m_pipeline_extensions_reads; });
+		m_phase = 253010; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_bitfield_ar7(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const value = std::array<u16, 4>{0, 1, 2, 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : 1;
+		bool const tc = (variant / 4) % 2, initial_tc = (variant / 8) % 2;
+		u32 const base = variant % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		std::array<u16, 7> const words{0x61f8, 0x0017, mask, u16(0xf820 | (tc << 4)), 0x0700, 0xe811, 0xf4e1};
+		for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR7, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitfield_ar7_sample",
+			[this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x17 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7,
+					"Original BITF family samples mapped AR7 once before TC publication"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "bitfield_ar7_target",
+			[this, value, tc, mask](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				if (m_cpu->pipeline_cycles() != 10) osd_printf_info("Mapped BITF target timing: cycle=%llu value=%04x mask=%04x tc_condition=%u\n",
+					(unsigned long long)m_cpu->pipeline_cycles(), value, mask, tc);
+				expect(bool(value & mask) == tc && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 10,
+					"Immediate TC/NTC branch consumes BITF's published mask result"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitfield_ar7_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITF/branch does not write its register source"); });
+		m_phase = 253030; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -32006,13 +32087,111 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				if (variant < 11) { start_pipeline_signed_branch_producer(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_bitfield(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253000)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252990;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253010)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant);
+			unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[variant / 18432];
+			bool const initial_tc = (variant / 1152) % 2, result = input[0] & input[1];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BITF has staged source/mask ownership");
+			expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick <= read_cycle ? initial_tc : result),
+				"BITF publishes TC only at Execute, not during Decode/address/Read");
+			if (tick == (f.form >= 14 ? 5 : 4))
+			{
+				auto const disable = machine().disable_side_effects();
+				u32 const base = f.reg == 6 ? 0x20000 : 0;
+				m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); if (f.form >= 14) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xdead);
+			}
+			if (tick == read_cycle - 1)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar)
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x5007),
+						"BITF performs its source-address modification once in Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+			}
+			if (tick == read_cycle) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BITF during Decode, captured address or retained source");
+			}
+			if (tick == 18)
+			{
+				u16 const expected_st0 = ((f.st1 & 0x20) && f.reg && f.form >= 2 && f.form != 17 ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0) & ~0x1000;
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == (f.form >= 14 ? 2 : 1) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (expected_st0 | (result ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222, "BITF changes only TC while retaining both its mask and source through replay");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BITF without duplicate source reads or pointer modifications");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253020; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 55295) { start_pipeline_bitfield(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged BITF: PASS cases=55296 forms=18 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=55296 duplicate_reads=0 data_writes=0\n");
+				start_pipeline_bitfield_ar7(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253020)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253010;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253030)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u16 const value = std::array<u16, 4>{0, 1, 2, 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : 1;
+			bool const result = value & mask, taken = result == bool((variant / 4) % 2), initial_tc = (variant / 8) % 2;
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 7, 8}[variant / 32];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR7 BITF and its immediate branch are organic CPU instructions");
+			expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick < 8 ? initial_tc : result), "AR7 BITF publishes its actual source/mask result in Execute");
+			if (tick == 7) m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x7777);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped BITF before/after source sampling or TC publication");
+			}
+			if (tick == 30)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(taken) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x7777 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (result ? 0x1000 : 0)),
+					"Immediate TC/NTC consumes mapped AR7 BITF's retained value rather than the later register contents");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped BITF/branch without source or target resampling");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253040; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				if (variant < 95) { start_pipeline_bitfield_ar7(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged mapped BITF branch: PASS cases=96 source=AR7 masks=0001,007f conditions=TC,NTC initial_tc=2 restore=96 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253040)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253030;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
