@@ -3072,6 +3072,36 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Memory MPYA/MASA/MACA/MACAR (`31xx/33xx/35xx/37xx`) retain one Smem
+sample through Read and use a shared operand-only arithmetic helper at
+Execute. The multiplier uses signed A bits 32--16 as a 17-bit value and
+a signed 16-bit memory operand, independently of SXM. A's lower word and
+bits above bit 32 do not participate. FRCT doubles the product. MPYA
+overwrites B; MASA subtracts from B; MACA adds to B; MACAR adds and rounds
+by adding `8000` then clearing the low word. The existing product/result
+SMUL/OVM policies are shared with the atomic decoder, not newly inferred.
+A and carry remain unchanged; result overflow affects sticky OVB.
+
+TI SPRU172C specifies memory-to-T publication in Read for these forms.
+The staged path publishes retained memory to T after older Execute in
+that clock and does not write T again at retirement. B and its flags
+publish in Execute. The 55296 replay cases cover 30720 RAM cases over
+ten address forms and 24576 mapped-register cases over AL/AH/AG, BL/BH/BG,
+T/TRN and AR0--AR7. They cover all four operations, eight independent
+input patterns and FRCT/OVM/SMUL/SXM combinations. Saves in Decode,
+Access or Read require one source sample, no data writes and no literal
+refetch. RAM/literals/pointers are changed after their owning phases;
+T is deliberately changed after Read to prove Execute cannot republish it.
+
+Short Read/T publication is clock 5 and B publication clock 6; extended
+forms add one clock in this partial model. A/B/flag sampling, operand-bank
+arbitration and older/younger producer interactions are not independently
+silicon-validated. The RAM matrix uses AR1/AR6 with BK=16 and standard
+addressing; broader modifiers/compatibility and status/producer conflicts
+remain outside it. Other control/peripheral sources, repeat bodies and
+control-delay composition fail closed. Opcode coverage is not native
+startup or speech acceptance.
+
 Register ADD/SUB admits the one-word encoded-shift forms (`f400/f420`
 families) and ASM-selected forms (`f480/f481` with source/destination
 selectors). These known register-only operations use the existing atomic
@@ -3389,12 +3419,13 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is MPYA, `310b` at `00:3520`, debugger context
-`00:3522`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is LD Smem,16,A, `440a` at `00:3521`, debugger context
+`00:3523`. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
-long-word DADD `5304` at `00:30fa` and LDU `12e1` at `00:3114`
+long-word DADD `5304` at `00:30fa`, LDU `12e1` at `00:3114`
+and MPYA `310b` at `00:3520`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3482,7 +3513,8 @@ upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
 The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
-LDU now have staged coverage; subsequent MPYA remains incomplete.
+LDU and memory MPYA now have staged coverage; subsequent memory LD
+shifted by 16 remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

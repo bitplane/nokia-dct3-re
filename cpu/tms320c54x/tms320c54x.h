@@ -145,6 +145,7 @@ private:
 	u64 shifted_load(u64 source, int shift, bool destination_b);
 	u64 add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry = false);
 	void long_word_arithmetic(u16 op, u16 high, u16 low_word);
+	void accumulator_memory_multiply(u16 op, u16 memory);
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);
 	u32 saturated_store(u64 value) const;
