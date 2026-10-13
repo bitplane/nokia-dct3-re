@@ -7,6 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
+    "TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0",
     "TMS320C54x staged frontend: PASS foreground_execute=6 vector_fetch=6 stack_write=7 isr_execute=10 pending_restore=1 coverage=register_one_word native_enabled=0",
     "TMS320C54x staged frontend exclusions: PASS unsupported_stops=1 atomic_fallback=0",
     "TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8",
@@ -60,7 +61,7 @@ REQUIRED = [
     "TMS320C54x staged original worker roundtrip: PASS cases=16 original_words=20 route=skip_body saved_intm_states=2 restore=16 duplicate_stack_reads=0 duplicate_source_reads=0",
     "TMS320C54x staged original context call route: PASS cases=40 original_words=67 pages=2 saved_intm_states=2 restore=40 context_restored=1 counter_increments=1 full_isr_claim=0",
     "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0",
-    "TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_read_first=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0",
+    "TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_forwarded=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0",
     "TMS320C54x staged RETD DARAM ordering: PASS cases=12 adjacent_old_word=6 nop_new_word=6 restore=12 duplicate_accesses=0",
     "TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0",
     "TMS320C54x staged short register stores: PASS cases=75 sources=6 address_forms=4 multi_store_cases=3 restore=75 duplicate_writes=0",

@@ -141,7 +141,8 @@ private:
 	void push(u16 value);
 	u16 pop();
 	u64 data_operand(u16 value) const;
-	u16 add_memory_word(u16 value, u16 immediate);
+	u16 add_memory_word(u16 value, u16 immediate, bool publish_status = true);
+	u16 pipeline_read_data(u16 address);
 	u64 shifted_load(u64 source, int shift, bool destination_b);
 	u64 add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry = false);
 	u64 conditional_subtract(u64 source, u16 memory, bool destination_b);

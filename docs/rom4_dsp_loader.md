@@ -2350,9 +2350,11 @@ Six compiler-mode consumers verify table 7-9's Category-I one-clock SP
 latency: the adjacent load uses pre-push SP, while one NOP exposes updated SP.
 Six cases compose the original `6b82 0002 4b92` ADDM/PSHD sequence.
 SPRU131G table 7-2 assigns DB reads to the first DARAM half-cycle and EB
-writes to the second: PSHD samples the old word before the concurrent ADDM
-write, then pushes that retained old word while RAM holds the incremented
-value. Do not forward the new ADDM value into this source read.
+writes to the second, but this does not determine the consumed value:
+section 7.3.2 specifies an internal-bus bypass for a same-location on-chip
+read with a pending write. PSHD retains the forwarded ADDM result without
+a second physical RAM read; the ADDM Write clock and flag publication
+remain unchanged.
 All 44 cases require one stack allocation/publication, retained samples and
 no duplicate replay accesses. PSHD preserves status and accumulator state.
 Peripheral sources, extended addressing, general stack/DAGEN conflicts and
@@ -2367,7 +2369,7 @@ stationary/postincrement AR3 destinations with four replay boundaries;
 six compiler-mode consumers verify one-clock Category-I SP latency.
 Twelve cases execute the original six words at `02:3dc5`--`02:3dca`:
 ADDM #2,*AR2; PSHD *AR2+; MVDK *AR2,AR3; POPD *AR3+.
-Both SXM states retain the old source word for the stack copy, while ADDM
+Both SXM states retain the forwarded result for the stack copy, while ADDM
 updates source RAM and its arithmetic flags. MVDK loads the second source
 word as the destination pointer; POPD writes to that captured address despite
 AR3 postincrement. All 50 cases require one stack consumption/publication,
@@ -2470,8 +2472,8 @@ The complete original worker is now separately pinned at
 The composed fixture also executes the four original CALLD/STM-parameter
 words at `02:3d92`--`02:3d95`. Forty-eight cases cover both CMPR/XC
 outcomes, both saved INTM states, both SXM states and six replay boundaries.
-Each leg requires eleven ordered data reads and nine or ten writes,
-including the old DARAM source through PSHD/POPD, consecutive B high/low
+Each leg requires ten ordered data reads and nine or ten writes,
+including the forwarded RMW source through PSHD/POPD, consecutive B high/low
 and T publications, the conditional control-word store and final mask/merge
 store. The stack balances, the worker restores the saved INTM predicate,
 and RETD reaches its page-2 continuation without fetching a third delay
@@ -2480,8 +2482,9 @@ execute the rest of the original outer handler.
 
 The non-taken BC retains the already-fetched first body word; its body
 timeline is one clock earlier than a redirect-style expectation. With
-the selected fixture, ADDM Read is clock 20, PSHD reads the old source
-before ADDM Write in clock 21, and the final result is written in clock 41.
+the selected fixture, ADDM Read is clock 20, PSHD retains the pending result
+through the internal bypass before ADDM Write in clock 21, and the final
+result is written in clock 41.
 The selected CMPR match controls a store in clock 33. The exact values
 and clocks are bounded CPU-fixture observations, not measured silicon or
 recovered recorder operand provenance.
@@ -2492,7 +2495,7 @@ The original outer-context handler is also composed with the active body:
 51 handler words plus all 38 worker words, rather than the former
 skip-body subset. The 128 cases cover pages 0/2, both saved INTM and SXM
 states, both CMPR/XC outcomes and eight replay checkpoints. Every leg
-requires sixteen ordered stack writes, eight ordered worker-source reads,
+requires sixteen ordered stack writes, seven ordered worker-source reads,
 six or seven worker RAM writes, one reserved-return read and one caller
 continuation fetch. The worker's B publications contain the handler's
 incremented `13572469` counter, while all original caller registers and
@@ -3619,19 +3622,20 @@ The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder.
 RPTB `f072` at `00:32ee` now executes.
-At the 20-second diagnostic tail, the original run has bootstrap
-entry_count=`1`, resident_count=`0`, PC=`00:307e`, ST1=`6900`,
-IMR=`0000`, IFR=`0008`, flag `374d`=`0000` and 37,019,530 NAND reads.
-The loader trace reaches index 128 with zero filename/descriptor fields.
-The terminal exception is now `MU4 original recorder command did not
-reach the native overlay loader`, not an unsupported-opcode stop.
-The additional 37,019,018 reads are outside the byte capture and unverified;
-their count is not proof of distinct pages or a valid firmware buffer.
-Recorder dispatch, loader, response, RX/TX and native program-write counts
-remain zero. Board boot, music decoding and recording remain unaccepted.
-The next question is the actual data-RAM buffer before/after the directory
-byte swap and the loader's filename/descriptor consumption, not another
-assumed decoder opcode. No firmware state should be forced to bypass it.
+Same-address RMW forwarding now lets the unchanged directory builder
+construct `MCUSI16 .BIN` with descriptor length `0001:e1e8`, matching the
+atomic reference. The current one-second observation stops at unsupported
+NEG `f484`, address `00:0e35`, after 2,564 NAND reads. The former malformed
+names/zero-length loader retry tail is superseded. Board boot, resident
+transfer, music decoding and recording remain unaccepted.
+The scoped bypass uses retained RMW operands, preserves EB/flag timing and
+excludes register/peripheral reads; physical memory-bank contention and
+other pending-write producer families remain unvalidated. The mandatory
+768-case `rmw-forward` fixture covers adjacent/spaced loads, same/different
+addresses, boundary arithmetic, SXM/OVM, two pages, DP/compiler addressing
+and save/replay. It does not claim measured DA150 bus phases. See
+[the original-bootstrap contract](5510_bringup.md) for the bounded
+descriptor and stale-offset data-bus witnesses. No firmware state is forced.
 STLM B,BRC at `00:32ec` now has 3,072 staged replay cases covering
 Execute publication, saturation, both accumulator sources and retained
 LDM reads. The context tool pins the original nine-word sequence:

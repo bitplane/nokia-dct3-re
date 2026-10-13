@@ -2471,52 +2471,37 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance.
-RPTB `f072` at `00:32ee` now executes. The 20-second diagnostic tail
-reports bootstrap entry_count=1, resident_count=0, PC=`00:307e`,
-ST1=`6900`, IMR=`0000`, IFR=`0008`, flag `374d`=`0000`, and
-37,019,530 NAND reads. A bounded data-bus observer independently establishes
-the first loader's descriptor-zero length reads: `36c2=0000` and
-`36c3=0000`, with AR1=`36b0`, T=`0000`, observed PC=`002ee6`.
-Later invocations read `4cc2=0000` and `4cc3=0000`, with AR1=`4cb0`,
-T=`0080`: descriptor 128 is also consumed, but it is not the first failure.
-These are actual data reads; the older program-Fetch tap's A snapshot alone
-cannot establish an instruction's consumed argument or retirement.
-The observer is read-only, limited to 32 reads in the loader's program
-neighborhood, and also records unrelated stack reads in that interval;
-those must not be interpreted as descriptor fields.
-Recorder dispatch/loader/response and native storage writes
-remain zero. The terminal failure is `MU4 original recorder command did
-not reach the native overlay loader`, not an unsupported opcode.
-The uncaptured 37,019,018 reads and the resulting firmware buffer are
-unverified. A bounded descriptor-write observer (64 real data-bus writes
-after NAND traffic begins) narrows directory construction: the first name
-is written as `MMCUSI16`, rather than `MCUSI16 `; the next as `MMP3SI16`,
-rather than `MP3SI16 `. The first extension begins `20,42,49` rather than
-`42,49,4e`, and the first length publication is `36c2=e1e8`, `36c3=0003`,
-rather than the reference `0001:e1e8` double-word. These writes occur in
-the original directory builder around `0ab1..0b55`, before the later
-zero-length loader read. Therefore directory metadata is initially
-populated but already malformed; do not diagnose this as a descriptor
-that was simply never written. The byte-reader/caller ordering and eventual
-overwrite remain to be isolated. In particular, adjacent `ADDM #1,*SP(2)`
-and `LD *SP(2),A` occur between name-byte calls. A one-second read-only
-capture confirms the modeled stale dependency at stack address `15de`:
-cycle 192385 reads `0000` for the increment; cycle 192386 reads `0000`
-for the follower before writing `0001`. The next pair similarly reads
-`0001` at cycles 192489/192490 before writing `0002`; the pattern repeats
-at directory offsets `0020`, `0040`, and later entries. Program PC in
-these records is a live pipeline observation, not the owner of every bus
-access. The startup stack differs from the loader's later `3aea` stack:
-original `0e41..0e48` selects `1200`, adds `03ff`, then aligns it.
-This identifies the stale offset in the current model, not physical
-DA150 RAM-bank ownership or a general write-before-read rule.
-[TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf), sections
-7.3/7.4, distinguishes dual-access and single-access arbitration;
-section 7.4 delays a conflicting single-access operand read. The next
-CPU correction needs a focused increment/load dependency test and an
-explicitly bounded arbitration contract rather than changing every Read
-sample or inventing a board memory class. Neither startup nor recording
-is accepted. Immediate
+RPTB `f072` at `00:32ee` now executes. The current one-second original
+bootstrap observation constructs `MCUSI16 .BIN` at descriptor `36b0`,
+with length words `36c2=0001`, `36c3=e1e8`, matching the atomic reference.
+The next stop is unsupported staged `f484` at `00:0e35`, after 2,564
+NAND reads. Neither resident transfer nor recording is accepted.
+
+The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
+requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+section 7.3.2 specifies an internal-bus bypass for an on-chip read from a
+location with a pending write. The staged model now forwards retained
+RMW results into supported Read-stage RAM consumers without reading stale
+RAM, moving the EB write, or publishing ADDM flags before Execute.
+Register/peripheral reads are excluded; unrelated addresses and spaced
+consumers retain real data-bus reads. Physical bank contention, other
+producer families and measured DA150 bus phases remain unvalidated.
+The isolated `tms54test -bios rmw-forward` fixture covers 768 cases with
+save/replay, boundary values, SXM/OVM combinations, two program pages,
+compiler/noncompiler addressing, same/different addresses and zero/one
+gap words. Existing PSHD and descriptor-copy expectations now reflect
+forwarded data rather than treating raw first-half DB ordering as proof
+that consumers must see old RAM.
+
+The defect's read-only witness is stack address `15de`: cycle 192385 read
+zero for the increment, while cycle 192386 read zero for the follower
+before writing one. It produced `MMCUSI16`, displaced extension bytes
+and malformed lengths, then zero-length loader reads and a 37,019,530-read
+retry tail. That tail is superseded, not a current startup result.
+Program-Fetch A snapshots alone never proved a consumed descriptor index;
+real data reads established descriptor zero before later index-128 retries.
+Original `0e41..0e48` selects stack `1200`, adds `03ff`, and aligns it;
+the loader later selects `3aea`. Immediate
 `MPY #lk,A`, `f066` at `00:2eda`, now has retained literal/T,
 arithmetic and producer/restoration coverage. STLM A,T,
 `880e` at `00:2ed8`, now has publication, saturation and consumer/replay

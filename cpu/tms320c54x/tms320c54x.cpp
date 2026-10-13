@@ -2765,7 +2765,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 19A/B: retain the source before Execute's destination write.
 		// Bus placement is partial; same-address moves must not read back a write.
-		m_pipeline_operand[4] = m_data.read_word(m_pipeline_immediate[4]);
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_immediate[4]);
 		if (m_pipeline_operand_address[4] < 0x60)
 			// The opcode's Execute coincides with the complete two-word slot's
 			// Read. This satisfies table 7-7's one-gap Category-I AR latency;
@@ -2987,7 +2987,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
 		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800))
-		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf800) == 0x2000)
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
@@ -2998,8 +2998,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = m_io.read_word(m_pipeline_immediate[4]);
 	if (m_pipeline_valid[4] && (staged_dld(m_pipeline_word[4]) || staged_long_arithmetic(m_pipeline_word[4])))
 	{
-		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
-		m_pipeline_immediate[4] = m_data.read_word(m_pipeline_operand_address[4] ^ 1);
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
+		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_operand_address[4] ^ 1);
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xffe0) == 0x4a00)
 	{
@@ -3053,8 +3053,8 @@ void tms320c54x_device::pipeline_step()
 		// Publish once after older stack reads; Access phase is partial.
 		m_st0 = (m_st0 & 0x1fff) | ((m_pipeline_word[3] & 7) << 13);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00)
-		// DARAM DB reads precede EB writes in the same clock (table 7-2).
-		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand[4]);
+		// Same-address pending RMW data uses the internal bypass, not stale RAM.
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand[4]);
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x4b00)
 	{
 		// Access-owned allocation follows any older stack Read update in
@@ -3653,16 +3653,34 @@ void tms320c54x_device::pipeline_accept_interrupt()
 	}
 }
 
-u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate)
+u16 tms320c54x_device::pipeline_read_data(u16 address)
+{
+	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
+	// write through an internal bus. Preserve the real EB write and flags;
+	// this partial model covers retained RMW producers, not bank contention.
+	if (address >= 0x60 && m_pipeline_valid[5] && staged_rmw(m_pipeline_word[5]) &&
+		address == m_pipeline_operand_address[5])
+	{
+		u16 const value = m_pipeline_operand[5], immediate = m_pipeline_immediate[5];
+		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
+			BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
+	}
+	return m_data.read_word(address);
+}
+
+u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_status)
 {
 	const s32 left = BIT(m_st1, 8) ? s16(value) : s32(value);
 	const s32 right = BIT(m_st1, 8) ? s16(immediate) : s32(immediate);
 	const s32 result = left + right;
 	const bool overflow = result < -0x8000 || result > 0x7fff;
 	// ADDM stores 16 bits, but the ALU carry is taken at bit 32.
-	m_st0 = (m_st0 & ~u16(0x0800)) |
-		(u64(u32(left)) + u32(right) > 0xffffffffULL ? 0x0800 : 0);
-	if (overflow) m_st0 |= 0x0400;
+	if (publish_status)
+	{
+		m_st0 = (m_st0 & ~u16(0x0800)) |
+			(u64(u32(left)) + u32(right) > 0xffffffffULL ? 0x0800 : 0);
+		if (overflow) m_st0 |= 0x0400;
+	}
 	return overflow && BIT(m_st1, 9)
 		? u16(std::clamp(result, s32(-0x8000), s32(0x7fff))) : u16(result);
 }

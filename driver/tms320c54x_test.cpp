@@ -4261,7 +4261,7 @@ private:
 			[this, saved_status, full_body](offs_t address, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				std::array<u16, 16> const expected{0xa61b, saved_status, 0x789a, 0x3456, 0x12, 0x5566, 0x3344, 0x22,
-					0x1357, 0x2468, 0x369c, 0x8888, 0x3d96, u16(saved_status & 0x900), full_body ? u16(0xff0f) : u16(0x4044), 0x4044};
+					0x1357, 0x2468, 0x369c, 0x8888, 0x3d96, u16(saved_status & 0x900), full_body ? u16(0xff11) : u16(0x4044), 0x4044};
 				unsigned const final = full_body ? 15 : 14;
 				expect(m_pipeline_store_writes <= final && address == (m_pipeline_store_writes < final ? 0xffe - m_pipeline_store_writes : 0xfff) &&
 					word == expected[m_pipeline_store_writes], "Original context call route owns all nested saves and reserved return write"); ++m_pipeline_store_writes;
@@ -4283,7 +4283,7 @@ private:
 				[this, matched](offs_t address, u16 &value, u16) {
 					if (machine().side_effects_disabled()) return;
 					std::array<u16, 7> const addresses{0x512, 0x470, 0x471, 0x472, 0x473, 0x511, 0x513};
-					std::array<u16, 7> const values{0xff11, 0xff0f, 0x1357, 0x2469, 6, 0x470, 0x4f4};
+					std::array<u16, 7> const values{0xff11, 0xff11, 0x1357, 0x2469, 6, 0x470, 0x4f4};
 					unsigned const index = m_pipeline_drained_fetches + unsigned(!matched && m_pipeline_drained_fetches >= 5);
 					expect(index < addresses.size() && address == addresses[index] && value == values[index],
 						"Outer context body publishes its counter-derived B words and retained source/store effects once");
@@ -4292,8 +4292,8 @@ private:
 			m_vector_prefetch_tap = data.install_read_tap(0x510, 0x515, "full_context_body_reads",
 				[this, matched](offs_t address, u16 &value, u16) {
 					if (machine().side_effects_disabled()) return;
-					std::array<u16, 8> const addresses{0x510, 0x511, 0x512, 0x512, 0x513, 0x513, 0x514, 0x515};
-					std::array<u16, 8> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0xff0f, 0x470, 0x470, 0xff0f, 0x00f0};
+					std::array<u16, 7> const addresses{0x510, 0x511, 0x512, 0x513, 0x513, 0x514, 0x515};
+					std::array<u16, 7> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0x470, 0x470, 0xff0f, 0x00f0};
 					expect(m_vector_reads < addresses.size() && address == addresses[m_vector_reads] && value == values[m_vector_reads],
 						"Outer context body consumes each source in original order without duplicate replay reads");
 					++m_vector_reads;
@@ -4389,7 +4389,7 @@ private:
 				if (machine().side_effects_disabled()) return;
 				if (address == source)
 				{
-					expect(value == word && m_cpu->pipeline_cycles() == (addm ? 6 + m_pipeline_operand_reads : 5), "PSHD retains its source once; adjacent ADDM Read precedes same-cycle Write"); ++m_pipeline_operand_reads;
+					expect(value == word && m_cpu->pipeline_cycles() == (addm ? 6 : 5), "PSHD retains its source once; adjacent ADDM source is read before internal forwarding"); ++m_pipeline_operand_reads;
 				}
 				else if (follower && (address == 0x1026 || address == 0x1027))
 				{
@@ -4401,11 +4401,11 @@ private:
 				if (machine().side_effects_disabled()) return;
 				if (address == 0xfff)
 				{
-					expect(value == word && m_cpu->pipeline_cycles() == (addm ? 8 : 6), "PSHD writes its retained old source to one allocated stack word"); ++m_pipeline_store_writes;
+					expect(value == (addm ? u16(word + 2) : word) && m_cpu->pipeline_cycles() == (addm ? 8 : 6), "PSHD writes its retained or forwarded source to one allocated stack word"); ++m_pipeline_store_writes;
 				}
 				else if (addm && address == 0x470)
 				{
-					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_operand_reads == 2, "ADDM writes after PSHD's first-half-cycle source sample"); ++m_pipeline_register_writes;
+					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_operand_reads == 1, "ADDM keeps its real Write clock while PSHD bypasses stale RAM"); ++m_pipeline_register_writes;
 				}
 			});
 		m_phase = 251890; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -4491,11 +4491,11 @@ private:
 				if (machine().side_effects_disabled()) return;
 				if (address == stack)
 				{
-					expect(value == word && m_cpu->pipeline_cycles() == (copy ? 10 : 5), "POPD samples one retained stack word"); ++m_pipeline_operand_reads;
+					expect(value == (copy ? u16(word + 2) : word) && m_cpu->pipeline_cycles() == (copy ? 10 : 5), "POPD samples one retained stack word"); ++m_pipeline_operand_reads;
 				}
 				else if (copy && (address == 0x470 || address == 0x471))
 				{
-					expect(value == (address == 0x471 ? destination : word) && m_cpu->pipeline_cycles() == 6 + m_pipeline_extensions_reads, "Original descriptor copy samples old ADDM/PSHD word then its destination pointer"); ++m_pipeline_extensions_reads;
+					expect(value == (address == 0x471 ? destination : word) && m_cpu->pipeline_cycles() == (address == 0x471 ? 8 : 6), "Original descriptor copy samples ADDM source and destination pointer; PSHD uses internal forwarding"); ++m_pipeline_extensions_reads;
 				}
 				else if (follower && (address == 0x1027 || address == 0x1028))
 				{
@@ -4507,15 +4507,15 @@ private:
 				if (machine().side_effects_disabled()) return;
 				if (address == destination)
 				{
-					expect(value == word && m_cpu->pipeline_cycles() == (copy ? 11 : 6) && m_pipeline_operand_reads == 1, "POPD publishes its retained stack sample to the captured destination once"); ++m_pipeline_store_writes;
+					expect(value == (copy ? u16(word + 2) : word) && m_cpu->pipeline_cycles() == (copy ? 11 : 6) && m_pipeline_operand_reads == 1, "POPD publishes its retained stack sample to the captured destination once"); ++m_pipeline_store_writes;
 				}
 				else if (copy && address == 0x470)
 				{
-					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_extensions_reads == 2, "Descriptor source update follows the old-word PSHD sample"); ++m_pipeline_register_writes;
+					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 7 && m_pipeline_extensions_reads == 1, "Descriptor source update preserves Write timing and bypasses the PSHD RAM read"); ++m_pipeline_register_writes;
 				}
 				else if (copy && address == 0xfff)
 				{
-					expect(value == word && m_cpu->pipeline_cycles() == 8, "Descriptor copy pushes its retained old source word"); ++m_pipeline_drained_fetches;
+					expect(value == u16(word + 2) && m_cpu->pipeline_cycles() == 8, "Descriptor copy pushes its retained forwarded source word"); ++m_pipeline_drained_fetches;
 				}
 			});
 		m_phase = 251930; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -4822,21 +4822,21 @@ private:
 		m_pipeline_operand_tap = data.install_read_tap(0x400, 0x1000, "full_worker_reads",
 			[this, matched, saved_status](offs_t address, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				std::array<u16, 11> const addresses{0x510, 0x511, 0x512, 0x512, 0x513, 0xffd, 0x513, 0x514, 0x515, 0xffe, 0xfff};
-				std::array<u16, 11> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0xff0f, 0x470, 0xff0f, 0x470, 0xff0f, 0x00f0, saved_status, 0x3d96};
-				std::array<unsigned, 11> const clocks{13, 15, 20, 21, 22, 24, 29, 37, 38, 41, 45};
+				std::array<u16, 10> const addresses{0x510, 0x511, 0x512, 0x513, 0xffd, 0x513, 0x514, 0x515, 0xffe, 0xfff};
+				std::array<u16, 10> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0x470, 0xff11, 0x470, 0xff0f, 0x00f0, saved_status, 0x3d96};
+				std::array<unsigned, 10> const clocks{13, 15, 20, 22, 24, 29, 37, 38, 41, 45};
 				unsigned const index = m_pipeline_operand_reads;
 				if (index >= addresses.size() || address != addresses[index] || value != values[index] || m_cpu->pipeline_cycles() != clocks[index])
 					osd_printf_info("Full worker read mismatch: index=%u cycle=%llu address=%04x value=%04x\n", index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
 				expect(index < addresses.size() && address == addresses[index] && value == values[index] && m_cpu->pipeline_cycles() == clocks[index],
-					"Complete original worker retains each source, old DARAM word and return slot in order");
+					"Complete original worker retains each source, forwarded RMW word and return slot in order");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_write_tap = data.install_write_tap(0x400, 0x1000, "full_worker_writes",
 			[this, matched, saved_status](offs_t address, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				std::array<u16, 10> const addresses{0xfff, 0xffe, 0x512, 0xffd, 0x470, 0x471, 0x472, 0x473, 0x511, 0x513};
-				std::array<u16, 10> const values{0x3d96, saved_status, 0xff11, 0xff0f, 0xff0f, 0x3344, 0x5566, 6, 0x470, 0x4f4};
+				std::array<u16, 10> const values{0x3d96, saved_status, 0xff11, 0xff11, 0xff11, 0x3344, 0x5566, 6, 0x470, 0x4f4};
 				std::array<unsigned, 10> const clocks{6, 11, 21, 22, 25, 26, 27, 29, 33, 41};
 				unsigned const index = m_pipeline_store_writes + unsigned(!matched && m_pipeline_store_writes >= 8);
 				if (index >= addresses.size() || address != addresses[index] || value != values[index] || m_cpu->pipeline_cycles() != clocks[index])
@@ -4926,7 +4926,7 @@ private:
 				if (machine().side_effects_disabled()) return;
 				std::array<u16, 18> const values{m_timer_probe_return_pc, u16(page), 0xa61b, u16(0x4a00 | (sxm ? 0x100 : 0)),
 					0x77, 0, 0, 0x5566, 0x3344, 0x22, 0x1357, 0x2468, 0x369c, 0x8888,
-					0x3d96, u16(0x800 | (sxm ? 0x100 : 0)), 0xff0f, 0x4044};
+					0x3d96, u16(0x800 | (sxm ? 0x100 : 0)), 0xff11, 0x4044};
 				unsigned const index = m_pipeline_store_writes;
 				unsigned const destination = index < 2 ? 0xfff - index : index < 17 ? 0xffe - index : 0xffd;
 				if (index >= values.size() || address != destination || value != values[index])
@@ -9062,6 +9062,44 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
+	void start_pipeline_rmw_forward(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const v = variant % 256;
+		u16 const initial = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[v & 3];
+		bool const sxm = BIT(v, 2), ovm = BIT(v, 3), compiler = BIT(v, 4), gap = BIT(v, 5), different = BIT(v, 7);
+		u32 const base = BIT(v, 6) ? 0x20000 : 0;
+		u16 const target = (compiler ? 0x1000 : 0x400) + 2;
+		s32 const sum = (sxm ? s16(initial) : s32(initial)) + 1;
+		u16 const result = ovm ? u16(std::clamp(sum, s32(-0x8000), s32(0x7fff))) : u16(sum);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x6b02); program.write_word(base + 0x601, 1);
+		program.write_word(base + 0x602 + gap, different ? 0x1003 : 0x1002);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(target, initial); m_cpu->space(AS_DATA).write_word(target + 1, 0x1357);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(target, target + 1, "rmw_forward_reads",
+			[this, target, initial, result, gap, different](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (!m_pipeline_operand_reads) expect(address == target && value == initial && m_cpu->pipeline_cycles() == 6, "RMW captures one original RAM operand");
+				else expect((gap || different) && address == target + different && value == (different ? 0x1357 : result) && m_cpu->pipeline_cycles() == 7 + gap, "Only a nonforwarded follower performs a real memory read");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "rmw_forward_write",
+			[this, result](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return;
+				expect(value == result && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7, "Forwarding leaves the original RMW Write clock unchanged"); ++m_pipeline_store_writes; });
+		m_phase = 253390; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -9072,6 +9110,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "rmw-forward"))
+		{
+			start_pipeline_rmw_forward(); return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "rptb"))
 		{
 			start_pipeline_rptb(); return;
@@ -30376,7 +30418,7 @@ private:
 			unsigned const gap = follower ? (variant - 32) & 1 : 0;
 			u16 const source = form == 1 ? 0x1020 : 0x470;
 			u64 const checkpoint = addm ? 6 + (variant - 38) / 2 : follower ? 4 + (variant - 32) / 2 : 3 + ((variant >> 1) & 3);
-			auto const reads_at = [addm](u64 clock) { return addm ? unsigned(clock >= 6) + unsigned(clock >= 7) : unsigned(clock >= 5); };
+			auto const reads_at = [addm](u64 clock) { return unsigned(clock >= (addm ? 6 : 5)); };
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_extensions_reads == unsigned(follower && cycle >= 6 + gap) &&
 				m_pipeline_store_writes == unsigned(cycle >= (addm ? 8 : 6)) && m_pipeline_register_writes == unsigned(addm && cycle >= 7) &&
@@ -30409,7 +30451,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 43) { start_pipeline_data_push(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_read_first=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0\n");
+				osd_printf_info("TMS320C54x staged PSHD: PASS cases=44 address_forms=4 compiler_latency=6 addm_forwarded=6 restore=44 duplicate_reads=0 duplicate_stack_writes=0\n");
 				start_pipeline_retd_data_order(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -30464,7 +30506,7 @@ private:
 			unsigned const form = variant < 32 ? variant / 8 : 2, gap = follower ? (variant - 32) & 1 : 0;
 			u16 const stack = copy ? 0xfff : 0x1000;
 			u64 const checkpoint = copy ? 8 + ((variant - 38) / 2) % 3 : follower ? 4 + (variant - 32) / 2 : 3 + ((variant >> 1) & 3);
-			auto const sources_at = [copy, follower, gap](u64 clock) { return copy ? unsigned(clock >= 6) + unsigned(clock >= 7) + unsigned(clock >= 8) : unsigned(follower && clock >= 6 + gap); };
+			auto const sources_at = [copy, follower, gap](u64 clock) { return copy ? unsigned(clock >= 6) + unsigned(clock >= 8) : unsigned(follower && clock >= 6 + gap); };
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == unsigned(cycle >= (copy ? 10 : 5)) && m_pipeline_extensions_reads == sources_at(cycle) &&
 				m_pipeline_store_writes == unsigned(cycle >= (copy ? 11 : 6)) && m_pipeline_drained_fetches == unsigned(copy && cycle >= 8) &&
@@ -30787,7 +30829,7 @@ private:
 			unsigned const checkpoint = std::array<unsigned, 6>{17, 22, 27, 34, 42, 46}[variant / 8];
 			u64 const cycle = m_cpu->pipeline_cycles();
 			auto const reads_at = [](u64 clock) {
-				unsigned count = 0; for (unsigned at : {13, 15, 20, 21, 22, 24, 29, 37, 38, 41, 45}) count += clock >= at; return count;
+				unsigned count = 0; for (unsigned at : {13, 15, 20, 22, 24, 29, 37, 38, 41, 45}) count += clock >= at; return count;
 			};
 			auto const writes_at = [matched](u64 clock) {
 				unsigned count = matched && clock >= 33; for (unsigned at : {6, 11, 21, 22, 25, 26, 27, 29, 41}) count += clock >= at; return count;
@@ -30852,7 +30894,7 @@ private:
 				{
 					auto const disable = machine().disable_side_effects();
 					expect(m_pipeline_store_writes == 16 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
-						m_pipeline_drained_fetches == (BIT(variant, 3) ? 7 : 6) && m_vector_reads == 8 &&
+						m_pipeline_drained_fetches == (BIT(variant, 3) ? 7 : 6) && m_vector_reads == 7 &&
 						m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b &&
 						m_cpu->state_int(tms320c54x_device::STATE_ST1) == saved_status && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
 						m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 &&
@@ -34086,13 +34128,52 @@ private:
 				if (variant < 15) { start_pipeline_rptb_edge(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged RPTB edges: PASS cases=16 restore=16 one_word=2 two_word=2 exclusions=12 atomic_fallback=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "rptb")) throw emu_fatalerror(0, "TMS320C54x isolated RPTB complete");
-				start_pipeline_immediate_multiply(); return;
+				start_pipeline_rmw_forward(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253380)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253370; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253390)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, v = variant % 256, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / 256;
+			bool const sxm = BIT(v, 2), ovm = BIT(v, 3), gap = BIT(v, 5), different = BIT(v, 7);
+			u16 const initial = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[v & 3];
+			s32 const sum = (sxm ? s16(initial) : s32(initial)) + 1;
+			u16 const result = ovm ? u16(std::clamp(sum, s32(-0x8000), s32(0x7fff))) : u16(sum), loaded = different ? 0x1357 : result;
+			u64 const a = sxm ? u64(s64(s16(loaded))) & 0xffffffffffULL : loaded;
+			u16 const st0 = 8 | (sum < -0x8000 || sum > 0x7fff ? 0x400 : 0) |
+				(u64(u32(sxm ? s16(initial) : s32(initial))) + 1 > 0xffffffffULL ? 0x800 : 0);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (tick >= 8 + gap ? a : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 7 ? st0 : 8), "Adjacent same-address LD consumes the pending RMW result without publishing flags before Execute");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save dependency before Read, before Write or after forwarding");
+			}
+			if (tick == 12)
+			{
+				expect(m_pipeline_operand_reads == unsigned(1 + bool(gap || different)) && m_pipeline_store_writes == 1, "Internal-bus bypass avoids a second RAM read and duplicate writes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore dependency with its retained producer operand and follower");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253400; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_pipeline_rmw_forward(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "rmw-forward")) throw emu_fatalerror(0, "TMS320C54x isolated RMW forwarding complete");
+				start_pipeline_immediate_multiply(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253400)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253390; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253290)
 		{
@@ -35202,6 +35283,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(2, "swap-body", "Original MU4 byte-swap body (not block-repeat acceptance)")
 	ROM_SYSTEM_BIOS(3, "swap-join", "Consecutive MU4 byte-swap bodies (not block-repeat acceptance)")
 	ROM_SYSTEM_BIOS(4, "rptb", "Staged straight-line RPTB conformance")
+	ROM_SYSTEM_BIOS(5, "rmw-forward", "Staged same-address RMW forwarding")
 ROM_END
 
 ROM_START(tms54rom4)
