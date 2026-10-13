@@ -7538,10 +7538,24 @@ private:
 	{
 		memory_arithmetic_fixture operand;
 		u64 a, b, result;
-		u16 result_st0, pmst;
+		u16 result_st0, pmst, t = 0x9abc;
 	};
 	static memory_multiply_fixture memory_multiply_case(unsigned variant)
 	{
+		if (variant >= 55296)
+		{
+			unsigned const v = variant - 55296;
+			auto f = memory_multiply_case(v);
+			unsigned const operation = v < 30720 ? (v % 10240 / 10) % 4 : ((v - 30720) % 8192 / 16) % 4;
+			f.operand.opcode = 0x2400 | ((operation & 1) << 8) | u8(f.operand.opcode);
+			f.t = operation & 2 ? 0xffff : 0x8000;
+			if (f.operand.address == 0x0e) f.operand.memory = f.t;
+			s64 const product = s64(f.t) * f.operand.memory * (BIT(f.operand.st1, 6) ? 2 : 1);
+			bool const overflow = product > 2147483647LL;
+			f.result = u64(overflow && BIT(f.operand.st1, 9) ? 2147483647LL : product);
+			f.result_st0 = f.operand.st0 | (overflow ? (BIT(f.operand.opcode, 8) ? 0x200 : 0x400) : 0);
+			return f;
+		}
 		bool const mapped = variant >= 30720;
 		unsigned const v = mapped ? (variant - 30720) % 8192 : variant % 10240;
 		unsigned const operation = mapped ? (v / 16) % 4 : (v / 10) % 4;
@@ -7590,7 +7604,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, o.memory);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -32966,11 +32980,14 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			auto const f = memory_multiply_case(variant); auto const &o = f.operand;
-			unsigned const index = variant < 30720 ? variant / 10240 : (variant - 30720) / 8192;
+			bool const unsigned_multiply = variant >= 55296;
+			unsigned const v = unsigned_multiply ? variant - 55296 : variant;
+			unsigned const index = v < 30720 ? v / 10240 : (v - 30720) / 8192;
 			unsigned const checkpoint = std::array<unsigned, 3>{3, o.read_cycle - 1, o.read_cycle}[index];
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (tick > o.read_cycle ? f.result : f.b) &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick < o.read_cycle ? 0x9abc : tick == o.read_cycle ? o.memory : 0xbeef) &&
+			bool const destination_b = !unsigned_multiply || BIT(o.opcode, 8);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (!destination_b && tick > o.read_cycle ? f.result : f.a) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b && tick > o.read_cycle ? f.result : f.b) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick < o.read_cycle ? f.t : tick == o.read_cycle ? unsigned_multiply ? f.t : o.memory : 0xbeef) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > o.read_cycle ? f.result_st0 : o.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1,
 				"Memory multiply owns T in Read and B/OVB in Execute, without altering A/carry or overwriting a newer T");
 			if (o.form >= 14 && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead); }
@@ -33000,8 +33017,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253160; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 55295) { start_pipeline_memory_multiply(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged memory multiply: PASS ram_cases=30720 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=55296 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 55295) osd_printf_info("TMS320C54x staged memory multiply: PASS ram_cases=30720 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=55296 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant < 110591) { start_pipeline_memory_multiply(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MPYU: PASS ram_cases=30720 mapped_cases=24576 accumulators=2 t_values=2 patterns=8 flag_states=16 restore=55296 t_retained=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

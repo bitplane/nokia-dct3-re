@@ -141,7 +141,7 @@ constexpr bool staged_extended_smem_arithmetic(u16 word)
 
 constexpr bool staged_memory_multiply(u16 word)
 {
-	return (word & 0xf900) == 0x3100 && u8(word) <= 0xf8;
+	return ((word & 0xf900) == 0x3100 || (word & 0xfe00) == 0x2400) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_memory_multiply(u16 word)
@@ -3199,7 +3199,13 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_memory_multiply(m_op))
 		{
-			accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
+			if ((m_op & 0xfe00) == 0x2400)
+			{
+				s64 product = s64(m_pipeline_immediate[5]) * m_pipeline_operand[5];
+				if (BIT(m_st1, 6)) product *= 2;
+				accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
+			}
+			else accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
 			if (staged_extended_memory_multiply(m_op)) ++m_pc;
 		}
 		else if (staged_smem_arithmetic(m_op))
@@ -3313,9 +3319,13 @@ void tms320c54x_device::pipeline_step()
 		}
 	}
 	if (m_pipeline_valid[4] && staged_memory_multiply(m_pipeline_word[4]))
-		// MPYA/MACA/MASA memory forms own T in Read (SPRU172C). Publish
-		// after older Execute and never overwrite a younger T at retirement.
-		m_t = m_pipeline_operand[4];
+	{
+		// MPYA/MACA/MASA publish T in Read (SPRU172C); MPYU retains its
+		// T input instead. Resolve after older Execute, without a retirement rewrite.
+		if ((m_pipeline_word[4] & 0xfe00) == 0x2400)
+			m_pipeline_immediate[4] = m_t; // MPYU consumes T without publishing it.
+		else m_t = m_pipeline_operand[4];
+	}
 	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
 	{
 		// Retain the source after older Execute writes, then occupy both

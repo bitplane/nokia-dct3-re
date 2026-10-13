@@ -3086,6 +3086,19 @@ sources below `0060` outside `0008..0017` remain rejected. The stage
 assignment is a partial frontend model, not measured silicon timing;
 repeat and delayed-control bodies remain restricted separately.
 
+Unsigned memory MPYU (`24xx/25xx`, SPRU172C 4-106) retains one
+Smem sample and its unsigned T input at Read, after older Execute work.
+Execute multiplies the retained 16-bit unsigned operands, applies FRCT,
+then the existing OVM/result-overflow behavior; it does not publish T.
+The partial Read ownership is not measured silicon interlock timing.
+Its 55,296 replay cases cover both accumulators, T=`8000/ffff`, eight
+memory/source patterns, 16 flag combinations, ten RAM address forms and
+all sixteen mapped register sources `0008..0017`. Decode/Access/Read
+snapshots, changed T after Read, poisoned literals and changed RAM/pointers
+check no resampling or duplicate pointer update. PMST.SMUL does not
+saturate this unsigned product before destination publication; repeat and
+control-delay forms remain separately restricted.
+
 Memory MPYA/MASA/MACA/MACAR (`31xx/33xx/35xx/37xx`) retain one Smem
 sample through Read and use a shared operand-only arithmetic helper at
 Execute. The multiplier uses signed A bits 32--16 as a 17-bit value and
@@ -3424,22 +3437,24 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 1048 reads and fifteen strobes,
-with AR0=`000b`, AR1=`3aea`, AR2=`0008`. After the first row, two further
+The stop summary counts 1550 reads and twenty strobes,
+with AR0=`0005`, AR1=`0043`, AR2=`0002`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 536 bytes are outside the bounded capture and remain
+The additional 1038 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is MPYU Smem,A, `240b` at `00:3523`, debugger context
-`00:3525`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+unsupported instruction is the extended Smem opcode `6fe6` at `00:3291`,
+debugger context `00:3293`; its operation-extension word must be decoded
+before naming the complete instruction. Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
 long-word DADD `5304` at `00:30fa`, LDU `12e1` at `00:3114`
-MPYA `310b` at `00:3520` and LD Smem,16,A `440a` at `00:3521`
+MPYA `310b` at `00:3520`, LD Smem,16,A `440a` at `00:3521`
+and MPYU `240b` at `00:3523`
 now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
@@ -3528,7 +3543,8 @@ upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
-subsequent unsigned memory multiply remains incomplete.
+unsigned memory multiply now has staged coverage. The subsequent extended
+Smem instruction remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
