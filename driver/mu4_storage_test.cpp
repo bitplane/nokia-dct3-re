@@ -225,6 +225,9 @@ private:
 	unsigned m_native_descriptor_reads = 0;
 	unsigned m_native_descriptor_writes = 0;
 	bool m_native_bootstrap_program_checked = false;
+	bool m_native_boundary_window = false;
+	unsigned m_native_boundary_events = 0;
+	unsigned m_native_boundary_dma_events = 0;
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -1534,6 +1537,77 @@ private:
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
+			if (system_bios() == 25 || system_bios() == 26)
+			{
+				m_cpu->space(AS_DATA).install_write_tap(0x36c5, 0x36c5, "mu4_file_boundary_cursor",
+					[this](offs_t, u16 &value, u16) {
+						if (machine().side_effects_disabled() || m_native_boundary_events >= 128) return;
+						if (value >= 0x1fe0 && value <= 0x2010) m_native_boundary_window = true;
+						if (!m_native_boundary_window) return;
+						++m_native_boundary_events;
+						auto const disable = machine().disable_side_effects();
+						logerror("mu4_file_boundary_cursor: value=%04x context_pc=%06x word36c4=%04x word36c6=%04x\n",
+							value, unsigned(m_cpu->pc()), m_cpu->space(AS_DATA).read_word(0x36c4), m_cpu->space(AS_DATA).read_word(0x36c6));
+					});
+				m_cpu->space(AS_DATA).install_write_tap(0x3c21, 0x3c30, "mu4_file_boundary_buffer",
+					[this](offs_t address, u16 &value, u16) {
+						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128) return;
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_buffer: address=%04x value=%04x context_pc=%06x\n", unsigned(address), value, unsigned(m_cpu->pc()));
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x32ee, 0x32ee, "mu4_file_boundary_swap",
+					[this](offs_t address, u16 &, u16) {
+						if (machine().side_effects_disabled() || m_cpu->pc() != address + 1 || !m_native_boundary_window || m_native_boundary_events >= 128) return;
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_swap_fetch: a=%010llx b=%010llx ar6=%04x brc=%04x fetch_snapshot=1\n",
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)) & 0xffffffffffULL,
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)));
+					});
+				m_cpu->space(AS_PROGRAM).install_write_tap(0x028e80, 0x028e8f, "mu4_file_boundary_dma",
+					[this](offs_t address, u16 &value, u16) {
+						if (machine().side_effects_disabled() || m_native_boundary_dma_events >= 32) return;
+						++m_native_boundary_dma_events;
+						u16 const source = 0x3c21 + (address - 0x028e80);
+						logerror("mu4_file_boundary_dma: destination=%06x value=%04x source=%04x channel0_source_match=%u\n",
+							unsigned(address), value, source, unsigned(m_dma->source_matches(0, AS_DATA, source)));
+						if (address == 0x028e8f) m_native_boundary_window = false;
+					});
+				m_cpu->space(AS_DATA).install_read_tap(0x36c4, 0x36c6, "mu4_file_boundary_cluster_reads",
+					[this](offs_t address, u16 &value, u16) {
+						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128 ||
+							m_cpu->pc() < 0x336c || m_cpu->pc() > 0x3380) return;
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_cluster_read: address=%04x value=%04x context_pc=%06x cycle=%llu\n",
+							unsigned(address), value, unsigned(m_cpu->pc()), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x336c, 0x33c0, "mu4_file_boundary_cluster_path",
+					[this](offs_t address, u16 &, u16) {
+						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128 || m_cpu->pc() != address + 1 ||
+							(address != 0x336c && address != 0x3375 && address != 0x3379 && address != 0x33bf && address != 0x33c0)) return;
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_cluster_fetch: address=%04x a=%010llx ar1=%04x cycle=%llu fetch_snapshot=1\n", unsigned(address),
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x343a, 0x3517, "mu4_file_boundary_fat_path",
+					[this](offs_t address, u16 &, u16) {
+						if (machine().side_effects_disabled() || !m_native_boundary_window || m_native_boundary_events >= 128 || m_cpu->pc() != address + 1) return;
+						switch (address)
+						{
+						case 0x343a: case 0x344e: case 0x3458: case 0x3482: case 0x348c:
+						case 0x34a2: case 0x34c6: case 0x34dc: case 0x34e1: case 0x34ea: case 0x34f4: case 0x3512:
+							break;
+						default: return;
+						}
+						++m_native_boundary_events;
+						logerror("mu4_file_boundary_fat_fetch: address=%04x a=%010llx b=%010llx ar1=%04x ar2=%04x ar6=%04x cycle=%llu fetch_snapshot=1\n", unsigned(address),
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)) & 0xffffffffffULL,
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
+					});
+			}
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x3acf2, 0x3acf2, "mu4_original_bootstrap_dispatch",
 				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_command_paths[5]; });
 		}

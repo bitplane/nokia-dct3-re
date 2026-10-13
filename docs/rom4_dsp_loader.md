@@ -3647,9 +3647,17 @@ a fresh atomic `bootrecsave` control with the same NAND/shared-memory
 profile matches every compared program word. The first staged divergence
 is record 434, word 11, file offset `4000` (16 KiB): its first five wrong
 words match byte-swapped source bytes at `3fda`, one 38-byte record earlier.
-The staged loader's first boundary/stale-data discrepancy needs investigation
-rather than treating entry or the mask-write stop as proof of a complete
-load. This witness does not yet identify the faulty instruction or cache.
+The crossing record gets only 11 fresh buffer words before the original
+16-word swap/DMA, leaving five stale words; DMA still reads the original
+buffer. Atomic advances both descriptor cluster fields from 3 to 4;
+staged resets the cursor without advancing either field. Their initial
+cluster comparison reads equal values, but next-cluster helper `343a`
+returns `0fff` staged versus 4 atomic. Offset helper `345c` has an earlier
+fetch-snapshot discrepancy at `3482` (A=0 staged versus 2 atomic).
+Snapshots do not establish retired operand values. The next question is
+the offset calculation's actual read/write composition, not a fabricated
+next-cluster response or support for later resident opcodes. Resident
+entry and the mask-write stop remain insufficient proof of complete load.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

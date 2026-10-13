@@ -2497,9 +2497,20 @@ the reference mapping. First divergence is word 11 of source record 434
 (destination `02:8e80`, 16 words), file byte offset `4000`. The first five
 bad words, byte-swapped, match the original sequence at `3fda`, exactly
 one 38-byte record earlier. This is a boundary/stale-data witness, not
-proof of a specific cache or byte-swap defect. Investigate that first
-16-KiB divergence before prioritizing later resident opcodes; neither
-staged transfer, full boot nor recording is accepted.
+proof of a specific cache or byte-swap defect. Bounded write observations
+show that the crossing record receives only 11 new words at `3c21..3c2b`,
+then the original swap and DMA process all 16 words, including five stale
+words. DMA source ownership matches the original buffer. The atomic
+reader advances descriptor cluster fields `36c4/36c6` from 3 to 4 and
+fills the remaining five words; staged resets cursor `36c5` but leaves
+both cluster fields at 3. The initial cluster comparison reads 3 and 3
+in both engines. The staged next-cluster helper `343a` subsequently
+returns `0fff`, whereas atomic returns 4. Earlier fetch snapshots in
+offset helper `345c`, at `3482`, already differ (atomic A=2, staged A=0).
+Fetch snapshots are not retired-instruction operand evidence: localize
+the offset computation's reads/writes before attributing a CPU defect.
+Investigate this FAT lookup divergence before prioritizing later resident
+opcodes; neither staged transfer, full boot nor recording is accepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
