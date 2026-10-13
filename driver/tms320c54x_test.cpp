@@ -6965,6 +6965,87 @@ private:
 		m_phase = 252950; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static u64 signed_branch_source(unsigned variant)
+	{
+		return std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0100000000ULL, 0x8000000000ULL, 0x7fffffffffULL}[(variant / 24) % 8];
+	}
+	static bool signed_branch_taken(unsigned variant)
+	{
+		u64 const bits = signed_branch_source(variant);
+		s64 const value = bits & (1ULL << 39) ? s64(bits) - (1LL << 40) : s64(bits);
+		return std::array<bool, 6>{value >= 0, value < 0, value != 0, value == 0, value > 0, value <= 0}[(variant / 2) % 6];
+	}
+	void start_pipeline_signed_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = variant % 2, delayed = (variant / 12) % 2, taken = signed_branch_taken(variant);
+		unsigned const condition = (variant / 2) % 6, flags = (variant / 192) % 4;
+		u32 const base = (variant / 1536) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, 0xf800 | (0x42 + condition) | (b << 3) | (delayed << 9));
+		program.write_word(base + 0x601, 0x700);
+		program.write_word(base + 0x602, b ? 0xe907 : 0xe807);
+		program.write_word(base + 0x603, b ? 0xe822 : 0xe922);
+		program.write_word(base + 0x604, b ? 0xe811 : 0xe911); program.write_word(base + 0x605, 0xf4e1);
+		program.write_word(base + 0x700, b ? 0xe855 : 0xe955); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0 : signed_branch_source(variant));
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? signed_branch_source(variant) : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "signed_branch_target",
+			[this, taken, delayed](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				expect(taken && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (delayed ? 8 : 7),
+					"Signed branch target is fetched once from the full-width retained condition"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "signed_branch_literal",
+			[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(word == 0x700 && !m_pipeline_extensions_reads, "Signed branch retains the target literal once"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "signed_branch_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Signed branch has no data-memory write"); });
+		m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "signed_branch_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Signed branch reads its live accumulator, not data memory"); });
+		m_phase = 252970; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_signed_branch_producer(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const count = std::array<u16, 4>{0, 1, 2, 0xffff}[variant % 4];
+		u32 const base = variant % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		std::array<u16, 7> const words{0x4811, 0x08e6, 0x0011, 0xf846, 0x0700, 0xe911, 0xf4e1};
+		for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		program.write_word(base + 0x700, 0xe955); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, count); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1011, 1);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "signed_branch_producer_reads",
+			[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_operand_reads < 2 && (m_pipeline_operand_reads ? at == 0x1011 && word == 1 && m_cpu->pipeline_cycles() == 7 :
+					at == 0x11 && word == count && m_cpu->pipeline_cycles() == 5), "LDM and long-offset SUB retire their ordered source samples before AGT evaluates"); ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "signed_branch_producer_target",
+			[this, count](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				expect(count > 1 && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 10,
+					"Original AGT family consumes the preceding SUB result with its retained redirect"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "signed_branch_producer_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "LDM/SUB/AGT producer chain does not write data memory"); });
+		m_phase = 252990; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -31793,7 +31874,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 1023) { start_pipeline_register_arithmetic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_signed_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -31846,6 +31927,92 @@ private:
 		if (m_phase == 252960)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252950;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252970)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, flags = (variant / 192) % 4;
+			bool const b = variant % 2, delayed = (variant / 12) % 2, poison = (variant / 768) % 2, taken = signed_branch_taken(variant);
+			u64 const original = signed_branch_source(variant), changed = original == 1 ? 0 : 1;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 6, 8}[variant / 3072];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "All six signed accumulator branch conditions have staged ownership");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 1536) % 2 ? 0x20000 : 0) + 0x601, 0xdead);
+			}
+			if (poison && tick == 6) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, changed);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save signed branch before/after predicate and delay-slot effects");
+			}
+			if (tick == 30)
+			{
+				u64 const compared = delayed || !taken ? 7 : poison ? changed : original, other = taken ? 0x55 : 0x11;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(taken) && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? other : compared) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? compared : other) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0)),
+					"Signed branch uses all 40 bits independent of SXM/OVM and retains its decision through later source changes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore signed branch without refetching its literal or target");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252980; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 12287) { start_pipeline_signed_branch(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0\n");
+				start_pipeline_signed_branch_producer(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252980)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252970;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252990)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u16 const count = std::array<u16, 4>{0, 1, 2, 0xffff}[variant % 4];
+			u64 const result = count ? count - 1 : 0xffffffffffULL;
+			unsigned const checkpoint = std::array<unsigned, 3>{6, 8, 9}[variant / 4];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "The original LDM/long-SUB/AGT chain has coherent staged ownership");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original signed-branch producer across SUB retirement and evaluation");
+			}
+			if (tick == 30)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == unsigned(count > 1) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == result && m_cpu->state_int(tms320c54x_device::STATE_B) == (count > 1 ? 0x55 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (count ? 0x800 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1000,
+					"AGT consumes the retired signed SUB result for negative, zero and positive counts without input or firmware-state forcing");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original AGT producer without duplicate source or target reads");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253000; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				if (variant < 11) { start_pipeline_signed_branch_producer(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253000)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252990;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

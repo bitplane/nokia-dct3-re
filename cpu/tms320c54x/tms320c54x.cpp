@@ -27,10 +27,31 @@ constexpr bool staged_tc_branch(u16 word)
 	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30;
 }
 
+constexpr bool staged_accumulator_branch(u16 word)
+{
+	u8 const condition = word;
+	return (word & 0xfd00) == 0xf800 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f));
+}
+
+constexpr bool staged_accumulator_condition(u16 word, u64 value)
+{
+	value &= 0xffffffffffULL;
+	bool const negative = BIT(value, 39), zero = !value;
+	switch (word & 7)
+	{
+	case 2: return !negative;
+	case 3: return negative;
+	case 4: return !zero;
+	case 5: return zero;
+	case 6: return !negative && !zero;
+	case 7: return negative || zero;
+	default: return false;
+	}
+}
+
 constexpr bool staged_conditional_branch(u16 word)
 {
-	return word == 0xfa44 || word == 0xfa45 || word == 0xfa4c || word == 0xfa4d ||
-		word == 0xf844 || word == 0xf845 || word == 0xf84c || word == 0xf84d || (word & 0xfdfe) == 0xf802 || staged_tc_branch(word);
+	return staged_accumulator_branch(word) || (word & 0xfdfe) == 0xf802 || staged_tc_branch(word);
 }
 
 constexpr bool staged_bio_branch(u16 word)
@@ -2228,10 +2249,9 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && !BIT(m_pipeline_word[4], 9))
 	{
-		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
 		bool const taken = staged_bio_branch(m_pipeline_word[4])
 			? (BIT(m_pipeline_word[4], 0) ? !m_bio_in_cb() : bool(m_bio_in_cb())) : staged_tc_branch(m_pipeline_word[4])
-			? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
+			? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) : staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
 		m_pipeline_immediate[4] = taken;
 		if (taken)
 		{
@@ -3177,8 +3197,8 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Our complete two-word slot reaches Read at the opcode's Evaluate
 		// clock. Retain the predicate after older Execute writes (example 7-17).
-		bool const zero = (accumulator(BIT(m_pipeline_word[4], 3)) & ACC_MASK) == 0;
-		m_pipeline_immediate[4] = staged_tc_branch(m_pipeline_word[4]) ? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) : BIT(m_pipeline_word[4], 0) ? zero : !zero;
+		m_pipeline_immediate[4] = staged_tc_branch(m_pipeline_word[4]) ? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) :
+			staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
 	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff80) == 0x4600)
 	{

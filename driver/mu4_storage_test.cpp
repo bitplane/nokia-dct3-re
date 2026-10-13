@@ -2001,7 +2001,14 @@ private:
 		if (original_bootstrap_profile())
 		{
 			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			{
+				if (system_bios() == 26)
+					logerror("mu4_staged_stop: pc=%06x nand_reads=%u nand_strobes=%zu ar0=%04x ar1=%04x ar2=%04x ready=%u acceptance=0\n",
+						unsigned(m_cpu->state_int(STATE_GENPC)), m_data_reads, m_writes.size(),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), m_ready);
 				fatalerror("MU4 original bootstrap entry did not execute cleanly");
+			}
 			auto const disable = machine().disable_side_effects();
 			logerror("mu4_original_bootstrap_frontier: entry_count=%u resident_count=%u pc=%06x st1=%04x imr=%04x ifr=%04x flag374d=%04x nand_reads=%u stream_words=%u tail_ms=20000 board_boot=0 music_decode=0\n",
 				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),

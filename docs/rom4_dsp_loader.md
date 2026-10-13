@@ -3197,13 +3197,16 @@ read, one I/O read, one data write, unchanged status/unselected accumulator
 lanes and no duplicate pointer update after restoration.
 
 The original upload now retires PORTR `74f8` at `00:302f`. The capped
-NAND read observer records `fa,33,c0,8e` with HD012=`0`, direction=`7` and
-ready=`1`; these match retained NAND row 1's first four bytes at raw offset
-`528`. The observer returns the single existing device read, never a second
+NAND read observer records a capped 16-byte prefix with HD012=`0`, direction=`7`
+and ready=`1`; `fa33c08ed0bc007c8bf45007501ffbfc` matches retained NAND row 1
+at raw offset `528`. The stop summary counts 452 reads and five strobes,
+with AR0/AR1=`00e1`, AR2=`0000`. The full 452-byte sequence is not captured
+by the capped prefix, and this is not a complete 512-byte page transfer.
+The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `BC AGT`, `f846` at `00:327e`, debugger context
-`00:3280`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is BITF, `61f8` at `00:3283`, debugger context
+`00:3285`. Unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3285,10 +3288,10 @@ register-6 cases use the high program page. Opcode-shaped offset retention,
 BK=16 circular wrap, compatibility ARP, changed pointers after Access and
 changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
-upload now decodes counter ADDM `6be6` at `00:3277` and long-offset SUB
-`08e6` at `00:327c` before stopping at the following `BC AGT`; this remains
-bounded coverage, not full loop or
-startup acceptance.
+upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
+`08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
+The next BITF boundary remains incomplete; this is bounded transfer coverage,
+not startup acceptance.
 
 Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their
 memory operand through Read and use the established 40-bit arithmetic
@@ -3332,6 +3335,25 @@ fetch one IRQ vector, save/restore XPC and the return address, execute the
 continuation and reach IDLE with balanced SP. The data source is read once;
 only the interrupt frame writes RAM. Other multiword protected-instruction
 families still require their own retirement/composition coverage.
+
+Signed accumulator BC/BCD now admit all six zero comparisons for A and B:
+GE, LT, NE, EQ, GT and LE (SPRU172C condition table, page 4-18).
+The predicate uses the full 40-bit accumulator, including guard sign and
+nonzero guard bits, independently of SXM/OVM. Plain and delayed forms retain
+the same existing Read/Evaluate and redirect paths; this extends the former
+zero/nonzero predicate without changing TC/BIO behavior or atomic execution.
+Phase placement remains a partial stage model, not silicon timing proof.
+
+The 12,288 replay cases cover both accumulators/forms, six conditions, eight
+signed/guard patterns including 40-bit limits, four SXM/OVM combinations, two
+pages, four checkpoints and a post-Evaluate source-change control. The latter
+is a firmware-free CPU conformance mutation, never an original-upload hook.
+Target-literal poisoning, one taken-target fetch, real delay-slot source
+changes, unchanged status and no data accesses are asserted. Twelve additional
+LDM/long-offset-SUB/AGT fixtures use counts `0,1,2,65535`: the source reads
+occur at clocks 5/7, SUB retires before evaluation, and taken targets fetch
+at 10. Three checkpoints replay negative/zero/positive outcomes without
+duplicate reads or writes.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles
