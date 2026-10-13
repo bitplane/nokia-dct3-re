@@ -2449,12 +2449,14 @@ latency coverage. Short RPT #32 (`ec20`) at `00:2fc1` now executes its
 retained NOP delay loop. The staged diagnostic observes the preceding NAND
 strobe: byte `00`, HD0/CLE asserted, HD2/CE low, direction `7`, ready high.
 This proves that I/O write retired, not NAND data-read or startup completion.
-The first unsupported instruction is now `9634` at `00:2fc3`; its debugger
-context is `00:2fc5`, not the opcode boundary. TI SPRU172C page 4-21
-identifies this as `BIT *AR5,4`: copy memory bit 11 into ST0.TC, with no
-pointer modification. It is not SUB (`92xx/93xx`). The following
-`fd20` is `XC 1,NTC`, so the load-bearing composition is the bit test's TC
-publication followed by conditional execution, not accumulator arithmetic. The
+`9634` at `00:2fc3` now executes as `BIT *AR5,4`: memory bit 11 is
+published to ST0.TC, with no pointer modification (SPRU172C 4-21).
+The following two NOPs provide the tested visibility window for `XC 1,NTC`.
+The original run retires five NAND strobes: command byte `00` with CLE high,
+then address bytes `00,01,00,00` with ALE high; CE remains low and direction
+is `7`. This is not evidence of a completed NAND read.
+The first unsupported instruction is `74f8` at `00:302f` (PORTR); debugger
+context is `00:3031`, not the opcode boundary. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2469,7 +2471,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:2fc3` needs staged BIT operand/TC and adjacent-XC conformance before advancing this diagnostic;
+`00:302f` needs staged PORTR I/O sampling, destination-write and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

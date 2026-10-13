@@ -3156,18 +3156,30 @@ Saving an undelivered MAME input synchronization request is not a test of
 saved CPU interrupt state. Short-repeat transfer-body composition and wider
 peripheral/HOLD interactions remain unvalidated; other bodies fail closed.
 
-The staged-only, first-16-strobes observer in the MU4 I/O handler records
-byte `00`, HD012=`1`, direction=`7`, ready=`1`: a retired NAND command
-strobe with CLE high and CE low. No device state or response is synthesized
-by that observer. The next unsupported instruction is `9634` at `00:2fc3`.
-SPRU172C page 4-21 assigns `96xx` to `BIT Xmem,BITC`, not ADD/SUB.
-For `9634`, Xmem selects unmodified AR5 and BITC=4 selects memory bit 11;
-only ST0.TC is changed. The atomic decoder already implements this operation.
-Staged acceptance requires a captured Xmem address, one retained memory read,
-TC publication at Execute, and an adjacent `XC 1,NTC` (`fd20`) composition
-test that establishes the consumer's actual visibility window. Checkpoints
-before and after the read must replay without duplicate reads or pointer
-updates. Accumulator arithmetic tests cannot establish this contract.
+Staged BIT admits the `96xx` Xmem/BITC family (SPRU172C 4-21).
+Access captures the selected AR2-AR5 address and applies its packed pointer
+modifier once; Read retains one RAM word; Execute copies bit `15-BITC`
+into ST0.TC without changing other status or either accumulator. Sources
+below `0060` fail closed before pointer modification; peripheral wait and
+control-register composition are not enabled by the RAM tests.
+
+The 9,216 replay cases cover all 16 packed Xmem fields, all 16 bit codes,
+both selected-bit values and initial TC states, zero/one/two-gap XC consumers,
+and Decode/Access/Read checkpoints. Poisoning RAM after Read must not
+change the result. XC samples before Execute, so zero/one gaps observe old
+TC while two gaps observe the BIT result. The original `9634` at `00:2fc3`
+uses unmodified AR5 and tests bit 11; its two NOPs before `fd20` match the
+tested window. Percent addressing is tested with BK=0 and AR0=3; nonzero
+BK, page variation, repeat bodies and wider producer conflicts remain
+unvalidated. These are staged-model contracts, not measured silicon phases.
+
+The staged-only, first-16-strobes observer records five original-upload
+NAND writes: command `00` with HD012=`1`, then address bytes `00,01,00,00`
+with HD012=`2`, direction=`7`, ready=`1`. CLE/ALE distinguish the cycles;
+CE is low. No device state or response is synthesized by that observer.
+The next unsupported instruction is PORTR `74f8` at `00:302f`, with
+debugger context `00:3031`. Its I/O read/destination publication and replay
+contract must be verified before enabling it in the staged frontend.
 This adds real I/O-retirement evidence but not native NAND read, recorder,
 startup or speech acceptance. Existing atomic profiles remain unchanged.
 
