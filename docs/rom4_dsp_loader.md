@@ -3005,6 +3005,28 @@ unchanged non-ARP status and an unchanged unselected accumulator. Arbitrary
 circular-region provenance, operand-bank conflicts, XC/interrupt composition
 and silicon phase fidelity remain unvalidated.
 
+Indirect DLD A/B (`56xx/57xx`) admits short MOD 0--11 and long
+offset/absolute MOD 12--15. Decode retains an extended operand literal;
+Access applies the shared long-word address helper or short pointer step
+once. Linear and circular unit steps are two words; AR0-indexed and
+reverse-carry steps retain their index semantics. Read retains the high
+word at `address`, then the low word at `address ^ 1`. Execute combines
+the 32-bit pair and extends its high sign bit into the guard byte when
+SXM is set, independently of C16. It changes only the chosen accumulator
+and any Access-owned compatibility ARP update.
+
+The 24576 replay cases cover sixteen address forms, eight encoded
+registers, both accumulators, four payload patterns, both address parities,
+SXM/C16 and compatibility mode. They change extended literals after
+Decode, AR/BK after Access and both source words after Read. Saves in
+Decode, Access or Read require exactly two ordered source reads and no
+data writes on each replay. Short paired reads occur at clock 5, extended
+paired reads at clock 6, with publication one clock later in this partial
+frontend model. This does not establish physical bus arbitration or
+silicon phase timing. Register/peripheral pairs and extended control-delay
+placement fail closed; arbitrary BK regions and short control-delay,
+XC/interrupt and source-bank conflict compositions remain unvalidated.
+
 Accumulator AND/OR/XOR register forms now retire in Execute using the
 existing one-word arithmetic semantics. They read no memory, consume no
 extension and change no flags. SPRU172C 4-11/4-123/4-201 specifies a logical
@@ -3230,18 +3252,22 @@ not retarget or resample the operation. Tests assert no data-destination
 read, one I/O read, one data write, unchanged status/unselected accumulator
 lanes and no duplicate pointer update after restoration.
 
-The original upload now retires PORTR `74f8` at `00:302f`. The capped
-NAND read observer records a capped 16-byte prefix with HD012=`0`, direction=`7`
-and ready=`1`; `fa33c08ed0bc007c8bf45007501ffbfc` matches retained NAND row 1
-at raw offset `528`. The stop summary counts 458 reads and five strobes,
-with AR0=`00e4`, AR1=`3aea`, AR2=`00e3`. The full 458-byte sequence is not captured
-by the capped prefix, and this is not a complete 512-byte page transfer.
+The original upload now retires PORTR `74f8` at `00:302f`. The bounded
+NAND read observer captures the first 512 bytes with HD012=`0`, direction=`7`
+and ready=`1`. They compare byte-for-byte with retained NAND row 1
+at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
+the full captured page SHA-256 is
+`7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
+The stop summary counts 512 reads and five strobes,
+with AR0=`00ff`, AR1=`3aea`, AR2=`00e4`. This validates device-read data,
+not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is short-indirect DLD, `5681` at `00:30d3`, debugger context
-`00:30d5`. Short-indirect DST `4e81` at `00:30c6` and long-offset
-LD `10e1` at `00:30c7` now decode, but
+unsupported instruction is long-offset XORM, `6ce2` at `00:30df`, debugger context
+`00:30e1`. Short-indirect DST `4e81` at `00:30c6`, long-offset
+LD `10e1` at `00:30c7` and short-indirect DLD `5681` at `00:30d3`
+now have staged coverage, but
 unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
@@ -3326,8 +3352,9 @@ changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
 upload now consumes counter ADDM `6be6` at `00:3277`, long-offset SUB
 `08e6` at `00:327c` and `BC AGT` at `00:327e` through repeated NAND reads.
-The following BITF, short-indirect DST and long-offset LD now have staged
-coverage; subsequent short-indirect DLD remains incomplete. This is bounded transfer
+The following BITF, short-indirect DST, long-offset LD and short-indirect
+DLD now have staged coverage; subsequent long-offset XORM remains incomplete.
+This is bounded transfer
 coverage, not startup acceptance.
 
 Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their

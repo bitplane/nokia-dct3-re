@@ -1171,7 +1171,8 @@ private:
 		if (!m_data_reads) m_first_data = machine().time();
 		++m_data_reads;
 		u16 const value = m_nand->data_r();
-		if (system_bios() == 26 && m_data_reads <= 16)
+		// Capture one bounded page from the existing read, never a second read.
+		if (system_bios() == 26 && m_data_reads <= 512)
 			logerror("mu4_staged_nand_read: index=%u byte=%02x hd012=%x direction=%x ready=%u observation_only=1\n",
 				m_data_reads, value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		return value;

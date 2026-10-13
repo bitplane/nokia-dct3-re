@@ -2455,19 +2455,21 @@ The following two NOPs provide the tested visibility window for `XC 1,NTC`.
 The original run retires five NAND strobes: command byte `00` with CLE high,
 then address bytes `00,01,00,00` with ALE high; CE remains low and direction
 is `7`. The write sequence alone is not evidence of a completed NAND read.
-PORTR `74f8` at `00:302f` now reads port `4000` into AL. The capped
-device-boundary observer records the first 16 bytes
+PORTR `74f8` at `00:302f` now reads port `4000` into AL. The bounded
+device-boundary observer records the first 512 bytes. The prefix is
 `fa33c08ed0bc007c8bf45007501ffbfc`, with CLE/ALE/CE low and ready high;
-they match retained NAND row 1 at raw offset `528`. The stopped-run summary
-counts 458 NAND byte reads and five strobes, with AR0=`00e4`, AR1=`3aea`, AR2=`00e3`.
-This is not a full 512-byte page read, buffered-page verification or startup.
+all 512 captured bytes compare with retained NAND row 1 at raw offset `528`,
+with SHA-256 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
+The stopped-run summary counts 512 NAND byte reads and five strobes, with
+AR0=`00ff`, AR1=`3aea`, AR2=`00e4`. This verifies device-read data, not
+the firmware buffer, spare-area handling or startup.
 `80e6` at `00:3269` now has staged long-offset
 STL conformance. Long-offset MVDK `71e6` at `00:326b` now has source,
 DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is short-indirect DLD `5681` at `00:30d3`; debugger context is `00:30d5`, not
+instruction is long-offset XORM `6ce2` at `00:30df`; debugger context is `00:30e1`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2487,8 +2489,10 @@ Do not reuse the source seed as writable NVRAM. The instruction contract at
 `00:30c6` now has short-indirect DST address/modification, two-write publication
 and replay conformance across all twelve short modes. The next instruction
 at `00:30c7` has long-offset LD source/address and replay conformance.
-Short-indirect DLD at `00:30d3` needs retained paired reads, pointer
-modification, accumulator publication and replay coverage;
+Short-indirect DLD at `00:30d3` has retained paired-read, pointer-modification,
+accumulator-publication and replay coverage, including all short modes and
+the extended forms. Long-offset XORM at `00:30df` needs retained offset/immediate,
+read-modify-write and replay coverage;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
