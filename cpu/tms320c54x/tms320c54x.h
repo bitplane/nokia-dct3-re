@@ -250,6 +250,16 @@ private:
 	std::array<u16, 6> m_pipeline_operand = {};
 	std::array<u16, 6> m_pipeline_immediate = {};
 	std::array<bool, 6> m_pipeline_valid = {};
+	std::array<bool, 6> m_pipeline_block_first_final = {};
+	std::array<bool, 6> m_pipeline_block_end = {};
+	std::array<bool, 6> m_pipeline_block_body = {};
+	bool m_pipeline_decode_block_body = false;
+	bool m_pipeline_block_active = false;
+	bool m_pipeline_block_fetch_enabled = false;
+	bool m_pipeline_decode_block_first_final = false;
+	u32 m_pipeline_block_start = 0;
+	u32 m_pipeline_block_end_address = 0;
+	u32 m_pipeline_block_fetch_remaining = 0;
 	std::array<bool, 6> m_pipeline_early_write_deferred = {};
 	std::array<bool, 6> m_pipeline_peripheral_wait_paid = {};
 	std::array<bool, 6> m_pipeline_intm_protected = {};

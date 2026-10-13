@@ -3610,25 +3610,37 @@ and ready=`1`. They compare byte-for-byte with retained NAND row 1
 at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
-The stop summary counts 3586 reads and forty strobes,
-with AR0=`0000`, AR1=`0001`, AR2=`0000`. After the first row, two further
-commands `00` with address bytes `00,20,00,00` select row 32.
-The additional 3074 bytes are outside the bounded capture and remain
-unverified. The first-page comparison validates device-read data,
+The bounded observer also sees two further commands `00` with address
+bytes `00,20,00,00`, selecting row 32.
+Only the first 512 bytes are captured and verified. The first-page
+comparison validates device-read data,
 not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
-MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `RPTB`, `f072` at `00:32ee`;
-debugger context is `00:32f0`, not the retained opcode address.
+MVDK `71e6` at `00:326b` are now accepted by the staged decoder.
+RPTB `f072` at `00:32ee` now executes.
+At the 20-second diagnostic tail, the original run has bootstrap
+entry_count=`1`, resident_count=`0`, PC=`00:307e`, ST1=`6900`,
+IMR=`0000`, IFR=`0008`, flag `374d`=`0000` and 37,019,530 NAND reads.
+The loader trace reaches index 128 with zero filename/descriptor fields.
+The terminal exception is now `MU4 original recorder command did not
+reach the native overlay loader`, not an unsupported-opcode stop.
+The additional 37,019,018 reads are outside the byte capture and unverified;
+their count is not proof of distinct pages or a valid firmware buffer.
+Recorder dispatch, loader, response, RX/TX and native program-write counts
+remain zero. Board boot, music decoding and recording remain unaccepted.
+The next question is the actual data-RAM buffer before/after the directory
+byte swap and the loader's filename/descriptor consumption, not another
+assumed decoder opcode. No firmware state should be forced to bypass it.
 STLM B,BRC at `00:32ec` now has 3,072 staged replay cases covering
 Execute publication, saturation, both accumulator sources and retained
 LDM reads. The context tool pins the original nine-word sequence:
 `891a f495 f072 32f4 1386 f678 f3e8 f1a0 8196`.
 Its intervening NOP satisfies SPRU131G table 7-3 category 9's BRC-store
 spacing rule; the requested block spans `00:32f0`--`00:32f4`.
-Loop execution, endpoint handling and block-repeat interrupt behavior
-remain unaccepted. Zero-gap LDM cases test the declared pipeline
+Straight-line block execution now has bounded conformance below;
+delayed/nested/control-changing blocks remain outside it.
+Zero-gap LDM cases test the declared pipeline
 projection, not silicon forwarding or RPTB latency.
 
 The static setup contract follows SPRU172C's RPTB[D] entry: two instruction
@@ -3638,12 +3650,30 @@ blocks. RPTBD executes two delay words and is not single-repeatable.
 SPRU131G sections 6.8/7.5.8 place BRC decrement at the last block
 instruction's Decode stage. The atomic frontend's post-instruction
 `REA+1` check is therefore not sufficient evidence for staged timing.
-Staged acceptance needs retained endpoint decisions before younger
-fall-through work executes, interruption/resumption with BRC/RSA/REA/BRAF,
-multiword endpoints, BRC=0, and save/restore across the loop boundary.
+The staged implementation retains endpoint predictions before younger
+fall-through work executes, independently of Decode-owned BRC updates.
+Interrupt acceptance discards undecoded fetch predictions and reconstitutes
+the remaining count from the architectural state at its saved return PC.
 Software BRC/BRAF modifications have separate five/six-word latencies
 (tables 7-3/7-25), not ordinary Execute forwarding. The context tool's
 setup arithmetic tests do not prove these runtime requirements.
+
+The `tms54test -bios rptb` runtime fixture covers 6,144 cases with counts
+0/1/2/7, sixteen source patterns, sixteen flag configurations, two program
+pages and three save points. The original five-word body has uninterrupted
+reads at clocks 9+5i and writes at 14+5i, with no loop padding. Twenty-four
+IRQ/NMI cases save before/through interrupt acceptance, use the existing
+same-page vector contract and return through RETE. Sixteen further replay
+cases cover one-word MAR and two-word LD endpoints and twelve fail-closed
+cases: delayed RPTBD, an in-block branch, STLM BRC, endpoints inside opcode
+or extension words, and an aliased STL to BRC. All block-prefetch tags,
+retained extension tags, active context and speculative count are saved.
+Terminal BRC remains zero in this declared model, matching the atomic
+frontend; exact silicon terminal-counter and phase behavior are not claimed.
+RPTBD, nested repeats, in-block branches/calls/XC/IDLE and loop-register
+modification latencies remain excluded. ISR-side loop-register replacement,
+wrapped endpoints and measured silicon timing remain unvalidated.
+These tests do not establish complete DSP startup or speech.
 
 The original block has a concrete data oracle: `1386` is
 `LDU *AR6,B`; `f678` is `SFTA B,-8,A`; `f3e8` is
