@@ -3717,7 +3717,7 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		bool const t_delay = variant >= 24;
-		u16 const parameter = t_delay ? std::array<u16, 5>{6, 0, 0x8000, 0xf495, 0xffff}[(variant - 24) / 12] : 0;
+		u16 const parameter = t_delay ? std::array<u16, 9>{6, 0, 0x8000, 0xf495, 0xffff, 0x76e6, 0x4ee6, 0x7001, 0x54e6}[(variant - 24) / 12] : 0;
 		unsigned const adjacent = t_delay ? BIT(variant, 1) : variant >= 12;
 		bool const delayed = t_delay || BIT(variant, 1);
 		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
@@ -6261,6 +6261,57 @@ private:
 			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 5) return;
 				expect(word == f.literal && !m_pipeline_extensions_reads, "DSUB retains its extension once"); ++m_pipeline_extensions_reads; });
 		m_phase = 252630; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	struct long_store_fixture
+	{
+		unsigned reg, selected, kind;
+		u16 offset, value, address, next_ar, st0;
+		bool compatibility;
+	};
+	static long_store_fixture immediate_long_store_fixture(unsigned variant)
+	{
+		unsigned const reg = variant % 8, kind = (variant / 8) % 3;
+		bool const compatibility = (variant / 384) % 2;
+		s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[(variant / 24) % 4];
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(variant / 96) % 4];
+		int const index = (7 + offset) % 16;
+		u16 const address = kind == 2 ? 0x1000 + (index < 0 ? index + 16 : index) : u16(0x1007 + offset);
+		return {reg, compatibility && !reg ? 3U : reg, kind, u16(offset), value, address,
+			u16(kind ? address : 0x1007), u16(compatibility ? 0x6608 : 0x608), compatibility};
+	}
+	void start_pipeline_long_immediate_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = immediate_long_store_fixture(variant);
+		u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x76e0 | (f.kind << 3) | f.reg);
+		program.write_word(base + 0x601, f.offset); program.write_word(base + 0x602, f.value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility << 5));
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x1007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "long_immediate_store_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Long immediate ST does not read its destination"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "long_immediate_store_publication",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 8,
+					"Long immediate ST owns its cached address and literal value with one Execute write"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x602, "long_immediate_store_literals",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_extensions_reads < 2 && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
+					word == (m_pipeline_extensions_reads ? f.value : f.offset), "Long immediate ST fetches offset then value exactly once"); ++m_pipeline_extensions_reads; });
+		m_phase = 252650; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pll_transition_case()
@@ -27852,7 +27903,7 @@ private:
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
 			bool const t_delay = m_pipeline_peripheral_case >= 24;
-			u16 const parameter = t_delay ? std::array<u16, 5>{6, 0, 0x8000, 0xf495, 0xffff}[(m_pipeline_peripheral_case - 24) / 12] : 0;
+			u16 const parameter = t_delay ? std::array<u16, 9>{6, 0, 0x8000, 0xf495, 0xffff, 0x76e6, 0x4ee6, 0x7001, 0x54e6}[(m_pipeline_peripheral_case - 24) / 12] : 0;
 			unsigned const adjacent = t_delay ? BIT(m_pipeline_peripheral_case, 1) : m_pipeline_peripheral_case >= 12;
 			bool const delayed = t_delay || BIT(m_pipeline_peripheral_case, 1);
 			u16 const continuation = 0x600 + adjacent + (delayed ? 4 : 2);
@@ -27891,8 +27942,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 83) { start_pipeline_call(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged calls: PASS cases=84 forms=CALL,CALLD pages=2 adjacent_push=42 stm_t_delay=60 parameters=5 restore=84 duplicate_stack_writes=0\n");
+				if (m_pipeline_peripheral_case < 131) { start_pipeline_call(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged calls: PASS cases=132 forms=CALL,CALLD pages=2 adjacent_push=66 stm_t_delay=108 parameters=9 restore=132 duplicate_stack_writes=0\n");
 				start_pipeline_direct_move(); return;
 			}
 			++m_pipeline_expected_cycle;
@@ -30344,13 +30395,71 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 6911) { start_pipeline_long_subtract(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged DSUB: PASS cases=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6912 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_long_immediate_store(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252640)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252630;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252650)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = immediate_long_store_fixture(variant);
+			u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 7, 8}[variant / 1536];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long immediate ST keeps partial and complete Decode operands separate");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
+			}
+			if (tick == 5)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 0x4000);
+			}
+			if (tick == 7)
+			{
+				u16 const st0 = f.compatibility && f.reg ? (f.st0 & ~0xe000) | (f.reg << 13) : f.st0;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0,
+					"Long immediate ST applies only its encoded AR/compatibility modification once");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (st0 & ~0x1ff) | 9);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save partial/complete long ST Decode or retained address/publication");
+			}
+			if (tick == 20)
+			{
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_cpu->space(AS_DATA).read_word(f.address) == f.value &&
+						m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
+						"Long ST does not resample poisoned operands or overwrite a later pointer update");
+				}
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore long ST without operand/address resampling or duplicate write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252660; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 6143) { start_pipeline_long_immediate_store(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252660)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252650;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

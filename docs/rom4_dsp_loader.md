@@ -3062,8 +3062,33 @@ dual-mode sign-extension and overflow-retention policies remain modeled,
 not independently silicon-validated. Exact bank arbitration, peripheral
 pairs, repeats and control-delay composition are not claimed; the last
 three remain unsupported. Original `54e6` now executes and the upload
-stops on long-offset immediate ST `76e6` at `00:322e`. No native startup,
+passes long-offset immediate ST `76e6` at `00:322e`. No native startup,
 recorder or speech acceptance follows from this opcode boundary.
+
+Long-offset immediate ST now consumes offset then value as a retained
+three-word operation. Its Read-owned destination calculation shares the
+same offset/preincrement/circular helper as atomic addressing and staged
+DST/DSUB, with no operand fetch at address generation or Execute. Execute
+writes the cached value once. Register/peripheral destinations for these
+new forms, repeats and control-delay placement remain unsupported; existing
+short and absolute immediate-ST paths retain their behavior.
+
+The 6144 replay cases cover three offset modes, eight encoded registers,
+four offsets, four values, both compatibility states, two pages and saves
+after partial Decode, complete Decode, address generation or publication.
+They poison each extension after capture and change AR/BK/DP after address
+generation, verifying no destination read, no refetch and no repeated write.
+Opcode-shaped offsets/values are data, not independently decoded opcodes.
+
+Control-delay rejection is likewise restricted to unowned instruction words,
+not extensions of an already decoded instruction. The call matrix now has
+132 replay cases with nine STM-T parameters, including `76e6`, `4ee6`,
+`7001` and `54e6`, inside valid CALLD delay slots. The unchanged call/stack
+and retained-parameter results protect that ownership rule while actual
+unsupported instructions still fail closed. Original startup now stops on
+BIO-conditioned BC `f803` at `00:2fca`. Its condition timing and the bench's
+BIO input contract need investigation; a new opcode boundary alone proves
+neither native startup nor physical input ownership.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP

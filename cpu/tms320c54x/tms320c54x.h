@@ -121,6 +121,7 @@ private:
 	u16 mmr_address(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	u16 long_offset_address(u8 mode);
+	u16 long_offset_address(u8 mode, unsigned ar, s16 offset);
 	unsigned indirect_ar(u8 mode) const;
 	void indirect_modify(u8 mode, bool long_operand = false);
 	void dual_modify(u8 operand);
