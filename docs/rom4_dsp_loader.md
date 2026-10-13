@@ -3206,10 +3206,30 @@ sources below `0060` outside `0008..0017` remain rejected. The stage
 assignment is a partial frontend model, not measured silicon timing;
 repeat and delayed-control bodies remain restricted separately.
 
+Direct STLM now admits T/TRN (`880e/890e/880f/890f`) in addition to
+the covered AR destinations. It ignores DP/CPL, publishes the saturated low
+source word in Execute and does not read its destination. SST handling is
+supported by SPRU131G's saturation-on-store list, which explicitly includes
+STLM; the instruction's unchanged status flags do not imply SST is ignored.
+SPRU131G table 7-3 category 7 requires the word immediately after STLM T
+not to consume T. The multiply path therefore retains T in Read before an
+older Execute store, rather than adding an invented store-forwarding path.
+The 12,288 replay cases cover A/B sources, eight guarded/boundary values,
+SST/SXM/OVM/FRCT, gaps `0..3`, MPY/MPYR/MPYU T consumers and LDM TRN
+consumers. Source changes after Read test Execute-live STLM sampling;
+changed T/TRN and RAM after consumer Read test retained operands.
+Decode/Read/consumer snapshots require one register write, one consumer
+read, unchanged source and no replay duplication. Gap-zero T consumers
+violate the documented restriction: their old-value result is a declared
+stage projection, not an architectural guarantee or valid firmware pattern.
+Gap-zero TRN behavior is likewise only a stage projection. Spaced consumers
+have distinct acceptance coverage; other non-DAGEN MMR destinations and
+indirect STLM forms remain outside this extension.
+
 Memory LD T (`30xx`, SPRU172C LD syntax 1 at 4-70) publishes one
 retained Smem sample in Read, after older Execute. Retirement advances the
 instruction but never rewrites T. Signed MPY/MPYR (`20xx..23xx`) retain
-Smem and T in Read; Execute multiplies signed 16-bit inputs, applies FRCT,
+Smem and T in Read before older Execute; Execute multiplies signed 16-bit inputs, applies FRCT,
 rounds MPYR by adding `8000` and clearing the low word, then applies the
 existing destination OVM/overflow handling. SXM does not reinterpret their
 signed operands. Each family has 55,296 RAM/mapped-source replay cases;
@@ -3223,7 +3243,7 @@ These are explicit partial frontend clocks, not measured silicon interlocks;
 repeat and delayed-control bodies remain restricted separately.
 
 Unsigned memory MPYU (`24xx/25xx`, SPRU172C 4-106) retains one
-Smem sample and its unsigned T input at Read, after older Execute work.
+Smem sample and its unsigned T input at Read, before older Execute work.
 Execute multiplies the retained 16-bit unsigned operands, applies FRCT,
 then the existing OVM/result-overflow behavior; it does not publish T.
 The partial Read ownership is not measured silicon interlock timing.
@@ -3582,8 +3602,11 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `STLM A,T`, `880e` at `00:2ed8`;
-debugger context is `00:2eda`, not the retained opcode address. Repeated
+unsupported instruction is `MPY #lk,A`, `f066` at `00:2eda`;
+debugger context is `00:2edc`, not the retained opcode address. STLM A,T,
+`880e` at `00:2ed8`, now has publication and consumer/replay coverage.
+Unsupported Decode can still stop older Execute, so this particular run
+does not alone prove the preceding store retired. Repeated
 `ST #lk,*AR1+`, `7691` at `00:08ea`, now has retained-literal,
 two-clock stream and pending-IRQ/restoration coverage. BANZD,
 `6e87` at `00:0a50`, now has short-indirect delayed-branch coverage.
@@ -3705,7 +3728,7 @@ LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
 single-step and short-memory repeated SUBC now have coverage;
 short-indirect BANZD and short-memory repeated immediate stores now have
-coverage; the subsequent accumulator-to-T MMR store remains incomplete.
+coverage; the subsequent immediate multiply remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 

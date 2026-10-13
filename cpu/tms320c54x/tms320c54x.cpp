@@ -261,7 +261,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && u8(word) >= 0x10 && u8(word) <= 0x17;
+	return (word & 0xfe00) == 0x8800 && u8(word) >= 0x0e && u8(word) <= 0x17;
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -2921,6 +2921,10 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
 		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf800) == 0x2000)
+		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
+		// Read owns this input before the older store publishes in Execute.
+		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && staged_port_read(m_pipeline_word[4]))
 		m_pipeline_operand[4] = m_io.read_word(m_pipeline_immediate[4]);
 	if (m_pipeline_valid[4] && (staged_dld(m_pipeline_word[4]) || staged_long_arithmetic(m_pipeline_word[4])))
@@ -3439,11 +3443,10 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]))
 	{
-		// LD T and MPYA/MACA/MASA publish T in Read; MPY[R]/MPYU retain
-		// T instead. This partial placement resolves after older Execute.
-		if ((m_pipeline_word[4] & 0xf800) == 0x2000)
-			m_pipeline_immediate[4] = m_t; // MPY[R]/MPYU consume T without publishing it.
-		else m_t = m_pipeline_operand[4];
+		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
+		// MPY[R]/MPYU retained their input before that older Execute.
+		if ((m_pipeline_word[4] & 0xf800) != 0x2000)
+			m_t = m_pipeline_operand[4];
 	}
 	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
 	{
