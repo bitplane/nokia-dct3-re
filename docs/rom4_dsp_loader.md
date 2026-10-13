@@ -3072,6 +3072,21 @@ timing is not silicon-validated. BANZD, broader short-modifier coverage,
 arbitrary BK regions and XC/interrupt or preceding DAGEN-writer composition
 remain outside this fixture matrix.
 
+Variable-shift memory LD (`6fxx` plus `0c40/0d40` operation extension,
+SPRU172C LD syntax 4) retains the address-extension word, when present,
+before the operation extension. Access owns DAGEN and Read samples memory
+once; Execute applies SXM and the signed five-bit shift through the shared
+shifted-load helper. Its 110,592 replay cases cover 18 RAM address forms,
+AR1/AR6, both accumulators, four values, all 32 shifts and SXM/OVM states.
+Separate Decode/Access/Read checkpoints, poisoned extension words and
+changed sources/pointers check retention and single publication. The 16-bit
+source and shift range `-16..15` cannot exceed signed 32-bit range on a
+left shift, so these fixtures check preservation of existing overflow flags
+rather than claiming an unreachable new overflow. Mapped `0008..0017`
+sources are permitted but are not covered by this matrix. Other `6fxx`
+operation extensions, repeat bodies and control-delay slots remain rejected.
+The stage assignment remains a partial frontend model, not measured timing.
+
 Memory LD shifted by 16 (`44xx/45xx`, SPRU172C LD syntax 3) shares
 the retained memory-load address and Read path. Execute sign-extends
 according to SXM, shifts by 16 and masks to 40 bits, without changing
@@ -3438,7 +3453,7 @@ at raw offset `528`; the prefix is `fa33c08ed0bc007c8bf45007501ffbfc` and
 the full captured page SHA-256 is
 `7876777bc75f8e33789d0b917ac2ca71debc977170e6bc6b0f2dcf9b2e2c9310`.
 The stop summary counts 1550 reads and twenty strobes,
-with AR0=`0005`, AR1=`0043`, AR2=`0002`. After the first row, two further
+with AR0=`0005`, AR1=`3aea`, AR2=`0002`. After the first row, two further
 commands `00` with address bytes `00,20,00,00` select row 32.
 The additional 1038 bytes are outside the bounded capture and remain
 unverified. The first-page comparison validates device-read data,
@@ -3446,15 +3461,18 @@ not the resulting firmware buffer, spare-area handling or native startup.
 The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is `LD *AR6(0010),8,B` at `00:3291`, encoded
-`6fe6 0010 0d48`. Debugger context `00:3293` is its operation-extension
-word, not another opcode. The checked original AA55 contract in
+unsupported instruction is `STL A,-1,*AR1(0003)` at `00:313e`, encoded
+`6fe1 0003 0c9f`; debugger context is `00:3142`. Its `0c9f` operation
+extension selects a low-word store with shift `-1`, not a load.
+`LD *AR6(0010),8,B` at `00:3291`, encoded `6fe6 0010 0d48`, now has
+staged coverage. The checked original AA55 contract in
 `mu4_context_contract.py` pins all three words and decodes the address
 extension before the operation extension (SPRU172C LD syntax 4).
 The signed five-bit shift is `+8`; destination is B. Unlike fixed
 shift-by-16 syntax 3, syntax 4 affects OVdst and uses OVM saturation.
-The decoder tests all 32 shifts, both destinations and short/extended
-forms, but do not prove DAGEN or execution-stage behavior. Short-indirect DST `4e81` at `00:30c6`, long-offset
+The static decoder tests all 32 shifts, both destinations and short/extended
+forms; the separate executable matrix covers retained RAM/DAGEN behavior.
+Short-indirect DST `4e81` at `00:30c6`, long-offset
 LD `10e1` at `00:30c7`, short-indirect DLD `5681` at `00:30d3`
 long-offset BANZ `6ce2` at `00:30df`, immediate SUB `f010` at `00:3216`
 register SUB `f620` at `00:321c`, register LD `f540` at `00:30f7`
@@ -3550,7 +3568,7 @@ The following BITF, short-indirect DST, long-offset LD and short-indirect
 DLD, long-offset BANZ, immediate SUB, register SUB, register LD, DADD and
 LDU, memory MPYA and memory LD shifted by 16 now have staged coverage;
 unsigned memory multiply now has staged coverage. The subsequent extended
-Smem instruction remains incomplete.
+Smem shifted store remains incomplete.
 This is bounded transfer
 coverage, not startup acceptance.
 
