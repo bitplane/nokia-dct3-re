@@ -3202,8 +3202,8 @@ ready=`1`; these match retained NAND row 1's first four bytes at raw offset
 `528`. The observer returns the single existing device read, never a second
 read or a synthesized reply. STL A `80e6` at `00:3269` and long-offset
 MVDK `71e6` at `00:326b` are now accepted by the staged decoder. The next
-unsupported instruction is long-offset SUB Smem,A, `08e6` at `00:327c`, debugger context
-`00:327e`. Unsupported Decode can stop older Execute work; later PC
+unsupported instruction is `BC AGT`, `f846` at `00:327e`, debugger context
+`00:3280`. Unsupported Decode can stop older Execute work; later PC
 observations alone are not a substitute for retirement evidence.
 
 Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
@@ -3285,9 +3285,45 @@ register-6 cases use the high program page. Opcode-shaped offset retention,
 BK=16 circular wrap, compatibility ARP, changed pointers after Access and
 changed RAM after Read are checked. Each leg must read and write once with
 the expected operation-specific flags and unchanged accumulators. The original
-upload now decodes counter ADDM `6be6` at `00:3277` before stopping at the
-following long-offset SUB; this remains bounded coverage, not full loop or
+upload now decodes counter ADDM `6be6` at `00:3277` and long-offset SUB
+`08e6` at `00:327c` before stopping at the following `BC AGT`; this remains
+bounded coverage, not full loop or
 startup acceptance.
+
+Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their
+memory operand through Read and use the established 40-bit arithmetic
+helper at Execute. Direct forms retain Decode CPL/DP and Access SP;
+short indirect modes apply one pointer modification in Access, including
+linear preincrement, AR0 indexing, reverse carry and BK circular addressing.
+Long-offset forms retain one Decode literal and use the shared address helper;
+absolute forms retain the address directly. The existing absolute-ADD path
+is preserved. Sources are bounded to RAM and mapped AR0-AR7 words; control
+and peripheral sources fail closed. Carry is taken at bit 32, destination
+overflow is sticky, and OVM clamps to signed 32 bits. Shifted/TS, unsigned,
+carry-consuming, repeat and wider producer/control-delay compositions remain
+outside this acceptance. Source/mode placement is a partial stage model,
+not measured silicon timing.
+
+The 110,592 RAM replay cases cover DP/CPL, all twelve short indirect
+modifiers, three long-offset forms and absolute addressing; eight encoded
+registers, four operation/destination selectors, eight guard/sign patterns,
+four SXM/OVM states, both compatibility states and three checkpoints.
+The direct-field matrix spans all 128 encoded offsets. Register-6 cases use
+the high program page. Independent arithmetic expectations assert bit-32
+carry, overflow and saturation without invoking the production helper.
+Changed literals, pointers after Access and RAM after Read must not retarget
+or resample the operand. An additional 1,024 cases read mapped AR0-AR7 via
+direct/absolute addressing, change the source register after Read, and restore
+before/after that sample. Each leg reads once, performs no data write, and
+preserves the other accumulator and unrelated status.
+
+Protected arithmetic needs a separate retirement audit: the legacy absolute-
+ADD predicate is excluded from the new memory-arithmetic predicate, but the
+XC retired-word classifier does not separately include it as a two-word
+operation. An accepted XC followed by absolute ADD can therefore miss its
+protected-window endpoint. This static finding requires an IRQ/replay fixture
+and correction before claiming protected absolute-ADD composition; ordinary
+unprotected absolute-ADD replay is covered by the matrix above.
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

@@ -6818,6 +6818,109 @@ private:
 		m_phase = 252890; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct memory_arithmetic_fixture
+	{
+		unsigned form, reg, selected, read_cycle;
+		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
+		u64 source, result;
+	};
+	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant)
+	{
+		unsigned const form = variant % 18, reg = (variant / 18) % 8, selector = (variant / 144) % 4, pattern = (variant / 576) % 8, flags = (variant / 4608) % 4;
+		bool const compatibility = (variant / 18432) % 2, subtract = selector & 2, sxm = flags & 1, ovm = flags & 2;
+		unsigned const selected = compatibility && !reg ? 3 : reg;
+		u64 const source = std::array<u64, 8>{0, 0xffffffff, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x56783933, 0x80aa001234ULL}[pattern];
+		u16 const memory = std::array<u16, 8>{1, 1, 1, 0xffff, 0x8000, 0xffff, 0x1234, 0xffff}[pattern];
+		s16 const offset = std::array<s16, 8>{0, 1, -1, 17, s16(0xf495), 0x7fff, s16(0x8000), 2}[pattern];
+		u8 const mode = form < 2 ? reg * 16 + pattern + (sxm ? 8 : 0) : form == 17 ? 0xf8 : 0x80 | ((form - 2) << 3) | reg;
+		int const index = (7 + offset) % 16;
+		u16 const address = form == 0 ? 0x200 + mode : form == 1 ? 0x1000 + mode : form == 5 ? 0x5008 :
+			form == 16 ? 0x5000 + (index < 0 ? index + 16 : index) : form >= 14 && form < 17 ? u16(0x5007 + offset) :
+			form == 17 ? u16(0x1500 + offset) : 0x5007;
+		u16 const next_ar = form < 2 || form == 17 ? 0x5007 : form >= 14 ? (form == 14 ? 0x5007 : address) :
+			std::array<u16, 12>{0x5007, 0x5006, 0x5008, 0x5008, 0, 0, 0xa00e, 0x2803, 0x5006, 0x5000, 0x5008, 0x500e}[form - 2];
+		u16 const st0 = 0x1804 | (compatibility ? 0x6000 : 0) | (pattern & 1 ? 0x600 : 0);
+		u16 const st1 = 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compatibility ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
+		u16 result_st0 = compatibility && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
+		s64 const left = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
+		s64 const right = sxm ? s16(memory) : s64(memory), sum = subtract ? left - right : left + right;
+		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
+		bool const carry = subtract ? u32(source) >= u32(right) : u64(u32(source)) + u32(right) > 0xffffffffULL;
+		result_st0 = (result_st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
+		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
+		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((subtract ? 0x0800 : 0) | ((selector & 1) << 8) | mode),
+			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result};
+	}
+	void start_pipeline_memory_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = memory_arithmetic_case(variant);
+		u32 const base = f.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, f.opcode); if (f.form >= 14) program.write_word(base + 0x601, f.literal);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(f.address, f.memory);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "memory_arithmetic_sample",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
+					"Memory ADD/SUB samples one word through its captured address in Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "memory_arithmetic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Memory ADD/SUB modifies only its accumulator/status"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "memory_arithmetic_literal",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 14) return;
+				expect(word == f.literal && !m_pipeline_extensions_reads, "Memory ADD/SUB retains its offset/absolute literal once"); ++m_pipeline_extensions_reads; });
+		m_phase = 252910; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	static memory_arithmetic_fixture register_arithmetic_case(unsigned variant)
+	{
+		unsigned const reg = variant % 8, selector = (variant / 8) % 4, flags = (variant / 32) % 4, pattern = 2 + (variant / 128) % 2;
+		bool const absolute = (variant / 256) % 2;
+		auto f = memory_arithmetic_case(selector * 144 + pattern * 576 + flags * 4608);
+		f.reg = f.selected = reg; f.form = absolute ? 17 : 0; f.read_cycle = absolute ? 6 : 5;
+		f.address = f.literal = 0x10 + reg;
+		f.opcode = (f.opcode & 0xff00) | (absolute ? 0xf8 : f.address);
+		f.st0 &= ~0x1ff; f.result_st0 &= ~0x1ff;
+		return f;
+	}
+	void start_pipeline_register_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = register_arithmetic_case(variant);
+		u32 const base = f.reg == 6 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, f.opcode); if (f.form == 17) program.write_word(base + 0x601, f.literal);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, f.memory);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "register_arithmetic_sample",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
+					"Memory arithmetic samples the mapped AR register once before later register changes"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "register_arithmetic_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Memory arithmetic does not write its AR source"); });
+		m_phase = 252930; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -31552,13 +31655,107 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 153599) { start_pipeline_long_rmw(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_memory_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252900)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252890;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252910)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = memory_arithmetic_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / 36864];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
+			if (f.form >= 14 && tick == 4)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
+			}
+			if (tick == f.read_cycle - 1)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar)
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x5007),
+						"Memory ADD/SUB modifies only the selected pointer once in Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
+			}
+			if (tick == f.read_cycle)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save memory ADD/SUB during Decode, captured address or retained Read");
+			}
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222,
+					"Memory ADD/SUB uses its retained sample with bit-32 carry, sticky destination overflow and signed OVM saturation");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore memory ADD/SUB without operand resampling or duplicate AR modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 110591) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=110592 forms=18 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=110592 duplicate_reads=0 data_writes=0\n");
+				start_pipeline_register_arithmetic(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252920)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252910;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252930)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = register_arithmetic_case(variant);
+			unsigned const checkpoint = variant / 512 ? f.read_cycle : f.read_cycle - 1;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR arithmetic sources have staged ownership");
+			if (tick == f.read_cycle) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, 0x2222);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped AR arithmetic before/after its retained read");
+			}
+			if (tick == 16)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == 0x2222,
+					"Mapped AR source is retained without duplicate reads or register publication");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped AR arithmetic without rereading the changed source");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252940; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1023) { start_pipeline_register_arithmetic(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 252940)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252930;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

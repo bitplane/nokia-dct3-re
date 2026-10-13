@@ -2465,7 +2465,7 @@ DAGEN-publication and replay coverage, including a coherent fixture of the
 preceding STL and immediate AR consumer. `BC NTC` (`f820`) at `00:3270`
 now has retained-predicate and producer/replay coverage. Counter ADDM
 `6be6` at `00:3277` has staged long-offset RMW conformance. The first unsupported
-instruction is `08e6` at `00:327c` (long-offset SUB Smem,A); debugger context is `00:327e`, not
+instruction is `f846` at `00:327e` (`BC AGT`); debugger context is `00:3280`, not
 the opcode boundary. Unsupported Decode can stop older Execute work, so
 later PCs alone are not retirement proof. The
 initializer loop's complete runtime effects have not yet been accepted.
@@ -2482,7 +2482,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:327c` needs staged memory-SUB address/read, arithmetic/status and replay conformance before advancing this diagnostic;
+`00:327e` needs staged signed-accumulator branch evaluation, redirect and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
