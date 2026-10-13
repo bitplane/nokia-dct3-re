@@ -2475,13 +2475,13 @@ RPTB `f072` at `00:32ee` now executes. The current one-second original
 bootstrap observation constructs `MCUSI16 .BIN` at descriptor `36b0`,
 with length words `36c2=0001`, `36c3=e1e8`, matching the atomic reference.
 NEG `f484` at `00:0e35` now executes with one-word Execute-owned
-semantics. The current one-second observation enters loader `3538` with
+semantics. The pre-correction one-second observation enters loader `3538` with
 index zero after 4,612 NAND reads, correct name/extension and length, then
 reads the first file-backed block count `0010`. `SUB *(0008),B`
 (`09f8 0008` at `00:2f46`) now consumes mapped AL and the run reaches
 the original DMA-completion polling sequence. `BITF *(0008),0001`
 (`61f8 0008 0001` at `00:2fa5`) now reads its mapped AL source after
-the preceding DMPREC load. The run reaches resident `02:6d62` and stops
+the preceding DMPREC load. That observation reaches resident `02:6d62` and stops
 on unsupported `STM #lk,IMR` (`7700` at `02:6d64`, live PC `026d66`).
 This entry is not a correct-transfer acceptance: a side-effect-free
 comparison at the first resident Fetch checks all 48,261 program words
@@ -2513,12 +2513,27 @@ An actual mapped-AL read tap now isolates the difference: `MPY #3,A`
 staged reads AL=3, the pre-multiply value, giving offset 0 instead of 2.
 SPRU131G table 7-28 explicitly assigns zero required gap to a two-word
 direct accumulator producer followed by a mapped accumulator consumer.
-The staged Read-before-Execute ordering violates that composition. The
-correction must retain operand/save-state ownership and the documented
-one-word producer latency; globally moving all reads after Execute is not
-justified. No CPU behavior has yet been changed for this witness.
-Investigate this mapped-operand ordering before prioritizing later resident
-opcodes; neither staged transfer, full boot nor recording is accepted.
+The CPU now finishes a matching mapped accumulator Read after the older
+two-word immediate MPY Execute, retaining exactly one operand sample.
+Other reads and the one-word producer restriction are unchanged.
+`tms54test -bios mpy-mapped` passes 3,072 cases and saved-state replays
+over AL/AH/AG, BL/BH/BG, both producer/consumer accumulators, signed
+operand patterns, FRCT/OVM, and zero/one-word gaps. It rejects the old
+ordering, poisons T after its capture and the producer accumulator after
+the consumer Read, and requires one mapped read and one literal fetch.
+The current one-second original bootstrap stops earlier, on unsupported
+long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`, live PC `0033ac`),
+in the cluster-control path. This is a changed software frontier, not
+proof that every transferred word is now correct. A read-only snapshot
+at this stop shows AR1=`36b0`, AR2=`0004`, A=`0003`, B=`0001`,
+`36c4=0003`, `36c5=0000`, `36c6=0003`. The next cluster has been
+recovered into AR2; the unsupported move would copy mapped AR2 (`0012`)
+to `*AR1(0016)` (`36c6`). No descriptor field was injected. The full
+C54x conformance runner and native 5110 save-state gate both pass.
+The next requirement
+is retained source/destination/extension execution for this class-19
+three-word move (SPRU172C 4-113), then re-run the full resident comparison.
+Neither staged transfer, full boot nor recording is accepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

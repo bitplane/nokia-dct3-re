@@ -3628,7 +3628,7 @@ atomic reference. NEG `f484` at `00:0e35` now has 13,824 staged replay
 cases, covering all source/destination selectors, carry, sticky overflow,
 OVM saturation, 32/40-bit boundary patterns and immediate-load producers
 without data-memory accesses or frontend fallback (SPRU172C 4-119/4-120).
-The current one-second observation enters loader `3538` with descriptor
+The pre-correction one-second observation enters loader `3538` with descriptor
 zero after 4,612 NAND reads and reads block count `0010`. Its mapped AL
 subtraction (`09f8 0008` at `00:2f46`) and mapped AL BITF
 (`61f8 0008 0001` at `00:2fa5`) now execute. The preceding load reads
@@ -3637,7 +3637,7 @@ DMPREC; BITF itself reads AL, not a DMA peripheral. Mapped BITF has
 two initial TC states, direct/absolute forms and AL producers, with one
 retained source read and no data writes. Only TC changes in Execute;
 zero mask clears it (SPRU172C 4-28/4-29).
-The run reaches resident `02:6d62`, stopping at `STM #lk,IMR` (`7700`
+That observation reaches resident `02:6d62`, stopping at `STM #lk,IMR` (`7700`
 at `02:6d64`). But the read-only comparison before resident execution
 finds 40,657 mismatches among 48,261 program words: first `02:8e8b`,
 actual `826c`, expected `0001`. It excludes 3,660 data words from the
@@ -3660,10 +3660,21 @@ mapped read observation establishes AL=3 staged versus AL=9 atomic at
 (`3479..347a`). `SFTA A,-2,A` then gives offset 0 instead of 2.
 SPRU131G table 7-28 requires no gap for this two-word producer/consumer
 composition, unlike a one-word producer with a short mapped consumer.
-The remaining correction is staged mapped-operand ordering, preserving
-the one-word restriction and retained replay semantics; no filesystem
-response or cluster state should be synthesized. Resident
-entry and the mask-write stop remain insufficient proof of complete load.
+Matching mapped accumulator reads now finish after the older two-word
+immediate MPY Execute without changing other reads or one-word latency.
+The isolated `mpy-mapped` fixture passes 3,072 saved-state replays over
+six accumulator words, both source/destination accumulators, signed
+patterns, FRCT/OVM and zero/one-word gaps, including mutations after T
+and mapped-word capture. The unmodified CPU fails the same fixture.
+The current original-bootstrap run instead stops at unsupported
+long-offset `MVKD` (`70e1 0016 0012`, `00:33aa`, live PC `0033ac`),
+before reaching the former resident comparison. At that stop a read-only
+snapshot has AR1=`36b0`, AR2=`0004` and descriptor cluster fields still
+3: the lookup found cluster 4, but its move into `36c6` cannot execute.
+The complete C54x conformance run and native 5110 save-state gate pass.
+Class-19 three-word
+move support and a fresh complete resident comparison are next; correct
+transfer remains unaccepted. No filesystem or cluster state is synthesized.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

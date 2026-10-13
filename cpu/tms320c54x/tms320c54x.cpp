@@ -2986,8 +2986,15 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged absolute ADD control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
-		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800))
+	bool const read_memory_operand = m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
+		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800);
+	// SPRU131G table 7-28: a two-word MPY has zero mapped-accumulator
+	// consumer latency. Finish this retained Read after its older Execute;
+	// do not change the one-word producer restriction or other bus reads.
+	bool const late_mapped_multiply_read = read_memory_operand && m_pipeline_valid[5] && staged_immediate_multiply(m_pipeline_word[5]) &&
+		m_pipeline_operand_address[4] >= 0x08 && m_pipeline_operand_address[4] <= 0x0d &&
+		(m_pipeline_operand_address[4] >= 0x0b) == bool(BIT(m_pipeline_word[5], 8));
+	if (read_memory_operand && !late_mapped_multiply_read)
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf800) == 0x2000)
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
@@ -3462,6 +3469,8 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (late_mapped_multiply_read)
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_move(m_pipeline_word[4]) && m_pipeline_immediate[4] >= 0x60)
 		m_data.write_word(m_pipeline_immediate[4], m_pipeline_operand[4]);
 	if (m_pipeline_valid[2] && (staged_call(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2])))
