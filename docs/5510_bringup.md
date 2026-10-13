@@ -2459,9 +2459,11 @@ PORTR `74f8` at `00:302f` now reads port `4000` into AL. The capped
 device-boundary observer records bytes `fa,33`, with CLE/ALE/CE low and
 ready high; they match the first two bytes of retained NAND row 1 (raw
 offset `528`). This establishes two actual data reads, not a completed
-page read or startup. The first unsupported instruction is `80e6` at
-`00:3269` (STL A with long-offset addressing); debugger context is
-`00:326b`, not the opcode boundary. The
+page read or startup. `80e6` at `00:3269` now has staged long-offset
+STL conformance. The first unsupported instruction is adjacent MVDK
+`71e6` at `00:326b`; debugger context is `00:326d`, not the opcode
+boundary. An unsupported Decode can stop an older store before Execute,
+so this frontier move does not independently prove the original STL retired. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2476,7 +2478,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:3269` needs staged long-offset accumulator-store address, publication and replay conformance before advancing this diagnostic;
+`00:326b` needs staged long-offset MVDK source/address, register-destination publication and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 

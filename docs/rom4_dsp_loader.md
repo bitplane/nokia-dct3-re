@@ -3200,8 +3200,32 @@ The original upload now retires PORTR `74f8` at `00:302f`. The capped
 NAND read observer records `fa,33` with HD012=`0`, direction=`7` and
 ready=`1`; these match retained NAND row 1's first two bytes at raw offset
 `528`. The observer returns the single existing device read, never a second
-read or a synthesized reply. The next unsupported instruction is STL A
-`80e6` at `00:3269`, debugger context `00:326b`.
+read or a synthesized reply. STL A `80e6` at `00:3269` is now accepted
+by the staged decoder. The next unsupported instruction is adjacent MVDK
+`71e6` at `00:326b`, debugger context `00:326d`. Since unsupported Decode
+can stop before an older Execute, this original-run boundary alone is not
+proof that the STL's RAM write retired.
+
+Long-offset/absolute STL/STH admit `80xx..83xx` with modes `e0..f8`.
+Decode retains one offset/absolute literal; Read presents the destination
+and applies the shared offset/preincrement/circular helper once; Execute
+stores the selected low/high word using existing live-source SST/SXM
+saturation. This preserves the short-store source policy rather than
+adding an early accumulator sample. Sources/status are not changed by
+saturation. RAM destinations only are accepted; peripheral/MMR, control-delay,
+repeat-body and broader producer-conflict compositions remain unvalidated.
+Read address/Execute source placement is a declared partial stage model,
+not independently measured silicon timing (SPRU131G 7.1, SPRU172C STL/STH).
+
+The 38,400 replay cases cover 24 long-offset forms plus absolute addressing,
+four offsets including an opcode-shaped literal, four accumulator/lane
+selectors, four SST/SXM combinations, four guard/sign patterns, both
+compatibility modes and three checkpoints. Register 6's fixtures use the
+high program page. BK=16 circular wrap and compatibility ARP selection
+are checked. Poisoning the retained literal, changing the AR after Read,
+and changing the source before Execute test the address/source boundaries.
+Every leg must write once without reading the destination, preserve
+unselected registers/status, and restore without duplicate pointer updates.
 This adds real I/O-retirement evidence but not native NAND read, recorder,
 startup or speech acceptance. Existing atomic profiles remain unchanged.
 
