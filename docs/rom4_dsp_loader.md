@@ -3177,9 +3177,31 @@ The staged-only, first-16-strobes observer records five original-upload
 NAND writes: command `00` with HD012=`1`, then address bytes `00,01,00,00`
 with HD012=`2`, direction=`7`, ready=`1`. CLE/ALE distinguish the cycles;
 CE is low. No device state or response is synthesized by that observer.
-The next unsupported instruction is PORTR `74f8` at `00:302f`, with
-debugger context `00:3031`. Its I/O read/destination publication and replay
-contract must be verified before enabling it in the staged frontend.
+Staged PORTR retains its port literal and, for `74f8`, the preceding
+absolute destination literal. Basic direct destinations retain Decode
+CPL/DP and Access SP through the existing consumer-latency machinery;
+short indirect destinations retain the address and postmodify in Access.
+Read samples the external I/O space once; Execute writes that retained
+word to data space. Only RAM and AL/AH/AG/BL/BH/BG/T/TRN destinations
+are accepted. Control, DAGEN and peripheral destinations fail closed before
+the I/O read; long-offset forms, control-delay composition, repeat bodies
+and external READY/HOLD wait behavior remain unvalidated. This is a partial
+Class-27 stage model, not measured silicon bus timing.
+
+The 416 replay cases cover those eight register destinations and absolute
+RAM, DP, CPL, AR postincrement and postdecrement forms; four values, two
+program pages and four checkpoints cover partial Decode through publication.
+Literal poisoning after complete Decode and port changes after Read must
+not retarget or resample the operation. Tests assert no data-destination
+read, one I/O read, one data write, unchanged status/unselected accumulator
+lanes and no duplicate pointer update after restoration.
+
+The original upload now retires PORTR `74f8` at `00:302f`. The capped
+NAND read observer records `fa,33` with HD012=`0`, direction=`7` and
+ready=`1`; these match retained NAND row 1's first two bytes at raw offset
+`528`. The observer returns the single existing device read, never a second
+read or a synthesized reply. The next unsupported instruction is STL A
+`80e6` at `00:3269`, debugger context `00:326b`.
 This adds real I/O-retirement evidence but not native NAND read, recorder,
 startup or speech acceptance. Existing atomic profiles remain unchanged.
 

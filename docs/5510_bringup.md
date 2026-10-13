@@ -2448,15 +2448,20 @@ NAND R/B attachment without overriding its level. MVMM SP,AR5 (`e785`) at
 latency coverage. Short RPT #32 (`ec20`) at `00:2fc1` now executes its
 retained NOP delay loop. The staged diagnostic observes the preceding NAND
 strobe: byte `00`, HD0/CLE asserted, HD2/CE low, direction `7`, ready high.
-This proves that I/O write retired, not NAND data-read or startup completion.
+That write observation alone does not prove NAND data-read or startup completion.
 `9634` at `00:2fc3` now executes as `BIT *AR5,4`: memory bit 11 is
 published to ST0.TC, with no pointer modification (SPRU172C 4-21).
 The following two NOPs provide the tested visibility window for `XC 1,NTC`.
 The original run retires five NAND strobes: command byte `00` with CLE high,
 then address bytes `00,01,00,00` with ALE high; CE remains low and direction
-is `7`. This is not evidence of a completed NAND read.
-The first unsupported instruction is `74f8` at `00:302f` (PORTR); debugger
-context is `00:3031`, not the opcode boundary. The
+is `7`. The write sequence alone is not evidence of a completed NAND read.
+PORTR `74f8` at `00:302f` now reads port `4000` into AL. The capped
+device-boundary observer records bytes `fa,33`, with CLE/ALE/CE low and
+ready high; they match the first two bytes of retained NAND row 1 (raw
+offset `528`). This establishes two actual data reads, not a completed
+page read or startup. The first unsupported instruction is `80e6` at
+`00:3269` (STL A with long-offset addressing); debugger context is
+`00:326b`, not the opcode boundary. The
 initializer loop's complete runtime effects have not yet been accepted.
 The terminal bootstrap-entry failure remains coverage evidence,
 not a passing recorder gate.
@@ -2471,7 +2476,7 @@ Reproduce in a new disk-backed run directory with a copy of the retained
 ```
 
 Do not reuse the source seed as writable NVRAM. The instruction contract at
-`00:302f` needs staged PORTR I/O sampling, destination-write and replay conformance before advancing this diagnostic;
+`00:3269` needs staged long-offset accumulator-store address, publication and replay conformance before advancing this diagnostic;
 passing the idle-call fixtures alone is insufficient to enable native
 staged startup.
 
