@@ -2550,11 +2550,27 @@ destinations (`007c..c281`).
 one ordered program/data report, exact counts and zero mismatches, and
 rejects duplicate or failed evidence. It accepts original RAM contents
 only, not hardware register effects or full boot.
-The next unsupported instruction is `STM #lk,IMR` (`7700` at `02:6d64`,
-live PC `026d66`). Program and ordinary-data loading are verified;
-register effects, physical banking, full boot and recording remain
-unaccepted. Implement the retained mask-write/interrupt contract before
-claiming resident execution.
+`STM #0,IMR` (`7700 0000`, `02:6d64`) now executes via the retained
+non-DAGEN control-write path, with one literal fetch, no destination read
+and one Execute publication. The isolated `imr-store` fixture passes
+4,608 cases and saved-state replays over all 16 IRQ bits, four masks,
+both initial masks/INTM states, no source/IRQ/NMI and two program pages.
+It preserves IRQs accepted before a later clear, leaves masked IRQs
+pending, and admits newly enabled IRQs only after publication. Physical
+bus-phase timing remains a partial model (SPRU172C 4-176/class 12A;
+SPRU131G 6.10.2).
+The full C54x conformance run, native 5110 save-state gate and original
+resident-memory checker pass. Fixture inputs return low before the next
+test group so its IRQ/NMI edges remain independent.
+The current original run retains both complete memory-audit passes and
+advances through resident startup to `STM #7fff,*(0028)` (`7728 7fff`,
+`02:6d05`, live PC `026d07`). Address `0028` is SWWSR, the software
+wait-state register; the following `7729 8006` at `02:6d07` targets BSCR,
+the bank-switching control register (SPRU131G 10.3.1/10.3.2). These
+external-bus controls are the next contract to recover, not arbitrary
+register storage to admit silently. Program/data RAM contents are
+verified; low register effects, physical banking, full boot and recording
+remain unaccepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

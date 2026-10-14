@@ -3677,8 +3677,7 @@ Read and completed write (SPRU172C 4-113).
 The full C54x conformance runner and native 5110 save-state gate pass.
 The current original bootstrap reaches resident `02:6d62`; all 48,261
 compared program words match, including the former 16-KiB crossing.
-The next unsupported instruction is `STM #lk,IMR` (`7700` at `02:6d64`,
-live PC `026d66`). A separate side-effect-free data audit now checks all
+A separate side-effect-free data audit now checks all
 3,656 ordinary data words with zero mismatches in both staged and atomic
 controls. It preserves later common-RAM program/data alias writes in
 record order for the configured profile. The four low register-window
@@ -3687,7 +3686,21 @@ write effects. `noki5510_bootstrap_check.py --resident-memory LOG` requires
 both complete audit reports with exact coverage and no mismatches or
 duplicate evidence. Original program/data RAM contents are verified;
 physical bank identity, register effects and full boot are not.
-The next requirement is retained IMR-write/interrupt execution. No
+The immediate IMR clear (`7700 0000`, `02:6d64`) now publishes through
+the retained non-DAGEN Execute path. Its 4,608-case replay fixture covers
+16 IRQ bits, four masks, both initial masks/INTM states, no source/IRQ/NMI
+and two pages, with one literal fetch/write and no destination read.
+Acceptance before a clear is preserved; a newly enabled pending source
+is accepted only after publication. Bus-phase timing is a partial model
+(SPRU172C 4-176/class 12A; SPRU131G 6.10.2).
+The full C54x conformance run, native 5110 save-state gate and original
+resident-memory checker pass; fixture IRQ/NMI inputs return low on exit.
+The current original run advances to `STM #7fff,*(0028)` (`7728 7fff`,
+`02:6d05`, live PC `026d07`) while retaining both memory-audit passes.
+SWWSR at `0028` and the following BSCR write (`7729 8006`, `02:6d07`)
+configure external wait states/bank switching (SPRU131G 10.3.1/10.3.2).
+Their register and external-bus effects are the next contract; storage
+alone must not be described as faithful wait-state modeling. No
 filesystem or cluster state is synthesized; full boot remains unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
