@@ -301,7 +301,7 @@ BUS_REGISTER_REQUIRED = "TMS320C54x C5416 bus registers: PASS encodings=65536 sa
 BUS_REGISTER_COMPLETION = "Fatal error: TMS320C54x isolated C5416 bus registers complete"
 BUS_IO_REQUIRED = "TMS320C54x staged external I/O waits: PASS cases=576 restore=576 software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 atomic_acceptance=separate physical_mapping=unvalidated"
 BUS_IO_COMPLETION = "Fatal error: TMS320C54x isolated staged external I/O complete"
-ATOMIC_IO_REQUIRED = BUS_IO_REQUIRED.replace("staged external", "atomic external").replace("cases=576 restore=576", "cases=1728 restore=1728 forms=short,offset,absolute").replace(" atomic_acceptance=separate", "")
+ATOMIC_IO_REQUIRED = BUS_IO_REQUIRED.replace("staged external", "atomic external").replace("cases=576 restore=576", "cases=2880 restore=2880 forms=short,offset,absolute,peripheral,AR_alias").replace(" atomic_acceptance=separate", "")
 ATOMIC_IO_COMPLETION = BUS_IO_COMPLETION.replace("staged external", "atomic external")
 COMPOSE_REQUIRED = "TMS320C54x atomic I/O composition: PASS cases=24 restore=24 contexts=repeat,delay,INTM pointer_updates=once interrupt_after_transfer=1 physical_mapping=unvalidated"
 COMPOSE_COMPLETION = "Fatal error: TMS320C54x isolated atomic I/O composition complete"

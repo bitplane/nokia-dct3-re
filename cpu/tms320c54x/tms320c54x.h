@@ -270,6 +270,7 @@ private:
 	u16 m_atomic_io_address = 0;
 	u16 m_atomic_io_port = 0;
 	u16 m_atomic_io_value = 0;
+	u8 m_atomic_io_mode = 0;
 	u16 m_atomic_io_instruction_pc = 0;
 	u16 m_atomic_io_previous_sp = 0;
 	bool m_atomic_io_repeat_armed = false;

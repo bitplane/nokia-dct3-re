@@ -3723,11 +3723,13 @@ side effects and saved transaction ownership across 576 replays. Timers
 continue and IRQ/NMI acknowledgement follows the transfer. Whole-pipeline
 stall placement is partial; simultaneous I/O arbitration is fail-closed.
 The atomic frontend now retains waited I/O and retirement context.
-Its separate gate passes 1,728 saved/replayed cases across short,
-long-offset and absolute addressing. A 24-case composition gate checks
+Its separate gate passes 2,880 saved/replayed cases across short,
+long-offset, absolute, peripheral-MMR and AR-alias addressing. A 24-case composition gate checks
 RPT counts 0..3, delayed branch slots and INTM-protected followers,
 including pointer updates and stacked interrupt continuations.
-These are RAM-operand gates, not control/peripheral-MMR acceptance.
+The MMR fixture checks the extra access clock at `0030`; the AR1 alias
+checks write-before-postincrement ordering. Other control-register side
+effects and physical bus phases remain outside this bounded acceptance.
 No handset selects the profile, and no bus-register opcode is admitted
 merely to move the frontier. Full CPU conformance, native 5110 save-state
 restoration and the original MU4 resident-memory audit pass with this

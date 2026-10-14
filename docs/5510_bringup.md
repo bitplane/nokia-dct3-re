@@ -2659,8 +2659,9 @@ pending CPU interrupt. The original source and handset profiles remain
 unchanged: the profile is still selected only by isolated conformance.
 
 Atomic execution now retains I/O transactions and retirement context.
-`run_c54x_core.py --atomic-io` passes 1,728 transfer cases and 1,728
-save/restores across short, long-offset and absolute addressing, with
+`run_c54x_core.py --atomic-io` passes 2,880 transfer cases and 2,880
+save/restores across short, long-offset, absolute, peripheral-MMR and
+AR-alias addressing, with
 the same software-wait, READY, IRQ/NMI and timer matrix. Extension taps
 check both three-word literal orders and reject refetch after mutation.
 Base transfer clocks are retained individually rather than charged as
@@ -2702,10 +2703,16 @@ operand. Full legacy CPU conformance and native 5110 save-state restoration
 pass with the integration. The original MU4 audit still matches all
 48,261 program and 3,656 ordinary data words, with the same fail-closed
 `7728` frontier at `02:6d05`; no handset profile has been changed.
-The atomic acceptance operands are ordinary RAM. Control-register alias
-ordering and peripheral-MMR extra clocks need their own coverage before
-this compatibility profile is promoted into a production composition;
-the passing RAM matrix must not be used as evidence for those operands.
+Peripheral acceptance uses the ordinary mapped register-window word
+`0030`: both directions retain its additional access clock rather than
+charging an upfront instruction debt. READY eligibility still depends
+only on programmed external software waits, not the extra MMR clock.
+The mapped AR1 alias uses `*AR1+` with AR1 initially `0011`; PORTR writes
+the received word to AR1 before its one postincrement. Its postincrement
+mode is saved until completion, while PORTW retains the source before
+its pointer modification. This validates that alias and representative
+peripheral timing, not every timer/control-register side effect or
+measured silicon bus phase. Production profile promotion remains separate.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

@@ -29,8 +29,8 @@ class CoreResultTests(unittest.TestCase):
     def test_atomic_bus_io_scope_is_separate(self):
         output = ATOMIC_IO_REQUIRED + '\n' + ATOMIC_IO_COMPLETION + '\n'
         check_result(output, 3, atomic_io=True)
-        for bad in (output.replace('cases=1728', 'cases=576'),
-                    output.replace('forms=short,offset,absolute', 'forms=short'),
+        for bad in (output.replace('cases=2880', 'cases=1728'),
+                    output.replace('forms=short,offset,absolute,peripheral,AR_alias', 'forms=short,offset,absolute'),
                     output.replace('ready_threshold=2', 'ready_threshold=0'),
                     output.replace('duplicate_io=0', 'duplicate_io=1'),
                     output.replace('physical_mapping=unvalidated', 'physical_mapping=validated'),

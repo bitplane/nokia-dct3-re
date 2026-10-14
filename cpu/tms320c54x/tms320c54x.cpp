@@ -962,6 +962,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_atomic_io_address));
 	save_item(NAME(m_atomic_io_port));
 	save_item(NAME(m_atomic_io_value));
+	save_item(NAME(m_atomic_io_mode));
 	save_item(NAME(m_atomic_io_instruction_pc));
 	save_item(NAME(m_atomic_io_previous_sp));
 	save_item(NAME(m_atomic_io_repeat_armed));
@@ -4919,12 +4920,17 @@ void tms320c54x_device::execute_one(u16 op)
 			m_atomic_io_write = false;
 			m_atomic_io_address = address;
 			m_atomic_io_port = port;
+			m_atomic_io_mode = low;
 			m_atomic_io_wait_remaining = external_io_wait_states();
 			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
 			m_atomic_io_wait_remaining += low >= 0xe0;
+			m_atomic_io_wait_remaining += address >= 0x20 && address <= 0x5f;
 		}
-		else data_write(address, m_io.read_word(port));
-		finish_smem_access(low);
+		else
+		{
+			data_write(address, m_io.read_word(port));
+			finish_smem_access(low);
+		}
 		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
@@ -4953,6 +4959,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_atomic_io_wait_remaining = external_io_wait_states();
 			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
 			m_atomic_io_wait_remaining += low >= 0xe0;
+			m_atomic_io_wait_remaining += address >= 0x20 && address <= 0x5f;
 		}
 		else m_io.write_word(port, value);
 		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
@@ -5905,7 +5912,11 @@ void tms320c54x_device::execute_run()
 			else if (!m_atomic_io_ready_required || m_ready_in_cb())
 			{
 				if (m_atomic_io_write) m_io.write_word(m_atomic_io_port, m_atomic_io_value);
-				else data_write(m_atomic_io_address, m_io.read_word(m_atomic_io_port));
+				else
+				{
+					data_write(m_atomic_io_address, m_io.read_word(m_atomic_io_port));
+					finish_smem_access(m_atomic_io_mode);
+				}
 				m_atomic_io_pending = false;
 				retire_atomic_instruction(m_atomic_io_instruction_pc, m_atomic_io_previous_sp,
 					m_atomic_io_repeat_armed, m_atomic_io_delayed, m_atomic_io_xc_guarded);
@@ -5949,7 +5960,7 @@ void tms320c54x_device::execute_run()
 		// SPRU172C memory-operand classes add one cycle for peripheral MMR
 		// access. SPRU131G maps peripherals at 20..5f; 60..7f is scratch DARAM.
 		// Charge once for an RMW instruction, not separately for read and write.
-		if (m_peripheral_mmr_access) --m_icount;
+		if (m_peripheral_mmr_access && !m_atomic_io_pending) --m_icount;
 		if (m_capture_extensions)
 		{
 			std::array<u16, 4> const words = {m_instruction_word_count,
