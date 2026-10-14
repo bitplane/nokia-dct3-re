@@ -3014,18 +3014,64 @@ at 7 plus the gap. Later low-word changes cannot alter the captured move;
 other accumulator/status and stack ownership are preserved. AH/AG/BH/BG,
 non-RAM destinations and direct-ALU producer composition remain unaccepted.
 
-The current original stop is the destination guard for MVMD AL
+The verified pre-status checkpoint stopped at the destination guard for MVMD AL
 `7308 0007` at `02:3f62`, live PC `02:3f65`, directly after POPM AL
 `8a08` at `02:3f61`. Retained instruction and destination observations
-confirm ST1 (`0007`); status writes are not admitted. The next acceptance
-must establish full-ST1 publication, field-specific consumers and IRQ/NMI
-ordering. SPRU131G table 7-14 lists MVMD among ST1 writers safe directly
+confirm ST1 (`0007`). The staged subset admits AL/BL to ST1 and
+publishes the retained word at the move's Read clock, rather than Execute.
+Its `mvmd-st1` fixture passes 288 cases/restores (POPM/STL producers,
+zero through two gaps, two pages, four full-word patterns), with one source
+read, one status write and no destination read. The `mvmd-cpl` fixture passes
+16 cases/restores: both CPL directions, basic LD/ST consumers and zero
+through three NOPs, checking the two-cycle consumer latency.
+
+The adjacent arithmetic fixture `mvmd-status-alu` passes 768 cases/restores:
+SXM-dependent indirect LD and ASM-dependent register LD, both SXM states,
+all 32 ASM fields, two pages and three snapshot positions. The old status
+fields deliberately differ; each case checks the independently computed
+40-bit result, source preservation and one status publication. These tested
+consumer forms have zero latency. The `mvmd-block` fixture passes 24
+cases/restores with immediately adjacent RPTB, counts 0/1/2/7, two pages
+and three snapshots. It checks the BRAF update survives status publication,
+then checks every byte-swapped body word and count-plus-one completion.
+
+The original run advances to unsupported `3f83` (`ADD *AR3,16,B,B`)
+at `02:3df3`,
+live PC `02:3df5`; the resident memory audit remains exact and the six
+observed serial TX words are unchanged. Acceptance is limited to the following
+tested consumer/composition forms, not every status-register interaction.
+The `mvmd-cmpt` fixture initially failed because indirect address selection
+and pointer modification sampled live CMPT. The correction retains CMPT
+in the saved Decode slot, separately from the DP/CPL sample (CMPT's bit
+position overlaps DP in that packed sample). Staged short/long address
+selection and AR modifications consume the same retained mode; atomic
+helpers keep their live-status defaults. The fixture passes 16 cases/restores
+across both directions, LD/ST with postincrement and zero through three
+NOPs, checking the old mode with zero/one and the new mode with two/three.
+ARP-writer latency and other indirect consumer categories require separate
+coverage; this fixture establishes the basic CMPT category only.
+
+The `mvmd-status-irq` fixture passes 576 cases/restores across IRQ/NMI,
+four INTM transitions, enabled/disabled IMR, arrivals at clocks 4/6/8,
+two pages, three snapshots and one-/two-word followers. It checks one
+status publication, accepted continuation/frame ownership, no masked frame,
+one foreground marker, RETE restoration and masked-pending IFR persistence.
+The one-word follower permits early selection before the status write;
+the two-word follower's incomplete Decode delays selection until the new
+mask is visible. This is ordinary Decode completion, not inherited
+RSBX/SSBX following-instruction protection. Negative masked cases keep a
+valid bounded IDLE continuation: pending sources may wake IDLE without
+being serviced. This fixture does not establish arbitrary interrupt arrival
+phases or all combinations with status consumers/block repeats.
+
+The arithmetic fixtures do not establish all possible SXM/ASM consumer forms.
+SPRU131G table 7-14 lists MVMD among ST1 writers safe directly
 before RPTB; a late write must not erase a younger BRAF update. Section
 6.10.7's protected-following-instruction rule specifically names RSBX/SSBX
 INTM and must not be assumed for every full-ST1 writer. The resident
 memory audit remains exact.
 
-The full-ST1 acceptance must distinguish the following SPRU131G contracts:
+The status gates distinguish the following SPRU131G contracts:
 
 - Table 7-16: MVMD has two intervening-cycle latency for CMPT consumers;
   POPM has three or two depending on the consumer category.
@@ -3040,18 +3086,19 @@ The full-ST1 acceptance must distinguish the following SPRU131G contracts:
 - Table 7-14: an immediately following RPTB must retain its BRAF update.
 
 These are consumer-visible latency requirements, not a claim that every
-status field is physically written at the same pipeline stage. Test status
-publication, retained consumer samples and save/replay independently before
-admitting destination `0007`; INTM protection still requires separate evidence.
+status field is physically written at the same pipeline stage. Publication,
+consumer sampling and save/replay have separate gates. Special INTM
+following-instruction protection is not assigned to arbitrary full-ST1 writes.
 
-The SUBS/mapped-source checkpoint passes full CPU conformance (288
-required markers), native 5110 save-state restoration, all 18 isolated
-profiles in `tools/run_c54x_core.py`, 120 targeted Python tests and evidence
+The status/CMPT checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 24 isolated
+profiles in `tools/run_c54x_core.py`, 126 targeted Python tests and evidence
 validation. The original audit still matches 48,261 program and 3,656
 ordinary data words, with four register-window words excluded. Full
 board boot, native speech and the explicitly excluded instruction or
-producer/interrupt compositions remain unaccepted. ST1 destination support
-is excluded from this checkpoint.
+producer/interrupt compositions remain unaccepted. Next stage the observed
+Class 3 memory ADD shift-16 form; do not infer full board boot from this
+initialization frontier.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR
 contents back to IFR as clearing all pending interrupts. The observed

@@ -12,6 +12,76 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mvmd_status_irq_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-status-irq']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-status-irq')
+        for bad in (output.replace('restore=576', 'restore=0'),
+                    output.replace('masked_frame=0', 'masked_frame=1'),
+                    output.replace('foreground_once=1', 'foreground_once=0'),
+                    output.replace('rsbx_guard_inherited=0', 'rsbx_guard_inherited=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-status-irq')
+
+    def test_mvmd_cmpt_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-cmpt']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-cmpt')
+        for bad in (output.replace('restore=16', 'restore=0'),
+                    output.replace('pointer_updates=1', 'pointer_updates=0'),
+                    output.replace('latency=2', 'latency=0'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-cmpt')
+
+    def test_mvmd_block_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-block']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-block')
+        for bad in (output.replace('restore=24', 'restore=0'),
+                    output.replace('braf_preserved=1', 'braf_preserved=0'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-block')
+
+    def test_mvmd_status_alu_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-status-alu']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-status-alu')
+        for bad in (output.replace('restore=768', 'restore=0'),
+                    output.replace('asm_values=32', 'asm_values=1'),
+                    output.replace('latency=0', 'latency=1'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-status-alu')
+
+    def test_mvmd_cpl_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-cpl']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-cpl')
+        for bad in (output.replace('restore=16', 'restore=0'),
+                    output.replace('latency=2', 'latency=0'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-cpl')
+
+    def test_mvmd_status_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-st1']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-st1')
+        for bad in (output.replace('restore=288', 'restore=0'),
+                    output.replace('status_writes=1', 'status_writes=2'),
+                    output.replace('consumer_latency=unvalidated', 'consumer_latency=1'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-st1')
+
     def test_mvmd_accumulator_scope(self):
         marker, ending = EXTRA_PROFILES['mvmd-acc']
         output = marker + '\n' + ending + '\n'

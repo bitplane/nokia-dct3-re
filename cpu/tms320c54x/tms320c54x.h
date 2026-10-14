@@ -126,7 +126,7 @@ private:
 	u16 register_read(u16 address);
 	void register_write(u16 address, u16 value);
 	u16 direct_address(u8 mode) const;
-	u16 short_smem_address(u8 mode) const;
+	u16 short_smem_address(u8 mode, unsigned stage = 6) const;
 	u16 prepare_smem_address(u8 mode);
 	void finish_smem_access(u8 mode);
 	u16 indirect_read(u8 mode);
@@ -134,9 +134,10 @@ private:
 	u16 mmr_address(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	u16 long_offset_address(u8 mode);
-	u16 long_offset_address(u8 mode, unsigned ar, s16 offset);
-	unsigned indirect_ar(u8 mode) const;
-	void indirect_modify(u8 mode, bool long_operand = false);
+	u16 long_offset_address(u8 mode, unsigned ar, s16 offset, unsigned stage = 6);
+	bool indirect_compatibility(unsigned stage) const;
+	unsigned indirect_ar(u8 mode, unsigned stage = 6) const;
+	void indirect_modify(u8 mode, bool long_operand = false, unsigned stage = 6);
 	void dual_modify(u8 operand);
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
@@ -305,6 +306,7 @@ private:
 	bool m_pipeline_io_ready_required = false;
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
+	std::array<bool, 6> m_pipeline_cmpt = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};
 	std::array<u8, 6> m_pipeline_far_call_page = {};
 	std::array<u16, 6> m_pipeline_far_call_stack = {};

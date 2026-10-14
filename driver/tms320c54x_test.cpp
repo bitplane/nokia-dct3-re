@@ -3136,6 +3136,8 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
+		bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt");
+		bool const mvmd = cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
 		bool const set = BIT(variant, 0), store = BIT(variant, 3);
 		bool const dp = BIT(variant, 4);
 		unsigned const gap = (variant / 2) % 4;
@@ -3143,6 +3145,14 @@ private:
 		for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
 		program.write_word(0x600, dp ? (set ? 0xf5b0 : 0xf4b0) : (set ? 0xf7be : 0xf6be));
 		program.write_word(0x601 + gap, store ? 0x8027 : 0x1027);
+		if (mvmd)
+		{
+			program.write_word(0x600, 0x730b); program.write_word(0x601, 7);
+			program.write_word(0x602 + gap, store ? 0x8027 : 0x1027);
+			if (!gap) program.write_word(0x603, 0xf495);
+			else program.write_word(0x601 + gap, 0xf495);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, set ? 0x4800 : 0x800);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -3154,6 +3164,15 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(0x727, 0x1111);
 		m_cpu->space(AS_DATA).write_word(dp ? 0x7a7 : 0x1027, 0x2222);
+		if (cmpt)
+		{
+			program.write_word(0x602 + gap, store ? 0x8090 : 0x1090);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, set ? 0x800 : 0x820);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, set ? 0x820 : 0x800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1500);
+			m_cpu->space(AS_DATA).write_word(0x1400, 0x1111); m_cpu->space(AS_DATA).write_word(0x1500, 0x2222);
+		}
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
@@ -9916,6 +9935,7 @@ private:
 	void start_mvmd_accumulator(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const status = !strcmp(machine().options().bios(), "mvmd-st1");
 		bool const b = variant & 1, store = variant >= 144;
 		unsigned const gap = (variant / 8) % 3;
 		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
@@ -9923,7 +9943,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, store ? (b ? 0x800b : 0x8108) : 0x8a00 | source);
-		program.write_word(base + 0x601 + gap, 0x7300 | source); program.write_word(base + 0x602 + gap, 0x1400);
+		program.write_word(base + 0x601 + gap, 0x7300 | source); program.write_word(base + 0x602 + gap, status ? 7 : 0x1400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
@@ -9933,8 +9953,80 @@ private:
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_accumulator_reads",
 			[this, source, value, gap, store](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1000) { expect(!store && !m_fast_stack_reads && word == value && m_cpu->pipeline_cycles() == 5, "POPM reads one owned stack word"); ++m_fast_stack_reads; } else { expect(at == source && word == value && !m_pipeline_operand_reads && m_pipeline_register_writes == 1 && m_cpu->pipeline_cycles() == 6 + gap, "MVMD reads the published mapped accumulator word once with no mapped-write conflict"); ++m_pipeline_operand_reads; } });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_accumulator_publication",
-			[this, source, value, gap](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value, "Mapped producer and MVMD retain their exact word"); if (at == source) { expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "Mapped producer publishes once in Execute"); ++m_pipeline_register_writes; } else { expect(at == 0x1400 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7 + gap, "MVMD publishes one retained mapped word to RAM"); ++m_pipeline_store_writes; } });
+			[this, source, value, gap, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value, "Mapped producer and MVMD retain their exact word"); if (at == source) { expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "Mapped producer publishes once in Execute"); ++m_pipeline_register_writes; } else { expect(at == (status ? 7 : 0x1400) && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7 + gap, "MVMD publishes one retained mapped word at its owned move clock"); ++m_pipeline_store_writes; } });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253830;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_mvmd_status_irq(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const two_word = variant >= 288;
+		bool const masked = variant & 2, enabled = variant & 4, nmi = variant & 8;
+		u32 const base = variant & 16 ? 0x20000 : 0, vector = base + (nmi ? 4 : 0x40);
+		u16 const status = masked ? 0x800 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		// A masked pending source may wake IDLE without being serviced. Keep
+		// the bounded continuation valid rather than running into erased words.
+		for (unsigned i = 0; i < 64; ++i) program.write_word(base + 0x600 + i, i >= 4 ? 0xf4e1 : 0xf495);
+		program.write_word(base + 0x600, 0x730b); program.write_word(base + 0x601, 7);
+		program.write_word(base + 0x602, two_word ? 0x770e : 0x880e); program.write_word(base + 0x603, two_word ? 0x55 : 0xf495);
+		program.write_word(base + 0x604, 0xf4e1); program.write_word(base + 0x620, 0xf4e1);
+		program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x2000); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant & 1 ? 0x800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, enabled ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x55); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234560000ULL | status); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_vector_acks = m_fast_stack_reads = m_pipeline_extensions_reads = 0; m_timer_probe_return_pc = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_status_irq_reads",
+			[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0xb) { expect(!m_pipeline_operand_reads && word == status && m_cpu->pipeline_cycles() == 5, "Status source read survives pending IRQ/NMI drain"); ++m_pipeline_operand_reads; } else { expect(at == 0xfff && !m_fast_stack_reads && m_vector_acks == 1 && word == m_timer_probe_return_pc, "RETE pops only the owned interrupt continuation"); ++m_fast_stack_reads; } });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_status_irq_writes",
+			[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 7) { expect(!m_pipeline_store_writes && word == status && m_cpu->pipeline_cycles() == 6, "Full status publishes once despite pending interrupts"); ++m_pipeline_store_writes; } else if (at == 0xe) { expect(!m_pipeline_register_writes && word == 0x55, "Foreground marker executes exactly once across interrupt return"); ++m_pipeline_register_writes; } else { expect(at == 0xfff && !m_pipeline_extensions_reads && m_vector_acks == 1 && word == m_timer_probe_return_pc, "IRQ/NMI stacks one owned continuation"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253890;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_mvmd_status_block(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const count = std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; u32 const base = variant & 4 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		static constexpr u16 words[] = {0x730b, 7, 0xf072, 0x608, 0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i < std::size(words) ? words[i] : 0xf495);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x800); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, count);
+		for (unsigned i = 0; i <= count; ++i) data.write_word(0x5000 + i, 0x1234 + i * 0x321);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x5000, 0x50ff, "mvmd_status_block_read",
+			[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_operand_reads <= count && at == 0x5000 + m_pipeline_operand_reads && word == 0x1234 + m_pipeline_operand_reads * 0x321, "Following RPTB reads each original word once"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0x5000, 0x50ff, "mvmd_status_block_write",
+			[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; u16 const source = 0x1234 + m_pipeline_store_writes * 0x321; expect(m_pipeline_store_writes <= count && at == 0x5000 + m_pipeline_store_writes && word == u16((source << 8) | (source >> 8)), "Following RPTB writes each byte-swapped word once"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253870;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_mvmd_status_alu(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const fields = variant % 256;
+		bool const sxm = fields & 1, shift = fields & 64;
+		u16 const status = 0x800 | (sxm ? 0x100 : 0) | ((fields / 2) & 31);
+		u32 const base = fields & 128 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x730b); program.write_word(base + 0x601, 7);
+		program.write_word(base + 0x602, shift ? 0xf682 : 0x1080);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa200); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, status ^ 0x11f);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x55); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8012340000ULL | status); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1400);
+		data.write_word(0x1400, 0x8001);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_status_alu_reads",
+			[this, status, shift](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0xb) { expect(!m_pipeline_operand_reads && word == status && m_cpu->pipeline_cycles() == 5, "Full status move samples BL once"); ++m_pipeline_operand_reads; } else { expect(!shift && at == 0x1400 && word == 0x8001 && !m_pipeline_register_writes && m_cpu->pipeline_cycles() == 7, "Adjacent SXM load samples its RAM operand once"); ++m_pipeline_register_writes; } });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_status_alu_write",
+			[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 7 && word == status && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6, "Full status publication precedes adjacent arithmetic"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253850;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	virtual void machine_start() override
@@ -9949,7 +10041,11 @@ private:
 
 	virtual void machine_reset() override
 	{
-		if (!strcmp(machine().options().bios(), "mvmd-acc")) { start_mvmd_accumulator(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-status-irq")) { start_mvmd_status_irq(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
@@ -30054,11 +30150,13 @@ private:
 		}
 		if (m_phase == 251350)
 		{
+			bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt");
+			bool const mvmd = cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const gap = (m_pipeline_peripheral_case / 2) % 4;
 			bool const set = BIT(m_pipeline_peripheral_case, 0), store = BIT(m_pipeline_peripheral_case, 3);
 			bool const dp = BIT(m_pipeline_peripheral_case, 4);
-			bool const alternate = gap == 3 ? set : !set;
+			bool const alternate = gap >= (mvmd ? 2 : 3) ? set : !set;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CPL/DP consumer executes without unsupported direct mode");
 			if (cycle == 4 + gap && !m_pipeline_replay)
 			{
@@ -30067,13 +30165,21 @@ private:
 			}
 			if (cycle == 11)
 			{
+				if (cmpt)
+				{
+					expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (set ? 0x820 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1400 + unsigned(!alternate) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1500 + unsigned(alternate), "MVMD CMPT consumer updates only its latency-selected auxiliary register");
+					expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : alternate ? 0x2222 : 0x1111) && m_cpu->space(AS_DATA).read_word(0x1400) == (store && !alternate ? 0x7777 : 0x1111) && m_cpu->space(AS_DATA).read_word(0x1500) == (store && alternate ? 0x7777 : 0x2222), "MVMD CMPT consumer samples the old mode with zero/one NOP and the new mode with two/three");
+				}
+				else
+				{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (dp || !set ? 0x800 : 0x4800) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (dp && set ? 0x0f : 0x0e),
 					"CPL/DP producer retires independently of retained consumer status");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : alternate ? 0x2222 : 0x1111) &&
 					m_cpu->space(AS_DATA).read_word(0x727) == (store && !alternate ? 0x7777 : 0x1111) &&
 					m_cpu->space(AS_DATA).read_word(dp ? 0x7a7 : 0x1027) == (store && alternate ? 0x7777 : 0x2222),
-					"Basic direct LD/ST uses old CPL/DP with zero to two NOPs, new state with three NOPs");
+					"Basic direct LD/ST respects the producer-specific CPL/DP latency");
+				}
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
@@ -30083,6 +30189,17 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_cpu->set_pipeline_frontend(false);
+				if (mvmd)
+				{
+					if (m_pipeline_peripheral_case < 15) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
+					if (cmpt)
+					{
+						osd_printf_info("TMS320C54x staged MVMD CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 pointer_updates=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+						throw emu_fatalerror(0, "TMS320C54x isolated MVMD CMPT complete");
+					}
+					osd_printf_info("TMS320C54x staged MVMD CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated MVMD CPL complete");
+				}
 				if (m_pipeline_peripheral_case < 31) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
 				start_pipeline_dp_immediate(); return;
@@ -35383,8 +35500,75 @@ private:
 			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253890)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, arrival = std::array<unsigned, 3>{4, 6, 8}[(variant / 32) % 3], checkpoint = std::array<unsigned, 3>{5, 7, 12}[(variant % 288) / 96];
+			bool const old_masked = variant & 1, masked = variant & 2, enabled = variant & 4, nmi = variant & 8;
+			// The two-word follower has an incomplete Decode at clock five;
+			// the one-word follower permits selection before clock-six INTM.
+			bool const accepted = nmi || (enabled && (!masked || (!old_masked && arrival == 4 && variant < 288)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Status/IRQ composition remains staged");
+			if (tick == arrival) m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+			if (tick == arrival + 1) m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_extensions_reads, m_timer_probe_return_pc}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save status mask change and pending/accepted interrupt"); }
+			if (tick == 96)
+			{
+				if (m_vector_acks != unsigned(accepted) || m_pipeline_register_writes != 1 || m_fast_stack_reads != unsigned(accepted) || m_pipeline_extensions_reads != unsigned(accepted))
+					osd_printf_info("MVMD status IRQ mismatch: case=%u replay=%u accepted=%u source=%u status=%u marker=%u ack=%u stack_read=%u stack_write=%u pc=%06x sp=%04x st1=%04x ifr=%04x t=%04x return=%04x\n", variant, unsigned(m_pipeline_replay), unsigned(accepted), m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_extensions_reads, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_T)), m_timer_probe_return_pc);
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_vector_acks == unsigned(accepted) && m_fast_stack_reads == unsigned(accepted) && m_pipeline_extensions_reads == unsigned(accepted) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_B) == (0x1234560000ULL | (masked ? 0x800 : 0)), "Full status mask transitions preserve pending selection, one frame and the foreground continuation");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (masked && !accepted ? 0x800 : 0) && (m_cpu->state_int(tms320c54x_device::STATE_IFR) & 1) == unsigned(!nmi && !accepted), "Masked IRQ remains pending; NMI ignores INTM/IMR; RETE clears INTM without undoing status publication");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3]; m_fast_stack_reads = m_recurring_irq_snapshot[4]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[5]; m_timer_probe_return_pc = m_recurring_irq_snapshot[6]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mask publication and IRQ/NMI without duplicate service"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253900; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 575) { start_mvmd_status_irq(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVMD status IRQ: PASS cases=576 restore=576 sources=IRQ,NMI intm_transitions=4 imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=1 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated MVMD status IRQ complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253900) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253890; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 253870)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4], checkpoint = std::array<unsigned, 3>{5, 6, 12}[variant / 8];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Full status followed by RPTB stays staged");
+			if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x8800, "Full status write does not erase the younger RPTB BRAF update");
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0, 0}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save status write and younger block repeat"); }
+			if (tick == 96)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x5001 + count && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Following RPTB completes its count-plus-one body and clears only BRAF");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore status/block composition without duplicate words"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253880; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 23) { start_mvmd_status_block(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVMD block: PASS cases=24 restore=24 counts=0,1,2,7 pages=2 snapshots=3 adjacent_rptb=1 braf_preserved=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated MVMD block complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253880) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253870; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 253850)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, fields = variant % 256, checkpoint = std::array<unsigned, 3>{4, 6, 7}[variant / 256];
+			bool const sxm = fields & 1, shift = fields & 64;
+			u16 const status = 0x800 | (sxm ? 0x100 : 0) | ((fields / 2) & 31);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Full status and adjacent arithmetic remain staged");
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, 0}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save full status publication and adjacent consumer"); }
+			if (tick == 14)
+			{
+				u64 const source = 0x8012340000ULL | status;
+				int const count = int(status & 31) - ((status & 16) ? 32 : 0);
+				u64 const expected = !shift ? (sxm ? 0xffffff8001ULL : 0x8001) : count >= 0 ? (source << count) & 0xffffffffffULL : sxm ? u64((s64(source) - (s64(1) << 40)) >> -count) & 0xffffffffffULL : source >> -count;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == source && m_cpu->state_int(tms320c54x_device::STATE_ST1) == status && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & ~0x400) == 0xa200 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1400 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(!shift), "Adjacent SXM and ASM consumers use the newly published fields with zero latency");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore status/consumer without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253860; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_mvmd_status_alu(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVMD status ALU: PASS cases=768 restore=768 consumers=SXM_LD,ASM_LD sxm_states=2 asm_values=32 pages=2 snapshots=3 source_reads=1 status_writes=1 latency=0 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated MVMD status ALU complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253860) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253850; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253830)
 		{
+			bool const status = !strcmp(machine().options().bios(), "mvmd-st1");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 8) % 3, read = 6 + gap, checkpoint = std::array<unsigned, 3>{5, read, read + 1}[(variant % 144) / 48];
 			bool const b = variant & 1, store = variant >= 144; u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped accumulator MVMD remains admitted");
@@ -35395,15 +35579,20 @@ private:
 			}
 			if (tick == 18)
 			{
-				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x1400) == value && m_cpu->space(AS_DATA).read_word(source) == 0xdead, "MVMD retains the source after later mapped-register changes"); }
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(status ? 7 : 0x1400) == value && m_cpu->space(AS_DATA).read_word(source) == 0xdead, "MVMD retains the source after later mapped-register changes"); }
 				expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == ((b ? 0xfedcba0000ULL : 0x1234560000ULL) | 0xdead), "Mapped low-word writes preserve the accumulator's high and guard words");
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_fast_stack_reads == unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (store ? value : b ? 0x123456789aULL : 0xfedcba9876ULL), "Mapped producer/MVMD preserves status, other accumulator and stack ownership");
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_fast_stack_reads == unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (status ? value : 0x800) && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (store ? value : b ? 0x123456789aULL : 0xfedcba9876ULL), "Mapped producer/MVMD preserves other status, accumulator and stack ownership");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay mapped producer/MVMD without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253840; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 287) { start_mvmd_accumulator(variant + 1); return; }
+				if (status)
+				{
+					osd_printf_info("TMS320C54x staged MVMD ST1: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 status_writes=1 destination_reads=0 consumer_latency=unvalidated interrupt_composition=unvalidated silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated MVMD ST1 complete");
+				}
 				osd_printf_info("TMS320C54x staged MVMD accumulator: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 ram_writes=1 mapped_no_conflict=1 status_destination=unvalidated silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated MVMD accumulator complete");
 			}
@@ -36426,6 +36615,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "IRQ/NMI cannot split FCALA's retained two-word frame"); ++m_vector_acks; }
 		if (m_phase == 253730) { unsigned const variant = m_pipeline_peripheral_case; expect(variant >= 48 && line == (variant < 72 ? 12 : INPUT_LINE_NMI) && !m_vector_acks && m_pipeline_store_writes == 1, "IFR clearance cannot cancel a selected IRQ or independent NMI"); ++m_vector_acks; }
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
@@ -37020,6 +37210,12 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(34, "conditional-ret", "Staged RC predicate and conditional return ownership")
 	ROM_SYSTEM_BIOS(35, "subs", "Staged unsigned memory subtraction")
 	ROM_SYSTEM_BIOS(36, "mvmd-acc", "Staged mapped accumulator producer and move")
+	ROM_SYSTEM_BIOS(37, "mvmd-st1", "Staged mapped accumulator to full status register")
+	ROM_SYSTEM_BIOS(38, "mvmd-cpl", "Staged full status transfer CPL consumer latency")
+	ROM_SYSTEM_BIOS(39, "mvmd-status-alu", "Staged full status SXM and ASM consumer latency")
+	ROM_SYSTEM_BIOS(40, "mvmd-block", "Staged full status and adjacent block repeat")
+	ROM_SYSTEM_BIOS(41, "mvmd-cmpt", "Staged full status compatibility-mode consumer latency")
+	ROM_SYSTEM_BIOS(42, "mvmd-status-irq", "Staged full status mask and interrupt composition")
 ROM_END
 
 ROM_START(tms54rom4)

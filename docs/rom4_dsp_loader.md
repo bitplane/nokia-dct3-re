@@ -3793,17 +3793,27 @@ conditional return `fc45` also executes after a 64-case AEQ/BEQ
 predicate/pop/target replay gate. Untaken returns have zero stack
 accesses. SUBS now passes 55,296 unsigned-source/address/arithmetic
 replays across 18 forms, A/B and SXM/OVM states; mapped sources and C16
-remain excluded. The current original stop is MVMD AL `7308 0007` at
+remain excluded. The pre-status checkpoint stopped at MVMD AL `7308 0007` at
 `02:3f62`, live PC `02:3f65`, immediately after POPM AL. AL/BL-to-RAM
 now passes 288 POPM/mapped-STL producer replays, with mapped-write
-no-conflict ordering and retained source publication. ST1 (`0007`) stays
-blocked pending field-consumer, RPTB/BRAF and IRQ/NMI ordering acceptance.
+no-conflict ordering and retained source publication. The staged ST1 subset
+passes 288 transfer/replay cases and 16 basic CPL consumer/replay cases;
+the original now stops at unsupported `3f83` at `02:3df3` (live `02:3df5`).
+Adjacent SXM/ASM LD consumers pass 768 save/replay cases; immediately
+following RPTB passes 24, including preservation and final clearing of BRAF.
+Basic CMPT indirect LD/ST passes 16 cases/restores after replacing live-mode
+address selection with saved Decode sampling shared by pointer updates.
+The status IRQ/NMI fixture passes 576 save/replay cases with mask transitions,
+three arrivals and one-/two-word followers, distinguishing incomplete Decode
+from special INTM protection. Other CMPT categories, ARP-writer latency and
+arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
+the accepted subset does not establish every status-register interaction.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
-Resident program/data memory still matches exactly. The peripheral/
-call/return checkpoint passes full CPU conformance (288 markers), native
-5110 restoration, all 16 isolated profiles in `run_c54x_core.py`,
-118 targeted Python tests and evidence validation. Excluded instruction
+Resident program/data memory still matches exactly. The status/CMPT
+checkpoint passes full CPU conformance (288 markers), native
+5110 restoration, all 24 isolated profiles in `run_c54x_core.py`,
+126 targeted Python tests and evidence validation. Excluded instruction
 and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
