@@ -3791,8 +3791,13 @@ with retained predicates/literals, conditional PC+2 frame publication
 and zero untaken stack accesses. Original `f945 3ff1` executes; the
 conditional return `fc45` also executes after a 64-case AEQ/BEQ
 predicate/pop/target replay gate. Untaken returns have zero stack
-accesses. The current original stop is SUBS `0a39` at `02:3f5a`, live PC
-`02:3f5c`; staged unsigned-memory subtract ownership needs acceptance.
+accesses. SUBS now passes 55,296 unsigned-source/address/arithmetic
+replays across 18 forms, A/B and SXM/OVM states; mapped sources and C16
+remain excluded. The current original stop is MVMD AL `7308 0007` at
+`02:3f62`, live PC `02:3f65`, immediately after POPM AL. AL/BL-to-RAM
+now passes 288 POPM/mapped-STL producer replays, with mapped-write
+no-conflict ordering and retained source publication. ST1 (`0007`) stays
+blocked pending field-consumer, RPTB/BRAF and IRQ/NMI ordering acceptance.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
 Resident program/data memory still matches exactly. The peripheral/

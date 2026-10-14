@@ -2992,17 +2992,66 @@ when the conformance marker and intentional completion exit are present.
 BIOS identifiers must fit MAME's 16-character limit; a passing CPU
 fixture cannot substitute for a valid driver definition.
 
-The current original stop is SUBS `0a39` at `02:3f5a`, live PC
-`02:3f5c`. The atomic core identifies the unsigned-memory subtract
-family, but staged source/address/arithmetic ownership needs acceptance.
-The peripheral/call/return checkpoint passes full CPU conformance (288
-required markers), native 5110 save-state restoration, all 16 isolated
-profiles in `tools/run_c54x_core.py`, 118 targeted Python tests and evidence
+SUBS `0a39` at `02:3f5a` now executes. SPRU172C page 4-194 specifies
+an unsigned 16-bit memory operand regardless of SXM, with C and sticky
+destination overflow updates and OVM saturation. The staged path reuses
+retained memory/address ownership and the shared arithmetic helper but
+bypasses sign extension for this family. The `subs` gate passes 55,296
+cases/restores: 18 addressing forms, eight address registers, A/B,
+eight value patterns, SXM/OVM states, both compatibility modes and three
+snapshots. Post-capture source/literal/pointer changes cannot alter the
+result, and no data write occurs. Mapped-register sources, C16 arithmetic
+and adjacent producer/branch composition are not accepted by this gate.
+
+MVMD AL/BL to RAM now has a separate `mvmd-acc` gate: 288 cases/restores
+with POPM and mapped STL producers, gaps 0/1/2, four values, two pages
+and three snapshots. Zero-gap mapped-source reads follow the older mapped
+write's Execute publication in the same clock (SPRU131G section 7.5.10,
+example 7-67's no-conflict rule). Direct-ALU producers retain their
+separate latency rules; this change does not forward all accumulator
+updates. The source reads once at clock 6 plus the gap, and RAM publishes
+at 7 plus the gap. Later low-word changes cannot alter the captured move;
+other accumulator/status and stack ownership are preserved. AH/AG/BH/BG,
+non-RAM destinations and direct-ALU producer composition remain unaccepted.
+
+The current original stop is the destination guard for MVMD AL
+`7308 0007` at `02:3f62`, live PC `02:3f65`, directly after POPM AL
+`8a08` at `02:3f61`. Retained instruction and destination observations
+confirm ST1 (`0007`); status writes are not admitted. The next acceptance
+must establish full-ST1 publication, field-specific consumers and IRQ/NMI
+ordering. SPRU131G table 7-14 lists MVMD among ST1 writers safe directly
+before RPTB; a late write must not erase a younger BRAF update. Section
+6.10.7's protected-following-instruction rule specifically names RSBX/SSBX
+INTM and must not be assumed for every full-ST1 writer. The resident
+memory audit remains exact.
+
+The full-ST1 acceptance must distinguish the following SPRU131G contracts:
+
+- Table 7-16: MVMD has two intervening-cycle latency for CMPT consumers;
+  POPM has three or two depending on the consumer category.
+- Table 7-19: MVMD has CPL latency two for ordinary direct addressing and
+  one for the listed extended-shift/data-copy category. Decode-time CPL
+  snapshots must not be replaced indiscriminately with the newly written bit.
+- Table 7-20: MVMD is absent from the one-cycle SXM-latency list, hence
+  covered consumers have zero latency; POPM and accumulator stores are listed.
+- Table 7-22: MVMD is likewise absent from the one-cycle ASM-latency list;
+  adjacent ASM-dependent arithmetic must use the new field, while POPM and
+  accumulator stores retain their documented consumer latency.
+- Table 7-14: an immediately following RPTB must retain its BRAF update.
+
+These are consumer-visible latency requirements, not a claim that every
+status field is physically written at the same pipeline stage. Test status
+publication, retained consumer samples and save/replay independently before
+admitting destination `0007`; INTM protection still requires separate evidence.
+
+The SUBS/mapped-source checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 18 isolated
+profiles in `tools/run_c54x_core.py`, 120 targeted Python tests and evidence
 validation. The original audit still matches 48,261 program and 3,656
 ordinary data words, with four register-window words excluded. Full
 board boot, native speech and the explicitly excluded instruction or
-producer/interrupt compositions remain unaccepted. SUBS is the next
-staged extension, not a resolved boundary.
+producer/interrupt compositions remain unaccepted. ST1 destination support
+is excluded from this checkpoint.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR
 contents back to IFR as clearing all pending interrupts. The observed

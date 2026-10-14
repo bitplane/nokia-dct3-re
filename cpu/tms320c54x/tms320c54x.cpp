@@ -96,7 +96,7 @@ constexpr bool staged_extended_move(u16 word)
 
 constexpr bool staged_direct_mvmd(u16 word)
 {
-	return (word & 0xfff8) == 0x7310;
+	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b;
 }
 
 constexpr bool staged_move(u16 word)
@@ -171,7 +171,7 @@ constexpr bool staged_absolute_add(u16 word)
 
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || (word & 0xfe00) == 0x1e00) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || (word & 0xfe00) == 0x0a00 || (word & 0xfe00) == 0x1e00) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -2712,7 +2712,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_valid[2] && direct_move && m_pipeline_immediate[2] < 0x60 &&
 			(m_pipeline_immediate[2] < 0x10 || m_pipeline_immediate[2] > 0x19))
 		{
-			logerror("%s: staged MVDK control/peripheral destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]);
 			m_illegal = true;
 			return;
 		}
@@ -2983,6 +2983,10 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[3];
 		bool const extended = staged_extended_move(m_pipeline_word[3]);
 		u16 const destination = m_pipeline_immediate[3];
+		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && destination < 0x60)
+		{
+			logerror("%s: staged MVMD accumulator-to-register destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (staged_direct_mvmd(m_pipeline_word[3]) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -3000,7 +3004,8 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		m_pipeline_operand[3] = m_data.read_word(source);
+		bool const mapped_write = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && pipeline_mapped_accumulator_write(source);
+		if (!mapped_write) m_pipeline_operand[3] = m_data.read_word(source);
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
 		if (BIT(mode, 7) && !extended) indirect_modify(mode);
@@ -3107,6 +3112,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode), s16(literal))) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if ((m_pipeline_word[3] & 0xfe00) == 0x0a00 && source < 0x60)
+		{
+			logerror("%s: staged SUBS mapped-register source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (m_pipeline_word[3] == 0x60f8 && source < 0x60)
 		{
 			logerror("%s: staged CMPM mapped-register source is unsupported\n", machine().describe_context());
@@ -3612,7 +3621,8 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_smem_arithmetic(m_op))
 		{
 			u64 &destination = accumulator(BIT(m_op, 8));
-			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) : add_sub(destination, data_operand(m_pipeline_operand[5]), BIT(m_op, 11), BIT(m_op, 8));
+			u64 const operand = (m_op & 0xfe00) == 0x0a00 ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) : add_sub(destination, operand, BIT(m_op, 11), BIT(m_op, 8));
 			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
 		}
 		else if (staged_absolute_add(m_op))
@@ -3693,6 +3703,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[4] && staged_move(m_pipeline_word[4]) && m_pipeline_immediate[4] >= 0x60)
 		m_data.write_word(m_pipeline_immediate[4], m_pipeline_operand[4]);
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) &&
+		pipeline_mapped_accumulator_write(u8(m_pipeline_word[3])))
+		// SPRU131G 7.5.10/example 7-67: a mapped write followed by a
+		// mapped read has no accumulator conflict. Sample after older mapped
+		// Execute, without changing direct-ALU producer latency.
+		m_pipeline_operand[3] = m_data.read_word(u8(m_pipeline_word[3]));
 	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
 	{
 		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + 2); }
@@ -3900,6 +3916,13 @@ void tms320c54x_device::pipeline_accept_interrupt()
 			m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 		m_pipeline_flush_front = m_pipeline_vector_pending = true;
 	}
+}
+
+bool tms320c54x_device::pipeline_mapped_accumulator_write(u16 address) const
+{
+	return address >= 8 && address <= 0x0d && m_pipeline_valid[5] &&
+		(m_pipeline_word[5] == (0x8a00 | address) ||
+		(staged_store(m_pipeline_word[5]) && m_pipeline_operand_address[5] == address));
 }
 
 u16 tms320c54x_device::pipeline_read_data(u16 address)

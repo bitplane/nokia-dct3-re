@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "mvmd-acc": (
+        "TMS320C54x staged MVMD accumulator: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 ram_writes=1 mapped_no_conflict=1 status_destination=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVMD accumulator complete",
+    ),
+    "subs": (
+        "TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated staged SUBS complete",
+    ),
     "conditional-ret": (
         "TMS320C54x staged conditional return: PASS cases=64 restore=64 conditions=AEQ,BEQ patterns=4 pages=2 taken_reads=1 data_writes=0 untaken_stack_accesses=0 predicate_retained=1 stack_target_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated conditional return complete",

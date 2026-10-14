@@ -6980,10 +6980,10 @@ private:
 		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
 		u64 source, result;
 	};
-	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant)
+	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_subtract = false)
 	{
 		unsigned const form = variant % 18, reg = (variant / 18) % 8, selector = (variant / 144) % 4, pattern = (variant / 576) % 8, flags = (variant / 4608) % 4;
-		bool const compatibility = (variant / 18432) % 2, subtract = selector & 2, sxm = flags & 1, ovm = flags & 2;
+		bool const compatibility = (variant / 18432) % 2, subtract = unsigned_subtract || (selector & 2), sxm = flags & 1, ovm = flags & 2;
 		unsigned const selected = compatibility && !reg ? 3 : reg;
 		u64 const source = std::array<u64, 8>{0, 0xffffffff, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x56783933, 0x80aa001234ULL}[pattern];
 		u16 const memory = std::array<u16, 8>{1, 1, 1, 0xffff, 0x8000, 0xffff, 0x1234, 0xffff}[pattern];
@@ -6999,18 +6999,23 @@ private:
 		u16 const st1 = 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compatibility ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
 		u16 result_st0 = compatibility && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
 		s64 const left = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-		s64 const right = sxm ? s16(memory) : s64(memory), sum = subtract ? left - right : left + right;
+		s64 const right = sxm && !unsigned_subtract ? s16(memory) : s64(memory), sum = subtract ? left - right : left + right;
 		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
 		bool const carry = subtract ? u32(source) >= u32(right) : u64(u32(source)) + u32(right) > 0xffffffffULL;
 		result_st0 = (result_st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
 		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
-		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((subtract ? 0x0800 : 0) | ((selector & 1) << 8) | mode),
+		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((unsigned_subtract ? 0x0a00 : subtract ? 0x0800 : 0) | ((selector & 1) << 8) | mode),
 			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result};
+	}
+	static memory_arithmetic_fixture memory_subs_case(unsigned variant)
+	{
+		return memory_arithmetic_case(variant % 144 + (2 + (variant / 144) % 2) * 144 +
+			((variant / 288) % 8) * 576 + ((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432, true);
 	}
 	void start_pipeline_memory_arithmetic(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = memory_arithmetic_case(variant);
+		auto const f = !strcmp(machine().options().bios(), "subs") ? memory_subs_case(variant) : memory_arithmetic_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -9908,6 +9913,30 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253810;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_mvmd_accumulator(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = variant & 1, store = variant >= 144;
+		unsigned const gap = (variant / 8) % 3;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
+		u32 const base = (variant / 24) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, store ? (b ? 0x800b : 0x8108) : 0x8a00 | source);
+		program.write_word(base + 0x601 + gap, 0x7300 | source); program.write_word(base + 0x602 + gap, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b && store ? value : 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, !b && store ? value : 0xfedcba9876ULL);
+		data.write_word(0x1000, value); data.write_word(0x1400, 0xaaaa);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_accumulator_reads",
+			[this, source, value, gap, store](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1000) { expect(!store && !m_fast_stack_reads && word == value && m_cpu->pipeline_cycles() == 5, "POPM reads one owned stack word"); ++m_fast_stack_reads; } else { expect(at == source && word == value && !m_pipeline_operand_reads && m_pipeline_register_writes == 1 && m_cpu->pipeline_cycles() == 6 + gap, "MVMD reads the published mapped accumulator word once with no mapped-write conflict"); ++m_pipeline_operand_reads; } });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_accumulator_publication",
+			[this, source, value, gap](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value, "Mapped producer and MVMD retain their exact word"); if (at == source) { expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "Mapped producer publishes once in Execute"); ++m_pipeline_register_writes; } else { expect(at == 0x1400 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7 + gap, "MVMD publishes one retained mapped word to RAM"); ++m_pipeline_store_writes; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253830;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	virtual void machine_start() override
 	{
 		save_item(NAME(m_bus_ready));
@@ -9920,6 +9949,8 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().options().bios(), "mvmd-acc")) { start_mvmd_accumulator(); return; }
+		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_fcala(); return; }
@@ -33887,8 +33918,9 @@ private:
 		if (m_phase == 252910)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = memory_arithmetic_case(variant);
-			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / 36864];
+			bool const subs = !strcmp(machine().options().bios(), "subs");
+			auto const f = subs ? memory_subs_case(variant) : memory_arithmetic_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (subs ? 18432 : 36864)];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
 			if (f.form >= 14 && tick == 4)
 			{
@@ -33928,7 +33960,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 110591) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				if (variant < (subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				if (subs)
+				{
+					osd_printf_info("TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated staged SUBS complete");
+				}
 				osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=110592 forms=18 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=110592 duplicate_reads=0 data_writes=0\n");
 				start_pipeline_register_arithmetic(); return;
 			}
@@ -35346,6 +35383,33 @@ private:
 			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253830)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 8) % 3, read = 6 + gap, checkpoint = std::array<unsigned, 3>{5, read, read + 1}[(variant % 144) / 48];
+			bool const b = variant & 1, store = variant >= 144; u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped accumulator MVMD remains admitted");
+			if (tick == read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped producer/MVMD around source and RAM ownership");
+			}
+			if (tick == 18)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x1400) == value && m_cpu->space(AS_DATA).read_word(source) == 0xdead, "MVMD retains the source after later mapped-register changes"); }
+				expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == ((b ? 0xfedcba0000ULL : 0x1234560000ULL) | 0xdead), "Mapped low-word writes preserve the accumulator's high and guard words");
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_fast_stack_reads == unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (store ? value : b ? 0x123456789aULL : 0xfedcba9876ULL), "Mapped producer/MVMD preserves status, other accumulator and stack ownership");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay mapped producer/MVMD without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253840; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_mvmd_accumulator(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVMD accumulator: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 ram_writes=1 mapped_no_conflict=1 status_destination=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated MVMD accumulator complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253840) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253830; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253810)
 		{
 			bool const returning = !strcmp(machine().options().bios(), "conditional-ret");
@@ -36954,6 +37018,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(32, "fcala-producer", "Staged DLD producer and accumulator far call")
 	ROM_SYSTEM_BIOS(33, "conditional-call", "Staged CC predicate and conditional stack ownership")
 	ROM_SYSTEM_BIOS(34, "conditional-ret", "Staged RC predicate and conditional return ownership")
+	ROM_SYSTEM_BIOS(35, "subs", "Staged unsigned memory subtraction")
+	ROM_SYSTEM_BIOS(36, "mvmd-acc", "Staged mapped accumulator producer and move")
 ROM_END
 
 ROM_START(tms54rom4)

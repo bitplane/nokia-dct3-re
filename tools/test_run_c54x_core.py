@@ -12,6 +12,28 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mvmd_accumulator_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-acc']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-acc')
+        for bad in (output.replace('restore=288', 'restore=0'),
+                    output.replace('mapped_no_conflict=1', 'mapped_no_conflict=0'),
+                    output.replace('status_destination=unvalidated', 'status_destination=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-acc')
+
+    def test_subs_unsigned_scope(self):
+        marker, ending = EXTRA_PROFILES['subs']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='subs')
+        for bad in (output.replace('restore=55296', 'restore=0'),
+                    output.replace('source_unsigned=1', 'source_unsigned=0'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='subs')
+
     def test_driver_validity_errors_reject_pass_marker(self):
         marker, ending = EXTRA_PROFILES['conditional-ret']
         output = ('Driver tms54test (file tms320c54x_test.cpp): 1 errors, 0 warnings\n'
