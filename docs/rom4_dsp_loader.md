@@ -3702,6 +3702,13 @@ configure external wait states/bank switching (SPRU131G 10.3.1/10.3.2).
 Their register and external-bus effects are the next contract; storage
 alone must not be described as faithful wait-state modeling. No
 filesystem or cluster state is synthesized; full boot remains unaccepted.
+The [MU4 external-bus contract](5510_bringup.md#external-bus-compatibility-contract)
+pins these original requests using SPRS095P's C5416-compatible dialect:
+BSCR's upper fields differ from the older generic family table. Its field
+decoder is tested exhaustively, but physical DA150 identity, program/data
+bank ownership and runtime bus timing remain unvalidated. External I/O
+wait integration is the next software target; no new register opcode is
+admitted merely to cross this boundary.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

@@ -2572,6 +2572,59 @@ register storage to admit silently. Program/data RAM contents are
 verified; low register effects, physical banking, full boot and recording
 remain unaccepted.
 
+#### External-bus compatibility contract
+
+`tools/mu4_external_bus_contract.py` pins the original resident prefix at
+`02:6d00..6d08` against the R060 source hash. It decodes the two writes
+under the existing C5416-compatible hypothesis, not exact DA150 identity.
+The authority is [TI SPRS095P](https://www.ti.com/lit/ds/symlink/tms320vc5416.pdf),
+sections 3.6.1-3.6.3 and tables 3-3/3-4/3-5.
+
+| Register | Address | C5416-compatible reset | Writable fields |
+| --- | --- | --- | --- |
+| SWWSR | `0028` | `7fff` | XPA and five three-bit wait counts |
+| BSCR | `0029` | `f000` | CONSEC, DIVFCT, IACKOFF, HBH, BH (`f006`) |
+| SWCR | `002b` | `0000` | SWSM (`0001`); other bits unaffected by writes |
+
+This BSCR dialect is **not** SPRU131G table 10-5's BNKCMP/PS-DS/IPIRQ
+layout. In the C5416-compatible dialect, resident `8006` requests
+consecutive external memory reads (three-cycle framing per read),
+undivided CLKOUT, enabled IACK output and both bus holders. A generic
+bank-compare interpretation of the same value would be the wrong model.
+Resident SWWSR `7fff` selects seven wait states for every external range,
+assuming SWCR remains at reset; SWSM doubles the count to fourteen.
+XPA changes the program-field boundary from bit 15 to bit 22. Internal
+program/data accesses do not pay these external waits. C5416 PORTR/PORTW
+I/O uses the external IS bus; MU4 NAND is attached at I/O `4000..7fff`.
+
+The tool's tests exhaust all 65,536 BSCR encodings and 655,360 SWWSR/
+multiplier/range selections, plus internal/external ownership and the
+original pinned source. These are field predictions, not runtime timing
+acceptance. There is no complete SWCR-writer census, and neither these
+values nor the test bench's flat RAM map establish physical bank extent.
+
+Implementation requirements:
+
+1. Select the C5416-compatible bus dialect explicitly; do not change
+   other native handset profiles by importing its fields/reset values.
+2. Own masked/resettable/saved register state in the CPU. Separate the
+   physical IACK output from logical interrupt acknowledgement, and
+   propagate CLKOUT division without changing the system clock itself.
+   These are peripheral MMRs (SPRS095P table 3-16), unlike IMR: preserve
+   the additional peripheral-access cycle in class-12 writes.
+3. Pay external I/O waits while retaining one address/data transaction
+   across stalls and replay; clocks continue and interrupt entry cannot
+   split that transaction. READY is only sampled after software waits,
+   with at least two software waits programmed (SPRS095P section 5.5.5).
+4. Add program/data framing and bank penalties only with explicit bus
+   ownership. Physical DA150 banks, READY wiring and electrical bus-holder
+   behavior remain separate unknowns, not reasons to fake register reads.
+
+The next software question is how to attach the evidenced external-I/O
+wait contract to both CPU execution backends without double reads/writes
+or corrupting timer/interrupt/save-state ownership. No bus behavior has
+been implemented by this read-only contract tool.
+
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
 13,824 replay cases: eight register sources, four masks including zero,
