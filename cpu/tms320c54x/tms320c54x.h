@@ -19,6 +19,13 @@ public:
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
 	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
+	// Register-level compatibility only; external wait payment is not implemented.
+	void set_c5416_bus_profile(bool enabled) { m_c5416_bus_profile = enabled; }
+	unsigned external_io_wait_states() const { return m_c5416_bus_profile ? ((m_swwsr >> 12) & 7) * (1 + (m_swcr & 1)) : 0; }
+	unsigned clkout_divisor() const { return m_c5416_bus_profile ? 1 + ((m_bscr >> 13) & 3) : 1; }
+	bool iack_output_enabled() const { return m_c5416_bus_profile && !(m_bscr & 0x1000); }
+	auto clkout_divisor_cb() { return m_clkout_divisor_cb.bind(); }
+	auto iack_enable_cb() { return m_iack_enable_cb.bind(); }
 	// Experimental stage-owned frontend; unsupported instruction forms stop,
 	// rather than falling back to instruction-boundary interrupt recognition.
 	void set_pipeline_frontend(bool enabled);
@@ -59,7 +66,10 @@ public:
 		STATE_TCR,
 		STATE_TRN,
 		STATE_RTN,
-		STATE_RC
+		STATE_RC,
+		STATE_SWWSR,
+		STATE_BSCR,
+		STATE_SWCR
 	};
 
 protected:
@@ -111,6 +121,7 @@ private:
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value);
 	void internal_data_map(address_map &map);
+	void publish_bus_controls();
 	u16 register_read(u16 address);
 	void register_write(u16 address, u16 value);
 	u16 direct_address(u8 mode) const;
@@ -219,6 +230,12 @@ private:
 	u16 m_power_on_imr = 0;
 	bool m_extended_program = false;
 	u16 m_clkmd = 0;
+	bool m_c5416_bus_profile = false;
+	u16 m_swwsr = 0;
+	u16 m_bscr = 0;
+	u16 m_swcr = 0;
+	devcb_write8 m_clkout_divisor_cb;
+	devcb_write_line m_iack_enable_cb;
 	u32 m_pll_reference_clock = 0;
 	bool m_follow_clkmd = false;
 	u16 m_reset_clkmd = 0;

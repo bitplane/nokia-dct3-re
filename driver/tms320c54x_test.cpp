@@ -9401,6 +9401,42 @@ private:
 		m_phase = 253450; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	void start_bus_register_test()
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto &data = m_cpu->space(AS_DATA);
+		expect(data.read_word(0x28) == 0x7fff && data.read_word(0x29) == 0xf000 && data.read_word(0x2b) == 0 &&
+			m_bus_divisor == 4 && !m_bus_iack_enable, "C5416-compatible bus controls reset from SPRS095P tables 3-3/3-4/3-5");
+		u32 const system_clock = m_cpu->clock();
+		for (unsigned value = 0; value < 0x10000; ++value)
+		{
+			data.write_word(0x28, value); data.write_word(0x29, value); data.write_word(0x2b, value);
+			expect(data.read_word(0x28) == value && data.read_word(0x29) == (value & 0xf006) && data.read_word(0x2b) == (value & 1), "Bus-control reserved fields ignore writes");
+			expect(m_cpu->external_io_wait_states() == ((value >> 12) & 7) * (1 + (value & 1)) &&
+				m_cpu->clkout_divisor() == 1 + ((value >> 13) & 3) && m_bus_divisor == m_cpu->clkout_divisor() &&
+				m_bus_iack_enable == !(value & 0x1000) && m_cpu->iack_output_enabled() == m_bus_iack_enable && m_cpu->clock() == system_clock,
+				"Register decode publishes independent CLKOUT/IACK configuration without changing the system clock");
+		}
+		data.write_word(0x28, 0x7fff); data.write_word(0x29, 0x8006); data.write_word(0x2b, 0);
+		m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save CPU-owned bus controls");
+		data.write_word(0x28, 0); data.write_word(0x29, 0xffff); data.write_word(0x2b, 1);
+		m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore bus controls and derived outputs");
+		expect(data.read_word(0x28) == 0x7fff && data.read_word(0x29) == 0x8006 && !data.read_word(0x2b) && m_bus_divisor == 1 && m_bus_iack_enable && m_cpu->external_io_wait_states() == 7,
+			"Saved bus state re-drives exact configuration outputs");
+		data.write_word(0x29, 0, 0x8000); data.write_word(0x29, 0xffff, 0x0ff9);
+		data.write_word(0x2b, 0xffff, 0xfffe); data.write_word(0x28, 0xabcd, 0x00ff);
+		expect(data.read_word(0x29) == 6 && data.read_word(0x2b) == 0 && data.read_word(0x28) == 0x7fcd, "Partial writes merge only writable selected fields");
+		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		expect(data.read_word(0x28) == 0x7fff && data.read_word(0x29) == 0xf000 && !data.read_word(0x2b) && m_bus_divisor == 4 && !m_bus_iack_enable,
+			"Device reset restores control state and outputs, independently of saved values");
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(0x40 + i, 0xf495); }
+		program.write_word(0x40, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(false); m_cpu->set_input_line(0, ASSERT_LINE);
+		m_vector_acks = 0; m_phase = 253530; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_usec(5));
+	}
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -9411,6 +9447,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-registers"))
+		{
+			start_bus_register_test(); return;
+		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "imr-store"))
 		{
 			start_pipeline_imr_store(); return;
@@ -34766,6 +34806,14 @@ private:
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253510; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 253530)
+		{
+			expect(m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && !m_bus_iack_enable,
+				"Disabling the physical IACK output must not suppress logical interrupt acknowledgement");
+			m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 io_waits_implemented=0 physical_mapping=unvalidated\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
+		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
 			unsigned const frame = (m_phase - 72000) / 2;
@@ -35250,6 +35298,8 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
+	u8 m_bus_divisor = 0;
+	bool m_bus_iack_enable = false;
 	unsigned m_fast_return_case = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
@@ -35287,7 +35337,11 @@ void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
+	if (!strcmp(config.options().bios(), "bus-registers")) m_cpu->set_c5416_bus_profile(true);
+	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
+	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253510)
 		{
 			auto const f = imr_store_case(m_pipeline_peripheral_case);
@@ -35850,6 +35904,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(9, "mpy-mapped", "Staged two-word MPY mapped accumulator consumers")
 	ROM_SYSTEM_BIOS(10, "long-mvkd", "Staged long-offset MVKD conformance")
 	ROM_SYSTEM_BIOS(11, "imr-store", "Staged immediate IMR write and pending interrupts")
+	ROM_SYSTEM_BIOS(12, "bus-registers", "C5416-compatible external-bus register conformance")
 ROM_END
 
 ROM_START(tms54rom4)

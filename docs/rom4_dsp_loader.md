@@ -3709,6 +3709,14 @@ decoder is tested exhaustively, but physical DA150 identity, program/data
 bank ownership and runtime bus timing remain unvalidated. External I/O
 wait integration is the next software target; no new register opcode is
 admitted merely to cross this boundary.
+The isolated C5416-compatible register profile now validates reset,
+masking, partial writes and saved-state/output restoration across all
+65,536 encodings. Its CLKOUT divider and IACK-enable callbacks are
+configuration outputs, not pin waveforms; logical IRQ acknowledgement
+remains independent. No handset selects this register-only profile,
+and staged bus-register opcodes remain fail-closed until waits are paid.
+The profile gate, full legacy CPU suite, native 5110 save-state gate and
+original memory audit pass; MU4 still stops at `7728` (`02:6d05`).
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

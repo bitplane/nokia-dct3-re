@@ -2586,6 +2586,23 @@ sections 3.6.1-3.6.3 and tables 3-3/3-4/3-5.
 | BSCR | `0029` | `f000` | CONSEC, DIVFCT, IACKOFF, HBH, BH (`f006`) |
 | SWCR | `002b` | `0000` | SWSM (`0001`); other bits unaffected by writes |
 
+The CPU's opt-in `set_c5416_bus_profile` now owns these registers, their
+masked/partial writes, reset values and saved state. It is enabled only
+by the isolated `tms54test -bios bus-registers` configuration, not MU4 or
+other handset profiles. `clkout_divisor_cb` publishes the exact divider;
+the existing system-clock callback remains the separate base clock.
+`iack_enable_cb` publishes output gating, not a physical IACK pulse, and
+cannot suppress logical interrupt acknowledgement. Reset and post-load
+re-drive these derived configuration outputs.
+`run_c54x_core.py --bus-registers` requires exhaustive 65,536-encoding
+native register conformance, partial writes, saved-state restoration,
+reset and a logical IRQ with IACKOFF set. Its marker explicitly says
+`io_waits_implemented=0`; it is not a bus-timing or full-core gate.
+The staged SWWSR/BSCR instructions remain unsupported until wait payment
+is integrated. The original resident frontier is therefore unchanged.
+The isolated profile, full legacy CPU suite, native 5110 save-state gate
+and original resident-memory checker pass on this register-state tree.
+
 This BSCR dialect is **not** SPRU131G table 10-5's BNKCMP/PS-DS/IPIRQ
 layout. In the C5416-compatible dialect, resident `8006` requests
 consecutive external memory reads (three-cycle framing per read),
@@ -2622,8 +2639,8 @@ Implementation requirements:
 
 The next software question is how to attach the evidenced external-I/O
 wait contract to both CPU execution backends without double reads/writes
-or corrupting timer/interrupt/save-state ownership. No bus behavior has
-been implemented by this read-only contract tool.
+or corrupting timer/interrupt/save-state ownership. No external transaction
+timing is implemented by the contract tool or register-only profile.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

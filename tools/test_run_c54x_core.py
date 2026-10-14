@@ -1,9 +1,23 @@
 import unittest
 
-from tools.run_c54x_core import COMPLETION, REQUIRED, check_result
+from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
+                                BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION)
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_bus_register_scope_is_separate(self):
+        output = BUS_REGISTER_REQUIRED + '\n' + BUS_REGISTER_COMPLETION + '\n'
+        check_result(output, 3, bus_registers=True)
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+        for bad in (output.replace('io_waits_implemented=0', 'io_waits_implemented=1'),
+                    output.replace('physical_mapping=unvalidated', 'physical_mapping=validated'),
+                    output.replace('encodings=65536', 'encodings=65535'),
+                    BUS_REGISTER_REQUIRED + '\n' + output,
+                    output + 'late output\n', output.replace(BUS_REGISTER_COMPLETION, COMPLETION)):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, bus_registers=True)
+
     def setUp(self):
         self.output = '\n'.join([*REQUIRED, COMPLETION]) + '\n'
 

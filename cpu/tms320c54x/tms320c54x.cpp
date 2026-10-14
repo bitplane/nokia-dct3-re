@@ -882,6 +882,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_xf_out_cb(*this),
 	m_peripheral_clock_stop_cb(*this),
 	m_pll_clock_stop_cb(*this),
+	m_clkout_divisor_cb(*this),
+	m_iack_enable_cb(*this),
 	m_system_clock_cb(*this)
 {
 }
@@ -940,6 +942,9 @@ void tms320c54x_device::device_start()
 	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
 	state_add(STATE_IFR, "IFR", m_ifr).formatstr("%04X");
 	state_add(STATE_IMR, "IMR", m_imr).formatstr("%04X");
+	state_add(STATE_SWWSR, "SWWSR", m_swwsr).formatstr("%04X");
+	state_add(STATE_BSCR, "BSCR", m_bscr).mask(0xf006).callimport().formatstr("%04X");
+	state_add(STATE_SWCR, "SWCR", m_swcr).mask(1).formatstr("%04X");
 	state_add(STATE_TIM, "TIM", m_debug_timer).callimport().callexport().formatstr("%04X");
 	state_add(STATE_PRD, "PRD", m_debug_timer).callimport().callexport().formatstr("%04X");
 	state_add(STATE_TCR, "TCR", m_debug_timer).callimport().callexport().formatstr("%04X");
@@ -1059,6 +1064,9 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_dp_wait));
 	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
+	save_item(NAME(m_swwsr));
+	save_item(NAME(m_bscr));
+	save_item(NAME(m_swcr));
 	save_item(NAME(m_pll_locked));
 	save_item(NAME(m_timer_clock));
 	save_item(NAME(m_pending_clock));
@@ -1179,6 +1187,10 @@ void tms320c54x_device::device_reset()
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
 	m_clkmd = m_reset_clkmd_enabled ? m_reset_clkmd : 0;
+	m_swwsr = m_c5416_bus_profile ? 0x7fff : 0;
+	m_bscr = m_c5416_bus_profile ? 0xf000 : 0;
+	m_swcr = 0;
+	publish_bus_controls();
 	m_pll_locked = m_reset_clkmd_enabled && BIT(m_clkmd, 0);
 	m_pll_timer->adjust(attotime::never);
 	m_clock_timer->adjust(attotime::never);
@@ -1425,6 +1437,8 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 	}
 	else if (entry.index() == STATE_ST1)
 		update_xf();
+	else if (entry.index() == STATE_BSCR)
+		publish_bus_controls();
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
 		data_write(0x24 + entry.index() - STATE_TIM, m_debug_timer);
 	else if (entry.index() == STATE_IDLE && !m_idle)
@@ -1447,6 +1461,16 @@ void tms320c54x_device::device_post_load()
 	update_xf(true);
 	m_pll_clock_stop_cb(m_idle_mode == 3);
 	m_system_clock_cb(clock());
+	publish_bus_controls();
+}
+
+void tms320c54x_device::publish_bus_controls()
+{
+	if (!m_c5416_bus_profile) return;
+	// These are configuration outputs, not a synthesized CLKOUT waveform
+	// or physical IACK pulse. Logical IRQ acknowledgement is independent.
+	m_clkout_divisor_cb(clkout_divisor());
+	m_iack_enable_cb(iack_output_enabled());
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
@@ -1495,7 +1519,8 @@ void tms320c54x_device::internal_data_map(address_map &map)
 	// Only owned registers shadow the board map; reserved gaps stay external.
 	for (u16 address = 0; address <= 0x58; ++address)
 		if (address <= 1 || (address >= 6 && address <= 0x1d) ||
-			(address == 0x1e && m_extended_program) || (address >= 0x24 && address <= 0x26) || address == 0x58)
+			(address == 0x1e && m_extended_program) || (address >= 0x24 && address <= 0x26) || address == 0x58 ||
+			(m_c5416_bus_profile && (address == 0x28 || address == 0x29 || address == 0x2b)))
 			// Device submaps use byte addresses; the C54x data space is word-addressed.
 			map(u32(address) << 1, (u32(address) << 1) | 1).lrw16(
 				NAME(([this, address]() { return register_read(address); })),
@@ -1562,6 +1587,9 @@ u16 tms320c54x_device::register_read(u16 address)
 	}
 	if (address == 0x58)
 		return m_clkmd;
+	if (m_c5416_bus_profile && address == 0x28) return m_swwsr;
+	if (m_c5416_bus_profile && address == 0x29) return m_bscr;
+	if (m_c5416_bus_profile && address == 0x2b) return m_swcr;
 	fatalerror("Unmapped C54x register read %04x", address);
 }
 
@@ -1628,6 +1656,15 @@ void tms320c54x_device::register_write(u16 address, u16 value)
 		}
 		arm_timer();
 	}
+	else if (m_c5416_bus_profile && address == 0x28)
+		m_swwsr = value;
+	else if (m_c5416_bus_profile && address == 0x29)
+	{
+		m_bscr = value & 0xf006;
+		publish_bus_controls();
+	}
+	else if (m_c5416_bus_profile && address == 0x2b)
+		m_swcr = value & 1;
 	else if (address == 0x58)
 	{
 		write_clkmd(value);
