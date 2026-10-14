@@ -3804,7 +3804,12 @@ operation/source/destination selectors and the syntax-3 partial carry rule;
 its full checkpoint regression passes. The original's LDU
 `1282` at `02:3dfa` reads actual IMR at `0000` after a separate 384-case
 unsigned mapped-load gate, including the adjacent pointer-producing MVDK.
-The current original stop is `809a` at `02:3e1c` (live `02:3e1e`).
+The preincrement STL/STH subset passes 6,144 save/replays; immediate
+preincrement ST passes 1,536; STM BRC followed immediately by RPTB passes
+30, including count 127. These additions pass the original clearing loop.
+The current original stop is `76e1 0038 0001` at `02:97d9` (live `02:97df`),
+destination `0038` (C5416-compatible McBSP0 SPSA). Physical DA150 mapping
+and the store/RMW peripheral access contract remain unvalidated.
 The earlier zero address is observed, not proof that the pointer lifecycle is correct.
 Adjacent SXM/ASM LD consumers pass 768 save/replay cases; immediately
 following RPTB passes 24, including preservation and final clearing of BRAF.
@@ -3817,10 +3822,10 @@ arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
-Resident program/data memory still matches exactly. The shift-16/IMR
+Resident program/data memory still matches exactly. The preincrement/BRC
 checkpoint passes full CPU conformance (288 markers), native
-5110 restoration, all 26 isolated profiles in `run_c54x_core.py`,
-128 targeted Python tests and evidence validation. Excluded instruction
+5110 restoration, all 29 isolated profiles in `run_c54x_core.py`,
+131 targeted Python tests and evidence validation. Excluded instruction
 and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained

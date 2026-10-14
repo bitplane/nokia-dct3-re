@@ -3061,9 +3061,40 @@ other newly untested unsigned control/peripheral sources remain excluded.
 These fixtures establish instruction composition, not that the original
 zero-pointer lifecycle is correct; that distinction remains explicit.
 
-The current original stop is `809a` (`STL A,*+AR2`) at `02:3e1c`, live
-PC `02:3e1e`. The resident memory audit remains exact and the six observed
-serial TX words are unchanged. Status acceptance
+Short accumulator STL/STH now admits preincrement modes `98..9f` and
+increments the selected AR before capturing its Read-owned destination.
+The `preinc-store` gate passes 6,144 cases/restores across four STL/STH
+selectors, eight registers, four source/address patterns, four SST/SXM
+settings, both CMPT states, two pages and three snapshots. It checks one
+pointer update, no destination read, one write, 16-bit wrapping into actual
+IMR and Execute-live source saturation despite later pointer changes.
+T/TRN preincrement forms remain excluded.
+
+`STM #k,BRC` now publishes early enough for an adjacent RPTB, as required
+by SPRU131G tables 7-23/7-24. It does not inherit DAGEN-bank arbitration.
+The `stm-brc` gate passes 30 cases/restores with counts 0/1/2/7/127,
+two pages and three snapshots, beginning with a deliberately different BRC.
+It verifies one retained literal, no counter data read, one counter write
+and complete count-plus-one byte-swap loops. In-loop BRC modification stays
+excluded because table 7-25 requires a separate latency contract.
+
+Short immediate preincrement ST passes 1,536 cases/restores in `preinc-st`:
+eight registers, four literals, four SST/SXM settings, both CMPT states,
+two pages and three snapshots. Program-literal and pointer changes after
+capture cannot affect the one write; unrelated accumulator changes cannot
+replace the retained literal. Single-instruction repeat of this new mode
+and its interrupt cross-products remain unaccepted.
+
+These changes execute the original `809a` at `02:3e1c`, then `771a 007f`
+at `02:98a5` and `769a 0000` at `02:98b1` in the clearing loop. The current
+original stop is `ST #1,*AR1(38)` (`76e1 0038 0001`) at `02:97d9`, live
+PC `02:97df`, with retained destination `0038`. The C5416-compatible register
+map identifies it as McBSP0 SPSA, selecting subbank register 1; the following
+`68e1 0039 fffe` masks SPSD. Validate the store/RMW access and peripheral wait
+contracts rather than assigning a guessed response. The physical DA150
+mapping remains separately unvalidated. The resident memory audit remains
+exact and the six observed serial TX words are unchanged.
+Status acceptance
 is limited to the following
 tested consumer/composition forms, not every status-register interaction.
 The `mvmd-cmpt` fixture initially failed because indirect address selection
@@ -3116,14 +3147,14 @@ status field is physically written at the same pipeline stage. Publication,
 consumer sampling and save/replay have separate gates. Special INTM
 following-instruction protection is not assigned to arbitrary full-ST1 writes.
 
-The shift-16/IMR checkpoint passes full CPU conformance (288
-required markers), native 5110 save-state restoration, all 26 isolated
-profiles in `tools/run_c54x_core.py`, 128 targeted Python tests and evidence
+The preincrement/BRC checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 29 isolated
+profiles in `tools/run_c54x_core.py`, 131 targeted Python tests and evidence
 validation. The original audit still matches 48,261 program and 3,656
 ordinary data words, with four register-window words excluded. Full
 board boot, native speech and the explicitly excluded instruction or
-producer/interrupt compositions remain unaccepted. Next establish the
-observed preincrement STL destination and pointer-update ownership; do not
+producer/interrupt compositions remain unaccepted. Next establish the observed
+long-offset store/RMW peripheral contract; do not
 infer full board boot from this initialization frontier.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR

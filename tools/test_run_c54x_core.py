@@ -12,6 +12,43 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_preincrement_immediate_scope(self):
+        marker, ending = EXTRA_PROFILES['preinc-st']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='preinc-st')
+        for bad in (output.replace('restore=1536', 'restore=0'),
+                    output.replace('source_literal_retained=1', 'source_literal_retained=0'),
+                    output.replace('single_repeat_acceptance=0', 'single_repeat_acceptance=1'),
+                    output.replace('pointer_updates=1', 'pointer_updates=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='preinc-st')
+
+    def test_stm_brc_scope(self):
+        marker, ending = EXTRA_PROFILES['stm-brc']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stm-brc')
+        for bad in (output.replace('restore=30', 'restore=0'),
+                    output.replace('latency=0', 'latency=1'),
+                    output.replace('counter_writes=1', 'counter_writes=2'),
+                    output.replace('in_loop_acceptance=0', 'in_loop_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stm-brc')
+
+    def test_preincrement_store_scope(self):
+        marker, ending = EXTRA_PROFILES['preinc-store']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='preinc-store')
+        for bad in (output.replace('restore=6144', 'restore=0'),
+                    output.replace('pointer_updates=1', 'pointer_updates=2'),
+                    output.replace('reads=0', 'reads=1'),
+                    output.replace('source_execute_live=1', 'source_execute_live=0'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='preinc-store')
+
     def test_ldu_imr_scope(self):
         marker, ending = EXTRA_PROFILES['ldu-imr']
         output = marker + '\n' + ending + '\n'
