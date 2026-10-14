@@ -47,11 +47,16 @@ its slot after older foreground Read-owned stack updates. The focused
 `stack-irq` gate passes 48 cases/restores, including IRQ0/NMI and three
 snapshots; `stack-irq-return` passes 80 replays, adding RETE, caller cleanup
 and snapshots of the retained return operand and returned caller. The
-original readiness gate reaches 1 and stops next at unsigned
-mapped-ST1 load `03:8f13`, not full boot. Resident loading remains exact;
+original readiness gate reaches 1. The mapped-ST1 LDU at `03:8f13` now
+passes through the existing retained Read path, with 288 focused replay
+cases and the existing 384-case IMR control. The next boundary is short
+CMPM at `03:91eb`, not full boot. Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. The full 288-marker regression, all 41 isolated profiles, 59
-verifier tests and native 5110 save-state gate pass with this correction.
+verifier tests and native 5110 save-state gate pass with the SP correction.
+The later operand-admission change adds the ST1 fixture and passes 60
+verifier tests and native restoration; no fresh broad-suite claim is made
+for that narrow addition.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses

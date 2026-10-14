@@ -3242,13 +3242,25 @@ protected and was not changed.
 
 The native return now confirms the correction: FRETE at `02:8b76` resumes at
 the populated `03:9b08`, not `03:0000`, and the original bootstrap readiness
-gate reaches 1. The next fail-closed boundary is LDU at `03:8f13` (`1281`,
-live PC `03:8f16`), with its indirect source resolving to mapped ST1 at 0007.
+gate reaches 1. LDU at `03:8f13` (`1281`) is now admitted for its mapped
+ST1 source at 0007 through the existing retained Read path. The `ldu-st1`
+fixture passes 288 cases/restores: direct/absolute/indirect addressing,
+eight full-word status patterns, both accumulators, two pages and snapshots
+before/after address and source capture. Changing ST1 after Read must not
+change the zero-extended result; changing pointers or the address literal
+after capture must not retarget it. CMPT's documented ARP update is checked
+against the captured mode, separately from the preserved arithmetic flags.
+One register read and no writes are observed. This is raw mapped-register
+read acceptance, not a claim about every ST1 producer latency or peripheral
+source. The existing 384-case IMR unsigned-read control also passes.
 The resident audit still matches 48,261 program and 3,656 data words. The
 1,024-case IPTR fixture and 59 verifier tests pass. The full 288-marker CPU
 regression, all 41 additional isolated profiles and native 5110 save-state
-gate pass with this SP correction. Recover unsigned mapped-status read
-ownership next.
+gate pass with the SP correction. The original now stops at short
+CMPM `03:91eb` (`6014`, live PC `03:91ed`); only absolute CMPM has staged
+composition coverage so far. This operand-admission addition has focused
+288/384-case controls, 60 verifier tests and native 5110 save-state coverage;
+the preceding broad CPU checkpoint remains the SP-ordering run above.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

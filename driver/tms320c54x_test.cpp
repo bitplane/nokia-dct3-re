@@ -10176,6 +10176,34 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253930;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static u16 ldu_status_value(unsigned variant)
+	{
+		return std::array<u16, 8>{0, 0x200, 0x8000, 0x8200, 0x6900, 0x6b00, 0xfdff, 0xffff}[variant % 8];
+	}
+	void start_ldu_status(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const form = (variant / 8) % 3, read = form == 1 ? 6 : 5;
+		bool const b = (variant / 24) % 2;
+		u16 const value = ldu_status_value(variant);
+		u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x1200 | (b ? 0x100 : 0) | (form == 1 ? 0xf8 : form == 2 ? 0x82 : 7));
+		if (form == 1) program.write_word(base + 0x601, 7);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0); // CPL direct offset 7 still selects ST1.
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcdef1234ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 7);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ldu_status_read", [this, value, read](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 7 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read, "LDU captures live mapped ST1 once at Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ldu_status_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Mapped ST1 LDU does not write memory or registers"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "ldu_status_literal", [this, form](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || form != 1) return; expect(word == 7 && !m_pipeline_extensions_reads, "Absolute ST1 LDU captures one address literal"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254010;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_ldu_imr(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -10315,6 +10343,7 @@ private:
 		if (!strcmp(machine().options().bios(), "pop-brc")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-store")) { start_preincrement_store(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-imr")) { start_ldu_imr(); return; }
+		if (!strcmp(machine().options().bios(), "ldu-st1")) { start_ldu_status(); return; }
 		if (!strcmp(machine().options().bios(), "memory-shift16")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-irq")) { start_mvmd_status_irq(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
@@ -35940,6 +35969,28 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253940) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253930; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254010)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 8) % 3, read = form == 1 ? 6 : 5;
+			unsigned const checkpoint = std::array<unsigned, 3>{3, read - 1, read}[variant / 96];
+			bool const b = (variant / 24) % 2; u16 const value = ldu_status_value(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped ST1 LDU remains staged");
+			if (form == 1 && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 48) % 2 ? 0x20000 : 0) + 0x601, 0xdead); }
+			if (form == 2 && tick == read - 1) for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x2222);
+			if (tick == read) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, value ^ 0xffff);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped status before and after retained Read"); }
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(form == 1) && m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0xabcdef1234ULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (value ^ 0xffff) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (form == 2 && (value & 0x20) ? 0x5600 : 0x1600) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0, "LDU retains unsigned ST1 and only the captured CMPT's documented ARP update");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore ST1 LDU without rereading a changed register or literal"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254020; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_ldu_status(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged LDU ST1: PASS cases=288 restore=288 forms=direct,absolute,indirect values=8 accumulators=2 pages=2 snapshots=3 register_reads=1 writes=0 source_retained=1 unsigned_full_word=1 producer_latency_claim=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated LDU ST1 complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254020) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254010; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253910)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 16) % 4, read = form == 3 ? 7 : form == 1 ? 6 : 5, checkpoint = std::array<unsigned, 3>{3, read - 1, read}[variant / 128];
@@ -37716,6 +37767,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(57, "pop-brc", "Staged block counter pop and repeat setup")
 	ROM_SYSTEM_BIOS(58, "stack-irq", "Staged stack updates and interrupt entry ordering")
 	ROM_SYSTEM_BIOS(59, "stack-irq-return", "Staged stack interrupt return round trip")
+	ROM_SYSTEM_BIOS(60, "ldu-st1", "Staged unsigned mapped-status register read")
 ROM_END
 
 ROM_START(tms54rom4)

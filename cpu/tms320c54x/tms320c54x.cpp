@@ -3103,9 +3103,10 @@ void tms320c54x_device::pipeline_step()
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
 		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
-		bool const unsigned_imr = (m_pipeline_word[3] & 0xfe00) == 0x1200 && m_pipeline_operand_address[3] == 0;
+		bool const unsigned_control = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
+			(m_pipeline_operand_address[3] == 0 || m_pipeline_operand_address[3] == 7);
 		if (staged_memory_load(m_pipeline_word[3]) && (BIT(m_pipeline_word[3], 9) || shifted_load) && m_pipeline_operand_address[3] < 0x60 &&
-			!unsigned_imr && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
+			!unsigned_control && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
 		{
 			logerror("%s: staged memory load control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;

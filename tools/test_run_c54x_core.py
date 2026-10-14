@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_ldu_status_scope(self):
+        marker, ending = EXTRA_PROFILES['ldu-st1']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ldu-st1')
+        for bad in (output.replace('restore=288', 'restore=0'),
+                    output.replace('register_reads=1', 'register_reads=2'),
+                    output.replace('unsigned_full_word=1', 'unsigned_full_word=0'),
+                    output.replace('producer_latency_claim=0', 'producer_latency_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='ldu-st1')
+
     def test_stack_irq_return_scope(self):
         marker, ending = EXTRA_PROFILES['stack-irq-return']
         output = marker + '\n' + ending + '\n'
