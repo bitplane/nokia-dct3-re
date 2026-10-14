@@ -26,6 +26,17 @@ with a repeated MVDP data-to-program transfer.
 
 ## Extended program overlay
 
+The staged frontend retains the physical program address selected by each
+Prefetch slot in save state, separately from its logical PC. The isolated
+`pmst-map`, `pmst-pop` and `pmst-prefetch` fixtures each pass 64 cases with
+replay. The last deliberately changes debugger PMST state between Prefetch
+and Fetch; it is CPU conformance, not a firmware-ordering fixture. The full
+288-marker core run and native 5110 save-state gate pass. These results do
+not certify all PMST fields or POPM/IPTR interrupt composition. The original
+MU4 resident now executes POPM PMST and stops at POPM REA (`02:8b3c`),
+with resident loading still exact; see [5510 bring-up](5510_bringup.md)
+for the bounded scope and remaining context-control contract.
+
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
 to `xx0000..xx7fff` resolve to page zero, while the upper half remains

@@ -3143,6 +3143,49 @@ is not proof of decoded media, native speech or full board boot. Next
 establish PMST restoration, mapping/fetch ownership and interrupt vector
 selection rather than extending the generic pop range blindly. The resident
 memory audit remains exact and the six command serial TX words are unchanged.
+
+PMST restoration acceptance must cover more than the existing 64-case STM
+fixture. SPRU131G section 7.5.9 assigns OVLY/IPTR/MP/MC evaluation to
+Prefetch; table 7-26 gives POPM (the "all other instructions" row)
+consumer-category latencies of 0/1/2/3. DROM has a separate Access/Read
+contract in table 7-27. The frontend now saves the physical mapping alongside
+each logical Prefetch address and carries it into Fetch. The isolated
+`pmst-map` profile runs the existing STM mapping/replay cases; those
+later-branch cases alone do not establish ownership across a PMST publication
+between stages. Before banking full PMST acceptance, test distinct old/new page
+contents across that boundary, retain the stack source despite subsequent
+mutation, and replay around source capture and publication. Interrupt tests
+must distinguish the IPTR value of an already accepted vector from a later
+acceptance. MP/MC and DROM physical-memory decoding remain separate scope;
+passing an OVLY fixture must not certify them. The original restoration
+tail continues with POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`), which require their
+own block-repeat ownership contract rather than a blanket pop-range change.
+
+The bounded `pmst-pop` prototype now passes 64 cases/restores: four values,
+two source pages, lower/upper branch targets and four snapshots. It captures
+one stack read at Read and publishes once at Execute; changing the stack word
+after capture must not change the published PMST. SP advances exactly once.
+The ordinary branch is separated by three NOPs, so this fixture does not
+establish every adjacent-consumer latency or interrupt-vector composition.
+The original now passes `8a1d` and stops at `8a1c` (POPM REA) at
+`02:8b3c`, live PC `02:8b3e`; the 48,261 program / 3,656 data word audit
+still passes. The earlier `8a1d` stop above is the banked pre-prototype
+checkpoint, not the current unbanked frontier. Verification scope is detailed
+below; interrupt composition is not yet part of PMST acceptance.
+
+The shared-core 288-marker conformance run now passes with saved physical
+Prefetch addresses. The `pmst-map`, `pmst-pop` and `pmst-prefetch` isolated
+profiles each pass 64 cases/restores. The last is explicitly a debugger-state
+conformance fixture: it changes PMST after the first Prefetch, with an illegal
+opcode in the newly selected bank, and saves at clocks 1/2/5/6. Fetch must use
+the original selected bank, including after restoration; subsequent slots
+use the new mapping. This establishes retained slot ownership, not an
+organic firmware transition or every table-7-26 consumer latency. Dedicated
+POPM/IPTR interrupt composition remains outstanding: source acceptance
+captures a logical vector, while `interrupt_entry_step` fetches its word
+later through the current program mapping. Test old/new IPTR and OVLY
+separately before changing that ownership or claiming full PMST fidelity.
+
 Status acceptance
 is limited to the following
 tested consumer/composition forms, not every status-register interaction.

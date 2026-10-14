@@ -1049,6 +1049,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_interrupt_stack_address));
 	save_item(NAME(m_interrupt_ack_source));
 	save_item(NAME(m_pipeline_address));
+	save_item(NAME(m_pipeline_physical_address));
 	save_item(NAME(m_pipeline_word));
 	save_item(NAME(m_pipeline_operand_address));
 	save_item(NAME(m_pipeline_operand));
@@ -2254,6 +2255,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_idle_resume_address = 0;
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
+	m_pipeline_physical_address.fill(0);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
 	m_pipeline_decode_word = 0;
@@ -2474,6 +2476,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_block_end[stage] = m_pipeline_block_end[stage - 1];
 		m_pipeline_block_body[stage] = m_pipeline_block_body[stage - 1];
 		m_pipeline_address[stage] = m_pipeline_address[stage - 1];
+		m_pipeline_physical_address[stage] = m_pipeline_physical_address[stage - 1];
 		m_pipeline_word[stage] = m_pipeline_word[stage - 1];
 		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
@@ -2519,7 +2522,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = u16(address + 1);
 			m_xpc = (address >> 16) & 0x7f;
-			m_pipeline_word[1] = m_cache.read_word(physical_program_address(address));
+			m_pipeline_word[1] = m_cache.read_word(m_pipeline_physical_address[1]);
 		}
 	}
 	if (m_pipeline_valid[3] && staged_banz(m_pipeline_word[3]))
@@ -2751,7 +2754,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
-		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x19;
+		bool const direct_pop = (word & 0xff00) == 0x8a00 && ((u8(word) >= 6 && u8(word) <= 0x19) || word == 0x8a1d);
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = staged_banz(word) || word == 0xf072 || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word)));
 		bool const block_setup = word == 0xf072;
@@ -3237,7 +3240,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 17A: retain the stack word before destination publication.
 		// Read-owned SP increment is a partial placement model; POPM excludes
-		// XPC/control destinations and POPD is bounded to RAM.
+		// XPC/repeat-control destinations and POPD is bounded to RAM.
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
 		{
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
@@ -3869,6 +3872,8 @@ void tms320c54x_device::pipeline_step()
 	if (!m_pipeline_flush_front && !prefetch_bubble && !m_pipeline_idle_barrier && !m_pipeline_idle_resume_pending && !m_pipeline_repeat_body_latched && !m_idle)
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
+		// SPRU131G 7.5.9: program mapping belongs to Prefetch, not Fetch.
+		m_pipeline_physical_address[0] = physical_program_address(m_pipeline_fetch_address);
 		m_pipeline_valid[0] = true;
 		m_pipeline_block_first_final[0] = m_pipeline_block_end[0] = false;
 		m_pipeline_block_body[0] = false;

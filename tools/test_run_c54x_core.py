@@ -12,6 +12,38 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_pmst_prefetch_scope(self):
+        marker, ending = EXTRA_PROFILES['pmst-prefetch']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pmst-prefetch')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('debugger_state_fixture=1', 'debugger_state_fixture=0'),
+                    output.replace('firmware_ordering_claim=0', 'firmware_ordering_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmst-prefetch')
+
+    def test_pmst_pop_scope(self):
+        marker, ending = EXTRA_PROFILES['pmst-pop']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pmst-pop')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('stack_reads=1', 'stack_reads=2'),
+                    output.replace('source_retained=1', 'source_retained=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmst-pop')
+
+    def test_pmst_mapping_scope(self):
+        marker, ending = EXTRA_PROFILES['pmst-map']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pmst-map')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('duplicate_register_writes=0', 'duplicate_register_writes=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmst-map')
+
     def test_stlm_imr_scope(self):
         marker, ending = EXTRA_PROFILES['stlm-imr']
         output = marker + '\n' + ending + '\n'

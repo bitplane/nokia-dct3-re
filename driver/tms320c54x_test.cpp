@@ -5369,16 +5369,37 @@ private:
 	}
 	void start_pipeline_pmst(unsigned variant = 0)
 	{
+		bool const boundary = !strcmp(machine().options().bios(), "pmst-prefetch");
+		bool const pop = boundary || !strcmp(machine().options().bios(), "pmst-pop");
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_pipeline_peripheral_case = variant;
 		u16 const value = std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa}[variant % 4];
 		u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
 		u16 const target = BIT(variant, 3) ? 0x8700 : 0x700;
+		u16 const entry = boundary ? 0x600 : 0x9000;
 		auto &program = m_cpu->space(AS_PROGRAM);
+		if (boundary)
+			for (unsigned i = 0; i < 64; ++i) { program.write_word(base + entry + i, 0xf495); program.write_word(entry + i, 0xf495); }
 		for (unsigned i = 0; i < 64; ++i) { program.write_word(base + 0x9000 + i, 0xf495); program.write_word(base + target + i, 0xf495); program.write_word(target + i, 0xf495); }
 		std::array<u16, 5> const code{0x771d, value, 0xf495, 0xf073, target};
 		for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x9000 + i, code[i]);
+		if (pop)
+		{
+			std::array<u16, 6> const pop_code{0x8a1d, 0xf495, 0xf495, 0xf495, 0xf073, target};
+			for (unsigned i = 0; i < pop_code.size(); ++i)
+			{
+				program.write_word(base + entry + i, pop_code[i]);
+				if (boundary) program.write_word(entry + i, pop_code[i]);
+			}
+			if (boundary)
+			{
+				// Deliberate debugger-state conformance input, not a firmware fixture.
+				// Only the bank not selected by the first Prefetch has a bad opcode.
+				program.write_word(BIT(value ^ 0x20, 5) ? base + entry : entry, 0xffff);
+			}
+			m_cpu->space(AS_DATA).write_word(0x1000, value);
+		}
 		program.write_word(base + target, 0xe844); program.write_word(target, 0xe811);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, value ^ 0x20);
@@ -5389,16 +5410,16 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
+		m_cpu->set_state_int(STATE_GENPC, base + entry); m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_idle_fixture_tick = 0;
 		m_pipeline_store_writes = m_pipeline_operand_reads = 0;
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x1d, 0x1d, "staged_pmst_publication",
-			[this, value](offs_t, u16 &word, u16) {
+			[this, value, pop](offs_t, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(word == value && m_cpu->pipeline_cycles() == 7 && !m_pipeline_store_writes,
+				expect(word == value && m_cpu->pipeline_cycles() == (pop ? 6 : 7) && !m_pipeline_store_writes,
 					"STM PMST publishes its retained value once, separate from DAGEN early writes"); ++m_pipeline_store_writes;
 			});
-		m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "staged_pmst_literal",
+		m_pipeline_fetch_tap = (pop ? m_cpu->space(AS_DATA) : program).install_read_tap(pop ? 0x1000 : base + 0x9001, pop ? 0x1000 : base + 0x9001, "staged_pmst_source",
 			[this, value](offs_t, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(word == value && !m_pipeline_operand_reads, "STM PMST fetches its original literal exactly once"); ++m_pipeline_operand_reads;
@@ -10184,6 +10205,9 @@ private:
 	virtual void machine_reset() override
 	{
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
+		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
+		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
+		if (!strcmp(machine().options().bios(), "pmst-prefetch")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "mcbsp-control")) { start_mcbsp_control_sequence(); return; }
 		if (!strcmp(machine().options().bios(), "rmw-long-periph")) { start_pipeline_long_rmw(); return; }
 		if (!strcmp(machine().options().bios(), "st-long-periph")) { start_pipeline_long_immediate_store(); return; }
@@ -32622,13 +32646,17 @@ private:
 		}
 		if (m_phase == 252270)
 		{
+			bool const boundary = !strcmp(machine().options().bios(), "pmst-prefetch");
+			bool const pop = boundary || !strcmp(machine().options().bios(), "pmst-pop");
 			unsigned const variant = m_pipeline_peripheral_case;
 			u16 const value = std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa}[variant % 4];
 			u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
 			unsigned const tick = ++m_idle_fixture_tick;
-			unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 8, 11}[variant / 16];
+			unsigned const checkpoint = (boundary ? std::array<unsigned, 4>{1, 2, 5, 6} : pop ? std::array<unsigned, 4>{4, 5, 6, 11} : std::array<unsigned, 4>{4, 6, 8, 11})[variant / 16];
+			if (boundary && tick == 1) m_cpu->set_state_int(tms320c54x_device::STATE_PMST, value);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged PMST does not enable unsupported immediate register forms");
-			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0xffff); }
+			if (!pop && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0xffff); }
+			if (pop && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1000, value ^ 0xffff); }
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_idle_fixture_saved_tick = tick; m_pipeline_store_case = m_pipeline_store_writes; m_pipeline_branch_case = m_pipeline_operand_reads;
@@ -32639,7 +32667,7 @@ private:
 			{
 				expect(m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == value &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(value, 5) && !BIT(variant, 3) ? 0x11 : 0x44) &&
-					m_cpu->state_int(tms320c54x_device::STATE_XPC) == base >> 16 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_XPC) == base >> 16 && m_cpu->state_int(tms320c54x_device::STATE_SP) == (pop ? 0x1001 : 0x1000) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
 					"PMST changes subsequent lower program mapping only, retains IPTR bits and does not alter source XPC or status");
 				if (!m_pipeline_replay)
@@ -32652,7 +32680,18 @@ private:
 				}
 				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 63) { start_pipeline_pmst(variant + 1); return; }
+				if (pop)
+				{
+					if (boundary)
+					{
+						osd_printf_info("TMS320C54x staged PMST prefetch ownership: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 snapshots=4 debugger_state_fixture=1 firmware_ordering_claim=0\n");
+						throw emu_fatalerror(3, "TMS320C54x isolated PMST prefetch complete");
+					}
+					osd_printf_info("TMS320C54x staged POPM PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated POPM PMST complete");
+				}
 				osd_printf_info("TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0\n");
+				if (!strcmp(machine().options().bios(), "pmst-map")) throw emu_fatalerror(3, "TMS320C54x isolated PMST mapping complete");
 				start_pipeline_mvpd(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -37493,6 +37532,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(49, "rmw-long-periph", "Staged long peripheral read-modify-write timing")
 	ROM_SYSTEM_BIOS(50, "mcbsp-control", "Staged actual McBSP selector and reset sequence")
 	ROM_SYSTEM_BIOS(51, "stlm-imr", "Staged accumulator interrupt-mask publication")
+	ROM_SYSTEM_BIOS(52, "pmst-map", "Staged PMST publication and program mapping")
+	ROM_SYSTEM_BIOS(53, "pmst-pop", "Staged PMST stack restoration and program mapping")
+	ROM_SYSTEM_BIOS(54, "pmst-prefetch", "Staged PMST prefetch ownership conformance")
 ROM_END
 
 ROM_START(tms54rom4)

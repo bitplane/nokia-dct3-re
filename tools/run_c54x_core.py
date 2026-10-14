@@ -312,6 +312,18 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "pmst-prefetch": (
+        "TMS320C54x staged PMST prefetch ownership: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 snapshots=4 debugger_state_fixture=1 firmware_ordering_claim=0",
+        "Fatal error: TMS320C54x isolated PMST prefetch complete",
+    ),
+    "pmst-pop": (
+        "TMS320C54x staged POPM PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated POPM PMST complete",
+    ),
+    "pmst-map": (
+        "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
+        "Fatal error: TMS320C54x isolated PMST mapping complete",
+    ),
     "stlm-imr": (
         "TMS320C54x staged STLM IMR: PASS cases=9216 restore=9216 accumulators=2 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 snapshots=3 source_execute_live=1 writes_each=1 destination_reads=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM IMR complete",

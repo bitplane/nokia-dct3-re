@@ -284,6 +284,7 @@ private:
 	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
 	// owned by their slots; no speculative instruction executes at acceptance.
 	std::array<u32, 6> m_pipeline_address = {};
+	std::array<u32, 6> m_pipeline_physical_address = {};
 	std::array<u16, 6> m_pipeline_word = {};
 	std::array<u16, 6> m_pipeline_operand_address = {};
 	std::array<u16, 6> m_pipeline_operand = {};
