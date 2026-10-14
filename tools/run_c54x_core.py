@@ -305,18 +305,31 @@ ATOMIC_IO_REQUIRED = BUS_IO_REQUIRED.replace("staged external", "atomic external
 ATOMIC_IO_COMPLETION = BUS_IO_COMPLETION.replace("staged external", "atomic external")
 COMPOSE_REQUIRED = "TMS320C54x atomic I/O composition: PASS cases=24 restore=24 contexts=repeat,delay,INTM pointer_updates=once interrupt_after_transfer=1 physical_mapping=unvalidated"
 COMPOSE_COMPLETION = "Fatal error: TMS320C54x isolated atomic I/O composition complete"
+BUS_STM_REQUIRED = "TMS320C54x staged bus STM: PASS cases=36 restore=36 registers=SWWSR,BSCR,SWCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 physical_mapping=unvalidated"
+BUS_STM_COMPLETION = "Fatal error: TMS320C54x isolated staged bus STM complete"
+READ_A_MAPPED_REQUIRED = "TMS320C54x mapped READA: PASS cases=288 restore=288 registers=AL,AH,AG,BL,BH,BG forms=direct,absolute source_pages=2 source_reads=1 writes=1 status_preserved=1 silicon_phase_claim=0"
+READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA complete"
+DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
+DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 
 
-def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False):
-    if sum((bus_registers, bus_io, atomic_io, compose)) > 1:
+def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False):
+    scopes = [(bus_registers, BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION),
+              (bus_io, BUS_IO_REQUIRED, BUS_IO_COMPLETION),
+              (atomic_io, ATOMIC_IO_REQUIRED, ATOMIC_IO_COMPLETION),
+              (compose, COMPOSE_REQUIRED, COMPOSE_COMPLETION),
+              (bus_stm, BUS_STM_REQUIRED, BUS_STM_COMPLETION),
+              (mapped_read_a, READ_A_MAPPED_REQUIRED, READ_A_MAPPED_COMPLETION),
+              (dp_absolute, DP_ABSOLUTE_REQUIRED, DP_ABSOLUTE_COMPLETION)]
+    selected = [(marker, ending) for enabled, marker, ending in scopes if enabled]
+    if len(selected) > 1:
         raise ValueError("choose one isolated conformance scope")
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit status {returncode}; expected test completion exit 3")
     lines = text.splitlines()
-    completion = COMPOSE_COMPLETION if compose else ATOMIC_IO_COMPLETION if atomic_io else BUS_IO_COMPLETION if bus_io else BUS_REGISTER_COMPLETION if bus_registers else COMPLETION
-    required = [COMPOSE_REQUIRED] if compose else [ATOMIC_IO_REQUIRED] if atomic_io else [BUS_IO_REQUIRED] if bus_io else [BUS_REGISTER_REQUIRED] if bus_registers else REQUIRED
+    required, completion = ([selected[0][0]], selected[0][1]) if selected else (REQUIRED, COMPLETION)
     for marker in required:
-        if sum(line == marker or (not (bus_registers or bus_io or atomic_io or compose) and line.startswith(marker + " ")) for line in lines) != 1:
+        if sum(line == marker or (not selected and line.startswith(marker + " ")) for line in lines) != 1:
             raise ValueError(f"missing or duplicated conformance marker: {marker}")
     if not lines or lines[-1] != completion:
         raise ValueError("missing terminal C54x test completion")
@@ -334,8 +347,11 @@ def main():
     parser.add_argument("--bus-io", action="store_true", help="run staged external I/O wait/READY conformance")
     parser.add_argument("--atomic-io", action="store_true", help="run atomic external I/O wait/READY conformance")
     parser.add_argument("--compose", action="store_true", help="run atomic waited I/O repeat/delay/INTM composition")
+    parser.add_argument("--bus-stm", action="store_true", help="run staged C5416 bus-control write conformance")
+    parser.add_argument("--mapped-read-a", action="store_true", help="run staged mapped-accumulator READA conformance")
+    parser.add_argument("--dp-absolute", action="store_true", help="run staged absolute memory-to-DP conformance")
     args = parser.parse_args()
-    if sum((args.bus_registers, args.bus_io, args.atomic_io, args.compose)) > 1:
+    if sum((args.bus_registers, args.bus_io, args.atomic_io, args.compose, args.bus_stm, args.mapped_read_a, args.dp_absolute)) > 1:
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
@@ -352,17 +368,26 @@ def main():
         command.extend(["-bios", "bus-io-atomic"])
     if args.compose:
         command.extend(["-bios", "bus-io-compose"])
+    if args.bus_stm:
+        command.extend(["-bios", "bus-stm"])
+    if args.mapped_read_a:
+        command.extend(["-bios", "read-a-mapped"])
+    if args.dp_absolute:
+        command.extend(["-bios", "dp-absolute"])
     print(f"C54x evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose)
+        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose, bus_stm=args.bus_stm, mapped_read_a=args.mapped_read_a, dp_absolute=args.dp_absolute)
     except ValueError as error:
         print(f"C54x conformance: FAIL: {error}", file=sys.stderr)
         return 1
-    print("C54x atomic I/O composition: PASS (bounded control forms; physical mapping unvalidated)" if args.compose else
+    print("C54x absolute memory DP: PASS (silicon phases unvalidated)" if args.dp_absolute else
+          "C54x mapped READA: PASS (bounded register forms; silicon phases unvalidated)" if args.mapped_read_a else
+          "C54x staged bus STM: PASS (physical mapping unvalidated)" if args.bus_stm else
+          "C54x atomic I/O composition: PASS (bounded control forms; physical mapping unvalidated)" if args.compose else
           "C54x atomic I/O conformance: PASS (repeat/guard acceptance separate; physical mapping unvalidated)" if args.atomic_io else
           "C54x staged I/O conformance: PASS (atomic acceptance separate; physical mapping unvalidated)" if args.bus_io else
           "C54x conformance: PASS (isolated native run)" if not args.bus_registers else

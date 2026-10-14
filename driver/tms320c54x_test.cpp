@@ -3564,6 +3564,7 @@ private:
 		m_phase = 251570; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	bool absolute_memory_dp() const { return !strcmp(machine().options().bios(), "dp-absolute"); }
 	void start_pipeline_memory_dp(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -3572,8 +3573,10 @@ private:
 		u16 const target = (page << 7) | 0x7e;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, 0x467f);
-		program.write_word(0x601, 0x107e);
+		bool const absolute = absolute_memory_dp();
+		program.write_word(0x600, absolute ? 0x46f8 : 0x467f);
+		program.write_word(0x601, absolute ? 0x47f : 0x107e);
+		if (absolute) program.write_word(0x602, 0x107e);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -3589,19 +3592,22 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x47f, 0x47f, "staged_memory_dp_source",
-			[this, page](offs_t, u16 &value, u16) {
+			[this, page, absolute](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == (0xe000 | page) && m_cpu->pipeline_cycles() == 5, "Memory DP retains one sample before held clocks");
+				expect(value == (0xe000 | page) && m_cpu->pipeline_cycles() == 5 + unsigned(absolute), "Memory DP retains one sample before held clocks");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_fetch_tap = m_cpu->space(AS_DATA).install_read_tap(target, target, "staged_memory_dp_consumer",
-			[this](offs_t, u16 &value, u16) {
+			[this, absolute](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x2222 && m_cpu->pipeline_cycles() == 8, "Adjacent direct load uses forwarded DP after the producer's two held clocks");
+				expect(value == 0x2222 && m_cpu->pipeline_cycles() == 8 + unsigned(absolute), "Adjacent direct load uses forwarded DP after the producer's two held clocks");
 				++m_pipeline_extensions_reads;
 			});
+		if (absolute)
+			m_pipeline_write_tap = program.install_read_tap(0x601, 0x601, "absolute_dp_extension",
+				[this](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && value == 0x47f, "Absolute DP owns one address extension"); ++m_pipeline_store_writes; });
 		m_phase = 251590; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -9516,6 +9522,56 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253570;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_staged_bus_stm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const address = std::array<u16, 3>{0x28, 0x29, 0x2b}[variant % 3];
+		u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff}[(variant / 3) % 4];
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0x7700 | address); program.write_word(0x601, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		data.write_word(0x28, 0); data.write_word(0x29, 0); data.write_word(0x2b, 0);
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_write_tap = data.install_write_tap(address, address, "staged_bus_stm_write",
+			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && m_cpu->pipeline_cycles() == 8, "Bus STM publishes once in Execute after its peripheral clock"); ++m_pipeline_store_writes; });
+		m_pipeline_operand_tap = data.install_read_tap(address, address, "staged_bus_stm_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "Bus STM must not read its destination"); } });
+		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "staged_bus_stm_literal",
+			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == value, "Bus STM owns one literal fetch"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253590;
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_mapped_read_a(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const destination = 8 + variant % 6;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4];
+		bool const absolute = (variant / 24) % 2;
+		u32 const source = ((variant / 48) % 2 ? 0x20000 : 0) | 0x400;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0x7e00 | (absolute ? 0xf8 : destination));
+		if (absolute) program.write_word(0x601, destination);
+		program.write_word(source, value); program.write_word(0x30400, value ^ 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200000000ULL | source); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(source, source, "mapped_read_a_source",
+			[this, value, absolute](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == value && m_cpu->pipeline_cycles() == (absolute ? 10 : 9), "Mapped READA retains the full program source through held clocks"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(destination, destination, "mapped_read_a_write",
+			[this, value, absolute](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && m_cpu->pipeline_cycles() == (absolute ? 11 : 10), "Mapped READA publishes the retained word once in Execute"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "mapped_read_a_extension",
+			[this, absolute, destination](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || !absolute) return; expect(!m_pipeline_extensions_reads && word == destination, "Mapped READA owns one absolute extension"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253610;
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	virtual void machine_start() override
 	{
 		save_item(NAME(m_bus_ready));
@@ -9528,6 +9584,9 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
+		if (!strcmp(machine().options().bios(), "read-a-mapped")) { start_mapped_read_a(); return; }
+		if (!strcmp(machine().options().bios(), "bus-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "bus-io-compose")) { start_atomic_io_composition(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && (!strcmp(machine().options().bios(), "bus-io") || atomic_bus_io())) { start_bus_io_test(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-registers"))
@@ -30156,12 +30215,13 @@ private:
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const page = m_pipeline_peripheral_case & 511;
-			u64 const checkpoint = 4 + m_pipeline_peripheral_case / 512;
+			unsigned const offset = unsigned(absolute_memory_dp());
+			u64 const checkpoint = 4 + offset + m_pipeline_peripheral_case / 512;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_extensions_reads == unsigned(cycle >= 8) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 9 ? 0x2222 : 0) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5 + offset) && m_pipeline_extensions_reads == unsigned(cycle >= 8 + offset) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 9 + offset ? 0x2222 : 0) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x123456789aULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (cycle >= 8 ? page : 8)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (cycle >= 8 + offset ? page : 8)) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
 				"Memory DP holds two clocks, masks nine bits and forwards to its adjacent consumer without early ST0 commitment");
 			if (cycle == checkpoint && !m_pipeline_replay)
@@ -30169,20 +30229,27 @@ private:
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save memory DP before/after sampling or during held clocks");
 			}
-			if (cycle == 5) m_cpu->space(AS_DATA).write_word(0x47f, 0);
-			if (cycle == 11)
+			if (offset && cycle == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xdead); }
+			if (cycle == 5 + offset) m_cpu->space(AS_DATA).write_word(0x47f, 0);
+			if (cycle == 11 + offset)
 			{
+				if (offset) expect(m_pipeline_store_writes == 1, "Absolute DP never refetches its address extension");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_extensions_reads = 0;
+					m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5 + offset); m_pipeline_extensions_reads = 0;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained DP sample, forwarding and remaining held clocks");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251600;
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
-				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); if (offset) m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 1535) { start_pipeline_memory_dp(m_pipeline_peripheral_case + 1); return; }
+				if (offset)
+				{
+					osd_printf_info("TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated absolute memory DP complete");
+				}
 				osd_printf_info("TMS320C54x staged memory DP: PASS pages=512 cases=1536 source_read=5 producer_execute=8 consumer_execute=9 restore=1536 duplicate_reads=0 silicon_phase_claim=0\n");
 				start_pipeline_conditional_branch(); return;
 			}
@@ -34897,6 +34964,71 @@ private:
 			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253610)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const reg = variant % 6, shift = (reg % 3) * 16;
+			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4];
+			bool const absolute = (variant / 24) % 2;
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 8, 12}[variant / 96];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped READA has no atomic fallback");
+			if (tick == 7) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x3400030400ULL);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, 0};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped READA before/during program hold or after write");
+			}
+			if (tick == 15)
+			{
+				u64 expected_a = 0x3400030400ULL, expected_b = 0xfeabcd9876ULL;
+				u64 &target = reg < 3 ? expected_a : expected_b;
+				u64 const mask = u64(reg % 3 == 2 ? 0xff : 0xffff) << shift;
+				target = (target & ~mask) | ((u64(value) << shift) & mask);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected_a && m_cpu->state_int(tms320c54x_device::STATE_B) == expected_b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Mapped READA preserves untouched accumulator words and status");
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == unsigned(absolute), "Mapped READA does not duplicate retained accesses");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay held program source and mapped publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253620; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_mapped_read_a(variant + 1); return; }
+				osd_printf_info("TMS320C54x mapped READA: PASS cases=288 restore=288 registers=AL,AH,AG,BL,BH,BG forms=direct,absolute source_pages=2 source_reads=1 writes=1 status_preserved=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated mapped READA complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253620) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253610; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 253590)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u16 const address = std::array<u16, 3>{0x28, 0x29, 0x2b}[variant % 3];
+			u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff}[(variant / 3) % 4];
+			unsigned const checkpoint = std::array<unsigned, 3>{6, 7, 9}[variant / 12];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Only configured bus STM forms execute");
+			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, value ^ 0xffff); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, 0};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save bus STM before/during peripheral wait or after publication");
+			}
+			if (tick == 12)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(address) == (value & (address == 0x29 ? 0xf006 : address == 0x2b ? 1 : 0xffff)), "Bus STM retains the device register mask"); }
+				expect(m_pipeline_store_writes == 1 && !m_pipeline_operand_reads && m_pipeline_extensions_reads == 1, "Bus STM has one literal and one write without destination reads");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore bus STM without repeating the wait or write"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253600; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 35) { start_staged_bus_stm(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged bus STM: PASS cases=36 restore=36 registers=SWWSR,BSCR,SWCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 physical_mapping=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated staged bus STM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253600) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253590; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253570)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -35500,7 +35632,7 @@ void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
-	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose")) m_cpu->set_c5416_bus_profile(true);
+	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose") || !strcmp(config.options().bios(), "bus-stm")) m_cpu->set_c5416_bus_profile(true);
 	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
@@ -36074,6 +36206,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(13, "bus-io", "Staged external I/O waits and READY conformance")
 	ROM_SYSTEM_BIOS(14, "bus-io-atomic", "Atomic external I/O waits and READY conformance")
 	ROM_SYSTEM_BIOS(15, "bus-io-compose", "Atomic waited I/O control-flow composition")
+	ROM_SYSTEM_BIOS(16, "bus-stm", "Staged C5416 bus-control immediate writes")
+	ROM_SYSTEM_BIOS(17, "read-a-mapped", "Staged READA mapped accumulator writes")
+	ROM_SYSTEM_BIOS(18, "dp-absolute", "Staged absolute memory-to-DP load")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -3713,10 +3713,9 @@ The isolated C5416-compatible register profile now validates reset,
 masking, partial writes and saved-state/output restoration across all
 65,536 encodings. Its CLKOUT divider and IACK-enable callbacks are
 configuration outputs, not pin waveforms; logical IRQ acknowledgement
-remains independent. No handset selects this register-only profile,
-and staged bus-register opcodes remain fail-closed until waits are paid.
+remains independent. No handset selects this compatibility profile.
 The profile gate, full legacy CPU suite, native 5110 save-state gate and
-original memory audit pass; MU4 still stops at `7728` (`02:6d05`).
+original memory audit passed at the retained-I/O checkpoint.
 The isolated staged I/O profile now validates software waits `0..14`,
 READY eligibility after at least two software waits, single read/write
 side effects and saved transaction ownership across 576 replays. Timers
@@ -3730,10 +3729,22 @@ including pointer updates and stacked interrupt continuations.
 The MMR fixture checks the extra access clock at `0030`; the AR1 alias
 checks write-before-postincrement ordering. Other control-register side
 effects and physical bus phases remain outside this bounded acceptance.
-No handset selects the profile, and no bus-register opcode is admitted
-merely to move the frontier. Full CPU conformance, native 5110 save-state
-restoration and the original MU4 resident-memory audit pass with this
-integration; the original staged frontier remains `7728` at `02:6d05`.
+Bus-control STM admission has a separate 36-case saved/replayed gate:
+one retained literal and one masked Execute write at clock 8, including
+the peripheral clock. The profile is also selected by the isolated
+`bootrecstage` diagnostic, not a handset composition. Original resident
+memory still matches all checked words. Mapped-accumulator READA now has
+288 saved/replayed cases for AL/AH/AG and BL/BH/BG, direct/absolute forms
+and two source pages, preserving status and untouched accumulator words.
+The original `7ef8 000b` transfer at `02:6d12` executes. Absolute LD
+Smem,DP has a 1,536-case saved/replayed gate for all 512 DP values,
+retained extension/source and zero-gap consumer forwarding. The original
+`46f8 007f` at `02:6d2b` also executes. The current frontier is MVDM
+`7212 b6be` at `02:df9b`, live PC `02:df9d`, copying absolute data into
+AR2. Full CPU conformance, native 5110 save-state restoration and the
+isolated profile gates pass with these admissions; repeated mapped
+READA and other control destinations remain excluded. This is not full
+board boot or native speech.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

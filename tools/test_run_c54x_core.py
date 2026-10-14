@@ -4,10 +4,49 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
                                 BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION,
                                 BUS_IO_REQUIRED, BUS_IO_COMPLETION,
                                 ATOMIC_IO_REQUIRED, ATOMIC_IO_COMPLETION,
-                                COMPOSE_REQUIRED, COMPOSE_COMPLETION)
+                                COMPOSE_REQUIRED, COMPOSE_COMPLETION,
+                                BUS_STM_REQUIRED, BUS_STM_COMPLETION,
+                                READ_A_MAPPED_REQUIRED, READ_A_MAPPED_COMPLETION,
+                                DP_ABSOLUTE_REQUIRED, DP_ABSOLUTE_COMPLETION)
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_absolute_dp_scope_is_separate(self):
+        output = DP_ABSOLUTE_REQUIRED + '\n' + DP_ABSOLUTE_COMPLETION + '\n'
+        check_result(output, 3, dp_absolute=True)
+        for bad in (output.replace('pages=512', 'pages=511'),
+                    output.replace('consumer_execute=10', 'consumer_execute=11'),
+                    output.replace('extension_fetches=1', 'extension_fetches=2'),
+                    DP_ABSOLUTE_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, dp_absolute=True)
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
+    def test_mapped_read_a_scope_is_separate(self):
+        output = READ_A_MAPPED_REQUIRED + '\n' + READ_A_MAPPED_COMPLETION + '\n'
+        check_result(output, 3, mapped_read_a=True)
+        for bad in (output.replace('restore=288', 'restore=0'),
+                    output.replace('status_preserved=1', 'status_preserved=0'),
+                    output.replace('silicon_phase_claim=0', 'silicon_phase_claim=1'),
+                    READ_A_MAPPED_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, mapped_read_a=True)
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
+    def test_bus_stm_scope_is_separate(self):
+        output = BUS_STM_REQUIRED + '\n' + BUS_STM_COMPLETION + '\n'
+        check_result(output, 3, bus_stm=True)
+        for bad in (output.replace('publish_clock=8', 'publish_clock=7'),
+                    output.replace('peripheral_extra_clock=1', 'peripheral_extra_clock=0'),
+                    output.replace('destination_reads=0', 'destination_reads=1'),
+                    BUS_STM_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, bus_stm=True)
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
     def test_conflicting_scopes_are_rejected(self):
         output = COMPOSE_REQUIRED + '\n' + COMPOSE_COMPLETION + '\n'
         with self.assertRaises(ValueError):

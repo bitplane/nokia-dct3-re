@@ -3,6 +3,7 @@
 
 // Isolated original MU4 routine execution, not a DA150 or handset boot profile.
 #include "emu.h"
+#include "emuopts.h"
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "machine/nandflash.h"
 #include "tms320c54x_dma.h"
@@ -32,6 +33,9 @@ public:
 		m_cpu->set_pll_reference_clock(11'995'200);
 		m_cpu->set_follow_clkmd(true);
 		m_cpu->set_reset_clkmd(0);
+		// Only the fail-closed original-firmware diagnostic opts into bus waits.
+		// Program/data bank ownership and physical READY wiring remain unvalidated.
+		if (!strcmp(config.options().bios(), "bootrecstage")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);

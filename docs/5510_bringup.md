@@ -2656,7 +2656,8 @@ side effects, retained literal/address/data despite later changes, timer
 continuity and acknowledgement after the transfer. Input pulses settle
 before same-transaction snapshots; queued scheduler events are not a
 pending CPU interrupt. The original source and handset profiles remain
-unchanged: the profile is still selected only by isolated conformance.
+unchanged: the profile is selected only by isolated conformance and the
+fail-closed MU4 `bootrecstage` original-firmware diagnostic.
 
 Atomic execution now retains I/O transactions and retirement context.
 `run_c54x_core.py --atomic-io` passes 2,880 transfer cases and 2,880
@@ -2667,9 +2668,8 @@ check both three-word literal orders and reject refetch after mutation.
 Base transfer clocks are retained individually rather than charged as
 upfront cycle debt. Selected repeat and delayed/guarded compositions
 have their separate bounded fixture below. The next software target is
-broader regression acceptance and correction of observed timing defects, followed by staged
-bus-register opcode admission with peripheral-access timing and an
-original MU4 control. Program/data bus ownership, physical timing and
+retained MVDM acceptance at the original MU4 frontier.
+Program/data bus ownership, physical timing and
 the remaining pin behavior remain open; neither register nor staged-I/O
 conformance is full bus or boot acceptance.
 Both isolated bus gates, full legacy CPU conformance, native 5110
@@ -2701,8 +2701,7 @@ sequential/delayed continuation. This is a bounded composition matrix,
 not exhaustive support for every repeat/control form or peripheral MMR
 operand. Full legacy CPU conformance and native 5110 save-state restoration
 pass with the integration. The original MU4 audit still matches all
-48,261 program and 3,656 ordinary data words, with the same fail-closed
-`7728` frontier at `02:6d05`; no handset profile has been changed.
+48,261 program and 3,656 ordinary data words; no handset profile has changed.
 Peripheral acceptance uses the ordinary mapped register-window word
 `0030`: both directions retain its additional access clock rather than
 charging an upfront instruction debt. READY eligibility still depends
@@ -2713,6 +2712,53 @@ mode is saved until completion, while PORTW retains the source before
 its pointer modification. This validates that alias and representative
 peripheral timing, not every timer/control-register side effect or
 measured silicon bus phase. Production profile promotion remains separate.
+
+`run_c54x_core.py --bus-stm` accepts 36 cases and save/replays for immediate
+SWWSR, BSCR and SWCR writes: four literals, three destinations and three
+checkpoint positions. The literal is retained despite a later program
+mutation, no destination read occurs, and one masked write publishes at
+clock 8 rather than early DAGEN publication. The extra peripheral clock
+uses the existing saved per-slot wait state. Admission is conditional on
+the C5416-compatible profile; other STM controls remain excluded.
+
+With that profile enabled only on `bootrecstage`, the original MU4 loader
+still matches all audited resident program/data words and executes past
+`7728 7fff` / `7729 8006`. READA `7ef8 000b` at `02:6d12` transfers the
+program word at `02:74b5` into BL. Its six accumulator-word destinations
+are now accepted by `--mapped-read-a`: 288 cases and save/replays across
+direct/absolute forms, four values and two source pages. A changes after
+capture without redirecting the held program read; one write preserves
+untouched accumulator words and status. Repeated mapped destinations,
+other controls and peripheral destinations remain excluded.
+
+Absolute LD Smem,DP `46f8` now shares direct LD's retained sample and
+zero-gap DP forwarding, with one retained address extension and correct
+two-word retirement. `--dp-absolute` tests all 512 DP values across 1,536
+saved/replayed cases: source Read at clock 6, DP Execute at 9 and adjacent
+consumer Execute at 10. Later source/extension mutations cannot redirect
+or resample the transfer. Other indirect memory-to-DP forms remain
+excluded; the absolute fixture uses ordinary RAM, not peripheral input.
+
+The original `46f8 007f` at `02:6d2b` executes and the current stop is
+`7212 b6be` at `02:df9b`, live PC `02:df9d`: MVDM from absolute data
+address `b6be` to AR2. The next contract is retained memory-to-MMR transfer
+and its consumer latency, not a missing DSP peer. The resident-memory
+audit remains exact. Full CPU conformance, native 5110 save-state
+restoration, all seven isolated profile gates and 101 targeted Python
+tests pass with these admissions. Physical program/data bus ownership
+remains unvalidated; this is still not full board boot or native speech.
+
+The next MVDM contract is pinned by SPRU172C 4-110: a two-word,
+two-cycle Class 19A transfer from absolute data address DAR to an MMR,
+without ordinary status-bit changes. Its repeat stream increments DAR
+and has a separate single-cycle steady-state contract; non-repeated
+admission must not imply repeat acceptance. SPRU131G tables 7-7, 7-9
+and 7-13 group MVDM with MVKD for AR, compiler-mode SP and T latency,
+not with MVDK's earlier publication. The existing retained Class 19A
+MVKD path is therefore the candidate implementation boundary. Required
+tests are one owned source literal/read/write, source/destination aliasing,
+saved pre-read/post-read publication, AR consumer gaps, and separate
+compiler-mode SP/T consumers before admitting those destination classes.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
