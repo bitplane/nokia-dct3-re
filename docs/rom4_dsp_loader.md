@@ -3739,12 +3739,27 @@ and two source pages, preserving status and untouched accumulator words.
 The original `7ef8 000b` transfer at `02:6d12` executes. Absolute LD
 Smem,DP has a 1,536-case saved/replayed gate for all 512 DP values,
 retained extension/source and zero-gap consumer forwarding. The original
-`46f8 007f` at `02:6d2b` also executes. The current frontier is MVDM
-`7212 b6be` at `02:df9b`, live PC `02:df9d`, copying absolute data into
-AR2. Full CPU conformance, native 5110 save-state restoration and the
-isolated profile gates pass with these admissions; repeated mapped
-READA and other control destinations remain excluded. This is not full
-board boot or native speech.
+`46f8 007f` at `02:6d2b` also executes. That checkpoint passes full CPU
+conformance, native 5110 restoration and the isolated profile gates.
+Direct MVDM-to-AR now has 1,152 saved/replayed cases for all eight
+registers, RAM/self/other-AR sources and table-7-7 consumer gaps. The
+original `7212 b6be` at `02:df9b` executes. MVDM `7211 b6a8` at
+`02:dfa6` also executes after a separate 576-case branch-delay gate,
+including both outcomes, pending IRQ/NMI and RETE/save/replay. Repeat
+and non-AR MVDM destinations remain excluded. FCALLD `fb82 dfc2` at
+`02:dfaf` has a 243-case saved/replayed gate for caller-fetched delay
+words, stacked PC/XPC and IRQ/NMI return. Delay-slot mapped-XPC read
+visibility is explicitly unvalidated, not inferred from the frame contract.
+The original enters `02:dfc2` and executes absolute MAC Smem,B
+`29f8 0011` at `02:dfc9`. The MAC/MACR/MAS/MASR family has a 73,728-case
+saved/replayed gate for retained memory/T, both accumulators, rounding,
+FRCT/OVM/SMUL/SXM and sticky overflow. The current frontier is MVKD
+`7084 0013` at `02:dfd8`, both delay words of BCD at `02:dfd6`, copying
+AR3 to the RAM word addressed by AR4. Three-word extended delay forms
+remain excluded. Full CPU conformance, native 5110 restoration and all
+four isolated addition profiles pass, with 105 targeted Python tests.
+This is not
+full board boot or native speech.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

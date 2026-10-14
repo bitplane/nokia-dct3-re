@@ -311,9 +311,27 @@ READ_A_MAPPED_REQUIRED = "TMS320C54x mapped READA: PASS cases=288 restore=288 re
 READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA complete"
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
+EXTRA_PROFILES = {
+    "mac-smem": (
+        "TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MAC/MAS complete",
+    ),
+    "far-call-delay": (
+        "TMS320C54x staged FCALLD: PASS cases=243 restore=243 caller_pages=3 target_pages=3 layouts=probe_XPC_STLM,STM,original_NOP_LDM sources=none,IRQ,NMI frame_words=2 complete_delays=2 return_roundtrip=1 xpc_delay_visibility=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed far call complete",
+    ),
+    "mvdm-delay": (
+        "TMS320C54x staged MVDM delay: PASS cases=576 restore=576 registers=8 outcomes=taken,untaken sources=none,IRQ,NMI literal_fetches=2 reads=1 writes=1 interrupt_return=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDM delay complete",
+    ),
+    "mvdm-ar": (
+        "TMS320C54x staged MVDM AR: PASS cases=1152 restore=1152 registers=8 sources=RAM,self_AR,other_AR gaps=0,1 pages=2 literal_fetches=1 reads=1 writes=1 repeat_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDM AR complete",
+    ),
+}
 
 
-def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False):
+def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False, profile=None):
     scopes = [(bus_registers, BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION),
               (bus_io, BUS_IO_REQUIRED, BUS_IO_COMPLETION),
               (atomic_io, ATOMIC_IO_REQUIRED, ATOMIC_IO_COMPLETION),
@@ -322,6 +340,10 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
               (mapped_read_a, READ_A_MAPPED_REQUIRED, READ_A_MAPPED_COMPLETION),
               (dp_absolute, DP_ABSOLUTE_REQUIRED, DP_ABSOLUTE_COMPLETION)]
     selected = [(marker, ending) for enabled, marker, ending in scopes if enabled]
+    if profile is not None:
+        if profile not in EXTRA_PROFILES:
+            raise ValueError(f"unknown isolated profile: {profile}")
+        selected.append(EXTRA_PROFILES[profile])
     if len(selected) > 1:
         raise ValueError("choose one isolated conformance scope")
     if returncode != 3:
@@ -350,8 +372,9 @@ def main():
     parser.add_argument("--bus-stm", action="store_true", help="run staged C5416 bus-control write conformance")
     parser.add_argument("--mapped-read-a", action="store_true", help="run staged mapped-accumulator READA conformance")
     parser.add_argument("--dp-absolute", action="store_true", help="run staged absolute memory-to-DP conformance")
+    parser.add_argument("--profile", choices=sorted(EXTRA_PROFILES), help="run an additional isolated instruction profile")
     args = parser.parse_args()
-    if sum((args.bus_registers, args.bus_io, args.atomic_io, args.compose, args.bus_stm, args.mapped_read_a, args.dp_absolute)) > 1:
+    if sum((args.bus_registers, args.bus_io, args.atomic_io, args.compose, args.bus_stm, args.mapped_read_a, args.dp_absolute, bool(args.profile))) > 1:
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
@@ -374,17 +397,20 @@ def main():
         command.extend(["-bios", "read-a-mapped"])
     if args.dp_absolute:
         command.extend(["-bios", "dp-absolute"])
+    if args.profile:
+        command.extend(["-bios", args.profile])
     print(f"C54x evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose, bus_stm=args.bus_stm, mapped_read_a=args.mapped_read_a, dp_absolute=args.dp_absolute)
+        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose, bus_stm=args.bus_stm, mapped_read_a=args.mapped_read_a, dp_absolute=args.dp_absolute, profile=args.profile)
     except ValueError as error:
         print(f"C54x conformance: FAIL: {error}", file=sys.stderr)
         return 1
-    print("C54x absolute memory DP: PASS (silicon phases unvalidated)" if args.dp_absolute else
+    print(f"C54x {args.profile}: PASS (bounded instruction profile; silicon phases unvalidated)" if args.profile else
+          "C54x absolute memory DP: PASS (silicon phases unvalidated)" if args.dp_absolute else
           "C54x mapped READA: PASS (bounded register forms; silicon phases unvalidated)" if args.mapped_read_a else
           "C54x staged bus STM: PASS (physical mapping unvalidated)" if args.bus_stm else
           "C54x atomic I/O composition: PASS (bounded control forms; physical mapping unvalidated)" if args.compose else

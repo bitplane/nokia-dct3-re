@@ -7,10 +7,64 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
                                 COMPOSE_REQUIRED, COMPOSE_COMPLETION,
                                 BUS_STM_REQUIRED, BUS_STM_COMPLETION,
                                 READ_A_MAPPED_REQUIRED, READ_A_MAPPED_COMPLETION,
-                                DP_ABSOLUTE_REQUIRED, DP_ABSOLUTE_COMPLETION)
+                                DP_ABSOLUTE_REQUIRED, DP_ABSOLUTE_COMPLETION,
+                                EXTRA_PROFILES)
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mac_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mac-smem']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mac-smem')
+        for bad in (output.replace('restore=73728', 'restore=0'),
+                    output.replace('flags=16', 'flags=8'),
+                    output.replace('t_retained=1', 't_retained=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mac-smem')
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
+    def test_delayed_far_call_scope_is_separate(self):
+        marker, ending = EXTRA_PROFILES['far-call-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='far-call-delay')
+        for bad in (output.replace('restore=243', 'restore=0'),
+                    output.replace('complete_delays=2', 'complete_delays=1'),
+                    output.replace('xpc_delay_visibility=unvalidated', 'xpc_delay_visibility=validated'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='far-call-delay')
+        with self.assertRaises(ValueError):
+            check_result(output, 3, profile='mvdm-delay')
+
+    def test_mvdm_delay_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mvdm-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdm-delay')
+        for bad in (output.replace('restore=576', 'restore=0'),
+                    output.replace('outcomes=taken,untaken', 'outcomes=taken'),
+                    output.replace('interrupt_return=1', 'interrupt_return=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdm-delay')
+        with self.assertRaises(ValueError):
+            check_result(output, 3, profile='mvdm-ar')
+
+    def test_extra_mvdm_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mvdm-ar']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdm-ar')
+        for bad in (output.replace('restore=1152', 'restore=0'),
+                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
+                    output.replace('gaps=0,1', 'gaps=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdm-ar')
+        for kwargs in ({}, {'profile': 'unknown'}, {'profile': 'mvdm-ar', 'bus_stm': True}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                check_result(output, 3, **kwargs)
+
     def test_absolute_dp_scope_is_separate(self):
         output = DP_ABSOLUTE_REQUIRED + '\n' + DP_ABSOLUTE_COMPLETION + '\n'
         check_result(output, 3, dp_absolute=True)

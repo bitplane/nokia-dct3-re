@@ -2668,7 +2668,7 @@ check both three-word literal orders and reject refetch after mutation.
 Base transfer clocks are retained individually rather than charged as
 upfront cycle debt. Selected repeat and delayed/guarded compositions
 have their separate bounded fixture below. The next software target is
-retained MVDM acceptance at the original MU4 frontier.
+two-word MVKD branch-delay composition at the original MU4 frontier.
 Program/data bus ownership, physical timing and
 the remaining pin behavior remain open; neither register nor staged-I/O
 conformance is full bus or boot acceptance.
@@ -2739,14 +2739,10 @@ consumer Execute at 10. Later source/extension mutations cannot redirect
 or resample the transfer. Other indirect memory-to-DP forms remain
 excluded; the absolute fixture uses ordinary RAM, not peripheral input.
 
-The original `46f8 007f` at `02:6d2b` executes and the current stop is
-`7212 b6be` at `02:df9b`, live PC `02:df9d`: MVDM from absolute data
-address `b6be` to AR2. The next contract is retained memory-to-MMR transfer
-and its consumer latency, not a missing DSP peer. The resident-memory
-audit remains exact. Full CPU conformance, native 5110 save-state
-restoration, all seven isolated profile gates and 101 targeted Python
-tests pass with these admissions. Physical program/data bus ownership
-remains unvalidated; this is still not full board boot or native speech.
+The original `46f8 007f` at `02:6d2b` executes. The retained-initialization
+checkpoint passes full CPU conformance, native 5110 restoration, seven
+isolated gates and 101 targeted Python tests. Physical program/data bus
+ownership remains unvalidated; this is not full board boot or native speech.
 
 The next MVDM contract is pinned by SPRU172C 4-110: a two-word,
 two-cycle Class 19A transfer from absolute data address DAR to an MMR,
@@ -2759,6 +2755,75 @@ MVKD path is therefore the candidate implementation boundary. Required
 tests are one owned source literal/read/write, source/destination aliasing,
 saved pre-read/post-read publication, AR consumer gaps, and separate
 compiler-mode SP/T consumers before admitting those destination classes.
+
+Direct MVDM destinations AR0..AR7 now share that retained Class 19A path.
+`run_c54x_core.py --profile mvdm-ar` requires 1,152 cases and save/replays:
+eight registers, RAM/self/other-AR sources, four values, zero/one-gap CMPR
+consumers, two execution pages and three snapshot positions. One absolute
+source literal is captured; one source read and one encoded MMR write
+occur at the complete slot's Read clock 6. DP does not select the MMR.
+Later RAM/literal changes cannot alter the owned transfer. Repeat and
+non-AR destination classes remain excluded.
+
+The original `7212 b6be` at `02:df9b` executes. MVDM
+`7211 b6a8` at `02:dfa6` occupies the two delay words following BCD
+`fa47 dfbe` at `02:dfa4`. The diagnostic records `decode_words=2`,
+`control=02dfa4`, `control_words=4` and the branch in Access; live PC is
+`02:dfa3`, not the stopped instruction address. This is a real excluded
+Class 19A delay-slot composition, not a wrong-literal or delay-owner
+inference. `--profile mvdm-delay` now accepts 576 cases and save/replays:
+eight AR destinations, four values, both outcomes of the original ALEQ
+branch family, none/IRQ/NMI and snapshots before/after publication and
+during entry. Branch and MVDM literals are owned separately, the transfer
+publishes once before acknowledgement, and RETE resumes the selected
+continuation with SP restored. Only the direct-AR MVDM form is exempted
+from the long-memory delay exclusion; other Class 19A forms remain
+excluded, and this is not exhaustive acceptance of other control contexts.
+
+That original delay slot executes. `fb82 dfc2`
+at `02:dfaf` is FCALLD to `02:dfc2` in extended-program
+mode. Its two delay words are NOP at `02:dfb1` and LDM AR6,A at
+`02:dfb2`; the return continuation is `02:dfb3`. Its accepted contract
+covers caller-fetched words and stacked PC/XPC ownership across those delays.
+`--profile far-call-delay` accepts 243 cases and save/replays: three
+caller and target pages, three delay layouts, none/IRQ/NMI and three
+snapshot positions. PC after both delay words is stacked before the
+retained caller page; FRET restores both and SP. RETE removes only the
+separate interrupt frame. Layouts cover two one-word operations, one
+two-word STM and the original NOP/LDM pair.
+
+Mapped XPC visibility inside a delay-slot Read is unvalidated. The
+primary instruction text (SPRU172C 4-57/4-58) specifies the stored frame
+and fetched delay words, not that cycle-level read. A caller-2/target-0
+probe observes XPC=0 because the current frontend publishes its speculative
+Fetch page into the shared XPC field. The fixture retains this probe but
+does not assert its value or change global publication to enforce a guess;
+its acceptance marker explicitly excludes that fidelity claim.
+
+The original call enters `02:dfc2`. Its `29f8 0011` at `02:dfc9` is
+absolute MAC Smem,B reading mapped AR1, with T initialized to 3.
+MAC/MACR/MAS/MASR now share arithmetic with the atomic interpreter while
+retaining staged memory and T in Read. The accumulator is consumed at
+Execute, consistent with the existing accumulator-feedback path.
+`--profile mac-smem` tests 73,728 cases and save/replays: four operations,
+both destinations, indirect/absolute RAM and mapped AR1, 64 signed input
+pairs, 16 FRCT/OVM/SMUL/SXM combinations and three checkpoint positions.
+Rounding, product saturation, sticky target overflow, the untouched
+accumulator and absence of T/data republishing are checked. Later source,
+T and extension changes cannot alter the sampled inputs. SQUR's staged
+T side effect and repeat/control-delay MAC forms remain excluded; other
+accumulator-producer compositions need separate acceptance.
+
+The original MAC executes. The current stop is MVKD `7084 0013` at
+`02:dfd8`, copying AR3 to the RAM word addressed by AR4 in both delay
+words of BCD `fa4d dfdd` at `02:dfd6`. The diagnostic records two remaining
+decode words and that control owner; live PC is `02:dfd5`. The next
+contract is the two-word Class 19A data-copy delay, not its three-word
+extended forms. The resident-memory audit remains exact. Full CPU
+conformance, native 5110 save-state restoration, all four new isolated
+profiles, 105 targeted Python tests and evidence validation pass with
+these additions. Full board boot, native speech and the excluded repeat/
+register classes remain unaccepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

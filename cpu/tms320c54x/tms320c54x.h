@@ -163,6 +163,7 @@ private:
 	u64 conditional_subtract(u64 source, u16 memory, bool destination_b);
 	void long_word_arithmetic(u16 op, u16 high, u16 low_word);
 	void accumulator_memory_multiply(u16 op, u16 memory);
+	u64 memory_t_multiply(u16 op, u16 memory, u16 t, u64 source);
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);
 	u32 saturated_store(u64 value) const;
