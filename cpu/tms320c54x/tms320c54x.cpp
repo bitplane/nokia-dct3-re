@@ -879,6 +879,7 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_data_config("data", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_bio_in_cb(*this, 1),
+	m_ready_in_cb(*this, 1),
 	m_xf_out_cb(*this),
 	m_peripheral_clock_stop_cb(*this),
 	m_pll_clock_stop_cb(*this),
@@ -1004,6 +1005,9 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_valid));
 	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
+	save_item(NAME(m_pipeline_io_wait_paid));
+	save_item(NAME(m_pipeline_io_wait_remaining));
+	save_item(NAME(m_pipeline_io_ready_required));
 	save_item(NAME(m_pipeline_intm_protected));
 	save_item(NAME(m_pipeline_direct_status));
 	save_item(NAME(m_pipeline_direct_sp));
@@ -2156,6 +2160,9 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_block_start = m_pipeline_block_end_address = m_pipeline_block_fetch_remaining = 0;
 	m_pipeline_early_write_deferred.fill(false);
 	m_pipeline_peripheral_wait_paid.fill(false);
+	m_pipeline_io_wait_paid.fill(false);
+	m_pipeline_io_wait_remaining = 0;
+	m_pipeline_io_ready_required = false;
 	m_pipeline_intm_protected.fill(false);
 	m_pipeline_direct_status.fill(0);
 	m_pipeline_direct_sp.fill(0);
@@ -2213,6 +2220,31 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	if (m_c5416_bus_profile)
+	{
+		bool const read = m_pipeline_valid[3] && staged_port_read(m_pipeline_word[3]);
+		bool const write = m_pipeline_valid[4] && staged_port_write(m_pipeline_word[4]);
+		if (read && write)
+		{
+			logerror("%s: overlapping staged external I/O arbitration is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (read || write)
+		{
+			unsigned const stage = read ? 3 : 4;
+			if (!m_pipeline_io_wait_paid[stage])
+			{
+				m_pipeline_io_wait_paid[stage] = true;
+				m_pipeline_io_wait_remaining = external_io_wait_states();
+				m_pipeline_io_ready_required = m_pipeline_io_wait_remaining >= 2;
+			}
+			// Hold the retained slot before the actual I/O side effect. Clock
+			// consumers continue; no new interrupt is accepted mid-transfer.
+			if (m_pipeline_io_wait_remaining) { --m_pipeline_io_wait_remaining; return; }
+			if (m_pipeline_io_ready_required && !m_ready_in_cb()) return;
+			m_pipeline_io_ready_required = false;
+		}
+	}
 	if (m_pipeline_repeat_stream)
 	{
 		// ST #lk is not in SPRU131G's single-cycle repeat acceleration table:
@@ -2352,6 +2384,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
 		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
 		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
+		m_pipeline_io_wait_paid[stage] = m_pipeline_io_wait_paid[stage - 1];
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
 		m_pipeline_direct_sp[stage] = m_pipeline_direct_sp[stage - 1];
@@ -2361,6 +2394,7 @@ void tms320c54x_device::pipeline_step()
 	m_pipeline_valid[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
 	m_pipeline_peripheral_wait_paid[0] = false;
+	m_pipeline_io_wait_paid[0] = false;
 	m_pipeline_intm_protected[0] = false;
 	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
 	if (m_pipeline_decode_flush)

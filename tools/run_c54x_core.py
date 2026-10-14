@@ -297,17 +297,20 @@ REQUIRED = [
     "TMS320C54x control disassembler: PASS vectors=48 pages=2"
 ]
 COMPLETION = "Fatal error: TMS320C54x core tests complete"
-BUS_REGISTER_REQUIRED = "TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 io_waits_implemented=0 physical_mapping=unvalidated"
+BUS_REGISTER_REQUIRED = "TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated"
 BUS_REGISTER_COMPLETION = "Fatal error: TMS320C54x isolated C5416 bus registers complete"
+BUS_IO_REQUIRED = "TMS320C54x staged external I/O waits: PASS cases=576 restore=576 software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 atomic_timing=unimplemented physical_mapping=unvalidated"
+BUS_IO_COMPLETION = "Fatal error: TMS320C54x isolated staged external I/O complete"
 
 
-def check_result(text, returncode, *, bus_registers=False):
+def check_result(text, returncode, *, bus_registers=False, bus_io=False):
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit status {returncode}; expected test completion exit 3")
     lines = text.splitlines()
-    completion = BUS_REGISTER_COMPLETION if bus_registers else COMPLETION
-    for marker in [BUS_REGISTER_REQUIRED] if bus_registers else REQUIRED:
-        if sum(line == marker or (not bus_registers and line.startswith(marker + " ")) for line in lines) != 1:
+    completion = BUS_IO_COMPLETION if bus_io else BUS_REGISTER_COMPLETION if bus_registers else COMPLETION
+    required = [BUS_IO_REQUIRED] if bus_io else [BUS_REGISTER_REQUIRED] if bus_registers else REQUIRED
+    for marker in required:
+        if sum(line == marker or (not (bus_registers or bus_io) and line.startswith(marker + " ")) for line in lines) != 1:
             raise ValueError(f"missing or duplicated conformance marker: {marker}")
     if not lines or lines[-1] != completion:
         raise ValueError("missing terminal C54x test completion")
@@ -322,7 +325,10 @@ def main():
     parser.add_argument("--output-root", type=Path, default=Path("tmp"))
     parser.add_argument("--bus-registers", action="store_true",
                         help="run opt-in C5416 register conformance, not bus timing or full core acceptance")
+    parser.add_argument("--bus-io", action="store_true", help="run staged external I/O wait/READY conformance")
     args = parser.parse_args()
+    if args.bus_registers and args.bus_io:
+        parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     command = [str(args.mame.resolve()), "tms54test", "-rompath", str(args.rompath.resolve()),
@@ -332,18 +338,21 @@ def main():
                "-log", "-seconds_to_run", "5"]
     if args.bus_registers:
         command.extend(["-bios", "bus-registers"])
+    if args.bus_io:
+        command.extend(["-bios", "bus-io"])
     print(f"C54x evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, bus_registers=args.bus_registers)
+        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io)
     except ValueError as error:
         print(f"C54x conformance: FAIL: {error}", file=sys.stderr)
         return 1
-    print("C54x conformance: PASS (isolated native run)" if not args.bus_registers else
-          "C54x bus-register conformance: PASS (I/O waits and physical mapping remain unvalidated)")
+    print("C54x staged I/O conformance: PASS (atomic timing and physical mapping unvalidated)" if args.bus_io else
+          "C54x conformance: PASS (isolated native run)" if not args.bus_registers else
+          "C54x bus-register conformance: PASS (registers only, not bus timing)")
     return 0
 
 

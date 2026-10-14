@@ -1,7 +1,8 @@
 import unittest
 
 from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
-                                BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION)
+                                BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION,
+                                BUS_IO_REQUIRED, BUS_IO_COMPLETION)
 
 
 class CoreResultTests(unittest.TestCase):
@@ -10,13 +11,25 @@ class CoreResultTests(unittest.TestCase):
         check_result(output, 3, bus_registers=True)
         with self.assertRaises(ValueError):
             check_result(output, 3)
-        for bad in (output.replace('io_waits_implemented=0', 'io_waits_implemented=1'),
+        for bad in (output.replace('bus_timing_acceptance=0', 'bus_timing_acceptance=1'),
                     output.replace('physical_mapping=unvalidated', 'physical_mapping=validated'),
                     output.replace('encodings=65536', 'encodings=65535'),
                     BUS_REGISTER_REQUIRED + '\n' + output,
                     output + 'late output\n', output.replace(BUS_REGISTER_COMPLETION, COMPLETION)):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, bus_registers=True)
+
+    def test_staged_bus_io_scope_is_separate(self):
+        output = BUS_IO_REQUIRED + '\n' + BUS_IO_COMPLETION + '\n'
+        check_result(output, 3, bus_io=True)
+        for bad in (output.replace('cases=576', 'cases=575'),
+                    output.replace('ready_threshold=2', 'ready_threshold=0'),
+                    output.replace('atomic_timing=unimplemented', 'atomic_timing=validated'),
+                    BUS_IO_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, bus_io=True)
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
 
     def setUp(self):
         self.output = '\n'.join([*REQUIRED, COMPLETION]) + '\n'

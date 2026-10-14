@@ -3717,6 +3717,15 @@ remains independent. No handset selects this register-only profile,
 and staged bus-register opcodes remain fail-closed until waits are paid.
 The profile gate, full legacy CPU suite, native 5110 save-state gate and
 original memory audit pass; MU4 still stops at `7728` (`02:6d05`).
+The isolated staged I/O profile now validates software waits `0..14`,
+READY eligibility after at least two software waits, single read/write
+side effects and saved transaction ownership across 576 replays. Timers
+continue and IRQ/NMI acknowledgement follows the transfer. Whole-pipeline
+stall placement is partial; simultaneous I/O arbitration is fail-closed.
+Atomic timing remains unimplemented, no handset selects the profile,
+and no bus-register opcode is admitted merely to move the frontier.
+Both isolated bus gates, full legacy CPU conformance, native 5110
+save-state restoration and the original memory audit pass on this tree.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

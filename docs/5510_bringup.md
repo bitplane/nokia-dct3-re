@@ -2597,7 +2597,7 @@ re-drive these derived configuration outputs.
 `run_c54x_core.py --bus-registers` requires exhaustive 65,536-encoding
 native register conformance, partial writes, saved-state restoration,
 reset and a logical IRQ with IACKOFF set. Its marker explicitly says
-`io_waits_implemented=0`; it is not a bus-timing or full-core gate.
+`bus_timing_acceptance=0`; it is not a bus-timing or full-core gate.
 The staged SWWSR/BSCR instructions remain unsupported until wait payment
 is integrated. The original resident frontier is therefore unchanged.
 The isolated profile, full legacy CPU suite, native 5110 save-state gate
@@ -2637,10 +2637,35 @@ Implementation requirements:
    ownership. Physical DA150 banks, READY wiring and electrical bus-holder
    behavior remain separate unknowns, not reasons to fake register reads.
 
-The next software question is how to attach the evidenced external-I/O
-wait contract to both CPU execution backends without double reads/writes
-or corrupting timer/interrupt/save-state ownership. No external transaction
-timing is implemented by the contract tool or register-only profile.
+The staged frontend now pays the C5416-compatible external-I/O wait
+component before a PORTR read or PORTW write. It freezes the programmed
+count and READY eligibility at transaction start, retains the existing
+instruction address/source slots, and samples READY only after at least
+two software waits. Zero/one-wait requests ignore READY. While stalled,
+clock consumers continue and new interrupt entry cannot split the
+transfer; its single side effect occurs only when the waits finish.
+The wait counter, eligibility and per-slot payment flags are saved.
+The complete-pipeline stall placement is a declared partial model, not
+a recovered silicon pipeline waveform. Simultaneous read/write I/O bus
+arbitration remains fail-closed rather than guessed.
+
+`run_c54x_core.py --bus-io` requires 576 cases and saved-state replays:
+eight base counts, both SWSM values, both directions, READY held/released,
+no source/IRQ/NMI and three checkpoint positions. It checks single I/O
+side effects, retained literal/address/data despite later changes, timer
+continuity and acknowledgement after the transfer. Input pulses settle
+before same-transaction snapshots; queued scheduler events are not a
+pending CPU interrupt. The original source and handset profiles remain
+unchanged: the profile is still selected only by isolated conformance.
+
+Atomic execution has no external wait integration yet. The next software
+target is its retained I/O transaction boundary, followed by staged
+bus-register opcode admission with peripheral-access timing and an
+original MU4 control. Program/data bus ownership, physical timing and
+the remaining pin behavior remain open; neither register nor staged-I/O
+conformance is full bus or boot acceptance.
+Both isolated bus gates, full legacy CPU conformance, native 5110
+save-state restoration and the unchanged original memory audit pass.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

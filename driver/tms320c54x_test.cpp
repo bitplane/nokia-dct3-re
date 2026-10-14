@@ -9401,6 +9401,45 @@ private:
 		m_phase = 253450; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	struct bus_io_fixture
+	{
+		unsigned waits, first, complete, checkpoint, interrupt;
+		bool write, hold;
+		u16 value;
+	};
+	static bus_io_fixture bus_io_case(unsigned variant)
+	{
+		unsigned const v = variant % 192, waits = (v % 8) * (1 + (v / 8) % 2);
+		bool const hold = (v / 16) % 2, write = (v / 32) % 2;
+		unsigned const first = write ? 7 : 6, complete = first + waits + (hold && waits >= 2 ? 3 : 0);
+		// Input pulses are scheduler-synchronized; save after their delivery settles.
+		return {waits, first, complete, std::array<unsigned, 3>{first - 1, first + 1, complete + 1}[variant / 192], v / 64, write, hold,
+			u16(write || !waits ? 0x1234 : 0xabcd)};
+	}
+	void start_bus_io_test(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = bus_io_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(i, 0xf495); }
+		program.write_word(0x600, f.write ? 0x7581 : 0x7481); program.write_word(0x601, 0x125);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1400);
+		data.write_word(0x1400, 0x1234); m_cpu->space(AS_IO).write_word(0x125, 0x1234);
+		data.write_word(0x28, (variant % 8) << 12); data.write_word(0x2b, (variant / 8) % 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+		m_bus_ready = !f.hold; m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0x125, 0x125, "bus_io_read",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.write && !m_pipeline_operand_reads && word == f.value && m_cpu->pipeline_cycles() == f.complete, "External PORTR samples once after software/READY waits"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_IO).install_write_tap(0x125, 0x125, "bus_io_write",
+			[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.write && !m_pipeline_store_writes && word == f.value && m_cpu->pipeline_cycles() == f.complete, "External PORTW preserves one retained source through waits"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "bus_io_literal",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "External I/O literal is retained across stalls"); ++m_pipeline_extensions_reads; } });
+		m_phase = 253550; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_bus_register_test()
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -9439,6 +9478,7 @@ private:
 	}
 	virtual void machine_start() override
 	{
+		save_item(NAME(m_bus_ready));
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
 		save_item(NAME(m_idle_dma_start));
 		save_item(NAME(m_idle_dma_rate));
@@ -9447,6 +9487,7 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-io")) { start_bus_io_test(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-registers"))
 		{
 			start_bus_register_test(); return;
@@ -34811,9 +34852,48 @@ private:
 			expect(m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && !m_bus_iack_enable,
 				"Disabling the physical IACK output must not suppress logical interrupt acknowledgement");
 			m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 io_waits_implemented=0 physical_mapping=unvalidated\n");
+			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253550)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = bus_io_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged external wait path has no atomic fallback");
+			if (tick == 6 && f.write) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1400, 0xdead); }
+			if (tick == f.first)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x28, 0); m_cpu->space(AS_DATA).write_word(0x2b, 0);
+				m_cpu->space(AS_IO).write_word(0x125, 0xabcd); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1500);
+				if (f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+			}
+			if (f.hold && f.waits >= 2 && tick == f.complete - 1) m_bus_ready = true;
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save external transfer before/during waits or after its side effect");
+			}
+			if (tick == f.complete + 12)
+			{
+				{ auto const disable = machine().disable_side_effects();
+					if ((!f.write && m_cpu->space(AS_DATA).read_word(0x1400) != f.value) || m_pipeline_operand_reads != unsigned(!f.write) || m_pipeline_store_writes != unsigned(f.write) || m_pipeline_extensions_reads != 1 || m_vector_acks != unsigned(bool(f.interrupt)))
+						osd_printf_info("Bus I/O failure: case=%u replay=%u waits=%u write=%u hold=%u irq=%u ram=%04x expected=%04x reads=%u writes=%u literals=%u acks=%u pc=%06x\n", variant, unsigned(m_pipeline_replay), f.waits, unsigned(f.write), unsigned(f.hold), f.interrupt, m_cpu->space(AS_DATA).read_word(0x1400), f.value, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks, unsigned(m_cpu->state_int(STATE_GENPC))); }
+				{ auto const disable = machine().disable_side_effects(); expect((f.write || m_cpu->space(AS_DATA).read_word(0x1400) == f.value) && m_pipeline_operand_reads == unsigned(!f.write) && m_pipeline_store_writes == unsigned(f.write) && m_pipeline_extensions_reads == 1 && m_vector_acks == unsigned(bool(f.interrupt)), "Waited transfer keeps address/data ownership and deferred interrupt delivery"); }
+				unsigned const elapsed = 0xffff - unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM));
+				expect(elapsed >= tick - 1 && elapsed <= tick + 1, "Timer clocks continue during external bus suspension");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained wait/READY state without duplicate I/O"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253560; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 575) { start_bus_io_test(variant + 1); return; }
+				m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+				osd_printf_info("TMS320C54x staged external I/O waits: PASS cases=576 restore=576 software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 atomic_timing=unimplemented physical_mapping=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated staged external I/O complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253560) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253550; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
 			unsigned const frame = (m_phase - 72000) / 2;
@@ -35300,6 +35380,7 @@ private:
 	unsigned m_fast_stack_reads = 0;
 	u8 m_bus_divisor = 0;
 	bool m_bus_iack_enable = false;
+	bool m_bus_ready = true;
 	unsigned m_fast_return_case = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
@@ -35337,10 +35418,12 @@ void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
-	if (!strcmp(config.options().bios(), "bus-registers")) m_cpu->set_c5416_bus_profile(true);
+	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io")) m_cpu->set_c5416_bus_profile(true);
+	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
 		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253510)
 		{
@@ -35905,6 +35988,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(10, "long-mvkd", "Staged long-offset MVKD conformance")
 	ROM_SYSTEM_BIOS(11, "imr-store", "Staged immediate IMR write and pending interrupts")
 	ROM_SYSTEM_BIOS(12, "bus-registers", "C5416-compatible external-bus register conformance")
+	ROM_SYSTEM_BIOS(13, "bus-io", "Staged external I/O waits and READY conformance")
 ROM_END
 
 ROM_START(tms54rom4)

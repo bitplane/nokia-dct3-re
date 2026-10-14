@@ -19,13 +19,14 @@ public:
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
 	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
-	// Register-level compatibility only; external wait payment is not implemented.
+	// Opt-in compatibility; staged I/O waits are modeled, atomic timing is pending.
 	void set_c5416_bus_profile(bool enabled) { m_c5416_bus_profile = enabled; }
 	unsigned external_io_wait_states() const { return m_c5416_bus_profile ? ((m_swwsr >> 12) & 7) * (1 + (m_swcr & 1)) : 0; }
 	unsigned clkout_divisor() const { return m_c5416_bus_profile ? 1 + ((m_bscr >> 13) & 3) : 1; }
 	bool iack_output_enabled() const { return m_c5416_bus_profile && !(m_bscr & 0x1000); }
 	auto clkout_divisor_cb() { return m_clkout_divisor_cb.bind(); }
 	auto iack_enable_cb() { return m_iack_enable_cb.bind(); }
+	auto ready_in_cb() { return m_ready_in_cb.bind(); }
 	// Experimental stage-owned frontend; unsupported instruction forms stop,
 	// rather than falling back to instruction-boundary interrupt recognition.
 	void set_pipeline_frontend(bool enabled);
@@ -170,6 +171,7 @@ private:
 	address_space_config m_data_config;
 	address_space_config m_io_config;
 	devcb_read_line m_bio_in_cb;
+	devcb_read_line m_ready_in_cb;
 	devcb_write_line m_xf_out_cb;
 	bool m_xf_level = true;
 	devcb_write_line m_peripheral_clock_stop_cb;
@@ -280,6 +282,9 @@ private:
 	u32 m_pipeline_block_fetch_remaining = 0;
 	std::array<bool, 6> m_pipeline_early_write_deferred = {};
 	std::array<bool, 6> m_pipeline_peripheral_wait_paid = {};
+	std::array<bool, 6> m_pipeline_io_wait_paid = {};
+	u8 m_pipeline_io_wait_remaining = 0;
+	bool m_pipeline_io_ready_required = false;
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};
