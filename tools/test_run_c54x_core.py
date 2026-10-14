@@ -12,6 +12,54 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_stlm_imr_scope(self):
+        marker, ending = EXTRA_PROFILES['stlm-imr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stlm-imr')
+        for bad in (output.replace('restore=9216', 'restore=0'),
+                    output.replace('accumulators=2', 'accumulators=1'),
+                    output.replace('source_execute_live=1', 'source_execute_live=0'),
+                    output.replace('destination_reads=0', 'destination_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stlm-imr')
+
+    def test_mcbsp_control_scope(self):
+        marker, ending = EXTRA_PROFILES['mcbsp-control']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mcbsp-control')
+        for bad in (output.replace('restore=16', 'restore=0'),
+                    output.replace('busy_after_read=1', 'busy_after_read=0'),
+                    output.replace('device_reset=1', 'device_reset=0'),
+                    output.replace('physical_mapping=unvalidated', 'physical_mapping=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mcbsp-control')
+
+    def test_long_peripheral_rmw_scope(self):
+        marker, ending = EXTRA_PROFILES['rmw-long-periph']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rmw-long-periph')
+        for bad in (output.replace('restore=368640', 'restore=0'),
+                    output.replace('double_charge=0', 'double_charge=1'),
+                    output.replace('ram_extra=0', 'ram_extra=1'),
+                    output.replace('device_semantics=unvalidated', 'device_semantics=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rmw-long-periph')
+
+    def test_long_peripheral_store_scope(self):
+        marker, ending = EXTRA_PROFILES['st-long-periph']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='st-long-periph')
+        for bad in (output.replace('restore=6144', 'restore=0'),
+                    output.replace('ram_extra=0', 'ram_extra=1'),
+                    output.replace('peripheral_extra=1', 'peripheral_extra=0'),
+                    output.replace('device_semantics=unvalidated', 'device_semantics=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='st-long-periph')
+
     def test_preincrement_immediate_scope(self):
         marker, ending = EXTRA_PROFILES['preinc-st']
         output = marker + '\n' + ending + '\n'

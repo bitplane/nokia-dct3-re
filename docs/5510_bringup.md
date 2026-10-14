@@ -3086,14 +3086,63 @@ replace the retained literal. Single-instruction repeat of this new mode
 and its interrupt cross-products remain unaccepted.
 
 These changes execute the original `809a` at `02:3e1c`, then `771a 007f`
-at `02:98a5` and `769a 0000` at `02:98b1` in the clearing loop. The current
-original stop is `ST #1,*AR1(38)` (`76e1 0038 0001`) at `02:97d9`, live
-PC `02:97df`, with retained destination `0038`. The C5416-compatible register
-map identifies it as McBSP0 SPSA, selecting subbank register 1; the following
-`68e1 0039 fffe` masks SPSD. Validate the store/RMW access and peripheral wait
-contracts rather than assigning a guessed response. The physical DA150
-mapping remains separately unvalidated. The resident memory audit remains
-exact and the six observed serial TX words are unchanged.
+at `02:98a5` and `769a 0000` at `02:98b1` in the clearing loop.
+
+Long-offset immediate ST now admits peripheral destinations `20..5f`,
+while low CPU-control destinations remain excluded from that form. The
+`st-long-periph` gate passes 6,144 cases/restores across eight AR selectors,
+offset/preincrement forms, four values, both CMPT states, offsets 3b/38/49,
+RAM/peripheral spans, two pages and four snapshots. Identical offset words
+with different pointer bases distinguish actual peripheral accesses from
+RAM. The captured destination/literals survive pointer and program changes;
+there is one write, no data read and one extra clock only for the resolved
+peripheral address, including replay of the held write.
+
+Long-offset ADDM/ANDM/ORM similarly admit peripheral destinations, with
+low controls and untested short ADDM controls still excluded. The
+`rmw-long-periph` gate passes 368,640 cases/restores: three operations,
+eight AR selectors, offset/preincrement forms, offsets 3b/39/49, both spans,
+eight value pairs/eight status states, both CMPT states, two pages and five
+snapshots (including the paid-wait clock). One captured read and one write
+share the single peripheral extra clock; RAM adds none. Source/pointer and
+program changes after capture cannot alter the result. These are CPU MMIO
+conformance fixtures backed by RAM, not a validation of device side effects.
+
+The original `ST #1,*AR1(38)` (`76e1 0038 0001`) at `02:97d9` now writes
+destination `0038` and the following `68e1 0039 fffe` executes. The
+C5416-compatible map identifies these as McBSP0 SPSA/SPSD; the native
+diagnostic routes them to the McBSP0 device, rather than a fabricated reply.
+The `mcbsp-control` fixture now connects the CPU's 38/39 window to the actual
+McBSP device rather than RAM and executes the six original selector/ANDM
+words. Its 16 cases/restores cover two pages, both SXM states and semantic
+snapshots at partial Decode, selector publication, captured read and reset.
+The device initially exposes XRST/XRDY (`0003`). A DXR write after the CPU
+read makes it busy (`0001`); the CPU must still write the captured masked
+word (`0002`). The device then reports actual transmitter reset (`0000`).
+Selector/read/reset each happen once through replay; CPU accumulators,
+status and AR1 are preserved. This validates the coupled model boundary,
+not the physical DA150 register map or measured silicon phase placement.
+
+`STLM A/B,IMR` is now admitted using the existing Execute-live saturated-
+store path. The `stlm-imr` fixture passes 9,216 cases/restores across both
+accumulators, all 16 IRQ sources, four masks, two prior masks, both INTM
+states, none/IRQ/NMI input, two pages and three snapshots. Changing the
+source at clock five must affect the sole Execute-clock-six write. There
+are no destination reads or extension fetches. Pending-mask enable/clear,
+previously selected interrupt ownership and NMI independence are checked
+alongside restoration. The ISR marker does not perform RETE; this fixture
+does not establish complete ISR return/context behavior or every SST source
+pattern, which require their separate existing/future contracts.
+
+The original now executes `8900` at `02:8b14` and begins McBSP0 stream
+output before stopping at `POPM PMST` (`8a1d`) at `02:8b3b`, live PC
+`02:8b3d`. Observed words before the stop are three zeros and `0480`;
+four `beef` words follow while peripherals continue after the core halt.
+Their source/content and audio meaning remain unvalidated: stream activity
+is not proof of decoded media, native speech or full board boot. Next
+establish PMST restoration, mapping/fetch ownership and interrupt vector
+selection rather than extending the generic pop range blindly. The resident
+memory audit remains exact and the six command serial TX words are unchanged.
 Status acceptance
 is limited to the following
 tested consumer/composition forms, not every status-register interaction.
@@ -3147,14 +3196,13 @@ status field is physically written at the same pipeline stage. Publication,
 consumer sampling and save/replay have separate gates. Special INTM
 following-instruction protection is not assigned to arbitrary full-ST1 writes.
 
-The preincrement/BRC checkpoint passes full CPU conformance (288
-required markers), native 5110 save-state restoration, all 29 isolated
-profiles in `tools/run_c54x_core.py`, 131 targeted Python tests and evidence
+The peripheral/control/IMR checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 33 isolated
+profiles in `tools/run_c54x_core.py`, 135 targeted Python tests and evidence
 validation. The original audit still matches 48,261 program and 3,656
 ordinary data words, with four register-window words excluded. Full
 board boot, native speech and the explicitly excluded instruction or
-producer/interrupt compositions remain unaccepted. Next establish the observed
-long-offset store/RMW peripheral contract; do not
+producer/interrupt compositions remain unaccepted; do not
 infer full board boot from this initialization frontier.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR

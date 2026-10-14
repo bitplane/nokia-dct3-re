@@ -312,6 +312,22 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "stlm-imr": (
+        "TMS320C54x staged STLM IMR: PASS cases=9216 restore=9216 accumulators=2 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 snapshots=3 source_execute_live=1 writes_each=1 destination_reads=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM IMR complete",
+    ),
+    "mcbsp-control": (
+        "TMS320C54x staged McBSP control: PASS cases=16 restore=16 pages=2 sxm_states=2 snapshots=4 selector_writes=1 status_reads=1 reset_writes=1 captured_ready=1 busy_after_read=1 device_reset=1 physical_mapping=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated McBSP control complete",
+    ),
+    "rmw-long-periph": (
+        "TMS320C54x staged long peripheral RMW: PASS cases=368640 restore=368640 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated long peripheral RMW complete",
+    ),
+    "st-long-periph": (
+        "TMS320C54x staged long peripheral ST: PASS cases=6144 restore=6144 registers=8 forms=offset,preincrement values=4 compatibility=2 offsets=3b,38,49 spans=peripheral,RAM pages=2 snapshots=4 literal_fetches=2 reads=0 writes=1 peripheral_extra=1 ram_extra=0 address_retained=1 device_semantics=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated long peripheral ST complete",
+    ),
     "preinc-st": (
         "TMS320C54x staged preincrement ST: PASS cases=1536 restore=1536 registers=8 literals=4 sst_sxm=4 compatibility=2 pages=2 snapshots=3 literal_fetches=1 reads=0 writes=1 pointer_updates=1 wrap_imr=1 source_literal_retained=1 single_repeat_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated preincrement ST complete",

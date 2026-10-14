@@ -309,7 +309,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) == 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x1a);
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x1a);
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -3102,7 +3102,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged long-offset LD control/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (extended_rmw && m_pipeline_operand_address[3] < 0x60)
+		if (extended_rmw && m_pipeline_operand_address[3] < 0x20)
 		{
 			logerror("%s: staged long-offset RMW register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -3112,7 +3112,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < 0x60)
+		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < (extended_rmw ? 0x20 : 0x60))
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -3367,7 +3367,7 @@ void tms320c54x_device::pipeline_step()
 			// Three-word Decode retains the offset separately from its value.
 			// Share address arithmetic with atomic/DST/DSUB, never fetch here.
 			m_pipeline_operand_address[4] = long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_operand_address[4]), 4);
-			if (m_pipeline_operand_address[4] < 0x60)
+			if (m_pipeline_operand_address[4] < 0x20)
 			{
 				logerror("%s: staged long-offset ST register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_operand_address[4]);
 				m_illegal = true; return;

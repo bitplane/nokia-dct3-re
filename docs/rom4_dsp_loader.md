@@ -3807,9 +3807,19 @@ unsigned mapped-load gate, including the adjacent pointer-producing MVDK.
 The preincrement STL/STH subset passes 6,144 save/replays; immediate
 preincrement ST passes 1,536; STM BRC followed immediately by RPTB passes
 30, including count 127. These additions pass the original clearing loop.
-The current original stop is `76e1 0038 0001` at `02:97d9` (live `02:97df`),
-destination `0038` (C5416-compatible McBSP0 SPSA). Physical DA150 mapping
-and the store/RMW peripheral access contract remain unvalidated.
+Long-offset peripheral ST passes 6,144 save/replays; ADDM/ANDM/ORM passes
+368,640, including RAM controls with identical offsets, one peripheral
+extra clock total and captured source/destination ownership. These are RAM-
+backed CPU MMIO conformance tests, not device-side-effect acceptance.
+The original McBSP0 SPSA/SPSD store/mask sequence at `02:97d9..02:97de`
+executes through the real device model. A separate 16-case coupled McBSP
+gate validates selector/read/reset order, volatile XRDY capture and joint
+CPU/device restoration. STLM A/B to IMR passes 9,216 mask/IRQ/NMI replays.
+The current original stop is `8a1d` (POPM PMST) at `02:8b3b`, live `02:8b3d`.
+McBSP0 stream words are now observed, but their source/audio meaning is not
+validated. Physical DA150 mapping and PMST restoration/fetch ownership
+remain open; checkpoint regression for the admitted peripheral/control
+subset passes.
 The earlier zero address is observed, not proof that the pointer lifecycle is correct.
 Adjacent SXM/ASM LD consumers pass 768 save/replay cases; immediately
 following RPTB passes 24, including preservation and final clearing of BRAF.
@@ -3822,10 +3832,10 @@ arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
-Resident program/data memory still matches exactly. The preincrement/BRC
+Resident program/data memory still matches exactly. The peripheral/control/IMR
 checkpoint passes full CPU conformance (288 markers), native
-5110 restoration, all 29 isolated profiles in `run_c54x_core.py`,
-131 targeted Python tests and evidence validation. Excluded instruction
+5110 restoration, all 33 isolated profiles in `run_c54x_core.py`,
+135 targeted Python tests and evidence validation. Excluded instruction
 and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
