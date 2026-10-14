@@ -346,6 +346,9 @@ private:
 	u16 m_pipeline_repeat_sp = 0;
 	u32 m_pipeline_repeat_address = 0;
 	u8 m_pipeline_read_a_wait = 0;
+	bool m_pipeline_acc_call_pending = false;
+	u32 m_pipeline_acc_call_target = 0;
+	bool m_pipeline_cc_pending = false;
 	u32 m_pipeline_read_a_source = 0;
 	u8 m_pipeline_memory_repeat_wait = 0;
 	u32 m_pipeline_repeat_program_source = 0;

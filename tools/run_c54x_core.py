@@ -312,6 +312,42 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "conditional-ret": (
+        "TMS320C54x staged conditional return: PASS cases=64 restore=64 conditions=AEQ,BEQ patterns=4 pages=2 taken_reads=1 data_writes=0 untaken_stack_accesses=0 predicate_retained=1 stack_target_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated conditional return complete",
+    ),
+    "conditional-call": (
+        "TMS320C54x staged conditional call: PASS cases=64 restore=64 conditions=AEQ,BEQ patterns=4 pages=2 literal_fetches=1 taken_frame=1 untaken_stack_accesses=0 predicate_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated conditional call complete",
+    ),
+    "fcala-producer": (
+        "TMS320C54x staged FCALA producer: PASS cases=216 restore=216 producer=DLD accumulators=2 gaps=0,1,2 caller_pages=3 target_pages=3 ram_reads=2 target_retained=1 frame_roundtrip=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated FCALA producer complete",
+    ),
+    "fcala": (
+        "TMS320C54x staged FCALA: PASS cases=216 restore=216 accumulators=2 caller_pages=3 target_pages=3 target_sample=5 stack_writes=5,6 target_fetch=8 callee_execute=12 sources=none,IRQ,NMI frame_roundtrip=1 producer_latency=unvalidated irq_composition=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated staged FCALA complete",
+    ),
+    "far-atomic": (
+        "TMS320C54x atomic far transfers: PASS encodings=16 caller_page=1 target_page=2 call_return_frame=1 delayed_target_retained=1 staged_acceptance=0 save_replay=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated atomic far transfers complete",
+    ),
+    "bitf-peripheral": (
+        "TMS320C54x staged peripheral BITF: PASS cases=384 restore=384 forms=offset,absolute pages=2 conditions=TC,NTC source_read=8 tc_publish=9 target_fetch=11 reads=1 destination_writes=0 peripheral_extra_clock=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated peripheral BITF complete",
+    ),
+    "t-peripheral": (
+        "TMS320C54x staged peripheral T/TRN store: PASS cases=864 restore=864 sources=T,TRN producer=STLM gaps=0,1,2 forms=indirect,postincrement destinations=3b,48,49 pages=2 destination_reads=0 writes=1 peripheral_extra_clock=1 pointer_updates=once silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated peripheral T/TRN store complete",
+    ),
+    "mvkd-peripheral": (
+        "TMS320C54x staged peripheral MVKD: PASS cases=648 restore=648 sources=AR,BK,RAM forms=indirect,postincrement,absolute destinations=3b,48,49 pages=2 reads=1 writes=1 peripheral_extra_clock=1 pointer_updates=once bk_producer_latency=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated peripheral MVKD complete",
+    ),
+    "cmpm-absolute": (
+        "TMS320C54x staged absolute CMPM: PASS cases=96 restore=96 source=RAM conditions=TC,NTC initial_tc=2 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated absolute CMPM complete",
+    ),
     "ifr-pair": (
         "TMS320C54x staged IFR pair: PASS cases=96 restore=96 accumulators=2 patterns=4 pending_only=1 late_irq=1 accepted_irq=1 nmi=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated IFR pair complete",
@@ -361,6 +397,8 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit status {returncode}; expected test completion exit 3")
     lines = text.splitlines()
+    if "Errors:" in lines:
+        raise ValueError("MAME reported driver validity errors")
     required, completion = ([selected[0][0]], selected[0][1]) if selected else (REQUIRED, COMPLETION)
     for marker in required:
         if sum(line == marker or (not selected and line.startswith(marker + " ")) for line in lines) != 1:

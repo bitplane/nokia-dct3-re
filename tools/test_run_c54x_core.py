@@ -12,6 +12,119 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_driver_validity_errors_reject_pass_marker(self):
+        marker, ending = EXTRA_PROFILES['conditional-ret']
+        output = ('Driver tms54test (file tms320c54x_test.cpp): 1 errors, 0 warnings\n'
+                  'Errors:\n   BIOS name exceeds maximum 16 characters\n' +
+                  marker + '\n' + ending + '\n')
+        with self.assertRaisesRegex(ValueError, 'validity errors'):
+            check_result(output, 3, profile='conditional-ret')
+
+    def test_conditional_return_scope(self):
+        marker, ending = EXTRA_PROFILES['conditional-ret']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='conditional-ret')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('untaken_stack_accesses=0', 'untaken_stack_accesses=1'),
+                    output.replace('stack_target_retained=1', 'stack_target_retained=0'),
+                    output.replace('delayed_acceptance=0', 'delayed_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='conditional-ret')
+
+    def test_conditional_call_scope(self):
+        marker, ending = EXTRA_PROFILES['conditional-call']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='conditional-call')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('untaken_stack_accesses=0', 'untaken_stack_accesses=1'),
+                    output.replace('predicate_retained=1', 'predicate_retained=0'),
+                    output.replace('delayed_acceptance=0', 'delayed_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='conditional-call')
+
+    def test_fcala_producer_scope(self):
+        marker, ending = EXTRA_PROFILES['fcala-producer']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='fcala-producer')
+        for bad in (output.replace('restore=216', 'restore=0'),
+                    output.replace('ram_reads=2', 'ram_reads=1'),
+                    output.replace('target_retained=1', 'target_retained=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='fcala-producer')
+
+    def test_staged_fcala_scope(self):
+        marker, ending = EXTRA_PROFILES['fcala']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='fcala')
+        for bad in (output.replace('restore=216', 'restore=0'),
+                    output.replace('callee_execute=12', 'callee_execute=11'),
+                    output.replace('stack_writes=5,6', 'stack_writes=5,5'),
+                    output.replace('producer_latency=unvalidated', 'producer_latency=1'),
+                    output.replace('irq_composition=1', 'irq_composition=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='fcala')
+
+    def test_atomic_far_reference_scope(self):
+        marker, ending = EXTRA_PROFILES['far-atomic']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='far-atomic')
+        for bad in (output.replace('encodings=16', 'encodings=1'),
+                    output.replace('staged_acceptance=0', 'staged_acceptance=1'),
+                    output.replace('save_replay=0', 'save_replay=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='far-atomic')
+
+    def test_bitf_peripheral_read_contract(self):
+        marker, ending = EXTRA_PROFILES['bitf-peripheral']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='bitf-peripheral')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('peripheral_extra_clock=1', 'peripheral_extra_clock=0'),
+                    output.replace('reads=1', 'reads=2'),
+                    output.replace('tc_publish=9', 'tc_publish=8'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='bitf-peripheral')
+
+    def test_t_peripheral_producer_contract(self):
+        marker, ending = EXTRA_PROFILES['t-peripheral']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='t-peripheral')
+        for bad in (output.replace('restore=864', 'restore=0'),
+                    output.replace('peripheral_extra_clock=1', 'peripheral_extra_clock=0'),
+                    output.replace('destination_reads=0', 'destination_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='t-peripheral')
+
+    def test_mvkd_peripheral_contract(self):
+        marker, ending = EXTRA_PROFILES['mvkd-peripheral']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvkd-peripheral')
+        for bad in (output.replace('restore=648', 'restore=0'),
+                    output.replace('bk_producer_latency=unvalidated', 'bk_producer_latency=1'),
+                    output.replace('peripheral_extra_clock=1', 'peripheral_extra_clock=0'),
+                    output.replace('writes=1', 'writes=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvkd-peripheral')
+
+    def test_cmpm_absolute_scope(self):
+        marker, ending = EXTRA_PROFILES['cmpm-absolute']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='cmpm-absolute')
+        for bad in (output.replace('restore=96', 'restore=0'),
+                    output.replace('source_read=7', 'source_read=6'),
+                    output.replace('data_writes=0', 'data_writes=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='cmpm-absolute')
+
     def test_ifr_pair_scope_is_explicit(self):
         marker, ending = EXTRA_PROFILES['ifr-pair']
         output = marker + '\n' + ending + '\n'

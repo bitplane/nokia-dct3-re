@@ -3764,13 +3764,42 @@ The original returns to the init spine and executes STLM A,IFR `8801`
 at `02:6d3f`, immediately following LDM IFR,A. The isolated pair gate
 passes 96 cases/restores: sampled flags, late physical IRQ, selected IRQ
 whose flag is cleared, independent NMI, and RETE stack restoration. The
-current original stop is `60f8` at `02:909c`, live PC `02:909e`, with
-following words `3762 000c`. Resident program/data memory still matches
-exactly. The move/IFR checkpoint passes full CPU conformance, native
-5110 restoration and all seven isolated move/call/MAC/IFR profiles,
-with 108 targeted Python tests and evidence validation.
-This is not
-full board boot or native speech.
+absolute CMPM `60f8 3762 000c` at `02:909c` now executes after a 96-case
+retained-extension/source and adjacent TC/NTC branch replay gate.
+Mapped-register CMPM remains excluded; the shared mapped-BITF gate passes.
+MVKD `7082 0010` at `02:8fbd` now copies AR0 through AR2 to McBSP's
+mapped control-data register `0049`, after a 648-case peripheral
+wait/publication/replay gate. The extra peripheral clock precedes a
+single Execute-owned write; DAGEN destinations retain their earlier
+publication path. BK sources now share retained Read ownership and
+post-capture-change replay; adjacent BK-producer latency remains
+unvalidated. T/TRN peripheral stores now pass an 864-case STLM-producer
+and peripheral-publication replay gate. Peripheral BITF now passes
+384 status-read/TC-branch replays with its extra access clock. Original
+`61e1 0001 0002` at `02:9521` polls the McBSP register-1 transmit-ready
+bit through `0049`, following index selection through `0048`. The
+original emits six native serial words and executes FCALA B `f5e7`
+at `02:40ef`. The nondelayed staged prototype
+now passes 216 saved/replayed page/frame round trips with a full-width
+retained accumulator target and two separately owned stack writes.
+IRQ/NMI cannot split the call frame; RETE resumes one callee execution
+and FRET restores the caller. A separate 216-case DLD-producer gate
+validates target publication with gaps 0/1/2 and retained RAM inputs.
+Other producer families and the producer-plus-interrupt cross-product
+remain unvalidated. Nondelayed CC AEQ/BEQ now passes 64 replay cases
+with retained predicates/literals, conditional PC+2 frame publication
+and zero untaken stack accesses. Original `f945 3ff1` executes; the
+conditional return `fc45` also executes after a 64-case AEQ/BEQ
+predicate/pop/target replay gate. Untaken returns have zero stack
+accesses. The current original stop is SUBS `0a39` at `02:3f5a`, live PC
+`02:3f5c`; staged unsigned-memory subtract ownership needs acceptance.
+FCALAD remains excluded.
+Serial output does not prove audio or full board boot.
+Resident program/data memory still matches exactly. The peripheral/
+call/return checkpoint passes full CPU conformance (288 markers), native
+5110 restoration, all 16 isolated profiles in `run_c54x_core.py`,
+118 targeted Python tests and evidence validation. Excluded instruction
+and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

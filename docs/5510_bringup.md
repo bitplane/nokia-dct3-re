@@ -2844,16 +2844,165 @@ SP/BK destination consumers and source-producer gaps need separate coverage.
 
 The original MVMD executes and returns to the initialization spine. The
 LDM IFR,A `4801` / STLM A,IFR `8801` pair at `02:6d3e..6d3f` now executes
-after the interrupt-register acceptance below. The current stop is
-`60f8` at `02:909c`, live PC `02:909e`; original following words are
-`3762 000c`. Its instruction/address ownership contract remains to be
-decoded for staged acceptance. SPRU172C page 4-33 identifies `60f8` as
+after the interrupt-register acceptance below. Absolute CMPM `60f8`
+at `02:909c` now executes with following words `3762 000c`.
+SPRU172C page 4-33 identifies `60f8` as
 absolute CMPM: the address extension `3762` precedes the comparison
 constant `000c`. It reads a 16-bit source and sets TC on equality, without
 a destination write. The absolute form adds one word and one cycle to
 the two-word/two-cycle base instruction. A retained source/address/literal
-fixture and adjacent TC-consumer coverage are required, not an RMW gate.
-The resident memory audit remains exact.
+fixture and adjacent TC-consumer coverage are supplied by the isolated
+`cmpm-absolute` profile: 96 cases/restores cover equal/unequal sources,
+both initial TC states and TC/NTC branches. The address and immediate
+fetch exactly once in order; later program/source changes cannot alter
+the retained comparison. Read occurs at clock 7, TC publishes at 8, and
+a taken adjacent branch fetches its target at 10. Both accumulators and
+the non-TC status bits are preserved. Mapped-register sources remain
+excluded. The shared mapped-BITF gate still passes 13,824 cases/restores.
+
+The original selects the high-rate PLL clock and executes MVKD
+`7082 0010` at `02:8fbd`: source `0010` (AR0), destination `0049`
+through AR2. MU4 maps `0048/0049` to the existing McBSP control index/data
+pair. SPRU172C Class 19A (page 3-40) requires one additional cycle for a
+peripheral memory-mapped access. Peripheral destinations now publish in
+Execute after that extra clock, rather than using the early Read-stage
+DAGEN-register write. The retained source is not read again during the
+wait. Low control destinations remain excluded.
+
+The `mvkd-peripheral` profile passes 648 cases/restores: AR0/BK/RAM sources,
+indirect/postincrement/absolute destinations `003b/0048/0049`, four
+values, two execution pages and three snapshots around Read/wait/write.
+The source read is at clock 6 (7 for absolute), with publication at 8
+(9 for absolute). Source and extension changes after capture cannot
+alter the transfer; pointers modify once, status/accumulators remain
+unchanged, and the destination is never read. These are CPU bus/replay
+checks, not physical McBSP timing measurements or serial output proof.
+BK reads use the same retained Read-owned source path. Later changes to
+BK cannot alter the transfer; adjacent BK-producer timing is not covered
+by this fixture and remains a separate acceptance requirement.
+
+The original advances beyond the BK-source boundary and executes the
+T store `8c82` at `02:8fed`. Peripheral T/TRN stores use the existing
+Execute-owned source/publication path and pay the extra peripheral clock;
+low CPU-register destinations remain excluded. The `t-peripheral` gate
+passes 864 cases/restores with instruction-driven STLM producers, T/TRN
+sources, gaps 0/1/2, indirect/postincrement addresses `003b/0048/0049`,
+four values, two execution pages and snapshots before the producer,
+during the wait and after publication. Producer writes at clock 6;
+peripheral publication is at 8 plus the gap. No destination reads or
+duplicate writes occur, and status/accumulators are preserved. This
+tests the admitted short store composition, not every possible producer.
+
+Original words `61e1 0001 0002` at `02:9521` now execute and test an
+AR1-plus-one source with mask `0002`. The preceding `7711 0048` and
+`7681 0001` select McBSP control register 1 through the `0048/0049`
+index/data pair. The existing McBSP register-1 read exposes transmit
+ready in bit 1. BITF now participates in the peripheral-read wait path.
+The `bitf-peripheral` gate passes 384 cases/restores with long-offset and
+absolute addressing, two execution pages, both initial TC states and
+TC/NTC branches. It samples the source once at clock 8, publishes TC at
+9 and fetches a taken adjacent branch target at 11. Changing peripheral
+status after Read cannot change the result. No destination write occurs.
+These clock positions describe the executable partial pipeline model,
+not measured silicon bus phases.
+
+The original emits six native McBSP TX words (`0c10 0818 0a01 0e53 1023
+1201`). FCALA B `f5e7` at `02:40ef` now executes in the original run
+after the frame, interrupt and producer gates below. SPRU172C
+page 4-55 identifies this as nondelayed FCALA B: push PC+1 and caller
+XPC, then load PC from B[15:0] and XPC from B[22:16], with no status
+change. It is a one-word/six-cycle Class 30B instruction and cannot be
+repeated or placed in a block repeat. Retained accumulator target,
+caller-page/return-frame ownership, producer timing, interrupts and
+save/replay require executable acceptance. Serial word output
+alone does not prove board boot, recorder readiness or audio.
+
+FCALA/FCALAD are already implemented by the atomic extended-transfer
+decoder `(op & 0xfcfe) == 0xf4e6`; the disassembler recognizes that
+family too. This is a staged-frontend gap, not an absent atomic opcode.
+The isolated `far-atomic` gate passes all 16 existing branch/call/return
+encodings, including A/B accumulator calls and delayed forms, from caller
+page 1 to target page 2. It verifies return frames, caller continuation,
+delay-word execution and target retention. It explicitly claims no
+staged acceptance, save/replay or silicon phase validation. Its setup
+initializes PMST, timer and interrupt controls rather than inheriting the
+full suite's preceding fixture state.
+
+The nondelayed staged prototype owns one instruction word, PC+1, a
+saved 23-bit accumulator target and the Class 30B six-cycle cadence.
+The generic operand slots are 16-bit and cannot hold that full target.
+A front-end barrier prevents younger sequential instructions from
+entering while target and frame ownership settle. Caller XPC comes
+from the retained instruction page, not target prefetch. The two stack
+writes have distinct saved ownership. The isolated `fcala` profile
+passes 216 cases/restores: both accumulators, caller pages 0/2/7f, target
+pages 0/3/7f, ignored high accumulator bits, post-sample source changes
+and four snapshots around target/frame publication, with no interrupt,
+IRQ or independent NMI. Target sampling is
+at clock 5; return PC and caller XPC publish at 5 and 6; target Prefetch
+is at 7, Fetch at 8 and first callee Execute at 12. FRET restores SP and
+the caller continuation, without duplicate frame accesses or changes
+to the unselected accumulator or non-INTM status. IRQ/NMI arrival during
+frame construction is acknowledged only after both call words publish.
+Its stack word is above the complete call frame, RETE removes only that
+word and resumes the target, and the callee executes once before FRET.
+The interrupted target has one initial Fetch and one legitimate return
+refetch. Interrupted snapshots allow the queued line pulse to settle
+before saving. These are declared partial pipeline placements, not
+measured silicon phases. The separate `fcala-producer` gate passes 216
+cases/restores with DLD building an A/B target from two RAM words, gaps
+0/1/2, nine caller/target page pairs and four snapshots. DLD samples
+its pair at clock 5; later RAM changes cannot change its publication,
+and post-FCALA-sample accumulator changes cannot change the call target.
+Zero-gap FCALA samples after older DLD Execute publication in the same
+clock. This validates that producer family, not every accumulator
+producer or a combined DLD-plus-interrupt cross-product. FCALAD is
+not admitted. The atomic, FCALLD and IFR reference gates still pass.
+SPRU172C page 4-55's
+detailed operation pushes return PC then XPC; SPRU131G section 6.4.3's
+short prose reverses their mention order and must not override the
+instruction operation or the tested FRET frame layout.
+
+CC `f945 3ff1` at `02:3f3c` now executes. Nondelayed AEQ/BEQ calls
+retain the branch predicate and target, then pay Class 31B's additional
+clock on both paths. Only a taken call allocates SP, publishes PC+2
+and updates RTN. The `conditional-call` gate passes 64 cases/restores:
+A/B predicates, four 40-bit patterns including guard-bit-only nonzero,
+two pages and snapshots around decision/held-clock/publication. Later
+literal and accumulator changes cannot change the retained outcome.
+The taken frame writes at clock 7 and target Fetch follows at 8; RET
+restores the caller. Untaken cases check unchanged SP on every clock,
+with no stack reads or writes. Both cases preserve accumulators and
+status. CCD, other condition groups, adjacent producer and IRQ/NMI
+composition remain unaccepted. The atomic core's broader CC/CCD family
+is unchanged.
+
+Conditional return `fc45` at `02:3f41` now executes. The
+`conditional-ret` gate passes 64 cases/restores for nondelayed AEQ/BEQ,
+four 40-bit patterns, two pages and four snapshots. Access samples the
+predicate before a conditional SP increment. Only a taken return reads
+its captured stack address at clock 5; later stack-word changes cannot
+change the return target. Untaken returns preserve SP on every clock
+and never read or write data memory. Accumulators, non-INTM status and
+INTM are preserved. RCD, other condition groups, adjacent producers and
+IRQ/NMI composition remain unaccepted.
+
+The isolated runner rejects MAME driver-validity `Errors:` output even
+when the conformance marker and intentional completion exit are present.
+BIOS identifiers must fit MAME's 16-character limit; a passing CPU
+fixture cannot substitute for a valid driver definition.
+
+The current original stop is SUBS `0a39` at `02:3f5a`, live PC
+`02:3f5c`. The atomic core identifies the unsigned-memory subtract
+family, but staged source/address/arithmetic ownership needs acceptance.
+The peripheral/call/return checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 16 isolated
+profiles in `tools/run_c54x_core.py`, 118 targeted Python tests and evidence
+validation. The original audit still matches 48,261 program and 3,656
+ordinary data words, with four register-window words excluded. Full
+board boot, native speech and the explicitly excluded instruction or
+producer/interrupt compositions remain unaccepted. SUBS is the next
+staged extension, not a resolved boundary.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR
 contents back to IFR as clearing all pending interrupts. The observed
@@ -2881,15 +3030,9 @@ bit; NMI is not cancelled by IFR clearance. All 96 cases and 96 restores
 pass. IMR stays zero in the pending-only and NMI cases. This is executable
 composition coverage, not a claim of measured silicon cycle timing.
 
-The move/IFR checkpoint passes full CPU conformance (288 required
-markers), native 5110 save-state restoration, all seven isolated profiles
-(`mvdm-ar`, `mvdm-delay`, `far-call-delay`, `mac-smem`, `mvkd-delay`,
-`mvmd-ar`, `ifr-pair`), 108 targeted Python tests and evidence validation.
-Full board boot, native speech and the excluded repeat/
-register classes remain unaccepted.
-
-Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
-control/peripheral exclusions. `tms54test -bios mapped-bitf` requires
+Mapped BITF admits AL/AH/AG, BL/BH/BG and T/TRN; other CPU control
+register sources below `0020` remain excluded. Peripheral-read acceptance
+is described above. `tms54test -bios mapped-bitf` requires
 13,824 replay cases: eight register sources, four masks including zero,
 both initial TC states, direct/absolute forms and 1,536 AL-producer cases.
 It captures one source in Read and changes only TC in Execute according
