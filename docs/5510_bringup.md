@@ -3035,10 +3035,36 @@ cases/restores with immediately adjacent RPTB, counts 0/1/2/7, two pages
 and three snapshots. It checks the BRAF update survives status publication,
 then checks every byte-swapped body word and count-plus-one completion.
 
-The original run advances to unsupported `3f83` (`ADD *AR3,16,B,B`)
-at `02:3df3`,
-live PC `02:3df5`; the resident memory audit remains exact and the six
-observed serial TX words are unchanged. Acceptance is limited to the following
+The status checkpoint advanced to `3f83` (`ADD *AR3,16,B,B`) at
+`02:3df3`, live PC `02:3df5`. The memory shift-16 subset now executes
+the Class 3 ADD/SUB family using retained addresses, extensions and source
+words. Its separate `memory-shift16` fixture passes 221,184 cases/restores:
+18 addressing forms, eight AR selectors, all eight operation/source/destination
+selectors, eight arithmetic patterns, four SXM/OVM settings, both CMPT
+states and three snapshots. The reference independently derives signed
+40-bit results, sticky destination overflow and OVM saturation. ADD sets
+C only when a carry occurs; SUB clears it only when a borrow occurs
+(SPRU172C syntax 3, pages 4-5 and 4-188). Other cases retain incoming C.
+RAM is read once; there are no data writes; mapped-register sources remain
+excluded.
+
+Unsigned `LDU *AR2,A` (`1282`) at `02:3dfa` reads source `0000` (IMR),
+after `MVDK *AR2,AR2` at `02:3df8`. LDU now admits IMR via the ordinary
+mapped read path, not a substituted zero. The `ldu-imr` gate passes 384
+cases/restores across direct, absolute, indirect and adjacent MVDK-producer
+forms, four actual IMR values, both SXM states, both accumulators, two pages
+and three snapshots. Each case reads IMR once and retains the unsigned
+result despite later IMR changes. The 96 producer cases check one RAM
+read, one AR2 write and captured address ownership despite subsequent
+pointer changes. All cases preserve status and the unrelated accumulator;
+other newly untested unsigned control/peripheral sources remain excluded.
+These fixtures establish instruction composition, not that the original
+zero-pointer lifecycle is correct; that distinction remains explicit.
+
+The current original stop is `809a` (`STL A,*+AR2`) at `02:3e1c`, live
+PC `02:3e1e`. The resident memory audit remains exact and the six observed
+serial TX words are unchanged. Status acceptance
+is limited to the following
 tested consumer/composition forms, not every status-register interaction.
 The `mvmd-cmpt` fixture initially failed because indirect address selection
 and pointer modification sampled live CMPT. The correction retains CMPT
@@ -3090,15 +3116,15 @@ status field is physically written at the same pipeline stage. Publication,
 consumer sampling and save/replay have separate gates. Special INTM
 following-instruction protection is not assigned to arbitrary full-ST1 writes.
 
-The status/CMPT checkpoint passes full CPU conformance (288
-required markers), native 5110 save-state restoration, all 24 isolated
-profiles in `tools/run_c54x_core.py`, 126 targeted Python tests and evidence
+The shift-16/IMR checkpoint passes full CPU conformance (288
+required markers), native 5110 save-state restoration, all 26 isolated
+profiles in `tools/run_c54x_core.py`, 128 targeted Python tests and evidence
 validation. The original audit still matches 48,261 program and 3,656
 ordinary data words, with four register-window words excluded. Full
 board boot, native speech and the explicitly excluded instruction or
-producer/interrupt compositions remain unaccepted. Next stage the observed
-Class 3 memory ADD shift-16 form; do not infer full board boot from this
-initialization frontier.
+producer/interrupt compositions remain unaccepted. Next establish the
+observed preincrement STL destination and pointer-update ownership; do not
+infer full board boot from this initialization frontier.
 
 TI SPRU131G section 6.10.1 explicitly defines writing the current IFR
 contents back to IFR as clearing all pending interrupts. The observed

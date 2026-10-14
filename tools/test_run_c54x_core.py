@@ -12,6 +12,30 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_ldu_imr_scope(self):
+        marker, ending = EXTRA_PROFILES['ldu-imr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ldu-imr')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('source_retained=1', 'source_retained=0'),
+                    output.replace('imr_reads=1', 'imr_reads=2'),
+                    output.replace('interrupt_composition=unvalidated', 'interrupt_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='ldu-imr')
+
+    def test_memory_shift16_scope(self):
+        marker, ending = EXTRA_PROFILES['memory-shift16']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='memory-shift16')
+        for bad in (output.replace('restore=221184', 'restore=0'),
+                    output.replace('partial_carry=1', 'partial_carry=0'),
+                    output.replace('selectors=8', 'selectors=4'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='memory-shift16')
+
     def test_mvmd_status_irq_scope(self):
         marker, ending = EXTRA_PROFILES['mvmd-status-irq']
         output = marker + '\n' + ending + '\n'

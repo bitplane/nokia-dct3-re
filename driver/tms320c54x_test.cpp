@@ -6999,10 +6999,11 @@ private:
 		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
 		u64 source, result;
 	};
-	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_subtract = false)
+	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_subtract = false, unsigned shift16_selector = 8)
 	{
 		unsigned const form = variant % 18, reg = (variant / 18) % 8, selector = (variant / 144) % 4, pattern = (variant / 576) % 8, flags = (variant / 4608) % 4;
-		bool const compatibility = (variant / 18432) % 2, subtract = unsigned_subtract || (selector & 2), sxm = flags & 1, ovm = flags & 2;
+		bool const shift16 = shift16_selector < 8;
+		bool const compatibility = (variant / 18432) % 2, subtract = shift16 ? bool(shift16_selector & 4) : unsigned_subtract || (selector & 2), sxm = flags & 1, ovm = flags & 2;
 		unsigned const selected = compatibility && !reg ? 3 : reg;
 		u64 const source = std::array<u64, 8>{0, 0xffffffff, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x56783933, 0x80aa001234ULL}[pattern];
 		u16 const memory = std::array<u16, 8>{1, 1, 1, 0xffff, 0x8000, 0xffff, 0x1234, 0xffff}[pattern];
@@ -7014,16 +7015,17 @@ private:
 			form == 17 ? u16(0x1500 + offset) : 0x5007;
 		u16 const next_ar = form < 2 || form == 17 ? 0x5007 : form >= 14 ? (form == 14 ? 0x5007 : address) :
 			std::array<u16, 12>{0x5007, 0x5006, 0x5008, 0x5008, 0, 0, 0xa00e, 0x2803, 0x5006, 0x5000, 0x5008, 0x500e}[form - 2];
-		u16 const st0 = 0x1804 | (compatibility ? 0x6000 : 0) | (pattern & 1 ? 0x600 : 0);
+		u16 const st0 = (shift16 ? 0x1004 | (pattern & 1 ? 0x800 : 0) : 0x1804) | (compatibility ? 0x6000 : 0) | (pattern & 1 ? 0x600 : 0);
 		u16 const st1 = 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compatibility ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
 		u16 result_st0 = compatibility && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
 		s64 const left = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-		s64 const right = sxm && !unsigned_subtract ? s16(memory) : s64(memory), sum = subtract ? left - right : left + right;
+		s64 const right = (sxm && !unsigned_subtract ? s64(s16(memory)) : s64(memory)) * (shift16 ? 65536 : 1), sum = subtract ? left - right : left + right;
 		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
 		bool const carry = subtract ? u32(source) >= u32(right) : u64(u32(source)) + u32(right) > 0xffffffffULL;
-		result_st0 = (result_st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
+		if (!shift16 || carry != subtract) result_st0 = (result_st0 & ~0x800) | (carry ? 0x800 : 0);
+		result_st0 |= overflow ? ((shift16 ? shift16_selector : selector) & 1 ? 0x200 : 0x400) : 0;
 		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
-		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((unsigned_subtract ? 0x0a00 : subtract ? 0x0800 : 0) | ((selector & 1) << 8) | mode),
+		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((shift16 ? (subtract ? 0x4000 : 0x3c00) | ((shift16_selector & 3) << 8) : (unsigned_subtract ? 0x0a00 : subtract ? 0x0800 : 0) | ((selector & 1) << 8)) | mode),
 			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result};
 	}
 	static memory_arithmetic_fixture memory_subs_case(unsigned variant)
@@ -7031,10 +7033,16 @@ private:
 		return memory_arithmetic_case(variant % 144 + (2 + (variant / 144) % 2) * 144 +
 			((variant / 288) % 8) * 576 + ((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432, true);
 	}
+	static memory_arithmetic_fixture memory_shift16_case(unsigned variant)
+	{
+		return memory_arithmetic_case(variant % 144 + ((variant / 1152) % 8) * 576 +
+			((variant / 9216) % 4) * 4608 + ((variant / 36864) % 2) * 18432, false, (variant / 144) % 8);
+	}
 	void start_pipeline_memory_arithmetic(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = !strcmp(machine().options().bios(), "subs") ? memory_subs_case(variant) : memory_arithmetic_case(variant);
+		bool const shift16 = !strcmp(machine().options().bios(), "memory-shift16");
+		auto const f = shift16 ? memory_shift16_case(variant) : !strcmp(machine().options().bios(), "subs") ? memory_subs_case(variant) : memory_arithmetic_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -7045,8 +7053,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, shift16 ? 9 : 8) ? 0x123456789aULL : f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, shift16 ? 9 : 8) ? f.source : 0x123456789aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, f.memory);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -9957,6 +9965,34 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253830;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_ldu_imr(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const form = (variant / 16) % 4, read = form == 3 ? 7 : form == 1 ? 6 : 5;
+		bool const sxm = variant & 4, b = variant & 8;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
+		u32 const base = variant & 64 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		unsigned const prefix = form == 3 ? 2 : 0;
+		if (prefix) { program.write_word(base + 0x600, 0x7182); program.write_word(base + 0x601, 0x12); }
+		program.write_word(base + 0x600 + prefix, 0x1200 | (b ? 0x100 : 0) | (form == 1 ? 0xf8 : form >= 2 ? 0x82 : 0));
+		if (form == 1) program.write_word(base + 0x601, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, sxm ? 0x900 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, value); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcdef1234ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, prefix ? 0x1400 : 0);
+		data.write_word(0x1400, 0);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ldu_imr_read",
+			[this, value, form, read](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0) { expect(!m_pipeline_operand_reads && word == value && m_cpu->pipeline_cycles() == read, "LDU captures the actual IMR value once at its Read clock"); ++m_pipeline_operand_reads; } else { expect(form == 3 && at == 0x1400 && word == 0 && !m_pipeline_register_writes && m_cpu->pipeline_cycles() == 5, "MVDK captures the zero next pointer once from RAM"); ++m_pipeline_register_writes; } });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ldu_imr_pointer",
+			[this, form](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(form == 3 && at == 0x12 && word == 0 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 5, "MVDK publishes the captured pointer before adjacent LDU address generation"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "ldu_imr_extension",
+			[this, form](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || (form != 1 && form != 3)) return; expect(!m_pipeline_extensions_reads && word == (form == 3 ? 0x12 : 0), "Mapped unsigned load composition retains its one extension once"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253910;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_mvmd_status_irq(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -10041,6 +10077,8 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().options().bios(), "ldu-imr")) { start_ldu_imr(); return; }
+		if (!strcmp(machine().options().bios(), "memory-shift16")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-irq")) { start_mvmd_status_irq(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
@@ -34036,8 +34074,9 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const subs = !strcmp(machine().options().bios(), "subs");
-			auto const f = subs ? memory_subs_case(variant) : memory_arithmetic_case(variant);
-			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (subs ? 18432 : 36864)];
+			bool const shift16 = !strcmp(machine().options().bios(), "memory-shift16");
+			auto const f = shift16 ? memory_shift16_case(variant) : subs ? memory_subs_case(variant) : memory_arithmetic_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (shift16 ? 73728 : subs ? 18432 : 36864)];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
 			if (f.form >= 14 && tick == 4)
 			{
@@ -34062,10 +34101,11 @@ private:
 			}
 			if (tick == 18)
 			{
+				u64 const other = shift16 && BIT(f.opcode, 8) != BIT(f.opcode, 9) ? f.source : 0x123456789aULL;
 				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? other : f.result) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : other) &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222,
 					"Memory ADD/SUB uses its retained sample with bit-32 carry, sticky destination overflow and signed OVM saturation");
 				if (!m_pipeline_replay)
@@ -34077,7 +34117,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				if (variant < (shift16 ? 221183 : subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				if (shift16)
+				{
+					osd_printf_info("TMS320C54x staged memory shift16: PASS cases=221184 restore=221184 forms=18 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated memory shift16 complete");
+				}
 				if (subs)
 				{
 					osd_printf_info("TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
@@ -35500,6 +35545,27 @@ private:
 			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253910)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 16) % 4, read = form == 3 ? 7 : form == 1 ? 6 : 5, checkpoint = std::array<unsigned, 3>{3, read - 1, read}[variant / 128];
+			bool const sxm = variant & 4, b = variant & 8; u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped IMR unsigned load remains staged");
+			if (tick == 4 && (form == 1 || form == 3)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((variant & 64 ? 0x20000 : 0) + 0x601, 0xdead); }
+			if (tick == read - 1 && form >= 2) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0, "Adjacent LDU consumes the published zero pointer before later changes"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); }
+			if (tick == read) m_cpu->set_state_int(tms320c54x_device::STATE_IMR, value ^ 0xffff);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped load around pointer and IMR sampling"); }
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(form == 3) && m_pipeline_register_writes == unsigned(form == 3) && m_pipeline_extensions_reads == unsigned(form == 1 || form == 3) && m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0xabcdef1234ULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (value ^ 0xffff) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (sxm ? 0x900 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (form >= 2 ? 0x2222 : 0), "LDU retains actual IMR without sign extension, resampling or extra pointer writes");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped load without rereading changed IMR or pointer"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253920; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_ldu_imr(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged LDU IMR: PASS cases=384 restore=384 forms=direct,absolute,indirect,MVDK values=4 sxm_states=2 accumulators=2 pages=2 snapshots=3 imr_reads=1 producer_reads=1 producer_writes=1 source_retained=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated LDU IMR complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253920) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253910; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253890)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, arrival = std::array<unsigned, 3>{4, 6, 8}[(variant / 32) % 3], checkpoint = std::array<unsigned, 3>{5, 7, 12}[(variant % 288) / 96];
@@ -37216,6 +37282,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(40, "mvmd-block", "Staged full status and adjacent block repeat")
 	ROM_SYSTEM_BIOS(41, "mvmd-cmpt", "Staged full status compatibility-mode consumer latency")
 	ROM_SYSTEM_BIOS(42, "mvmd-status-irq", "Staged full status mask and interrupt composition")
+	ROM_SYSTEM_BIOS(43, "memory-shift16", "Staged memory ADD and SUB shift sixteen")
+	ROM_SYSTEM_BIOS(44, "ldu-imr", "Staged unsigned IMR load and pointer producer")
 ROM_END
 
 ROM_START(tms54rom4)

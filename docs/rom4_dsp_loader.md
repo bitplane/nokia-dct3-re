@@ -3798,7 +3798,14 @@ remain excluded. The pre-status checkpoint stopped at MVMD AL `7308 0007` at
 now passes 288 POPM/mapped-STL producer replays, with mapped-write
 no-conflict ordering and retained source publication. The staged ST1 subset
 passes 288 transfer/replay cases and 16 basic CPL consumer/replay cases;
-the original now stops at unsupported `3f83` at `02:3df3` (live `02:3df5`).
+the original passed `3f83` at `02:3df3` after a separate 221,184-case
+memory ADD/SUB shift-16 gate. That new RAM-only subset covers all eight
+operation/source/destination selectors and the syntax-3 partial carry rule;
+its full checkpoint regression passes. The original's LDU
+`1282` at `02:3dfa` reads actual IMR at `0000` after a separate 384-case
+unsigned mapped-load gate, including the adjacent pointer-producing MVDK.
+The current original stop is `809a` at `02:3e1c` (live `02:3e1e`).
+The earlier zero address is observed, not proof that the pointer lifecycle is correct.
 Adjacent SXM/ASM LD consumers pass 768 save/replay cases; immediately
 following RPTB passes 24, including preservation and final clearing of BRAF.
 Basic CMPT indirect LD/ST passes 16 cases/restores after replacing live-mode
@@ -3810,10 +3817,10 @@ arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
-Resident program/data memory still matches exactly. The status/CMPT
+Resident program/data memory still matches exactly. The shift-16/IMR
 checkpoint passes full CPU conformance (288 markers), native
-5110 restoration, all 24 isolated profiles in `run_c54x_core.py`,
-126 targeted Python tests and evidence validation. Excluded instruction
+5110 restoration, all 26 isolated profiles in `run_c54x_core.py`,
+128 targeted Python tests and evidence validation. Excluded instruction
 and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
