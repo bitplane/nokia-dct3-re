@@ -3155,11 +3155,16 @@ later-branch cases alone do not establish ownership across a PMST publication
 between stages. Before banking full PMST acceptance, test distinct old/new page
 contents across that boundary, retain the stack source despite subsequent
 mutation, and replay around source capture and publication. Interrupt tests
-must distinguish the IPTR value of an already accepted vector from a later
-acceptance. MP/MC and DROM physical-memory decoding remain separate scope;
+must distinguish the accepted interrupt number from IPTR evaluation at the
+later ISR Prefetch. MP/MC and DROM physical-memory decoding remain separate scope;
 passing an OVLY fixture must not certify them. The original restoration
 tail continues with POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`), which require their
 own block-repeat ownership contract rather than a blanket pop-range change.
+For POPM BRC followed by a new RPTB, SPRU131G table 7-24 and example
+7-54(d) require one intervening instruction; STM BRC has zero latency.
+This is distinct from the in-loop BRC-write latency in table 7-25. A
+restoration fixture must separate these cases and independently count loop
+iterations rather than treating a stored BRC value as execution proof.
 
 The bounded `pmst-pop` prototype now passes 64 cases/restores: four values,
 two source pages, lower/upper branch targets and four snapshots. It captures
@@ -3181,10 +3186,24 @@ opcode in the newly selected bank, and saves at clocks 1/2/5/6. Fetch must use
 the original selected bank, including after restoration; subsequent slots
 use the new mapping. This establishes retained slot ownership, not an
 organic firmware transition or every table-7-26 consumer latency. Dedicated
-POPM/IPTR interrupt composition remains outstanding: source acceptance
-captures a logical vector, while `interrupt_entry_step` fetches its word
-later through the current program mapping. Test old/new IPTR and OVLY
-separately before changing that ownership or claiming full PMST fidelity.
+The `pmst-iptr` fixture exposed an early vector-page selection: with a pop
+publishing `PMST=0000` during the foreground drain, the first run executed
+the old vector page's `0066` marker. SPRU131G 7.5.9 and example 7-18 put
+IPTR evaluation at the later ISR Prefetch. The staged core now retains the
+accepted interrupt number but selects its IPTR page there, after older
+Execute publications. The fixture passes 1,024 cases/restores across four
+PMST values, two source pages, all 16 maskable IRQ sources, early/late
+pending latches and snapshots at
+clocks 3/5/6/11. Its old/new vector markers are distinct; the expected
+new-page marker is `0055`. It supplies a controlled CPU pending latch,
+not an asynchronous pin-edge or handset fixture. Both physical banks carry
+the same vector marker, so this checks IPTR, not vector OVLY bank ownership.
+The ISR does not return. A further mapping change between ISR Prefetch and
+Fetch, other interrupt sources and full return composition remain separate
+acceptance work. The full 288-marker core regression passes with this
+correction, as do the 55 verifier tests. A fresh original resident audit
+still matches all 48,261 program and 3,656 data words and stops at POPM REA
+(`02:8b3c`), not a completed board boot.
 
 Status acceptance
 is limited to the following

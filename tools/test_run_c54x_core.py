@@ -12,6 +12,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_pmst_iptr_scope(self):
+        marker, ending = EXTRA_PROFILES['pmst-iptr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pmst-iptr')
+        for bad in (output.replace('restore=1024', 'restore=0'),
+                    output.replace('irq_bits=16', 'irq_bits=1'),
+                    output.replace('vector_prefetch_owned=1', 'vector_prefetch_owned=0'),
+                    output.replace('pending_latch_fixture=1', 'pending_latch_fixture=0'),
+                    output.replace('isr_return_claim=0', 'isr_return_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmst-iptr')
+
     def test_pmst_prefetch_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-prefetch']
         output = marker + '\n' + ending + '\n'

@@ -32,7 +32,12 @@ Prefetch slot in save state, separately from its logical PC. The isolated
 replay. The last deliberately changes debugger PMST state between Prefetch
 and Fetch; it is CPU conformance, not a firmware-ordering fixture. The full
 288-marker core run and native 5110 save-state gate pass. These results do
-not certify all PMST fields or POPM/IPTR interrupt composition. The original
+not certify all PMST fields or full interrupt composition. The `pmst-iptr`
+profile separately passes 1,024 cases/restores across all 16 maskable IRQ
+sources, early/late pending CPU latches, four PMST values and two source
+pages. IPTR is selected at ISR Prefetch after decoded foreground writes,
+while the accepted interrupt number is retained. NMI, ISR return and a
+second OVLY change before vector Fetch are outside this fixture. The original
 MU4 resident now executes POPM PMST and stops at POPM REA (`02:8b3c`),
 with resident loading still exact; see [5510 bring-up](5510_bringup.md)
 for the bounded scope and remaining context-control contract.
@@ -2706,9 +2711,10 @@ around literal assembly, publication and redirection. Changing the fixture
 literal after Fetch must not alter the write. Subsequent lower-bank fetches
 use the new OVLY bit; upper targets stay in their original logical page.
 The full PMST value (including IPTR), XPC, SP and ST1 reproduce without
-duplicate literal fetches or writes. IRQ/IPTR selection across an in-flight
-PMST write and execution already prefetched under another mapping remain
-unvalidated. No native production profile is promoted by these cases.
+duplicate literal fetches or writes. This STM fixture alone does not
+establish IRQ/IPTR selection or prefetch ownership; the isolated PMST
+profiles in the current overlay contract cover their separately stated
+subsets. No native production profile is promoted by these cases.
 
 Short-form MVPD (`7cxx`, destination mode below `98`) retains its absolute
 program-source literal separately from the data destination. Its Read stage

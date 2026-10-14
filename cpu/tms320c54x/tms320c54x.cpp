@@ -3828,6 +3828,9 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (entry_stage == 2)
 	{
+		// SPRU131G 7.5.9 / example 7-18: IPTR is evaluated by vector
+		// Prefetch after decoded foreground publications, not source acceptance.
+		m_interrupt_vector_pc = (m_pmst & 0xff80) | (m_interrupt_vector_pc & 0x7f);
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
 		m_pipeline_flush_front = false;
 	}
