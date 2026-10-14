@@ -955,6 +955,18 @@ void tms320c54x_device::device_start()
 	state_add(STATE_GENPCBASE, "CURPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
 
 	save_item(NAME(m_pc));
+	save_item(NAME(m_atomic_io_pending));
+	save_item(NAME(m_atomic_io_write));
+	save_item(NAME(m_atomic_io_ready_required));
+	save_item(NAME(m_atomic_io_wait_remaining));
+	save_item(NAME(m_atomic_io_address));
+	save_item(NAME(m_atomic_io_port));
+	save_item(NAME(m_atomic_io_value));
+	save_item(NAME(m_atomic_io_instruction_pc));
+	save_item(NAME(m_atomic_io_previous_sp));
+	save_item(NAME(m_atomic_io_repeat_armed));
+	save_item(NAME(m_atomic_io_delayed));
+	save_item(NAME(m_atomic_io_xc_guarded));
 	save_item(NAME(m_xpc));
 	save_item(NAME(m_op));
 	save_item(NAME(m_a));
@@ -1146,6 +1158,9 @@ void tms320c54x_device::device_stop()
 
 void tms320c54x_device::device_reset()
 {
+	m_atomic_io_pending = false;
+	m_atomic_io_wait_remaining = 0;
+	m_atomic_io_ready_required = false;
 	m_pc = 0xff80;
 	m_xpc = 0;
 	m_op = 0;
@@ -4898,9 +4913,19 @@ void tms320c54x_device::execute_one(u16 op)
 			address = prepare_smem_address(low);
 			port = fetch();
 		}
-		data_write(address, m_io.read_word(port));
+		if (m_c5416_bus_profile)
+		{
+			m_atomic_io_pending = true;
+			m_atomic_io_write = false;
+			m_atomic_io_address = address;
+			m_atomic_io_port = port;
+			m_atomic_io_wait_remaining = external_io_wait_states();
+			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
+			m_atomic_io_wait_remaining += low >= 0xe0;
+		}
+		else data_write(address, m_io.read_word(port));
 		finish_smem_access(low);
-		m_icount -= low >= 0xe0 ? 2 : 1;
+		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7500: // PORTW Smem, port
@@ -4918,8 +4943,19 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		const u16 value = data_read(address);
 		finish_smem_access(low);
-		m_io.write_word(port, value);
-		m_icount -= low >= 0xe0 ? 2 : 1;
+		if (m_c5416_bus_profile)
+		{
+			m_atomic_io_pending = true;
+			m_atomic_io_write = true;
+			m_atomic_io_address = address;
+			m_atomic_io_port = port;
+			m_atomic_io_value = value;
+			m_atomic_io_wait_remaining = external_io_wait_states();
+			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
+			m_atomic_io_wait_remaining += low >= 0xe0;
+		}
+		else m_io.write_word(port, value);
+		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem
@@ -5816,6 +5852,34 @@ void tms320c54x_device::execute_one(u16 op)
 	m_illegal = true;
 }
 
+void tms320c54x_device::retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
+	bool repeat_was_armed, bool delayed, bool xc_guarded)
+{
+	update_xf();
+	// Calls/returns use architectural SP, not the stack-operation DAGEN snapshot.
+	m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||
+		((m_op & 0xff00) == 0x4a00) ||
+		((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
+	if (m_sp_address_pending) m_sp_address_base = previous_sp;
+	if (m_illegal) return;
+	if (m_intm_guard) --m_intm_guard;
+	// Count executed words before repeat redirection changes the continuation.
+	const unsigned words = u16(m_pc - instruction_pc);
+	// Repeat setup arms its body; setup retirement must not consume an iteration.
+	if (repeat_was_armed || !m_rpt_armed) finish_repeats();
+	if (delayed)
+	{
+		m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
+		if (!m_delayed_words)
+		{
+			m_pc = m_delayed_target;
+			if (m_delayed_far) m_xpc = m_delayed_xpc;
+			m_delayed_far = false;
+		}
+	}
+	if (xc_guarded) m_xc_guard = words >= m_xc_guard ? 0 : m_xc_guard - words;
+}
+
 void tms320c54x_device::execute_run()
 {
 	while (m_icount > 0)
@@ -5831,6 +5895,21 @@ void tms320c54x_device::execute_run()
 				pipeline_accept_interrupt();
 			}
 			pipeline_step();
+			--m_icount;
+			continue;
+		}
+		if (m_atomic_io_pending)
+		{
+			if (m_atomic_io_wait_remaining)
+				--m_atomic_io_wait_remaining;
+			else if (!m_atomic_io_ready_required || m_ready_in_cb())
+			{
+				if (m_atomic_io_write) m_io.write_word(m_atomic_io_port, m_atomic_io_value);
+				else data_write(m_atomic_io_address, m_io.read_word(m_atomic_io_port));
+				m_atomic_io_pending = false;
+				retire_atomic_instruction(m_atomic_io_instruction_pc, m_atomic_io_previous_sp,
+					m_atomic_io_repeat_armed, m_atomic_io_delayed, m_atomic_io_xc_guarded);
+			}
 			--m_icount;
 			continue;
 		}
@@ -5880,38 +5959,15 @@ void tms320c54x_device::execute_run()
 			++entry->second.count;
 			m_capture_extensions = false;
 		}
-		update_xf();
-		// One-cycle stack-operation group from SPRU131G table 7-9.
-		// Calls/returns use the architectural SP, not this DAGEN snapshot.
-		m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||
-			((m_op & 0xff00) == 0x4a00) ||
-			((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
-		if (m_sp_address_pending) m_sp_address_base = previous_sp;
-		if (!m_illegal)
+		if (m_atomic_io_pending)
 		{
-			if (m_intm_guard)
-				--m_intm_guard;
-			// A repeat redirect is not an executed instruction word. Measure
-			// guard consumption before finish_repeats changes the continuation.
-			const unsigned words = u16(m_pc - instruction_pc);
-			// RPT/RPTZ arms the next instruction; its own retirement must not
-			// consume one of the requested body executions.
-			if (repeat_was_armed || !m_rpt_armed)
-				finish_repeats();
-			if (delayed)
-			{
-				m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
-				if (!m_delayed_words)
-				{
-					m_pc = m_delayed_target;
-					if (m_delayed_far)
-						m_xpc = m_delayed_xpc;
-					m_delayed_far = false;
-				}
-			}
-			if (xc_guarded)
-				m_xc_guard = words >= m_xc_guard ? 0 : m_xc_guard - words;
+			m_atomic_io_instruction_pc = instruction_pc;
+			m_atomic_io_previous_sp = previous_sp;
+			m_atomic_io_repeat_armed = repeat_was_armed;
+			m_atomic_io_delayed = delayed;
+			m_atomic_io_xc_guarded = xc_guarded;
 		}
+		else retire_atomic_instruction(instruction_pc, previous_sp, repeat_was_armed, delayed, xc_guarded);
 		--m_icount;
 	}
 }

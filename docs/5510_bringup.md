@@ -2658,14 +2658,54 @@ before same-transaction snapshots; queued scheduler events are not a
 pending CPU interrupt. The original source and handset profiles remain
 unchanged: the profile is still selected only by isolated conformance.
 
-Atomic execution has no external wait integration yet. The next software
-target is its retained I/O transaction boundary, followed by staged
+Atomic execution now retains I/O transactions and retirement context.
+`run_c54x_core.py --atomic-io` passes 1,728 transfer cases and 1,728
+save/restores across short, long-offset and absolute addressing, with
+the same software-wait, READY, IRQ/NMI and timer matrix. Extension taps
+check both three-word literal orders and reject refetch after mutation.
+Base transfer clocks are retained individually rather than charged as
+upfront cycle debt. Selected repeat and delayed/guarded compositions
+have their separate bounded fixture below. The next software target is
+broader regression acceptance and correction of observed timing defects, followed by staged
 bus-register opcode admission with peripheral-access timing and an
 original MU4 control. Program/data bus ownership, physical timing and
 the remaining pin behavior remain open; neither register nor staged-I/O
 conformance is full bus or boot acceptance.
 Both isolated bus gates, full legacy CPU conformance, native 5110
 save-state restoration and the unchanged original memory audit pass.
+
+The atomic integration must defer retirement as well as the I/O callback.
+`execute_run` currently applies repeat redirects, delayed-word accounting,
+XC protection and INTM-guard consumption immediately after `execute_one`.
+A retained PORTR/PORTW must therefore own the instruction PC, original
+delay/XC eligibility, repeat-armed state and consumed word count until
+completion. Resume a pending transaction before `service_interrupt` or
+another fetch; retire exactly once after its single bus side effect.
+Preserve the existing extension order: long-offset forms fetch the port
+before the address extension, while short/absolute forms prepare the
+address before fetching the port. PORTW also retains its sampled source;
+PORTR retains its destination and must not read the port before READY.
+Pointer modification must occur once, at a documented phase, rather
+than being repeated on each resumed clock. All pending transaction and
+retirement fields require save-state coverage. Acceptance must include
+two/three-word forms, repeated transfers and delayed/guarded followers,
+in addition to the staged gate's wait/READY/IRQ/NMI cases. Subtracting
+extra cycles after an immediate callback does not satisfy this contract.
+
+The isolated `bus-io-compose` fixture additionally tests 24 saved/replayed
+cases: RPT counts 0..3 and read/write transfers, delayed-branch slots and
+RSBX INTM followers, all with seven software waits. It checks one pointer
+update per transfer, deferred IRQ acknowledgement and the stacked
+sequential/delayed continuation. This is a bounded composition matrix,
+not exhaustive support for every repeat/control form or peripheral MMR
+operand. Full legacy CPU conformance and native 5110 save-state restoration
+pass with the integration. The original MU4 audit still matches all
+48,261 program and 3,656 ordinary data words, with the same fail-closed
+`7728` frontier at `02:6d05`; no handset profile has been changed.
+The atomic acceptance operands are ordinary RAM. Control-register alias
+ordering and peripheral-MMR extra clocks need their own coverage before
+this compatibility profile is promoted into a production composition;
+the passing RAM matrix must not be used as evidence for those operands.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

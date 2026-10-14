@@ -2,10 +2,45 @@ import unittest
 
 from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
                                 BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION,
-                                BUS_IO_REQUIRED, BUS_IO_COMPLETION)
+                                BUS_IO_REQUIRED, BUS_IO_COMPLETION,
+                                ATOMIC_IO_REQUIRED, ATOMIC_IO_COMPLETION,
+                                COMPOSE_REQUIRED, COMPOSE_COMPLETION)
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_conflicting_scopes_are_rejected(self):
+        output = COMPOSE_REQUIRED + '\n' + COMPOSE_COMPLETION + '\n'
+        with self.assertRaises(ValueError):
+            check_result(output, 3, compose=True, atomic_io=True)
+
+    def test_composition_scope_is_separate(self):
+        output = COMPOSE_REQUIRED + '\n' + COMPOSE_COMPLETION + '\n'
+        check_result(output, 3, compose=True)
+        for bad in (output.replace('restore=24', 'restore=0'),
+                    output.replace('pointer_updates=once', 'pointer_updates=twice'),
+                    output.replace('interrupt_after_transfer=1', 'interrupt_after_transfer=0'),
+                    COMPOSE_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, compose=True)
+        for kwargs in ({}, {'atomic_io': True}, {'bus_io': True}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                check_result(output, 3, **kwargs)
+
+    def test_atomic_bus_io_scope_is_separate(self):
+        output = ATOMIC_IO_REQUIRED + '\n' + ATOMIC_IO_COMPLETION + '\n'
+        check_result(output, 3, atomic_io=True)
+        for bad in (output.replace('cases=1728', 'cases=576'),
+                    output.replace('forms=short,offset,absolute', 'forms=short'),
+                    output.replace('ready_threshold=2', 'ready_threshold=0'),
+                    output.replace('duplicate_io=0', 'duplicate_io=1'),
+                    output.replace('physical_mapping=unvalidated', 'physical_mapping=validated'),
+                    ATOMIC_IO_REQUIRED + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, atomic_io=True)
+        for kwargs in ({}, {'bus_io': True}, {'bus_registers': True}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                check_result(output, 3, **kwargs)
+
     def test_bus_register_scope_is_separate(self):
         output = BUS_REGISTER_REQUIRED + '\n' + BUS_REGISTER_COMPLETION + '\n'
         check_result(output, 3, bus_registers=True)
@@ -24,7 +59,7 @@ class CoreResultTests(unittest.TestCase):
         check_result(output, 3, bus_io=True)
         for bad in (output.replace('cases=576', 'cases=575'),
                     output.replace('ready_threshold=2', 'ready_threshold=0'),
-                    output.replace('atomic_timing=unimplemented', 'atomic_timing=validated'),
+                    output.replace('atomic_acceptance=separate', 'atomic_acceptance=validated'),
                     BUS_IO_REQUIRED + '\n' + output, output + 'late output\n'):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, bus_io=True)

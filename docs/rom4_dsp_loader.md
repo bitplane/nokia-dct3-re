@@ -3722,10 +3722,16 @@ READY eligibility after at least two software waits, single read/write
 side effects and saved transaction ownership across 576 replays. Timers
 continue and IRQ/NMI acknowledgement follows the transfer. Whole-pipeline
 stall placement is partial; simultaneous I/O arbitration is fail-closed.
-Atomic timing remains unimplemented, no handset selects the profile,
-and no bus-register opcode is admitted merely to move the frontier.
-Both isolated bus gates, full legacy CPU conformance, native 5110
-save-state restoration and the original memory audit pass on this tree.
+The atomic frontend now retains waited I/O and retirement context.
+Its separate gate passes 1,728 saved/replayed cases across short,
+long-offset and absolute addressing. A 24-case composition gate checks
+RPT counts 0..3, delayed branch slots and INTM-protected followers,
+including pointer updates and stacked interrupt continuations.
+These are RAM-operand gates, not control/peripheral-MMR acceptance.
+No handset selects the profile, and no bus-register opcode is admitted
+merely to move the frontier. Full CPU conformance, native 5110 save-state
+restoration and the original MU4 resident-memory audit pass with this
+integration; the original staged frontier remains `7728` at `02:6d05`.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

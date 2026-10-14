@@ -19,7 +19,7 @@ public:
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
 	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
-	// Opt-in compatibility; staged I/O waits are modeled, atomic timing is pending.
+	// Opt-in compatibility; retained I/O has bounded RAM-operand acceptance.
 	void set_c5416_bus_profile(bool enabled) { m_c5416_bus_profile = enabled; }
 	unsigned external_io_wait_states() const { return m_c5416_bus_profile ? ((m_swwsr >> 12) & 7) * (1 + (m_swcr & 1)) : 0; }
 	unsigned clkout_divisor() const { return m_c5416_bus_profile ? 1 + ((m_bscr >> 13) & 3) : 1; }
@@ -140,6 +140,8 @@ private:
 	void dual_modify(u8 operand);
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
+	void retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
+		bool repeat_was_armed, bool delayed, bool xc_guarded);
 	bool service_interrupt();
 	bool accept_interrupt();
 	void interrupt_entry_step();
@@ -258,9 +260,21 @@ private:
 	u8 m_idle_mode = 0;
 	u64 m_idle_timer_ticks = 0;
 	bool m_illegal = false;
-	// Synchronous semantic-call accounting, reset before each instruction.
-	// No partially completed wait is carried across a scheduler/save boundary.
+	// Synchronous peripheral-MMR accounting, reset before each instruction.
 	bool m_peripheral_mmr_access = false;
+	// External I/O owns its saved continuation until the bus transfer retires.
+	bool m_atomic_io_pending = false;
+	bool m_atomic_io_write = false;
+	bool m_atomic_io_ready_required = false;
+	u8 m_atomic_io_wait_remaining = 0;
+	u16 m_atomic_io_address = 0;
+	u16 m_atomic_io_port = 0;
+	u16 m_atomic_io_value = 0;
+	u16 m_atomic_io_instruction_pc = 0;
+	u16 m_atomic_io_previous_sp = 0;
+	bool m_atomic_io_repeat_armed = false;
+	bool m_atomic_io_delayed = false;
+	bool m_atomic_io_xc_guarded = false;
 	bool m_pipeline_frontend = false;
 	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
 	// owned by their slots; no speculative instruction executes at acceptance.
