@@ -12,6 +12,30 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_pop_brc_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['pop-brc']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pop-brc')
+        for bad in (output.replace('restore=30', 'restore=0'),
+                    output.replace('gap_nops=1', 'gap_nops=0'),
+                    output.replace('count_plus_one=1', 'count_plus_one=0'),
+                    output.replace('active_repeat_write_acceptance=0', 'active_repeat_write_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pop-brc')
+
+    def test_repeat_control_pop_scope(self):
+        marker, ending = EXTRA_PROFILES['pop-repeat']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pop-repeat')
+        for bad in (output.replace('restore=192', 'restore=0'),
+                    output.replace('stack_reads=1', 'stack_reads=2'),
+                    output.replace('active_repeat_acceptance=0', 'active_repeat_acceptance=1'),
+                    output.replace('excluded_active=3', 'excluded_active=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pop-repeat')
+
     def test_pmst_iptr_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-iptr']
         output = marker + '\n' + ending + '\n'

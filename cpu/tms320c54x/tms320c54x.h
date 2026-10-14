@@ -70,7 +70,9 @@ public:
 		STATE_RC,
 		STATE_SWWSR,
 		STATE_BSCR,
-		STATE_SWCR
+		STATE_SWCR,
+		STATE_RSA,
+		STATE_REA
 	};
 
 protected:

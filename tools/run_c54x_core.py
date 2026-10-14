@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "pop-brc": (
+        "TMS320C54x staged POPM BRC repeat: PASS cases=30 restore=30 counts=0,1,2,7,127 pages=2 snapshots=3 stack_reads=1 counter_reads=0 counter_writes=1 gap_nops=1 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated POPM BRC repeat complete",
+    ),
+    "pop-repeat": (
+        "TMS320C54x staged repeat-control POPM: PASS cases=192 restore=192 registers=BRC,RSA,REA values=4 source_pages=2 target_regions=2 snapshots=4 stack_reads=1 writes=1 source_retained=1 active_repeat_acceptance=0 excluded_active=3 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeat-control POPM complete",
+    ),
     "pmst-iptr": (
         "TMS320C54x staged PMST IPTR: PASS cases=1024 restore=1024 values=4 source_pages=2 irq_bits=16 irq_timings=2 snapshots=4 vector_prefetch_owned=1 pending_latch_fixture=1 isr_return_claim=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated PMST IPTR complete",

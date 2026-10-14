@@ -3205,6 +3205,51 @@ correction, as do the 55 verifier tests. A fresh original resident audit
 still matches all 48,261 program and 3,656 data words and stops at POPM REA
 (`02:8b3c`), not a completed board boot.
 
+The `pop-repeat` prototype admits direct POPM BRC/RSA/REA only
+outside an active staged repeat. Its 192 cases/restores cover the three
+registers, four words (0/1/8000/ffff), two source pages, two branch target
+regions and snapshots at clocks 4/5/6/11. One captured stack read advances
+SP once and supplies one Execute write despite later stack-word mutation;
+the other two repeat registers, PMST and status are preserved. Three negative
+cases place each pop inside an active RPTB and prove rejection before any
+stack read, SP change or repeat-register write. RSA/REA are now exposed as
+debugger states, using the existing saved register storage. The `pop-brc`
+fixture additionally passes 30 cases/restores: counts 0/1/2/7/127, two pages
+and snapshots at clocks 4/5/6. It places one NOP between POPM BRC and RPTB,
+mutates the captured stack source, checks one stack read/write publication,
+and independently observes count-plus-one byte-swap reads/writes. The
+zero-latency `stm-brc` control also passes. Active-loop writes and interrupt
+composition are not accepted by these cases. The full 288-marker CPU
+regression and 57 verifier tests pass with the admitted control pops.
+
+This prototype passes the original restoration tail without an unsupported
+opcode, but that is not a boot result. A passive one-second lifecycle capture
+first observes a program read at page 4 or higher at `08:0000` (zero word)
+at 0.237083648 s. At 1.016666667 s the staged core is at `08:e35a`, word
+0000, illegal=0, idle=0, SP=1280, ST1=6900, PMST=ffc8. The resident image
+contains pages 0/2/3, not page 8. The routine-test address space is broadly
+RAM-backed, so unsupported-opcode absence does not protect against this
+unpopulated-code walk. The atomic `bootrecsave` control instead remains at
+`00:3280` (word 71e6), with no page-4-or-higher fetch observed in that window.
+Its later bench stimuli differ, so it is a control observation, not a matched
+instruction-equivalence claim. Recover the first escaping control transfer
+and its source/return frame before attributing it to a physical memory map.
+A bounded preceding-read history identifies FRET (`f4e4`) at `00:0203`
+before that transfer, but already contains a zero-filled walk below
+`00:0200`. Page 8 is therefore a downstream symptom, not the first invalid
+control-flow boundary. Program-read taps also observe speculative fetches
+and program-data accesses; identify the executing instruction before making
+a retirement or causal claim from them. A subsequent debugger execution
+trace identifies the earlier continuation: FRETE at `02:8b76` resumes at
+`03:0000` after the POPM ST1/ST0 and FRAME #1 tail. That begins execution
+of zero-filled words. The later walk reaches the bootstrap at `00:ff80`,
+takes IRQ11 at `00:ff88`, then walks another unpopulated vector region
+before reaching the page-8 transfer. Recover the restored frame's writers
+and the adjacent POPM/FRAME/FRETE ordering first; do not fill the empty
+program regions or substitute a continuation to conceal this divergence.
+The resident program/data audit remains exact; no state correction or
+synthetic continuation was applied.
+
 Status acceptance
 is limited to the following
 tested consumer/composition forms, not every status-register interaction.

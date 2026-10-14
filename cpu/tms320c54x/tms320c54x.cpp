@@ -978,6 +978,8 @@ void tms320c54x_device::device_start()
 	for (unsigned i = 0; i != std::size(m_ar); ++i)
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
 	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
+	state_add(STATE_RSA, "RSA", m_rsa).formatstr("%04X");
+	state_add(STATE_REA, "REA", m_rea).formatstr("%04X");
 	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
 	state_add(STATE_IFR, "IFR", m_ifr).formatstr("%04X");
 	state_add(STATE_IMR, "IMR", m_imr).formatstr("%04X");
@@ -2754,7 +2756,12 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
-		bool const direct_pop = (word & 0xff00) == 0x8a00 && ((u8(word) >= 6 && u8(word) <= 0x19) || word == 0x8a1d);
+		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
+		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active)
+		{
+			logerror("%s: staged POPM active repeat-control write is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		bool const frame = (word & 0xff00) == 0xee00;
 		bool const branch = staged_banz(word) || word == 0xf072 || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word)));
 		bool const block_setup = word == 0xf072;

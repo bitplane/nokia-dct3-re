@@ -37,10 +37,16 @@ profile separately passes 1,024 cases/restores across all 16 maskable IRQ
 sources, early/late pending CPU latches, four PMST values and two source
 pages. IPTR is selected at ISR Prefetch after decoded foreground writes,
 while the accepted interrupt number is retained. NMI, ISR return and a
-second OVLY change before vector Fetch are outside this fixture. The original
-MU4 resident now executes POPM PMST and stops at POPM REA (`02:8b3c`),
-with resident loading still exact; see [5510 bring-up](5510_bringup.md)
-for the bounded scope and remaining context-control contract.
+second OVLY change before vector Fetch are outside this fixture. Inactive
+repeat-control restoration now passes 192 replay cases plus three active-loop
+exclusions. POPM BRC followed by one NOP and RPTB passes 30 replay cases,
+with independently checked count-plus-one output; active-loop writes remain
+excluded. The original MU4 resident gets past those pops, but FRETE at
+`02:8b76` resumes at `03:0000` and runs zero-filled code. This is a
+context-continuation frontier, not full boot. Resident loading remains exact;
+see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
+question. The 288-marker regression, 57 verifier tests and native 5110
+save-state gate pass with these changes.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
