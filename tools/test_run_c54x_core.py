@@ -12,6 +12,45 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_ifr_pair_scope_is_explicit(self):
+        marker, ending = EXTRA_PROFILES['ifr-pair']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ifr-pair')
+        for bad in (output.replace('restore=96', 'restore=0'),
+                    output.replace('late_irq=1', 'late_irq=0'),
+                    output.replace('accepted_irq=1', 'accepted_irq=0'),
+                    output.replace('nmi=1', 'nmi=0'),
+                    output.replace('interrupt_return=1', 'interrupt_return=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='ifr-pair')
+
+    def test_mvmd_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mvmd-ar']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-ar')
+        for bad in (output.replace('restore=576', 'restore=0'),
+                    output.replace('source_read=5', 'source_read=6'),
+                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-ar')
+        with self.assertRaises(ValueError):
+            check_result(output, 3, profile='mvdm-ar')
+
+    def test_mvkd_delay_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mvkd-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvkd-delay')
+        for bad in (output.replace('restore=1728', 'restore=0'),
+                    output.replace('ram_write=10', 'ram_write=9'),
+                    output.replace('forms=AR_source,postincrement,same_RAM', 'forms=AR_source'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvkd-delay')
+        with self.assertRaises(ValueError):
+            check_result(output, 3, profile='mvdm-delay')
+
     def test_mac_profile_is_separate(self):
         marker, ending = EXTRA_PROFILES['mac-smem']
         output = marker + '\n' + ending + '\n'

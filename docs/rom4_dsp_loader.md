@@ -3753,11 +3753,22 @@ visibility is explicitly unvalidated, not inferred from the frame contract.
 The original enters `02:dfc2` and executes absolute MAC Smem,B
 `29f8 0011` at `02:dfc9`. The MAC/MACR/MAS/MASR family has a 73,728-case
 saved/replayed gate for retained memory/T, both accumulators, rounding,
-FRCT/OVM/SMUL/SXM and sticky overflow. The current frontier is MVKD
-`7084 0013` at `02:dfd8`, both delay words of BCD at `02:dfd6`, copying
-AR3 to the RAM word addressed by AR4. Three-word extended delay forms
-remain excluded. Full CPU conformance, native 5110 restoration and all
-four isolated addition profiles pass, with 105 targeted Python tests.
+FRCT/OVM/SMUL/SXM and sticky overflow. MVKD
+`7084 0013` at `02:dfd8` now executes as both delay words of BCD at
+`02:dfd6`, after a 1,728-case saved/replayed MVKD delay gate. It includes
+AR sources, postincrement and same-address RAM read-before-write. Three-
+word extended delay forms remain excluded. MVMD `7316 b6a9` at
+`02:e078` now executes after a 576-case saved/replayed gate for direct
+AR sources, RAM/register destination ownership and unchanged status.
+The original returns to the init spine and executes STLM A,IFR `8801`
+at `02:6d3f`, immediately following LDM IFR,A. The isolated pair gate
+passes 96 cases/restores: sampled flags, late physical IRQ, selected IRQ
+whose flag is cleared, independent NMI, and RETE stack restoration. The
+current original stop is `60f8` at `02:909c`, live PC `02:909e`, with
+following words `3762 000c`. Resident program/data memory still matches
+exactly. The move/IFR checkpoint passes full CPU conformance, native
+5110 restoration and all seven isolated move/call/MAC/IFR profiles,
+with 108 targeted Python tests and evidence validation.
 This is not
 full board boot or native speech.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,

@@ -2668,7 +2668,7 @@ check both three-word literal orders and reject refetch after mutation.
 Base transfer clocks are retained individually rather than charged as
 upfront cycle debt. Selected repeat and delayed/guarded compositions
 have their separate bounded fixture below. The next software target is
-two-word MVKD branch-delay composition at the original MU4 frontier.
+accumulator-to-IFR acknowledgement at the original MU4 frontier.
 Program/data bus ownership, physical timing and
 the remaining pin behavior remain open; neither register nor staged-I/O
 conformance is full bus or boot acceptance.
@@ -2776,9 +2776,11 @@ eight AR destinations, four values, both outcomes of the original ALEQ
 branch family, none/IRQ/NMI and snapshots before/after publication and
 during entry. Branch and MVDM literals are owned separately, the transfer
 publishes once before acknowledgement, and RETE resumes the selected
-continuation with SP restored. Only the direct-AR MVDM form is exempted
-from the long-memory delay exclusion; other Class 19A forms remain
-excluded, and this is not exhaustive acceptance of other control contexts.
+continuation with SP restored. Snapshots at clocks 8/9/12 now straddle
+the observed source/publication boundary, rather than assuming clock 8
+was after publication. Direct-AR MVDM and basic two-word MVKD are exempted
+from the long-memory delay exclusion; extended forms remain excluded,
+and this is not exhaustive acceptance of other control contexts.
 
 That original delay slot executes. `fb82 dfc2`
 at `02:dfaf` is FCALLD to `02:dfc2` in extended-program
@@ -2814,15 +2816,76 @@ T and extension changes cannot alter the sampled inputs. SQUR's staged
 T side effect and repeat/control-delay MAC forms remain excluded; other
 accumulator-producer compositions need separate acceptance.
 
-The original MAC executes. The current stop is MVKD `7084 0013` at
-`02:dfd8`, copying AR3 to the RAM word addressed by AR4 in both delay
+The original MAC executes. MVKD `7084 0013` at
+`02:dfd8` copies AR3 to the RAM word addressed by AR4 in both delay
 words of BCD `fa4d dfdd` at `02:dfd6`. The diagnostic records two remaining
-decode words and that control owner; live PC is `02:dfd5`. The next
+decode words and that control owner; live PC is `02:dfd5`. Its accepted
 contract is the two-word Class 19A data-copy delay, not its three-word
-extended forms. The resident-memory audit remains exact. Full CPU
-conformance, native 5110 save-state restoration, all four new isolated
-profiles, 105 targeted Python tests and evidence validation pass with
-these additions. Full board boot, native speech and the excluded repeat/
+extended forms. `--profile mvkd-delay` accepts 1,728 cases and save/replays:
+eight pointer registers, both outcomes of the original BEQ branch family,
+AR sources, RAM-source postincrement and same-address RAM copying,
+none/IRQ/NMI and snapshots before Read, after Read and during entry.
+Read is observed at clock 9 and RAM publication at clock 10. Mutating the
+source after sampling proves retention, including the same-address case;
+one pointer update and complete RETE return are checked. The reused MVDM
+gate still passes its 576 cases with the corrected snapshots.
+
+The original MVKD delay executes. MVMD `7316 b6a9`
+at `02:e078` copies encoded MMR AR6 to absolute data address `b6a9`.
+Direct MVMD sources AR0..AR7 now share the established Class 19A MVDK
+transfer path, but bypass DP/indirect source addressing. `--profile mvmd-ar`
+accepts 576 cases and save/replays: eight registers, four values, RAM/
+self-AR/other-AR destinations, two execution pages and snapshots before
+Read, after Read and after publication. The source is sampled at clock 5;
+RAM publishes at 6, DAGEN destinations at 5. Later source/extension
+changes cannot alter the retained transfer. Status and both accumulators
+are preserved. Repeat, indirect and non-AR source classes remain excluded;
+SP/BK destination consumers and source-producer gaps need separate coverage.
+
+The original MVMD executes and returns to the initialization spine. The
+LDM IFR,A `4801` / STLM A,IFR `8801` pair at `02:6d3e..6d3f` now executes
+after the interrupt-register acceptance below. The current stop is
+`60f8` at `02:909c`, live PC `02:909e`; original following words are
+`3762 000c`. Its instruction/address ownership contract remains to be
+decoded for staged acceptance. SPRU172C page 4-33 identifies `60f8` as
+absolute CMPM: the address extension `3762` precedes the comparison
+constant `000c`. It reads a 16-bit source and sets TC on equality, without
+a destination write. The absolute form adds one word and one cycle to
+the two-word/two-cycle base instruction. A retained source/address/literal
+fixture and adjacent TC-consumer coverage are required, not an RMW gate.
+The resident memory audit remains exact.
+
+TI SPRU131G section 6.10.1 explicitly defines writing the current IFR
+contents back to IFR as clearing all pending interrupts. The observed
+`4801 -> 8801` pair therefore has a documented acknowledgement purpose,
+not a request for a fabricated peer response. The existing staged STLM
+path samples the accumulator in Execute, rather than using the older
+Read-stage operand snapshot; the adjacent LDM fixture confirms that
+publication order without an additional forwarding change.
+SPRU172C page 4-175 identifies STLM as a one-word Class 10A store with
+page-zero addressing independent of DP. Pending/accepted interrupt
+ownership and NMI isolation are covered by the composition fixture below.
+
+The isolated `ifr-pair` profile admits direct `8801/8901` stores and
+executes adjacent `4801/4901` loads, covering both accumulators, four
+pending-bit patterns, with and without a physical IRQ12 pulse after the
+read, and three snapshot positions. The pulse is delivered strictly between the
+read and store; a newly set bit survives unless the captured mask already
+contained that bit. Snapshots after the pulse allow its scheduled delivery
+to settle before saving. This proves read-back acknowledgement and
+preservation of the unselected accumulator. Additional cases unmask IRQ12
+after the read with its flag already set, or pulse independent NMI. Both
+finish one vector acknowledgement after the older store and return through
+RETE with SP restored. The selected IRQ survives clearance of its own IFR
+bit; NMI is not cancelled by IFR clearance. All 96 cases and 96 restores
+pass. IMR stays zero in the pending-only and NMI cases. This is executable
+composition coverage, not a claim of measured silicon cycle timing.
+
+The move/IFR checkpoint passes full CPU conformance (288 required
+markers), native 5110 save-state restoration, all seven isolated profiles
+(`mvdm-ar`, `mvdm-delay`, `far-call-delay`, `mac-smem`, `mvkd-delay`,
+`mvmd-ar`, `ifr-pair`), 108 targeted Python tests and evidence validation.
+Full board boot, native speech and the excluded repeat/
 register classes remain unaccepted.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining

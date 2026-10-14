@@ -9598,30 +9598,34 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253630;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	bool mvkd_delay() const { return !strcmp(machine().options().bios(), "mvkd-delay"); }
 	void start_mvdm_delay(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		unsigned const reg = variant % 8; bool const taken = (variant / 8) % 2;
 		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 16) % 4];
+		bool const mvkd = mvkd_delay(); unsigned const form = mvkd ? variant / 576 : 0;
+		u16 const source = mvkd && form == 0 ? 0x10 + (reg + 7) % 8 : mvkd && form == 2 ? 0x1400 : 0x500;
+		u16 const destination = mvkd ? 0x1400 : 0x10 + reg;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 64; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(0x700 + i, 0xf495); program.write_word(i, 0xf495); }
-		program.write_word(0x600, 0xfa47); program.write_word(0x601, 0x700);
-		program.write_word(0x602, 0x7210 | reg); program.write_word(0x603, 0x500);
+		program.write_word(0x600, mvkd ? 0xfa4d : 0xfa47); program.write_word(0x601, 0x700);
+		program.write_word(0x602, mvkd ? 0x7000 | (form == 1 ? 0x90 : 0x80) | reg : 0x7210 | reg); program.write_word(0x603, source);
 		program.write_word(0x604, 0xe922); program.write_word(0x700, 0xe911);
 		program.write_word(4, 0xf4eb); program.write_word(0x40, 0xf4eb);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, taken ? 0 : 1); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, mvkd ? 0 : taken ? 0 : 1); m_cpu->set_state_int(tms320c54x_device::STATE_B, mvkd && !taken ? 1 : 0);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-		data.write_word(0x10 + reg, 0x400 + reg); data.write_word(0x500, value);
+		data.write_word(0x10 + reg, mvkd ? 0x1400 : 0x400 + reg); if (mvkd) data.write_word(destination, 0xaaaa); data.write_word(source, value);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0x500, 0x500, "mvdm_delay_source",
-			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == value, "Delay MVDM owns one source read"); ++m_pipeline_operand_reads; });
-		m_pipeline_write_tap = data.install_write_tap(0x10 + reg, 0x10 + reg, "mvdm_delay_write",
-			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && !m_vector_acks, "Delay MVDM publishes before pending IRQ/NMI entry"); ++m_pipeline_store_writes; });
+		m_pipeline_operand_tap = data.install_read_tap(source, source, "data_move_delay_source",
+			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == value && m_cpu->pipeline_cycles() == 9, "Delay data move owns one source read before publication"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(destination, destination, "data_move_delay_write",
+			[this, value, mvkd](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && !m_vector_acks && m_cpu->pipeline_cycles() == (mvkd ? 10 : 9), "Delay data move publishes before pending IRQ/NMI entry"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x603, "mvdm_delay_literals",
-			[this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled() || at == 0x602) return; expect(m_pipeline_extensions_reads < 2 && at == (m_pipeline_extensions_reads ? 0x603 : 0x601) && word == (m_pipeline_extensions_reads ? 0x500 : 0x700), "Branch and MVDM retain their separate literal words"); ++m_pipeline_extensions_reads; });
+			[this, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled() || at == 0x602) return; expect(m_pipeline_extensions_reads < 2 && at == (m_pipeline_extensions_reads ? 0x603 : 0x601) && word == (m_pipeline_extensions_reads ? source : 0x700), "Branch and data move retain their separate literal words"); ++m_pipeline_extensions_reads; });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253650;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -9700,6 +9704,56 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253690;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_mvmd_ar(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const reg = variant % 8, kind = (variant / 32) % 3;
+		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 8) % 4];
+		u16 const source = 0x10 + reg, destination = kind == 0 ? 0x1400 : kind == 1 ? source : 0x10 + (reg + 1) % 8;
+		u32 const base = (variant / 96) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x7310 | reg); program.write_word(base + 0x601, destination);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		data.write_word(destination, 0xaaaa); data.write_word(source, value);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_ar_source",
+			[this, source, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == source && word == value && m_cpu->pipeline_cycles() == 5, "MVMD owns one encoded MMR read independently of DP"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_ar_destination",
+			[this, destination, value, kind](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == destination && word == value && m_cpu->pipeline_cycles() == (kind ? 5 : 6), "MVMD publishes one retained source to its captured destination"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "mvmd_ar_literal",
+			[this, destination](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == destination, "MVMD retains one destination-address literal"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253710;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_ifr_pair(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = variant & 1;
+		u16 const flags = std::array<u16, 4>{0, 8, 0x438, 0xffff}[(variant / 2) % 4] | (variant >= 48 && variant < 72 ? 0x1000 : 0);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, b ? 0x4901 : 0x4801);
+		program.write_word(0x601, b ? 0x8901 : 0x8801);
+		program.write_word(4, 0xf4eb); program.write_word(0x70, 0xf4eb);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant >= 48 ? 0 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, flags); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x23456789);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(12, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(1, 1, "ifr_pair_read",
+			[this, flags](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == flags && !m_pipeline_operand_reads, "LDM reads pending IFR exactly once"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(1, 1, "ifr_pair_ack",
+			[this, flags](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == flags && !m_pipeline_store_writes, "STLM acknowledges the adjacent LDM result exactly once"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253730;
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	virtual void machine_start() override
 	{
 		save_item(NAME(m_bus_ready));
@@ -9712,9 +9766,11 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
 		if (!strcmp(machine().options().bios(), "mac-smem")) { start_mac_smem(); return; }
 		if (!strcmp(machine().options().bios(), "far-call-delay")) { start_delayed_far_call(); return; }
-		if (!strcmp(machine().options().bios(), "mvdm-delay")) { start_mvdm_delay(); return; }
+		if (!strcmp(machine().options().bios(), "mvdm-delay") || mvkd_delay()) { start_mvdm_delay(); return; }
 		if (!strcmp(machine().options().bios(), "mvdm-ar")) { start_mvdm_ar(); return; }
 		if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
 		if (!strcmp(machine().options().bios(), "read-a-mapped")) { start_mapped_read_a(); return; }
@@ -35096,6 +35152,79 @@ private:
 			osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
 		}
+		if (m_phase == 253730)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 6, 8}[(variant % 24) / 8];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "IFR pair remains admitted");
+			if (tick == 5 && variant >= 24 && variant < 48)
+			{
+				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes, "Late IRQ arrives strictly between IFR Read and acknowledgement");
+				m_cpu->set_input_line(12, ASSERT_LINE); m_cpu->set_input_line(12, CLEAR_LINE);
+			}
+			if (tick == 5 && variant >= 48)
+			{
+				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes, "IRQ/NMI selection composes with an in-flight IFR acknowledgement");
+				if (variant < 72) m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x1000);
+				else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save IFR pair around Read and acknowledgement");
+			}
+			if (tick == (variant >= 48 ? 40 : 12))
+			{
+				u16 const flags = std::array<u16, 4>{0, 8, 0x438, 0xffff}[(variant / 2) % 4];
+				u16 const remaining = variant >= 24 && variant < 48 ? (0x1000 & ~flags) : 0;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == remaining && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "Read-back/write-back clears sampled IFR bits and retains a newly pending IRQ");
+				expect(m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == ((variant & 1) ? 0x12345678 : 0x23456789), "IFR acknowledgement preserves the unselected accumulator");
+				expect(m_vector_acks == unsigned(variant >= 48) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Accepted IRQ/NMI completes exactly one entry and RETE restores the stack");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_vector_acks = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay IFR acknowledgement ownership"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253740; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 95) { start_ifr_pair(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged IFR pair: PASS cases=96 restore=96 accumulators=2 patterns=4 pending_only=1 late_irq=1 accepted_irq=1 nmi=1 interrupt_return=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated IFR pair complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253740) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253730; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 253710)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, reg = variant % 8, kind = (variant / 32) % 3;
+			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 8) % 4];
+			u16 const source = 0x10 + reg, destination = kind == 0 ? 0x1400 : kind == 1 ? source : 0x10 + (reg + 1) % 8;
+			u32 const base = (variant / 96) % 2 ? 0x20000 : 0;
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 7}[variant / 192];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVMD AR remains an admitted retained transfer");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); }
+			if (tick == 5 && source != destination) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVMD before/after MMR Read or data publication");
+			}
+			if (tick == 12)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(destination) == value && m_cpu->space(AS_DATA).read_word(source) == (source == destination ? value : 0xdead), "MVMD retains the sampled MMR even after its source changes"); }
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1, "MVMD preserves accumulators/status and never duplicates its accesses");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay MVMD source and destination ownership"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253720; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 575) { start_mvmd_ar(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVMD AR: PASS cases=576 restore=576 registers=8 destinations=RAM,self_AR,other_AR pages=2 source_read=5 ram_write=6 mmr_write=5 literal_fetches=1 reads=1 writes=1 status_preserved=1 repeat_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated MVMD AR complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253720) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253710; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253690)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mac_smem_case(variant);
@@ -35162,10 +35291,13 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, reg = variant % 8, interrupt = (variant / 64) % 3;
 			bool const taken = (variant / 8) % 2;
 			u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 16) % 4];
-			unsigned const checkpoint = std::array<unsigned, 3>{6, 8, 12}[variant / 192];
+			bool const mvkd = mvkd_delay(); unsigned const form = mvkd ? variant / 576 : 0;
+			u16 const source = mvkd && form == 0 ? 0x10 + (reg + 7) % 8 : mvkd && form == 2 ? 0x1400 : 0x500;
+			unsigned const checkpoint = std::array<unsigned, 3>{8, 9, 12}[(variant % 576) / 192];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Two-word MVDM is an admitted complete BCD delay slot");
 			if (tick == 5 && interrupt) m_cpu->set_input_line(interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
 			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xbeef); m_cpu->space(AS_PROGRAM).write_word(0x603, 0xdead); }
+			if (mvkd && tick == 9) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead); }
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
@@ -35173,7 +35305,7 @@ private:
 			}
 			if (tick == 40)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == value && m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 0x11 : 0x22) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "MVDM delay retires once and resumes the selected branch after interrupt return");
+				{ auto const disable = machine().disable_side_effects(); expect((!mvkd || m_cpu->space(AS_DATA).read_word(0x1400) == value) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == (mvkd ? 0x1400 + unsigned(form == 1) : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 0x11 : 0x22) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Data-move delay preserves its destination and pointer update across branch/interrupt return"); }
 				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_vector_acks == unsigned(bool(interrupt)), "Protected MVDM delay has no repeated accesses or interrupt acknowledgement");
 				if (!m_pipeline_replay)
 				{
@@ -35181,7 +35313,12 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay MVDM delay ownership and protected interrupt return"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253660; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_cpu->set_pipeline_frontend(false);
-				if (variant < 575) { start_mvdm_delay(variant + 1); return; }
+				if (variant < (mvkd ? 1727 : 575)) { start_mvdm_delay(variant + 1); return; }
+				if (mvkd)
+				{
+					osd_printf_info("TMS320C54x staged MVKD delay: PASS cases=1728 restore=1728 registers=8 forms=AR_source,postincrement,same_RAM outcomes=taken,untaken sources=none,IRQ,NMI source_read=9 ram_write=10 literal_fetches=2 reads=1 writes=1 interrupt_return=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated MVKD delay complete");
+				}
 				osd_printf_info("TMS320C54x staged MVDM delay: PASS cases=576 restore=576 registers=8 outcomes=taken,untaken sources=none,IRQ,NMI literal_fetches=2 reads=1 writes=1 interrupt_return=1 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated MVDM delay complete");
 			}
@@ -35893,6 +36030,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 253730) { unsigned const variant = m_pipeline_peripheral_case; expect(variant >= 48 && line == (variant < 72 ? 12 : INPUT_LINE_NMI) && !m_vector_acks && m_pipeline_store_writes == 1, "IFR clearance cannot cancel a selected IRQ or independent NMI"); ++m_vector_acks; }
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
 		if (m_phase == 253570) { unsigned const transfers = m_pipeline_peripheral_case / 8 ? 1 : 1 + (m_pipeline_peripheral_case / 2) % 4; expect(line == 0 && !m_vector_acks && m_pipeline_operand_reads + m_pipeline_store_writes == transfers, "IRQ acknowledgement follows the complete guarded I/O sequence"); ++m_vector_acks; }
 		if (m_phase == 253650) { unsigned const source = (m_pipeline_peripheral_case / 64) % 3; expect(source && line == (source == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "IRQ/NMI acknowledgement cannot split the two-word MVDM delay slot"); ++m_vector_acks; }
@@ -36471,6 +36609,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(20, "mvdm-delay", "Staged MVDM conditional branch delay composition")
 	ROM_SYSTEM_BIOS(21, "far-call-delay", "Staged delayed far-call page and return ownership")
 	ROM_SYSTEM_BIOS(22, "mac-smem", "Staged T-based MAC/MAS arithmetic and retained operands")
+	ROM_SYSTEM_BIOS(23, "mvkd-delay", "Staged two-word MVKD branch delay composition")
+	ROM_SYSTEM_BIOS(24, "mvmd-ar", "Staged encoded AR-to-data MVMD ownership")
+	ROM_SYSTEM_BIOS(25, "ifr-pair", "Staged IFR read-back acknowledgement")
 ROM_END
 
 ROM_START(tms54rom4)
