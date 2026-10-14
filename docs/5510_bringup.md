@@ -2537,16 +2537,24 @@ The full C54x conformance runner and native 5110 save-state gate pass.
 
 The current one-second original bootstrap reaches resident `02:6d62`
 with all 48,261 compared program words correct, zero mismatches. The
-16-KiB crossing record now has all 16 correct words. The program audit
-still excludes 3,660 data words and retains the configured-mapping scope
-above. The next unsupported instruction is `STM #lk,IMR` (`7700` at
-`02:6d64`, live PC `026d66`). Correct program loading is verified;
-complete AA22 data transfer, physical banking, full boot and recording
-remain unaccepted. The AA22 data inventory has 3,660 unique destinations
-(`007c..c281`), including four low register-window writes at `007c..007f`
-with values `0000,0000,4000,017b`; do not treat their live values as RAM.
-Audit the remaining data transfer and implement the
-retained mask-write/interrupt contract before claiming resident execution.
+16-KiB crossing record now has all 16 correct words. A separate read-only
+data audit checks all 3,656 ordinary data destinations, with zero
+mismatches in both staged and atomic controls. Later program writes that
+alias previously initialized data words retain record order under the
+configured common-RAM profile; physical banking remains unvalidated.
+Four low register-window writes at `007c..007f` (source values
+`0000,0000,4000,017b`) are explicitly excluded: live register contents do
+not prove their write effects. The inventory has 3,660 unique data
+destinations (`007c..c281`).
+`python3 tools/noki5510_bootstrap_check.py --resident-memory LOG` requires
+one ordered program/data report, exact counts and zero mismatches, and
+rejects duplicate or failed evidence. It accepts original RAM contents
+only, not hardware register effects or full boot.
+The next unsupported instruction is `STM #lk,IMR` (`7700` at `02:6d64`,
+live PC `026d66`). Program and ordinary-data loading are verified;
+register effects, physical banking, full boot and recording remain
+unaccepted. Implement the retained mask-write/interrupt contract before
+claiming resident execution.
 
 Mapped BITF now admits AL/AH/AG, BL/BH/BG and T/TRN while retaining
 control/peripheral exclusions. `tms54test -bios mapped-bitf` requires

@@ -3678,11 +3678,17 @@ The full C54x conformance runner and native 5110 save-state gate pass.
 The current original bootstrap reaches resident `02:6d62`; all 48,261
 compared program words match, including the former 16-KiB crossing.
 The next unsupported instruction is `STM #lk,IMR` (`7700` at `02:6d64`,
-live PC `026d66`). This verifies program loading only: the audit excludes
-3,660 data words and physical bank identity remains unvalidated. The
-next requirements are the remaining data audit and retained mask-write/
-interrupt execution. No filesystem or cluster state is synthesized;
-full resident transfer and boot remain unaccepted.
+live PC `026d66`). A separate side-effect-free data audit now checks all
+3,656 ordinary data words with zero mismatches in both staged and atomic
+controls. It preserves later common-RAM program/data alias writes in
+record order for the configured profile. The four low register-window
+writes at `007c..007f` remain excluded; their live values cannot establish
+write effects. `noki5510_bootstrap_check.py --resident-memory LOG` requires
+both complete audit reports with exact coverage and no mismatches or
+duplicate evidence. Original program/data RAM contents are verified;
+physical bank identity, register effects and full boot are not.
+The next requirement is retained IMR-write/interrupt execution. No
+filesystem or cluster state is synthesized; full boot remains unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word

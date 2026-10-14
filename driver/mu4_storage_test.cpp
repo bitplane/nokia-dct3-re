@@ -224,7 +224,7 @@ private:
 	unsigned m_native_bootstrap_paths[10] = {};
 	unsigned m_native_descriptor_reads = 0;
 	unsigned m_native_descriptor_writes = 0;
-	bool m_native_bootstrap_program_checked = false;
+	bool m_native_bootstrap_memory_checked = false;
 	bool m_native_boundary_window = false;
 	unsigned m_native_boundary_events = 0;
 	unsigned m_native_boundary_dma_events = 0;
@@ -1197,7 +1197,7 @@ private:
 	{
 		m_cpu->space(AS_DATA).write_word(0x2000 + offset, value);
 	}
-	void observe_bootstrap_resident_program()
+	void observe_bootstrap_resident_memory()
 	{
 		auto const disable = machine().disable_side_effects();
 		auto word = [this](unsigned offset) -> u16
@@ -1207,9 +1207,10 @@ private:
 		};
 		unsigned segment = 0;
 		while (word(segment) != 0xaa22) segment += 10 + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
-		unsigned cursor = segment + 6, total = 0, data_words = 0;
+		unsigned cursor = segment + 6, total = 0, data_words = 0, register_words = 0;
 		unsigned const end = cursor + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
 		std::map<offs_t, u16> expected;
+		std::map<offs_t, u16> expected_data;
 		while (word(cursor))
 		{
 			unsigned const count = word(cursor);
@@ -1222,9 +1223,26 @@ private:
 				// the configured mapping, not physical DA150 RAM-bank identity.
 				u32 const address = (destination & 0x8000) ? destination : destination & 0xffff;
 				for (unsigned i = 0; i < count; ++i)
-					expected[(address & 0x7f0000) | u16(address + i)] = word(cursor + i * 2);
+				{
+					offs_t const target = (address & 0x7f0000) | u16(address + i);
+					u16 const value = word(cursor + i * 2);
+					expected[target] = value;
+					// Preserve record order when a later program write aliases a
+					// previously initialized data word in the configured common RAM.
+					if (shared_daram_profile() && target >= 0x2000 && target < 0x8000 && expected_data.count(target))
+						expected_data[target] = value;
+				}
 			}
-			else data_words += count;
+			else
+			{
+				data_words += count;
+				for (unsigned i = 0; i < count; ++i)
+				{
+					offs_t const target = u16(destination + i);
+					if (target < 0x80) { ++register_words; continue; }
+					expected_data[target] = word(cursor + i * 2);
+				}
+			}
 			cursor += count * 2; total += count;
 		}
 		if (cursor + 2 != end || total != 51921) fatalerror("MU4 resident source coverage mismatch");
@@ -1238,9 +1256,21 @@ private:
 				++mismatches;
 			}
 		}
-		m_native_bootstrap_program_checked = true;
+		m_native_bootstrap_memory_checked = true;
 		logerror("mu4_original_resident_program: %s checked_words=%u mismatch_words=%u excluded_data_words=%u source_words=%u before_resident_execution=1 physical_mapping=unvalidated full_boot=0\n",
 			mismatches ? "MISMATCH" : "PASS", unsigned(expected.size()), mismatches, data_words, total);
+		unsigned data_mismatches = 0;
+		for (auto const &[address, value] : expected_data)
+		{
+			u16 const actual = m_cpu->space(AS_DATA).read_word(address);
+			if (actual != value)
+			{
+				if (data_mismatches < 8) logerror("mu4_original_resident_data_mismatch: address=%04x actual=%04x expected=%04x\n", unsigned(address), actual, value);
+				++data_mismatches;
+			}
+		}
+		logerror("mu4_original_resident_data: %s checked_words=%u mismatch_words=%u excluded_register_words=%u source_data_words=%u before_resident_execution=1 physical_mapping=unvalidated full_boot=0\n",
+			data_mismatches ? "MISMATCH" : "PASS", unsigned(expected_data.size()), data_mismatches, register_words, data_words);
 	}
 	void verify_recorder_overlay()
 	{
@@ -1485,7 +1515,7 @@ private:
 				[this](offs_t address, u16 &, u16) {
 					if (machine().side_effects_disabled() || (m_cpu->pc() & 0xffff) != address + 1) return;
 					++m_native_bootstrap_resident_entries;
-					if ((system_bios() == 25 || system_bios() == 26) && !m_native_bootstrap_program_checked) observe_bootstrap_resident_program();
+					if ((system_bios() == 25 || system_bios() == 26) && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
 				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
 				[this](offs_t address, u16 &, u16)

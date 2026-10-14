@@ -104,10 +104,43 @@ def verify_dsp_service_route(text):
         cursor += ingress.end()
 
 
+def verify_resident_memory(text):
+    """Check original AA22 program/data RAM contents, not register effects or boot."""
+    for kind in ('program', 'data'):
+        if text.count('mu4_original_resident_' + kind + ':') != 1:
+            raise ValueError('missing or duplicated resident ' + kind + ' report')
+    for failure in ('mu4_original_resident_program_mismatch:',
+                    'mu4_original_resident_data_mismatch:', '[LUA ERROR]',
+                    'Disk quota exceeded', 'No space left on device'):
+        if failure in text:
+            raise ValueError('resident memory audit failure: ' + failure)
+    reports = (
+        (r'mu4_original_resident_program: (PASS|MISMATCH) checked_words=(\d+) '
+         r'mismatch_words=(\d+) excluded_data_words=(\d+) source_words=(\d+) '
+         r'before_resident_execution=1 physical_mapping=unvalidated full_boot=0$',
+         (48261, 0, 3660, 51921)),
+        (r'mu4_original_resident_data: (PASS|MISMATCH) checked_words=(\d+) '
+         r'mismatch_words=(\d+) excluded_register_words=(\d+) source_data_words=(\d+) '
+         r'before_resident_execution=1 physical_mapping=unvalidated full_boot=0$',
+         (3656, 0, 4, 3660)),
+    )
+    cursor = 0
+    for pattern, expected in reports:
+        matches = list(re.finditer(pattern, text, re.MULTILINE))
+        if len(matches) != 1:
+            raise ValueError('missing or duplicated complete resident memory report')
+        match = matches[0]
+        if match.start() < cursor or match[1] != 'PASS' or tuple(map(int, match.groups()[1:])) != expected:
+            raise ValueError('resident memory scope/count/result mismatch')
+        cursor = match.end()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--runtime', action='store_true', help='check explicitly hybrid service frontier')
+    parser.add_argument('--resident-memory', action='store_true',
+                        help='check MU4 original AA22 program/data RAM only, not handset bootstrap or boot')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -117,8 +150,16 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
+    if args.resident_memory and any((args.runtime, args.serial_readiness, args.input_lifecycle,
+                                    args.input_timer, args.dsp_service_route)):
+        parser.error('--resident-memory cannot be combined with handset bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.resident_memory:
+            verify_resident_memory(text)
+            print('MU4 resident memory PASS: 48261 program + 3656 data words; '
+                  '4 register writes and physical mapping unverified; not full boot')
+            return
         verify(text, args.runtime)
         if args.serial_readiness:
             verify_serial_readiness(text)

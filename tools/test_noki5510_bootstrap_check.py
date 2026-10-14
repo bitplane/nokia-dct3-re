@@ -1,11 +1,47 @@
 import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
-    verify_input_timer, verify_dsp_service_route,
+    verify_input_timer, verify_dsp_service_route, verify_resident_memory,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    RESIDENT = '\n'.join((
+        'mu4_original_resident_program: PASS checked_words=48261 mismatch_words=0 '
+        'excluded_data_words=3660 source_words=51921 before_resident_execution=1 '
+        'physical_mapping=unvalidated full_boot=0',
+        'mu4_original_resident_data: PASS checked_words=3656 mismatch_words=0 '
+        'excluded_register_words=4 source_data_words=3660 before_resident_execution=1 '
+        'physical_mapping=unvalidated full_boot=0',
+    ))
+
+    def test_resident_memory_complete_scope(self):
+        verify_resident_memory(self.RESIDENT)
+
+    def test_resident_memory_rejects_partial_or_changed_scope(self):
+        for old, new in (('48261', '48260'), ('3656', '3655'),
+                         ('excluded_register_words=4', 'excluded_register_words=5'),
+                         ('source_words=51921', 'source_words=51920'),
+                         ('source_data_words=3660', 'source_data_words=3656'),
+                         ('excluded_data_words=3660', 'excluded_data_words=0'),
+                         ('before_resident_execution=1', 'before_resident_execution=0'),
+                         ('physical_mapping=unvalidated', 'physical_mapping=validated'),
+                         ('full_boot=0', 'full_boot=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_resident_memory(self.RESIDENT.replace(old, new))
+
+    def test_resident_memory_rejects_failure_or_duplicate_evidence(self):
+        for bad in (self.RESIDENT.replace('PASS', 'MISMATCH'),
+                    self.RESIDENT.replace('mismatch_words=0', 'mismatch_words=1'),
+                    self.RESIDENT + '\n' + self.RESIDENT,
+                    self.RESIDENT + '\n' + self.RESIDENT.splitlines()[1].replace('full_boot=0', 'full_boot=1'),
+                    self.RESIDENT.splitlines()[0], self.RESIDENT.splitlines()[1],
+                    '\n'.join(reversed(self.RESIDENT.splitlines())),
+                    self.RESIDENT + '\nmu4_original_resident_data_mismatch: address=0080',
+                    self.RESIDENT + '\n[LUA ERROR] observer failed'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                verify_resident_memory(bad)
+
     def test_dsp_service_route_requires_forward_then_both_service_ingresses(self):
         forward = ('5510_input_dsp_forward: caller=003a53f7 object=0012e9cc '
                    'length=0a type=8e transport=1e destination=00 source=02 class=d0')
