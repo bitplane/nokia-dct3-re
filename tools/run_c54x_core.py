@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "stack-irq-return": (
+        "TMS320C54x staged stack IRQ return: PASS cases=80 restore=80 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=5 acknowledgements=1 return_reads=1 caller_cleanup=push_forms resumed_idle=1 intm_cleared=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated stack IRQ return complete",
+    ),
+    "stack-irq": (
+        "TMS320C54x staged stack IRQ ordering: PASS cases=48 restore=48 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=3 stack_read=5 interrupt_reserve=5 foreground_write=6 interrupt_write=7 acknowledgements=1 older_first=1 isr_return_claim=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated stack IRQ ordering complete",
+    ),
     "pop-brc": (
         "TMS320C54x staged POPM BRC repeat: PASS cases=30 restore=30 counts=0,1,2,7,127 pages=2 snapshots=3 stack_reads=1 counter_reads=0 counter_writes=1 gap_nops=1 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated POPM BRC repeat complete",

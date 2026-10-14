@@ -12,6 +12,30 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_stack_irq_return_scope(self):
+        marker, ending = EXTRA_PROFILES['stack-irq-return']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stack-irq-return')
+        for bad in (output.replace('restore=80', 'restore=0'),
+                    output.replace('return_reads=1', 'return_reads=0'),
+                    output.replace('resumed_idle=1', 'resumed_idle=0'),
+                    output.replace('intm_cleared=1', 'intm_cleared=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stack-irq-return')
+
+    def test_stack_irq_order_scope(self):
+        marker, ending = EXTRA_PROFILES['stack-irq']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stack-irq')
+        for bad in (output.replace('restore=48', 'restore=0'),
+                    output.replace('older_first=1', 'older_first=0'),
+                    output.replace('acknowledgements=1', 'acknowledgements=2'),
+                    output.replace('isr_return_claim=0', 'isr_return_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stack-irq')
+
     def test_pop_brc_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['pop-brc']
         output = marker + '\n' + ending + '\n'

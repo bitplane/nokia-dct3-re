@@ -2157,7 +2157,11 @@ void tms320c54x_device::interrupt_entry_step()
 	switch (m_interrupt_entry_stage++)
 	{
 	case 1: m_rtn = m_pc; break; // INTR Decode, before stack Access.
-	case 2: m_interrupt_stack_address = --m_sp; break;
+	case 2:
+		// Staged Access shares a clock with older foreground Read operations;
+		// pipeline_step reserves its slot after those older SP updates.
+		if (!m_pipeline_frontend) m_interrupt_stack_address = --m_sp;
+		break;
 	case 3:
 		// SPRU131G 6.10.4/6.10.8 tie IFR clearance and maskable INTM
 		// setting to vector Fetch/IACK, not the earlier source selection.
@@ -3247,7 +3251,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 17A: retain the stack word before destination publication.
 		// Read-owned SP increment is a partial placement model; POPM excludes
-		// XPC/repeat-control destinations and POPD is bounded to RAM.
+		// XPC and active repeat-control destinations; POPD is bounded to RAM.
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
 		{
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
@@ -3835,6 +3839,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (entry_stage == 2)
 	{
+		m_interrupt_stack_address = --m_sp;
 		// SPRU131G 7.5.9 / example 7-18: IPTR is evaluated by vector
 		// Prefetch after decoded foreground publications, not source acceptance.
 		m_interrupt_vector_pc = (m_pmst & 0xff80) | (m_interrupt_vector_pc & 0x7f);

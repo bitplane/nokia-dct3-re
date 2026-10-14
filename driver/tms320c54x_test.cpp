@@ -5452,6 +5452,48 @@ private:
 		m_phase = 252270; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_stack_irq_order(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const returning = !strcmp(machine().options().bios(), "stack-irq-return");
+		unsigned const form = variant % 4;
+		bool const nmi = (variant / 4) % 2;
+		u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
+		u32 const vector = base + (nmi ? 4 : 0x40);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(vector + i, 0xf495); }
+		program.write_word(base + 0x600, std::array<u16, 4>{0x4a08, 0x4b62, 0x8a0e, 0x8a18}[form]);
+		program.write_word(vector, 0xe955);
+		if (returning) { program.write_word(vector + 1, 0xf4eb); program.write_word(base + 0x601, form < 2 ? 0x8a0e : 0xf4e1); program.write_word(base + 0x602, 0xf4e1); }
+		for (unsigned line = 0; line < 16; ++line) m_cpu->set_input_line(line, CLEAR_LINE);
+		m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+		data.write_word(0x62, 0x1234); data.write_word(0x1000, form == 3 ? 0x1100 : 0x1234);
+		data.write_word(0xffe, 0xdead); data.write_word(0xfff, 0xbeef); data.write_word(0x10ff, 0xdead);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
+		m_stack_irq_return_reads = m_stack_irq_cleanup_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stack_irq_owned_read", [this, form, returning](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (returning && m_pipeline_operand_reads && at == (form < 2 ? 0xffe : form == 2 ? 0x1000 : 0x10ff)) { expect(word == 0x601 && !m_stack_irq_return_reads && m_vector_acks == 1, "RETE reads the hardware-owned return PC once"); ++m_stack_irq_return_reads; return; }
+			if (returning && form < 2 && at == 0xfff) { expect(word == 0x1234 && m_stack_irq_return_reads == 1 && !m_stack_irq_cleanup_reads, "Returned caller pops its own preserved push word"); ++m_stack_irq_cleanup_reads; return; }
+			if (at != (form == 0 ? 8 : form == 1 ? 0x62 : 0x1000) || word != (form == 3 ? 0x1100 : 0x1234) || m_pipeline_operand_reads || m_cpu->pipeline_cycles() != 5)
+				osd_printf_info("Stack IRQ read observation: case=%u replay=%u address=%04x word=%04x clock=%llu reads=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles(), m_pipeline_operand_reads);
+			expect(at == (form == 0 ? 8 : form == 1 ? 0x62 : 0x1000) && word == (form == 3 ? 0x1100 : 0x1234) && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Foreground stack source is read before interrupt SP reservation"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stack_irq_owned_write", [this, form, returning](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == (form < 2 ? 0xffe : form == 2 ? 0x1000 : 0x10ff)) { expect(word == 0x601 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7, "Interrupt return PC owns the slot after the older stack operation"); ++m_pipeline_store_writes; }
+			else if (form < 2 && at == 0xfff) { expect(word == 0x1234 && !m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "Older stack push retains its pre-interrupt destination"); ++m_pipeline_register_writes; }
+			else if (form >= 2 && at == (form == 2 ? 0xe : 0x18)) { expect(word == (form == 2 ? 0x1234 : 0x1100) && !m_pipeline_extensions_reads, "Older POPM publishes its captured source once"); ++m_pipeline_extensions_reads; }
+			else if (returning && form < 2 && at == 0xe) { expect(word == 0x1234 && !m_pipeline_extensions_reads && m_stack_irq_cleanup_reads == 1, "Caller cleanup publishes the original word after RETE"); ++m_pipeline_extensions_reads; }
+			else expect(false, "Stack/interrupt composition must not write an unowned slot");
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253980;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_repeat_pop_exclusion(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -10263,6 +10305,8 @@ private:
 		if (!strcmp(machine().options().bios(), "pmst-prefetch")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-iptr")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pop-repeat")) { start_pipeline_pmst(); return; }
+		if (!strcmp(machine().options().bios(), "stack-irq")) { start_stack_irq_order(); return; }
+		if (!strcmp(machine().options().bios(), "stack-irq-return")) { start_stack_irq_order(); return; }
 		if (!strcmp(machine().options().bios(), "mcbsp-control")) { start_mcbsp_control_sequence(); return; }
 		if (!strcmp(machine().options().bios(), "rmw-long-periph")) { start_pipeline_long_rmw(); return; }
 		if (!strcmp(machine().options().bios(), "st-long-periph")) { start_pipeline_long_immediate_store(); return; }
@@ -35855,6 +35899,31 @@ private:
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 253980)
+		{
+			bool const returning = !strcmp(machine().options().bios(), "stack-irq-return");
+			unsigned const variant = m_pipeline_peripheral_case, form = variant % 4, tick = ++m_idle_fixture_tick;
+			unsigned const checkpoint = returning ? std::array<unsigned, 5>{4, 5, 6, 10, 14}[variant / 16] : std::array<unsigned, 3>{4, 5, 6}[variant / 16];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Stack/interrupt composition stays staged");
+			if (tick == 2) { if ((variant / 4) % 2) m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); else m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1); }
+			if (tick == 5) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (form < 2 ? 0xffe : form == 2 ? 0x1000 : 0x10ff), "Interrupt Access reserves SP after the older stack update in the same clock");
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_pipeline_extensions_reads, m_vector_acks}; m_stack_irq_read_snapshot = {m_stack_irq_return_reads, m_stack_irq_cleanup_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save foreground stack and interrupt reservation boundary"); }
+			if (tick == 20)
+			{
+				expect(m_vector_acks == 1 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(form < 2) && m_pipeline_extensions_reads == unsigned(returning || form >= 2) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == (returning ? form < 2 ? 0x1000 : form == 2 ? 0x1001 : 0x1100 : form < 2 ? 0xffe : form == 2 ? 0x1000 : 0x10ff) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601,
+					"Interrupt source and older stack operation preserve both owned effects");
+				if (returning) expect(m_stack_irq_return_reads == 1 && m_stack_irq_cleanup_reads == unsigned(form < 2) && m_cpu->state_int(tms320c54x_device::STATE_T) == (form < 3 ? 0x1234 : 0) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && !(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800), "RETE resumes the caller and restores its pre-interrupt stack lifecycle");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; m_vector_acks = m_recurring_irq_snapshot[4]; m_stack_irq_return_reads = m_stack_irq_read_snapshot[0]; m_stack_irq_cleanup_reads = m_stack_irq_read_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore stack/interrupt ordering without duplicate bus effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253990; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (returning ? 79 : 47)) { start_stack_irq_order(variant + 1); return; }
+				if (returning) { osd_printf_info("TMS320C54x staged stack IRQ return: PASS cases=80 restore=80 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=5 acknowledgements=1 return_reads=1 caller_cleanup=push_forms resumed_idle=1 intm_cleared=1 silicon_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated stack IRQ return complete"); }
+				osd_printf_info("TMS320C54x staged stack IRQ ordering: PASS cases=48 restore=48 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=3 stack_read=5 interrupt_reserve=5 foreground_write=6 interrupt_write=7 acknowledgements=1 older_first=1 isr_return_claim=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated stack IRQ ordering complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 253990) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253980; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253970)
 		{
 			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
@@ -36979,6 +37048,8 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
+	unsigned m_stack_irq_return_reads = 0, m_stack_irq_cleanup_reads = 0;
+	std::array<unsigned, 2> m_stack_irq_read_snapshot = {};
 	u8 m_bus_divisor = 0;
 	bool m_bus_iack_enable = false;
 	bool m_bus_ready = true;
@@ -37025,6 +37096,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "IRQ/NMI cannot split FCALA's retained two-word frame"); ++m_vector_acks; }
 		if (m_phase == 253730) { unsigned const variant = m_pipeline_peripheral_case; expect(variant >= 48 && line == (variant < 72 ? 12 : INPUT_LINE_NMI) && !m_vector_acks && m_pipeline_store_writes == 1, "IFR clearance cannot cancel a selected IRQ or independent NMI"); ++m_vector_acks; }
@@ -37642,6 +37714,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(55, "pmst-iptr", "Staged PMST pop and interrupt vector composition")
 	ROM_SYSTEM_BIOS(56, "pop-repeat", "Staged repeat-control stack restoration")
 	ROM_SYSTEM_BIOS(57, "pop-brc", "Staged block counter pop and repeat setup")
+	ROM_SYSTEM_BIOS(58, "stack-irq", "Staged stack updates and interrupt entry ordering")
+	ROM_SYSTEM_BIOS(59, "stack-irq-return", "Staged stack interrupt return round trip")
 ROM_END
 
 ROM_START(tms54rom4)

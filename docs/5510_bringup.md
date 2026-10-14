@@ -3222,33 +3222,43 @@ zero-latency `stm-brc` control also passes. Active-loop writes and interrupt
 composition are not accepted by these cases. The full 288-marker CPU
 regression and 57 verifier tests pass with the admitted control pops.
 
-This prototype passes the original restoration tail without an unsupported
-opcode, but that is not a boot result. A passive one-second lifecycle capture
-first observes a program read at page 4 or higher at `08:0000` (zero word)
-at 0.237083648 s. At 1.016666667 s the staged core is at `08:e35a`, word
-0000, illegal=0, idle=0, SP=1280, ST1=6900, PMST=ffc8. The resident image
-contains pages 0/2/3, not page 8. The routine-test address space is broadly
-RAM-backed, so unsupported-opcode absence does not protect against this
-unpopulated-code walk. The atomic `bootrecsave` control instead remains at
-`00:3280` (word 71e6), with no page-4-or-higher fetch observed in that window.
-Its later bench stimuli differ, so it is a control observation, not a matched
-instruction-equivalence claim. Recover the first escaping control transfer
-and its source/return frame before attributing it to a physical memory map.
-A bounded preceding-read history identifies FRET (`f4e4`) at `00:0203`
-before that transfer, but already contains a zero-filled walk below
-`00:0200`. Page 8 is therefore a downstream symptom, not the first invalid
-control-flow boundary. Program-read taps also observe speculative fetches
-and program-data accesses; identify the executing instruction before making
-a retirement or causal claim from them. A subsequent debugger execution
-trace identifies the earlier continuation: FRETE at `02:8b76` resumes at
-`03:0000` after the POPM ST1/ST0 and FRAME #1 tail. That begins execution
-of zero-filled words. The later walk reaches the bootstrap at `00:ff80`,
-takes IRQ11 at `00:ff88`, then walks another unpopulated vector region
-before reaching the page-8 transfer. Recover the restored frame's writers
-and the adjacent POPM/FRAME/FRETE ordering first; do not fill the empty
-program regions or substitute a continuation to conceal this divergence.
-The resident program/data audit remains exact; no state correction or
-synthetic continuation was applied.
+Staged interrupt Access reserves its stack slot
+after older foreground Read-owned SP changes in the same clock. The atomic
+entry path is unchanged. The `stack-irq` fixture passes 48 cases/restores:
+PSHM AL, PSHD RAM, POPM T and POPM SP; IRQ0/NMI; two source pages; and
+snapshots at clocks 4/5/6. It checks source Read at 5, interrupt SP reservation
+at 5, foreground push Write at 6 and hardware return-PC Write at 7, with one
+correct source acknowledgement at 6. This entry-only fixture makes no
+ISR-return acceptance claim. The separate `stack-irq-return` gate passes
+80 cases/restores over the same forms, sources and pages, with snapshots
+at clocks 4/5/6/10/14. It adds RETE, verifies one return-frame read, resumes
+the caller, pops the caller's preserved word for push forms, and checks
+final SP/T, cleared INTM and ordinary IDLE. Those extra snapshots cover
+the retained return operand and caller cleanup, not just entry allocation.
+The earlier core reserved SP before an older PSHM Read, interleaving the
+hardware return frame with the foreground push; the independent fixture
+failed on that slot ownership. FRAME's older-POPM ordering was already
+protected and was not changed.
+
+The native return now confirms the correction: FRETE at `02:8b76` resumes at
+the populated `03:9b08`, not `03:0000`, and the original bootstrap readiness
+gate reaches 1. The next fail-closed boundary is LDU at `03:8f13` (`1281`,
+live PC `03:8f16`), with its indirect source resolving to mapped ST1 at 0007.
+The resident audit still matches 48,261 program and 3,656 data words. The
+1,024-case IPTR fixture and 59 verifier tests pass. The full 288-marker CPU
+regression, all 41 additional isolated profiles and native 5110 save-state
+gate pass with this SP correction. Recover unsigned mapped-status read
+ownership next.
+
+The former bad return produced a zero-filled walk, a bootstrap restart and
+a later FRET into page 8. These were downstream symptoms, not missing ROM
+evidence. Zero is a valid ADD opcode, so illegal=0 did not establish useful
+execution in the RAM-backed bench. Program-read taps include speculation and
+program-data accesses; debugger execution tracing was needed to identify
+the earlier return. The atomic `bootrecsave` observation remained in populated
+code, but its later stimuli differ and it was not an instruction-equivalence
+proof. No empty region was filled and no return target or firmware state was
+forced to repair the continuation.
 
 Status acceptance
 is limited to the following

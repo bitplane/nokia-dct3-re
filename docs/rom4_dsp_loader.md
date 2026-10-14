@@ -41,12 +41,17 @@ second OVLY change before vector Fetch are outside this fixture. Inactive
 repeat-control restoration now passes 192 replay cases plus three active-loop
 exclusions. POPM BRC followed by one NOP and RPTB passes 30 replay cases,
 with independently checked count-plus-one output; active-loop writes remain
-excluded. The original MU4 resident gets past those pops, but FRETE at
-`02:8b76` resumes at `03:0000` and runs zero-filled code. This is a
-context-continuation frontier, not full boot. Resident loading remains exact;
+excluded. The staged SP-ordering correction lets FRETE at
+`02:8b76` resume at the populated `03:9b08`; interrupt Access reserves
+its slot after older foreground Read-owned stack updates. The focused
+`stack-irq` gate passes 48 cases/restores, including IRQ0/NMI and three
+snapshots; `stack-irq-return` passes 80 replays, adding RETE, caller cleanup
+and snapshots of the retained return operand and returned caller. The
+original readiness gate reaches 1 and stops next at unsigned
+mapped-ST1 load `03:8f13`, not full boot. Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
-question. The 288-marker regression, 57 verifier tests and native 5110
-save-state gate pass with these changes.
+question. The full 288-marker regression, all 41 isolated profiles, 59
+verifier tests and native 5110 save-state gate pass with this correction.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
