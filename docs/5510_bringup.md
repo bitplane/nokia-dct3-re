@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`XC 1,ALT` (`fd43`) at `03:dea4` (live PC `03:dea6`) within a five-second observation,
+`MPY Xmem,Ymem,A` (`a49a`) at `03:dda3` (live PC `03:dda5`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
@@ -152,10 +152,29 @@ prototype's stale-T projection, not a guaranteed hardware result for an
 invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
 `03:de97..de9b` has the required separation and now executes.
 
-The runner's 106 unit tests pass; the full tool suite passes 2,814 tests with
-one skip. EXP, TS-load producer, load/return and long-pair controls also pass,
-as does native 5110 save-state restoration. These focused changes do not renew
-the default-suite checkpoint.
+Staged XC now accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
+GT/LE for A/B with XC1/XC2 protected spans. XC itself is a one-word opcode.
+It uses the shared signed
+40-bit comparator at Access, preserving the existing skip-word and two-word
+interrupt-protection mechanisms. Carry/BIO/overflow and combined conditions
+outside the previously supported TC/NTC/UNC forms remain unimplemented.
+`xc-signed` passes 2,304 cases/restores: six comparisons, A/B, eight patterns,
+three legal slot layouts, two pages and four snapshots. Predicate replacement
+before and after Access distinguishes the owned sample from Decode/Execute;
+guard-only nonzero and positive-bit-31 values prevent a 32-bit comparison.
+The two-word layout includes an opcode-shaped literal and verifies that
+rejected words never become a nested instruction or data write.
+
+`xc-controls` passes 212 existing cases/restores covering unconditional IRQ
+protection, arithmetic/IRQ composition, TC/NTC and equality sampling. This
+guards the common mechanism; signed-predicate/IRQ composition is not separately
+established. The original `XC 1,ALT` at `03:dea4` now executes and advances to
+the current multiply boundary without a firmware branch override.
+
+The runner's 107 unit tests pass; the full tool suite passes 2,815 tests with
+one skip. Load/return, carry-branch and EXP/NORM controls also pass, as does
+native 5110 save-state restoration. These focused changes do not renew the
+default-suite checkpoint.
 
 The original recorder subsequently emits NAND data writes through firmware
 at `02:891c`, then reaches the current unsupported form. NAND traffic alone

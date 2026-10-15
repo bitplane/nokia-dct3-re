@@ -833,6 +833,20 @@ class CoreResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_result(marker.replace('zero_gap=projection_only', 'zero_gap=validated') + '\n' + ending + '\n', 3, profile='exp-norm')
 
+    def test_signed_xc_profile_scopes(self):
+        for profile, restores in (('xc-signed', 2304), ('xc-controls', 212)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        marker, ending = EXTRA_PROFILES['xc-signed']
+        for old, new in (('predicate=Access', 'predicate=Read'),
+                         ('rejected_writes=0', 'rejected_writes=1'),
+                         ('signed_irq_composition=unvalidated', 'signed_irq_composition=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='xc-signed')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

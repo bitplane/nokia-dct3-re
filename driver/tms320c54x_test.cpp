@@ -4074,6 +4074,51 @@ private:
 		m_phase = 251770; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct signed_xc_fixture
+	{
+		unsigned condition, layout;
+		bool b, taken;
+		u64 value, opposite;
+		u32 base;
+	};
+	static signed_xc_fixture signed_xc_case(unsigned variant)
+	{
+		unsigned const condition = variant % 6, pattern = (variant / 12) % 8;
+		bool const b = (variant / 6) % 2;
+		u64 const value = std::array<u64, 8>{0, 1, 0x8000000000ULL, 0xffffffffffULL, 0x7fffffffffULL, 0x0100000000ULL, 0x0080000000ULL, 0xff80000000ULL}[pattern];
+		s64 const signed_value = value & 0x8000000000ULL ? s64(value) - (s64(1) << 40) : s64(value);
+		bool const taken = std::array<bool, 6>{signed_value >= 0, signed_value < 0, value != 0, value == 0, signed_value > 0, signed_value <= 0}[condition];
+		u64 const opposite = taken ? std::array<u64, 6>{0x8000000000ULL, 0, 0, 1, 0, 1}[condition] : std::array<u64, 6>{0, 0x8000000000ULL, 1, 0, 1, 0}[condition];
+		return {condition, (variant / 96) % 3, b, taken, value, opposite, (variant / 288) % 2 ? 0x20000U : 0};
+	}
+	void start_signed_xc(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = signed_xc_case(variant); bool const multiword = f.layout == 2;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xfd42 + f.condition + (f.b ? 8 : 0) + (f.layout ? 0x200 : 0));
+		program.write_word(f.base + 0x601, multiword ? 0x7600 : 0x8c00);
+		program.write_word(f.base + 0x602, multiword ? 0xfd43 : 0x8c01);
+		if (multiword) program.write_word(f.base + 0x603, 0x8c01);
+		program.write_word(f.base + 0x603 + multiword, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.b ? 0x1234 : f.opposite); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ? f.opposite : 0x3456);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "signed_xc_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Signed XC slots never read a data operand"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "signed_xc_writes",
+			[this, f, multiword](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect((at == 0x700 || at == 0x701) && (f.taken || (at == 0x701 && (multiword || !f.layout))) && word == (at == 0x700 && multiword ? 0xfd43 : 0x5aa5) && m_cpu->pipeline_cycles() == 7 + unsigned(multiword) + at - 0x700, "Signed XC retains its Access predicate and never executes a rejected slot"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x602, "signed_xc_words",
+			[this, f](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; unsigned const bit = 1U << (at - f.base - 0x601); expect(!(m_pipeline_extensions_reads & bit), "Each protected word is fetched once, including opcode-shaped literal"); m_pipeline_extensions_reads |= bit; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254880;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_delayed_return(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -12010,6 +12055,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
+		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
 		if (!strcmp(machine().options().bios(), "drsub") || !strcmp(machine().options().bios(), "long-pair")) { start_pipeline_long_pair(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-store")) { start_xmem_store(); return; }
@@ -33187,6 +33234,11 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 47) { start_pipeline_xc_accumulator(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged XC accumulator sampling: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ words=1,2 restore=48 access_sampled=1 rejected_writes=0\n");
+				if (!strcmp(machine().options().bios(), "xc-controls"))
+				{
+					osd_printf_info("TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 eq_ne=48 restore=212\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated XC controls complete");
+				}
 				start_pipeline_plain_branch(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -39140,6 +39192,36 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254880)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = signed_xc_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 4, 5, 8}[variant / 576];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa60e && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Signed XC preserves status and T");
+			if (tick == 3 || tick == 4) m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 3 ? f.value : f.opposite);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save signed XC before/after predicate and protected-slot decisions");
+			}
+			if (tick == 16)
+			{
+				unsigned const writes = unsigned(f.taken) + unsigned(f.taken || f.layout != 1);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == writes && m_pipeline_extensions_reads == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b ? 0x1234 : f.opposite) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ? f.opposite : 0x3456), "Signed XC uses a retained 40-bit comparison, legal slot layout and no duplicate effects");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore signed XC without resampling predicate or decoding rejected literal");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254890; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 2303) { start_signed_xc(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged signed XC: PASS cases=2304 restore=2304 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B patterns=8 layouts=XC1_single,XC2_two_single,XC2_one_double pages=2 snapshots=4 predicate=Access rejected_writes=0 opcode_literal=1 signed_irq_composition=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated signed XC complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254890) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254880; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254860)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -40733,6 +40815,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(128, "norm", "Retained normalization shift sampling and replay")
 	ROM_SYSTEM_BIOS(129, "norm-edge", "Unsupported normalization shift-domain controls")
 	ROM_SYSTEM_BIOS(130, "exp-norm", "EXP producer and normalization T latency")
+	ROM_SYSTEM_BIOS(131, "xc-signed", "Signed XC predicate and protected-slot replay")
+	ROM_SYSTEM_BIOS(132, "xc-controls", "Existing XC sampling and interrupt controls")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -374,7 +374,7 @@ constexpr bool staged_xc(u16 word)
 {
 	u16 const form = word & ~u16(0x0200);
 	return form == 0xfd00 || form == 0xfd20 || form == 0xfd30 ||
-		form == 0xfd44 || form == 0xfd45 || form == 0xfd4c || form == 0xfd4d;
+		(form >= 0xfd42 && form <= 0xfd47) || (form >= 0xfd4a && form <= 0xfd4f);
 }
 
 constexpr bool staged_rmw(u16 word)
@@ -2776,8 +2776,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && staged_xc(m_pipeline_word[3]))
 	{
 		u16 const word = m_pipeline_word[3];
-		bool const zero = (accumulator(BIT(word, 3)) & ACC_MASK) == 0;
-		bool const execute = BIT(word, 6) ? (BIT(word, 0) ? zero : !zero) :
+		bool const execute = BIT(word, 6) ? staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
 			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : true;
 		m_pipeline_operand[3] = execute;
 		if (!execute) m_pipeline_xc_skip_words = BIT(m_pipeline_word[3], 9) ? 2 : 1;
