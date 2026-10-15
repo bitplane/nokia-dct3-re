@@ -23,14 +23,24 @@ class HostSmsRunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(socket.recv.await_count, 5)
 
     async def test_unrelated_traffic_cannot_extend_total_budget(self):
+        remaining = 5
+
         async def unrelated():
-            await asyncio.sleep(0.002)
-            return '{}'
+            nonlocal remaining
+            if remaining:
+                remaining -= 1
+                return '{}'
+            await asyncio.Future()
+
         socket = AsyncMock()
         socket.recv.side_effect = unrelated
-        with self.assertRaises(asyncio.TimeoutError):
-            await gate.wait_for_sms_end(socket, 1, 0.02)
-        self.assertGreater(socket.recv.await_count, 1)
+        # Deliver the burst without yielding: a loaded host cannot expire the
+        # budget before multiple unrelated events have actually been consumed.
+        with patch.object(gate.asyncio, 'timeout', wraps=asyncio.timeout) as budget:
+            with self.assertRaises(asyncio.TimeoutError):
+                await gate.wait_for_sms_end(socket, 1, 0.02)
+        budget.assert_called_once_with(0.02)
+        self.assertEqual(socket.recv.await_count, 6)
 
     def test_completion_budget_is_finite_positive(self):
         self.assertEqual(gate.positive_seconds('180'), 180)
