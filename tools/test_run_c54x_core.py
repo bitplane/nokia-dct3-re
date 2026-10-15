@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_smem_cmpm_scope(self):
+        for name in ('cmpm-smem', 'cmpm-branch'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('data_writes=0', 'data_writes=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_delay_multiply_scope(self):
         for name in ('mpy-delay', 'mpy-delay-edge'):
             marker, ending = EXTRA_PROFILES[name]

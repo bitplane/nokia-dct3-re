@@ -257,10 +257,9 @@ constexpr bool staged_immediate_multiply(u16 word)
 
 constexpr bool staged_bitfield(u16 word)
 {
-	// CMPM shares BITF's retained address/literal path. Direct and absolute
-	// RAM forms have composition coverage; indirect forms remain excluded.
-	return ((word & 0xff00) == 0x6100 && u8(word) <= 0xf8) ||
-		((word & 0xff00) == 0x6000 && (u8(word) < 0x80 || u8(word) == 0xf8));
+	// CMPM and BITF share the retained Smem address and immediate-word path.
+	// CMPM's mapped/peripheral-source exclusion is checked after DAGEN.
+	return ((word & 0xff00) == 0x6100 || (word & 0xff00) == 0x6000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_bitfield(u16 word)
@@ -3054,7 +3053,7 @@ void tms320c54x_device::pipeline_step()
 				long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4);
 			if (m_pipeline_operand_address[4] < 0x60)
 			{
-				logerror("%s: staged long-offset accumulator store register/peripheral destination is unsupported\n", machine().describe_context());
+				logerror("%s: staged extended accumulator store register/peripheral destination is unsupported instruction=%06x last_fetch_physical=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[4]), unsigned(m_pipeline_physical_address[4]), m_pipeline_word[4], m_pipeline_operand_address[4]);
 				m_illegal = true; return;
 			}
 		}
@@ -3307,7 +3306,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (source < 0x60 && (source < (multiply || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !(bitfield && source >= 0x20))
 		{
-			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x physical=%06x word=%04x source=%04x pmst=%04x\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), unsigned(m_pipeline_physical_address[3]), m_pipeline_word[3], source, m_pmst);
+			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x last_fetch_physical=%06x word=%04x source=%04x pmst=%04x\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), unsigned(m_pipeline_physical_address[3]), m_pipeline_word[3], source, m_pmst);
 			m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);

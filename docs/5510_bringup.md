@@ -12,8 +12,11 @@ streams, not a matching handset PMM or an internal DSP mask image.
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
-`007f,0001,0055`, and enters the recorder routine. Execution stops at
-short-indirect CMPM (`6081`) at `02:a6b1` (live PC `02:a6b3`).
+`007f,0001,0055`, and enters the recorder routine. It also compares the
+recorder overlay's 73,762 RAM destination words before execution (four
+register words excluded) and enters original recorder startup at `0073f9`.
+Execution stops at absolute STH A (`82f8 0011`) at `03:f7dd`, whose
+mapped AR1 destination is not yet admitted (live PC `03:f7e2`).
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -119,7 +122,8 @@ Native 5110 save-state restoration also passes. At that checkpoint the tool
 suite ran 2,800 tests with one skip, including 92 core-result verifier tests.
 SIP lifecycle unit tests require local loopback socket permission.
 The original staged MU4 probe retains exact comparison of 48,261 program
-and 3,656 data words and reaches the CMPM frontier in
+and 3,656 data words. This checkpoint reaches the earlier CMPM frontier;
+the subsequent focused extension and current recorder stop are described in
 [Current boundary](#current-boundary). The separate atomic `bootreplay`
 control also passes original bootstrap loading, pin-level status service
 and mid-byte save/replay, including equality of its selected emulation
@@ -3425,11 +3429,38 @@ capture survives later DP/SP mutation; source and literal survive later
 replacement. Read is at 6, TC publication at 7 and the following branch's
 taken target Fetch at 10 (one intervening NOP). One source read, one literal
 fetch and zero writes are checked. The 96-case absolute-CMPM control passes.
-Indirect CMPM and all mapped/peripheral CMPM sources remain excluded.
+Smem CMPM also shares BITF's retained indirect address/literal path
+(SPRU172C, CMPM, page 4-33). The `cmpm-smem` fixture passes 55,296 cases
+and restores over 18 addressing forms, eight auxiliary-register selections,
+eight equality/inequality pairs, both initial TC states, four SXM/OVM
+settings and both compatibility modes. Snapshots bracket address capture
+and Read. Later pointer, source and literal mutations cannot retarget or
+change the comparison; offset/address extensions precede the distinct
+comparison literal, and only TC changes at Execute. Each case observes
+one source read, no duplicate address modification and no data write.
+The `cmpm-branch` fixture adds 192 cases/restores over two program pages,
+TC/NTC conditions and both initial TC states, with the branch immediately
+following `CMPM *AR1,#lk`. Source Read is at clock 6, TC publication at 7
+and taken-target Fetch at 9. The post-Access pointer and post-Read source
+are replaced to verify retained ownership, not just final equality.
+Mapped/peripheral CMPM sources remain excluded by the Access guard;
+these tests do not establish physical pipeline phases, repeated CMPM or
+control-delay composition.
+Focused acceptance passes ten profiles: `cmpm-smem`, `cmpm-branch`,
+`cmpm-direct`, `cmpm-absolute`, `bitf-peripheral`, `memory-shift16`,
+`mpy-delay`, `store-delay`, `move-t` and `stack-irq-return`. The tool suite
+runs 2,801 tests with one skip, including 93 core-result verifier tests;
+native 5110 save-state restoration also passes. The original firmware
+passes `6081 0006` at `02:a6b1` and loads its recorder overlay, rather
+than merely moving to another instruction in the resident initializer.
+Failure diagnostics report the retained logical instruction separately
+from the ahead live PC. For folded multiword forms, `last_fetch_physical`
+identifies the final extension fetch, not the opcode's physical address.
 The original CMPM at `03:91eb` executes with CPL set, SP=`1246` and
 direct source `125a`. The `7725` at `02:6d47` is STM immediate to PRD,
-covered by the timer-register contract below. These fixtures and native
-5110 restoration are covered by the shared regression checkpoint.
+covered by the timer-register contract below. The new Smem and adjacent-branch
+profiles have focused acceptance; they do not inherit all-profile coverage
+from the separately versioned shared regression checkpoint.
 
 Immediate TIM/PRD/TCR writes (`7724..7726`) now retain their literal and
 publish through the timer's existing register writer at Execute, after one

@@ -97,8 +97,10 @@ and MVMD BK,AR0 are admitted. Long-offset STL `80e2 0001` at
 `02:e206` fits the complete two-word delay of `f273 e209` at `02:e204`
 and now executes, as does MVMD AR6,T (`7316 000e`) at `02:e109`.
 Absolute MPY (`20f8 0017`, AR7 source) at `02:e10f` in FCALLD's
-delay now executes. The next stop is short-indirect CMPM (`6081`) at
-`02:a6b1` (live PC `02:a6b3`).
+delay now executes. Smem CMPM now passes its retained addressing and
+adjacent TC/NTC branch fixtures, and the original recorder overlay loads
+and enters startup. The single authoritative staged execution stop is in
+[5510 Current boundary](5510_bringup.md#current-boundary).
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.

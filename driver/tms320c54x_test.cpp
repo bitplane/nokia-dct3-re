@@ -7384,8 +7384,10 @@ private:
 		m_phase = 252990; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	static std::array<u16, 2> bitfield_inputs(unsigned variant)
+	static std::array<u16, 2> bitfield_inputs(unsigned variant, bool compare = false)
 	{
+		if (compare) return std::array<std::array<u16, 2>, 8>{{{0, 0}, {1, 1}, {0x80, 0x7f}, {0x7f, 0x7f},
+			{0x8000, 0x8000}, {0x8000, 0x7fff}, {0xffff, 0xf495}, {0xffff, 0xffff}}}[(variant / 144) % 8];
 		return std::array<std::array<u16, 2>, 8>{{{0xffff, 0}, {1, 1}, {0x80, 0x7f}, {0x7f, 0x7f},
 			{0x8000, 0x8000}, {0x8000, 0x7fff}, {0xffff, 0xf495}, {0, 0xffff}}}[(variant / 144) % 8];
 	}
@@ -7397,12 +7399,13 @@ private:
 	void start_pipeline_bitfield(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant);
+		bool const compare = !strcmp(machine().options().bios(), "cmpm-smem");
+		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
 		bool const extended = f.form >= 14;
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x600, 0x6100 | u8(f.opcode));
+		program.write_word(base + 0x600, (compare ? 0x6000 : 0x6100) | u8(f.opcode));
 		program.write_word(base + 0x601, extended ? f.literal : input[1]);
 		if (extended) program.write_word(base + 0x602, input[1]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
@@ -7458,15 +7461,17 @@ private:
 	void start_pipeline_bitfield_ar7(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const compare = !strcmp(machine().options().bios(), "cmpm-absolute");
+		bool const short_compare = !strcmp(machine().options().bios(), "cmpm-branch");
+		bool const compare = short_compare || !strcmp(machine().options().bios(), "cmpm-absolute");
 		bool const peripheral = !strcmp(machine().options().bios(), "bitf-peripheral"), offset = peripheral && (variant / 32) % 2;
 		u16 const value = std::array<u16, 4>{0, 1, u16(compare ? 0x7f : 2), 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : peripheral ? 2 : 1;
 		bool const tc = (variant / 4) % 2, initial_tc = (variant / 8) % 2;
-		u32 const base = (peripheral ? (variant / 64) % 2 : variant % 2) ? 0x20000 : 0;
+		u32 const base = (short_compare ? (variant / 32) % 2 : peripheral ? (variant / 64) % 2 : variant % 2) ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-		std::array<u16, 7> const words{u16(compare ? 0x60f8 : offset ? 0x61e1 : 0x61f8), u16(compare ? 0x3762 : peripheral ? offset ? 1 : 0x49 : 0x0017), mask, u16(0xf820 | (tc << 4)), 0x0700, 0xe811, 0xf4e1};
-		for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
+		std::array<u16, 7> const words{u16(short_compare ? 0x6081 : compare ? 0x60f8 : offset ? 0x61e1 : 0x61f8), u16(compare ? 0x3762 : peripheral ? offset ? 1 : 0x49 : 0x0017), mask, u16(0xf820 | (tc << 4)), 0x0700, 0xe811, 0xf4e1};
+		for (unsigned i = 0; i < words.size(); ++i)
+			if (!short_compare || i != 1) program.write_word(base + 0x600 + i - (short_compare && i > 1), words[i]);
 		program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -7474,6 +7479,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR7, value);
 		if (compare) m_cpu->space(AS_DATA).write_word(0x3762, value);
+		if (short_compare) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x3762);
 		if (peripheral) { m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x48); m_cpu->space(AS_DATA).write_word(0x49, value); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -7482,18 +7488,19 @@ private:
 		if (compare)
 		{
 			m_fast_stack_reads = 0;
-			m_operand_data_tap = program.install_read_tap(base + 0x601, base + 0x602, "cmpm_literal_ownership",
-				[this, base, mask](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (m_fast_stack_reads >= 2 || at != base + 0x601 + m_fast_stack_reads || word != (m_fast_stack_reads ? mask : 0x3762)) osd_printf_info("CMPM extension mismatch: case=%u at=%06x word=%04x index=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(at), word, m_fast_stack_reads, (unsigned long long)m_cpu->pipeline_cycles()); expect(m_fast_stack_reads < 2 && at == base + 0x601 + m_fast_stack_reads && word == (m_fast_stack_reads ? mask : 0x3762), "CMPM fetches address before immediate exactly once"); ++m_fast_stack_reads; });
+			m_operand_data_tap = program.install_read_tap(base + 0x601, base + (short_compare ? 0x601 : 0x602), "cmpm_literal_ownership",
+				[this, base, mask, short_compare](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+					expect(m_fast_stack_reads < (short_compare ? 1 : 2) && at == base + 0x601 + m_fast_stack_reads && word == (short_compare || m_fast_stack_reads ? mask : 0x3762), "CMPM captures its comparison literal after any address extension exactly once"); ++m_fast_stack_reads; });
 		}
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitfield_ar7_sample",
-			[this, value, compare, peripheral](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(at == (compare ? 0x3762 : peripheral ? 0x49 : 0x17) && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (peripheral ? 8 : 7),
+			[this, value, compare, peripheral, short_compare](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == (compare ? 0x3762 : peripheral ? 0x49 : 0x17) && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (short_compare ? 6 : peripheral ? 8 : 7),
 					"Original BITF family samples mapped AR7 once before TC publication"); ++m_pipeline_operand_reads; });
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "bitfield_ar7_target",
-			[this, value, tc, mask, compare, peripheral](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-				if (m_cpu->pipeline_cycles() != (peripheral ? 11 : 10)) osd_printf_info("Mapped BITF target timing: cycle=%llu value=%04x mask=%04x tc_condition=%u\n",
+			[this, value, tc, mask, compare, peripheral, short_compare](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
+				if (m_cpu->pipeline_cycles() != (short_compare ? 9 : peripheral ? 11 : 10)) osd_printf_info("Mapped BITF target timing: cycle=%llu value=%04x mask=%04x tc_condition=%u\n",
 					(unsigned long long)m_cpu->pipeline_cycles(), value, mask, tc);
-				expect((compare ? value == mask : bool(value & mask)) == tc && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == (peripheral ? 11 : 10),
+				expect((compare ? value == mask : bool(value & mask)) == tc && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == (short_compare ? 9 : peripheral ? 11 : 10),
 					"Immediate TC/NTC branch consumes BITF's published mask result"); ++m_pipeline_extensions_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitfield_ar7_no_write",
 			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITF/branch does not write its register source"); });
@@ -11456,6 +11463,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
+		if (!strcmp(machine().options().bios(), "cmpm-smem")) { start_pipeline_bitfield(); return; }
+		if (!strcmp(machine().options().bios(), "cmpm-branch")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
 		if (!strcmp(machine().options().bios(), "mac-smem")) { start_mac_smem(); return; }
@@ -35755,12 +35764,13 @@ private:
 		if (m_phase == 253010)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant);
+			bool const compare = !strcmp(machine().options().bios(), "cmpm-smem");
+			auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
 			unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[variant / 18432];
-			bool const initial_tc = (variant / 1152) % 2, result = input[0] & input[1];
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BITF has staged source/mask ownership");
+			bool const initial_tc = (variant / 1152) % 2, result = compare ? input[0] == input[1] : bool(input[0] & input[1]);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Smem test/compare has staged source and literal ownership");
 			expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick <= read_cycle ? initial_tc : result),
-				"BITF publishes TC only at Execute, not during Decode/address/Read");
+				"Smem test/compare publishes TC only at Execute, not during Decode/address/Read");
 			if (tick == (f.form >= 14 ? 5 : 4))
 			{
 				auto const disable = machine().disable_side_effects();
@@ -35798,6 +35808,11 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 55295) { start_pipeline_bitfield(variant + 1); return; }
+				if (compare)
+				{
+					osd_printf_info("TMS320C54x staged Smem CMPM: PASS cases=55296 restore=55296 forms=18 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated Smem CMPM complete");
+				}
 				osd_printf_info("TMS320C54x staged BITF: PASS cases=55296 forms=18 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=55296 duplicate_reads=0 data_writes=0\n");
 				start_pipeline_bitfield_ar7(); return;
 			}
@@ -35811,20 +35826,23 @@ private:
 		if (m_phase == 253030)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const compare = !strcmp(machine().options().bios(), "cmpm-absolute");
+			bool const short_compare = !strcmp(machine().options().bios(), "cmpm-branch");
+			bool const compare = short_compare || !strcmp(machine().options().bios(), "cmpm-absolute");
 			bool const peripheral = !strcmp(machine().options().bios(), "bitf-peripheral");
 			u16 const value = std::array<u16, 4>{0, 1, u16(compare ? 0x7f : 2), 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : peripheral ? 2 : 1;
 			bool const result = compare ? value == mask : bool(value & mask), taken = result == bool((variant / 4) % 2), initial_tc = (variant / 8) % 2;
-			unsigned const checkpoint = peripheral ? std::array<unsigned, 3>{5, 8, 9}[variant / 128] : (compare ? std::array<unsigned, 3>{3, 7, 8} : std::array<unsigned, 3>{5, 7, 8})[variant / 32];
+			unsigned const checkpoint = short_compare ? std::array<unsigned, 3>{3, 5, 6}[variant / 64] : peripheral ? std::array<unsigned, 3>{5, 8, 9}[variant / 128] : (compare ? std::array<unsigned, 3>{3, 7, 8} : std::array<unsigned, 3>{5, 7, 8})[variant / 32];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR7 BITF and its immediate branch are organic CPU instructions");
-			expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick < (peripheral ? 9 : 8) ? initial_tc : result), "BITF/CMPM publishes its retained source result in Execute");
+			expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick < (short_compare ? 7 : peripheral ? 9 : 8) ? initial_tc : result), "BITF/CMPM publishes its retained source result in Execute");
+			if (short_compare && tick == 5) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x7777);
 			if (tick == 6 && compare)
 			{
-				expect(m_fast_stack_reads == 2, "CMPM captures both extensions before later program changes");
-				auto const disable = machine().disable_side_effects(); u32 const base = variant % 2 ? 0x20000 : 0;
-				m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
+				expect(m_fast_stack_reads == (short_compare ? 1 : 2), "CMPM captures its extensions before later program changes");
+				auto const disable = machine().disable_side_effects(); u32 const base = (short_compare ? (variant / 32) % 2 : variant % 2) ? 0x20000 : 0;
+				m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
+				if (!short_compare) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
 			}
-			if (tick == (peripheral ? 8 : 7))
+			if (tick == (short_compare ? 6 : peripheral ? 8 : 7))
 			{
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x7777);
 				if (compare) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3762, 0x7777); }
@@ -35838,7 +35856,8 @@ private:
 			}
 			if (tick == 30)
 			{
-				if (compare) expect(m_fast_stack_reads == 2, "CMPM never re-fetches its captured extensions");
+				if (compare) expect(m_fast_stack_reads == (short_compare ? 1 : 2), "CMPM never re-fetches its captured extensions");
+				if (short_compare) expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x7777, "Short CMPM retains its captured address without restoring or reapplying the pointer");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(taken) &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x7777 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (result ? 0x1000 : 0)),
@@ -35855,7 +35874,12 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				if (compare) m_operand_data_tap.remove();
-				if (variant < (peripheral ? 383 : 95)) { start_pipeline_bitfield_ar7(variant + 1); return; }
+				if (variant < (short_compare ? 191 : peripheral ? 383 : 95)) { start_pipeline_bitfield_ar7(variant + 1); return; }
+				if (short_compare)
+				{
+					osd_printf_info("TMS320C54x staged short CMPM branch: PASS cases=192 restore=192 pages=2 conditions=TC,NTC initial_tc=2 source_read=6 tc_publish=7 target_fetch=9 source_reads=1 literal_fetches=1 data_writes=0 adjacent_branch=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated short CMPM branch complete");
+				}
 				if (peripheral)
 				{
 					osd_printf_info("TMS320C54x staged peripheral BITF: PASS cases=384 restore=384 forms=offset,absolute pages=2 conditions=TC,NTC source_read=8 tc_publish=9 target_fetch=11 reads=1 destination_writes=0 peripheral_extra_clock=1 silicon_phase_claim=0\n");
@@ -39650,6 +39674,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(106, "move-t", "Retained T and TRN move destinations with consumers")
 	ROM_SYSTEM_BIOS(107, "mpy-delay", "Retained memory multiply in control delay words")
 	ROM_SYSTEM_BIOS(108, "mpy-delay-edge", "Rejected multiply straddling a control delay")
+	ROM_SYSTEM_BIOS(109, "cmpm-smem", "Retained Smem equality and indirect address ownership")
+	ROM_SYSTEM_BIOS(110, "cmpm-branch", "Short indirect comparison and adjacent TC branch")
 ROM_END
 
 ROM_START(tms54rom4)
