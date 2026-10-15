@@ -50,6 +50,8 @@ handles[4] = data:install_read_tap(0, 0x7f, 'mu4_recorder_first_low_page_copy', 
     end
 end)
 local stop = emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('mu4_recorder_terminal: pc=%06x illegal=%u idle=%u observer_writes=0\n',
+        context(), cpu.state['ILLEGAL'].value, cpu.state['IDLE'].value))
     machine:logerror(string.format('mu4_recorder_source_summary: field_writes=%u field_reads=%u nonzero_writes=%u first_copy_reads=%u order_errors=%u first_copy_before_nonzero=%u selector_reads=%u observer_writes=0\n',
         field_writes, field_reads, nonzero_writes, first_copy_reads, order_errors, first_copy_before_nonzero and 1 or 0, selector_reads))
 end)

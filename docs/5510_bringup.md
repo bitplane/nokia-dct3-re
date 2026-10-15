@@ -24,8 +24,13 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`9808` at `03:83ad` (live PC `03:83af`). This is not complete recording or
+`58f8` at `02:8d23` (live PC `02:8d25`) within a five-second observation.
+The one-second prefix has no illegal-opcode stop; extending the bound exposes
+this next gap and terminal `illegal=1`. This is not complete recording or
 validated audio.
+
+## Retained recorder execution contracts
+
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
 isolated conditional-return fixture alone excludes adjacent producers; its
@@ -95,9 +100,30 @@ The original `9008` at `03:838b` executes inside the firmware's block-repeat
 loop and advances to the current unsupported form; this is a bounded original
 composition observation, not general block-repeat arithmetic acceptance.
 
-The runner's 102 unit tests pass; the full tool suite passes 2,810 tests with
-one skip. The 196,608-case Xmem load regression, carry-branch, load/return and
-WRITA exclusion controls also pass, as does native 5110 save-state restoration.
+Compact shifted Xmem stores (`9800..9bff`) now present the retained write
+address on EAB in Read and write EB in Execute, following SPRU131G section
+7.1 and SPRU172C Class 10A. Source shifting and SST saturation use the
+Execute-visible accumulator; this is distinct from a memory operand sample.
+AR modification occurs once with the write address, before younger Access
+uses the pointer. CPU low-page register/peripheral destinations remain excluded.
+
+`xmem-store` passes 786,432 cases/restores across all 1,024 STL/STH encodings:
+16 Xmem modes, shifts 0..15, eight 40-bit source patterns, both accumulators,
+16 status combinations, two pages and three snapshots. The fixture changes
+AR after EAB sampling and the source accumulator before Execute, then checks
+the actual RAM word. SST, SXM and OVM vary independently; neither the source
+accumulator nor status is changed by the store. There are no destination reads.
+`xmem-store-bp` adds 288 cases/restores for same-location store-to-load bypass,
+with zero/one gap, alias/nonalias addresses, six producers and both load
+destinations. A bypass suppresses only the stale backing-memory read, not the
+store's real Execute write. Physical bank arbitration remains unvalidated.
+
+The original `9808` at `03:83ad` executes after a long-offset load and advances
+to the current boundary. The passive source observer also reports terminal
+live PC, illegal and idle state; a quiet short run is not acceptance.
+The runner's 104 unit tests pass; the full tool suite passes 2,812 tests with
+one skip. The 393,216-case arithmetic and 196,608-case load regressions pass,
+along with both store-bypass profiles and native 5110 save-state restoration.
 These focused changes do not renew the default-suite checkpoint.
 
 The original recorder subsequently emits NAND data writes through firmware
@@ -108,6 +134,8 @@ The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
 transaction or physical DA150 mapping is established.
+
+## Independent MU4 acceptance
 
 The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six

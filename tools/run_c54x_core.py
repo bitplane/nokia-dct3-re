@@ -404,6 +404,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "xmem-store-bp": (
+        "TMS320C54x staged Xmem store bypass: PASS cases=288 restore=288 producers=6 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated",
+        "Fatal error: TMS320C54x isolated Xmem store bypass complete",
+    ),
+    "xmem-store": (
+        "TMS320C54x staged Xmem stores: PASS cases=786432 restore=786432 encodings=1024 operations=STL,STH xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=16 pages=2 snapshots=3 eab=Read eb=Execute destination_reads=0 data_writes=1 sst_sxm=1 ovm_independent=1 bk_zero_and_wrap=1 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated Xmem stores complete",
+    ),
     "xmem-alu": (
         "TMS320C54x staged Xmem arithmetic: PASS cases=393216 restore=393216 encodings=1024 operations=ADD,SUB xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 read=5 publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated Xmem arithmetic complete",

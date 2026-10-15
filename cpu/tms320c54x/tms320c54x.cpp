@@ -26,6 +26,11 @@ constexpr bool staged_xmem_arithmetic(u16 word)
 	return (word & 0xfc00) == 0x9000;
 }
 
+constexpr bool staged_xmem_store(u16 word)
+{
+	return (word & 0xfc00) == 0x9800;
+}
+
 constexpr bool staged_mvdd(u16 word)
 {
 	return (word & 0xff00) == 0xe500;
@@ -2937,7 +2942,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || staged_timer_control(word);
 		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
+			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -3079,6 +3084,17 @@ void tms320c54x_device::pipeline_step()
 	// Resolve an older store's implicit DAGEN update before a younger
 	// memory Access consumes the same AR. The data write remains in Execute.
 	// This is address ordering, not forwarding an explicit MMR store.
+	if (m_pipeline_valid[4] && staged_xmem_store(m_pipeline_word[4]))
+	{
+		// SPRU131G 7.1: a store presents EAB in Read and drives EB in Execute.
+		u8 const xmem = m_pipeline_word[4] >> 4;
+		m_pipeline_operand_address[4] = m_ar[2 + (xmem & 3)];
+		if (m_pipeline_operand_address[4] < 0x60)
+		{
+			logerror("%s: staged Xmem store register/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		dual_modify(xmem, 4);
+	}
 	if (m_pipeline_valid[4] && staged_store(m_pipeline_word[4]))
 	{
 		u8 const mode = m_pipeline_word[4];
@@ -3876,6 +3892,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_mvdd(m_op))
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		else if (staged_xmem_store(m_op))
+		{
+			u64 const shifted = (accumulator(BIT(m_op, 8)) << (m_op & 15)) & ACC_MASK;
+			data_write(m_pipeline_operand_address[5], u16(saturated_store(shifted) >> (BIT(m_op, 9) ? 16 : 0)));
+		}
 		else if (staged_xmem_arithmetic(m_op))
 		{
 			u64 const operand = (data_operand(m_pipeline_operand[5]) << (m_op & 15)) & ACC_MASK;
@@ -4308,10 +4329,12 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 	// write through an internal bus. Preserve the real EB write and flags;
 	// This partial model covers retained RMW and ordinary store producers,
 	// not bank contention or stack instructions' separate read ordering.
-	if (address >= 0x60 && m_pipeline_valid[5] && staged_store(m_pipeline_word[5]) &&
+	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5])) &&
 		address == m_pipeline_operand_address[5])
 	{
 		u16 const word = m_pipeline_word[5];
+		if (staged_xmem_store(word))
+			return u16(saturated_store((accumulator(BIT(word, 8)) << (word & 15)) & ACC_MASK) >> (BIT(word, 9) ? 16 : 0));
 		return (word & 0xfe00) == 0x8c00 ? (BIT(word, 8) ? m_trn : m_t) :
 			u16(saturated_store(accumulator(BIT(word, 8))) >> (BIT(word, 9) ? 16 : 0));
 	}

@@ -791,6 +791,26 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(output.replace(old, new), 3, profile='xmem-alu')
 
+    def test_xmem_store_scope(self):
+        marker, ending = EXTRA_PROFILES['xmem-store']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='xmem-store')
+        for old, new in (('restore=786432', 'restore=0'), ('operations=STL,STH', 'operations=STL'),
+                         ('destination_reads=0', 'destination_reads=1'),
+                         ('eab=Read', 'eab=Execute'), ('sst_sxm=1', 'sst_sxm=0'),
+                         ('mapped_acceptance=0', 'mapped_acceptance=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='xmem-store')
+
+    def test_xmem_store_bypass_scope(self):
+        marker, ending = EXTRA_PROFILES['xmem-store-bp']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='xmem-store-bp')
+        for old, new in (('restore=288', 'restore=0'), ('alias_reads=0', 'alias_reads=1'),
+                         ('writes=1', 'writes=2'), ('gaps=0,1', 'gaps=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='xmem-store-bp')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'
