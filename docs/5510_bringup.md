@@ -31,9 +31,10 @@ times. The call's delay span ends at the active block endpoint `03:db3a`;
 this is covered by the retained loop/call contract below. The REA, RSA and
 BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
 The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
-times in a five-second passive observation. The next stop is the in-block
-loop-register-write guard (context PC `03:d6a1`, terminal PC `03:d69d`,
-`illegal=1`); its exact writer and loop ownership remain to be mapped.
+times in a five-second passive observation. The next stop is unsupported
+`6dbb` at `03:c84a` (live/terminal PC `03:c84c`, `illegal=1`); its addressing
+contract remains to be mapped. The post-loop BRC reload has separate
+write-stage ownership, as described below.
 The intervening indirect PMST and repeat-control restore exclusions are
 covered by the bounded tests below.
 The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
@@ -55,6 +56,26 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Post-loop BRC write ownership
+
+STM BRC uses the existing zero-latency Access publication before a new
+RPTB (SPRU131G table 7-24). Its loop membership must come from that
+Access instruction, not whichever older instruction occupies Execute.
+The original `STM #003f,BRC` at `03:d69d` overlaps the older loop endpoint
+`DST A,*AR1+` at `03:d69c`. A guard using only Execute's body tag wrongly
+attributes the value `003f` to the DST and rejects an outside-loop reload.
+Early Access/Read writes now pass their owner stage to the shared guard;
+ordinary Execute writes retain their own stage. No in-loop latency or
+dynamic BRC-update semantics are added by this correction.
+
+`repeat-rearm` covers 64 cases/restores: consecutive blocks with first
+counts 0/1/3/7, next counts 0/2, two pages and four snapshots. It checks
+one BRC publication and independently counted iterations in both blocks.
+The negative `rearm-edge` fixture passes eight cases/restores for an actual
+Access-owned in-body STM BRC write, excluded before publication. These are
+CPU conformance guards, not silicon traps. Physical phase timing and
+interrupt composition are not established by this fixture.
 
 ### Signed dual-memory MAC
 
@@ -267,7 +288,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,847 tests with one skip; the native 5110
+The tool suite passes 2,849 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

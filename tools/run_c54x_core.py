@@ -820,6 +820,14 @@ EXTRA_PROFILES = {
         "TMS320C54x dual MAC exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated dual MAC exclusions complete",
     ),
+    "repeat-rearm": (
+        "TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated adjacent block rearm complete",
+    ),
+    "rearm-edge": (
+        "TMS320C54x in-body STM BRC exclusion: PASS cases=8 restore=8 pages=2 snapshots=4 write_owner=Access publications=0 body_effects=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated in-body STM BRC exclusion complete",
+    ),
     "pmst-map": (
         "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
         "Fatal error: TMS320C54x isolated PMST mapping complete",

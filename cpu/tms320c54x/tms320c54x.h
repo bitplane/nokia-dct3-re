@@ -122,7 +122,7 @@ private:
 	u32 program_address(u16 address) const { return physical_program_address(logical_program_address(address)); }
 	void far_transfer(u32 address, bool delayed);
 	u16 data_read(u16 address);
-	void data_write(u16 address, u16 value);
+	void data_write(u16 address, u16 value, unsigned owner_stage = 5);
 	void internal_data_map(address_map &map);
 	void publish_bus_controls();
 	u16 register_read(u16 address);

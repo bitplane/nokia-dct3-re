@@ -1697,12 +1697,15 @@ u16 tms320c54x_device::data_read(u16 address)
 	return m_data.read_word(address);
 }
 
-void tms320c54x_device::data_write(u16 address, u16 value)
+void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 {
-	if (m_pipeline_frontend && m_pipeline_valid[5] && m_pipeline_block_body[5] &&
+	if (m_pipeline_frontend && m_pipeline_valid[owner_stage] && m_pipeline_block_body[owner_stage] &&
 		((address >= 0x1a && address <= 0x1c) || (address == 7 && ((value ^ m_st1) & ST1_BRAF))))
 	{
-		logerror("%s: staged in-block loop-register write is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		logerror("%s: staged in-block loop-register write is unsupported (instruction=%06x word=%04x destination=%04x value=%04x block=%06x..%06x brc=%04x rsa=%04x rea=%04x)\n",
+			machine().describe_context(), m_pipeline_address[owner_stage], m_pipeline_word[owner_stage], address, value,
+			m_pipeline_block_start, m_pipeline_block_end_address, m_brc, m_rsa, m_rea);
+		m_illegal = true; return;
 	}
 	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
 	m_data.write_word(address, value);
@@ -2562,7 +2565,7 @@ void tms320c54x_device::pipeline_step()
 		// Classes 30A/B hold this transfer boundary; only FCALA owns
 		// a second stack write. BACC/FBACC own no stack transaction.
 		// Bus placement is a partial model, not measured silicon phases.
-		if (staged_accumulator_far_call(m_pipeline_word[4])) data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4]);
+		if (staged_accumulator_far_call(m_pipeline_word[4])) data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4], 4);
 		m_pipeline_acc_transfer_pending = false;
 		return;
 	}
@@ -2571,7 +2574,7 @@ void tms320c54x_device::pipeline_step()
 		// The retained nondelayed Class 31B model holds one clock on both
 		// paths. Only a taken predicate owns a stack write; retain that
 		// decision through the held clock.
-		if (m_pipeline_immediate[4]) data_write(m_pipeline_operand_address[4], u16(m_pipeline_address[4] + 2));
+		if (m_pipeline_immediate[4]) data_write(m_pipeline_operand_address[4], u16(m_pipeline_address[4] + 2), 4);
 		m_pipeline_cc_pending = false;
 		return;
 	}
@@ -3107,7 +3110,7 @@ void tms320c54x_device::pipeline_step()
 		if (u8(m_pipeline_word[3]) == 0x18) m_pipeline_direct_sp[3] = m_sp;
 		if (!older_store)
 		{
-			data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3]);
+			data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3], 3);
 			if (u8(m_pipeline_word[3]) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
 		}
 	}
@@ -3115,7 +3118,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		bool const move = staged_move(m_pipeline_word[4]);
 		u16 const destination = move ? m_pipeline_immediate[4] : u8(m_pipeline_word[4]);
-		data_write(destination, move ? m_pipeline_operand[4] : m_pipeline_immediate[4]);
+		data_write(destination, move ? m_pipeline_operand[4] : m_pipeline_immediate[4], 4);
 		if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		m_pipeline_early_write_deferred[4] = false;
 	}
@@ -3251,7 +3254,7 @@ void tms320c54x_device::pipeline_step()
 			// The opcode's Execute coincides with the complete two-word slot's
 			// Read. This satisfies table 7-7's one-gap Category-I AR latency;
 			// unlike one-word STLM, no DAGEN write remains in the next clock.
-			data_write(m_pipeline_operand_address[4], m_pipeline_operand[4]);
+			data_write(m_pipeline_operand_address[4], m_pipeline_operand[4], 4);
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x4b00)
 	{
@@ -3335,7 +3338,7 @@ void tms320c54x_device::pipeline_step()
 			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
 			if (!conflict && !mapped_write)
 			{
-				data_write(destination, m_pipeline_operand[3]);
+				data_write(destination, m_pipeline_operand[3], 3);
 				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
 			}
 		}
@@ -3672,7 +3675,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_early_write_deferred[4] = conflict;
 			if (!conflict && !late_popm_read)
 			{
-				data_write(destination, m_pipeline_operand[4]);
+				data_write(destination, m_pipeline_operand[4], 4);
 				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 			}
 		}
@@ -4248,7 +4251,7 @@ void tms320c54x_device::pipeline_step()
 		u16 const destination = u8(m_pipeline_word[4]);
 		if (destination >= 0x10 && destination <= 0x19 && !m_pipeline_early_write_deferred[4])
 		{
-			data_write(destination, m_pipeline_operand[4]);
+			data_write(destination, m_pipeline_operand[4], 4);
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		}
 	}
@@ -4264,7 +4267,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0x7308 || m_pipeline_word[4] == 0x730b) && m_pipeline_immediate[4] == 7)
 		// Publish at the move's Read clock, not its later Execute clock:
 		// SPRU131G table 7-14 permits an immediately following RPTB.
-		data_write(7, m_pipeline_operand[4]);
+		data_write(7, m_pipeline_operand[4], 4);
 	if (m_pipeline_valid[3] && staged_move(m_pipeline_word[3]) &&
 		pipeline_mapped_accumulator_write(m_pipeline_operand_address[3]))
 	{
@@ -4275,7 +4278,7 @@ void tms320c54x_device::pipeline_step()
 		u16 const destination = m_pipeline_immediate[3];
 		if (destination >= 0x10 && destination <= 0x19 && !m_pipeline_early_write_deferred[3])
 		{
-			data_write(destination, m_pipeline_operand[3]);
+			data_write(destination, m_pipeline_operand[3], 3);
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
 		}
 	}
@@ -4295,7 +4298,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			if (far) m_pipeline_far_call_stack[4] = --m_sp;
 			else m_rtn = m_pipeline_immediate[4];
-			data_write(m_pipeline_operand_address[4], m_pipeline_immediate[4]);
+			data_write(m_pipeline_operand_address[4], m_pipeline_immediate[4], 4);
 		}
 		m_pipeline_acc_transfer_pending = true;
 	}
@@ -4424,7 +4427,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		u16 const destination = 0x10 + (m_pipeline_word[3] & 15);
 		u16 const previous_sp = m_sp;
-		data_write(destination, m_pipeline_operand[3]);
+		data_write(destination, m_pipeline_operand[3], 3);
 		if (destination == 0x18) pipeline_delay_compiler_sp(previous_sp);
 	}
 	if (m_pipeline_valid[2] && staged_mmr_move(m_pipeline_word[2]))

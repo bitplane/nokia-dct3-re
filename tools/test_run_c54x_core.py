@@ -629,6 +629,27 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=profile)
 
+    def test_repeat_rearm_scope(self):
+        marker, ending = EXTRA_PROFILES['repeat-rearm']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='repeat-rearm')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('brc_publications=1', 'brc_publications=2'),
+                    output.replace('write_owner=Access', 'write_owner=Execute'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='repeat-rearm')
+
+    def test_repeat_rearm_edge_scope(self):
+        marker, ending = EXTRA_PROFILES['rearm-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rearm-edge')
+        for bad in (output.replace('restore=8', 'restore=0'),
+                    output.replace('publications=0', 'publications=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rearm-edge')
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'
