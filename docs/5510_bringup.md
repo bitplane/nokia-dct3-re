@@ -23,14 +23,13 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the long-memory control-delay
-exclusion for `10e1` at `03:a5b4`, following control at `03:a5b2`
-(live PC `03:a5b6`) within a five-second observation,
+pin-decoded response words before stopping at unsupported opcode `10b3`
+at `03:dd3a` (live PC `03:dd3c`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record 220 far-call entries at `02:a395` and 221
-conditional-branch entries at `02:a39f`, with no observer writes.
+Passive Execute hooks record 221 conditional-branch entries at `02:a39f`
+and one delayed offset-load entry at `03:a5b4`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +39,30 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,830 tests with one skip; the native 5110
+The tool suite passes 2,831 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Plain LD Smem,A/B with a long-offset address can occupy a complete two-word
+control-delay span. Decode counts both words before admission; existing
+Access/Read/Execute ownership retains the literal, address, auxiliary update
+and RAM word through the control transfer. This follows SPRU131G 6.3's
+one-two-word/two-one-word delay rule; the load is not a PC discontinuity.
+
+`load-delay` passes 147,456 cases/restores across BD, BCD taken/untaken,
+CALLD, FCALLD and RETD; offset/preincrement/circular/absolute forms; eight
+AR fields, offsets +/-1 (two RAM addresses for absolute), A/B, four RAM
+values, SXM/OVM, CMPT, two pages and three snapshots. Absolute ignores the
+encoded AR dimension. Replacing literals after Fetch, pointers after Access
+and RAM after Read cannot change the retained load or duplicate updates.
+The selected target observes the result once; BCD decisions survive delay
+loads that change A. Call frames and RETD's separate stack read are checked;
+the CALLD/FCALLD targets stop after observation, not a return round trip.
+`ld-delay-edge` adds 28 cases/restores: 16 two-word spills into a one-word
+remainder and 12 still-excluded offset LDU/TS/shift-16 family cases, before
+data reads, writes, pointer updates or result publication. Family exclusions
+are prototype limits, not silicon traps. Mapped sources, general interrupt
+composition and measured physical phases remain unvalidated.
 
 Near B and non-delayed BC admit backward as well as forward targets inside
 the current block, provided the complete branch precedes REA. A taken branch

@@ -861,6 +861,20 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_delayed_load_profile_scope(self):
+        edge, end = EXTRA_PROFILES['ld-delay-edge']
+        check_result(edge + '\n' + end + '\n', 3, profile='ld-delay-edge')
+        with self.assertRaises(ValueError):
+            check_result(edge.replace('spill_cases=16', 'spill_cases=0') + '\n' + end + '\n', 3, profile='ld-delay-edge')
+        marker, ending = EXTRA_PROFILES['load-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='load-delay')
+        for old, new in (('restore=147456', 'restore=0'),
+                         ('target_observes_result=1', 'target_observes_result=0'),
+                         ('interrupt_composition=unvalidated', 'interrupt_composition=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='load-delay')
+
     def test_block_backward_profile_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-back']
         output = marker + '\n' + ending + '\n'
