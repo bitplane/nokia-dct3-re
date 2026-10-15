@@ -81,9 +81,14 @@ Class-14 extra cycle; 1,536 replay cases and ordinary/repeated RAM controls
 pass. The original firmware emits the pin-decoded acknowledgement
 `007f,0001,0055`. ABS A,A (`f485`) at `02:e5e5` and ABS B,B (`f785`)
 at `02:e5e7` now execute, with 13,824 arithmetic/status/producer replay
-cases and an unchanged NEG control. The next stop is MPY
-(`62f8 0008 012c`, mapped AL times immediate 300) at `03:95b5`
-(live PC `03:95b7`). This is not a complete command transaction or native
+cases and an unchanged NEG control. MPY (`62f8 0008 012c`, mapped AL
+times immediate 300) at `03:95b5` now executes through retained
+memory/immediate operands, with Read-owned T publication and 106,496
+replay cases. The original recorder routine at `02:9e90` is entered and
+output words `0580,0a09` are observed. The next stop is the existing
+in-block control-flow exclusion: conditional branch `f84b a0f4` at
+`02:a0ef`, in block `02:a0ea..02:a0fd` (live PC `02:a0f2`).
+This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the

@@ -3298,9 +3298,10 @@ POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
 Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
 T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
 executes, sending the first acknowledgement word to the modeled serial
-transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` now execute. The next
-stop is MPY (`62f8 0008 012c`, mapped AL times immediate 300) at
-`03:95b5` (live PC `03:95b7`); all
+transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
+(`62f8 0008 012c`) at `03:95b5` now execute. The next stop is conditional
+branch `f84b a0f4` at `02:a0ef`, rejected inside the active repeat block
+`02:a0ea..02:a0fd` (live PC `02:a0f2`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3597,9 +3598,14 @@ observation at the former MVDD guard found AR2=`14b2`, AR3=`0033` and
 source word `007f`: ordinary RAM to the bench's McBSP2 transmit path,
 not a CPU-register transfer. Original firmware now emits the pin-decoded
 acknowledgement `007f,0001,0055`. ABS A,A/B,B (`f485`/`f785`) at
-`02:e5e5`/`02:e5e7` now execute. The next stop is MPY
-(`62f8 0008 012c`, mapped AL times immediate 300) at `03:95b5`
-(live PC `03:95b7`). The input cursor is 9/50 delivered words,
+`02:e5e5`/`02:e5e7` and MPY (`62f8 0008 012c`, mapped AL times
+immediate 300) at `03:95b5` now execute. Original firmware enters the
+recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
+decoded audio. The next stop is the in-block control-flow guard at
+`02:a0ef` (`f84b a0f4`), inside block `02:a0ea..02:a0fd`.
+The diagnostic now reports decoded instruction and block addresses:
+live PC `02:a0f2` does not identify the rejected instruction.
+The input cursor is 9/50 delivered words,
 not nine parsed commands. This acknowledgement is not a completed command
 transaction, and the physical DA150 register map remains unverified.
 ABS uses the existing Class-1 register ALU Execute path and shared atomic
@@ -3615,6 +3621,30 @@ The matching NEG control, conditional returns, T/TRN moves and peripheral
 MVDD also pass (five profiles total), along with 79 verifier tests,
 evidence validation and native 5110 restoration. The broad regression
 baseline remains `690ace59`, not a fresh full-suite claim.
+
+Memory/immediate MPY uses Class 6A/6B (SPRU172C, MPY syntax 3): the
+memory word publishes to T in Read, while the retained memory word and
+signed literal produce the accumulator result at Execute. Absolute and
+long-offset forms retain address/offset before the multiplier literal,
+adding one word and cycle. The `mpy-mem-imm` fixture passes 106,496
+cases/restores: thirteen forms (DP/SP direct, short fixed/postincrement/
+postdecrement/preincrement, long offset/preincrement/circular, absolute
+RAM and mapped AL/AH/T/AR3), eight memory values, eight literals, eight
+FRCT/OVM/SXM configurations, both destinations, two pages and four
+snapshots. DP/SP selection shares the direct-form page cases; CMPT=0
+and PMST=0 are fixed. BK=13 circular indexing uses an aligned 16-word
+queue with the initial index inside the queue. Address modifiers, one
+source read, ordered extension fetches, Read-owned T, signed/FRCT product,
+OVM saturation, sticky overflow and carry preservation are checked.
+Poisoning literals, the selected pointer, source and T verifies retained
+ownership through replay. Peripheral/control sources, repeats, IRQs and
+new producer/consumer-latency composition are outside acceptance.
+The shared existing T/immediate control passes 86,016 replay cases, and
+its mapped-consumer control passes 3,072. Offset loads, ABS and peripheral
+MVDD also pass (six profiles including the new fixture), along with 80
+verifier tests, evidence validation and native 5110 restoration. No new
+CPU saved fields are introduced. The full-suite baseline remains
+`690ace59`; this is focused acceptance, not a new broad checkpoint.
 
 All 48,261 program and
 3,656 compared resident data words still match. This remains partial
