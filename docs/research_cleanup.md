@@ -144,6 +144,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
 - An address hit does not establish dispatcher or subsystem ownership. Confirm
   the containing function boundary and exhaustively decode the relevant
   dispatch extent or caller set before assigning an input to a handler.
+- Widening an operation classifier requires auditing all of its consumers,
+  not just the primary execution path. Forwarding, bypass, wait arbitration
+  and repeat helpers can retain assumptions about the narrower family.
+  Production and forwarded values should share one calculation where their
+  contract is identical, with an executable producer/consumer test.
 
 ## Protect surprising facts
 
@@ -155,10 +160,14 @@ or was expensive to discover. Current examples include:
 - keeping data/program spaces and logical/physical addresses distinct: an
   absent image word is not a zero word, and overlay projection must follow
   a proven mapping rather than a merged numeric-address dictionary;
-- PC hooks firing only at actual branch targets;
+- fetch-based PC taps missing sequential instructions between block-entry
+  fetches; establish the hook's coverage rather than assuming it observes
+  the same events as an Execute instruction hook;
 - a staged CPU's unsupported Decode frontier not proving that preceding
   instructions reached Execute; validate retirement with a positive-controlled
   stage observation rather than the reported PC alone;
+- Access/Read-owned register writes not inheriting the PC or loop membership
+  of the different instruction currently occupying Execute;
 - Lua tap subscriptions needing a live owner for the entire observation
   window; retain them in a callback/upvalue and validate positive-control
   detail records, not just counters, before interpreting absent events;

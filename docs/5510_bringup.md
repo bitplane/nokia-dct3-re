@@ -19,48 +19,25 @@ The repeated MVDD (`e598`) at `03:8eda` now completes its first 128 ordered
 source reads from `0000..007f` into RAM beginning at `0e35`. Firmware then
 publishes buffer pointers `1800` and `1880`. The zero source is shared with
 the atomic control, not a demonstrated staged-only pointer defect; see
-[Recorder low-page copy](#recorder-low-page-copy). The adjacent
-`LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
-and returns on the zero terminator instead of calling program address zero.
-The original recorder continues through repeated callbacks and emits its
-pin-decoded response words. In a five-second passive Execute observation,
-the mapped MVDK at `03:dafe` executes twice, `CCD 0xdada,ANEQ` at
-`03:db37` executes 2,048 times, its first delay instruction at `03:db39`
-executes 2,048 times, and the callee entry at `03:dada` executes 1,601
-times. The call's delay span ends at the active block endpoint `03:db3a`;
-this is covered by the retained loop/call contract below. The REA, RSA and
-BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
-The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
-times in a five-second passive observation. Reverse-carry MAR `6dbb` at
-`03:c84a` reaches Execute once. The internal delayed branch `fa42` at
-`03:c852` and its join at `03:c85e` each reach Execute 510 times. The next
-stop is the memory-move control-destination exclusion at `03:e195`:
-`7102` targets BRC (`001a`), with live/terminal PC `03:e198`, `illegal=1`.
-Its publication and repeat-count setup contract remain to be decoded.
-The shifted load at `03:d01d` and its branch at `03:d01b` each reach
-Execute once.
-ASM stores at `03:e0c9` and `03:e0e7` each reach Execute 128 times;
-immediate ASM load `ed1e` at `03:cfb7` reaches Execute once. The post-loop
-BRC reload has separate write-stage ownership, as described below.
-The intervening indirect PMST and repeat-control restore exclusions are
-covered by the bounded tests below.
-The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
-AR7 is `001d`, SP is `5cd3`, and its pending stack word `202c` matches
-current PMST. RSA/REA remain `db51/db56`, outside this restore routine.
-OVLY maps this low-half instruction to physical program `001f02`; a raw
-read at `031f02` returns zero and is not evidence of missing code. The
-surrounding sequence sets AR7 to `001d`, pops PMST, then sets AR7 to
-`0016` for another indirect pop. These observations identify the next
-conformance case. Unchanged PMST restoration outside the active body is
-now admitted by the bounded contract below; other active POPD control
-destinations inside the loop body remain excluded.
-These are passive observations, not firmware writes or a claim of complete
-recording or validated audio.
+[Recorder low-page copy](#recorder-low-page-copy).
 
-Passive Execute hooks record one delayed offset-load entry at `03:a5b4`
-and one AR0-indexed load entry at `03:dd3a`, with no observer writes.
-These now reach Execute in the original sequence, not just Decode
-admission. A moved Decode frontier alone is not retirement evidence.
+The current stop is the memory-move control-destination exclusion at `03:e195`:
+`7102` targets BRC (`001a`), with live/terminal PC `03:e198`, `illegal=1`.
+Static decoding of the unchanged `aa88` section identifies its `001a`
+destination word at `03:e196` and a later `RPTBD e1d2` at `03:e1aa`,
+after intervening setup. This does not establish the runtime source word
+or an adjacent-load hazard in the original sequence.
+The unresolved contract is the source-word ownership, BRC publication and
+the following consumer of that count. SPRU131G table 7-24 specifies zero
+setup latency for MVDK/MVMD to BRC before RPTB[D]; in-loop modifications
+have a separate table 7-25 contract. A blanket destination-range expansion
+would not establish either behavior.
+
+Validated instruction and composition boundaries are collected below;
+aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
+Original-firmware probes are observation-only. Execute-entry evidence is
+distinct from merely moving a Decode stop, and neither establishes complete
+recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
 
@@ -112,6 +89,15 @@ store-index/bypass/preincrement/delay and immediate-ASM/block-branch
 controls pass separately. Long-offset, preincrement, reverse/circular ASM
 store forms, mapped destinations, general ST1-producer latency and
 interrupt/repeat/delay composition are not established by these matrices.
+
+Known shared-path defect at `e05f575b`: the pending-write branch in
+`pipeline_read_data()` classifies ASM stores as ordinary stores but computes
+their bypass value without the retained ASM shift. An adjacent same-address
+load can therefore disagree with the real Execute write. The standalone
+store matrices and existing ordinary/Xmem bypass matrices do not cover this
+combination. A native failing fixture and a shared store-value calculation
+are required before claiming ASM-store/load composition; this takes priority
+over extending the next BRC destination.
 
 ### Immediate ASM publication
 
@@ -217,6 +203,12 @@ not admitted by this contract. Execution of the original MAC is not proof
 of valid recording or audio.
 
 ### Active repeat context and stack bypass
+
+The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7
+`001d`, SP `5cd3` and saved/current PMST `202c`; RSA/REA remain
+`db51/db56`, outside the restore routine. OVLY maps this low-half code
+to physical program `001f02`. A raw read at `031f02` returns zero and
+must not be interpreted as missing program content.
 
 `pmst-popd` passes 64 cases/restores for indirect POPD PMST: four values,
 two source pages, lower/upper targets and four snapshots. It checks one
@@ -714,16 +706,14 @@ The EXP/NORM, mapped repeated-MVDD and XC controls pass, as does the native
 passes independently of the new Decode boundary.
 
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
-pipeline latency) from memory-mapped accumulator reads. The existing
-isolated conditional-return fixture alone excludes adjacent producers; its
-former Access-owned predicate did not establish this pair's correctness.
-With the same retained NAND, the atomic zero-entry control returns from
-`1c48` to `1c59` (SP `6f12`, AR2 `8002`, A zero), then restarts the table
-walk through `1c54`. The staged trace instead fell through to `1c49..1c4c`
-and called zero before the correction. This was a frontend decision
-divergence, not evidence that the table needs a synthetic nonzero terminator.
-The `ret-load` fixture reproduces the old defect and passes 64 cases/restores
-after correction: A/B, zero/nonzero results opposed to the old accumulator,
+pipeline latency) from memory-mapped accumulator reads. The zero-terminated
+table walk uses adjacent `LDU *AR2+,A` / `RC AEQ` at `1c47..1c48`.
+Its return predicate must consume the older load's Execute publication,
+not the accumulator present at Access. The atomic zero-entry control
+returns from `1c48` to `1c59` (SP `6f12`, AR2 `8002`, A zero), then
+restarts the table walk through `1c54`. A synthetic nonzero terminator
+would hide a producer/consumer timing error rather than repair the table.
+`ret-load` passes 64 cases/restores: A/B, zero/nonzero results opposed to the old accumulator,
 adjacent/one-NOP separation, two pages and four snapshots. Conditional return
 now decides after older Execute publications and retains its stack sample.
 Sequential prefetch preserves the existing taken/untaken cadence. The 768-case
@@ -957,11 +947,12 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Versioned aggregate acceptance has two distinct scopes:
 
-- CPU source at `35cfaf07`: renewed full default run, all 288 required markers
+- CPU source at `e05f575b`: renewed full default run, all 288 required markers
   exactly once, expected completion exit and terminal completion check. This
-  includes the shared-path changes through delayed conditional calls and
-  block-end near-return continuation. The new CCD and mapped-MVDK matrices
-  remain separately scoped isolated-profile acceptance above.
+  renews the default population after the shared-path changes through active
+  context restoration, write-stage ownership, ASM stores and shifted control
+  delays. Their additional isolated matrices remain separately scoped above;
+  default acceptance does not cover the known ASM-store/load bypass defect.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
@@ -1839,7 +1830,8 @@ comparison remain firmware-owned. The gate observes seven selected segments,
 ring, then successfully mounts the retained medium with original InitData.
 This covers the raw first-segment and subsequent file-write receiver paths.
 Independent original-consumer file readback and DMA-backed loading are
-validated below; native program-entry execution remains unverified.
+validated below. Program-entry execution is a separate acceptance scope;
+its current limit is in [Current boundary](#current-boundary).
 
 The acquired repair-tool analysis describes a different, upstream layer:
 PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
@@ -1897,8 +1889,9 @@ header `08aa` of `aa55`.
 
 The fixture uses routine ABI wrappers and retained in-memory NAND across
 soft resets. This does not establish host NVRAM persistence, physical DA150
-DMA mapping/timing or native music-DSP boot. The original `2ed4 -> 2f56`
-load is executed below; program-entry execution remains the next boundary.
+DMA mapping/timing or native music-DSP boot. It also does not establish
+program entry by itself; the executed loader and recorder scopes are
+separate, with their current limit in [Current boundary](#current-boundary).
 
 ### Original CLKMD contract
 
@@ -3466,9 +3459,10 @@ flag and TINT enabled, decoded-instruction drain completes ANDM before
 vector execution: the stacked continuation is `98e4`, not atomic `98de`.
 After one ISR the original ORM/flag writes complete and the CPU sleeps with
 TINT masked. Even/odd stacks and in-flight save/replay reproduce this bounded
-result without a post-return delay or timer change. The next boundary is
-complete surrounding staged opcode coverage and native warm execution;
-the CPU fixture does not close the metadata acceptance failure below.
+result without a post-return delay or timer change. This bounded fixture
+does not establish complete surrounding opcode coverage, native warm
+execution or the atomic metadata acceptance behavior described below.
+The staged execution stop is maintained in [Current boundary](#current-boundary).
 
 `mu4nand -bios bootrecstage` is a separate fail-closed staged coverage
 diagnostic using the same original upload, retained NAND and provisional
@@ -5625,8 +5619,9 @@ from `2f58ac`, with transport `1e`, source `02`, destination zero and
 classes `01/04`. These do not establish MU4 traffic. The sole observed
 local `d2` delivery follows constructor `362de0` with arguments `01/02/1e`
 and router caller `362d5e`, confirming the internal-control interpretation.
-The next boundary is the sequenced receive path's external sender and
-startup exchange, not an inactive generic receive queue.
+The MCU-side sequenced-ingress boundary is the external sender and startup
+exchange, not an inactive generic receive queue. This is separate from
+the standalone recorder's CPU execution limit.
 
 The package checker pins sequenced receiver `2f5760..2f59db` and task-loop
 code `2f5c8c..2f5d71`. Descriptor index 8 in the 30-entry task table selects
