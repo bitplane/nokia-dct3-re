@@ -11550,7 +11550,8 @@ private:
 		bool add, compatibility, excluded;
 		u32 base;
 		u64 value;
-		u16 word, st0, st1, pmst, address, final_ar;
+		u16 word, st0, st1, pmst, address, final_ar, bk;
+		u8 mode;
 		std::array<u16, 8> initial;
 	};
 	static indexed_store_fixture indexed_store_case(unsigned v)
@@ -11603,16 +11604,54 @@ private:
 		f.value = u64(f.st1 & 0x100 ? s64(s16(f.word)) : s64(f.word)) & 0xffffffffffULL;
 		return f;
 	}
+	static indexed_store_fixture circular_load_case(unsigned v)
+	{
+		indexed_store_fixture f{};
+		unsigned const operation = v % 4, index = (v / 512) % 4, flags = (v / 8192) % 8;
+		f.ar = (v / 4) % 8; f.compatibility = (v / 32) % 2; f.selector = (v / 64) % 2;
+		f.selected = f.compatibility && !f.ar ? 4 : f.ar;
+		f.bk = std::array<u16, 4>{0, 1, 7, 16}[(v / 128) % 4];
+		if (!f.selected && f.bk) f.bk = 0x2000;
+		f.mode = 0xc0 | (operation << 3) | f.ar;
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x1000 + i * 0x100;
+		// SPRU131G 5.5.3.4 requires |step| <= BK for a nonzero block.
+		// A self-indexed RAM pointer therefore needs a correspondingly large BK.
+		f.initial[0] = std::array<u16, 4>{0, 1, 0xffff, f.bk ? u16(-f.bk) : u16(0x8000)}[index];
+		unsigned const position = !f.bk || !index ? 0 : index == 1 ? f.bk - 1 : index == 2 ? f.bk / 2 : f.bk > 1 ? 1 : 0;
+		f.address = index == 3 && (v / 128) % 4 == 1 ? 0x20 : 0x1000 + f.selected * 0x100 + (f.selected ? position : 0);
+		f.initial[f.selected] = f.address;
+		f.excluded = f.address < 0x60;
+		s32 const step = operation & 1 ? s32(s16(f.initial[0])) : 1;
+		s32 const delta = operation < 2 ? -step : step;
+		if (!f.bk) f.final_ar = f.address + delta;
+		else
+		{
+			// Independent modulo oracle for the selected block sizes; the CPU
+			// instead derives an address mask and performs iterative wrapping.
+			u16 const mask = f.bk == 1 ? 1 : f.bk == 7 ? 7 : f.bk == 16 ? 31 : 0x3fff;
+			s32 const remainder = (s32(f.address & mask) + delta) % f.bk;
+			f.final_ar = (f.address & ~mask) | u16(remainder < 0 ? remainder + f.bk : remainder);
+		}
+		f.word = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 2048) % 4];
+		f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (f.compatibility ? 0x20 : 0);
+		f.pmst = (flags >> 2) & 1;
+		f.st0 = !f.excluded && f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
+		f.value = u64(f.st1 & 0x100 ? s64(s16(f.word)) : s64(f.word)) & 0xffffffffffULL;
+		f.base = (v / 65536) % 2 ? 0x20000 : 0; f.snapshot = v / 131072;
+		return f;
+	}
 	void start_indexed_load(unsigned variant = 0)
 	{
-		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = indexed_load_case(variant);
+		bool const circular = !strcmp(machine().options().bios(), "ld-circular");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0x1000 | ((f.selector & 1) << 8) | (f.add ? 0xb0 : 0xa8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, 0x1000 | ((f.selector & 1) << 8) | (circular ? f.mode : (f.add ? 0xb0 : 0xa8) | f.ar)); program.write_word(f.base + 0x601, 0xf4e1);
 		if (!f.excluded) data.write_word(f.address, f.word);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
+		if (circular) m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "indexed_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "AR0-indexed LD reads one retained old-address RAM word"); ++m_pipeline_operand_reads; });
@@ -13659,7 +13698,7 @@ private:
 		if (!strcmp(machine().options().bios(), "shift-delay")) { start_delay_load(); return; }
 		if (!strcmp(machine().options().bios(), "shift-delay-edge")) { start_shift_delay_edge(); return; }
 		if (!strcmp(machine().options().bios(), "ld-delay-edge")) { start_delay_load_edge(); return; }
-		if (!strcmp(machine().options().bios(), "ld-ar0-index")) { start_indexed_load(); return; }
+		if (!strcmp(machine().options().bios(), "ld-ar0-index") || !strcmp(machine().options().bios(), "ld-circular")) { start_indexed_load(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd")) { start_rptbd(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-mapped")) { start_mvdk_mapped(); return; }
@@ -41294,11 +41333,20 @@ private:
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255300)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_load_case(variant);
+			bool const circular = !strcmp(machine().options().bios(), "ld-circular");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 4), "Indexed LD admits RAM and excludes low mapped sources before effects");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.excluded && tick >= 6 && !(f.selector & 1) ? f.value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!f.excluded && tick >= 6 && (f.selector & 1) ? f.value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!f.excluded && tick >= 4 ? f.st0 : 0x8608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Indexed LD publishes a signed or unsigned word only in Execute without SST OVM or status side effects");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick <= 3 ? 0x3300 + i : f.excluded ? f.initial[i] : tick == 4 ? i == f.selected ? f.final_ar : f.initial[i] : 0x2200 + i), "Indexed LD samples AR and AR0 in Access and modifies its pointer exactly once");
+			for (unsigned i = 0; i < 8; ++i)
+			{
+				u16 const expected = tick <= 3 ? 0x3300 + i : f.excluded ? f.initial[i] : tick == 4 ? i == f.selected ? f.final_ar : f.initial[i] : 0x2200 + i;
+				u16 const actual = m_cpu->state_int(tms320c54x_device::STATE_AR0 + i);
+				if (actual != expected) osd_printf_info("Indexed LD pointer failure: variant=%u tick=%u ar=%u actual=%04x expected=%04x mode=%02x bk=%04x\n", variant, tick, i, actual, expected, f.mode, f.bk);
+				expect(actual == expected, "Indexed LD samples AR and AR0 in Access and modifies its pointer exactly once");
+			}
 			if (tick == 3) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+			if (circular) expect(m_cpu->state_int(tms320c54x_device::STATE_BK) == (tick <= 3 ? f.bk : f.bk ^ 0xffff), "Circular LD uses Decode-owned BK despite a later live size change");
+			if (circular && tick == 3) m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk ^ 0xffff);
 			if (!f.excluded && tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
 			if (!f.excluded && tick == 5) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, f.word ^ 0xffff); }
 			if (tick == 3 + f.snapshot && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed LD around Decode address capture and RAM Read"); }
@@ -41307,7 +41355,12 @@ private:
 				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1, "Indexed LD completes one source transaction or rejects without one");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = 3 + f.snapshot; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed LD without resampling pointers RAM or applying its index twice"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255310; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 98303) { start_indexed_load(variant + 1); return; }
+				if (variant < (circular ? 393215 : 98303)) { start_indexed_load(variant + 1); return; }
+				if (circular)
+				{
+					osd_printf_info("TMS320C54x circular LD: PASS cases=393216 restore=393216 ram_cases=368640 excluded_cases=24576 modifiers=4 registers=8 compatibility_states=2 destinations=2 bk=0,1,7,16,8192 index_patterns=4 valid_nonzero_steps=1 memory_values=4 sxm_ovm_sst=8 pages=2 snapshots=3 bk_sample=Decode address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_repeat_composition=unvalidated physical_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated circular LD complete");
+				}
 				osd_printf_info("TMS320C54x AR0 indexed LD: PASS cases=98304 restore=98304 ram_cases=96000 excluded_cases=2304 registers=8 index_directions=2 compatibility_states=2 destinations=2 index_values=8 memory_values=4 sxm_sst_ovm=8 pages=2 snapshots=3 address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated AR0 indexed LD complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -43469,6 +43522,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(189, "asm-store-bp", "ASM-shifted same-location store and load bypass")
 	ROM_SYSTEM_BIOS(190, "move-brc", "Memory move block count and zero-latency repeat setup")
 	ROM_SYSTEM_BIOS(191, "move-brc-edge", "Memory move block count body and delay exclusions")
+	ROM_SYSTEM_BIOS(192, "ld-circular", "Signed circular loads with retained block size and replay")
 ROM_END
 
 ROM_START(tms54rom4)

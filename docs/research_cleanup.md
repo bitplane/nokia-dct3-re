@@ -149,6 +149,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
   and repeat helpers can retain assumptions about the narrower family.
   Production and forwarded values should share one calculation where their
   contract is identical, with an executable producer/consumer test.
+- Check fixture inputs against the documented domain before interpreting a
+  mismatch. Circular addressing, for example, constrains the initial index
+  and nonzero-buffer step size; an out-of-domain modulo oracle does not prove
+  a CPU arithmetic defect. Keep empirical behavior outside that domain
+  separately scoped rather than silently generalizing it.
 
 ## Protect surprising facts
 

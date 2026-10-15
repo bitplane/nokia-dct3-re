@@ -28,9 +28,13 @@ publications across counts `6`, `0e`, `1e`, `3e`, `7e`. These observations
 do not imply an adjacent producer/consumer hazard in the original sequence.
 Execute-entry hooks separately observe 124 entries each at the move, RPTBD
 and following instruction `03:e1d3`; this is not merely an advanced live PC.
-The current stop is unsupported word `11df` at `03:dc39`, with terminal
-PC `03:dc3b`, `illegal=1`. Its memory-load/addressing contract is the next
-unresolved boundary; execution beyond it and complete recording are unproven.
+The signed circular load `11df` at `03:dc39` and its following instruction
+each have 49 observed Execute entries. Passive reads begin at `aa5a` and
+advance by two with AR0=`2`, BK=`0`; no firmware state is injected.
+The current stop is the in-block conditional-execute exclusion at `03:da85`,
+word `fd4b` (`XC 1,BLT`), inside block `03:da71..03:da93`, with terminal
+PC `03:da87`, `illegal=1`. Protected-slot and block-accounting composition
+is the next unresolved boundary; complete recording remains unproven.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -39,6 +43,32 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+### Signed circular memory loads
+
+Signed LD admits the four short circular modifiers `c0..df`, using the
+existing retained address-generation and load paths. BK is sampled in
+Decode; the source address, AR0 index and pointer update belong to Access;
+the word is sampled in Read and published to the selected accumulator in
+Execute. Low mapped/peripheral sources remain excluded before reading or
+updating the source pointer. No address-generation arithmetic was changed.
+
+`ld-circular` passes 393,216 cases/restores: 368,640 RAM cases and 24,576
+mapped-source exclusions; four modifiers, eight encoded registers, both
+compatibility states and destinations, four source words, eight SXM/OVM/SST
+states, two pages and three snapshots. BK covers 0/1/7/16, with 8192 used
+for valid RAM-pointer self-indexing. Post-Decode BK changes, post-Access
+pointer/index changes and post-Read RAM changes cannot retarget the load or
+repeat its effects. Ordinary indexed-load coverage remains a separate gate.
+
+Nonzero buffers obey [SPRU131G section 5.5.3.4](https://www.ti.com/lit/ug/spru131g/spru131g.pdf):
+aligned base, initial index inside the queue, step magnitude at most BK.
+The independent expectation uses modulo, while the CPU uses iterative
+wrapping; values outside that documented domain are not a conformance oracle.
+BK=0 retains the independently exercised linear-update contract described in
+[ROM4 codec validation](djr_dsp_integration.md). Generic IRQ/NMI, delay/repeat
+composition and physical bus timing are not established by this isolated
+matrix; the recorder's 49 executed iterations are separately scoped evidence.
 
 ### Memory transfers into the block counter
 
@@ -426,7 +456,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,858 tests with one skip; the native 5110
+The tool suite passes 2,859 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

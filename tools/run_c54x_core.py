@@ -600,6 +600,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0",
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
+    "ld-circular": (
+        "TMS320C54x circular LD: PASS cases=393216 restore=393216 ram_cases=368640 excluded_cases=24576 modifiers=4 registers=8 compatibility_states=2 destinations=2 bk=0,1,7,16,8192 index_patterns=4 valid_nonzero_steps=1 memory_values=4 sxm_ovm_sst=8 pages=2 snapshots=3 bk_sample=Decode address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_repeat_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated circular LD complete",
+    ),
     "move-brc-edge": (
         "TMS320C54x staged memory move BRC exclusions: PASS cases=24 restore=24 writers=MVDK,MVMD contexts=block_body,RPTBD_delay pages=2 snapshots=3 source_reads=0 counter_writes=0 pointer_effects=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated memory move BRC exclusions complete",

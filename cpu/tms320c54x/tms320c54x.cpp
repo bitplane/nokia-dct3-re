@@ -376,7 +376,7 @@ constexpr bool staged_accumulator_arithmetic(u16 word)
 constexpr bool staged_memory_load(u16 word)
 {
 	return (((word & 0xfc00) == 0x1000 &&
-		(BIT(word, 9) || u8(word) < 0xa0 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || u8(word) >= 0xe0)) ||
+		(BIT(word, 9) || u8(word) < 0xa0 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || u8(word) >= 0xc0)) ||
 		(word & 0xfe00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8;
 }
 
@@ -3430,9 +3430,9 @@ void tms320c54x_device::pipeline_step()
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
 		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
-		if ((m_pipeline_word[3] & 0xfe00) == 0x1000 && mode >= 0xa8 && mode < 0xb8 && m_pipeline_operand_address[3] < 0x60)
+		if ((m_pipeline_word[3] & 0xfe00) == 0x1000 && ((mode >= 0xa8 && mode < 0xb8) || (mode >= 0xc0 && mode < 0xe0)) && m_pipeline_operand_address[3] < 0x60)
 		{
-			logerror("%s: staged AR0-indexed LD mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged indexed/circular LD mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xfe00) == 0x1400 && m_pipeline_operand_address[3] < 0x60)
 		{

@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_circular_load_scope(self):
+        marker, ending = EXTRA_PROFILES['ld-circular']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ld-circular')
+        for bad in (output.replace('restore=393216', 'restore=0'),
+                    output.replace('bk_sample=Decode', 'bk_sample=Access'),
+                    output.replace('data_writes=0', 'data_writes=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='ld-circular')
+
     def test_memory_move_brc_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['move-brc-edge']
         output = marker + '\n' + ending + '\n'
