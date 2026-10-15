@@ -420,7 +420,7 @@ constexpr bool staged_extended_dld(u16 word)
 
 constexpr bool staged_long_arithmetic(u16 word)
 {
-	return ((word & 0xfc00) == 0x5000 || (word & 0xfe00) == 0x5400) && u8(word) <= 0xf8;
+	return ((word & 0xfc00) == 0x5000 || (word & 0xfe00) == 0x5400 || (word & 0xfe00) == 0x5800) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_long_arithmetic(u16 word)

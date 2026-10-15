@@ -811,6 +811,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(output.replace(old, new), 3, profile='xmem-store-bp')
 
+    def test_long_pair_profile_scopes(self):
+        for profile, restores in (('drsub', 6912), ('long-pair', 20736)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in ((f'restore={restores}', 'restore=0'),
+                             ('pair_reads=2', 'pair_reads=1'),
+                             ('memory_writes=0', 'memory_writes=1')):
+                with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

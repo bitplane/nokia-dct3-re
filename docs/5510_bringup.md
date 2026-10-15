@@ -24,9 +24,8 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`58f8` at `02:8d23` (live PC `02:8d25`) within a five-second observation.
-The one-second prefix has no illegal-opcode stop; extending the bound exposes
-this next gap and terminal `illegal=1`. This is not complete recording or
+`NORM B,B` (`f78f`) at `03:de9b` (live PC `03:de9d`) within a five-second observation,
+with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
 ## Retained recorder execution contracts
@@ -121,10 +120,24 @@ store's real Execute write. Physical bank arbitration remains unvalidated.
 The original `9808` at `03:83ad` executes after a long-offset load and advances
 to the current boundary. The passive source observer also reports terminal
 live PC, illegal and idle state; a quiet short run is not acceptance.
-The runner's 104 unit tests pass; the full tool suite passes 2,812 tests with
-one skip. The 393,216-case arithmetic and 196,608-case load regressions pass,
-along with both store-bypass profiles and native 5110 save-state restoration.
-These focused changes do not renew the default-suite checkpoint.
+DRSUB (`5800/5900`) uses the same retained paired-read path as DADD/DSUB,
+but computes memory minus the selected accumulator. At original `02:8d23`,
+`58f8 efb8` consumes the RAM pair `efb8/efb9` after a DLD from `efbe/efbf`.
+The two words are sampled once in parity-defined MSW/LSW order, then the
+shared long-word arithmetic helper publishes at Execute. C16 mode subtracts
+the two lanes independently and does not saturate with OVM; full-width mode
+uses SXM, carry, sticky destination overflow and OVM saturation.
+`drsub` passes 6,912 cases/restores across nine address forms, A/B, eight
+patterns, C16/SXM/OVM combinations and both pair parities. Later extension,
+AR/SP and memory changes cannot alter the retained address or word pair.
+`long-pair` independently runs the existing 6,912 DSUB and 13,824 DADD cases
+as controls. CPU low-page pairs remain excluded; physical phase timing and
+general producer/interrupt composition are not established by these fixtures.
+
+The runner's 105 unit tests pass; the full tool suite passes 2,813 tests with
+one skip. Load/return, carry-branch, PMST mapping and WRITA exclusion controls
+also pass, as does native 5110 save-state restoration. These focused changes
+do not renew the default-suite checkpoint.
 
 The original recorder subsequently emits NAND data writes through firmware
 at `02:891c`, then reaches the current unsupported form. NAND traffic alone

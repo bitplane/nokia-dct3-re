@@ -6579,10 +6579,33 @@ private:
 		}
 		return f;
 	}
+	static long_pair_fixture_data long_reverse_fixture(unsigned variant)
+	{
+		auto f = long_pair_fixture(variant);
+		f.opcode = (f.opcode & 0x01ff) | 0x5800;
+		bool const dual = f.st1 & 0x80, sxm = f.st1 & 0x100, ovm = f.st1 & 0x200;
+		if (dual)
+		{
+			s64 const memory_high = sxm ? s16(f.memory >> 16) : u16(f.memory >> 16);
+			s64 const source_high = sxm ? s16(f.source >> 16) : u16(f.source >> 16);
+			f.result = ((u64(memory_high - source_high) & 0xffffff) << 16) | u16(u16(f.memory) - u16(f.source));
+			f.result_st0 = (f.st0 & ~0x800) | (u16(f.memory >> 16) >= u16(f.source >> 16) ? 0x800 : 0);
+		}
+		else
+		{
+			s64 const memory = sxm && (f.memory & 0x80000000U) ? s64(f.memory) - (s64(1) << 32) : s64(f.memory);
+			s64 const source = f.source & 0x8000000000ULL ? s64(f.source) - (s64(1) << 40) : s64(f.source);
+			s64 const difference = memory - source;
+			bool const overflow = difference < -2147483648LL || difference > 2147483647LL;
+			f.result = u64(overflow && ovm ? (difference < 0 ? -2147483648LL : 2147483647LL) : difference) & 0xffffffffffULL;
+			f.result_st0 = (f.st0 & ~0x800) | (f.memory >= u32(f.source) ? 0x800 : 0) | (overflow ? BIT(f.opcode, 8) ? 0x200 : 0x400 : 0);
+		}
+		return f;
+	}
 	void start_pipeline_long_pair(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = long_pair_fixture(variant);
+		auto const f = !strcmp(machine().options().bios(), "drsub") ? long_reverse_fixture(variant) : long_pair_fixture(variant);
 		bool const source = (f.opcode & 0xfc00) == 0x5000 ? BIT(f.opcode, 9) : BIT(f.opcode, 8);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -11913,6 +11936,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "drsub") || !strcmp(machine().options().bios(), "long-pair")) { start_pipeline_long_pair(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-store")) { start_xmem_store(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-load") || !strcmp(machine().options().bios(), "xmem-alu")) { start_xmem_load(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd")) { start_mvdd(); return; }
@@ -35493,7 +35517,8 @@ private:
 		if (m_phase == 252630)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = long_pair_fixture(variant);
+			bool const reverse = !strcmp(machine().options().bios(), "drsub");
+			auto const f = reverse ? long_reverse_fixture(variant) : long_pair_fixture(variant);
 			bool const destination = BIT(f.opcode, 8), retired = tick >= f.read_cycle + 1;
 			bool const source = (f.opcode & 0xfc00) == 0x5000 ? BIT(f.opcode, 9) : destination;
 			u64 const initial_a = source ? 0x246813579aULL : f.source, initial_b = source ? f.source : 0x246813579aULL;
@@ -35536,9 +35561,20 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252640; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (reverse)
+				{
+					if (variant < 6911) { start_pipeline_long_pair(variant + 1); return; }
+					osd_printf_info("TMS320C54x staged DRSUB: PASS cases=6912 restore=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated DRSUB complete");
+				}
 				if (variant == 6911) osd_printf_info("TMS320C54x staged DSUB: PASS cases=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6912 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
 				if (variant < 20735) { start_pipeline_long_pair(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged DADD: PASS cases=13824 address_forms=9 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=13824 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "long-pair"))
+				{
+					osd_printf_info("TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated long-pair controls complete");
+				}
 				start_pipeline_long_immediate_store(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40576,6 +40612,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(123, "xmem-alu", "Retained compact Xmem ADD and SUB replay")
 	ROM_SYSTEM_BIOS(124, "xmem-store", "Retained compact shifted Xmem stores")
 	ROM_SYSTEM_BIOS(125, "xmem-store-bp", "Compact Xmem store and load bus bypass")
+	ROM_SYSTEM_BIOS(126, "drsub", "Retained reversed long-word subtraction")
+	ROM_SYSTEM_BIOS(127, "long-pair", "DADD and DSUB retained long-pair controls")
 ROM_END
 
 ROM_START(tms54rom4)
