@@ -23,13 +23,14 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the mapped/peripheral-source
-exclusion for `LD Smem,ASM` (live PC `03:dfe2`) within a five-second observation,
+pin-decoded response words before stopping at the active-block control/count
+exclusion for `RPT #7` (`ec07`) at `03:a582` inside block
+`03:a538..03:a590` (live PC `03:a584`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record one T-shifted ADD entry at `03:df52` and one
-`STL B,*(000e)` entry at `03:de88`, with no observer writes.
+Passive Execute hooks record 195 `STL B,*(000e)` entries at `03:de88` and
+187 `LD *(AH),ASM` entries at `03:dfde`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -98,9 +99,24 @@ offset, preincrement and absolute addressing, all eight AR fields, all 32 ASM
 encodings, four status/payload profiles, both CMPT states, two pages and three
 snapshots. Replacing the literal, source word and ARs after their owning stage
 cannot cause resampling or duplicate updates. `asm-edge` adds 16 direct mapped/
-peripheral exclusions before source reads or register results; these are
+peripheral exclusions for control, SP and peripheral sources before reads or
+register results; these are
 prototype exclusions, not silicon traps. Incrementing excluded forms and mapped
-ASM-source latency are not established by those tests.
+ASM-source producer latency are not established by those tests.
+
+The separate `asm-mapped` fixture admits the existing register window
+`0008..0017` (AL/AH/AG, BL/BH/BG, T, TRN and AR0..AR7). It passes 49,152
+cases/restores across all 16 sources, DP/postincrement/offset/absolute forms,
+32 ASM counts, four payload/status profiles, two pages and three snapshots.
+The Read-owned source is retained after all source registers and address
+pointers are replaced; Execute changes only ASM, with no data writes or
+duplicate source/literal reads. Guard-register sources use their eight-bit
+width. Pointer registers are selected separately from an AR source, so
+source/address alias behavior is not claimed. This fixture does not establish
+general producer latency, CMPT, interrupt or control-delay composition.
+SPRU131G table 7-28 and example 7-69 explicitly cover mapped accumulator
+consumers, including long-address `LD *(AL),ASM`; the original recorder uses
+the equivalent AH source.
 
 SPRU131G table 7-3 and example 7-52 require zero consumer latency for this
 load. `asm-consumer` passes 9,216 cases/restores with immediately following

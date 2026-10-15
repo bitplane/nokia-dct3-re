@@ -901,7 +901,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(old, new), 3, profile='t-load-control')
 
     def test_asm_load_profile_scopes(self):
-        for profile, restores in (('asm-load', 73728), ('asm-consumer', 9216), ('asm-edge', 16)):
+        for profile, restores in (('asm-load', 73728), ('asm-consumer', 9216), ('asm-edge', 16), ('asm-mapped', 49152)):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)
@@ -909,6 +909,8 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
         for profile, old, new in (('asm-load', 't_unchanged=1', 't_unchanged=0'),
                                   ('asm-load', 'publish=Execute', 'publish=Read'),
+                                  ('asm-mapped', 'sources=16', 'sources=1'),
+                                  ('asm-mapped', 'source_sample=Read', 'source_sample=Execute'),
                                   ('asm-consumer', 'latency=zero', 'latency=one_word')):
             marker, ending = EXTRA_PROFILES[profile]
             with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
