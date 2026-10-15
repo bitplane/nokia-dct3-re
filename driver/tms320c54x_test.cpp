@@ -9744,6 +9744,98 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253570;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct mvdd_fixture
+	{
+		unsigned x, y, count, irq, prefix, snapshot;
+		bool repeated, linear;
+		u32 base;
+		u16 input, st0, st1;
+		std::array<u16, 4> initial, final;
+		std::array<u16, 16> source, destination, word;
+		unsigned first_write() const { return 6 + prefix; }
+		static u16 seed(unsigned address) { return 0xa500U ^ ((address - 0x1000) * 73U); }
+	};
+	static mvdd_fixture mvdd_case(unsigned v, bool repeated)
+	{
+		mvdd_fixture f{};
+		f.x = (v >> 4) & 15; f.y = v & 15; f.repeated = repeated;
+		unsigned const layout = repeated ? (v / 768) % 3 : (v / 1024) % 3;
+		f.count = repeated ? std::array<unsigned, 3>{0, 1, 15}[(v / 256) % 3] : 0;
+		f.linear = repeated ? (v / 2304) % 2 : (v / 3072) % 2;
+		f.base = (repeated ? (v / 4608) % 2 : (v / 6144) % 2) ? 0x20000 : 0;
+		f.irq = repeated ? (v / 9216) % 3 : 0;
+		f.prefix = repeated ? 1 + (v / 27648) % 2 : 0;
+		f.snapshot = repeated ? v / 55296 : v / 12288;
+		f.input = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 256) % 4];
+		f.st0 = 0xa602 | (v & 1 ? 0x1800 : 0);
+		f.st1 = (v & 2 ? 0x4320 : 0) | (f.irq == 1 ? 0 : 0x800);
+		// BK=16 requires a 32-word aligned base and an initial index below 16.
+		for (unsigned i = 0; i < 4; ++i) f.initial[i] = layout == 2 ? 0x1048 + i : 0x100f + (layout == 0 ? i * 0x100 : 0);
+		auto ar = f.initial;
+		auto modify = [&f](u16 a, unsigned mode) -> u16 {
+			if (mode == 1) return a - 1;
+			if (mode == 2) return a + 1;
+			if (mode == 3) return f.linear ? a + 3 : (a & 0xfff0) | ((a + 3) & 15);
+			return a;
+		};
+		for (unsigned i = 0; i <= f.count; ++i)
+		{
+			f.source[i] = ar[f.x & 3]; f.destination[i] = ar[f.y & 3];
+			ar[f.x & 3] = modify(ar[f.x & 3], f.x >> 2);
+			if ((f.x & 3) != (f.y & 3)) ar[f.y & 3] = modify(ar[f.y & 3], f.y >> 2);
+		}
+		f.final = ar;
+		std::array<u16, 1024> memory;
+		for (unsigned i = 0; i < memory.size(); ++i) memory[i] = mvdd_fixture::seed(0x1000 + i);
+		if (!repeated) memory[f.source[0] - 0x1000] = f.input;
+		for (unsigned i = 0; i <= f.count; ++i)
+		{
+			// DARAM Read n precedes the older Write n-1 in the same clock.
+			f.word[i] = memory[f.source[i] - 0x1000];
+			if (i) memory[f.destination[i - 1] - 0x1000] = f.word[i - 1];
+		}
+		return f;
+	}
+	void start_mvdd(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_mvdd_fixture = mvdd_case(variant, !strcmp(machine().options().bios(), "mvdd-repeat")); auto const &f = m_mvdd_fixture;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.prefix) program.write_word(f.base + 0x600, f.prefix == 2 ? 0xf070 : 0xec00 | f.count);
+		if (f.prefix == 2) program.write_word(f.base + 0x601, f.count);
+		program.write_word(f.base + 0x600 + f.prefix, 0xe500 | (f.x << 4) | f.y); program.write_word(f.base + 0x601 + f.prefix, 0xf4e1);
+		if (f.irq) program.write_word(f.base + (f.irq == 2 ? 4 : 0x40), 0xf4eb);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		for (unsigned i = 0; i <= f.count; ++i) { data.write_word(f.source[i], mvdd_fixture::seed(f.source[i])); data.write_word(f.destination[i], mvdd_fixture::seed(f.destination[i])); }
+		if (!f.repeated) data.write_word(f.source[0], f.input);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_fast_stack_reads = m_pipeline_register_writes = m_vector_acks = m_port_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdd_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff) { expect(f.irq && m_pipeline_store_writes == f.count + 1 && !m_fast_stack_reads && word == 0x601 + f.prefix, "RETE consumes only the post-MVDD interrupt frame"); ++m_fast_stack_reads; return; }
+			unsigned const i = m_pipeline_operand_reads;
+			expect(i <= f.count && at == f.source[i] && word == f.word[i] && m_cpu->pipeline_cycles() == f.first_write() - 1 + i, "MVDD reads its captured source before the preceding write, including overlap"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdd_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff) { expect(f.irq && m_pipeline_store_writes == f.count + 1 && !m_pipeline_register_writes && word == 0x601 + f.prefix, "IRQ frame follows all MVDD destination writes"); ++m_pipeline_register_writes; return; }
+			unsigned const i = m_pipeline_store_writes;
+			expect(i <= f.count && at == f.destination[i] && word == f.word[i] && m_cpu->pipeline_cycles() == f.first_write() + i, "MVDD writes one retained word to its captured destination at Execute"); ++m_pipeline_store_writes;
+		});
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600 + f.prefix, "mvdd_fetch", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == f.base + 0x600 + f.prefix) { expect(!m_pipeline_extensions_reads && word == (0xe500 | (f.x << 4) | f.y), "MVDD owns one opcode fetch even when repeated"); ++m_pipeline_extensions_reads; }
+			else if (f.prefix == 2 && at == f.base + 0x601) { expect(!m_port_reads && word == f.count, "Long RPT owns one retained count literal"); ++m_port_reads; }
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254140;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -10584,6 +10676,8 @@ private:
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-load")) { start_xmem_load(); return; }
+		if (!strcmp(machine().options().bios(), "mvdd")) { start_mvdd(); return; }
+		if (!strcmp(machine().options().bios(), "mvdd-repeat")) { start_mvdd(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
@@ -36786,6 +36880,58 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253620) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253610; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254140)
+		{
+			unsigned const tick = ++m_idle_fixture_tick; auto const &f = m_mvdd_fixture;
+			unsigned const checkpoint = std::array<unsigned, 4>{3 + f.prefix, f.first_write() - 2, f.first_write() - 1, f.first_write() + f.count}[f.snapshot];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVDD remains stage-owned without atomic fallback");
+			if (!f.repeated && tick <= 4)
+				for (unsigned i = 0; i < 4; ++i)
+				{
+					u16 const expected = tick == 4 ? f.final[i] : f.initial[i];
+					if (m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) != expected) osd_printf_info("mvdd_ar: case=%u tick=%u reg=%u actual=%04x expected=%04x x=%x y=%x bk=%u\n", m_pipeline_peripheral_case, tick, i + 2, unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i)), expected, f.x, f.y, f.linear ? 0 : 16);
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == expected, "MVDD captures both addresses before one X-priority AR update at Access");
+				}
+			if (!f.repeated && tick == 4) for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2222 + i);
+			if (!f.repeated && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source[0], 0xdead); }
+			if (f.prefix == 2 && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xffff); }
+			// A pin edge queued in this callback is not CPU-owned save state.
+			// RPT is decoded at clock 3; latch the event before any checkpoint.
+			if (f.irq && tick == 3) { if (f.irq == 1) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1); else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); } }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads, m_pipeline_register_writes, m_vector_acks, m_port_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVDD addresses, pending Read/write, issue count and deferred IRQ");
+			}
+			if (tick == f.first_write() + f.count + 24)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x602 + f.prefix && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "MVDD resumes the exact caller page after any deferred interrupt return");
+				if (m_pipeline_operand_reads != f.count + 1 || m_pipeline_store_writes != f.count + 1 || m_pipeline_extensions_reads != 1 || m_fast_stack_reads != unsigned(bool(f.irq)) || m_pipeline_register_writes != unsigned(bool(f.irq)) || m_vector_acks != unsigned(bool(f.irq)) || m_port_reads != unsigned(f.prefix == 2))
+					osd_printf_info("mvdd_counts: case=%u replay=%u count=%u prefix=%u irq=%u reads=%u writes=%u fetches=%u irq_reads=%u irq_writes=%u acks=%u literals=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), f.count, f.prefix, f.irq, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads, m_pipeline_register_writes, m_vector_acks, m_port_reads);
+				expect(m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.count + 1 && m_pipeline_extensions_reads == 1 && m_fast_stack_reads == unsigned(bool(f.irq)) && m_pipeline_register_writes == unsigned(bool(f.irq)) && m_vector_acks == unsigned(bool(f.irq)) && m_port_reads == unsigned(f.prefix == 2), "MVDD owns exact, nonduplicated copy, count and interrupt transactions");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 & ~(f.irq ? 0x800 : 0)), "MVDD preserves accumulators, T and status apart from RETE's INTM clearance");
+				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (f.repeated ? f.final[i] : 0x2222 + i), "MVDD applies each pointer modification once with Xmod priority for a shared AR");
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination[f.count]) == f.word[f.count], "MVDD's final destination contains the retained word"); }
+				if (f.repeated) expect(m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Repeated MVDD drains its architectural repeat count");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_register_writes = m_recurring_irq_snapshot[4]; m_vector_acks = m_recurring_irq_snapshot[5]; m_port_reads = m_recurring_irq_snapshot[6];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MVDD without duplicating a read, write, pointer update or issue"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254150; m_check_timer->enable(true); return;
+				}
+				bool const repeated = f.repeated; unsigned const variant = m_pipeline_peripheral_case;
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (repeated ? 221183 : 49151)) { start_mvdd(variant + 1); return; }
+				if (repeated)
+				{
+					osd_printf_info("TMS320C54x repeated MVDD: PASS cases=221184 restore=221184 encodings=256 counts=0,1,15 forms=short,long layouts=distinct,equal,overlap bk=0,16 pages=2 snapshots=4 sources=none,IRQ,NMI read_before_older_write=1 same_ar_xmod_priority=1 opcode_fetches=1 literal_fetches=once issue_interval=1 interrupt_return=1 mapped_acceptance=0 memory_count_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated repeated MVDD complete");
+				}
+				osd_printf_info("TMS320C54x staged MVDD: PASS cases=49152 restore=49152 encodings=256 layouts=distinct,equal,overlap values=4 bk=0,16 pages=2 snapshots=4 address_access=4 source_read=5 destination_write=6 same_ar_xmod_priority=1 captured_addresses=1 captured_source=1 reads=1 writes=1 mapped_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated staged MVDD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254150) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254140; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254120)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 65536; auto const f = xmem_load_case(variant);
@@ -37572,6 +37718,8 @@ private:
 	u16 m_middle_port_value = 0;
 	u16 m_last_port_value = 0;
 	unsigned m_saved_repeat_reads = 0;
+	// Immutable case inputs remain unchanged across each manual replay.
+	mvdd_fixture m_mvdd_fixture = {};
 	std::stringstream m_saved_repeat;
 	bool m_far_save_return = false;
 	std::array<u16, 0x800> m_saved_transport = {};
@@ -37587,6 +37735,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
+		if (m_phase == 254140) { auto const &f = m_mvdd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "MVDD acknowledges IRQ/NMI only after the final retained destination write"); ++m_vector_acks; }
 		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == (near_accumulator_fixture() ? 1 : 2), "IRQ/NMI cannot split the retained accumulator-call frame"); ++m_vector_acks; }
@@ -38217,6 +38366,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(67, "xmem-load", "Staged compact-address shifted accumulator load")
 	ROM_SYSTEM_BIOS(68, "cala", "Staged near accumulator call and exact return frame")
 	ROM_SYSTEM_BIOS(69, "cala-producer", "Staged DLD target publication before near accumulator call")
+	ROM_SYSTEM_BIOS(70, "mvdd", "Staged dual-data transfer address and operand ownership")
+	ROM_SYSTEM_BIOS(71, "mvdd-repeat", "Repeated dual-data transfers with DARAM overlap ordering")
 ROM_END
 
 ROM_START(tms54rom4)

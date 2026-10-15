@@ -3292,8 +3292,9 @@ read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
-`02:3fbc` and CALA B at `02:40e1`, reaching repeated MVDD (`e598`)
-at `02:a169` (live PC `02:a16b`); all
+`02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
+at `02:a169`, reaching unsupported `1af8` at `03:abca`
+(live PC `03:abcc`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3399,9 +3400,37 @@ is RC ANEQ (`fc44`). The MVDD worker is reached later by FCALL
 `02:993d -> 02:a164`, so its FRET does not belong to the near-call frame.
 The debugger's low-window mnemonic text in this run prints zero-word ADDs
 for nonzero ROM instructions; these labels are not used as opcode evidence.
-Addresses were cross-checked against the original AA22 word image. The new
-stop is `STM #0090,AR3; RPT #000f; MVDD Xmem,Ymem` (`e598`), requiring
-separate retained source/destination ownership and repeat semantics.
+Addresses were cross-checked against the original AA22 word image.
+
+MVDD (`e5XY`, SPRU172C Class 14 and SPRU131G section 5.5.4) captures
+both addresses at Access, reads its source at Read and writes the retained
+word at Execute. When both operands select the same AR, Xmod wins; Ymod
+must not modify it a second time. `mvdd` passes 49,152 cases/restores over
+all 256 encodings, distinct/equal/overlapping address layouts, four values,
+BK=0/16, two pages and four snapshots. Post-capture pointer/source mutation
+cannot retarget the transfer or change the retained word.
+
+`mvdd-repeat` passes 221,184 cases/restores over all encodings, immediate
+short/long counts 0/1/15, three layouts, BK=0/16, two pages, four snapshots
+and no interrupt/IRQ/NMI. Each iteration occupies real pipeline slots:
+Read of iteration n precedes the older iteration's Execute write in the
+same clock, including overlapping buffers. The body is fetched once,
+long count literals once, and copies issue one clock apart. IRQ/NMI wait
+for repeat completion, return through RETE and restore the caller's page
+and stack. Input pulses settle into CPU-owned state before snapshots.
+Circular fixtures start inside a valid BK-sized queue whose base alignment
+is the next power of two strictly larger than BK, not merely BK alignment.
+
+PSHD and MVDD share the retained repeat issuer and its saved remaining-issue
+count. Mapped/peripheral MVDD operands and memory-count repeats remain
+fail-closed; external-bank contention and silicon phase accuracy are not
+established by these DARAM fixtures. The original run passes this worker
+and still compares all 48,261 program and 3,656 data words successfully;
+its next unsupported form is `1af8` at `03:abca`. This is not complete
+resident initialization, board boot or decoded audio.
+Focused PSHD-repeat, near/far accumulator-call and stack-IRQ controls,
+69 verifier unit tests, evidence validation and native 5110 save-state
+restoration pass. This is not a fresh full-core acceptance run.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

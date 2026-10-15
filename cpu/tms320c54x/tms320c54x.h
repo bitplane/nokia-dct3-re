@@ -347,7 +347,7 @@ private:
 	bool m_pipeline_repeat_stream = false;
 	bool m_pipeline_repeat_store_pending = false;
 	u16 m_pipeline_repeat_store_address = 0;
-	u16 m_pipeline_repeat_push_issues = 0;
+	u16 m_pipeline_repeat_issue_remaining = 0;
 	u16 m_pipeline_repeat_word = 0;
 	u16 m_pipeline_repeat_source = 0;
 	u16 m_pipeline_repeat_status = 0;
