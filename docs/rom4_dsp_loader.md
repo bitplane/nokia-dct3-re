@@ -66,8 +66,13 @@ execute. Repeated MVDD (`e598`) at `02:a169` and absolute OR
 restoration loops at `02:4062`/`02:4066`. Mapped AR/BK writes retain their
 Read-stage ownership, including older-store conflicts. BACC A (`f4e2`) at
 `03:9de4` now retains the accumulator target after READA's mapped write,
-without allocating a call frame. The next stop is long-offset AND
-(`18e2 1462`) at `03:9dff`.
+without allocating a call frame. Long-offset AND (`18e2 1462`) at
+`03:9dff` now executes through retained address and source stages. Its
+294,912-case replay fixture covers AND/OR/XOR, both accumulators, all
+24 offset/preincrement/circular encodings, CMPT selection and BK=0/13.
+Mapped/peripheral sources, repeats and control-delay composition remain
+fail-closed, with 24 exclusion cases. The next stop is mapped MVMD
+(`730e 0011`, T to AR1) at `03:9ba2`.
 The exact resident program/data comparison still passes; this is not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve

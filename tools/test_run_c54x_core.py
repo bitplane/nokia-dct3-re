@@ -12,6 +12,33 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_profile_names_fit_mame_bios_limit(self):
+        for name in EXTRA_PROFILES:
+            with self.subTest(profile=name):
+                self.assertLessEqual(len(name), 16)
+
+    def test_logic_controls_and_exclusions(self):
+        for name in ('logic-edges', 'logic-short', 'logic-peripheral', 'load-offset'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
+    def test_long_memory_logic_scope(self):
+        marker, ending = EXTRA_PROFILES['logic-offset']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='logic-offset')
+        for bad in (output.replace('restore=294912', 'restore=0'),
+                    output.replace('pointer_updates_once=1', 'pointer_updates_once=0'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='logic-offset')
+
     def test_accumulator_branch_scope(self):
         for name in ('bacc', 'fbacc', 'bacc-producer', 'fbacc-producer'):
             marker, ending = EXTRA_PROFILES[name]

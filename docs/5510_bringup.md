@@ -3295,8 +3295,9 @@ passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
 at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
 POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
-It stops at long-offset AND (`18e2 1462`) at `03:9dff`
-(live PC `03:9e01`); all
+Long-offset AND (`18e2 1462`) at `03:9dff` now executes; the next stop is
+mapped MVMD (`730e 0011`, T to AR1) at `03:9ba2`
+(live PC `03:9ba4`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3531,9 +3532,33 @@ prefetch and repeated POPD (14 profiles total). The 73 verifier unit tests,
 evidence validation and native 5110 save-state restoration pass. The full
 suite baseline remains `690ace59`; this is focused acceptance.
 
-The original run now passes BACC A at `03:9de4` and stops at long-offset
-AND (`18e2 1462`) at `03:9dff`. Retained extended Smem addressing for the
-logical family is the next instruction boundary. All 48,261 program and
+Long-offset AND/OR/XOR now use the same retained extended Smem address
+machinery as loads. TI SPRU172C's instruction descriptions specify an extra
+word and cycle for long-offset Smem, with no arithmetic-status changes.
+The literal is retained at Decode, address and pointer modification at
+Access (clock 5), source at Read (6), and accumulator publication at Execute
+(7). Circular fixtures use BK=13 with a 16-word-aligned queue base and an
+initial index inside the queue; BK=0 remains linear. CMPT's encoded-AR0
+selection uses the retained ARP, while nonzero encoded ARs update ARP.
+
+The `logic-offset` profile passes 294,912 cases/restores over six operation/
+accumulator combinations, 24 addressing encodings, four signed offsets,
+four value pairs, four SXM/OVM states, both CMPT settings, BK=0/13, two
+pages and four snapshots. Poisoning the fetched literal, all ARs after
+Access and source RAM after Read checks single modification and retained
+operands. Other accumulator, T, stack and arithmetic flags are preserved.
+The `logic-edges` profile passes 24 fail-closed cases for mapped/peripheral
+sources, repeats and control-delay composition, with no operand access or
+pointer update. Interrupt composition and physical silicon phases are not
+claimed. Separate short/peripheral/absolute logic controls pass 576/864/
+1,536 cases, and the offset-load control passes 12,672. Both accumulator-
+branch producer controls and repeated POPD also pass (nine profiles total).
+The 76 verifier unit tests and native 5110 save-state restoration pass;
+the full-suite baseline remains `690ace59`.
+
+The original run passes BACC A at `03:9de4` and long-offset
+AND (`18e2 1462`) at `03:9dff`, then stops at mapped MVMD (`730e 0011`,
+T to AR1) at `03:9ba2`. All 48,261 program and
 3,656 compared resident data words still match. This remains partial
 initialization, not complete board boot, native speech or a completed
 service transaction.
