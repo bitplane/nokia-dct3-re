@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_absolute_and_negate_scope(self):
+        for name in ('absolute', 'negate'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=13824', 'restore=0'),
+                        output.replace('producer_cases=1536', 'producer_cases=0'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_profile_names_fit_mame_bios_limit(self):
         for name in EXTRA_PROFILES:
             with self.subTest(profile=name):

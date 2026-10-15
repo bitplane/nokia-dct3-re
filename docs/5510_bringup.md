@@ -3298,8 +3298,9 @@ POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
 Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
 T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
 executes, sending the first acknowledgement word to the modeled serial
-transmitter. The next stop is ABS A,A (`f485`) at `02:e5e5`
-(live PC `02:e5e7`); all
+transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` now execute. The next
+stop is MPY (`62f8 0008 012c`, mapped AL times immediate 300) at
+`03:95b5` (live PC `03:95b7`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3595,10 +3596,26 @@ T to AR1) at `03:9ba2` and MVDD (`e501`) at `03:9c70`. A read-only
 observation at the former MVDD guard found AR2=`14b2`, AR3=`0033` and
 source word `007f`: ordinary RAM to the bench's McBSP2 transmit path,
 not a CPU-register transfer. Original firmware now emits the pin-decoded
-acknowledgement `007f,0001,0055`, then stops at ABS A,A (`f485`) at
-`02:e5e5` (live PC `02:e5e7`). The input cursor is 9/50 delivered words,
+acknowledgement `007f,0001,0055`. ABS A,A/B,B (`f485`/`f785`) at
+`02:e5e5`/`02:e5e7` now execute. The next stop is MPY
+(`62f8 0008 012c`, mapped AL times immediate 300) at `03:95b5`
+(live PC `03:95b7`). The input cursor is 9/50 delivered words,
 not nine parsed commands. This acknowledgement is not a completed command
 transaction, and the physical DA150 register map remains unverified.
+ABS uses the existing Class-1 register ALU Execute path and shared atomic
+arithmetic (SPRU172C, ABS instruction). The `absolute` profile passes
+13,824 cases/restores over all four accumulator selections, sixteen
+40-bit patterns, 32 status configurations, two pages and three snapshots.
+It covers zero carry, sticky destination overflow, OVM saturation including
+the 40-bit minimum, unchanged non-destination accumulator/status and 1,536
+adjacent immediate-load producer cases. The source is live at Execute,
+not a newly invented Read-stage latch. There are no data-memory accesses
+or new CPU saved fields. IRQ and repeat composition are not claimed.
+The matching NEG control, conditional returns, T/TRN moves and peripheral
+MVDD also pass (five profiles total), along with 79 verifier tests,
+evidence validation and native 5110 restoration. The broad regression
+baseline remains `690ace59`, not a fresh full-suite claim.
+
 All 48,261 program and
 3,656 compared resident data words still match. This remains partial
 initialization, not complete board boot, native speech or a completed

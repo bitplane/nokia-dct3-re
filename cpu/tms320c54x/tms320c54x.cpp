@@ -301,7 +301,7 @@ constexpr bool staged_accumulator_shift(u16 word)
 
 constexpr bool staged_accumulator_arithmetic(u16 word)
 {
-	return (word & 0xfce0) == 0xf400 || (word & 0xfce0) == 0xf420 || (word & 0xfcfe) == 0xf480 || (word & 0xfcff) == 0xf484;
+	return (word & 0xfce0) == 0xf400 || (word & 0xfce0) == 0xf420 || (word & 0xfcfe) == 0xf480 || (word & 0xfcfe) == 0xf484;
 }
 
 constexpr bool staged_memory_load(u16 word)

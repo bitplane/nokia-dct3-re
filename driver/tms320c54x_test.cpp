@@ -9458,7 +9458,7 @@ private:
 		u32 base;
 		unsigned prefix;
 	};
-	static negate_fixture negate_case(unsigned variant)
+	static negate_fixture negate_case(unsigned variant, bool absolute = false)
 	{
 		unsigned const v = variant % 4608;
 		bool const producer = v >= 4096;
@@ -9473,20 +9473,20 @@ private:
 		u64 const initial = patterns[producer ? 3 : p & 15];
 		u64 const source = producer ? (BIT(p, 8) ? 5 : 0) : initial;
 		s64 const signed_source = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-		s64 const negated = -signed_source;
+		s64 const negated = absolute && signed_source >= 0 ? signed_source : -signed_source;
 		bool const overflow = negated < -0x80000000LL || negated > 0x7fffffffLL;
 		u64 const result = u64(overflow && BIT(flags, 0) ? std::clamp(negated, s64(-0x80000000LL), s64(0x7fffffffLL)) : negated) & 0xffffffffffULL;
 		u16 const st0 = 0x101b | (BIT(flags, 1) ? 0x400 : 0) | (BIT(flags, 2) ? 0x200 : 0) | (BIT(flags, 3) ? 0x800 : 0);
 		u16 const result_st0 = (st0 & ~u16(0x800)) | (!source ? 0x800 : 0) | (overflow ? destination_b ? 0x200 : 0x400 : 0);
 		return {source_b ? 0x123456789aULL : initial, source_b ? initial : 0x2233445566ULL,
-			source, result, u16(0xf484 | (selectors << 8)), st0, result_st0,
+			source, result, u16((absolute ? 0xf485 : 0xf484) | (selectors << 8)), st0, result_st0,
 			u16(0x800 | (BIT(flags, 0) ? 0x200 : 0) | (BIT(flags, 4) ? 0x100 : 0)),
 			u32(BIT(p, producer ? 7 : 11) ? 0x20000 : 0), unsigned(producer)};
 	}
 	void start_pipeline_negate(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = negate_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		auto const f = negate_case(variant, !strcmp(machine().options().bios(), "absolute")); auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		if (f.prefix) program.write_word(f.base + 0x600, (BIT(f.opcode, 9) ? 0xe900 : 0xe800) | u16(f.source));
 		program.write_word(f.base + 0x600 + f.prefix, f.opcode);
@@ -11115,7 +11115,7 @@ private:
 		{
 			start_pipeline_mapped_word_arithmetic(); return;
 		}
-		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "negate"))
+		if (!strcmp(machine().system().name, "tms54test") && (!strcmp(machine().options().bios(), "negate") || !strcmp(machine().options().bios(), "absolute")))
 		{
 			start_pipeline_negate(); return;
 		}
@@ -36327,7 +36327,8 @@ private:
 		if (m_phase == 253410)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = negate_case(variant); unsigned const checkpoint = std::array<unsigned, 3>{3 + f.prefix, 5 + f.prefix, 6 + f.prefix}[variant / 4608];
+			bool const absolute = !strcmp(machine().options().bios(), "absolute");
+			auto const f = negate_case(variant, absolute); unsigned const checkpoint = std::array<unsigned, 3>{3 + f.prefix, 5 + f.prefix, 6 + f.prefix}[variant / 4608];
 			u64 a = f.a, b = f.b;
 			if (f.prefix && tick >= 6) (BIT(f.opcode, 9) ? b : a) = f.source;
 			if (tick >= 6 + f.prefix) (BIT(f.opcode, 8) ? b : a) = f.result;
@@ -36351,6 +36352,11 @@ private:
 				}
 				m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 13823) { start_pipeline_negate(variant + 1); return; }
+				if (absolute)
+				{
+					osd_printf_info("TMS320C54x staged ABS: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 irq_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated ABS complete");
+				}
 				osd_printf_info("TMS320C54x staged NEG: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "negate")) throw emu_fatalerror(0, "TMS320C54x isolated NEG complete");
 				start_pipeline_mapped_word_arithmetic(); return;
@@ -38999,6 +39005,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(85, "logic-edges", "Long logical memory exclusion replay")
 	ROM_SYSTEM_BIOS(86, "mvmd-t", "Staged T and TRN mapped moves")
 	ROM_SYSTEM_BIOS(87, "mvdd-periph", "Retained RAM to peripheral dual transfers")
+	ROM_SYSTEM_BIOS(88, "absolute", "Staged accumulator ABS conformance")
 ROM_END
 
 ROM_START(tms54rom4)
