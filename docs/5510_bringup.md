@@ -879,7 +879,7 @@ prototype's stale-T projection, not a guaranteed hardware result for an
 invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
 `03:de97..de9b` has the required separation and now executes.
 
-Staged XC now accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
+Staged XC accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
 GT/LE for A/B with XC1/XC2 protected spans. XC itself is a one-word opcode.
 It uses the shared signed
 40-bit comparator at Access, preserving the existing skip-word and two-word
@@ -899,8 +899,18 @@ established. The original `XC 1,ALT` at `03:dea4` executes without a firmware
 branch override. Aggregate test counts and the current execution boundary
 are maintained above, not repeated for this instruction family.
 
-The original recorder subsequently emits NAND data writes through firmware
-at `02:891c`, then reaches the current unsupported form. NAND traffic alone
+The unchanged `aa88` upload contains two pertinent in-block forms:
+`ff4a` at `03:da79` is `XC 2,BGEQ`, protecting `32f8 0009` (a two-word
+ASM load); `fd4b` at `03:da85` is `XC 1,BLT`, protecting `ed11`
+(`LD #-15,ASM`). Both spans finish inside `03:da71..03:da93`.
+SPRU131G example 7-57 explicitly uses XC within RPTB; the current exclusion
+is a model boundary, not a hardware prohibition. Before admitting it, verify
+taken/skipped words and literals, per-iteration counter/BRAF ownership and
+pending IRQ/NMI through the two-word protected span. Include the shortest
+legal loops: repeated PCs must not let retirement from an older iteration
+clear a newer XC's protection. That ownership question is not yet tested.
+
+Original recorder NAND data writes are observed at `02:891c`. NAND traffic alone
 does not establish a valid recording, completed file, PCM or physical audio.
 The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
@@ -1004,13 +1014,12 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Versioned aggregate acceptance has two distinct scopes:
 
-- CPU source at `e05f575b`: renewed full default run, all 288 required markers
+- CPU source at `09229001`: renewed full default run, all 288 required markers
   exactly once, expected completion exit and terminal completion check. This
-  renews the default population after the shared-path changes through active
-  context restoration, write-stage ownership, ASM stores and shifted control
-  delays. Their additional isolated matrices remain separately scoped above;
-  default acceptance does not cover ASM-store/load bypass composition, whose
-  additional isolated matrix is documented above.
+  renews the default population after shared ASM store/bypass calculation,
+  zero-latency memory moves into BRC and signed circular-load admission.
+  Their additional isolated matrices remain separately scoped above; default
+  acceptance does not imply those cases are part of its 288-marker population.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
