@@ -28,7 +28,7 @@ constexpr bool staged_mvdd(u16 word)
 
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_mvdd(word) || ((word & 0xff00) == 0x4b00 && u8(word) < 0x98);
+	return staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_immediate_alu(u16 word)
@@ -3055,9 +3055,11 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const mode = m_pipeline_word[3];
 		m_pipeline_operand_address[3] = basic_address(3, mode);
-		if (m_pipeline_operand_address[3] < 0x60)
+		u16 const destination = m_pipeline_operand_address[3];
+		bool const mapped = (destination >= 8 && destination <= 0x17) || (destination >= 0x19 && destination <= 0x1d);
+		if ((destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active))
 		{
-			logerror("%s: staged POPD register/peripheral destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged POPD status/SP/peripheral or active repeat-control destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
@@ -3329,7 +3331,8 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 17A: retain the stack word before destination publication.
 		// Read-owned SP increment is a partial placement model; POPM excludes
-		// XPC and active repeat-control destinations; POPD is bounded to RAM.
+		// XPC and active repeat-control destinations. POPD also excludes SP,
+		// status and peripheral destinations until their contracts are covered.
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
 		{
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
@@ -3341,17 +3344,18 @@ void tms320c54x_device::pipeline_step()
 			pipeline_delay_compiler_sp(m_sp);
 		}
 		m_pipeline_operand[4] = data_read(m_sp++);
-		if ((m_pipeline_word[4] & 0xff00) == 0x8a00 && u8(m_pipeline_word[4]) >= 0x10 && u8(m_pipeline_word[4]) <= 0x19)
+		u16 const destination = (m_pipeline_word[4] & 0xff00) == 0x8a00 ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4];
+		if (destination >= 0x10 && destination <= 0x19)
 		{
-			// Table 7-4 gives POPM DAGEN an early Read write; an older
+			// Table 7-4 gives POPM/POPD DAGEN an early Read write; an older
 			// store using that register bank defers publication one clock.
 			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[4] = conflict;
 			if (!conflict)
 			{
-				data_write(u8(m_pipeline_word[4]), m_pipeline_operand[4]);
-				if (u8(m_pipeline_word[4]) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
+				data_write(destination, m_pipeline_operand[4]);
+				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 			}
 		}
 	}
@@ -3658,7 +3662,11 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 		else if ((m_op & 0xff00) == 0x8b00)
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		{
+			u16 const destination = m_pipeline_operand_address[5];
+			if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
+				data_write(destination, m_pipeline_operand[5]);
+		}
 		else if (staged_accumulator_mmr_store(m_op))
 			// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.
 			// Direct MMR addressing ignores DP/CPL (SPRU172C 4-175).

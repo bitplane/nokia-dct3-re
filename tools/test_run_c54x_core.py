@@ -12,6 +12,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_popd_edges_scope(self):
+        for name in ('popd-edges', 'popd-ram'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            with self.subTest(profile=name), self.assertRaises(ValueError):
+                check_result(output.replace('restore=', 'missing_restore='), 3, profile=name)
+
+    def test_popd_scope(self):
+        for name, cases in (('popd-mapped', 4032), ('popd-repeat', 6528)):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace(f'restore={cases}', 'restore=0'),
+                        output.replace('writes=1', 'writes=2').replace('writes_each=1', 'writes_each=2'),
+                        output.replace('active_block_acceptance=0', 'active_block_acceptance=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_absolute_logic_scope(self):
         marker, ending = EXTRA_PROFILES['logic-absolute']
         output = marker + '\n' + ending + '\n'

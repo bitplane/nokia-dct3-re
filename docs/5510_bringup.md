@@ -3293,8 +3293,9 @@ checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
 `02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
-at `02:a169` and absolute OR (`1af8 b582`) at `03:abca`, reaching
-unsupported repeated POPD (`8b8f`) at `02:4062` (live PC `02:4064`); all
+at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
+POPD restoration loops at `02:4062`/`02:4066`. It stops at unsupported
+BACC A (`f4e2`) at `03:9de4` (live PC `03:9de6`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3438,19 +3439,69 @@ Literal mutation after Fetch and RAM mutation after Read cannot change
 the result; the next instruction is reached without executing the literal.
 Mapped/peripheral operands, interrupt composition and control-delay
 composition are not established by this fixture. No new saved CPU field
-is required. The original run stops at `RPT #4; POPD *AR7-` at
-`02:4061..4062`. The preceding ROM words are `STM #001d,AR7`, so the
-sequence restores PMST/REA/RSA/BRC/BK; that restoration has not executed
-in the staged run. It requires both repeated stack reads and mapped-register
-destination semantics, not repeat admission alone. Resident-memory
-comparison remains exact. This does not establish
-complete initialization or native audio.
+is required. The original restoration sequence is `STM #001d,AR7;
+RPT #4; POPD *AR7-`, followed by `STM #0016,AR7; RPT #000b;
+POPD *AR7-`. These restore PMST/REA/RSA/BRC/BK and AR6 through BL;
+the mapped/repeated contracts below cover these ranges. Resident-memory
+comparison remains exact; this is not complete initialization or native audio.
 
 Combined pipeline acceptance at the absolute-logic checkpoint passes the full
 288-marker core regression, all 54 isolated profiles, 70 verifier unit tests,
 evidence validation and native 5110 save-state restoration. The individual
 contracts above retain their stated exclusions; this does not validate
 uncovered instruction combinations, physical bus ownership or silicon phases.
+
+Mapped POPD retains its Smem destination at Access and consumes one RAM
+stack word, incrementing SP once, at Read. SPRU131G table 7-4 puts AR/BK
+publication in Read; accumulator/T/TRN and inactive control destinations
+publish in Execute. An older store to the DAGEN bank defers the mapped
+write to Execute without rereading the source. The existing register writers
+own partial accumulator-word masks and PMST mapping effects. No new saved
+CPU field is needed. `popd-mapped` passes 4,032 cases/restores over 21
+destinations (AL through AR7, BK, BRC, RSA, REA, PMST), four values,
+direct/postincrement/postdecrement forms, CMPT=0/1, two pages and four
+snapshots. Indirect forms use AR7, including a modifying self-AR destination;
+pointer mutation after Access cannot retarget the retained write.
+
+`popd-repeat` passes 6,528 cases/restores with short/long immediate counts,
+four patterns, CMPT=0/1, two pages, four snapshots and no interrupt/IRQ0/NMI.
+RAM layouts cover incrementing/decrementing/fixed destinations and forward/
+backward stack aliases with counts 0/1/15; mapped ranges use the original
+counts 4/11. Each body copy owns real pipeline slots: Read n precedes the
+older Execute write, while DAGEN writes retain their Read-stage ownership.
+The final BK publication can therefore precede an older BRC publication in
+the same clock; the checker tracks per-iteration writes rather than assuming
+publication order equals instruction order. There is one body fetch and one
+long-count literal fetch. IRQ/NMI waits for final retirement, returns through
+RETE with one balanced frame and resumes the exact caller page, including
+PMST common-window changes. Pin pulses settle before any snapshot.
+
+`popd-edges` passes 31 cases/restores: 15 model-boundary rejections and
+16 older-STL/DAGEN conflicts over same/different registers and two pages.
+Conflicting source Read remains at clock 6 and deferred publication at 7.
+SP, status, XPC, peripheral and active block-control destinations remain
+fail-closed, as do mapped stack sources, memory-count repeats and extended
+POPD addressing. Destination rejection precedes pointer modification and
+stack consumption; unsupported stack sources stop before SP increments,
+after any earlier legal destination Access. RPTB guard fixtures account for
+its setup flush/refetch rather than treating its body as an ordinary stream.
+The existing `popd-ram` 50-case control retains compiler SP latency and the
+original descriptor-copy ordering.
+
+The focused POPD checkpoint passes twelve isolated profiles: the four POPD
+profiles, POPM BRC/repeat controls, PMST pop/prefetch controls, both stack-IRQ
+controls and PSHD/MVDD repeats. The 72 verifier unit tests, evidence validation
+and native 5110 save-state restoration also pass. The full 288-marker/all-54-
+profile baseline is the preceding absolute-logic checkpoint `690ace59`, not
+a fresh full-suite claim for this change.
+
+The original staged run passes both restoration loops and reaches BACC A
+(`f4e2`) at `03:9de4`, after `READA *(0008)`. SPRU172C 4-15 defines this
+as a nonrepeatable Class 30A branch to A's low sixteen bits on the current
+logical page. Retained target sampling and branch-front ownership
+are the next missing instruction contract. All 48,261 program and 3,656
+compared resident data words still match. This is partial initialization,
+not complete board boot, native speech or a completed service transaction.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

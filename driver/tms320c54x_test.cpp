@@ -9836,6 +9836,129 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254140;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct popd_fixture
+	{
+		unsigned mode, count, prefix, irq, snapshot;
+		bool repeated, cmpt;
+		u32 base;
+		u16 pointer, st0, st1;
+		int step;
+		std::array<u16, 16> destination, word;
+		std::array<u16, 21> initial;
+		static constexpr u16 reg(unsigned i) { return i < 16 ? 8 + i : 0x19 + i - 16; }
+		unsigned read_clock(unsigned i = 0) const { return 5 + prefix + i; }
+		unsigned write_clock(unsigned i) const { return read_clock(i) + unsigned(destination[i] < 0x10 || destination[i] > 0x19); }
+		u32 write_mask(unsigned tick) const { u32 mask = 0; for (unsigned i = 0; i <= count; ++i) if (tick >= write_clock(i)) mask |= 1U << i; return mask; }
+		unsigned write_count(unsigned tick) const { unsigned n = 0; for (unsigned i = 0; i <= count; ++i) if (tick >= write_clock(i)) ++n; return n; }
+		u16 opcode() const { return 0x8b00 | mode; }
+	};
+	static popd_fixture popd_case(unsigned v, bool repeated)
+	{
+		popd_fixture f{}; f.repeated = repeated;
+		unsigned const spec = v % 17, form = repeated ? (spec < 15 ? spec / 3 : spec - 10) : (v / 84) % 3;
+		unsigned const pattern = repeated ? (v / 17) % 4 : (v / 21) % 4;
+		f.prefix = repeated ? 1 + (v / 68) % 2 : 0;
+		f.cmpt = repeated ? (v / 136) % 2 : (v / 252) % 2;
+		f.base = (repeated ? (v / 272) % 2 : (v / 504) % 2) ? 0x20000 : 0;
+		f.irq = repeated ? (v / 544) % 3 : 0;
+		f.count = !repeated ? 0 : spec < 15 ? std::array<unsigned, 3>{0, 1, 15}[spec % 3] : spec == 15 ? 4 : 11;
+		f.pointer = !repeated ? (form ? popd_fixture::reg(v % 21) : 0x7777) : std::array<u16, 7>{0x4000, 0x400f, 0x4020, 0x3001, 0x2fff, 0x1d, 0x16}[form];
+		f.mode = !repeated ? (form ? form == 1 ? 0x97 : 0x8f : popd_fixture::reg(v % 21)) : form == 2 ? 0x20 : form == 1 || form >= 5 ? 0x8f : 0x97;
+		f.step = BIT(f.mode, 7) ? (f.mode & 0x78) == 0x08 ? -1 : 1 : 0;
+		f.st0 = 0xa600 | (repeated && form == 2 ? 0x80 : 0);
+		f.st1 = 0x100 | (f.cmpt ? 0x20 : 0) | (f.irq == 1 ? 0 : 0x800);
+		for (unsigned i = 0; i <= f.count; ++i)
+		{
+			f.destination[i] = !repeated ? popd_fixture::reg(v % 21) : f.pointer + i * f.step;
+			f.word[i] = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern] ^ (i * 0x111);
+		}
+		unsigned const checkpoint = repeated ? v / 1632 : v / 1008;
+		f.snapshot = std::array<unsigned, 4>{3 + f.prefix, 4 + f.prefix, f.read_clock() + (f.count + 1) / 2, f.read_clock() + f.count + 1}[checkpoint];
+		return f;
+	}
+	void start_popd_mapped(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_popd_fixture = popd_case(variant, !strcmp(machine().options().bios(), "popd-repeat")); auto &f = m_popd_fixture;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		// PMST restoration may select the common lower program window.
+		for (u32 const base : {0U, 0x20000U})
+		{
+			for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+			if (f.prefix) program.write_word(base + 0x600, f.prefix == 2 ? 0xf070 : 0xec00 | f.count);
+			if (f.prefix == 2) program.write_word(base + 0x601, f.count);
+			program.write_word(base + 0x600 + f.prefix, f.opcode()); program.write_word(base + 0x601 + f.prefix, 0xf4e1);
+			u16 const pmst = f.repeated && f.destination[0] == 0x1d ? f.word[0] : 0;
+			program.write_word(base + (pmst & 0xff80) + (f.irq == 2 ? 4 : 0x40), 0xf4eb);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		for (unsigned i = 0; i < f.initial.size(); ++i) data.write_word(popd_fixture::reg(i), 0x2200 + i);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, f.pointer);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 ? 1 : 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		for (unsigned i = 0; i <= f.count; ++i) if (f.destination[i] >= 0x60) data.write_word(f.destination[i], 0xa55a);
+		for (unsigned i = 0; i <= f.count; ++i) data.write_word(0x3000 + i, f.word[i]);
+		for (unsigned i = 0; i < f.initial.size(); ++i) f.initial[i] = data.read_word(popd_fixture::reg(i));
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_port_reads = m_fast_stack_reads = m_pipeline_register_writes = m_vector_acks = m_popd_write_mask = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "popd_mapped_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (f.irq && m_pipeline_operand_reads == f.count + 1 && at == 0x3000 + f.count) { expect(!m_fast_stack_reads && word == 0x601 + f.prefix, "RETE consumes only the completed POPD repeat's interrupt frame"); ++m_fast_stack_reads; return; }
+			unsigned const i = m_pipeline_operand_reads;
+			if (i > f.count || at != 0x3000 + i || word != f.word[i] || m_cpu->pipeline_cycles() != f.read_clock(i)) osd_printf_info("popd_read: case=%u replay=%u i=%u at=%04x word=%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), i, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles());
+			expect(i <= f.count && at == 0x3000 + i && word == f.word[i] && m_cpu->pipeline_cycles() == f.read_clock(i), "POPD consumes each stack word once before the preceding DARAM write"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "popd_mapped_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (f.irq && m_pipeline_store_writes == f.count + 1 && at == 0x3000 + f.count) { expect(!m_pipeline_register_writes && word == 0x601 + f.prefix, "IRQ reserves one frame only after every POPD publication"); ++m_pipeline_register_writes; return; }
+			for (unsigned i = 0; i <= f.count; ++i)
+				if (!(m_popd_write_mask & (1U << i)) && at == f.destination[i] && word == f.word[i] && m_cpu->pipeline_cycles() == f.write_clock(i)) { m_popd_write_mask |= 1U << i; ++m_pipeline_store_writes; return; }
+			osd_printf_info("popd_write: case=%u replay=%u at=%04x word=%04x cycle=%llu mask=%x\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles(), m_popd_write_mask);
+			expect(false, "POPD publishes a retained word once at its destination's Read/Execute stage");
+		});
+		m_pipeline_fetch_tap = program.install_read_tap(0, 0x7fffff, "popd_mapped_fetch", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == f.base + 0x600 + f.prefix || at == 0x600 + f.prefix) { expect(!m_pipeline_extensions_reads && word == f.opcode(), "POPD fetches one body opcode even during repeat or PMST mapping changes"); ++m_pipeline_extensions_reads; }
+			else if (f.prefix == 2 && (at == f.base + 0x601 || at == 0x601)) { expect(!m_port_reads && word == f.count, "Long POPD repeat retains one count literal"); ++m_port_reads; }
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254200;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_popd_edges(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const conflict = variant >= 15, active = variant >= 8 && variant < 12;
+		unsigned const c = conflict ? variant - 15 : 0;
+		u32 const base = conflict && c >= 8 ? 0x20000 : 0;
+		u16 const destination = conflict ? std::array<u16, 4>{0x10, 0x12, 0x17, 0x19}[c % 4] : variant < 8 ? std::array<u16, 8>{0, 1, 6, 7, 0x18, 0x1e, 0x24, 0x58}[variant] : active ? 0x1a + variant - 8 : 0x4000;
+		u16 const writer = (c / 4) % 2 ? destination : destination == 0x12 ? 0x11 : 0x12;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		if (conflict) { program.write_word(base + 0x600, 0x8000 | writer); program.write_word(base + 0x601, 0x8b97); program.write_word(base + 0x602, 0xf4e1); }
+		else if (active) { program.write_word(0x600, 0xf072); program.write_word(0x601, 0x603); program.write_word(0x602, 0x8b97); }
+		else if (variant == 12) { program.write_word(0x600, 0x47f8); program.write_word(0x601, 0x100); program.write_word(0x602, 0x8b97); data.write_word(0x100, 1); }
+		else program.write_word(0x600, variant == 14 ? 0x8ba0 : 0x8b97);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		if (conflict) data.write_word(destination, 0x2222);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, variant == 13 ? 0xe : 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, destination); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); data.write_word(0x3000, 0x2468);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_popd_write_mask = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "popd_edge_read", [this, conflict, variant](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (!conflict && variant == 12 && at == 0x100) return;
+			expect(conflict && at == 0x3000 && word == 0x2468 && m_cpu->pipeline_cycles() == 6 && !m_pipeline_operand_reads, "POPD rejects unsupported contracts before stack consumption and retains the conflict source once"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "popd_edge_write", [this, conflict, destination, writer](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const bit = m_cpu->pipeline_cycles() == 6 && at == writer && word == 0x1357 ? 1 : m_cpu->pipeline_cycles() == 7 && at == destination && word == 0x2468 ? 2 : 0;
+			expect(conflict && bit && !(m_popd_write_mask & bit), "POPD defers its Read-owned DAGEN write behind the older store's bank access"); m_popd_write_mask |= bit; ++m_pipeline_store_writes;
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254220;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct absolute_logic_fixture
 	{
 		unsigned kind, snapshot;
@@ -10733,6 +10856,9 @@ private:
 		if (!strcmp(machine().options().bios(), "mvdd")) { start_mvdd(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-repeat")) { start_mvdd(); return; }
 		if (!strcmp(machine().options().bios(), "logic-absolute")) { start_absolute_logic(); return; }
+		if (!strcmp(machine().options().bios(), "popd-mapped") || !strcmp(machine().options().bios(), "popd-repeat")) { start_popd_mapped(); return; }
+		if (!strcmp(machine().options().bios(), "popd-edges")) { start_popd_edges(); return; }
+		if (!strcmp(machine().options().bios(), "popd-ram")) { start_pipeline_data_pop(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
@@ -32259,6 +32385,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 49) { start_pipeline_data_pop(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0\n");
+				if (!strcmp(machine().options().bios(), "popd-ram")) throw emu_fatalerror(0, "TMS320C54x isolated RAM POPD complete");
 				start_pipeline_register_store(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -37012,6 +37139,83 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254170) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254160; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254200)
+		{
+			auto const &f = m_popd_fixture; unsigned const tick = ++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped and repeated POPD stays in the retained frontend");
+			if (tick == 3 && f.irq) { if (f.irq == 1) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1); else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); } }
+			if (tick == 3 && f.prefix == 2) { auto const disable = machine().disable_side_effects(); for (u32 const base : {0U, 0x20000U}) m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xffff); }
+			unsigned const reads = std::min(f.count + 1, tick >= f.read_clock() ? tick - f.read_clock() + 1 : 0);
+			expect(m_pipeline_operand_reads == reads && m_popd_write_mask == f.write_mask(tick) && m_pipeline_store_writes == f.write_count(tick), "POPD retains exact stack and destination transactions across replay");
+			if (!f.repeated && tick == 4 && BIT(f.mode, 7)) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == u16(f.pointer + f.step), "POPD modifies its destination pointer once at Access"); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x2222); }
+			if (tick >= f.read_clock() && tick <= f.read_clock(f.count)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000 + tick - f.read_clock(), 0xdead); }
+			if (tick <= f.read_clock() + f.count + 1 || tick == 96)
+			{
+				auto const disable = machine().disable_side_effects();
+				unsigned const accessed = std::min(f.count + 1, tick >= 4 + f.prefix ? tick - (4 + f.prefix) + 1 : 0);
+				for (unsigned r = 0; r < f.initial.size(); ++r)
+				{
+					u16 const address = popd_fixture::reg(r); u16 expected = f.initial[r];
+					if (address == 0x17 && BIT(f.mode, 7)) expected = !f.repeated && tick >= 4 ? 0x2222 : u16(f.pointer + f.step * accessed);
+					for (unsigned i = 0; i <= f.count; ++i) if (address == f.destination[i] && tick >= f.write_clock(i)) expected = (address == 0xa || address == 0xd) ? f.word[i] & 0xff : f.word[i];
+					u16 const actual = m_cpu->space(AS_DATA).read_word(address);
+					if (actual != expected) osd_printf_info("popd_register: case=%u replay=%u tick=%u address=%04x actual=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), tick, address, actual, expected);
+					expect(actual == expected, "POPD changes only its retained destination at the documented DAGEN/data publication stage");
+				}
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 + reads && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (f.cmpt && BIT(f.mode, 7) && accessed ? (f.st0 & 0x1fff) | 0xe000 : f.st0), "POPD increments SP once per Read and retains only the legitimate ARP update");
+			}
+			if (tick == f.snapshot && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save POPD ownership, count, partial register restoration and deferred interrupt"); }
+			if (tick == 96)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x602 + f.prefix && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 & ~(f.irq ? 0x800 : 0)) && m_pipeline_extensions_reads == 1 && m_port_reads == unsigned(f.prefix == 2) && m_vector_acks == unsigned(bool(f.irq)) && m_fast_stack_reads == unsigned(bool(f.irq)) && m_pipeline_register_writes == unsigned(bool(f.irq)), "POPD completes on the exact caller page with balanced IRQ frame and preserved status");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.snapshot; m_pipeline_operand_reads = f.snapshot >= f.read_clock() ? std::min(f.count + 1, f.snapshot - f.read_clock() + 1) : 0;
+					m_popd_write_mask = f.write_mask(f.snapshot); m_pipeline_store_writes = f.write_count(f.snapshot); m_pipeline_extensions_reads = 1; m_port_reads = unsigned(f.prefix == 2); m_fast_stack_reads = m_pipeline_register_writes = m_vector_acks = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore POPD without duplicating a stack read, mapped write, modifier or interrupt"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254210; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < (f.repeated ? 6527 : 4031)) { start_popd_mapped(m_pipeline_peripheral_case + 1); return; }
+				if (f.repeated) { osd_printf_info("TMS320C54x repeated POPD: PASS cases=6528 restore=6528 layouts=RAM,fixed,forward_alias,back_alias,PMST_to_BK,AR6_to_BL forms=short,long counts=0,1,15,4,11 patterns=4 cmpt=2 pages=2 snapshots=4 sources=none,IRQ,NMI reads_each=1 writes_each=1 body_fetches=1 literal_fetches=once read_before_older_write=1 interrupt_return=1 active_block_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated POPD complete"); }
+				osd_printf_info("TMS320C54x mapped POPD: PASS cases=4032 restore=4032 registers=21 forms=direct,postincrement,postdecrement patterns=4 cmpt=2 pages=2 snapshots=4 reads=1 writes=1 captured_destination=1 captured_source=1 dagen_write=Read data_write=Execute active_block_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped POPD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254210) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254200; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254220)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, c = variant >= 15 ? variant - 15 : 0;
+			bool const conflict = variant >= 15, active = variant >= 8 && variant < 12;
+			// RPTB flushes the speculative body and refetches it before Access.
+			unsigned const fail = active ? 8 : variant == 12 || variant == 13 ? 5 : variant == 14 ? 3 : 4, checkpoint = conflict ? 6 : fail - 1;
+			u16 const destination = conflict ? std::array<u16, 4>{0x10, 0x12, 0x17, 0x19}[c % 4] : variant < 8 ? std::array<u16, 8>{0, 1, 6, 7, 0x18, 0x1e, 0x24, 0x58}[variant] : active ? 0x1a + variant - 8 : 0x4000;
+			u16 const writer = (c / 4) % 2 ? destination : destination == 0x12 ? 0x11 : 0x12;
+			if (bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) != (!conflict && tick >= fail)) osd_printf_info("popd_edge_stop: case=%u replay=%u tick=%u cycle=%llu illegal=%u expected_at=%u\n", variant, unsigned(m_pipeline_replay), tick, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), fail);
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (!conflict && tick >= fail), "POPD fails closed at Decode/Access/Read before consuming an unsupported transaction");
+			expect(m_pipeline_operand_reads == unsigned(conflict && tick >= 6) && m_pipeline_store_writes == (conflict ? unsigned(tick >= 6) + unsigned(tick >= 7) : 0), "POPD edge replay neither rereads the stack nor duplicates an old/new bank write");
+			if (conflict && tick == 5) { m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x3333); }
+			if (conflict && tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save rejected or deferred POPD before its decisive stage"); }
+			if (tick == (conflict ? 12 : fail))
+			{
+				if (conflict)
+				{
+					auto const disable = machine().disable_side_effects();
+					expect(m_cpu->space(AS_DATA).read_word(destination) == 0x2468 && (writer == destination || m_cpu->space(AS_DATA).read_word(writer) == 0x1357) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == (destination == 0x17 ? 0x2468 : 0x3333) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3001 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (c >= 8 ? 0x20603 : 0x603), "Deferred POPD retains its source/destination and reaches the exact caller continuation");
+				}
+				else expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (variant == 13 ? 0xe : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == (variant == 13 ? 0x4001 : destination), "Rejected POPD never consumes SP or applies a forbidden destination modifier");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = conflict ? 1 : 0; m_pipeline_store_writes = conflict ? 1 : 0; m_popd_write_mask = conflict ? 1 : 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore POPD rejection/deferred-write ownership without repeating effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254230; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 30) { start_popd_edges(variant + 1); return; }
+				osd_printf_info("TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated POPD edges complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254230) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254220; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254120)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 65536; auto const f = xmem_load_case(variant);
@@ -37800,6 +38004,8 @@ private:
 	unsigned m_saved_repeat_reads = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
 	mvdd_fixture m_mvdd_fixture = {};
+	popd_fixture m_popd_fixture = {};
+	u32 m_popd_write_mask = 0;
 	std::stringstream m_saved_repeat;
 	bool m_far_save_return = false;
 	std::array<u16, 0x800> m_saved_transport = {};
@@ -37816,6 +38022,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
 		if (m_phase == 254140) { auto const &f = m_mvdd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "MVDD acknowledges IRQ/NMI only after the final retained destination write"); ++m_vector_acks; }
+		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
 		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == (near_accumulator_fixture() ? 1 : 2), "IRQ/NMI cannot split the retained accumulator-call frame"); ++m_vector_acks; }
@@ -38449,6 +38656,10 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(70, "mvdd", "Staged dual-data transfer address and operand ownership")
 	ROM_SYSTEM_BIOS(71, "mvdd-repeat", "Repeated dual-data transfers with DARAM overlap ordering")
 	ROM_SYSTEM_BIOS(72, "logic-absolute", "Retained absolute-addressed memory logic")
+	ROM_SYSTEM_BIOS(73, "popd-mapped", "Mapped POPD destination and stack ownership")
+	ROM_SYSTEM_BIOS(74, "popd-repeat", "Retained repeated POPD and mapped context restoration")
+	ROM_SYSTEM_BIOS(75, "popd-ram", "Existing RAM POPD and compiler latency controls")
+	ROM_SYSTEM_BIOS(76, "popd-edges", "POPD exclusions and DAGEN conflict replay")
 ROM_END
 
 ROM_START(tms54rom4)
