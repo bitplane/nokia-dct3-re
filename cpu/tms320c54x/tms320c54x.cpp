@@ -3228,8 +3228,10 @@ void tms320c54x_device::pipeline_step()
 		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
 		bool const unsigned_control = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
 			(m_pipeline_operand_address[3] == 0 || m_pipeline_operand_address[3] == 7);
+		bool const unsigned_peripheral = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
+			m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f && !offset_load;
 		if (staged_memory_load(m_pipeline_word[3]) && (BIT(m_pipeline_word[3], 9) || shifted_load) && m_pipeline_operand_address[3] < 0x60 &&
-			!unsigned_control && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
+			!unsigned_control && !unsigned_peripheral && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
 		{
 			logerror("%s: staged memory load control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;
@@ -3291,7 +3293,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (source < 0x60 && (source < (multiply || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !(bitfield && source >= 0x20))
 		{
-			logerror("%s: staged %s control/peripheral source is unsupported\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB");
+			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), m_pipeline_word[3], source);
 			m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);

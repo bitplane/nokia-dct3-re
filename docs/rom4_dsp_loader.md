@@ -88,8 +88,11 @@ replay cases. The original recorder routine at `02:9e90` is entered and
 output words `0580,0a09` are observed. Forward near B/BC inside
 `02:a0ea..02:a0fd` now executes, with 12,288 IRQ/NMI/replay cases and
 32 exclusion cases. Software INTR 25 (`f7d9`) at `02:9c74` now
-executes. The next stop is memory load `1281` at `02:9edc`, whose
-peripheral source `002a` is not yet admitted by the staged frontend.
+executes, as does unsigned load `1281` at `02:9edc`. Its source `002a`
+is backed by bench RAM, not an identified DA150 register. The next stop
+decodes `0000` at logical `02:2050` (source `001d`, live PC `02:2053`),
+where the resident image contains `4a1e`. Program mapping/write history
+must be resolved before treating this as an arithmetic-coverage gap.
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.

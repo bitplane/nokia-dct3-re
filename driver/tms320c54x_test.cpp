@@ -11039,6 +11039,30 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254010;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_ldu_peripheral(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const address = 0x20 + variant % 64, form = (variant / 256) % 3, read = form == 1 ? 7 : 6;
+		u16 const value = std::array<u16, 4>{0, 0xffff, 0x8000, 0x1234}[(variant / 64) % 4];
+		bool const b = (variant / 768) % 2;
+		u32 const base = (variant / 1536) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x1200 | (b ? 0x100 : 0) | (form == 1 ? 0xf8 : form == 2 ? 0x81 : address));
+		if (form == 1) program.write_word(base + 0x601, address);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcdef1234ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, address);
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		// Synthetic bus endpoint: proves CPU transaction semantics, not any part's register map.
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ldu_peripheral_read", [this, address, value, read](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == address && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == read, "Peripheral LDU pays one extra clock and reads its endpoint exactly once"); word = value; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ldu_peripheral_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Peripheral LDU never writes a bus endpoint"); });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "ldu_peripheral_literal", [this, form, address](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || form != 1) return; expect(word == address && !m_pipeline_extensions_reads++, "Peripheral LDU fetches one retained address literal"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254420;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_ldu_imr(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11177,6 +11201,7 @@ private:
 		if (!strcmp(machine().options().bios(), "stm-brc")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "pop-brc")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-store")) { start_preincrement_store(); return; }
+		if (!strcmp(machine().options().bios(), "ldu-periph")) { start_ldu_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-imr")) { start_ldu_imr(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-st1")) { start_ldu_status(); return; }
 		if (!strcmp(machine().options().bios(), "memory-shift16")) { start_pipeline_memory_arithmetic(); return; }
@@ -36879,6 +36904,28 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254040) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254030; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254420)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 256) % 3, read = form == 1 ? 7 : 6;
+			unsigned const checkpoint = std::array<unsigned, 3>{4, read - 1, read}[variant / 3072];
+			u16 const value = std::array<u16, 4>{0, 0xffff, 0x8000, 0x1234}[(variant / 64) % 4];
+			bool const b = (variant / 768) % 2;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Peripheral LDU uses retained bus stages");
+			if (form == 1 && tick == 4) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 1536) % 2 ? 0x20000 : 0) + 0x601, 0xdead); }
+			if (form == 2 && tick == read - 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x2222);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save peripheral LDU before, during and after its paid wait"); }
+			if (tick == 18)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(form == 1) && m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0xabcdef1234ULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Peripheral LDU zero-extends one retained word without changing status or the other accumulator");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay peripheral LDU without duplicate endpoint transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254430; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 9215) { start_ldu_peripheral(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged peripheral LDU: PASS cases=9216 restore=9216 addresses=64 forms=direct,absolute,indirect values=4 accumulators=2 pages=2 snapshots=3 source_reads=1 writes=0 peripheral_extra_clock=1 physical_mapping=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated peripheral LDU complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254430) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254420; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254010)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 8) % 3, read = form == 1 ? 6 : 5;
@@ -39252,6 +39299,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(95, "bio-branch", "Existing BIO branch controls")
 	ROM_SYSTEM_BIOS(96, "plain-branch", "Existing held-word conditional branch controls")
 	ROM_SYSTEM_BIOS(97, "software-intr", "Retained software interrupt entry and return")
+	ROM_SYSTEM_BIOS(98, "ldu-periph", "Retained unsigned peripheral bus loads")
 ROM_END
 
 ROM_START(tms54rom4)

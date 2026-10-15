@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_peripheral_ldu_scope(self):
+        marker, ending = EXTRA_PROFILES['ldu-periph']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ldu-periph')
+        for bad in (output.replace('restore=9216', 'restore=0'),
+                    output.replace('source_reads=1', 'source_reads=2'),
+                    output.replace('physical_mapping=unvalidated', 'physical_mapping=validated'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='ldu-periph')
+
     def test_software_intr_scope(self):
         marker, ending = EXTRA_PROFILES['software-intr']
         output = marker + '\n' + ending + '\n'
