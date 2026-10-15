@@ -12,14 +12,27 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_pshd_scope(self):
+        marker, ending = EXTRA_PROFILES['pshd-repeat']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pshd-repeat')
+        for bad in (output.replace('restore=768', 'restore=0'),
+                    output.replace('issue_interval=1', 'issue_interval=2'),
+                    output.replace('pending_irq_deferred=1', 'pending_irq_deferred=0'),
+                    output.replace('excluded_aliases=2', 'excluded_aliases=0'),
+                    output.replace('memory_count_acceptance=0', 'memory_count_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pshd-repeat')
+
     def test_mapped_pshd_scope(self):
         marker, ending = EXTRA_PROFILES['pshd-mapped']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='pshd-mapped')
         for bad in (output.replace('restore=288', 'restore=0'),
                     output.replace('source_retained=1', 'source_retained=0'),
-                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
-                    output.replace('dagen_source_acceptance=0', 'dagen_source_acceptance=1'),
+                    output.replace('repeat_coverage=0', 'repeat_coverage=1'),
+                    output.replace('dagen_source_coverage=0', 'dagen_source_coverage=1'),
                     marker + '\n' + output, output + 'late output\n'):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='pshd-mapped')

@@ -9743,6 +9743,86 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253570;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeat_push_fixture
+	{
+		unsigned count, kind, interrupt;
+		bool long_form;
+		u32 base;
+		unsigned first_write() const { return long_form ? 8 : 7; }
+		u16 first_source() const { return kind >= 2 ? 11 : kind == 0 ? 0x900 + count : 0x900; }
+		u16 source(unsigned i) const { return kind == 1 || kind == 3 ? first_source() + i : first_source() - i; }
+		u16 value(unsigned i) const
+		{
+			if (kind < 2) return 0x5100 + i;
+			if (source(i) >= 0x10) return first_source();
+			return std::array<u16, 16>{u16(interrupt == 1), u16(interrupt == 1), 0x9002, 0x9003, 0x9004, 0x9005, 0xa600, 0, 0x789a, 0x3456, 0x12, 0x9876, 0xabcd, 0xfe, 0x5678, 0x9abc}[source(i)];
+		}
+	};
+	static repeat_push_fixture repeat_push_case(unsigned v)
+	{
+		return {std::array<unsigned, 4>{0, 1, 4, 11}[v % 4], (v / 4) % 4, (v / 32) % 3, bool((v / 96) % 2), (v / 16) % 2 ? 0x20000U : 0};
+	}
+	void start_repeat_push(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = repeat_push_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		u32 const body = f.base + (f.long_form ? 0x602 : 0x601);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.long_form ? 0xf070 : 0xec00 | f.count);
+		if (f.long_form) program.write_word(f.base + 0x601, f.count);
+		program.write_word(body, f.kind == 1 || f.kind == 3 ? 0x4b97 : 0x4b8f); program.write_word(body + 1, 0xf4e1);
+		if (f.interrupt)
+		{
+			u32 const vector = f.base + (f.interrupt == 2 ? 4 : 0x40);
+			program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.interrupt == 1 ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5678); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x9abc);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		for (unsigned i = 0; i < 8; ++i) data.write_word(0x10 + i, f.first_source());
+		for (unsigned i = 2; i <= 5; ++i) data.write_word(i, 0x9000 + i);
+		if (f.kind < 2) for (unsigned i = 0; i <= f.count; ++i) data.write_word(f.source(i), f.value(i));
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_fast_stack_reads = m_pipeline_register_writes = m_vector_acks = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_push_source",
+			[this, f](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x1e) { expect(f.interrupt && m_vector_acks == 1 && word == f.base >> 16, "ISR saves its current XPC after repeated pushes retire"); return; }
+				if (at < 0x1000 - f.count - 1 && at >= 0x1000 - f.count - 3) { expect(f.interrupt && m_pipeline_store_writes == f.count + 1, "ISR return cannot precede the final repeated push"); ++m_fast_stack_reads; return; }
+				unsigned const i = m_pipeline_operand_reads;
+				if (i > f.count || at != f.source(i) || word != f.value(i) || m_cpu->pipeline_cycles() != f.first_write() - 1 + i)
+					osd_printf_info("repeat_push_read: case=%u index=%u address=%04x word=%04x clock=%llu expected_address=%04x expected_word=%04x expected_clock=%u\n", m_pipeline_peripheral_case, i, at, word, (unsigned long long)m_cpu->pipeline_cycles(), f.source(i), i <= f.count ? f.value(i) : 0, f.first_write() - 1 + i);
+				expect(i <= f.count && at == f.source(i) && word == f.value(i) && m_cpu->pipeline_cycles() == f.first_write() - 1 + i, "Each repeated PSHD owns a distinct Read before the preceding Execute"); ++m_pipeline_operand_reads;
+				if (f.kind < 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); }
+			});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_push_stack",
+			[this, f](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at < 0x1000 - f.count - 1) { expect(f.interrupt && m_pipeline_store_writes == f.count + 1 && at >= 0x1000 - f.count - 3, "IRQ frame is below the completed repeated-push frame"); ++m_pipeline_register_writes; return; }
+				unsigned const i = m_pipeline_store_writes;
+				expect(i <= f.count && at == 0xfff - i && word == f.value(i) && m_cpu->pipeline_cycles() == f.first_write() + i, "Repeated PSHD publishes one retained stack word per Execute"); ++m_pipeline_store_writes;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(body, body, "repeat_push_body",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Repeated PSHD fetches its opcode once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254070;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_push_exclusion(bool self_ar = false)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = self_ar;
+		auto &program = m_cpu->space(AS_PROGRAM); program.write_word(0x600, 0x4b97); program.write_word(0x601, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR7, self_ar ? 0x17 : 0x18);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "push_exclusion_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "push_exclusion_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_idle_fixture_tick = 0; m_phase = 254090; m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_mapped_pshd(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -10431,6 +10511,7 @@ private:
 		if (!strcmp(machine().options().bios(), "bus-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "timer-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-mapped")) { start_mapped_pshd(); return; }
+		if (!strcmp(machine().options().bios(), "pshd-repeat")) { start_repeat_push(); return; }
 		if (!strcmp(machine().options().bios(), "bus-io-compose")) { start_atomic_io_composition(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && (!strcmp(machine().options().bios(), "bus-io") || atomic_bus_io())) { start_bus_io_test(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-registers"))
@@ -36596,6 +36677,47 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253620) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253610; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254070)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_push_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 4>{4, f.first_write() - 1, f.first_write(), f.first_write() + f.count}[variant / 192];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated PSHD stays in the staged frontend");
+			if (tick == 5 && f.interrupt) { if (f.interrupt == 2) m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); else m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1); }
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads, m_pipeline_register_writes, m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save issued and in-flight repeated pushes and pending IRQ/NMI");
+			}
+			if (tick == f.first_write() + f.count + 32)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xfff - f.count && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Repeated PSHD completes and restores the interrupt frame above its caller-owned pushes");
+				expect(m_cpu->state_int(STATE_GENPC) == f.base + (f.long_form ? 0x604 : 0x603), "Repeated PSHD resumes the exact caller continuation and program page");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == u16(f.kind == 1 || f.kind == 3 ? f.first_source() + f.count + 1 : f.first_source() - f.count - 1), "Repeated PSHD modifies AR7 once per iteration");
+				expect(m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.count + 1 && m_pipeline_extensions_reads == 1 && m_vector_acks == unsigned(bool(f.interrupt)) && m_fast_stack_reads == (f.interrupt ? 2 : 0) && m_pipeline_register_writes == (f.interrupt ? 2 : 0), "Repeated PSHD and interrupt return own exact, nonduplicated transactions");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_register_writes = m_recurring_irq_snapshot[4]; m_vector_acks = m_recurring_irq_snapshot[5];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated PSHD without reissuing completed or in-flight pushes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254080; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_repeat_push(variant + 1); return; }
+				start_push_exclusion(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254080) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254070; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254090)
+		{
+			if (++m_idle_fixture_tick == 8)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_AR7) == (m_pipeline_peripheral_case ? 0x17 : 0x18) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "PSHD SP and modifying self-AR aliases fail before allocation, mutation or data access");
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (!m_pipeline_peripheral_case) { start_push_exclusion(true); return; }
+				osd_printf_info("TMS320C54x repeated PSHD: PASS cases=768 restore=768 counts=0,1,4,11 forms=short,long sources=RAM_up,RAM_down,MMR_up,MMR_down pages=2 interrupts=none,IRQ,NMI snapshots=4 reads_each=1 writes_each=1 issue_interval=1 opcode_fetches=1 pending_irq_deferred=1 isr_return=1 excluded_aliases=2 memory_count_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated PSHD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
 		if (m_phase == 254050)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -36631,7 +36753,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 287) { start_mapped_pshd(variant + 1); return; }
-				osd_printf_info("TMS320C54x mapped PSHD: PASS cases=288 restore=288 registers=12 patterns=4 pages=2 snapshots=3 address_access=4 source_read=5 stack_write=6 reads=1 writes=1 source_retained=1 repeat_acceptance=0 dagen_source_acceptance=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x mapped PSHD: PASS cases=288 restore=288 registers=12 patterns=4 pages=2 snapshots=3 address_access=4 source_read=5 stack_write=6 reads=1 writes=1 source_retained=1 repeat_coverage=0 dagen_source_coverage=0 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated mapped PSHD complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -37294,6 +37416,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
+		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "IRQ/NMI cannot split FCALA's retained two-word frame"); ++m_vector_acks; }
 		if (m_phase == 253730) { unsigned const variant = m_pipeline_peripheral_case; expect(variant >= 48 && line == (variant < 72 ? 12 : INPUT_LINE_NMI) && !m_vector_acks && m_pipeline_store_writes == 1, "IFR clearance cannot cancel a selected IRQ or independent NMI"); ++m_vector_acks; }
@@ -37917,6 +38040,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(61, "cmpm-direct", "Staged direct DP/SP comparison and branch")
 	ROM_SYSTEM_BIOS(62, "timer-stm", "Staged timer immediate writes and retained peripheral wait")
 	ROM_SYSTEM_BIOS(63, "pshd-mapped", "Staged mapped-register PSHD source ownership")
+	ROM_SYSTEM_BIOS(64, "pshd-repeat", "Staged repeated PSHD with retained per-iteration operands")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -58,24 +58,26 @@ wait before Execute publication. The `timer-stm` profile passes 36 replay
 cases checking stopped-timer register effects, writable masks and TRB reload;
 it does not claim new running-timer timing validation. Original R060 now
 executes conditional return `fc43` at `02:3e44` after the full signed
-accumulator predicate family gained 768-case replay coverage. The next stop
-is repeated PSHD `4b97` at `02:3f7e`, not full boot.
+accumulator predicate family gained 768-case replay coverage. Repeated PSHD
+at `02:3f7e` also executes; the next stop is EXP B (`f58e`) at `02:3fa8`,
+not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve
 owned registers with 288 Access/Read/Execute replays, retaining one source
-word despite later source/pointer mutation. DAGEN/peripheral sources and
-repeated pushes remain excluded; repeat scheduling is still required for
-the original register-save loop.
+word despite later source/pointer mutation. The `pshd-repeat` fixture adds
+768 replay cases for short/long immediate repeats, four counts, upward and
+downward RAM/MMR reads, two pages, and IRQ/NMI deferral with ISR return.
+Each copy owns real Decode/Access/Read/Execute slots rather than using the
+atomic stream shortcut. Ordinary DAGEN reads are admitted, but SP,
+modifying self-AR aliases, peripheral sources and memory-count RPT remain
+excluded. The original `4b97` increments AR7 (`MOD=2`); its first window is
+BL..AR6. The decrementing form is `4b8f` (`MOD=1`).
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
-question. Verification baseline: the full 288-marker regression and all 41
-isolated profiles passed with the SP correction. The later ST1/direct-CMPM
-admissions have their focused controls, 61 verifier tests and native 5110
-restoration, without a fresh broad-suite claim.
-The timer-write addition passes all 44 current isolated profiles, the
-separate bus-STM control, native 5110 restoration and 62 verifier tests;
-this does not replace the
-earlier full-core checkpoint with a new full-core claim.
+question. The current repeated-push CPU checkpoint passes the full
+288-marker regression, all 46 isolated profiles, 64 verifier tests and
+native 5110 save-state restoration. These checks establish the declared
+execution models, not full MU4 boot, the physical DA150 map or native speech.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses

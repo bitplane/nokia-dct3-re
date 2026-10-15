@@ -1116,6 +1116,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_repeat_stream));
 	save_item(NAME(m_pipeline_repeat_store_pending));
 	save_item(NAME(m_pipeline_repeat_store_address));
+	save_item(NAME(m_pipeline_repeat_push_issues));
 	save_item(NAME(m_pipeline_repeat_word));
 	save_item(NAME(m_pipeline_repeat_source));
 	save_item(NAME(m_pipeline_repeat_status));
@@ -2289,6 +2290,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;
 	m_pipeline_repeat_store_pending = false;
 	m_pipeline_repeat_store_address = 0;
+	m_pipeline_repeat_push_issues = 0;
 	m_pipeline_repeat_word = m_pipeline_repeat_source = m_pipeline_repeat_status = m_pipeline_repeat_sp = 0;
 	m_pipeline_repeat_address = 0;
 	m_pipeline_read_a_wait = 0;
@@ -2509,6 +2511,18 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_valid[2] = false;
 		--m_pipeline_decode_flush;
+	}
+	if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched &&
+		(m_pipeline_repeat_word & 0xff00) == 0x4b00 && m_pipeline_repeat_push_issues)
+	{
+		// Repeated PSHD remains a sequence of stage-owned instructions:
+		// Read of push n precedes Execute of push n-1 in the same clock.
+		m_pipeline_valid[2] = true;
+		m_pipeline_word[2] = m_pipeline_repeat_word;
+		m_pipeline_address[2] = m_pipeline_repeat_address;
+		m_pipeline_block_body[2] = m_pipeline_block_end[2] = m_pipeline_block_first_final[2] = false;
+		m_pipeline_peripheral_wait_paid[2] = m_pipeline_io_wait_paid[2] = false;
+		--m_pipeline_repeat_push_issues;
 	}
 
 	// SPRU131G example 7-18: INTR occupies Decode/Access/Read/Execute
@@ -2792,7 +2806,16 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && m_pipeline_repeat_active && word != 0xf070 && word != 0x47f8 && !short_repeat && !m_pipeline_repeat_body_latched)
 		{
-			if (!program_move && !read_a && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
+			if (!program_move && !read_a && !data_push && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
+			if (data_push)
+			{
+				if (!m_pipeline_valid[3] || (!staged_short_repeat(m_pipeline_word[3]) && m_pipeline_word[3] != 0xf070))
+				{
+					logerror("%s: staged PSHD requires an immediate repeat count\n", machine().describe_context()); m_illegal = true; return;
+				}
+				m_pipeline_repeat_word = word;
+				m_pipeline_repeat_push_issues = m_pipeline_immediate[3];
+			}
 			m_pipeline_repeat_body_latched = true;
 			m_pipeline_repeat_address = m_pipeline_address[2];
 			m_pipeline_valid[0] = m_pipeline_valid[1] = false;
@@ -2984,9 +3007,11 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const mode = m_pipeline_word[3];
 		m_pipeline_operand[3] = basic_address(3, mode);
-		if (m_pipeline_operand[3] >= 0x10 && m_pipeline_operand[3] < 0x60)
+		u16 const source = m_pipeline_operand[3];
+		bool const self_ar = BIT(mode, 7) && (mode & 0x78) && source == 0x10 + indirect_ar(mode, 3);
+		if (source == 0x18 || self_ar || (source >= 0x20 && source < 0x60))
 		{
-			logerror("%s: staged PSHD DAGEN/peripheral source is unsupported\n", machine().describe_context());
+			logerror("%s: staged PSHD SP/self-AR/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
@@ -3573,7 +3598,19 @@ void tms320c54x_device::pipeline_step()
 			if (staged_extended_dst(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xffe0) == 0x4a00 || (m_op & 0xff00) == 0x4b00)
+		{
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+			if ((m_op & 0xff00) == 0x4b00 && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+			{
+				if (m_rptc) { --m_rptc; ++m_rpt_iteration; }
+				else
+				{
+					m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
+					m_rpt_iteration = 0;
+					m_pipeline_fetch_address = (address & 0x7f0000) | u16(address + 1);
+				}
+			}
+		}
 		else if ((m_op & 0xff00) == 0x8a00)
 		{
 			if (u8(m_op) < 0x10 || u8(m_op) > 0x19 || m_pipeline_early_write_deferred[5])

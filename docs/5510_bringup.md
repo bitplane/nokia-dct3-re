@@ -3290,34 +3290,52 @@ It checks one literal fetch, no destination reads, one write at clock 8,
 stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
-passes conditional return `fc43` at `02:3e44` and stops at repeated PSHD
-`4b97` at `02:3f7e` (live PC `02:3f80`); all
+passes conditional return `fc43` at `02:3e44` and repeated PSHD at
+`02:3f7e`, reaching EXP B (`f58e`) at `02:3fa8` (live PC `02:3faa`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
-The complete 44-profile isolated batch and the separate 36-case bus-STM
-control pass on this tree, along with 62 verifier tests and native 5110
-save-state restoration. The full 288-marker
-CPU regression baseline remains the SP-ordering checkpoint above; it was
-not re-run for this opcode-admission change.
-The signed-return admission has its expanded 768-case return gate, the
-unchanged 64-case CC control and focused stack-IRQ, stack-IRQ-return,
-far-atomic and timer-STM controls; the broad isolated checkpoint remains
-the timer-write tree above.
-The new stop follows `STM #000b,AR7; RPT #000b; PSHD *AR7-`:
-twelve stack pushes read the mapped register window `000b..0000`, not
-ordinary source RAM. Its next acceptance contract must cover repeated
-source sampling, per-iteration stack allocation/write and AR7 modification,
-including saved partial progress; ordinary single-PSHD acceptance is not
-sufficient evidence for this sequence.
+The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
+twelve stack pushes read the mapped register window `000b..0016`, not
+ordinary source RAM. The repeat contract covers fresh source sampling,
+per-iteration stack allocation/write, AR7 modification and saved partial progress.
 The single-push prerequisite is now covered by `pshd-mapped`: 288
 cases/restores over IMR, IFR, ST0, ST1, AL/AH/AG, BL/BH/BG, T and TRN,
 two pages and three snapshots (Access/Read/Execute). Accumulator/T/TRN
 sources use four data patterns; control sources use fixed safe state.
 The resolved source is sampled once at clock 5 and written once to the
 Access-allocated stack slot at clock 6, despite later source and AR mutation.
-Peripheral and DAGEN-register sources remain excluded: SP/self-AR alias
-ordering is not established by this fixture. Repeat remains fail-closed;
-this prerequisite does not advance the original stop by itself.
+This prerequisite alone did not advance the original repeat stop. The
+repeated-push contract below adds ordinary DAGEN sources; SP and modifying
+self-AR aliases remain excluded because this fixture establishes neither
+ordering rule.
+
+`pshd-repeat` passes 768 cases/restores for short and long immediate RPT,
+counts 0/1/4/11, upward/downward RAM and mapped-register reads, two program
+pages, no interrupt/IRQ0/NMI, and four snapshots. Each copy traverses the
+ordinary Decode/Access/Read/Execute slots at a one-clock issue interval;
+it is not collapsed into the atomic repeat-stream helper. A saved issue
+counter owns copies still to enter Decode; RC owns retiring iterations.
+Tests observe count-plus-one distinct reads and retained stack writes,
+single opcode Fetch, one AR7 update per iteration, RAM mutation after Read,
+deferred IRQ/NMI acknowledgement and a complete ISR far-return round trip
+to the exact caller PC and program page. Two negative fixtures confirm
+SP/self-AR exclusions occur before stack allocation, AR mutation or data access.
+Mapped upward reads cover the original BL..AR6 save sequence. SP,
+modifying self-AR aliases and peripheral sources remain fail-closed, as
+do memory-sourced repeat counts. This establishes the declared stage model,
+not measured silicon bus-phase timing. `4b97` increments AR7 (`MOD=2`);
+the former decrement interpretation was incorrect.
+The current CPU checkpoint passes the full 288-marker regression, all 46
+isolated profiles, 64 verifier tests and native 5110 save-state restoration.
+The original resident load still matches all 48,261 program and 3,656 data
+words. These are execution/model checks, not a full-board boot, physical
+DA150 bus-map validation or native speech claim.
+The next original sequence is `LDU ...,B; EXP B; LD #1e,A; LDM T,B`.
+SPRU172C 4-52 defines EXP's signed exponent in T without accumulator or
+status changes, including zero's special result of zero. SPRU131G table
+7-13 requires one instruction of T-consumer latency; the original has that
+gap. A staged EXP fixture must preserve this producer/consumer distinction,
+not simply make the opcode stop disappear.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM
