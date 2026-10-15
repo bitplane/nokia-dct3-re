@@ -43,7 +43,7 @@ constexpr bool staged_minmax(u16 word)
 
 constexpr bool staged_dual_multiply(u16 word)
 {
-	return (word & 0xfe00) == 0xa400;
+	return (word & 0xfc00) == 0xa400; // MPY and MACSU.
 }
 
 constexpr bool staged_dual_arithmetic(u16 word)
@@ -3999,9 +3999,13 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_dual_multiply(m_op))
 		{
-			s64 product = s64(s16(m_pipeline_operand[5])) * s64(s16(m_pipeline_immediate[5]));
+			bool const accumulate = BIT(m_op, 9), destination_b = BIT(m_op, 8);
+			s64 product = (accumulate ? s64(m_pipeline_operand[5]) : s64(s16(m_pipeline_operand[5]))) * s64(s16(m_pipeline_immediate[5]));
 			if (BIT(m_st1, 6)) product *= 2;
-			accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
+			// MACSU's X/Y operands were retained in Read; the accumulator
+			// remains Execute-owned. SMUL clamps the product before addition.
+			if (accumulate) product = (s64(accumulator(destination_b) << 24) >> 24) + multiply_product(product);
+			accumulator(destination_b) = multiply_result(product, destination_b);
 		}
 		else if (staged_xmem_store(m_op))
 		{
@@ -4258,7 +4262,7 @@ void tms320c54x_device::pipeline_step()
 		}
 	}
 	if (m_pipeline_valid[4] && staged_dual_multiply(m_pipeline_word[4]))
-		// MPY Xmem,Ymem loads T in Read (SPRU172C 4-101). An older
+		// MPY/MACSU Xmem,Ymem load T in Read (SPRU172C 4-101/4-91). An older
 		// Execute write must not overwrite this younger publication.
 		m_t = m_pipeline_operand[4];
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))

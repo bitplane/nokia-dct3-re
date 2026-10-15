@@ -11296,7 +11296,7 @@ private:
 		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0;
 		u64 result;
 	};
-	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false)
+	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false)
 	{
 		dual_multiply_fixture f{};
 		bool const subtract = alu && variant >= (edge ? 16U : 43008U);
@@ -11308,8 +11308,8 @@ private:
 		f.destination = arithmetic ? (v / 64) % 2 : edge ? 0 : (v / 256) % 2;
 		f.flags = arithmetic ? (v / 128) % 32 : edge ? 0 : ((v / 64) ^ (v / 512)) % 32;
 		f.linear = edge || arithmetic || (v / 1536) % 2;
-		f.base = (edge ? (v / 4) % 2 : arithmetic ? (v / 4096) % 2 : (v / 3072) % 2) ? 0x20000 : 0;
-		f.snapshot = edge ? v / 8 : arithmetic ? v / 8192 : v / 6144;
+		f.base = (edge ? (v / 4) % 2 : arithmetic ? (v / (macsu ? 32768 : 4096)) % 2 : (v / 3072) % 2) ? 0x20000 : 0;
+		f.snapshot = edge ? v / 8 : arithmetic ? v / (macsu ? 65536 : 8192) : v / 6144;
 		for (unsigned i = 0; i < 4; ++i) f.initial[i] = layout == 2 ? 0x1048 + i : 0x100f + (layout ? 0 : 0x100 * i);
 		if (edge)
 		{
@@ -11340,6 +11340,16 @@ private:
 		bool const overflow = product < -2147483648LL || product > 2147483647LL;
 		f.result = u64(overflow && (f.flags & 2) ? (product < 0 ? -2147483648LL : 2147483647LL) : product) & 0xffffffffffULL;
 		f.result_st0 = f.st0 | (overflow ? f.destination ? 0x200 : 0x400 : 0);
+		if (macsu)
+		{
+			s64 product = s64(f.xword) * s16(f.yword) * (f.flags & 1 ? 2 : 1);
+			if ((f.flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
+			u64 const seed = dual_macsu_seed(variant, edge);
+			s64 const result = (BIT(seed, 39) ? s64(seed) - (s64(1) << 40) : s64(seed)) + product;
+			bool const ov = result < -2147483648LL || result > 2147483647LL;
+			f.result = u64(ov && (f.flags & 2) ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
+			f.result_st0 = f.st0 | (ov ? f.destination ? 0x200 : 0x400 : 0);
+		}
 		if (alu)
 		{
 			s64 const left = s64(f.flags & 8 ? s16(f.xword) : s32(f.xword)) * 65536;
@@ -11352,20 +11362,27 @@ private:
 		}
 		return f;
 	}
+	static u64 dual_macsu_seed(unsigned variant, bool edge)
+	{
+		unsigned const v = !edge && variant >= 18432 ? (variant - 18432) / 4096 : variant / 512;
+		return std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL}[v % 8];
+	}
 	void start_dual_multiply(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu);
+		bool const macsu = !strncmp(machine().options().bios(), "macsu-dual", 10);
+		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : 0xa400) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : macsu ? 0xa600 : 0xa400) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
+		if (macsu) m_cpu->set_state_int(f.destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(variant, edge) ^ (edge ? 0 : 0xffffffffffULL));
 		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
@@ -12703,6 +12720,7 @@ private:
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual") || !strcmp(machine().options().bios(), "alu-dual-edge")) { start_dual_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "macsu-dual") || !strcmp(machine().options().bios(), "macsu-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
 		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
@@ -40135,10 +40153,12 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu);
+			bool const macsu = !strncmp(machine().options().bios(), "macsu-dual", 10);
+			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu);
 			unsigned const checkpoint = 3 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual MPY publishes product and sticky destination overflow only at Execute");
+			u64 const before = dual_macsu_seed(variant, edge) ^ (!edge && tick <= 5 ? 0xffffffffffULL : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : macsu && !f.destination ? before : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : macsu && f.destination ? before : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
 			if (tick == 4)
 			{
 				for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Dual MPY captures both addresses before one X-priority alias update"); if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
@@ -40148,6 +40168,7 @@ private:
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (alu ? 0xabcd : f.xword), "Dual memory Read publishes T only for multiply");
 				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+				if (macsu) m_cpu->set_state_int(f.destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(variant, edge));
 				auto const disable = machine().disable_side_effects();
 				m_cpu->space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu->space(AS_DATA).write_word(f.yaddress, 0xbeef);
 			}
@@ -40167,7 +40188,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254910; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < (edge ? 16U : 43008U) * (alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return; }
+				if (variant + 1 < (edge ? 16U : macsu ? 215040U : 43008U) * (alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return; }
+				if (macsu)
+				{
+					if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
+					osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
+				}
 				if (alu)
 				{
 					if (edge)
@@ -41838,6 +41864,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(153, "asm-mapped", "Mapped accumulator T TRN and AR sources for LD ASM")
 	ROM_SYSTEM_BIOS(154, "rptb-single", "Single repeat within an outer block repeat")
 	ROM_SYSTEM_BIOS(155, "rptb-rpt-edge", "Unsupported inner repeat setup forms")
+	ROM_SYSTEM_BIOS(156, "macsu-dual", "Dual signed unsigned multiply accumulate ownership")
+	ROM_SYSTEM_BIOS(157, "macsu-dual-edge", "Dual MACSU low mapped source exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

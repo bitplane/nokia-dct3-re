@@ -861,6 +861,20 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_dual_macsu_profile_scope(self):
+        for profile, count in (('macsu-dual', 215040), ('macsu-dual-edge', 16)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={count}', 'restore=0'), 3, profile=profile)
+        marker, ending = EXTRA_PROFILES['macsu-dual']
+        for old, new in (('x_unsigned_y_signed=1', 'x_unsigned_y_signed=0'),
+                         ('accumulator_sample=Execute', 'accumulator_sample=Read'),
+                         ('t_publish=Read', 't_publish=Execute')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='macsu-dual')
+
     def test_block_single_profile_scope(self):
         edge, end = EXTRA_PROFILES['rptb-rpt-edge']
         check_result(edge + '\n' + end + '\n', 3, profile='rptb-rpt-edge')

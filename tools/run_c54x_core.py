@@ -432,6 +432,14 @@ EXTRA_PROFILES = {
         "TMS320C54x T load control: PASS load_cases=55296 pair_cases=768 restore=56064 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated T load control complete",
     ),
+    "macsu-dual": (
+        "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated",
+        "Fatal error: TMS320C54x isolated dual MACSU complete",
+    ),
+    "macsu-dual-edge": (
+        "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated dual MACSU exclusions complete",
+    ),
     "rptb-rpt-edge": (
         "TMS320C54x inner repeat exclusions: PASS cases=16 restore=16 forms=header_at_end,long_immediate,memory_count,nested_block pages=2 snapshots=2 data_reads=0 data_writes=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated inner repeat exclusions complete",

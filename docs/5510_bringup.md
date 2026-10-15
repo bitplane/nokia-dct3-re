@@ -23,14 +23,14 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at unsupported opcode `a749`
-at `03:dc95` (live PC `03:dc97`) within a five-second observation,
+pin-decoded response words before stopping at the active-block control/count
+exclusion for opcode `f983` at `02:a395` inside block `02:a384..02:a3a5`
+(live PC `02:a398`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record 187 `LD *(AH),ASM` entries at `03:dfde`, one
-`RPT #7` entry at `03:a582` and eight `MVDD` entries at `03:a583`, with
-no observer writes.
+Passive Execute hooks record eight `MVDD` entries at `03:a583` and three
+`MACSU` entries at `03:dc95`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +40,29 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,827 tests with one skip; the native 5110
+The tool suite passes 2,828 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+MACSU Xmem,Ymem,A/B retains both RAM words in Read, treating X as unsigned
+and Y as signed independently of SXM. X is also published to T in Read, after
+older Execute writes; retirement does not overwrite a younger T. Execute
+uses the current destination accumulator, FRCT and SMUL product handling,
+OVM and sticky destination overflow. Carry and other status bits are preserved.
+This follows SPRU172C 4-91 and the shared multiply-product/result helpers.
+
+`macsu-dual` passes 215,040 restores in factored matrices: 18,432 address cases
+cover all 512 encodings, three alias/address layouts, linear/circular BK,
+two pages and three snapshots; 196,608 arithmetic cases cross 64 value pairs,
+both destinations, eight accumulator patterns, 32 status profiles, two pages
+and three snapshots. This is not the address/arithmetic full cross-product.
+Post-Access pointer replacement and post-Read RAM/T replacement cannot change
+retained inputs; replacing the accumulator after Read checks Execute ownership.
+Paired reads are ordered and occur twice even when logical addresses alias;
+only Xmod updates a shared AR. `macsu-dual-edge` adds 16 low mapped/peripheral
+source exclusions before reads, pointer updates or register publication.
+These are prototype exclusions, not silicon traps. Physical bank arbitration
+and general interrupt/repeat composition remain unvalidated.
 
 Short-immediate RPT is admitted within an active block; tested bodies remain
 wholly inside the block. RPTC owns the inner repetition; BRC and endpoint metadata
