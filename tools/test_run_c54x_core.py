@@ -861,6 +861,20 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_ts_arithmetic_profile_scopes(self):
+        for profile, restores in (('ts-alu', 154368), ('ts-alu-producer', 18432), ('ts-alu-edge', 320)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        for profile, old, new in (('ts-alu', 't_sample=Read', 't_sample=Execute'),
+                                  ('ts-alu-producer', 'projection_only_stlm_gap=0', 'projection_only_stlm_gap=none'),
+                                  ('ts-alu-edge', 'invalid_count_reads=1', 'invalid_count_reads=0')):
+            marker, ending = EXTRA_PROFILES[profile]
+            with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile=profile)
+
     def test_t_load_control_scope(self):
         marker, ending = EXTRA_PROFILES['t-load-control']
         output = marker + '\n' + ending + '\n'

@@ -260,9 +260,14 @@ constexpr bool staged_unsigned_memory_arithmetic(u16 word)
 	return (word & 0xfe00) == 0x0200 || (word & 0xfe00) == 0x0a00;
 }
 
+constexpr bool staged_ts_arithmetic(u16 word)
+{
+	return (word & 0xfe00) == 0x0400 || (word & 0xfe00) == 0x0c00;
+}
+
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -3396,6 +3401,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3)) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if (staged_ts_arithmetic(m_pipeline_word[3]) && source < 0x60)
+		{
+			logerror("%s: staged TS arithmetic mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x3200 && source < 0x60)
 		{
 			logerror("%s: staged LD ASM mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -3550,10 +3559,17 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged NORM shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe00) == 0x1400)
+	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1400 || staged_ts_arithmetic(m_pipeline_word[4])))
+	{
 		// Like the multiplier's T input, TS belongs to Read before an
 		// older accumulator-to-T store can publish in Execute (table 7-3).
 		m_pipeline_immediate[4] = m_t;
+		unsigned const code = m_t & 63;
+		if (staged_ts_arithmetic(m_pipeline_word[4]) && code >= 32 && code < 48)
+		{
+			logerror("%s: staged TS arithmetic shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
+		}
+	}
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf000) == 0x2000)
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
@@ -4045,7 +4061,7 @@ void tms320c54x_device::pipeline_step()
 			u64 &destination = accumulator(BIT(m_op, 8));
 			bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
 			u64 const memory = staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			u64 const operand = shift16 ? (memory << 16) & ACC_MASK : memory;
+			u64 const operand = staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
 			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
 				add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);
 			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;

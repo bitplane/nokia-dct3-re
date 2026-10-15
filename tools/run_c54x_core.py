@@ -404,6 +404,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "ts-alu": (
+        "TMS320C54x TS arithmetic: PASS address_cases=6912 arithmetic_cases=147456 restore=154368 operations=ADD,SUB selectors=4 address_forms=18 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated TS arithmetic complete",
+    ),
+    "ts-alu-producer": (
+        "TMS320C54x TS arithmetic producers: PASS cases=18432 restore=18432 producers=STM_T,LD_T,STLM_T gaps=0,1 shift_codes=8 memory_values=4 sxm_ovm=4 selectors=4 pages=2 snapshots=3 t_sample=Read projection_only_stlm_gap=0 duplicate_transactions=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated TS arithmetic producers complete",
+    ),
+    "ts-alu-edge": (
+        "TMS320C54x TS arithmetic exclusions: PASS cases=320 restore=320 invalid_shift_cases=256 mapped_cases=64 selectors=4 invalid_codes=32..47 pages=2 snapshots=2 invalid_count_reads=1 mapped_reads=0 alu_publication=0 data_writes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated TS arithmetic exclusions complete",
+    ),
     "t-load-control": (
         "TMS320C54x T load control: PASS load_cases=55296 pair_cases=768 restore=56064 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated T load control complete",

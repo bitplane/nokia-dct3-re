@@ -23,15 +23,15 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at unsupported staged
-`ADD Smem,TS,B` (`0583`) at `03:df52` (live PC `03:df54`) within a five-second
-observation,
+pin-decoded response words before stopping at the mapped-destination exclusion
+for `STL B,*(000e)` (`81f8 000e`, destination T) at `03:de88`
+(live PC `03:de8d`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record two entries each for the branch at `03:e6e7`,
-its delayed CMPM at `03:e6e9`, and the ASM load at `03:e6f0`, with no observer
-writes. These now reach Execute in the original sequence, not just Decode
+Passive Execute hooks record two ASM-load entries at `03:e6f0` and one
+T-shifted ADD entry at `03:df52`, with no observer writes.
+These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
@@ -40,9 +40,34 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,824 tests with one skip; the native 5110
+The tool suite passes 2,825 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+ADD/SUB Smem,TS,A/B retains both the RAM word and T in Read before older
+Execute publications, then shifts and adds/subtracts in Execute. Only T bits
+5..0 select the shift. SPRU172C defines the supported domain as -16..31;
+raw codes 32..47 are excluded by the staged prototype, not claimed silicon
+traps. Arithmetic uses SXM, 32-bit carry, sticky destination overflow and OVM
+saturation through the existing shared helper. `ts-alu` passes 154,368
+cases/restores in two factored matrices: 6,912 address cases over all 18
+address forms, eight AR fields, both CMPT states, all four selectors, two pages
+and three snapshots; and 147,456 arithmetic cases crossing four memory values,
+eight accumulator patterns, 48 supported counts, SXM/OVM, selectors, pages
+and snapshots. Address and arithmetic matrices are not their full cross-product.
+Post-capture T, RAM, literal and pointer replacement cannot change retained
+inputs or duplicate auxiliary updates.
+
+`ts-alu-producer` passes 18,432 cases/restores with STM T, LD T and STLM T,
+gaps 0/1, eight supported counts, four memory values, SXM/OVM, A/B and ADD/SUB,
+two pages and three snapshots. STLM's forbidden zero-gap sequence checks the
+prototype's old-T projection, not a guaranteed hardware outcome. `ts-alu-edge`
+adds 256 unsupported-count and 64 direct mapped/peripheral-source exclusions.
+The former may perform one retained RAM read before rejection; the latter
+reject before Read. Neither publishes an ALU result or status change.
+Mapped sources and general interrupt/control-delay composition remain
+unvalidated. The neighboring legacy TS-load producer control passes without
+promoting its raw-64-code projection to an architectural oracle.
 
 `LD Smem,ASM` retains its RAM word in Read and updates only ST1 bits 4..0 in
 Execute, leaving T unchanged. Its shared Smem-special path also serves T loads

@@ -10759,6 +10759,100 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct ts_arithmetic_fixture
+	{
+		memory_arithmetic_fixture address;
+		unsigned selector, prefix, producer_kind, gap, checkpoint;
+		bool producer;
+		u32 base;
+		u16 memory, t, sampled_t, result_st0;
+		u64 a, b, result;
+	};
+	static ts_arithmetic_fixture ts_arithmetic_case(unsigned variant, bool producer)
+	{
+		ts_arithmetic_fixture f{}; f.producer = producer;
+		bool const numeric = !producer && variant >= 6912;
+		unsigned const v = numeric ? variant - 6912 : variant;
+		unsigned form, reg, compatibility, code, flags, pattern, memory_pattern, snapshot;
+		if (producer)
+		{
+			f.producer_kind = v % 3; f.gap = (v / 3) % 2; code = std::array<unsigned, 8>{0, 1, 15, 16, 31, 48, 49, 63}[(v / 6) % 8];
+			memory_pattern = (v / 48) % 4; pattern = (v / 48) % 8; flags = (v / 192) % 4; f.selector = (v / 768) % 4;
+			f.base = (v / 3072) % 2 ? 0x20000 : 0; snapshot = v / 6144; form = 2; reg = 1; compatibility = 0;
+			f.prefix = (f.producer_kind == 0 ? 2 : 1) + f.gap;
+		}
+		else if (numeric)
+		{
+			unsigned const index = v % 48; code = index < 32 ? index : index + 16;
+			memory_pattern = (v / 48) % 4; pattern = (v / 192) % 8; flags = (v / 1536) % 4; f.selector = (v / 6144) % 4;
+			f.base = (v / 24576) % 2 ? 0x20000 : 0; snapshot = v / 49152; form = 0; reg = 2; compatibility = 0;
+		}
+		else
+		{
+			form = v % 18; reg = (v / 18) % 8; compatibility = (v / 144) % 2; f.selector = (v / 288) % 4;
+			f.base = (v / 1152) % 2 ? 0x20000 : 0; snapshot = v / 2304;
+			unsigned const index = v % 48; code = index < 32 ? index : index + 16;
+			memory_pattern = (v / 8) % 4; pattern = (v / 96) % 8; flags = (v / 64) % 4;
+		}
+		f.address = memory_arithmetic_case(form + 18 * reg + f.selector * 144 + pattern * 576 + flags * 4608 + compatibility * 18432);
+		auto &o = f.address; o.opcode |= 0x0400; o.read_cycle += f.prefix;
+		f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[memory_pattern]; f.t = 0xa500 | code;
+		f.sampled_t = producer && f.producer_kind == 2 && !f.gap ? 15 : f.t;
+		f.a = f.selector & 1 ? 0x123456789aULL : o.source; f.b = f.selector & 1 ? o.source : 0xfeabcd9876ULL;
+		if (producer && f.producer_kind == 2) f.a = f.t;
+		u64 const left_bits = f.selector & 1 ? f.b : f.a;
+		u64 const right_bits = ts_load_expected(f.memory, f.sampled_t, flags & 1);
+		s64 const left = BIT(left_bits, 39) ? s64(left_bits) - (s64(1) << 40) : s64(left_bits);
+		s64 const right = BIT(right_bits, 39) ? s64(right_bits) - (s64(1) << 40) : s64(right_bits);
+		s64 const result = f.selector & 2 ? left - right : left + right;
+		bool const carry = f.selector & 2 ? u32(left_bits) >= u32(right_bits) : u64(u32(left_bits)) + u32(right_bits) > 0xffffffffULL;
+		bool const overflow = result < -2147483648LL || result > 2147483647LL;
+		o.result_st0 = compatibility && reg && form >= 2 && form != 17 ? (o.st0 & 0x1fff) | (reg << 13) : o.st0;
+		f.result_st0 = (o.result_st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? f.selector & 1 ? 0x200 : 0x400 : 0);
+		f.result = u64(overflow && (flags & 2) ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
+		f.checkpoint = producer ? std::array<unsigned, 3>{o.read_cycle - 1, o.read_cycle, o.read_cycle + 1}[snapshot] : std::array<unsigned, 3>{3, o.read_cycle, o.read_cycle + 1}[snapshot];
+		return f;
+	}
+	void start_ts_arithmetic(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const producer = !strcmp(machine().options().bios(), "ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (producer) { program.write_word(f.base + 0x600, f.producer_kind == 0 ? 0x770e : f.producer_kind == 1 ? 0x3082 : 0x880e); if (!f.producer_kind) program.write_word(f.base + 0x601, f.t); }
+		program.write_word(f.base + 0x600 + f.prefix, o.opcode); if (!producer && o.form >= 14) program.write_word(f.base + 0x601, o.literal);
+		program.write_word(f.base + 0x601 + f.prefix + unsigned(o.form >= 14), 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 15 : f.t);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x5007);
+		if (producer && f.producer_kind == 1) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5100); data.write_word(0x5100, f.t); } data.write_word(o.address, f.memory);
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ts_arithmetic_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; bool const t_read = f.producer && f.producer_kind == 1 && !m_pipeline_operand_reads; expect(at == (t_read ? 0x5100 : f.address.address) && word == (t_read ? f.t : f.memory) && m_pipeline_operand_reads < (f.producer && f.producer_kind == 1 ? 2U : 1U) && m_cpu->pipeline_cycles() == (t_read ? 5 : f.address.read_cycle), "TS arithmetic retains one source and any instruction-driven T input"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ts_arithmetic_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.producer && f.producer_kind != 1 && at == 0x0e && word == f.t && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (f.producer_kind == 0 ? 5 : 6), "TS arithmetic writes no memory except the selected T producer"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "ts_arithmetic_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || (f.producer ? f.producer_kind != 0 : f.address.form < 14)) return; expect(word == (f.producer ? f.t : f.address.literal) && !m_pipeline_extensions_reads, "TS arithmetic owns one retained address or producer literal"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255060;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_ts_arithmetic_edge(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const mapped = variant >= 256; unsigned const v = mapped ? variant - 256 : variant;
+		unsigned const selector = mapped ? (v / 4) % 4 : (v / 16) % 4, code = mapped ? 0 : 32 + v % 16;
+		u32 const base = (mapped ? (v / 16) % 2 : (v / 64) % 2) ? 0x20000 : 0;
+		u16 const mode = mapped ? std::array<u16, 4>{8, 0x0e, 0x20, 0x33}[v % 4] : 2;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x0400 | ((selector & 1) << 8) | (selector & 2 ? 0x800 : 0) | mode); program.write_word(base + 0x601, 0xf4e1); data.write_word(0x1002, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, mapped ? 0x8800 : 0x8820); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xa500 | code);
+		m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ts_arithmetic_edge_read", [this, mapped](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!mapped && at == 0x1002 && word == 0xffff && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Unsupported TS code may retain one RAM read; mapped sources stop before Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ts_arithmetic_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "TS arithmetic exclusions never write data memory"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255080;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct asm_load_fixture
 	{
 		unsigned form, ar, selected, raw, flags, read, consumer_clock, checkpoint, operation, gap;
@@ -12434,6 +12528,8 @@ private:
 		if (!strcmp(machine().options().bios(), "asm-load") || !strcmp(machine().options().bios(), "asm-consumer")) { start_asm_load(); return; }
 		if (!strcmp(machine().options().bios(), "asm-edge")) { start_asm_edge(); return; }
 		if (!strcmp(machine().options().bios(), "t-load-control")) { start_pipeline_memory_multiply(165888); return; }
+		if (!strcmp(machine().options().bios(), "ts-alu") || !strcmp(machine().options().bios(), "ts-alu-producer")) { start_ts_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "ts-alu-edge")) { start_ts_arithmetic_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -39585,6 +39681,46 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255080)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const mapped = variant >= 256; unsigned const v = mapped ? variant - 256 : variant;
+			unsigned const guard = mapped ? 4 : 5, checkpoint = mapped ? 3 + v / 32 : 4 + v / 128;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && m_pipeline_operand_reads == unsigned(!mapped && tick >= 5), "TS arithmetic excludes unsupported counts in Read and mapped sources in Access");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (mapped ? 0x8800 : 0x8820) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_T) == (0xa500 | (mapped ? 0 : 32 + v % 16)), "TS arithmetic exclusions publish no ALU result or status change");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TS arithmetic exclusion before or after owned Read"); }
+			if (tick == 12)
+			{
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TS arithmetic rejection without repeated source reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255090; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 319) { start_ts_arithmetic_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x TS arithmetic exclusions: PASS cases=320 restore=320 invalid_shift_cases=256 mapped_cases=64 selectors=4 invalid_codes=32..47 pages=2 snapshots=2 invalid_count_reads=1 mapped_reads=0 alu_publication=0 data_writes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255090) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255080; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255060)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const producer = !strcmp(machine().options().bios(), "ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
+			u16 const st0 = tick > o.read_cycle ? f.result_st0 : tick >= o.read_cycle - 1 ? o.result_st0 : o.st0;
+			bool const state_ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (!(f.selector & 1) && tick > o.read_cycle ? f.result : f.a) && m_cpu->state_int(tms320c54x_device::STATE_B) == ((f.selector & 1) && tick > o.read_cycle ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1;
+			if (!state_ok) osd_printf_info("ts_arithmetic_state: producer=%u case=%u tick=%u a=%llx b=%llx result=%llx st0=%llx expected=%04x\n", unsigned(producer), variant, tick, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)f.result, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), st0);
+			expect(state_ok, "TS arithmetic publishes retained shifted data and ALU carry overflow saturation only in Execute");
+			if (tick == 4 && (producer ? f.producer_kind == 0 : o.form >= 14)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == o.read_cycle - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == o.next_ar, "TS arithmetic modifies its captured source pointer once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.selected, 0x2222); }
+			if (tick == o.read_cycle) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "TS arithmetic distinguishes visible producer T from a retained restricted-gap sample"); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t ^ 63); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(o.address, 0xdead); }
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TS arithmetic address Read operands and publication"); }
+			if (tick == 24)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_T) == (f.t ^ 63) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == 0x2222 && m_pipeline_operand_reads == (producer && f.producer_kind == 1 ? 2U : 1U) && m_pipeline_store_writes == unsigned(producer && f.producer_kind != 1) && m_pipeline_extensions_reads == unsigned(producer ? f.producer_kind == 0 : o.form >= 14), "TS arithmetic preserves owned operands and never repeats source reads writes or pointer updates");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TS arithmetic without resampling memory T or literals"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255070; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (producer ? 18432U : 154368U)) { start_ts_arithmetic(variant + 1); return; }
+				if (producer) { osd_printf_info("TMS320C54x TS arithmetic producers: PASS cases=18432 restore=18432 producers=STM_T,LD_T,STLM_T gaps=0,1 shift_codes=8 memory_values=4 sxm_ovm=4 selectors=4 pages=2 snapshots=3 t_sample=Read projection_only_stlm_gap=0 duplicate_transactions=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic producers complete"); }
+				osd_printf_info("TMS320C54x TS arithmetic: PASS address_cases=6912 arithmetic_cases=147456 restore=154368 operations=ADD,SUB selectors=4 address_forms=18 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255070) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255060; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255040)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 8;
@@ -41429,6 +41565,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(144, "asm-consumer", "Zero-latency ASM load and adjacent register consumers")
 	ROM_SYSTEM_BIOS(145, "asm-edge", "ASM mapped peripheral source exclusions")
 	ROM_SYSTEM_BIOS(146, "t-load-control", "Existing RAM mapped T loads and multiply pair control")
+	ROM_SYSTEM_BIOS(147, "ts-alu", "Retained memory arithmetic with T-selected shifts")
+	ROM_SYSTEM_BIOS(148, "ts-alu-producer", "Instruction-driven T shift arithmetic latency")
+	ROM_SYSTEM_BIOS(149, "ts-alu-edge", "TS arithmetic unsupported shift and source exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
