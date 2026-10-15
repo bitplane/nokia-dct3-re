@@ -31,10 +31,12 @@ times. The call's delay span ends at the active block endpoint `03:db3a`;
 this is covered by the retained loop/call contract below. The REA, RSA and
 BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
 The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
-times in a five-second passive observation. The next stop is unsupported
-`6dbb` at `03:c84a` (live/terminal PC `03:c84c`, `illegal=1`); its addressing
-contract remains to be mapped. The post-loop BRC reload has separate
-write-stage ownership, as described below.
+times in a five-second passive observation. Reverse-carry MAR `6dbb` at
+`03:c84a` reaches Execute once. The next stop is a block-control exclusion
+for `fa42` at `03:c852`, in block `03:c851..03:c862` (live/terminal PC
+`03:c855`, `illegal=1`). Its conditional-branch composition must be mapped
+before admission. The post-loop BRC reload has separate write-stage
+ownership, as described below.
 The intervening indirect PMST and repeat-control restore exclusions are
 covered by the bounded tests below.
 The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
@@ -56,6 +58,26 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Reverse-carry MAR
+
+`6dbb` is `MAR *AR3+0B`. SPRU131G 5.5.3.5 defines AR0-indexed
+reverse carry/borrow for MOD 7/4; FFT use specifies a power-of-two AR0.
+The staged frontend admits both reverse forms through the existing
+Access-owned auxiliary update, using the shared addressing helper without
+adding a data-memory transaction or an Execute-time update.
+
+`mar-reverse` passes 3,072 cases/restores across add/subtract, eight
+auxiliary registers, both compatibility states, eight power-of-two indices,
+two initial layouts, two program pages and three snapshots. Expected
+addresses use an independent MSB-first bit-serial carry/borrow oracle,
+not the core's reverse/add/reverse implementation. Mutation after Access
+checks that AR0 and the selected register are not consumed again. AR0
+self-aliasing, compatibility ARP publication, accumulators/T and remaining
+status are checked; no data reads/writes or extension fetches occur.
+Non-power-of-two index meaning, producer latency, interrupt composition
+and physical phase timing are unvalidated. The existing 3,072-case
+`mar-index` profile also passes on this source.
 
 ### Post-loop BRC write ownership
 
@@ -288,7 +310,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,849 tests with one skip; the native 5110
+The tool suite passes 2,850 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

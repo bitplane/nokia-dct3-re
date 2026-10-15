@@ -650,6 +650,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rearm-edge')
 
+    def test_reverse_mar_scope(self):
+        marker, ending = EXTRA_PROFILES['mar-reverse']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mar-reverse')
+        for bad in (output.replace('restore=3072', 'restore=0'),
+                    output.replace('independent_bit_serial_oracle=1', 'independent_bit_serial_oracle=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mar-reverse')
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'
