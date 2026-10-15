@@ -3291,8 +3291,8 @@ stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
-`02:3f7e` and EXP B at `02:3fa8`, reaching ADDS (`023e`) at `02:3fad`
-(live PC `02:3faf`); all
+`02:3f7e`, EXP B at `02:3fa8` and ADDS at `02:3fad`, reaching
+syntax-5 LD Xmem (`9421`) at `02:3fbc` (live PC `02:3fbe`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3346,8 +3346,22 @@ that EXP sees its retained published value rather than stale accumulator
 state or a reread. NORM and interrupt composition are not admitted by this
 fixture. The addition passes its focused LDU, push and conditional-return
 controls and 65 verifier tests; the broad baseline remains the repeated-push
-checkpoint above. ADDS at the new stop is a real one-word opcode, not
+checkpoint above. ADDS at `02:3fad` is a real one-word opcode, not
 an unconsumed extension of the preceding SFTL.
+
+ADDS now shares the retained memory ADD/SUB pipeline and unsigned-source
+handling with SUBS. SPRU172C 4-10 requires zero extension regardless of SXM,
+with C and destination overflow updates and OVM saturation. The `adds`
+fixture passes 55,296 cases/restores over eighteen RAM address forms,
+eight address registers, both accumulators, eight arithmetic patterns,
+SXM/OVM states, standard/compatibility addressing and three snapshots.
+Captured addresses/literals and Read operands survive later mutation;
+one source read and no data writes are observed. Mapped/peripheral sources
+remain excluded. The shared fixture's SUBS control still passes 55,296
+cases/restores; EXP, push and LDU controls, 66 verifier tests and native
+5110 restoration also pass. The broad baseline remains the repeated-push
+checkpoint, not a fresh full-core run. The next form is `LD Xmem,SHFT,A`
+(syntax 5), not another unsigned ADD or a stray extension word.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

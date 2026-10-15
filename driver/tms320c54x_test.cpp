@@ -7146,11 +7146,11 @@ private:
 		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
 		u64 source, result;
 	};
-	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_subtract = false, unsigned shift16_selector = 8)
+	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8)
 	{
 		unsigned const form = variant % 18, reg = (variant / 18) % 8, selector = (variant / 144) % 4, pattern = (variant / 576) % 8, flags = (variant / 4608) % 4;
 		bool const shift16 = shift16_selector < 8;
-		bool const compatibility = (variant / 18432) % 2, subtract = shift16 ? bool(shift16_selector & 4) : unsigned_subtract || (selector & 2), sxm = flags & 1, ovm = flags & 2;
+		bool const compatibility = (variant / 18432) % 2, subtract = shift16 ? bool(shift16_selector & 4) : bool(selector & 2), sxm = flags & 1, ovm = flags & 2;
 		unsigned const selected = compatibility && !reg ? 3 : reg;
 		u64 const source = std::array<u64, 8>{0, 0xffffffff, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x56783933, 0x80aa001234ULL}[pattern];
 		u16 const memory = std::array<u16, 8>{1, 1, 1, 0xffff, 0x8000, 0xffff, 0x1234, 0xffff}[pattern];
@@ -7166,18 +7166,18 @@ private:
 		u16 const st1 = 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compatibility ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
 		u16 result_st0 = compatibility && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
 		s64 const left = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-		s64 const right = (sxm && !unsigned_subtract ? s64(s16(memory)) : s64(memory)) * (shift16 ? 65536 : 1), sum = subtract ? left - right : left + right;
+		s64 const right = (sxm && !unsigned_memory ? s64(s16(memory)) : s64(memory)) * (shift16 ? 65536 : 1), sum = subtract ? left - right : left + right;
 		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
 		bool const carry = subtract ? u32(source) >= u32(right) : u64(u32(source)) + u32(right) > 0xffffffffULL;
 		if (!shift16 || carry != subtract) result_st0 = (result_st0 & ~0x800) | (carry ? 0x800 : 0);
 		result_st0 |= overflow ? ((shift16 ? shift16_selector : selector) & 1 ? 0x200 : 0x400) : 0;
 		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
-		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((shift16 ? (subtract ? 0x4000 : 0x3c00) | ((shift16_selector & 3) << 8) : (unsigned_subtract ? 0x0a00 : subtract ? 0x0800 : 0) | ((selector & 1) << 8)) | mode),
+		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((shift16 ? (subtract ? 0x4000 : 0x3c00) | ((shift16_selector & 3) << 8) : (unsigned_memory ? (subtract ? 0x0a00 : 0x0200) : subtract ? 0x0800 : 0) | ((selector & 1) << 8)) | mode),
 			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result};
 	}
-	static memory_arithmetic_fixture memory_subs_case(unsigned variant)
+	static memory_arithmetic_fixture memory_unsigned_case(unsigned variant, bool subtract = true)
 	{
-		return memory_arithmetic_case(variant % 144 + (2 + (variant / 144) % 2) * 144 +
+		return memory_arithmetic_case(variant % 144 + ((subtract ? 2 : 0) + (variant / 144) % 2) * 144 +
 			((variant / 288) % 8) * 576 + ((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432, true);
 	}
 	static memory_arithmetic_fixture memory_shift16_case(unsigned variant)
@@ -7189,7 +7189,8 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const shift16 = !strcmp(machine().options().bios(), "memory-shift16");
-		auto const f = shift16 ? memory_shift16_case(variant) : !strcmp(machine().options().bios(), "subs") ? memory_subs_case(variant) : memory_arithmetic_case(variant);
+		bool const adds = !strcmp(machine().options().bios(), "adds");
+		auto const f = shift16 ? memory_shift16_case(variant) : adds || !strcmp(machine().options().bios(), "subs") ? memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -10541,6 +10542,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_fcala(); return; }
@@ -34592,9 +34594,10 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const subs = !strcmp(machine().options().bios(), "subs");
+			bool const adds = !strcmp(machine().options().bios(), "adds");
 			bool const shift16 = !strcmp(machine().options().bios(), "memory-shift16");
-			auto const f = shift16 ? memory_shift16_case(variant) : subs ? memory_subs_case(variant) : memory_arithmetic_case(variant);
-			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (shift16 ? 73728 : subs ? 18432 : 36864)];
+			auto const f = shift16 ? memory_shift16_case(variant) : adds || subs ? memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (shift16 ? 73728 : adds || subs ? 18432 : 36864)];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
 			if (f.form >= 14 && tick == 4)
 			{
@@ -34635,11 +34638,16 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (shift16 ? 221183 : subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
+				if (variant < (shift16 ? 221183 : adds || subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
 				if (shift16)
 				{
 					osd_printf_info("TMS320C54x staged memory shift16: PASS cases=221184 restore=221184 forms=18 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated memory shift16 complete");
+				}
+				if (adds)
+				{
+					osd_printf_info("TMS320C54x staged ADDS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated staged ADDS complete");
 				}
 				if (subs)
 				{
@@ -38124,6 +38132,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(63, "pshd-mapped", "Staged mapped-register PSHD source ownership")
 	ROM_SYSTEM_BIOS(64, "pshd-repeat", "Staged repeated PSHD with retained per-iteration operands")
 	ROM_SYSTEM_BIOS(65, "exp-t", "Staged exponent publication and T consumer latency")
+	ROM_SYSTEM_BIOS(66, "adds", "Staged unsigned memory add and retained operands")
 ROM_END
 
 ROM_START(tms54rom4)

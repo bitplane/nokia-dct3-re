@@ -170,9 +170,14 @@ constexpr bool staged_absolute_add(u16 word)
 	return (word & 0xfeff) == 0x00f8;
 }
 
+constexpr bool staged_unsigned_memory_arithmetic(u16 word)
+{
+	return (word & 0xfe00) == 0x0200 || (word & 0xfe00) == 0x0a00;
+}
+
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || (word & 0xfe00) == 0x0a00 || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -3179,9 +3184,9 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged shift-16 memory arithmetic mapped source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if ((m_pipeline_word[3] & 0xfe00) == 0x0a00 && source < 0x60)
+		if (staged_unsigned_memory_arithmetic(m_pipeline_word[3]) && source < 0x60)
 		{
-			logerror("%s: staged SUBS mapped-register source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged unsigned memory arithmetic mapped-register source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60)
 		{
@@ -3701,7 +3706,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			u64 &destination = accumulator(BIT(m_op, 8));
 			bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
-			u64 const memory = (m_op & 0xfe00) == 0x0a00 ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			u64 const memory = staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
 			u64 const operand = shift16 ? (memory << 16) & ACC_MASK : memory;
 			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
 				add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);

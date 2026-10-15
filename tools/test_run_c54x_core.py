@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_unsigned_add_scope(self):
+        marker, ending = EXTRA_PROFILES['adds']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='adds')
+        for bad in (output.replace('restore=55296', 'restore=0'),
+                    output.replace('source_unsigned=1', 'source_unsigned=0'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='adds')
+
     def test_exponent_t_scope(self):
         marker, ending = EXTRA_PROFILES['exp-t']
         output = marker + '\n' + ending + '\n'
