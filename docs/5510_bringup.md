@@ -24,16 +24,15 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged
-`LD Smem,ASM` (`3202`) at `03:e6f0` (live PC `03:e6f2`) within a five-second
+`ADD Smem,TS,B` (`0583`) at `03:df52` (live PC `03:df54`) within a five-second
 observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record one branch entry at `03:e6e7` but zero entries
-for its delayed CMPM at `03:e6e9`, with no observer writes. CMPM is now admitted
-and passes the isolated composition fixture below, but the younger unsupported
-instruction stops Decode before it executes in this original sequence. A moved
-Decode frontier alone is not retirement evidence.
+Passive Execute hooks record two entries each for the branch at `03:e6e7`,
+its delayed CMPM at `03:e6e9`, and the ASM load at `03:e6f0`, with no observer
+writes. These now reach Execute in the original sequence, not just Decode
+admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
 
@@ -41,9 +40,32 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,822 tests with one skip; the native 5110
+The tool suite passes 2,824 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+`LD Smem,ASM` retains its RAM word in Read and updates only ST1 bits 4..0 in
+Execute, leaving T unchanged. Its shared Smem-special path also serves T loads
+and memory multiplies, whose distinct T publication remains in Read. The
+`asm-load` fixture passes 73,728 cases/restores over DP, SP, postincrement,
+offset, preincrement and absolute addressing, all eight AR fields, all 32 ASM
+encodings, four status/payload profiles, both CMPT states, two pages and three
+snapshots. Replacing the literal, source word and ARs after their owning stage
+cannot cause resampling or duplicate updates. `asm-edge` adds 16 direct mapped/
+peripheral exclusions before source reads or register results; these are
+prototype exclusions, not silicon traps. Incrementing excluded forms and mapped
+ASM-source latency are not established by those tests.
+
+SPRU131G table 7-3 and example 7-52 require zero consumer latency for this
+load. `asm-consumer` passes 9,216 cases/restores with immediately following
+LD/ADD/SUB ASM operations, all 32 signed shift encodings, positive/negative
+accumulators, SXM/OVM combinations, gaps 0/1, two pages and three snapshots.
+Upper bits of the source word do not overwrite other ST1 flags. The isolated
+`t-load-control` reuses 55,296 existing RAM/mapped T-load and 768 multiply-pair
+cases, with 56,064 restores, to protect Read-owned T publication without a
+retirement rewrite. The 73,728-case MAC/MAS and delayed-comparison controls
+also pass after the shared-path rename. General ASM-load interrupt/control-delay
+composition, mapped sources and measured physical phase timing remain unvalidated.
 
 Short two-word CMPM/BITF is admitted in a complete BD/BCD delay span. The
 owner is recovered from retained pipeline slots, not reread from program

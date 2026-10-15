@@ -404,6 +404,22 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "t-load-control": (
+        "TMS320C54x T load control: PASS load_cases=55296 pair_cases=768 restore=56064 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated T load control complete",
+    ),
+    "asm-load": (
+        "TMS320C54x staged LD ASM: PASS cases=73728 restore=73728 forms=DP,SP,postincrement,offset,preincrement,absolute registers=8 shifts=32 status_states=4 compatibility_states=2 pages=2 snapshots=3 source_reads=1 publish=Execute t_unchanged=1 pointer_updates=once mapped_sources=excluded physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated LD ASM complete",
+    ),
+    "asm-consumer": (
+        "TMS320C54x LD ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero source_reads=1 data_writes=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated ASM consumers complete",
+    ),
+    "asm-edge": (
+        "TMS320C54x LD ASM exclusions: PASS cases=16 restore=16 sources=AL,T,peripheral pages=2 snapshots=2 source_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated ASM exclusions complete",
+    ),
     "cmp-delay-edge": (
         "TMS320C54x delayed comparison exclusions: PASS cases=48 restore=48 controls=BD,BCD_TC,BCD_NTC operations=2 layouts=last_word,three_word pages=2 snapshots=2 operand_reads=0 data_writes=0 register_publication=0 literal_prefetch=unclaimed silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated delayed comparison exclusions complete",

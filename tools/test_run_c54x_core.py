@@ -861,6 +861,30 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_t_load_control_scope(self):
+        marker, ending = EXTRA_PROFILES['t-load-control']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='t-load-control')
+        for old, new in (('restore=56064', 'restore=0'),
+                         ('t_publish=Read', 't_publish=Execute'),
+                         ('no_retirement_rewrite=1', 'no_retirement_rewrite=0')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='t-load-control')
+
+    def test_asm_load_profile_scopes(self):
+        for profile, restores in (('asm-load', 73728), ('asm-consumer', 9216), ('asm-edge', 16)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        for profile, old, new in (('asm-load', 't_unchanged=1', 't_unchanged=0'),
+                                  ('asm-load', 'publish=Execute', 'publish=Read'),
+                                  ('asm-consumer', 'latency=zero', 'latency=one_word')):
+            marker, ending = EXTRA_PROFILES[profile]
+            with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile=profile)
+
     def test_delayed_comparison_profile_scope(self):
         marker, ending = EXTRA_PROFILES['cmp-delay-edge']
         output = marker + '\n' + ending + '\n'
