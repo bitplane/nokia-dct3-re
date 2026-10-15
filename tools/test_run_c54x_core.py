@@ -12,6 +12,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_near_accumulator_call_scope(self):
+        for name in ('cala', 'cala-producer'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=216', 'restore=0'),
+                        output.replace('frame_words=1', 'frame_words=2'),
+                        output.replace('ignored_upper_targets=3', 'ignored_upper_targets=0'),
+                        output.replace('delayed_acceptance=0', 'delayed_acceptance=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_xmem_load_scope(self):
         marker, ending = EXTRA_PROFILES['xmem-load']
         output = marker + '\n' + ending + '\n'

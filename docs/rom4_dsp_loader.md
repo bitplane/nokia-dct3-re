@@ -60,8 +60,9 @@ it does not claim new running-timer timing validation. Original R060 now
 executes conditional return `fc43` at `02:3e44` after the full signed
 accumulator predicate family gained 768-case replay coverage. Repeated PSHD
 at `02:3f7e`, EXP B (`f58e`) at `02:3fa8` and ADDS at `02:3fad` also
-execute. Syntax-5 LD Xmem at `02:3fbc` also executes; the next stop is
-CALA B (`f5e3`) at `02:40e1`, not full boot.
+execute. Syntax-5 LD Xmem at `02:3fbc` and CALA B at `02:40e1` also
+execute; the next stop is repeated MVDD (`e598`)
+at `02:a169`, not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve
 owned registers with 288 Access/Read/Execute replays, retaining one source
@@ -90,14 +91,21 @@ Distinct source pointers, source mutation, BK=0/nonzero wrap, both
 destinations, all sixteen shifts and three snapshots are checked. T,
 unselected accumulator and status are preserved. Mapped/peripheral sources,
 repeats and interrupt composition are not covered.
+Nondelayed CALA now retains a low-16-bit target on the caller's logical
+page and one PC+1 frame word through Class 30B's held Read clock. Its
+216-case IRQ/NMI/return/replay gate and separate 216-case DLD-producer
+gate pass; the existing far-call controls remain green. CALAD, repeat and
+other producer/composition cases remain unaccepted. An executed-address
+trace confirms CALA's `02:3e55 -> 02:40e2` return path; the later MVDD
+worker is entered by FCALL at `02:993d`, not directly by this near call.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. The repeated-push broad baseline passes the full
 288-marker regression, all 46 isolated profiles, 64 verifier tests and
 native 5110 save-state restoration. These checks establish the declared
 execution models, not full MU4 boot, the physical DA150 map or native speech.
-The subsequent EXP/ADDS/Xmem-load admissions have their focused fixtures and
-LDU/push/return controls, 67 verifier tests and native 5110 restoration; no new
+The subsequent EXP/ADDS/Xmem-load/CALA admissions have their focused fixtures
+and LDU/push/return controls, 68 verifier tests and native 5110 restoration; no new
 full-core regression is claimed.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

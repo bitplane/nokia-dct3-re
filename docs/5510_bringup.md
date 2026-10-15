@@ -3292,7 +3292,8 @@ read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
-`02:3fbc`, reaching CALA B (`f5e3`) at `02:40e1` (live PC `02:40e3`); all
+`02:3fbc` and CALA B at `02:40e1`, reaching repeated MVDD (`e598`)
+at `02:a169` (live PC `02:a16b`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3376,8 +3377,31 @@ old accumulator remains through Read at clock 5 and the shifted result
 publishes at Execute at clock 6; other accumulator, T and status stay intact.
 There is one opcode fetch and one data read, with no data writes. Mapped/
 peripheral sources, repeats and interrupt composition remain outside this
-acceptance. The next original form is a near accumulator-indirect call,
-CALA B, requiring retained target and single-word return-frame ownership.
+acceptance.
+
+Nondelayed CALA A/B now shares the Class 30B held-Read/retained-target
+path with FCALA, but selects only the accumulator's low sixteen bits on
+the caller's logical page and publishes one PC+1 stack word, not an XPC
+word. The held clock remains even without FCALA's second bus write.
+`cala` passes 216 cases/restores over both sources, three caller pages,
+three conflicting upper-target fields, four snapshots and no interrupt/
+IRQ/NMI, including RET and exact caller-page restoration. `cala-producer`
+passes another 216 cases with DLD producers and gaps 0/1/2; RAM and
+accumulator mutation after capture cannot change the target. Existing
+FCALA, FCALA-producer and stack-IRQ controls, 68 verifier tests and native
+5110 restoration pass. No new saved CPU field was needed. CALAD, repeated
+calls, other producer families and producer-plus-interrupt composition
+are outside this acceptance; stage placement remains a declared model.
+
+A read-only executed-address trace starts after CALA at `02:40e1` in
+`02:3e55` and later returns to `02:40e2`; the original return at `02:3ebb`
+is RC ANEQ (`fc44`). The MVDD worker is reached later by FCALL
+`02:993d -> 02:a164`, so its FRET does not belong to the near-call frame.
+The debugger's low-window mnemonic text in this run prints zero-word ADDs
+for nonzero ROM instructions; these labels are not used as opcode evidence.
+Addresses were cross-checked against the original AA22 word image. The new
+stop is `STM #0090,AR3; RPT #000f; MVDD Xmem,Ymem` (`e598`), requiring
+separate retained source/destination ownership and repeat semantics.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

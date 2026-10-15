@@ -95,6 +95,16 @@ constexpr bool staged_accumulator_far_call(u16 word)
 	return (word & 0xfeff) == 0xf4e7; // Nondelayed FCALA A/B only.
 }
 
+constexpr bool staged_accumulator_near_call(u16 word)
+{
+	return (word & 0xfeff) == 0xf4e3; // Nondelayed CALA A/B only.
+}
+
+constexpr bool staged_accumulator_call(u16 word)
+{
+	return staged_accumulator_far_call(word) || staged_accumulator_near_call(word);
+}
+
 constexpr bool staged_extended_move(u16 word)
 {
 	return (word & 0xff00) == 0x7100 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
@@ -2429,9 +2439,9 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_acc_call_pending)
 	{
-		// Class 30B: retain the second stack write while holding Read.
+		// Class 30B holds Read; only FCALA owns a second stack write.
 		// Bus placement is a partial model, not measured silicon phases.
-		data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4]);
+		if (staged_accumulator_far_call(m_pipeline_word[4])) data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4]);
 		m_pipeline_acc_call_pending = false;
 		return;
 	}
@@ -2667,7 +2677,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			if (staged_conditional_return(word)) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (staged_accumulator_far_call(word)) { logerror("%s: staged FCALA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+			if (staged_accumulator_call(word)) { logerror("%s: staged accumulator call inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_t_memory_operation(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_accumulator_store(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
@@ -2793,7 +2803,7 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		bool const frame = (word & 0xff00) == 0xee00;
-		bool const branch = staged_banz(word) || word == 0xf072 || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word)));
+		bool const branch = staged_banz(word) || word == 0xf072 || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word)));
 		bool const block_setup = word == 0xf072;
 		bool const block_word = m_pipeline_block_body[2];
 		if (m_pipeline_valid[2] && block_word && (branch || block_setup || plain_return || delayed_return || far_return || fast_return ||
@@ -2856,10 +2866,10 @@ void tms320c54x_device::pipeline_step()
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
-			m_pipeline_control_words = (staged_accumulator_far_call(word) ? 1 : staged_extended_banz(word) ? 3 : branch || block_setup ? 2 : 1) + (delayed ? 2 : 0);
+			m_pipeline_control_words = (staged_accumulator_call(word) ? 1 : staged_extended_banz(word) ? 3 : branch || block_setup ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) || staged_banz(word) ? 0 : 2;
-			if (plain_return || (far_return && !delayed) || staged_accumulator_far_call(word)) m_pipeline_flush_front = true;
+			if (plain_return || (far_return && !delayed) || staged_accumulator_call(word)) m_pipeline_flush_front = true;
 			if (delayed_return) m_pipeline_retd_stage = 1;
 		}
 		if (m_pipeline_valid[2] && (dagen_immediate || immediate_brc || immediate_t || direct_move)) m_pipeline_early_write_deferred[2] = false;
@@ -3524,7 +3534,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_decode_flush = 1;
 			}
 		}
-		else if (staged_accumulator_far_call(m_op))
+		else if (staged_accumulator_call(m_op))
 		{
 			m_pipeline_flush_front = false;
 			m_pipeline_decode_flush = 0;
@@ -3814,15 +3824,18 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[2] && staged_accumulator_far_call(m_pipeline_word[2]))
 		m_pipeline_far_call_page[2] = (m_pipeline_address[2] >> 16) & 0x7f;
-	if (m_pipeline_valid[3] && staged_accumulator_far_call(m_pipeline_word[3]))
+	if (m_pipeline_valid[3] && staged_accumulator_call(m_pipeline_word[3]))
 	{
 		m_pipeline_operand_address[3] = --m_sp;
 		m_pipeline_immediate[3] = u16(m_pipeline_address[3] + 1);
 	}
-	if (m_pipeline_valid[4] && staged_accumulator_far_call(m_pipeline_word[4]))
+	if (m_pipeline_valid[4] && staged_accumulator_call(m_pipeline_word[4]))
 	{
-		m_pipeline_acc_call_target = accumulator(BIT(m_pipeline_word[4], 8)) & 0x7fffff;
-		m_pipeline_far_call_stack[4] = --m_sp;
+		bool const far = staged_accumulator_far_call(m_pipeline_word[4]);
+		u64 const source = accumulator(BIT(m_pipeline_word[4], 8));
+		m_pipeline_acc_call_target = far ? source & 0x7fffff : (m_pipeline_address[4] & 0x7f0000) | u16(source);
+		if (far) m_pipeline_far_call_stack[4] = --m_sp;
+		else m_rtn = m_pipeline_immediate[4];
 		data_write(m_pipeline_operand_address[4], m_pipeline_immediate[4]);
 		m_pipeline_acc_call_pending = true;
 	}

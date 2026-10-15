@@ -10254,35 +10254,37 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253770;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	void start_fcala(unsigned variant = 0)
+	bool near_accumulator_fixture() const { return !strcmp(machine().options().bios(), "cala") || !strcmp(machine().options().bios(), "cala-producer"); }
+	void start_accumulator_call(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const b = variant & 1;
-		bool const producer = !strcmp(machine().options().bios(), "fcala-producer");
+		bool const near = near_accumulator_fixture(), producer = !strcmp(machine().options().bios(), "fcala-producer") || !strcmp(machine().options().bios(), "cala-producer");
+		unsigned const frame = near ? 1 : 2;
 		unsigned const interrupt = producer ? 0 : variant / 72, prefix = producer ? 1 + variant / 72 : 0, continuation = 0x601 + prefix;
-		unsigned const caller = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 2) % 3], target = std::array<unsigned, 3>{0, 3, 0x7f}[(variant / 6) % 3];
+		unsigned const caller = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 2) % 3], hint = std::array<unsigned, 3>{0, 3, 0x7f}[(variant / 6) % 3], target = near ? caller : hint;
 		u32 const base = caller << 16, destination = (target << 16) | 0x700;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(destination + i, 0xf495); }
-		program.write_word(base + 0x600 + prefix, b ? 0xf5e7 : 0xf4e7); program.write_word(base + continuation, 0xf4e1); program.write_word(destination, 0x880e); program.write_word(destination + 1, 0xf4e4);
-		if (producer) { program.write_word(base + 0x600, b ? 0x5700 : 0x5600); m_cpu->space(AS_DATA).write_word(0x1400, 0x8000 | target); m_cpu->space(AS_DATA).write_word(0x1401, 0x700); }
+		program.write_word(base + 0x600 + prefix, (near ? 0xf4e3 : 0xf4e7) | (b ? 0x100 : 0)); program.write_word(base + continuation, 0xf4e1); program.write_word(destination, 0x880e); program.write_word(destination + 1, near ? 0xfc00 : 0xf4e4);
+		if (producer) { program.write_word(base + 0x600, b ? 0x5700 : 0x5600); m_cpu->space(AS_DATA).write_word(0x1400, 0x8000 | hint); m_cpu->space(AS_DATA).write_word(0x1401, 0x700); }
 		program.write_word((target << 16) | 4, 0xf4eb); program.write_word((target << 16) | 0x40, 0xf4eb);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, producer ? 0xa628 : 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt == 1 ? 0 : 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt == 1 ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1234 : 0x5500000000ULL | destination); m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0x5500000000ULL | destination : 0x2345);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1234 : 0x5500000700ULL | (hint << 16)); m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0x5500000700ULL | (hint << 16) : 0x2345);
 		if (producer) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0xdeadbeef);
 		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_register_writes = 0;
 		m_vector_acks = m_fast_stack_reads = m_pipeline_drained_fetches = 0;
 		m_port_reads = 0;
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "fcala_frame",
-			[this, caller, b, interrupt, prefix, continuation](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x0e) { expect(!m_pipeline_register_writes && word == (b ? 0x1234 : 0xbeef) && (interrupt ? m_cpu->pipeline_cycles() >= 12 && m_vector_acks == 1 : m_cpu->pipeline_cycles() == 12 + prefix), "FCALA callee Execute follows the six-cycle call or completed interrupt return"); ++m_pipeline_register_writes; return; } if (at == 0xffd) { expect(interrupt && !m_pipeline_drained_fetches && word == 0x700 && m_pipeline_store_writes == 2, "IRQ/NMI stacks only the target continuation above the complete call frame"); ++m_pipeline_drained_fetches; return; } unsigned const part = m_pipeline_store_writes++; expect(part < 2 && at == 0xfff - part && word == (part ? caller : continuation) && m_cpu->pipeline_cycles() == 5 + prefix + part, "FCALA retains PC+1 then caller XPC in two distinct stack writes"); });
+			[this, caller, b, interrupt, prefix, continuation, frame](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x0e) { expect(!m_pipeline_register_writes && word == (b ? 0x1234 : 0xbeef) && (interrupt ? m_cpu->pipeline_cycles() >= 12 && m_vector_acks == 1 : m_cpu->pipeline_cycles() == 12 + prefix), "Accumulator-call callee Execute follows the six-cycle call or completed interrupt return"); ++m_pipeline_register_writes; return; } if (at == 0xfff - frame) { expect(interrupt && !m_pipeline_drained_fetches && word == 0x700 && m_pipeline_store_writes == frame, "IRQ/NMI stacks only the target continuation below the complete call frame"); ++m_pipeline_drained_fetches; return; } unsigned const part = m_pipeline_store_writes++; expect(part < frame && at == 0xfff - part && word == (part ? caller : continuation) && m_cpu->pipeline_cycles() == 5 + prefix + part, "Accumulator call retains exactly its PC or PC/XPC frame"); });
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "fcala_return_frame",
-			[this, caller, interrupt, producer, continuation, target](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1400 || at == 0x1401) { unsigned const part = m_port_reads++; expect(producer && part < 2 && at == 0x1400 + part && word == (part ? 0x700 : 0x8000 | target) && m_cpu->pipeline_cycles() == 5, "DLD samples both RAM words once before accumulator publication"); return; } if (at == 0xffd) { expect(interrupt && !m_fast_stack_reads && word == 0x700, "RETE removes only its interrupt frame"); ++m_fast_stack_reads; return; } unsigned const part = m_pipeline_operand_reads++; expect(part < 2 && at == 0xffe + part && word == (part ? continuation : caller), "FRET consumes the FCALA page/return frame once"); });
+			[this, caller, interrupt, producer, continuation, hint, frame](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1400 || at == 0x1401) { unsigned const part = m_port_reads++; expect(producer && part < 2 && at == 0x1400 + part && word == (part ? 0x700 : 0x8000 | hint) && m_cpu->pipeline_cycles() == 5, "DLD samples both RAM words once before accumulator publication"); return; } if (at == 0xfff - frame) { expect(interrupt && !m_fast_stack_reads && word == 0x700, "RETE removes only its interrupt frame"); ++m_fast_stack_reads; return; } unsigned const part = m_pipeline_operand_reads++; expect(part < frame && at == 0x1000 - frame + part && word == (frame == 1 || part ? continuation : caller), "RET/FRET consumes exactly the owned accumulator-call frame"); });
 		m_pipeline_fetch_tap = program.install_read_tap(destination, destination, "fcala_target",
-			[this, interrupt, prefix](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_store_writes == 2 && (interrupt ? m_pipeline_extensions_reads < 2 : !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 8 + prefix), "FCALA target fetches are initial Fetch and, only after interruption, return refetch"); ++m_pipeline_extensions_reads; });
+			[this, interrupt, prefix, frame](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_store_writes == frame && (interrupt ? m_pipeline_extensions_reads < 2 : !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 8 + prefix), "Accumulator-call target fetches are initial Fetch and, only after interruption, return refetch"); ++m_pipeline_extensions_reads; });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253790;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -10584,8 +10586,10 @@ private:
 		if (!strcmp(machine().options().bios(), "xmem-load")) { start_xmem_load(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
-		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_fcala(); return; }
-		if (!strcmp(machine().options().bios(), "fcala")) { start_fcala(); return; }
+		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
+		if (!strcmp(machine().options().bios(), "fcala")) { start_accumulator_call(); return; }
+		if (!strcmp(machine().options().bios(), "cala-producer")) { start_accumulator_call(); return; }
+		if (!strcmp(machine().options().bios(), "cala")) { start_accumulator_call(); return; }
 		if (!strcmp(machine().options().bios(), "far-atomic")) { m_cpu->set_pipeline_frontend(false); start_far_case(0); return; }
 		if (!strcmp(machine().options().bios(), "bitf-peripheral")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "t-peripheral")) { start_t_peripheral(); return; }
@@ -36437,9 +36441,10 @@ private:
 		if (m_phase == 253790)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const producer = !strcmp(machine().options().bios(), "fcala-producer");
+			bool const near = near_accumulator_fixture(), producer = !strcmp(machine().options().bios(), "fcala-producer") || !strcmp(machine().options().bios(), "cala-producer");
+			unsigned const frame = near ? 1 : 2;
 			unsigned const prefix = producer ? 1 + variant / 72 : 0, interrupt = producer ? 0 : variant / 72, checkpoint = (producer ? std::array<unsigned, 4>{4, 5 + prefix, 6 + prefix, 8 + prefix} : interrupt ? std::array<unsigned, 4>{4, 6, 8, 12} : std::array<unsigned, 4>{4, 5, 6, 8})[(variant % 72) / 18], caller = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 2) % 3];
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Nondelayed FCALA is staged without atomic fallback");
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Nondelayed accumulator calls are staged without atomic fallback");
 			if (tick == 5 && producer)
 			{
 				expect(m_port_reads == 2, "DLD owns its RAM target before later input changes");
@@ -36452,18 +36457,23 @@ private:
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
-				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_drained_fetches, m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FCALA around target sampling and both stack publications");
+				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_drained_fetches, m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save accumulator call around target sampling and its owned stack publications");
 			}
 			if (tick == 48)
 			{
-				expect(m_pipeline_register_writes == 1, "FCALA executes its callee once at the six-cycle boundary");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (caller << 16 | (0x602 + prefix)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_pipeline_store_writes == 2 && m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == (interrupt ? 2 : 1) && m_vector_acks == unsigned(bool(interrupt)) && m_fast_stack_reads == unsigned(bool(interrupt)) && m_pipeline_drained_fetches == unsigned(bool(interrupt)) && m_port_reads == (producer ? 2 : 0) && m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0xdeadbeef && m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == ((variant & 1) ? 0x1234 : 0x2345) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (producer ? 0xa628 : 0xa608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (interrupt ? 0 : 0x800), "FCALA/FRET retains the sampled target and caller frame through producer publication, IRQ/NMI and replay");
+				expect(m_pipeline_register_writes == 1, "Accumulator call executes its callee once at the six-cycle boundary");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (caller << 16 | (0x602 + prefix)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_pipeline_store_writes == frame && m_pipeline_operand_reads == frame && m_pipeline_extensions_reads == (interrupt ? 2 : 1) && m_vector_acks == unsigned(bool(interrupt)) && m_fast_stack_reads == unsigned(bool(interrupt)) && m_pipeline_drained_fetches == unsigned(bool(interrupt)) && m_port_reads == (producer ? 2 : 0) && m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0xdeadbeef && m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == ((variant & 1) ? 0x1234 : 0x2345) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (producer ? 0xa628 : 0xa608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (interrupt ? 0 : 0x800), "Accumulator call/return retains its target and exact caller frame through producer publication, IRQ/NMI and replay");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_vector_acks = m_recurring_irq_snapshot[4]; m_fast_stack_reads = m_recurring_irq_snapshot[5]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[6]; m_port_reads = m_recurring_irq_snapshot[7]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay retained accumulator call and far return"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253800; m_check_timer->enable(true); return;
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_vector_acks = m_recurring_irq_snapshot[4]; m_fast_stack_reads = m_recurring_irq_snapshot[5]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[6]; m_port_reads = m_recurring_irq_snapshot[7]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay retained accumulator call and matching return"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253800; m_check_timer->enable(true); return;
 				}
 				m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 215) { start_fcala(variant + 1); return; }
+				if (variant < 215) { start_accumulator_call(variant + 1); return; }
+				if (near)
+				{
+					osd_printf_info(producer ? "TMS320C54x staged CALA producer: PASS cases=216 restore=216 producer=DLD accumulators=2 gaps=0,1,2 caller_pages=3 ignored_upper_targets=3 ram_reads=2 target_retained=1 frame_words=1 frame_roundtrip=1 delayed_acceptance=0 silicon_phase_claim=0\n" : "TMS320C54x staged CALA: PASS cases=216 restore=216 accumulators=2 caller_pages=3 ignored_upper_targets=3 target_sample=5 stack_write=5 target_fetch=8 callee_execute=12 sources=none,IRQ,NMI frame_words=1 frame_roundtrip=1 delayed_acceptance=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, producer ? "TMS320C54x isolated CALA producer complete" : "TMS320C54x isolated staged CALA complete");
+				}
 				if (producer)
 				{
 					osd_printf_info("TMS320C54x staged FCALA producer: PASS cases=216 restore=216 producer=DLD accumulators=2 gaps=0,1,2 caller_pages=3 target_pages=3 ram_reads=2 target_retained=1 frame_roundtrip=1 silicon_phase_claim=0\n");
@@ -37579,7 +37589,7 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
 		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
-		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "IRQ/NMI cannot split FCALA's retained two-word frame"); ++m_vector_acks; }
+		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == (near_accumulator_fixture() ? 1 : 2), "IRQ/NMI cannot split the retained accumulator-call frame"); ++m_vector_acks; }
 		if (m_phase == 253730) { unsigned const variant = m_pipeline_peripheral_case; expect(variant >= 48 && line == (variant < 72 ? 12 : INPUT_LINE_NMI) && !m_vector_acks && m_pipeline_store_writes == 1, "IFR clearance cannot cancel a selected IRQ or independent NMI"); ++m_vector_acks; }
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
 		if (m_phase == 253570) { unsigned const transfers = m_pipeline_peripheral_case / 8 ? 1 : 1 + (m_pipeline_peripheral_case / 2) % 4; expect(line == 0 && !m_vector_acks && m_pipeline_operand_reads + m_pipeline_store_writes == transfers, "IRQ acknowledgement follows the complete guarded I/O sequence"); ++m_vector_acks; }
@@ -38205,6 +38215,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(65, "exp-t", "Staged exponent publication and T consumer latency")
 	ROM_SYSTEM_BIOS(66, "adds", "Staged unsigned memory add and retained operands")
 	ROM_SYSTEM_BIOS(67, "xmem-load", "Staged compact-address shifted accumulator load")
+	ROM_SYSTEM_BIOS(68, "cala", "Staged near accumulator call and exact return frame")
+	ROM_SYSTEM_BIOS(69, "cala-producer", "Staged DLD target publication before near accumulator call")
 ROM_END
 
 ROM_START(tms54rom4)
