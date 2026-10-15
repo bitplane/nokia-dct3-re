@@ -10920,6 +10920,56 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255080;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct block_single_fixture
+	{
+		unsigned outer, inner, kind, checkpoint, total;
+		bool tail;
+		u32 base;
+		u16 end;
+	};
+	static block_single_fixture block_single_case(unsigned v)
+	{
+		block_single_fixture f{};
+		f.outer = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4]; f.inner = std::array<unsigned, 4>{0, 1, 2, 7}[(v / 4) % 4];
+		f.kind = (v / 16) % 3; f.tail = (v / 48) % 2; f.base = (v / 96) % 2 ? 0x20000 : 0;
+		f.checkpoint = std::array<unsigned, 4>{7, 10, 13, 17}[v / 192]; f.total = (f.outer + 1) * (f.inner + 1);
+		f.end = 0x604 + unsigned(f.kind == 1) + (f.tail ? 0 : 3);
+		return f;
+	}
+	void start_block_single(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = block_single_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, f.end);
+		program.write_word(f.base + 0x602, 0x6d94); program.write_word(f.base + 0x603, 0xec00 | f.inner);
+		program.write_word(f.base + 0x604, std::array<u16, 3>{0xe589, 0x7693, 0xf495}[f.kind]);
+		if (f.kind == 1) program.write_word(f.base + 0x605, 0x1234);
+		if (!f.tail) program.write_word(f.base + 0x605 + unsigned(f.kind == 1), 0x6d95);
+		program.write_word(f.base + f.end + 1, 0x770e); program.write_word(f.base + f.end + 2, 0x1a2b); program.write_word(f.base + f.end + 3, 0xf4e1);
+		for (unsigned i = 0; i < 128; ++i) { data.write_word(0x5000 + i, 0x9000 + i); data.write_word(0x6000 + i, 0); }
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8820); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.outer); m_cpu->set_state_int(tms320c54x_device::STATE_RC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5555); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == 2 ? 0x5000 : i == 3 ? 0x6000 : i == 4 ? 0x7000 : i == 5 ? 0x7100 : 0x7200 + i);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x5000, 0x50ff, "block_single_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_operand_reads; expect(f.kind == 0 && i < f.total && at == 0x5000 + i && word == 0x9000 + i, "Inner MVDD reads each outer/inner source once in order"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0x6000, 0x60ff, "block_single_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes; expect(f.kind < 2 && i < f.total && at == 0x6000 + i && word == (f.kind == 1 ? 0x1234 : 0x9000 + i), "Inner repeat writes each destination once without consuming outer iterations"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255160;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_block_single_edge(unsigned variant = 0)
+	{
+		u32 const base = (variant / 4) % 2 ? 0x20000 : 0; unsigned const kind = variant % 4;
+		start_block_single(2 + (base ? 96 : 0)); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(base + 0x601, kind ? 0x603 : 0x602); program.write_word(base + 0x602, std::array<u16, 4>{0xec07, 0xf070, 0x47f8, 0xf072}[kind]); program.write_word(base + 0x603, kind == 3 ? 0x604 : 1);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_single_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_single_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_phase = 255180; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	struct asm_mapped_fixture
 	{
 		unsigned source, form, raw, flags, ar, read, checkpoint;
@@ -12644,6 +12694,8 @@ private:
 		if (!strcmp(machine().options().bios(), "st-t") || !strcmp(machine().options().bios(), "st-t-consumer")) { start_t_store(); return; }
 		if (!strcmp(machine().options().bios(), "st-t-edge")) { start_t_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "asm-mapped")) { start_asm_mapped(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-single")) { start_block_single(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-rpt-edge")) { start_block_single_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -39795,6 +39847,41 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255180)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, guard = variant % 4 ? 8 : 7, checkpoint = guard - 1 + variant / 8;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Unsupported inner repeat forms reject before any data transactions");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 2 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick < 4 ? 0x800 : 0x8800) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5555 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000, "Excluded repeat setup preserves counters and body state");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save unsupported inner repeat before or after rejection"); }
+			if (tick == 16)
+			{
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore inner repeat exclusion without changing outer ownership"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255190; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 15) { start_block_single_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x inner repeat exclusions: PASS cases=16 restore=16 forms=header_at_end,long_immediate,memory_count,nested_block pages=2 snapshots=2 data_reads=0 data_writes=0 counters_preserved=1 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated inner repeat exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255190) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255180; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255160)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_single_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Single repeat inside a block uses independent RPTC and BRC ownership");
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save inner repeat with active outer block ownership"); }
+			if (tick == 600)
+			{
+				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(STATE_GENPC) != f.base + f.end + 4 || m_cpu->state_int(tms320c54x_device::STATE_BRC) || m_cpu->state_int(tms320c54x_device::STATE_ST1) != 0x800 || m_cpu->state_int(tms320c54x_device::STATE_T) != 0x1a2b)
+					osd_printf_info("block_single_state: case=%u pc=%llx end=%04x idle=%llu brc=%llu rc=%llu st1=%llx t=%llx reads=%u writes=%u\n", variant, (unsigned long long)m_cpu->state_int(STATE_GENPC), f.end, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_BRC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_RC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_T), m_pipeline_operand_reads, m_pipeline_store_writes);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end + 4 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x8820 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1a2b, "Inner repeat preserves outer completion count BRAF and fallthrough");
+				expect(m_pipeline_operand_reads == (f.kind == 0 ? f.total : 0) && m_pipeline_store_writes == (f.kind < 2 ? f.total : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + (f.kind == 0 ? f.total : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + (f.kind < 2 ? f.total : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000 + f.outer + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7100 + (f.tail ? 0 : f.outer + 1) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL, "Inner repeat composes ordered memory effects with one prefix and suffix per outer iteration");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore inner and outer repeat without lost or duplicate bus work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255170; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_block_single(variant + 1); return; }
+				osd_printf_info("TMS320C54x single repeat in block: PASS cases=768 restore=768 outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 ordered_memory=1 outer_counts_preserved=1 duplicate_transactions=0 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated single repeat in block complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255170) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255160; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255140)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = asm_mapped_case(variant);
@@ -41749,6 +41836,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(151, "st-t-consumer", "Mapped T store shift latency and younger Read merge")
 	ROM_SYSTEM_BIOS(152, "st-t-edge", "Mapped T store neighboring destination exclusions")
 	ROM_SYSTEM_BIOS(153, "asm-mapped", "Mapped accumulator T TRN and AR sources for LD ASM")
+	ROM_SYSTEM_BIOS(154, "rptb-single", "Single repeat within an outer block repeat")
+	ROM_SYSTEM_BIOS(155, "rptb-rpt-edge", "Unsupported inner repeat setup forms")
 ROM_END
 
 ROM_START(tms54rom4)

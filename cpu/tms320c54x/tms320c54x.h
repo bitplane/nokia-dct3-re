@@ -155,6 +155,7 @@ private:
 	void pipeline_accept_interrupt();
 	void pipeline_delay_compiler_sp(u16 previous);
 	void pipeline_begin_repeat_stream();
+	void pipeline_resume_after_repeat();
 	void enter_idle(u8 mode);
 	void finish_repeats();
 	void push(u16 value);

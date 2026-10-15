@@ -23,14 +23,14 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the active-block control/count
-exclusion for `RPT #7` (`ec07`) at `03:a582` inside block
-`03:a538..03:a590` (live PC `03:a584`) within a five-second observation,
+pin-decoded response words before stopping at unsupported opcode `a749`
+at `03:dc95` (live PC `03:dc97`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record 195 `STL B,*(000e)` entries at `03:de88` and
-187 `LD *(AH),ASM` entries at `03:dfde`, with no observer writes.
+Passive Execute hooks record 187 `LD *(AH),ASM` entries at `03:dfde`, one
+`RPT #7` entry at `03:a582` and eight `MVDD` entries at `03:a583`, with
+no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +40,30 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,826 tests with one skip; the native 5110
+The tool suite passes 2,827 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Short-immediate RPT is admitted within an active block; tested bodies remain
+wholly inside the block. RPTC owns the inner repetition; BRC and endpoint metadata
+still belong to the outer block's Decode. Inner completion rebuilds discarded
+prefetch predictions from BRC and resumes either after the body or at RSA
+when the repeated body ends the outer block. Cloned MVDD pipeline slots do
+not decrement the outer count. No new scalar save-state fields are required.
+SPRU131G sections 6.7/6.8 describe the separate single/block controls; the
+block-count update is Decode-owned. This is not nested RPTB support.
+
+`rptb-single` passes 768 cases/restores over outer and inner counts 0/1/2/7,
+MVDD, immediate ST and NOP bodies, middle/end placement, two pages and four
+snapshots. Ordered RAM copies/stores, one prefix/suffix per outer iteration,
+final BRC/RPTC, BRAF, RSA/REA and continuation are checked. NOP has no memory
+effects; it is a control-state case, not an independently measured cycle count.
+`rptb-rpt-edge` adds 16 cases/restores for a short header at the endpoint,
+long-immediate or memory-count inner RPT, and nested RPTB; all remain prototype
+exclusions before data transactions. Those exclusions are not silicon traps.
+Boundary-straddling body encodings, combined inner-RPT/block interrupt behavior
+and measured physical phases remain unvalidated, independently of the existing
+standalone-repeat and RPTB IRQ/NMI controls.
 
 Extended STL/STH A/B stores admit mapped T (`000e`) alongside the existing
 AR destinations. The destination and any auxiliary update belong to Read;

@@ -2520,7 +2520,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;
 			m_rpt_iteration = 0;
-			m_pipeline_fetch_address = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address + staged_repeat_body_words(m_pipeline_repeat_word));
+			pipeline_resume_after_repeat();
 			pipeline_accept_interrupt();
 		}
 		return;
@@ -2964,7 +2964,7 @@ void tms320c54x_device::pipeline_step()
 		bool const forward_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !BIT(word, 9))) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_address[2] + 2 && block_branch_target <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !forward_block_branch) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
-			word == 0xf070 || word == 0x47f8 || word == 0x771a || short_repeat || staged_xc(word) || word == 0xf4e1 ||
+			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
 			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
@@ -4137,7 +4137,7 @@ void tms320c54x_device::pipeline_step()
 			{
 				m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
 				m_rpt_iteration = 0;
-				m_pipeline_fetch_address = (address & 0x7f0000) | u16(address + 1);
+				pipeline_resume_after_repeat();
 			}
 		}
 		if ((m_op == 0xf495 || (m_op & 0xfe00) == 0x1e00) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
@@ -4389,8 +4389,25 @@ void tms320c54x_device::pipeline_begin_repeat_stream()
 	if (!m_rptc)
 	{
 		m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
-		m_pipeline_fetch_address = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address + staged_repeat_body_words(m_op));
+		pipeline_resume_after_repeat();
 	}
+}
+
+void tms320c54x_device::pipeline_resume_after_repeat()
+{
+	u32 const next = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address +
+		(staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
+	// Inner RPT discards undecoded prefetch, including any predicted block
+	// wrap. Rebuild that prediction from Decode-owned BRC, not RPTC. The
+	// outer endpoint was decoded once, never once per repeated body copy.
+	if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
+		m_pipeline_repeat_address >= m_pipeline_block_start && m_pipeline_repeat_address <= m_pipeline_block_end_address)
+	{
+		m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+		u32 const after_end = (m_pipeline_block_end_address & 0x7f0000) | u16(m_pipeline_block_end_address + 1);
+		m_pipeline_fetch_address = next == after_end ? m_pipeline_block_start : next;
+	}
+	else m_pipeline_fetch_address = next;
 }
 
 void tms320c54x_device::enter_idle(u8 mode)

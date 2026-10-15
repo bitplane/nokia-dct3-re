@@ -432,6 +432,14 @@ EXTRA_PROFILES = {
         "TMS320C54x T load control: PASS load_cases=55296 pair_cases=768 restore=56064 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated T load control complete",
     ),
+    "rptb-rpt-edge": (
+        "TMS320C54x inner repeat exclusions: PASS cases=16 restore=16 forms=header_at_end,long_immediate,memory_count,nested_block pages=2 snapshots=2 data_reads=0 data_writes=0 counters_preserved=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated inner repeat exclusions complete",
+    ),
+    "rptb-single": (
+        "TMS320C54x single repeat in block: PASS cases=768 restore=768 outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 ordered_memory=1 outer_counts_preserved=1 duplicate_transactions=0 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated single repeat in block complete",
+    ),
     "asm-mapped": (
         "TMS320C54x mapped LD ASM: PASS cases=49152 restore=49152 sources=16 forms=DP,postincrement,offset,absolute shifts=32 status_states=4 pages=2 snapshots=3 source_sample=Read publish=Execute data_writes=0 pointer_updates=once physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped LD ASM complete",

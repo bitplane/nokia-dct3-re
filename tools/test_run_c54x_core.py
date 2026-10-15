@@ -861,6 +861,21 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_block_single_profile_scope(self):
+        edge, end = EXTRA_PROFILES['rptb-rpt-edge']
+        check_result(edge + '\n' + end + '\n', 3, profile='rptb-rpt-edge')
+        with self.assertRaises(ValueError):
+            check_result(edge.replace('restore=16', 'restore=0') + '\n' + end + '\n', 3, profile='rptb-rpt-edge')
+        marker, ending = EXTRA_PROFILES['rptb-single']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-single')
+        for old, new in (('restore=768', 'restore=0'),
+                         ('positions=middle,end', 'positions=middle'),
+                         ('outer_counts_preserved=1', 'outer_counts_preserved=0'),
+                         ('interrupt_composition=unvalidated', 'interrupt_composition=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rptb-single')
+
     def test_t_store_profile_scopes(self):
         for profile, restores in (('st-t', 49152), ('st-t-consumer', 15360), ('st-t-edge', 64)):
             marker, ending = EXTRA_PROFILES[profile]
