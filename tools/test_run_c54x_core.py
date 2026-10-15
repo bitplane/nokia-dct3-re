@@ -463,6 +463,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='mvmd-cpl')
 
+    def test_mvmd_t_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-t']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-t')
+        for bad in (output.replace('restore=432', 'restore=0'),
+                    output.replace('source_reads=1', 'source_reads=2'),
+                    output.replace('producer_composition=unvalidated', 'producer_composition=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-t')
+
     def test_mvmd_status_scope(self):
         marker, ending = EXTRA_PROFILES['mvmd-st1']
         output = marker + '\n' + ending + '\n'

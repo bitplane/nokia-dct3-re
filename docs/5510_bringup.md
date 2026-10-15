@@ -3295,9 +3295,10 @@ passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
 at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
 POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
-Long-offset AND (`18e2 1462`) at `03:9dff` now executes; the next stop is
-mapped MVMD (`730e 0011`, T to AR1) at `03:9ba2`
-(live PC `03:9ba4`); all
+Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
+T to AR1) at `03:9ba2` now execute; the next stop is MVDD (`e501`)
+at `03:9c70`, rejected for a register/peripheral operand
+(live PC `03:9c73`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3556,9 +3557,24 @@ branch producer controls and repeated POPD also pass (nine profiles total).
 The 76 verifier unit tests and native 5110 save-state restoration pass;
 the full-suite baseline remains `690ace59`.
 
-The original run passes BACC A at `03:9de4` and long-offset
-AND (`18e2 1462`) at `03:9dff`, then stops at mapped MVMD (`730e 0011`,
-T to AR1) at `03:9ba2`. All 48,261 program and
+MVMD now admits T/TRN sources through its existing retained Class-19A
+move path (SPRU172C, MVMD instruction). The `mvmd-t` profile passes 432
+cases/restores: two sources, eight AR destinations plus BK, four word
+patterns, two pages and three snapshots. Source sampling and AR/BK
+publication occur once at the modeled Access clock 5; changing the source
+after that clock cannot change the destination or cause another access
+after replay. Unselected registers, accumulators, stack and status are
+preserved. This is not a producer-latency, repeat, IRQ or physical-phase
+claim, nor new acceptance of other destination classes. Six neighboring
+controls (`mvmd-acc`, `mvmd-st1`, `mvmd-cmpt`, `mvmd-block`,
+`mvmd-status-irq`, `popd-repeat`), 77 verifier tests, evidence validation
+and native 5110 save-state restoration pass. No new CPU saved fields are
+needed; the broad baseline remains `690ace59`.
+
+The original run passes BACC A at `03:9de4`, long-offset
+AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
+T to AR1) at `03:9ba2`, then stops at MVDD (`e501`) at `03:9c70`
+on the register/peripheral-operand guard (live PC `03:9c73`). All 48,261 program and
 3,656 compared resident data words still match. This remains partial
 initialization, not complete board boot, native speech or a completed
 service transaction.
