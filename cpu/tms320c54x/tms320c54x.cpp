@@ -282,7 +282,7 @@ constexpr bool staged_memory_immediate_multiply(u16 word)
 
 constexpr bool staged_immediate_multiply(u16 word)
 {
-	return (word & 0xfeff) == 0xf066 || staged_memory_immediate_multiply(word);
+	return (word & 0xfeff) == 0xf066 || (word & 0xfcff) == 0xf067 || staged_memory_immediate_multiply(word);
 }
 
 constexpr bool staged_bitfield(u16 word)
@@ -3536,7 +3536,7 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
 		m_pipeline_immediate[4] = m_t;
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfeff) == 0xf066)
+	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfeff) == 0xf066 || (m_pipeline_word[4] & 0xfcff) == 0xf067))
 		m_pipeline_operand[4] = m_t;
 	if (m_pipeline_valid[4] && staged_port_read(m_pipeline_word[4]))
 		m_pipeline_operand[4] = m_io.read_word(m_pipeline_immediate[4]);
@@ -4029,6 +4029,12 @@ void tms320c54x_device::pipeline_step()
 		{
 			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
 			if (BIT(m_st1, 6)) product *= 2;
+			if ((m_op & 0xfcff) == 0xf067)
+			{
+				product = multiply_product(product);
+				u64 const source = accumulator(BIT(m_op, 9));
+				product += s64(source << 24) >> 24;
+			}
 			accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
 			m_pc += staged_memory_immediate_multiply(m_op) && u8(m_op) >= 0xe0 ? 2 : 1;
 		}

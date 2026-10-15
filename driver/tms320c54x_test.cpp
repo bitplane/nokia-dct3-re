@@ -9022,8 +9022,10 @@ private:
 		u64 a, b, result;
 		u32 base;
 	};
-	static immediate_multiply_fixture immediate_multiply_case(unsigned variant)
+	static immediate_multiply_fixture immediate_multiply_case(unsigned variant, bool mac = false)
 	{
+		bool const mac_source = mac && variant >= 86016;
+		if (mac) variant %= 86016;
 		bool const producer = variant >= 12288;
 		unsigned const v = producer ? (variant - 12288) % 24576 : variant % 4096;
 		unsigned const pattern = v % 8, literal_pattern = (v / 8) % 8;
@@ -9050,18 +9052,30 @@ private:
 		u16 const st0 = 0x1804 | ((pattern ^ literal_pattern) & 1 ? 0x600 : 0), st1 = 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0) | (flags & 4 ? 0x100 : 0) | (producer && (pattern & 2) ? 0x4000 : 0);
 		u64 const result = u64(overflow && (flags & 2) ? std::clamp(product, s64(-2147483648LL), s64(2147483647LL)) : product) & 0xffffffffffULL;
 		unsigned const checkpoint_index = producer ? (variant - 12288) / 24576 : variant / 4096;
-		return {producer, source, destination, start, 6 + start, std::array<unsigned, 3>{4 + start, 5 + start, 6 + start}[checkpoint_index],
+		immediate_multiply_fixture f{producer, source, destination, start, 6 + start, std::array<unsigned, 3>{4 + start, 5 + start, 6 + start}[checkpoint_index],
 			t, literal, st0, st1, pmst, u16(st0 | (overflow ? destination ? 0x200 : 0x400 : 0)),
 			producer ? source ? 0x2222 : value : 0x12345678, producer ? source ? value : 0x1111 : 0x87654321,
 			result, producer ? pattern & 1 ? 0x20000U : 0 : (v / 2048) % 2 ? 0x20000U : 0};
+		if (mac)
+		{
+			s64 p = product;
+			if ((pmst & 2) && (flags & 1) && (flags & 2)) p = std::clamp(p, s64(-2147483648LL), s64(2147483647LL));
+			u64 const accumulator = mac_source ? f.b : f.a;
+			s64 const total = (BIT(accumulator, 39) ? s64(accumulator) - (s64(1) << 40) : s64(accumulator)) + p;
+			bool const ov = total < -2147483648LL || total > 2147483647LL;
+			f.result = u64(ov && (flags & 2) ? std::clamp(total, s64(-2147483648LL), s64(2147483647LL)) : total) & 0xffffffffffULL;
+			f.result_st0 = st0 | (ov ? destination ? 0x200 : 0x400 : 0);
+		}
+		return f;
 	}
 	void start_pipeline_immediate_multiply(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = immediate_multiply_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		bool const mac = !strcmp(machine().options().bios(), "mac-t-imm");
+		auto const f = immediate_multiply_case(variant, mac); auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		if (f.producer) program.write_word(f.base + 0x600, 0x880e | (f.source << 8));
-		program.write_word(f.base + 0x600 + f.start, 0xf066 | (f.destination << 8)); program.write_word(f.base + 0x601 + f.start, f.literal);
+		program.write_word(f.base + 0x600 + f.start, (mac ? 0xf067 | (variant >= 86016 ? 0x200 : 0) : 0xf066) | (f.destination << 8)); program.write_word(f.base + 0x601 + f.start, f.literal);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
@@ -12138,7 +12152,7 @@ private:
 		if (!strcmp(machine().options().bios(), "plain-branch")) { start_pipeline_plain_branch(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
-		if (!strcmp(machine().options().bios(), "mpy-t-imm")) { start_pipeline_immediate_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -37841,7 +37855,8 @@ private:
 		if (m_phase == 253290)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = immediate_multiply_case(variant); bool const retired = tick > f.read_cycle;
+			bool const mac = !strcmp(machine().options().bios(), "mac-t-imm");
+			auto const f = immediate_multiply_case(variant, mac); bool const retired = tick > f.read_cycle;
 			u16 const t = tick > f.read_cycle ? 0xbeef : f.producer && tick < 6 ? 0x9abc : f.t;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == (retired && !f.destination ? f.result : f.a) &&
@@ -37865,7 +37880,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253300; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 86015) { start_pipeline_immediate_multiply(variant + 1); return; }
+				if (variant + 1 < (mac ? 172032U : 86016U)) { start_pipeline_immediate_multiply(variant + 1); return; }
+				if (mac)
+				{
+					osd_printf_info("TMS320C54x staged immediate MAC: PASS isolated_cases=24576 stlm_cases=147456 value_pairs=64 selectors=4 flags=16 restore=172032 literal_fetches=1 t_retained=1 accumulator_latency=unvalidated data_reads=0 projection_only_stlm_gap=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated immediate MAC complete");
+				}
 				osd_printf_info("TMS320C54x staged immediate MPY: PASS isolated_cases=12288 stlm_cases=73728 value_pairs=64 selectors=4 flags=16 restore=86016 literal_fetches=1 t_retained=1 data_reads=0 projection_only_stlm_gap=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "mpy-t-imm")) throw emu_fatalerror(0, "TMS320C54x isolated immediate MPY complete");
 				start_pipeline_multiply_mapped(); return;
@@ -40970,6 +40990,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(134, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
 	ROM_SYSTEM_BIOS(135, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
 	ROM_SYSTEM_BIOS(136, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
+	ROM_SYSTEM_BIOS(137, "mac-t-imm", "Immediate MAC retained T literal and accumulator selection")
 ROM_END
 
 ROM_START(tms54rom4)

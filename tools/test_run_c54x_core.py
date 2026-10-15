@@ -861,6 +861,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_immediate_mac_profile_scope(self):
+        marker, ending = EXTRA_PROFILES['mac-t-imm']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mac-t-imm')
+        for old, new in (('restore=172032', 'restore=0'),
+                         ('t_retained=1', 't_retained=0'),
+                         ('accumulator_latency=unvalidated', 'accumulator_latency=validated'),
+                         ('projection_only_stlm_gap=0', 'projection_only_stlm_gap=none')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mac-t-imm')
+
     def test_dual_arithmetic_profile_scopes(self):
         for profile, restores in (('alu-dual', 86016), ('alu-dual-edge', 32)):
             marker, ending = EXTRA_PROFILES[profile]

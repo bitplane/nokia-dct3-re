@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`MAC #lk,B,B` (`f367`) at `03:ddaa` (live PC `03:ddac`) within a five-second observation,
+`MAR` indirect modifier (`6daa`) at `03:dcdb` (live PC `03:dcdd`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
@@ -35,6 +35,23 @@ that multiply could execute. A moved unsupported-opcode frontier alone therefore
 does not prove retirement of its prefix.
 
 ## Retained recorder execution contracts
+
+Immediate MAC (`f067/f167/f267/f367`, SPRU172C syntax 3) retains its literal
+and Read-owned signed T operand through the existing Class-2 path. Execute
+adds the signed product to the selected 40-bit source accumulator. FRCT shifts
+the product by one; SPRU131G section 4.5.3 requires SMUL pre-accumulation
+saturation only when SMUL, FRCT and OVM are all set. Final destination overflow
+and saturation use the shared multiplier helper; T and carry are preserved.
+`mac-t-imm` passes 172,032 cases/restores: 24,576 isolated and 147,456 with
+STLM-to-T producers, all four accumulator selections, 64 operand pairs and
+16 flag combinations. Literal replacement and post-Read T mutation cannot
+alter the retained operands. Zero-gap STLM sequences check the prototype's
+stale-T projection, not a guaranteed silicon result. Adjacent accumulator
+producer timing, repeat and interrupt composition remain unvalidated.
+The tool suite passes 2,818 tests with one skip, and the exact resident-memory
+comparison still passes at the new original recorder boundary.
+The 86,016-case immediate-MPY control and native 5110 save-state round trip
+also pass. This is focused acceptance, not a renewed full default CPU run.
 
 Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
 address/read machinery as dual MPY, but does not load T. Both operands are
