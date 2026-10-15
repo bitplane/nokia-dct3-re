@@ -780,6 +780,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(output.replace(old, new), 3, profile='write-a-edge')
 
+    def test_xmem_arithmetic_scope(self):
+        marker, ending = EXTRA_PROFILES['xmem-alu']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='xmem-alu')
+        for old, new in (('restore=393216', 'restore=0'), ('encodings=1024', 'encodings=512'),
+                         ('operations=ADD,SUB', 'operations=ADD'),
+                         ('mapped_acceptance=0', 'mapped_acceptance=1'),
+                         ('repeat_acceptance=0', 'repeat_acceptance=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='xmem-alu')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`9008` at `03:838b` (live PC `03:838d`). This is not complete recording or
+`9808` at `03:83ad` (live PC `03:83af`). This is not complete recording or
 validated audio.
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
@@ -80,8 +80,25 @@ before any data read or program write. Those excluded combinations remain
 work to implement, not hardware-invalid forms. Mapped READA, PMST mapping,
 MVDD source repeats and load/return controls pass. This focused WRITA coverage
 does not renew the full default CPU checkpoint above.
-The runner's 101 unit tests pass; the full tool suite passes 2,809 tests with
-one skip. Native 5110 save-state restoration also passes.
+
+Compact Xmem arithmetic (`9000..93ff`) retains its RAM address and performs
+one pointer update at Access, samples the word at Read and publishes ADD/SUB
+at Execute through the shared arithmetic helper. It preserves the other
+accumulator and updates carry/sticky destination overflow with SXM/OVM
+semantics. `xmem-alu` passes 393,216 cases/restores over all 1,024 encodings:
+16 Xmem modes, shifts 0..15, eight source/accumulator patterns, both
+accumulators, eight status combinations, two pages and three snapshots.
+Source-memory and AR changes after their sampling boundaries cannot change
+the result. BK-zero linear and circular-wrap cases are included; mapped
+sources and repeat composition are not established by this isolated fixture.
+The original `9008` at `03:838b` executes inside the firmware's block-repeat
+loop and advances to the current unsupported form; this is a bounded original
+composition observation, not general block-repeat arithmetic acceptance.
+
+The runner's 102 unit tests pass; the full tool suite passes 2,810 tests with
+one skip. The 196,608-case Xmem load regression, carry-branch, load/return and
+WRITA exclusion controls also pass, as does native 5110 save-state restoration.
+These focused changes do not renew the default-suite checkpoint.
 
 The original recorder subsequently emits NAND data writes through firmware
 at `02:891c`, then reaches the current unsupported form. NAND traffic alone

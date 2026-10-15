@@ -404,6 +404,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "xmem-alu": (
+        "TMS320C54x staged Xmem arithmetic: PASS cases=393216 restore=393216 encodings=1024 operations=ADD,SUB xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 read=5 publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated Xmem arithmetic complete",
+    ),
     "write-a-edge": (
         "TMS320C54x staged WRITA exclusions: PASS cases=12 restore=12 classes=cpu_source,peripheral_source,repeat,control_delay,block_repeat,XC source_reads=0 program_writes=0 atomic_fallback=0",
         "Fatal error: TMS320C54x isolated WRITA exclusions complete",
