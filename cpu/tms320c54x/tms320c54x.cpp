@@ -2835,6 +2835,8 @@ void tms320c54x_device::pipeline_step()
 	}
 	bool const completing_shift_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
 		m_pipeline_decode_remaining == 1 && staged_shifted_smem(m_pipeline_decode_word);
+	bool const completing_move_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
+		m_pipeline_decode_remaining == 1 && staged_move(m_pipeline_decode_word);
 	if (m_pipeline_valid[2])
 	{
 		if (m_pipeline_delay_decode_words)
@@ -2963,7 +2965,12 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged WRITA repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_pipeline_immediate[2] == 7;
-		if (m_pipeline_valid[2] && direct_move && !accumulator_status_move && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
+		bool const brc_move = direct_move && m_pipeline_immediate[2] == 0x1a;
+		if (m_pipeline_valid[2] && brc_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		if (m_pipeline_valid[2] && direct_move && !brc_move && !accumulator_status_move && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
 			(m_pipeline_immediate[2] < 0x10 || m_pipeline_immediate[2] > 0x19))
 		{
 			logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]);
@@ -3326,15 +3333,16 @@ void tms320c54x_device::pipeline_step()
 		bool const extended = staged_extended_move(m_pipeline_word[3]);
 		u16 const destination = m_pipeline_immediate[3];
 		bool const status = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && destination == 7;
-		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && !status && destination < 0x60)
+		bool const brc = destination == 0x1a;
+		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && !status && !brc && destination < 0x60)
 		{
 			logerror("%s: staged MVMD accumulator-to-register destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (staged_direct_mvmd(m_pipeline_word[3]) && !status && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if (staged_direct_mvmd(m_pipeline_word[3]) && !status && !brc && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (extended && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if (extended && !brc && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged long-offset MVDK control/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -3356,6 +3364,10 @@ void tms320c54x_device::pipeline_step()
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
 		if (BIT(mode, 7) && !extended) indirect_modify(mode, false, 3);
+		// SPRU131G table 7-24: MVDK/MVMD BRC has zero latency before
+		// RPTB[D]. Publish the retained Access sample before younger Decode
+		// initializes its loop; do not apply DAGEN-bank write deferral.
+		if (brc && !mapped_write) data_write(destination, m_pipeline_operand[3], 3);
 		if (destination >= 0x10 && destination <= 0x19)
 		{
 			bool const conflict = m_pipeline_valid[5] &&
@@ -4311,7 +4323,7 @@ void tms320c54x_device::pipeline_step()
 		// Execute, without changing direct-ALU producer latency.
 		m_pipeline_operand[3] = m_data.read_word(m_pipeline_operand_address[3]);
 		u16 const destination = m_pipeline_immediate[3];
-		if (destination >= 0x10 && destination <= 0x19 && !m_pipeline_early_write_deferred[3])
+		if (((destination >= 0x10 && destination <= 0x19) || destination == 0x1a) && !m_pipeline_early_write_deferred[3])
 		{
 			data_write(destination, m_pipeline_operand[3], 3);
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);

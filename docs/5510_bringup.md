@@ -21,17 +21,16 @@ publishes buffer pointers `1800` and `1880`. The zero source is shared with
 the atomic control, not a demonstrated staged-only pointer defect; see
 [Recorder low-page copy](#recorder-low-page-copy).
 
-The current stop is the memory-move control-destination exclusion at `03:e195`:
-`7102` targets BRC (`001a`), with live/terminal PC `03:e198`, `illegal=1`.
-Static decoding of the unchanged `aa88` section identifies its `001a`
-destination word at `03:e196` and a later `RPTBD e1d2` at `03:e1aa`,
-after intervening setup. This does not establish the runtime source word
-or an adjacent-load hazard in the original sequence.
-The unresolved contract is the source-word ownership, BRC publication and
-the following consumer of that count. SPRU131G table 7-24 specifies zero
-setup latency for MVDK/MVMD to BRC before RPTB[D]; in-loop modifications
-have a separate table 7-25 contract. A blanket destination-range expansion
-would not establish either behavior.
+The stack-relative `7102 001a` at `03:e195` now transfers its captured word
+to BRC before the later `RPTBD e1d2` at `03:e1aa`. Passive guest-access
+taps observe source `5cee` with SP=`5cec`: 124 reads and matching BRC
+publications across counts `6`, `0e`, `1e`, `3e`, `7e`. These observations
+do not imply an adjacent producer/consumer hazard in the original sequence.
+Execute-entry hooks separately observe 124 entries each at the move, RPTBD
+and following instruction `03:e1d3`; this is not merely an advanced live PC.
+The current stop is unsupported word `11df` at `03:dc39`, with terminal
+PC `03:dc3b`, `illegal=1`. Its memory-load/addressing contract is the next
+unresolved boundary; execution beyond it and complete recording are unproven.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -40,6 +39,31 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+### Memory transfers into the block counter
+
+SPRU131G table 7-24 gives MVDK/MVMD-to-BRC zero latency before RPTB[D].
+The retained frontend reads the source and publishes BRC at Access, before
+younger Decode initializes the repeat. The move does not inherit DAGEN-bank
+write deferral. A preceding mapped accumulator write uses the existing
+late-sample path rather than a stale mapped read. No new save fields or
+atomic-interpreter fallback are introduced.
+
+`move-brc` passes 960 cases/restores: DP, SP, postincrement, absolute,
+long-offset, MVMD AR4, MVMD AL and MVDK AL sources; counts 0/1/2/7/127;
+adjacent/NOP-separated RPTB/RPTBD; two pages and three snapshots. The
+source is read once, BRC writes once without a destination read, and the
+following loop copies exactly count-plus-one words. Mutating the source
+after capture cannot change the loop count. The mapped-source cases do not
+independently establish every preceding accumulator-producer composition.
+
+`move-brc-edge` passes 24 cases/restores for MVDK/MVMD in a repeat body
+or RPTBD delay. Rejection precedes source reads, BRC writes and source-pointer
+updates, including restoration before/after Decode. The completing two-word
+move retains its delay context even when its extension consumes the final
+delay word. These are bounded model exclusions, not asserted silicon traps.
+In-loop modification (table 7-25), general control-delay composition,
+IRQ/NMI composition and physical bus timing remain unvalidated.
 
 ### Shifted memory loads in control delays
 
@@ -402,7 +426,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,856 tests with one skip; the native 5110
+The tool suite passes 2,858 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
@@ -4413,7 +4437,7 @@ one skip, including 95 core-result verifier tests; native 5110 save-state
 restoration passes. The atomic `bootreplay` bootstrap/status control also
 passes pin-level exchange, selected-state replay equality and unchanged
 NAND after the shared arithmetic extraction. Original `1481` at `03:f0f6` now executes. The
-current MVDD stop and exact resident/overlay comparison are recorded in
+current execution boundary and exact resident/overlay comparison are recorded in
 [Current boundary](#current-boundary), not a completed recorder transaction.
 The original CMPM at `03:91eb` executes with CPL set, SP=`1246` and
 direct source `125a`. The `7725` at `02:6d47` is STM immediate to PRD,

@@ -12,6 +12,28 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_memory_move_brc_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['move-brc-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='move-brc-edge')
+        for bad in (output.replace('restore=24', 'restore=0'),
+                    output.replace('source_reads=0', 'source_reads=1'),
+                    output.replace('pointer_effects=0', 'pointer_effects=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='move-brc-edge')
+
+    def test_memory_move_brc_scope(self):
+        marker, ending = EXTRA_PROFILES['move-brc']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='move-brc')
+        for bad in (output.replace('restore=960', 'restore=0'),
+                    output.replace('latency=0', 'latency=1'),
+                    output.replace('counter_writes=1', 'counter_writes=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='move-brc')
+
     def test_asm_store_bypass_scope(self):
         marker, ending = EXTRA_PROFILES['asm-store-bp']
         output = marker + '\n' + ending + '\n'

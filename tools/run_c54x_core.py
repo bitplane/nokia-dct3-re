@@ -600,6 +600,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0",
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
+    "move-brc-edge": (
+        "TMS320C54x staged memory move BRC exclusions: PASS cases=24 restore=24 writers=MVDK,MVMD contexts=block_body,RPTBD_delay pages=2 snapshots=3 source_reads=0 counter_writes=0 pointer_effects=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated memory move BRC exclusions complete",
+    ),
+    "move-brc": (
+        "TMS320C54x staged memory move BRC: PASS cases=960 restore=960 source_forms=8 counts=0,1,2,7,127 gaps=0,1 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_reads=0 counter_writes=1 latency=0 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated memory move BRC complete",
+    ),
     "asm-store-bp": (
         "TMS320C54x staged ASM store bypass: PASS cases=24576 restore=24576 selectors=4 shifts=32 sxm_sst=4 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 retained_shift=1 alias_reads=0 writes=1 physical_banks=unvalidated",
         "Fatal error: TMS320C54x isolated ASM store bypass complete",
