@@ -13,9 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in the
-FCALLD at `02:e10d` (live PC `02:e111`). MVMD AR6,T and the
-two-word STL in the delayed branch at `02:e204` now execute. Ordinary
+short-indirect CMPM (`6081`) at `02:a6b1` (live PC `02:a6b3`).
+Absolute MPY from AR7 in FCALLD's delay at `02:e10f` now executes,
+as do MVMD AR6,T and the delayed STL at `02:e206`. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1777,6 +1777,21 @@ and saturation. Accumulator-sourced MVMD to T/TRN, other control-register
 destinations, delayed-control and interrupt composition are not admitted
 by this acceptance claim.
 
+Signed memory MPY A/B may occupy one delay word, or both words when it
+has an offset/absolute extension. The same full-instruction budget check
+rejects a two-word MPY starting in the final slot. `mpy-delay` passes
+18,432 cases/restores over BD, taken/untaken BCD, CALLD, cross-page FCALLD
+and RETD; short, absolute RAM, absolute AR7 and offset sources; both
+accumulators; sixteen operand pairs, FRCT/OVM, two caller pages and three
+snapshots. The fixture changes the pointer after Access, the source/T
+after Read and the literal after Fetch. The selected callee copies the
+product, verifying availability at the boundary as well as independent
+40-bit arithmetic, overflow/saturation, frame/page ownership and one source
+read. Sixteen `mpy-delay-edge` cases reject straddling instructions without
+data accesses or atomic fallback. Rounded/unsigned MPY, MAC/MAS and
+immediate-multiply delay compositions remain excluded. Exact stages remain
+manual-derived frontend projections, not silicon measurements.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3447,8 +3462,9 @@ now executes, as does LDU `1281` at `02:9edc` against the bench's
 unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
 and STLM B,BK/MVMD BK,AR0 are admitted, as is the two-word STL in
 the delayed branch at `02:e204`. MVMD AR6,T at `02:e109` also
-executes. The next rejecting stage is absolute MPY `20f8 0017` at
-`02:e10f`, inside FCALLD `02:e10d` (live PC `02:e111`). All
+executes, as does absolute MPY `20f8 0017` at `02:e10f` in
+FCALLD's delay. The next rejecting stage is short-indirect CMPM
+`6081` at `02:a6b1` (live PC `02:a6b3`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3747,9 +3763,10 @@ inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
 and MVMD BK,AR0 are admitted, as is long-offset STL `80e2 0001`
 at `02:e206` in delayed branch `f273 e209` at `02:e204`.
-MVMD AR6,T (`7316 000e`) at `02:e109` now executes. The next
-stop is absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in
-FCALLD `02:e10d`, live PC `02:e111`.
+MVMD AR6,T (`7316 000e`) at `02:e109` and
+absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in FCALLD
+`02:e10d`, now execute. The next stop is short-indirect CMPM
+(`6081`) at `02:a6b1`, live PC `02:a6b3`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,
