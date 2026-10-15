@@ -93,9 +93,10 @@ is backed by bench RAM, not an identified DA150 register. Same-location
 STL/STH/T/TRN-to-load bypass is now covered by 288 replay cases, avoiding
 stale stack locals and the resulting IMR corruption/default-vector loop.
 Absolute ADD from BK (`01f8 0019`) at `02:e1e5` and STLM B,BK
-and MVMD BK,AR0 are admitted. The next stop is long-offset STL
-`80e2 0001` at `02:e206`, in delayed branch `f273 e209` at
-`02:e204` (live PC `02:e208`).
+and MVMD BK,AR0 are admitted. Long-offset STL `80e2 0001` at
+`02:e206` fits the complete two-word delay of `f273 e209` at `02:e204`
+and now executes. The next stop is MVMD AR6,T (`7316 000e`) at
+`02:e109` (live PC `02:e10c`).
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.

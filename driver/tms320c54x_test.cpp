@@ -8544,6 +8544,64 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254380;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct delay_store_fixture
+	{
+		unsigned kind, operation, mode, checkpoint;
+		u16 literal, address, next_ar, value;
+		u32 base;
+		u64 a, b;
+		unsigned delay() const { return kind == 4 ? 1 : 2; }
+		unsigned literal_clock() const { return kind == 4 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
+		// SPRU131G example 7-8 holds RETD's prefetched words until its stack Read completes.
+		unsigned write_clock() const { return kind == 0 || kind == 3 ? 9 : 10; }
+	};
+	static delay_store_fixture delay_store_case(unsigned variant)
+	{
+		unsigned const kind = variant % 5, operation = (variant / 5) % 4, form = (variant / 20) % 4;
+		u16 const literal = std::array<u16, 6>{1, 0xffff, 0xf495, 0xfc43, 0xf7d9, 0xf4e2}[(variant / 80) % 6];
+		u16 const offset = form == 3 && literal == 1 ? 0x5001 : literal;
+		int const index = ((5 + s16(offset)) % 13 + 13) % 13;
+		u16 const address = form == 3 ? offset : form == 2 ? 0x5000 + index : u16(0x5005 + s16(offset));
+		u64 const a = kind == 1 ? 0 : kind == 2 ? 1 : 0x123456789aULL, b = 0xfedcba9876ULL;
+		u64 const accumulator = operation & 1 ? b : a;
+		unsigned const write = kind == 0 || kind == 3 ? 9 : 10;
+		return {kind, operation, std::array<unsigned, 4>{0xe2, 0xea, 0xf2, 0xf8}[form],
+			std::array<unsigned, 3>{3, kind == 4 ? 4U : 5U, write - 1}[variant / 960],
+			offset, address, form == 1 || form == 2 ? address : u16(0x5005),
+			u16(accumulator >> (operation & 2 ? 16 : 0)), (variant / 480) % 2 ? 0x20000U : 0, a, b};
+	}
+	void start_delay_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = delay_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, std::array<u16, 5>{0xf273, 0xfa45, 0xfa45, 0xf274, 0xfe00}[f.kind]);
+		if (f.kind != 4) program.write_word(f.base + 0x601, 0x700);
+		program.write_word(f.base + 0x600 + f.delay(), 0x8000 | (f.operation << 8) | f.mode);
+		program.write_word(f.base + 0x601 + f.delay(), f.literal);
+		program.write_word(f.base + 0x602 + f.delay(), 0xf4e1); program.write_word(f.base + 0x700, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5005); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		data.write_word(0x3000, 0x700); data.write_word(f.address, 0xdead);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_store_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.kind == 4 && at == 0x3000 && word == 0x700 && !m_pipeline_operand_reads++, "Only RETD reads one stack continuation; the delay store never reads its destination"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_store_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(f.kind == 3 && word == 0x604 && !m_pipeline_register_writes++, "CALLD owns one separate post-delay continuation frame"); return; } bool const valid = at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.write_clock(); if (!valid) osd_printf_info("delay_store_write: case=%u replay=%u address=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), f.address, word, f.value, (unsigned long long)m_cpu->pipeline_cycles(), f.write_clock()); expect(valid, "The complete two-word delay store writes its retained address exactly once"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x700, "delay_store_program", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == f.base + 0x601 + f.delay()) { bool const valid = word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.literal_clock(); if (!valid) osd_printf_info("delay_store_literal: case=%u replay=%u address=%06x word=%04x expected=%04x reads=%u cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, f.literal, m_pipeline_extensions_reads, (unsigned long long)m_cpu->pipeline_cycles(), f.literal_clock()); expect(valid, "Delay literal belongs to its store and is fetched once"); ++m_pipeline_extensions_reads; } if (at == f.base + 0x700) ++m_pipeline_drained_fetches; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254480;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_delay_store_edge(unsigned variant = 0)
+	{
+		unsigned const fixture = (variant % 4) * 20 + ((variant / 4) % 2) * 480;
+		start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, 0x8000 | f.mode); program.write_word(f.base + 0x604, f.literal);
+		m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_stlm_bk(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11265,6 +11323,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
+		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
 		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute")) { start_pipeline_absolute_add(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bk")) { start_stlm_bk(); return; }
 		if (!strcmp(machine().options().bios(), "store-bypass")) { start_store_bypass(); return; }
@@ -37860,6 +37920,41 @@ private:
 		}
 		if (m_phase == 254370) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 254371; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254500)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 8 ? 3 : 5;
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before a store straddles the control-delay boundary"); }
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes && !m_pipeline_register_writes, "A two-word store cannot start in the final one-word delay slot");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore the rejected delay without a memory write or atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254510; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 15) { start_delay_store_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254500; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254480)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_store_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "A complete long store fits the two-word control delay");
+			if (tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.delay(), 0x1234); }
+			if (tick == f.write_clock() - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.next_ar, "Delay-store address modification occurs once before publication"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000); }
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_pipeline_extensions_reads, m_pipeline_drained_fetches}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save control redirect and partially decoded or addressed delay store"); }
+			if (tick == 24)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.kind == 2 ? 0x605 : 0x701) && m_pipeline_operand_reads == unsigned(f.kind == 4) && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.kind == 3) && m_pipeline_extensions_reads == 1 && m_pipeline_drained_fetches == unsigned(f.kind != 2) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 3 ? 0x2fff : f.kind == 4 ? 0x3001 : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Delay store retires once before the correct control continuation without extra frames or status changes");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[4]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay delay store without repeated literals, writes or control transfers"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254490; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 2879) { start_delay_store(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged long delay store: PASS cases=2880 restore=2880 controls=BD,BCD_taken,BCD_untaken,CALLD,RETD stores=STL_A,STL_B,STH_A,STH_B forms=offset,preincrement,circular,absolute literals=6 pages=2 snapshots=3 literal_fetches=1 destination_reads=0 store_writes=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated long delay store complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254480; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254460)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 8) % 4;
@@ -39417,6 +39512,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(101, "add-bk", "Retained absolute ADD from BK")
 	ROM_SYSTEM_BIOS(102, "add-absolute", "Existing absolute ADD register and RAM controls")
 	ROM_SYSTEM_BIOS(103, "mvmd-bk", "Retained BK transfers and STLM producer composition")
+	ROM_SYSTEM_BIOS(104, "store-delay", "Complete two-word stores in control delays")
+	ROM_SYSTEM_BIOS(105, "st-delay-edge", "Rejected stores straddling a control delay")
 ROM_END
 
 ROM_START(tms54rom4)

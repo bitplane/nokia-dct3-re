@@ -13,9 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-long-offset STL (`80e2 0001`) at `02:e206`, inside the delayed branch
-`f273 e209` at `02:e204` (live PC `02:e208`). Absolute ADD from BK,
-STLM B,BK and MVMD BK,AR0 are now admitted. Ordinary
+MVMD AR6,T (`7316 000e`) at `02:e109` (live PC `02:e10c`).
+The two-word long-offset STL in the delayed branch at `02:e204`
+now executes with retained literal/address ownership. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1747,6 +1747,23 @@ publication clocks and preservation of other registers/status. The existing
 STLM/MVMD DAGEN-write conflicts and control-delay composition are not
 claimed by this acceptance surface.
 
+A two-word long-offset/absolute STL/STH may occupy the complete two-word
+control delay (SPRU172C B[D], BC[D], CALL[D], RET[D]). The decoder
+counts both words and retains the literal as data, including literals
+that resemble RC, INTR or BACC. It does not admit a store that starts in
+the final one-word slot. `store-delay` passes 2,880 cases/restores over
+BD, taken/untaken BCD, CALLD and RETD; both accumulators and low/high
+stores; offset/preincrement/circular/absolute forms; six literals, two
+pages and three snapshots. It checks exact word fetch/write counts,
+retained addresses after pointer mutation, stack ownership and the selected
+continuation. The sixteen `st-delay-edge` cases/restores reject partial
+instructions without a data access or atomic fallback. RETD retains its
+early-prefetched words until the stack Read completes (SPRU131G example
+7-8); BCD has its own extra cycle relative to BD/CALLD. These are retained
+frontend projections, not physical timing measurements. Interrupt arrival
+during a long delay store and far-control composition remain outside this
+new fixture's acceptance scope.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3415,9 +3432,9 @@ transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
 unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
-and STLM B,BK/MVMD BK,AR0 are admitted. The next rejecting stage is
-long-offset STL `80e2 0001` at `02:e206`, inside the delayed branch
-at `02:e204` (live PC `02:e208`). All
+and STLM B,BK/MVMD BK,AR0 are admitted, as is the two-word STL in
+the delayed branch at `02:e204`. The next rejecting stage is MVMD
+AR6,T (`7316 000e`) at `02:e109` (live PC `02:e10c`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3714,9 +3731,9 @@ decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
 inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
 `02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
-and MVMD BK,AR0 are admitted. The next stop is long-offset STL
-`80e2 0001` at `02:e206`, inside delayed branch `f273 e209` at
-`02:e204`, live PC `02:e208`.
+and MVMD BK,AR0 are admitted, as is long-offset STL `80e2 0001`
+at `02:e206` in delayed branch `f273 e209` at `02:e204`. The next
+stop is MVMD AR6,T (`7316 000e`) at `02:e109`, live PC `02:e10c`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,

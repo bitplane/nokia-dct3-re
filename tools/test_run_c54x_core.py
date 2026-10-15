@@ -12,6 +12,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_delay_store_boundary_scope(self):
+        marker, ending = EXTRA_PROFILES['st-delay-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='st-delay-edge')
+        for bad in (output.replace('restore=16', 'restore=0'),
+                    output.replace('memory_writes=0', 'memory_writes=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='st-delay-edge')
+
+    def test_long_store_delay_scope(self):
+        marker, ending = EXTRA_PROFILES['store-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='store-delay')
+        for bad in (output.replace('restore=2880', 'restore=0'),
+                    output.replace('literal_fetches=1', 'literal_fetches=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='store-delay')
+
     def test_mvmd_bk_scope(self):
         marker, ending = EXTRA_PROFILES['mvmd-bk']
         output = marker + '\n' + ending + '\n'
