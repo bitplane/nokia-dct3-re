@@ -12,6 +12,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_delayed_block_repeat_interrupt_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd-irq']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd-irq')
+        for bad in (output.replace('restore=768', 'restore=0'),
+                    output.replace('balanced_frames=1', 'balanced_frames=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptbd-irq')
+
     def test_delayed_block_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['rptbd']
         output = marker + '\n' + ending + '\n'

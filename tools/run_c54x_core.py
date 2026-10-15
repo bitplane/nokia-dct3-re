@@ -456,6 +456,10 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated delayed block repeat exclusions complete",
     ),
+    "rptbd-irq": (
+        "TMS320C54x delayed block repeat interrupts: PASS cases=768 restore=768 counts=0,1,2,7 delay_layouts=4 pages=2 sources=IRQ,NMI arrivals=delay,first_write snapshots=6 delay_effects=once ordered_copies=1 balanced_frames=1 retained_words=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed block repeat interrupts complete",
+    ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block far call exclusions complete",

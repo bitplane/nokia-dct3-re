@@ -26,8 +26,9 @@ The original recorder continues through repeated callbacks and emits its
 pin-decoded response words. Its `RPTBD` at `03:d9c4` now reaches Execute
 once, its two-word MAR delay reaches Execute once, and its first body
 instruction at `03:d9c8` reaches Execute 1,024 times. It subsequently stops
-on an unsupported staged MVDK register/peripheral source (live PC
-`03:db03`), with terminal `illegal=1`. These are passive Execute observations,
+on staged `MVDK *(0x0008),AR3` at `03:dafe` (`71f8 0008 0013`): its
+source is mapped AL, currently excluded (live PC `03:db03`, terminal
+`illegal=1`). These are passive Execute observations,
 not firmware writes or a claim of complete recording or validated audio.
 
 Passive Execute hooks record one delayed offset-load entry at `03:a5b4`
@@ -88,14 +89,25 @@ RPTB (6,168 cases/restores plus 16 edge cases), backward in-block branches,
 in-block far calls, delayed LD (147,456 cases/restores) and the native 5110
 save-state control pass on this implementation. This is not a renewed full
 default-suite checkpoint: the full checkpoint below remains tied to its
-documented source revision. RPTBD interrupt composition, instruction-produced
-BRC latency matrices and measured physical phase timing remain unvalidated.
+documented source revision.
+
+`rptbd-irq` passes 768 cases/restores across four counts, all four delay
+layouts, two pages, IRQ2/NMI, arrivals during the delay span or at the first
+body write, and six snapshots. Interrupt acknowledgement follows complete
+delay work; each case balances one retained continuation frame and returns
+to ordered copies without repeating delay side effects. The terminal IDLE
+is separated from the body by eight NOPs to distinguish loop continuation
+from the separately tested IDLE-wake path. Header literals, delay words,
+delay-load samples, CPU loop state and host observation counters survive
+replay. Other arrival clocks, nested interrupts, instruction-produced BRC
+latency matrices and measured physical timing remain unvalidated. No CPU
+behavior change was needed for this additional interrupt acceptance.
 
 The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,834 tests with one skip; the native 5110
+The tool suite passes 2,835 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

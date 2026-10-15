@@ -8650,10 +8650,13 @@ private:
 					(irq || m_cpu->pipeline_cycles() == 14 + index * 5), "RPTB writes each transformed word once through interrupt and restore"); ++m_pipeline_store_writes; });
 		m_phase = 253350; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	}
-	static unsigned rptbd_count(unsigned v) { return std::array<unsigned, 4>{0, 1, 2, 7}[v % 4]; }
-	static unsigned rptbd_layout(unsigned v) { return (v / 4) % 4; }
-	static u32 rptbd_base(unsigned v) { return (v / 64) % 2 ? 0x20000 : 0; }
-	static u16 rptbd_source(unsigned v, unsigned i) { return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 16) % 4] ^ u16(i * 0x1357); }
+	static unsigned rptbd_seed(unsigned v) { return v < 512 ? v : (v - 512) % 16 + (((v - 512) / 16) % 2) * 64; }
+	static unsigned rptbd_count(unsigned v) { return std::array<unsigned, 4>{0, 1, 2, 7}[rptbd_seed(v) % 4]; }
+	static unsigned rptbd_layout(unsigned v) { return (rptbd_seed(v) / 4) % 4; }
+	static u32 rptbd_base(unsigned v) { return (rptbd_seed(v) / 64) % 2 ? 0x20000 : 0; }
+	static u16 rptbd_source(unsigned v, unsigned i) { return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(rptbd_seed(v) / 16) % 4] ^ u16(i * 0x1357); }
+	static int rptbd_irq_line(unsigned v) { return ((v - 512) / 32) % 2 ? INPUT_LINE_NMI : 2; }
+	static bool rptbd_late_irq(unsigned v) { return ((v - 512) / 64) % 2; }
 	void start_rptbd(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -8664,13 +8667,22 @@ private:
 		program.write_word(base + 0x602, std::array<u16, 4>{0x6d95, 0x770e, 0x10e1, 0x6deb}[layout]);
 		program.write_word(base + 0x603, std::array<u16, 4>{0x6d96, 0x1234, 3, 0x0a40}[layout]);
 		program.write_word(base + 0x604, 0xe589); program.write_word(base + 0x605, 0x6d94);
-		program.write_word(base + 0x607, 0xf4e1);
+		// Keep the IRQ fixture's terminal IDLE beyond the interrupted body;
+		// this tests loop return, not the separately covered IDLE wake path.
+		program.write_word(base + (variant >= 512 ? 0x60f : 0x607), 0xf4e1);
+		if (variant >= 512)
+		{
+			u32 const vector = base + (rptbd_irq_line(variant) == INPUT_LINE_NMI ? 4 : 0x48);
+			program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
+		}
 		for (unsigned i = 0; i < 8; ++i) { data.write_word(0x5000 + i, rptbd_source(variant, i)); data.write_word(0x6000 + i, 0xdead); }
 		data.write_word(0x4003, rptbd_source(variant, 0));
 		m_cpu->set_pipeline_frontend(false);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		if (variant >= 512) { m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, rptbd_irq_line(variant) == 2 ? 4 : 0); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000);
@@ -8686,14 +8698,17 @@ private:
 				expect(i < 3 && at == base + 0x601 + i && word == expected, "RPTBD fetches endpoint and both delay words exactly once"); });
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "rptbd_ordered_reads",
 			[this, variant, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (at == 0x2fff && variant >= 512) { expect(!m_rptbd_counts.stack_reads && m_rptbd_counts.stack_writes == 1 && word == m_rptbd_return, "RPTBD ISR reads its original continuation frame once"); ++m_rptbd_counts.stack_reads; return; }
 				if (at == 0x4003) { expect(layout == 2 && !m_rptbd_counts.delay_reads && word == rptbd_source(variant, 0), "RPTBD delay load samples its operand once"); ++m_rptbd_counts.delay_reads; return; }
 				unsigned const i = m_rptbd_counts.reads++;
 				expect(i <= rptbd_count(variant) && at == 0x5000 + i && word == rptbd_source(variant, i), "RPTBD repeats ordered source reads, excluding delay work"); });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "rptbd_ordered_writes",
 			[this, variant, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (at == 0x2fff && variant >= 512) { expect(!m_rptbd_counts.stack_writes && word >= 0x604 && word <= 0x60f, "RPTBD interrupt stacks one continuation after the complete delay span"); ++m_rptbd_counts.stack_writes; m_rptbd_return = word; return; }
 				if (at == 0x0e) { expect(layout == 1 && !m_rptbd_counts.delay_writes && word == 0x1234, "RPTBD delay STM publishes T once"); ++m_rptbd_counts.delay_writes; return; }
 				unsigned const i = m_rptbd_counts.writes++;
-				expect(i <= rptbd_count(variant) && at == 0x6000 + i && word == rptbd_source(variant, i), "RPTBD repeats ordered destination writes without replay duplicates"); });
+				expect(i <= rptbd_count(variant) && at == 0x6000 + i && word == rptbd_source(variant, i), "RPTBD repeats ordered destination writes without replay duplicates");
+				if (!i && variant >= 512 && rptbd_late_irq(variant)) m_cpu->set_input_line(rptbd_irq_line(variant), ASSERT_LINE); });
 		m_phase = 255320; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_rptbd_edge(unsigned variant = 0)
@@ -12971,6 +12986,7 @@ private:
 		if (!strcmp(machine().options().bios(), "ld-delay-edge")) { start_delay_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "ld-ar0-index")) { start_indexed_load(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd")) { start_rptbd(); return; }
+		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-edge")) { start_rptbd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
@@ -38421,43 +38437,58 @@ private:
 		if (m_phase == 255320)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, layout = rptbd_layout(variant), iterations = rptbd_count(variant) + 1;
-			unsigned const checkpoint = std::array<unsigned, 4>{3, 6, 8, 13}[variant / 128];
+			bool const interrupt = variant >= 512;
+			unsigned const checkpoint = interrupt ? std::array<unsigned, 6>{3, 4, 6, 8, 11, 17}[(variant - 512) / 128] : std::array<unsigned, 4>{3, 6, 8, 13}[variant / 128];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RPTBD fixture remains in supported staged forms");
 			// Replace fetched words and sampled RAM, never firmware architectural state.
 			if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(rptbd_base(variant) + 0x601, 0xdead); }
 			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(rptbd_base(variant) + 0x603, 0xdead); }
 			if (tick == 8 && layout == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x4003, 0xdead); }
+			if (interrupt && tick == 5 && !rptbd_late_irq(variant)) m_cpu->set_input_line(rptbd_irq_line(variant), ASSERT_LINE);
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_rptbd_saved_counts = m_rptbd_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				m_rptbd_saved_return = m_rptbd_return;
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RPTBD header, delay span or active loop");
 			}
-			if (tick == 96)
+			if (tick == (interrupt ? 160 : 96))
 			{
 				u64 const a = layout == 2 ? u64(s64(s16(rptbd_source(variant, 0)))) & 0xffffffffffULL : 0x123456789aULL;
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == rptbd_base(variant) + 0x608 &&
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == rptbd_base(variant) + (interrupt ? 0x610 : 0x608) &&
 					!m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x604 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x606 &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (interrupt ? 0x100 : 0x900) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x4000 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + iterations &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7100 + unsigned(layout == 0) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x7200 + unsigned(layout == 0) &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (layout == 1 ? 0x1234 : 0x5aa5) &&
 					m_rptbd_counts.reads == iterations && m_rptbd_counts.writes == iterations && m_rptbd_counts.fetches == 3 && m_rptbd_counts.delay_reads == unsigned(layout == 2) && m_rptbd_counts.delay_writes == unsigned(layout == 1),
 					"RPTBD executes delay work once and body BRC+1 times, preserving unrelated state");
+				expect(m_rptbd_counts.acks == unsigned(interrupt) && m_rptbd_counts.stack_reads == unsigned(interrupt) && m_rptbd_counts.stack_writes == unsigned(interrupt), "RPTBD balances one optional interrupt frame and acknowledges its source once");
 				{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < iterations; ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == rptbd_source(variant, i), "RPTBD final copy matches independent source oracle"); }
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_rptbd_counts = m_rptbd_saved_counts;
+					m_rptbd_return = m_rptbd_saved_return;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore RPTBD without fetching retained words or duplicating delay effects");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255330; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 511) { start_rptbd(variant + 1); return; }
+				if (variant < (interrupt ? 1279U : 511U)) { start_rptbd(variant + 1); return; }
+				if (interrupt)
+				{
+					osd_printf_info("TMS320C54x delayed block repeat interrupts: PASS cases=768 restore=768 counts=0,1,2,7 delay_layouts=4 pages=2 sources=IRQ,NMI arrivals=delay,first_write snapshots=6 delay_effects=once ordered_copies=1 balanced_frames=1 retained_words=1 physical_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat interrupts complete");
+				}
 				osd_printf_info("TMS320C54x delayed block repeat: PASS cases=512 restore=512 counts=0,1,2,7 delay_layouts=4 patterns=4 pages=2 snapshots=4 delay_effects=once ordered_copies=1 retained_words=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
-		if (m_phase == 255330) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255330)
+		{
+			if (m_pipeline_peripheral_case >= 512) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 255331; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255331) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255340)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, kind = variant % 7, tick = ++m_idle_fixture_tick;
@@ -41504,8 +41535,9 @@ private:
 	unsigned m_pipeline_register_writes = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
-	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0; };
+	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0, acks = 0, stack_reads = 0, stack_writes = 0; };
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
+	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
@@ -41583,6 +41615,13 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 255320)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, layout = rptbd_layout(variant);
+			expect(variant >= 512 && line == rptbd_irq_line(variant) && !m_rptbd_counts.acks && m_cpu->pipeline_cycles() >= 9 &&
+				m_rptbd_counts.delay_reads == unsigned(layout == 2) && m_rptbd_counts.delay_writes == unsigned(layout == 1), "RPTBD acknowledges its pending source only after complete delay work");
+			++m_rptbd_counts.acks; m_cpu->set_input_line(line, CLEAR_LINE);
+		}
 		if (m_phase == 255240) { auto const f = block_back_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes, "Backward block acknowledges its pending source once after the first copy"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 255200) { auto const f = block_far_call_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_operand_reads, "In-block far call acknowledges the actual pending source once after callee entry"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
@@ -42319,6 +42358,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(163, "ld-ar0-index", "AR0 indexed plain LD address read and replay ownership")
 	ROM_SYSTEM_BIOS(164, "rptbd", "Delayed block repeat with retained delay words and replay")
 	ROM_SYSTEM_BIOS(165, "rptbd-edge", "Delayed block repeat count control and spill exclusions")
+	ROM_SYSTEM_BIOS(166, "rptbd-irq", "Delayed block repeat IRQ NMI and saved continuation")
 ROM_END
 
 ROM_START(tms54rom4)
