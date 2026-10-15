@@ -2977,14 +2977,19 @@ status. CCD, other condition groups, adjacent producer and IRQ/NMI
 composition remain unaccepted. The atomic core's broader CC/CCD family
 is unchanged.
 
-Conditional return `fc45` at `02:3f41` now executes. The
-`conditional-ret` gate passes 64 cases/restores for nondelayed AEQ/BEQ,
-four 40-bit patterns, two pages and four snapshots. Access samples the
+Conditional return `fc45` at `02:3f41` and signed `fc43` at `02:3e44`
+now execute. The `conditional-ret` gate passes 768 cases/restores for all
+twelve nondelayed signed A/B predicates (GEQ, LT, NEQ, EQ, GT, LEQ),
+eight 40-bit patterns, two pages and four snapshots. Sign is determined by
+bit 39, including positive values with bit 31 set and nonzero guard words.
+Access samples the
 predicate before a conditional SP increment. Only a taken return reads
 its captured stack address at clock 5; later stack-word changes cannot
 change the return target. Untaken returns preserve SP on every clock
 and never read or write data memory. Accumulators, non-INTM status and
-INTM are preserved. RCD, other condition groups, adjacent producers and
+INTM are preserved. Changing the selected accumulator after Access to an
+opposite-predicate value does not change the decision. RCD, other condition
+groups, adjacent producers and
 IRQ/NMI composition remain unaccepted.
 
 The isolated runner rejects MAME driver-validity `Errors:` output even
@@ -3285,7 +3290,8 @@ It checks one literal fetch, no destination reads, one write at clock 8,
 stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
-reaches conditional return `fc43` at `02:3e44` (live PC `02:3e46`); all
+passes conditional return `fc43` at `02:3e44` and stops at repeated PSHD
+`4b97` at `02:3f7e` (live PC `02:3f80`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The complete 44-profile isolated batch and the separate 36-case bus-STM
@@ -3293,6 +3299,16 @@ control pass on this tree, along with 62 verifier tests and native 5110
 save-state restoration. The full 288-marker
 CPU regression baseline remains the SP-ordering checkpoint above; it was
 not re-run for this opcode-admission change.
+The signed-return admission has its expanded 768-case return gate, the
+unchanged 64-case CC control and focused stack-IRQ, stack-IRQ-return,
+far-atomic and timer-STM controls; the broad isolated checkpoint remains
+the timer-write tree above.
+The new stop follows `STM #000b,AR7; RPT #000b; PSHD *AR7-`:
+twelve stack pushes read the mapped register window `000b..0000`, not
+ordinary source RAM. Its next acceptance contract must cover repeated
+source sampling, per-iteration stack allocation/write and AR7 modification,
+including saved partial progress; ordinary single-PSHD acceptance is not
+sufficient evidence for this sequence.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

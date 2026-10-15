@@ -353,7 +353,8 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['conditional-ret']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='conditional-ret')
-        for bad in (output.replace('restore=64', 'restore=0'),
+        for bad in (output.replace('restore=768', 'restore=0'),
+                    output.replace('patterns=8', 'patterns=4'),
                     output.replace('untaken_stack_accesses=0', 'untaken_stack_accesses=1'),
                     output.replace('stack_target_retained=1', 'stack_target_retained=0'),
                     output.replace('delayed_acceptance=0', 'delayed_acceptance=1'),

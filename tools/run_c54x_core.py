@@ -425,7 +425,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated staged SUBS complete",
     ),
     "conditional-ret": (
-        "TMS320C54x staged conditional return: PASS cases=64 restore=64 conditions=AEQ,BEQ patterns=4 pages=2 taken_reads=1 data_writes=0 untaken_stack_accesses=0 predicate_retained=1 stack_target_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x staged conditional return: PASS cases=768 restore=768 conditions=AGEQ,ALT,ANEQ,AEQ,AGT,ALEQ,BGEQ,BLT,BNEQ,BEQ,BGT,BLEQ patterns=8 pages=2 snapshots=4 taken_reads=1 data_writes=0 untaken_stack_accesses=0 predicate_retained=1 stack_target_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated conditional return complete",
     ),
     "conditional-call": (

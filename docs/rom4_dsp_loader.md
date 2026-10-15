@@ -57,7 +57,9 @@ Immediate TIM/PRD/TCR writes now use retained literals and one peripheral
 wait before Execute publication. The `timer-stm` profile passes 36 replay
 cases checking stopped-timer register effects, writable masks and TRB reload;
 it does not claim new running-timer timing validation. Original R060 now
-stops at conditional return `fc43` at `02:3e44`, not full boot.
+executes conditional return `fc43` at `02:3e44` after the full signed
+accumulator predicate family gained 768-case replay coverage. The next stop
+is repeated PSHD `4b97` at `02:3f7e`, not full boot.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. Verification baseline: the full 288-marker regression and all 41
@@ -3833,8 +3835,9 @@ Other producer families and the producer-plus-interrupt cross-product
 remain unvalidated. Nondelayed CC AEQ/BEQ now passes 64 replay cases
 with retained predicates/literals, conditional PC+2 frame publication
 and zero untaken stack accesses. Original `f945 3ff1` executes; the
-conditional return `fc45` also executes after a 64-case AEQ/BEQ
-predicate/pop/target replay gate. Untaken returns have zero stack
+conditional returns now cover all twelve signed A/B predicates in 768
+predicate/pop/target replay cases (eight 40-bit patterns, two pages and four
+snapshots). Untaken returns have zero stack
 accesses. SUBS now passes 55,296 unsigned-source/address/arithmetic
 replays across 18 forms, A/B and SXM/OVM states; mapped sources and C16
 remain excluded. The pre-status checkpoint stopped at MVMD AL `7308 0007` at

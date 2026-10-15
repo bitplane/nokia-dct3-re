@@ -34,7 +34,8 @@ constexpr bool staged_conditional_call(u16 word)
 
 constexpr bool staged_conditional_return(u16 word)
 {
-	return (word & 0xfff7) == 0xfc45; // Nondelayed RC AEQ/BEQ only.
+	u8 const condition = word;
+	return (word & 0xff00) == 0xfc00 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f));
 }
 
 constexpr bool staged_accumulator_branch(u16 word)
