@@ -404,6 +404,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "store-index": (
+        "TMS320C54x staged indexed STL STH: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 selectors=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read data=Execute destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated indexed STL STH complete",
+    ),
     "minmax": (
         "TMS320C54x staged MAX MIN: PASS cases=65536 restore=65536 selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MAX MIN complete",

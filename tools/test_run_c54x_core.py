@@ -861,6 +861,18 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_indexed_store_profile_scope(self):
+        marker, ending = EXTRA_PROFILES['store-index']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='store-index')
+        for old, new in (('restore=98304', 'restore=0'),
+                         ('address=Read', 'address=Access'),
+                         ('data=Execute', 'data=Read'),
+                         ('excluded_pointer_updates=0', 'excluded_pointer_updates=1'),
+                         ('producer_composition=unvalidated', 'producer_composition=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='store-index')
+
     def test_minmax_profile_scope(self):
         marker, ending = EXTRA_PROFILES['minmax']
         output = marker + '\n' + ending + '\n'

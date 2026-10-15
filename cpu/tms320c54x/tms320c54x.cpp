@@ -410,6 +410,7 @@ constexpr bool staged_extended_accumulator_store(u16 word)
 constexpr bool staged_store(u16 word)
 {
 	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xa0) ||
+		((word & 0xfc00) == 0x8000 && u8(word) >= 0xa8 && u8(word) < 0xb8) ||
 		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || staged_extended_accumulator_store(word);
 }
 
@@ -3134,6 +3135,10 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 		else m_pipeline_operand_address[4] = basic_address(4, mode);
+		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && mode >= 0xa8 && mode < 0xb8 && m_pipeline_operand_address[4] < 0x60)
+		{
+			logerror("%s: staged AR0-indexed accumulator store low-page destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if ((m_pipeline_word[4] & 0xfe00) == 0x8c00 && m_pipeline_operand_address[4] < 0x20)
 		{
 			logerror("%s: staged T/TRN store register/peripheral destination is unsupported\n", machine().describe_context());
