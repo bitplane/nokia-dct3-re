@@ -128,13 +128,13 @@ trace confirms CALA's `02:3e55 -> 02:40e2` return path; the later MVDD
 worker is entered by FCALL at `02:993d`, not directly by this near call.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
-question. The repeated-push broad baseline passes the full
-288-marker regression, all 46 isolated profiles, 64 verifier tests and
-native 5110 save-state restoration. These checks establish the declared
-execution models, not full MU4 boot, the physical DA150 map or native speech.
-The subsequent EXP/ADDS/Xmem-load/CALA admissions have their focused fixtures
-and LDU/push/return controls, 68 verifier tests and native 5110 restoration; no new
-full-core regression is claimed.
+question. The CPU at `1a790619` passes the full 288-marker regression,
+all 74 named isolated profiles, all seven legacy runner scopes and native
+5110 save-state restoration. The tool suite runs 2,788 tests with one skip,
+including 80 passing core-result verifier tests. See the authoritative
+[core regression checkpoint](5510_bringup.md#core-regression-checkpoint).
+These checks establish the declared execution models, not full MU4 boot,
+the physical DA150 map, in-block branch support or native speech.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses

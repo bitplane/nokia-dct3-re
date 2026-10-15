@@ -9,6 +9,15 @@ the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, regi
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
+The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
+profiles below. It loads all 48,261 resident program and 3,656 compared data
+words exactly, emits the original pin-decoded acknowledgement
+`007f,0001,0055`, and enters the recorder routine. Execution stops at
+conditional branch `f84b a0f4` at `02:a0ef` because control flow inside
+the active block `02:a0ea..02:a0fd` remains excluded. Output words
+`0580,0a09` are not decoded audio. No complete staged boot, service
+transaction or physical DA150 mapping is established.
+
 The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
@@ -87,7 +96,7 @@ programming through a clean 20-second execution window. The separate
 further control packet, but its previous-command filter rejects the repeated
 selector before parameter dispatch. `bootrecpoll` first issues the original
 read-only status query, then reaches the control handler and returns through
-the native loader to `MCUSI16`. The current recorder frontier is warm resident
+the native loader to `MCUSI16`. The atomic recorder frontier is warm resident
 timer/receive recovery before the save/name transaction, not initial serial
 receipt, control dispatch or an
 unsupported instruction. The poll sequence is a bench protocol test, not a
@@ -98,6 +107,22 @@ Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
 display, USB and music functions. These are product differences to recover,
 not permission to borrow another handset's keypad or UI completion events.
+
+## Core regression checkpoint
+
+The CPU at `1a790619` passes the full 288-marker native core regression,
+all 74 named isolated profiles in `tools/run_c54x_core.py`, and all seven
+additional runner scopes: `--bus-registers`, `--bus-io`, `--atomic-io`,
+`--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
+Native 5110 save-state restoration also passes. The complete tool suite
+runs 2,788 tests with one skip; its 80 core-result verifier tests pass.
+SIP lifecycle unit tests require local loopback socket permission.
+
+This is the shared regression checkpoint for the instruction contracts
+below, superseding their earlier focused-only acceptance notes. It does
+not expand any fixture's declared opcode, composition, physical timing,
+bus ownership or handset-feature scope. In particular, the staged
+in-block branch exclusion remains intact, and no native speech is claimed.
 
 ## Reproducible input normalization
 
@@ -3274,12 +3299,10 @@ replacement. Read is at 6, TC publication at 7 and the following branch's
 taken target Fetch at 10 (one intervening NOP). One source read, one literal
 fetch and zero writes are checked. The 96-case absolute-CMPM control passes.
 Indirect CMPM and all mapped/peripheral CMPM sources remain excluded.
-The original gets past `03:91eb`; the pre-admission stop had CPL set,
-SP=1246 and candidate direct source 125a. It now stops at `02:6d47`,
-`7725` (STM immediate to PRD), live PC `02:6d49`, was the next missing form.
-This addressing extension passes 61 verifier tests
-and native 5110 restoration; its verification scope is the focused fixtures,
-not a fresh broad-core run.
+The original CMPM at `03:91eb` executes with CPL set, SP=`1246` and
+direct source `125a`. The `7725` at `02:6d47` is STM immediate to PRD,
+covered by the timer-register contract below. These fixtures and native
+5110 restoration are covered by the shared regression checkpoint.
 
 Immediate TIM/PRD/TCR writes (`7724..7726`) now retain their literal and
 publish through the timer's existing register writer at Execute, after one
@@ -3352,9 +3375,8 @@ exponent. Mutating T after the consumer Read must not alter its result.
 The unsigned producer's RAM input is also changed after Read, checking
 that EXP sees its retained published value rather than stale accumulator
 state or a reread. NORM and interrupt composition are not admitted by this
-fixture. The addition passes its focused LDU, push and conditional-return
-controls and 65 verifier tests; the broad baseline remains the repeated-push
-checkpoint above. ADDS at `02:3fad` is a real one-word opcode, not
+fixture. Its focused LDU, push and conditional-return controls pass.
+ADDS at `02:3fad` is a real one-word opcode, not
 an unconsumed extension of the preceding SFTL.
 
 ADDS now shares the retained memory ADD/SUB pipeline and unsigned-source
@@ -3366,9 +3388,8 @@ SXM/OVM states, standard/compatibility addressing and three snapshots.
 Captured addresses/literals and Read operands survive later mutation;
 one source read and no data writes are observed. Mapped/peripheral sources
 remain excluded. The shared fixture's SUBS control still passes 55,296
-cases/restores; EXP, push and LDU controls, 66 verifier tests and native
-5110 restoration also pass. The broad baseline remains the repeated-push
-checkpoint, not a fresh full-core run. `9421` at the following load is
+cases/restores; EXP, push and LDU controls and native
+5110 restoration also pass. `9421` at the following load is
 `LD Xmem,SHFT,A` (syntax 5), not another unsigned ADD or a stray extension word.
 
 Syntax-5 LD now shares Xmem BIT's captured AR2..AR5 address and one-time
@@ -3451,10 +3472,7 @@ POPD *AR7-`. These restore PMST/REA/RSA/BRC/BK and AR6 through BL;
 the mapped/repeated contracts below cover these ranges. Resident-memory
 comparison remains exact; this is not complete initialization or native audio.
 
-Combined pipeline acceptance at the absolute-logic checkpoint passes the full
-288-marker core regression, all 54 isolated profiles, 70 verifier unit tests,
-evidence validation and native 5110 save-state restoration. The individual
-contracts above retain their stated exclusions; this does not validate
+The shared regression checkpoint covers these contracts without promoting
 uncovered instruction combinations, physical bus ownership or silicon phases.
 
 Mapped POPD retains its Smem destination at Access and consumes one RAM
@@ -3497,9 +3515,8 @@ original descriptor-copy ordering.
 The POPD checkpoint `862b0ce1` passed twelve isolated profiles: the four POPD
 profiles, POPM BRC/repeat controls, PMST pop/prefetch controls, both stack-IRQ
 controls and PSHD/MVDD repeats, plus native 5110 save-state restoration.
-The full 288-marker/all-54-
-profile baseline is the preceding absolute-logic checkpoint `690ace59`, not
-a fresh full-suite claim for this change.
+The shared broad acceptance is recorded in the
+[core regression checkpoint](#core-regression-checkpoint).
 
 Nondelayed BACC/FBACC A/B share the retained Class 30 transfer boundary
 with CALA/FCALA, but allocate no stack words and leave RTN unchanged.
@@ -3532,9 +3549,9 @@ are outside this acceptance.
 
 The branch checkpoint passes these four profiles plus CALA/FCALA and their
 producer profiles, conditional call/return, both stack-IRQ controls, PMST
-prefetch and repeated POPD (14 profiles total). The 73 verifier unit tests,
-evidence validation and native 5110 save-state restoration pass. The full
-suite baseline remains `690ace59`; this is focused acceptance.
+prefetch and repeated POPD (14 profiles total). Evidence validation and
+native 5110 save-state restoration pass. The shared broad acceptance is
+recorded in the core regression checkpoint.
 
 Long-offset AND/OR/XOR now use the same retained extended Smem address
 machinery as loads. TI SPRU172C's instruction descriptions specify an extra
@@ -3557,8 +3574,7 @@ pointer update. Interrupt composition and physical silicon phases are not
 claimed. Separate short/peripheral/absolute logic controls pass 576/864/
 1,536 cases, and the offset-load control passes 12,672. Both accumulator-
 branch producer controls and repeated POPD also pass (nine profiles total).
-The 76 verifier unit tests and native 5110 save-state restoration pass;
-the full-suite baseline remains `690ace59`.
+Native 5110 save-state restoration and the shared broad checkpoint pass.
 
 MVMD now admits T/TRN sources through its existing retained Class-19A
 move path (SPRU172C, MVMD instruction). The `mvmd-t` profile passes 432
@@ -3570,9 +3586,9 @@ after replay. Unselected registers, accumulators, stack and status are
 preserved. This is not a producer-latency, repeat, IRQ or physical-phase
 claim, nor new acceptance of other destination classes. Six neighboring
 controls (`mvmd-acc`, `mvmd-st1`, `mvmd-cmpt`, `mvmd-block`,
-`mvmd-status-irq`, `popd-repeat`), 77 verifier tests, evidence validation
+`mvmd-status-irq`, `popd-repeat`), evidence validation
 and native 5110 save-state restoration pass. No new CPU saved fields are
-needed; the broad baseline remains `690ace59`.
+needed; the shared broad checkpoint covers these profiles too.
 
 RAM-to-peripheral MVDD now shares the saved peripheral-wait mechanism.
 SPRU172C Class 14 specifies one extra peripheral-access cycle. The
@@ -3588,7 +3604,7 @@ CPU-register operands and repeated peripheral transfers remain excluded;
 IRQ composition and silicon phase placement are not claimed. Existing
 ordinary/repeated MVDD (49,152/221,184 replays), T/TRN moves, peripheral
 logic, long peripheral stores and actual McBSP control also pass (seven
-profiles total), along with 78 verifier tests, evidence validation and
+profiles total), along with evidence validation and
 native 5110 save-state restoration. No new CPU saved fields are required.
 
 The original run passes BACC A at `03:9de4`, long-offset
@@ -3618,9 +3634,9 @@ adjacent immediate-load producer cases. The source is live at Execute,
 not a newly invented Read-stage latch. There are no data-memory accesses
 or new CPU saved fields. IRQ and repeat composition are not claimed.
 The matching NEG control, conditional returns, T/TRN moves and peripheral
-MVDD also pass (five profiles total), along with 79 verifier tests,
-evidence validation and native 5110 restoration. The broad regression
-baseline remains `690ace59`, not a fresh full-suite claim.
+MVDD also pass (five profiles total), along with evidence validation and
+native 5110 restoration. The shared broad checkpoint
+also covers these profiles.
 
 Memory/immediate MPY uses Class 6A/6B (SPRU172C, MPY syntax 3): the
 memory word publishes to T in Read, while the retained memory word and
@@ -3641,10 +3657,10 @@ ownership through replay. Peripheral/control sources, repeats, IRQs and
 new producer/consumer-latency composition are outside acceptance.
 The shared existing T/immediate control passes 86,016 replay cases, and
 its mapped-consumer control passes 3,072. Offset loads, ABS and peripheral
-MVDD also pass (six profiles including the new fixture), along with 80
-verifier tests, evidence validation and native 5110 restoration. No new
-CPU saved fields are introduced. The full-suite baseline remains
-`690ace59`; this is focused acceptance, not a new broad checkpoint.
+MVDD also pass (six profiles including the new fixture), along with
+evidence validation and native 5110 restoration. No new
+CPU saved fields are introduced. The shared broad checkpoint also covers
+these profiles without promoting untested compositions.
 
 All 48,261 program and
 3,656 compared resident data words still match. This remains partial
