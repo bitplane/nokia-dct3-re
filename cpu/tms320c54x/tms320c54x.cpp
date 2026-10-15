@@ -376,7 +376,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x1a);
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a);
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -1132,6 +1132,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_intm_protected));
 	save_item(NAME(m_pipeline_direct_status));
 	save_item(NAME(m_pipeline_cmpt));
+	save_item(NAME(m_pipeline_bk));
 	save_item(NAME(m_pipeline_direct_sp));
 	save_item(NAME(m_pipeline_far_call_page));
 	save_item(NAME(m_pipeline_far_call_stack));
@@ -2008,10 +2009,10 @@ void tms320c54x_device::indirect_modify(u8 mode, bool long_operand, unsigned sta
 	case 0x28: m_ar[ar] -= m_ar[0]; break;
 	case 0x30: m_ar[ar] += m_ar[0]; break;
 	case 0x38: m_ar[ar] = reverse_carry_index(m_ar[ar], m_ar[0], false); break;
-	case 0x40: circular_modify(ar, -word_step); break;
-	case 0x48: circular_modify(ar, -s16(m_ar[0])); break;
-	case 0x50: circular_modify(ar, word_step); break;
-	case 0x58: circular_modify(ar, s16(m_ar[0])); break;
+	case 0x40: circular_modify(ar, -word_step, stage); break;
+	case 0x48: circular_modify(ar, -s16(m_ar[0]), stage); break;
+	case 0x50: circular_modify(ar, word_step, stage); break;
+	case 0x58: circular_modify(ar, s16(m_ar[0]), stage); break;
 	default: break;
 	}
 	// In compatibility mode, a nonzero ARF both selects the auxiliary register
@@ -2021,7 +2022,7 @@ void tms320c54x_device::indirect_modify(u8 mode, bool long_operand, unsigned sta
 		m_st0 = (m_st0 & ~u16(0xe000)) | u16((mode & 7) << 13);
 }
 
-void tms320c54x_device::dual_modify(u8 operand)
+void tms320c54x_device::dual_modify(u8 operand, unsigned stage)
 {
 	const unsigned ar = 2 + (operand & 3);
 	switch ((operand >> 2) & 3)
@@ -2029,28 +2030,29 @@ void tms320c54x_device::dual_modify(u8 operand)
 	case 0: break;
 	case 1: --m_ar[ar]; break;
 	case 2: ++m_ar[ar]; break;
-	case 3: circular_modify(ar, s16(m_ar[0])); break;
+	case 3: circular_modify(ar, s16(m_ar[0]), stage); break;
 	}
 }
 
-void tms320c54x_device::circular_modify(unsigned ar, s16 step)
+void tms320c54x_device::circular_modify(unsigned ar, s16 step, unsigned stage)
 {
-	if (!m_bk)
+	u16 const bk = stage < 6 ? m_pipeline_bk[stage] : m_bk;
+	if (!bk)
 	{
 		// BK=0 makes the % modifier linear (SPRU429A section 3.3.6).
 		m_ar[ar] += step;
 		return;
 	}
 	unsigned address_bits = 0;
-	while ((1U << address_bits) <= m_bk && address_bits != 16)
+	while ((1U << address_bits) <= bk && address_bits != 16)
 		++address_bits;
 	const u32 mask = address_bits == 16 ? 0xffff : (1U << address_bits) - 1;
 	const u16 base = m_ar[ar] & ~mask;
 	s32 index = (m_ar[ar] & mask) + step;
-	while (index >= m_bk)
-		index -= m_bk;
+	while (index >= bk)
+		index -= bk;
 	while (index < 0)
-		index += m_bk;
+		index += bk;
 	m_ar[ar] = base | u16(index);
 }
 
@@ -2149,7 +2151,7 @@ u16 tms320c54x_device::long_offset_address(u8 mode, unsigned ar, s16 offset, uns
 	u16 address;
 	if ((mode & 0x78) == 0x70)
 	{
-		circular_modify(ar, offset);
+		circular_modify(ar, offset, stage);
 		address = m_ar[ar];
 	}
 	else
@@ -2320,6 +2322,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_intm_protected.fill(false);
 	m_pipeline_direct_status.fill(0);
 	m_pipeline_cmpt.fill(false);
+	m_pipeline_bk.fill(0);
 	m_pipeline_direct_sp.fill(0);
 	m_pipeline_far_call_page.fill(0);
 	m_pipeline_far_call_stack.fill(0);
@@ -2567,6 +2570,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
 		m_pipeline_cmpt[stage] = m_pipeline_cmpt[stage - 1];
+		m_pipeline_bk[stage] = m_pipeline_bk[stage - 1];
 		m_pipeline_direct_sp[stage] = m_pipeline_direct_sp[stage - 1];
 		m_pipeline_far_call_page[stage] = m_pipeline_far_call_page[stage - 1];
 		m_pipeline_far_call_stack[stage] = m_pipeline_far_call_stack[stage - 1];
@@ -2949,6 +2953,8 @@ void tms320c54x_device::pipeline_step()
 			// SPRU131G table 7-16: retain CMPT before the older full-status
 			// move publishes. Address selection and AR updates share this sample.
 			m_pipeline_cmpt[2] = BIT(m_st1, 5);
+			// Table 7-3: STLM BK has a three-word circular-address latency.
+			m_pipeline_bk[2] = m_bk;
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
 			if (staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop)
@@ -3333,8 +3339,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged MVDD register/peripheral operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		dual_modify(x);
-		if (xar != yar) dual_modify(y);
+		dual_modify(x, 3);
+		if (xar != yar) dual_modify(y, 3);
 	}
 	if (m_pipeline_valid[4] && staged_mvdd(m_pipeline_word[4]))
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_immediate[4]);
@@ -3347,7 +3353,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged Xmem register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		dual_modify(xmem);
+		dual_modify(xmem, 4);
 	}
 	if (m_pipeline_valid[3] && staged_absolute_add(m_pipeline_word[3]))
 	{
@@ -3355,7 +3361,7 @@ void tms320c54x_device::pipeline_step()
 		u16 const source = m_pipeline_operand_address[3];
 		if (source < 0x60 && (source < 0x08 || source > 0x17))
 		{
-			logerror("%s: staged absolute ADD control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged absolute ADD control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source); m_illegal = true; return;
 		}
 	}
 	if (m_pipeline_valid[3] && staged_memory_immediate_multiply(m_pipeline_word[3]))

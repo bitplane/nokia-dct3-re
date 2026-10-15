@@ -13,7 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-STLM B,BK (`8919`) at `02:e1e7` (live PC `02:e1e9`). Ordinary
+absolute ADD (`01f8 0019`) at `02:e1e5`, reading BK
+(live PC `02:e1e9`). STLM B,BK decoding is accepted; the older ADD
+now reaches its source-ownership guard. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1708,6 +1710,21 @@ source 4 into the self-loop at vector `2050`. Repeated pushes eventually
 overwrote PMST and exposed zero program memory. This was not missing ADD
 support or an absent resident word; the ordinary-store bypass removes it.
 
+STLM A/B,BK publishes through the existing Execute-owned MMR path.
+Circular modifiers retain BK in the saved per-instruction Decode state,
+shared by short/long-offset and dual-operand addressing. Atomic execution
+continues to use live BK. SPRU131G table 7-3 forbids circular use in the
+next three words after STLM BK; Decode sampling gives the new value to
+the first legal short consumer. The `stlm-bk` fixture covers 192
+cases/restores: both accumulators, BK 0/3/4/13, four gaps, two pages and
+three snapshots. It changes live BK after consumer Decode and checks one
+Execute publication, one source read, exact circular wrap and preserved
+status. Results inside the three forbidden words are explicitly model
+projections, not guaranteed silicon behavior. The existing DAGEN-bank
+write-conflict path also recognizes BK as an older STLM destination
+(SPRU131G example 7-23); that composition needs dedicated BK acceptance
+beyond this single-consumer fixture.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3375,8 +3392,9 @@ transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 (`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
 inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
-unowned `002a` location. The next stop is STLM B,BK (`8919`) at
-`02:e1e7` (live PC `02:e1e9`). All
+unowned `002a` location. The next rejecting stage is absolute ADD
+`01f8 0019` at `02:e1e5`, source BK (live PC `02:e1e9`), after the
+younger STLM B,BK passes Decode. All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3672,8 +3690,9 @@ recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
 decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
 inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
-`02:9edc`. The next stop is STLM B,BK (`8919`) at `02:e1e7`,
-live PC `02:e1e9`.
+`02:9edc`. With STLM B,BK admitted in Decode, the older absolute ADD
+`01f8 0019` at `02:e1e5` now reaches its source guard for BK;
+live PC is `02:e1e9`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,

@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_stlm_bk_scope(self):
+        marker, ending = EXTRA_PROFILES['stlm-bk']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stlm-bk')
+        for bad in (output.replace('restore=192', 'restore=0'),
+                    output.replace('circular_bk=Decode', 'circular_bk=Access'),
+                    output.replace('forbidden_gaps_projection=1', 'forbidden_gaps_projection=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stlm-bk')
+
     def test_store_bypass_scope(self):
         marker, ending = EXTRA_PROFILES['store-bypass']
         output = marker + '\n' + ending + '\n'

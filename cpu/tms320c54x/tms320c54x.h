@@ -140,8 +140,8 @@ private:
 	bool indirect_compatibility(unsigned stage) const;
 	unsigned indirect_ar(u8 mode, unsigned stage = 6) const;
 	void indirect_modify(u8 mode, bool long_operand = false, unsigned stage = 6);
-	void dual_modify(u8 operand);
-	void circular_modify(unsigned ar, s16 step);
+	void dual_modify(u8 operand, unsigned stage = 6);
+	void circular_modify(unsigned ar, s16 step, unsigned stage = 6);
 	void execute_one(u16 op);
 	bool staged_bus_control(u16 op) const { return m_c5416_bus_profile && (op == 0x7728 || op == 0x7729 || op == 0x772b); }
 	bool staged_timer_control(u16 op) const { return op >= 0x7724 && op <= 0x7726; }
@@ -311,6 +311,7 @@ private:
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
 	std::array<bool, 6> m_pipeline_cmpt = {};
+	std::array<u16, 6> m_pipeline_bk = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};
 	std::array<u8, 6> m_pipeline_far_call_page = {};
 	std::array<u16, 6> m_pipeline_far_call_stack = {};
