@@ -3359,7 +3359,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_operand_address[3] = m_pipeline_immediate[3];
 		u16 const source = m_pipeline_operand_address[3];
-		if (source < 0x60 && (source < 0x08 || source > 0x17))
+		if (source < 0x60 && (source < 0x08 || source > 0x17) && source != 0x19)
 		{
 			logerror("%s: staged absolute ADD control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source); m_illegal = true; return;
 		}

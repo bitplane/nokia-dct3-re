@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "add-bk": (
+        "TMS320C54x staged absolute ADD BK: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=BK,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1 source_retained=1",
+        "Fatal error: TMS320C54x isolated absolute ADD BK complete",
+    ),
+    "add-absolute": (
+        "TMS320C54x staged absolute ADD: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=AR,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1",
+        "Fatal error: TMS320C54x isolated absolute ADD complete",
+    ),
     "stlm-bk": (
         "TMS320C54x staged STLM BK: PASS cases=384 restore=384 sources=2 values=0,3,4,13 consumers=LDU,Xmem gaps=0,1,2,3 pages=2 snapshots=3 bk_write=Execute circular_bk=Decode post_decode_change=1 forbidden_gaps_projection=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM BK complete",

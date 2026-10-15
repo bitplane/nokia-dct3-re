@@ -5868,11 +5868,12 @@ private:
 	void start_pipeline_absolute_add(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const bk = !strcmp(machine().options().bios(), "add-bk");
 		u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
 		u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
 		bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
 		u32 const base = BIT(variant, 8) ? 0x20000 : 0;
-		u16 const source = ram ? 0x500 : 0x11;
+		u16 const source = ram ? 0x500 : bk ? 0x19 : 0x11;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, b ? 0x01f8 : 0x00f8); program.write_word(base + 0x601, source);
@@ -5883,6 +5884,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, operand);
+		if (bk) m_cpu->set_state_int(tms320c54x_device::STATE_BK, operand);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : initial);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? initial : 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -5892,7 +5894,7 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "absolute_add_operand",
 			[this, operand](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6,
-				"Absolute accumulator ADD owns one retained AR/RAM operand read"); ++m_pipeline_operand_reads; });
+				"Absolute accumulator ADD owns one retained register/RAM operand read"); ++m_pipeline_operand_reads; });
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "absolute_add_address_literal",
 			[this, source](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == source && !m_pipeline_extensions_reads,
 				"Absolute accumulator ADD does not refetch its source-address literal"); ++m_pipeline_extensions_reads; });
@@ -11260,6 +11262,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute")) { start_pipeline_absolute_add(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bk")) { start_stlm_bk(); return; }
 		if (!strcmp(machine().options().bios(), "store-bypass")) { start_store_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "software-intr")) { start_software_intr(); return; }
@@ -34125,6 +34128,7 @@ private:
 		if (m_phase == 252430)
 		{
 			unsigned const variant = m_pipeline_peripheral_case;
+			bool const bk = !strcmp(machine().options().bios(), "add-bk");
 			u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
 			u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
 			bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
@@ -34135,7 +34139,7 @@ private:
 			if (tick == 6)
 			{
 				if (ram) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x500, 0x1234); }
-				else m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1234);
+				else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR1, 0x1234);
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
@@ -34166,7 +34170,13 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 2047) { start_pipeline_absolute_add(variant + 1); return; }
+				if (bk)
+				{
+					osd_printf_info("TMS320C54x staged absolute ADD BK: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=BK,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1 source_retained=1\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated absolute ADD BK complete");
+				}
 				osd_printf_info("TMS320C54x staged absolute ADD: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=AR,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1\n");
+				if (!strcmp(machine().options().bios(), "add-absolute")) throw emu_fatalerror(0, "TMS320C54x isolated absolute ADD complete");
 				start_pipeline_direct_rmw(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -39397,6 +39407,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(98, "ldu-periph", "Retained unsigned peripheral bus loads")
 	ROM_SYSTEM_BIOS(99, "store-bypass", "Same-location store and load bus bypass")
 	ROM_SYSTEM_BIOS(100, "stlm-bk", "STLM BK publication and circular-address visibility")
+	ROM_SYSTEM_BIOS(101, "add-bk", "Retained absolute ADD from BK")
+	ROM_SYSTEM_BIOS(102, "add-absolute", "Existing absolute ADD register and RAM controls")
 ROM_END
 
 ROM_START(tms54rom4)

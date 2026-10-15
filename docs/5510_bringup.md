@@ -13,9 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-absolute ADD (`01f8 0019`) at `02:e1e5`, reading BK
-(live PC `02:e1e9`). STLM B,BK decoding is accepted; the older ADD
-now reaches its source-ownership guard. Ordinary
+MVMD BK,AR0 (`7319 0010`) at `02:e1e9`
+(live PC `02:e1eb`). Absolute ADD from BK at `02:e1e5` and
+STLM B,BK are now admitted. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1726,6 +1726,16 @@ write-conflict path also recognizes BK as an older STLM destination
 (SPRU131G example 7-23); that composition needs dedicated BK acceptance
 beyond this single-consumer fixture.
 
+Absolute ADD may also read BK at `0019` through its retained data-Read
+path. The `add-bk` profile reuses the independent arithmetic matrix for
+2,048 cases/restores over BK/RAM sources, four words, four accumulator
+initial values, SXM/OVM, both accumulators, two pages and four snapshots.
+Changing BK and the address literal after their capture cannot change the
+result. One source read and literal fetch are preserved, with independent
+40-bit result/carry/overflow/saturation checks. The `add-absolute` control
+keeps the existing 2,048 AR/RAM cases unchanged. This does not admit SP,
+status/peripheral sources or short-form ADD from BK.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3393,9 +3403,9 @@ transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 (`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
 inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
-unowned `002a` location. The next rejecting stage is absolute ADD
-`01f8 0019` at `02:e1e5`, source BK (live PC `02:e1e9`), after the
-younger STLM B,BK passes Decode. All
+unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
+and STLM B,BK are admitted. The next rejecting stage is MVMD BK,AR0
+`7319 0010` at `02:e1e9` (live PC `02:e1eb`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3691,9 +3701,9 @@ recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
 decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
 inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
-`02:9edc`. With STLM B,BK admitted in Decode, the older absolute ADD
-`01f8 0019` at `02:e1e5` now reaches its source guard for BK;
-live PC is `02:e1e9`.
+`02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
+are admitted. The next stop is MVMD BK,AR0 (`7319 0010`) at
+`02:e1e9`, live PC `02:e1eb`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,
