@@ -691,6 +691,26 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=profile)
 
+    def test_shifted_delay_load_scope(self):
+        marker, ending = EXTRA_PROFILES['shift-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='shift-delay')
+        for bad in (output.replace('restore=110592', 'restore=0'),
+                    output.replace('extension_fetches=1', 'extension_fetches=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='shift-delay')
+
+    def test_shifted_delay_exclusions(self):
+        marker, ending = EXTRA_PROFILES['shift-delay-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='shift-delay-edge')
+        for bad in (output.replace('restore=16', 'restore=0'),
+                    output.replace('data_reads=0', 'data_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='shift-delay-edge')
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'

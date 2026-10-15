@@ -848,6 +848,14 @@ EXTRA_PROFILES = {
         "TMS320C54x short ASM stores: PASS cases=122880 restore=122880 selectors=4 shifts=32 patterns=8 sxm_sst=4 forms=DP,SP,postincrement,indexed_sub,indexed_add pages=2 snapshots=3 source=Execute address_and_shift=Read writes=1 data_reads=0 asm_load_prefix=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated short ASM stores complete",
     ),
+    "shift-delay": (
+        "TMS320C54x delayed shifted LD: PASS cases=110592 restore=110592 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postincrement destinations=2 shifts=32 memory_values=4 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed shifted LD complete",
+    ),
+    "shift-delay-edge": (
+        "TMS320C54x shifted-delay exclusions: PASS cases=16 restore=16 forms=spill,store_extension,arithmetic_extension,long_source pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 atomic_fallback=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated shifted-delay exclusions complete",
+    ),
     "pmst-map": (
         "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
         "Fatal error: TMS320C54x isolated PMST mapping complete",

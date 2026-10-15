@@ -2833,6 +2833,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_word[2] = 0xf495; // Rejected words are NOPs, not decoded operands.
 		--m_pipeline_xc_skip_words;
 	}
+	bool const completing_shift_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
+		m_pipeline_decode_remaining == 1 && staged_shifted_smem(m_pipeline_decode_word);
 	if (m_pipeline_valid[2])
 	{
 		if (m_pipeline_delay_decode_words)
@@ -2840,6 +2842,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			bool const delay_store = staged_extended_accumulator_store(word);
 			bool const delay_load = staged_offset_load(word) && (word & 0xfe00) == 0x1000;
+			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
 			bool const delay_multiply = (word & 0xfe00) == 0x2000 &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			bool delay_compare = false;
@@ -2865,7 +2868,7 @@ void tms320c54x_device::pipeline_step()
 			if (!m_pipeline_decode_remaining && staged_conditional_return(word)) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && !delay_store && !delay_load && !delay_multiply && !delay_compare && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && !delay_store && !delay_load && !delay_shift && !delay_multiply && !delay_compare && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
 					machine().describe_context(), word, m_pipeline_address[2], m_pipeline_delay_decode_words,
@@ -2874,7 +2877,7 @@ void tms320c54x_device::pipeline_step()
 					logerror("staged_control_delay_slot: stage=%u valid=%u address=%06x word=%04x\n", stage, unsigned(m_pipeline_valid[stage]), m_pipeline_address[stage], m_pipeline_word[stage]);
 				m_illegal = true; return;
 			}
-			unsigned const words = delay_store || delay_load || delay_compare || (delay_multiply && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
+			unsigned const words = delay_store || delay_load || delay_shift || delay_compare || (delay_multiply && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_block_repeat(word) || staged_port_read(word) || staged_port_write(word) || staged_absolute_add(word) || word == 0x47f8 || staged_banz(word) || staged_read_a(word) || word == 0xf070 || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
@@ -2926,6 +2929,10 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
+		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40)
+		{
+			logerror("%s: staged control-delay Smem extension is not an admitted shifted load\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const software_intr = staged_software_intr(word);
 		bool const short_repeat = staged_short_repeat(word);
 		if (m_pipeline_valid[2] && short_repeat)

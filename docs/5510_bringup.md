@@ -34,9 +34,11 @@ The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
 times in a five-second passive observation. Reverse-carry MAR `6dbb` at
 `03:c84a` reaches Execute once. The internal delayed branch `fa42` at
 `03:c852` and its join at `03:c85e` each reach Execute 510 times. The next
-stop is a control-delay exclusion for `6f00` at `03:d01d`, owned by control
-`03:d01b` with four control words (live/terminal PC `03:d01e`, `illegal=1`).
-Its extension and complete delay-word contract remain to be decoded.
+stop is the memory-move control-destination exclusion at `03:e195`:
+`7102` targets BRC (`001a`), with live/terminal PC `03:e198`, `illegal=1`.
+Its publication and repeat-count setup contract remain to be decoded.
+The shifted load at `03:d01d` and its branch at `03:d01b` each reach
+Execute once.
 ASM stores at `03:e0c9` and `03:e0e7` each reach Execute 128 times;
 immediate ASM load `ed1e` at `03:cfb7` reaches Execute once. The post-loop
 BRC reload has separate write-stage ownership, as described below.
@@ -61,6 +63,30 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Shifted memory loads in control delays
+
+The original `6f00 0c5f` at `03:d01d` is a two-word memory load with
+encoded shift -1 into A. It fills both delay words of `BCD d036,AEQ`
+at `03:d01b`. The retained Decode span now admits short shifted-load
+forms and validates the load extension before Access; a store/arithmetic
+extension does not inherit admission merely by sharing the first word.
+The existing source Read, encoded shift and Execute result are reused,
+without an atomic-interpreter fallback or additional CPU save fields.
+
+`shift-delay` passes 110,592 cases/restores for BD, taken/untaken BCD,
+CALLD, FCALLD and RETD; DP/plain-indirect/postincrement sources; A/B;
+all 32 shifts; four source words; four SXM/OVM states; two pages and three
+snapshots. Replacing the fetched extension, source memory and address
+registers after capture must not change the result or duplicate updates.
+The selected continuation observes the completed load and the original
+call/return frame, while a conditional owner retains its earlier decision.
+`shift-delay-edge` passes 16 cases/restores for spill into the final delay
+word, store/arithmetic extensions and a long-source form, with no data
+access or pointer/accumulator effect. These are bounded conformance
+exclusions, not silicon traps. Mapped sources, SP-specific call/return
+addressing, three-word forms, IRQ/NMI composition and physical phase
+timing are not established by these fixtures.
 
 ### ASM-controlled accumulator stores
 
@@ -381,7 +407,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,853 tests with one skip; the native 5110
+The tool suite passes 2,855 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
