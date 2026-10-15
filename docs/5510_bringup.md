@@ -1715,8 +1715,9 @@ Circular modifiers retain BK in the saved per-instruction Decode state,
 shared by short/long-offset and dual-operand addressing. Atomic execution
 continues to use live BK. SPRU131G table 7-3 forbids circular use in the
 next three words after STLM BK; Decode sampling gives the new value to
-the first legal short consumer. The `stlm-bk` fixture covers 192
-cases/restores: both accumulators, BK 0/3/4/13, four gaps, two pages and
+the first legal short consumer. The `stlm-bk` fixture covers 384
+cases/restores: both accumulators, ordinary and Xmem load consumers,
+BK 0/3/4/13, four gaps, two pages and
 three snapshots. It changes live BK after consumer Decode and checks one
 Execute publication, one source read, exact circular wrap and preserved
 status. Results inside the three forbidden words are explicitly model

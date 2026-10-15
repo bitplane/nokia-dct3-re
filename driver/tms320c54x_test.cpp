@@ -8553,12 +8553,12 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, 0x8819 | (source ? 0x100 : 0));
-		program.write_word(base + 0x601 + gap, 0x12d2 | (source ? 0 : 0x100));
+		program.write_word(base + 0x601 + gap, (variant >= 192 ? 0x94c0 : 0x12d2) | (source ? 0 : 0x100));
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, source ? 0x123456789aULL : value); m_cpu->set_state_int(tms320c54x_device::STATE_B, source ? value : 0xfedcba9876ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, pointer);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, pointer); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
 		data.write_word(pointer, 0xcafe); m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stlm_bk_read", [this, pointer, gap](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == pointer && word == 0xcafe && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == 6 + gap, "Circular consumer reads its retained address exactly once"); });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_bk_write", [this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x19 && word == value && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == 6, "STLM BK publishes one low accumulator word in Execute"); });
@@ -37846,7 +37846,7 @@ private:
 		if (m_phase == 254460)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 8) % 4;
-			unsigned const checkpoint = std::array<unsigned, 3>{3, 4 + gap, 5 + gap}[variant / 64];
+			unsigned const checkpoint = std::array<unsigned, 3>{3, 4 + gap, 5 + gap}[(variant % 192) / 64];
 			bool const source = variant % 2; u16 const value = std::array<u16, 4>{0, 3, 4, 13}[(variant / 2) % 4];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM BK and its circular consumer stay staged");
 			if (tick == 4 + gap) m_cpu->set_state_int(tms320c54x_device::STATE_BK, 5);
@@ -37854,11 +37854,11 @@ private:
 			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save STLM BK and retained circular-address state"); }
 			if (tick == 18)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(source ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0xcafe && m_cpu->state_int(source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value && m_cpu->state_int(tms320c54x_device::STATE_BK) == (gap < 2 ? value : 5) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "STLM BK retains one publication and circular update without changing arithmetic status");
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(source ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (variant >= 192 ? 0xffffffcafeULL : 0xcafe) && m_cpu->state_int(source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value && m_cpu->state_int(tms320c54x_device::STATE_BK) == (gap < 2 ? value : 5) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "STLM BK retains one publication and circular update without changing arithmetic status");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay BK visibility without duplicate register writes or memory reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254470; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 191) { start_stlm_bk(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged STLM BK: PASS cases=192 restore=192 sources=2 values=0,3,4,13 gaps=0,1,2,3 pages=2 snapshots=3 bk_write=Execute circular_bk=Decode post_decode_change=1 forbidden_gaps_projection=1 silicon_phase_claim=0\n");
+				if (variant < 383) { start_stlm_bk(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged STLM BK: PASS cases=384 restore=384 sources=2 values=0,3,4,13 consumers=LDU,Xmem gaps=0,1,2,3 pages=2 snapshots=3 bk_write=Execute circular_bk=Decode post_decode_change=1 forbidden_gaps_projection=1 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated STLM BK complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

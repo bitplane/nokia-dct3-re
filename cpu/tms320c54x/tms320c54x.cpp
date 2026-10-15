@@ -3353,7 +3353,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged Xmem register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		dual_modify(xmem, 4);
+		dual_modify(xmem, 3);
 	}
 	if (m_pipeline_valid[3] && staged_absolute_add(m_pipeline_word[3]))
 	{

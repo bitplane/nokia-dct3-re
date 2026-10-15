@@ -16,7 +16,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['stlm-bk']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='stlm-bk')
-        for bad in (output.replace('restore=192', 'restore=0'),
+        for bad in (output.replace('restore=384', 'restore=0'),
                     output.replace('circular_bk=Decode', 'circular_bk=Access'),
                     output.replace('forbidden_gaps_projection=1', 'forbidden_gaps_projection=0'),
                     marker + '\n' + output, output + 'late output\n'):
