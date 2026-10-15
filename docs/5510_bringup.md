@@ -24,13 +24,13 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at the active-block control/count
-exclusion for opcode `f983` at `02:a395` inside block `02:a384..02:a3a5`
-(live PC `02:a398`) within a five-second observation,
+exclusion for conditional branch `f84a` at `02:a39f` inside block
+`02:a384..02:a3a5` (live PC `02:a3a2`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record eight `MVDD` entries at `03:a583` and three
-`MACSU` entries at `03:dc95`, with no observer writes.
+Passive Execute hooks record three `MACSU` entries at `03:dc95` and one
+non-delayed far call (`f983`) at `02:a395`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +40,27 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,828 tests with one skip; the native 5110
+The tool suite passes 2,829 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Non-delayed FCALL is admitted from inside a block when the complete call
+precedes the endpoint and its target is outside that block. Existing retained
+frames and Access-time redirection preserve the caller's Decode-owned loop
+state and rebuild discarded endpoint predictions; no separate call/loop state
+or save fields are introduced. Callees do not acquire the caller's block tags.
+
+`rptb-fcall` passes 768 cases/restores across counts 0/1/2/7, early/near-end
+placement, two caller pages, same/cross-page callees, one/two nested far-call
+frames, none/IRQ/NMI and four snapshots. Interrupts arrive on the first callee
+RAM read, not at every possible clock. The test checks one ordered copy per
+outer iteration, balanced frame/interrupt transactions, caller-page return,
+prefix/suffix counts, BRC, RSA/REA and final BRAF. The original recorder reaches
+its `FCALL` Execute hook once before the next exclusion. `rptb-fcall-edge`
+adds 16 cases/restores retaining delayed, endpoint, internal-target and near-call
+exclusions before data work or frame allocation; these are prototype limits,
+not silicon traps. Callee loop-control writes, arbitrary control mixtures and
+physical phase timing remain unvalidated.
 
 MACSU Xmem,Ymem,A/B retains both RAM words in Read, treating X as unsigned
 and Y as signed independently of SXM. X is also published to T in Read, after
@@ -4345,7 +4363,7 @@ CPU resumption. These are declared model clocks, not measured silicon
 phases.
 
 The `rptb-br-edges` fixture passes 32 fail-closed replay cases for backward
-and out-of-block targets, delayed control, calls, nested blocks and far
+and out-of-block targets, delayed control, near calls, nested blocks and far
 branches, with no control frame or body write. Branches occupying the
 endpoint, XC/IDLE in the block and software loop-control modification
 remain excluded by the existing RPTB guards. Original RPTB/IRQ/NMI and
