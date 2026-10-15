@@ -2984,9 +2984,9 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const mode = m_pipeline_word[3];
 		m_pipeline_operand[3] = basic_address(3, mode);
-		if (m_pipeline_operand[3] < 0x60)
+		if (m_pipeline_operand[3] >= 0x10 && m_pipeline_operand[3] < 0x60)
 		{
-			logerror("%s: staged PSHD register/peripheral source is unsupported\n", machine().describe_context());
+			logerror("%s: staged PSHD DAGEN/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (BIT(mode, 7)) indirect_modify(mode, false, 3);

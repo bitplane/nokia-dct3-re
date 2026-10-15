@@ -60,6 +60,12 @@ it does not claim new running-timer timing validation. Original R060 now
 executes conditional return `fc43` at `02:3e44` after the full signed
 accumulator predicate family gained 768-case replay coverage. The next stop
 is repeated PSHD `4b97` at `02:3f7e`, not full boot.
+Single PSHD now reads CPU-register sources `0000..000f` through the
+existing mapped Read path. The `pshd-mapped` fixture covers the twelve
+owned registers with 288 Access/Read/Execute replays, retaining one source
+word despite later source/pointer mutation. DAGEN/peripheral sources and
+repeated pushes remain excluded; repeat scheduling is still required for
+the original register-save loop.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. Verification baseline: the full 288-marker regression and all 41

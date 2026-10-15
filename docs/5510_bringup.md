@@ -3309,6 +3309,15 @@ ordinary source RAM. Its next acceptance contract must cover repeated
 source sampling, per-iteration stack allocation/write and AR7 modification,
 including saved partial progress; ordinary single-PSHD acceptance is not
 sufficient evidence for this sequence.
+The single-push prerequisite is now covered by `pshd-mapped`: 288
+cases/restores over IMR, IFR, ST0, ST1, AL/AH/AG, BL/BH/BG, T and TRN,
+two pages and three snapshots (Access/Read/Execute). Accumulator/T/TRN
+sources use four data patterns; control sources use fixed safe state.
+The resolved source is sampled once at clock 5 and written once to the
+Access-allocated stack slot at clock 6, despite later source and AR mutation.
+Peripheral and DAGEN-register sources remain excluded: SP/self-AR alias
+ordering is not established by this fixture. Repeat remains fail-closed;
+this prerequisite does not advance the original stop by itself.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM
