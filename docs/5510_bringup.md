@@ -30,7 +30,9 @@ executes 2,048 times, and the callee entry at `03:dada` executes 1,601
 times. The call's delay span ends at the active block endpoint `03:db3a`;
 this is covered by the retained loop/call contract below. The next stop is
 the active repeat-control restoration exclusion at `03:9568`, `POPM REA`
-(`8a1c`; live PC `03:956a`, terminal `illegal=1`).
+(`8a1c`; live PC `03:956a`, terminal `illegal=1`). The open question is
+which loop context this pop restores and how BRC/RSA/REA/BRAF values
+replace the currently active pipeline state.
 These are passive observations, not firmware writes or a claim of complete
 recording or validated audio.
 
@@ -739,9 +741,11 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Versioned aggregate acceptance has two distinct scopes:
 
-- CPU source at `6e92f509`: renewed full default run, all 288 required markers
+- CPU source at `35cfaf07`: renewed full default run, all 288 required markers
   exactly once, expected completion exit and terminal completion check. This
-  includes the shared-path changes through AR0-indexed plain loads.
+  includes the shared-path changes through delayed conditional calls and
+  block-end near-return continuation. The new CCD and mapped-MVDK matrices
+  remain separately scoped isolated-profile acceptance above.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
@@ -3984,32 +3988,23 @@ alongside restoration. The ISR marker does not perform RETE; this fixture
 does not establish complete ISR return/context behavior or every SST source
 pattern, which require their separate existing/future contracts.
 
-The original now executes `8900` at `02:8b14` and begins McBSP0 stream
-output before stopping at `POPM PMST` (`8a1d`) at `02:8b3b`, live PC
-`02:8b3d`. Observed words before the stop are three zeros and `0480`;
-four `beef` words follow while peripherals continue after the core halt.
-Their source/content and audio meaning remain unvalidated: stream activity
-is not proof of decoded media, native speech or full board boot. Next
-establish PMST restoration, mapping/fetch ownership and interrupt vector
-selection rather than extending the generic pop range blindly. The resident
-memory audit remains exact and the six command serial TX words are unchanged.
+The original stream observation around `8900` at `02:8b14` contains three
+zeros and `0480`; four `beef` words continue after a core halt.
+Peripherals continuing after a CPU halt is distinct from validated stream
+content: these words do not establish decoded media or native speech.
+Current execution and resident-memory acceptance are indexed above.
 
-PMST restoration acceptance must cover more than the existing 64-case STM
-fixture. SPRU131G section 7.5.9 assigns OVLY/IPTR/MP/MC evaluation to
+SPRU131G section 7.5.9 assigns PMST OVLY/IPTR/MP/MC evaluation to
 Prefetch; table 7-26 gives POPM (the "all other instructions" row)
 consumer-category latencies of 0/1/2/3. DROM has a separate Access/Read
-contract in table 7-27. The frontend now saves the physical mapping alongside
-each logical Prefetch address and carries it into Fetch. The isolated
-`pmst-map` profile runs the existing STM mapping/replay cases; those
-later-branch cases alone do not establish ownership across a PMST publication
-between stages. Before banking full PMST acceptance, test distinct old/new page
-contents across that boundary, retain the stack source despite subsequent
-mutation, and replay around source capture and publication. Interrupt tests
-must distinguish the accepted interrupt number from IPTR evaluation at the
-later ISR Prefetch. MP/MC and DROM physical-memory decoding remain separate scope;
-passing an OVLY fixture must not certify them. The original restoration
-tail continues with POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`), which require their
-own block-repeat ownership contract rather than a blanket pop-range change.
+contract in table 7-27. The frontend saves the physical mapping alongside
+each logical Prefetch address and carries it into Fetch. The STM-based
+`pmst-map` later-branch cases do not alone establish intervening PMST
+publication ownership; the distinct Prefetch/IPTR checks below delimit that
+coverage. MP/MC and DROM physical decoding remain separate scope, not
+implied by an OVLY result. POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`) also
+require their own block-repeat ownership contract, not a blanket pop-range
+change; active-context restoration is the current open boundary.
 For POPM BRC followed by a new RPTB, SPRU131G table 7-24 and example
 7-54(d) require one intervening instruction; STM BRC has zero latency.
 This is distinct from the in-loop BRC-write latency in table 7-25. A
@@ -4025,8 +4020,7 @@ establish every adjacent-consumer latency or interrupt-vector composition.
 The current original-firmware stop and resident-memory comparison are maintained
 above; this PMST fixture does not establish interrupt composition.
 
-The shared-core 288-marker conformance run now passes with saved physical
-Prefetch addresses. The `pmst-map`, `pmst-pop` and `pmst-prefetch` isolated
+The `pmst-map`, `pmst-pop` and `pmst-prefetch` isolated
 profiles each pass 64 cases/restores. The last is explicitly a debugger-state
 conformance fixture: it changes PMST after the first Prefetch, with an illegal
 opcode in the newly selected bank, and saves at clocks 1/2/5/6. Fetch must use
