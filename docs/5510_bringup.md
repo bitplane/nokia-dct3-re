@@ -35,6 +35,39 @@ admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
 
+### Delayed block-repeat boundary
+
+A passive program-space read at the stopped original recorder supplies this
+instruction sequence; it is not an injected test program:
+
+```text
+03:d9c2  891a       STLM B,BRC
+03:d9c3  8812       STLM A,AR2
+03:d9c4  f272 d9c9  RPTBD 0xd9c9
+03:d9c6  6deb 0a40  MAR *+AR3(0x0a40)
+03:d9c8  e5b8       repeated body, first word
+03:d9c9  e5b9       repeated body, inclusive endpoint
+03:d9ca  f6e4       following delayed far return
+```
+
+SPRU131G section 6.8 specifies that RPTBD executes either one two-word
+instruction or two one-word instructions in its delay span. Thus this
+sequence requires RSA `0xd9c8`, REA `0xd9c9`, one MAR update before the
+loop, and `BRC+1` body iterations. Treating the delay span as two decoded
+instructions, repeating MAR with the body, or starting RSA immediately after
+the header would be incorrect. Section 7.5.8.1 separately prohibits BRC
+modification in RPTBD delay slots and describes producer latency before
+RPTB[D]; the preceding STLM-to-BRC sequence needs that ownership checked,
+not a blanket immediate forwarding rule.
+
+The staged implementation remains unsupported. Its acceptance must retain
+the endpoint literal and complete delay instruction across Fetch, execute
+delay work once, preserve loop state across interrupts and save/restore,
+and reject still-unimplemented nested/control-register modifications before
+side effects. An original-firmware Execute observation is required separately
+from synthetic conformance or a moved Decode stop. None of this static
+evidence proves RPTBD retirement or complete recording.
+
 The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
