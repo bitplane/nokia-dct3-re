@@ -10742,6 +10742,27 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253810;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_mvdd_peripheral(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const destination = std::array<u16, 3>{0x20, 0x33, 0x5f}[variant % 3], value = std::array<u16, 4>{0, 0x7f, 0x8000, 0xffff}[(variant / 3) % 4];
+		unsigned const x = ((variant / 12) % 4) << 2, y = (((variant / 48) % 4) << 2) | 1;
+		u32 const base = (variant / 192) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0xe500 | (x << 4) | y); program.write_word(base + 0x601, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x14b2); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, destination); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		data.write_word(0x14b2, value); data.write_word(destination, 0xaaaa);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdd_peripheral_read", [this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x14b2 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Peripheral MVDD retains one RAM source before its write wait"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdd_peripheral_write", [this, destination, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == destination && word == value && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == 7, "Peripheral MVDD publishes once after paying one extra cycle"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254320;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_mvmd_t_register(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11025,6 +11046,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t")) { start_mvmd_t_register(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
@@ -37497,6 +37519,27 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254310) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254300; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254320)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 384;
+			u16 const destination = std::array<u16, 3>{0x20, 0x33, 0x5f}[variant % 3], value = std::array<u16, 4>{0, 0x7f, 0x8000, 0xffff}[(variant / 3) % 4];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RAM-to-peripheral MVDD remains staged");
+			if (tick == 4) { unsigned const xm = (variant / 12) % 4, ym = (variant / 48) % 4; auto delta = [](unsigned mode) { return mode == 1 ? -1 : mode == 2 ? 1 : mode == 3 ? 3 : 0; }; expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == unsigned(0x14b2 + delta(xm)) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == unsigned(destination + delta(ym)), "MVDD applies each selected dual modifier once before waiting"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x3333); }
+			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x14b2, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVDD before, during or after its peripheral wait"); }
+			if (tick == 12)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(destination) == value && m_cpu->space(AS_DATA).read_word(0x14b2) == 0xdead, "MVDD uses its captured source and peripheral destination"); }
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2222 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x3333 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Peripheral MVDD preserves status, stack and retained pointers without duplicate accesses");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MVDD with its peripheral wait already paid when appropriate"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254330; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_mvdd_peripheral(variant + 1); return; }
+				osd_printf_info("TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated peripheral MVDD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254330) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254120)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 65536; auto const f = xmem_load_case(variant);
@@ -38955,6 +38998,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(84, "load-offset", "Existing offset and absolute memory load controls")
 	ROM_SYSTEM_BIOS(85, "logic-edges", "Long logical memory exclusion replay")
 	ROM_SYSTEM_BIOS(86, "mvmd-t", "Staged T and TRN mapped moves")
+	ROM_SYSTEM_BIOS(87, "mvdd-periph", "Retained RAM to peripheral dual transfers")
 ROM_END
 
 ROM_START(tms54rom4)

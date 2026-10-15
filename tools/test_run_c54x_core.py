@@ -463,6 +463,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='mvmd-cpl')
 
+    def test_mvdd_peripheral_scope(self):
+        marker, ending = EXTRA_PROFILES['mvdd-periph']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdd-periph')
+        for bad in (output.replace('restore=1536', 'restore=0'),
+                    output.replace('extra_cycles=1', 'extra_cycles=0'),
+                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdd-periph')
+
     def test_mvmd_t_scope(self):
         marker, ending = EXTRA_PROFILES['mvmd-t']
         output = marker + '\n' + ending + '\n'

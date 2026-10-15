@@ -3296,9 +3296,10 @@ passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
 POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
 Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
-T to AR1) at `03:9ba2` now execute; the next stop is MVDD (`e501`)
-at `03:9c70`, rejected for a register/peripheral operand
-(live PC `03:9c73`); all
+T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
+executes, sending the first acknowledgement word to the modeled serial
+transmitter. The next stop is ABS A,A (`f485`) at `02:e5e5`
+(live PC `02:e5e7`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3571,10 +3572,34 @@ controls (`mvmd-acc`, `mvmd-st1`, `mvmd-cmpt`, `mvmd-block`,
 and native 5110 save-state restoration pass. No new CPU saved fields are
 needed; the broad baseline remains `690ace59`.
 
+RAM-to-peripheral MVDD now shares the saved peripheral-wait mechanism.
+SPRU172C Class 14 specifies one extra peripheral-access cycle. The
+`mvdd-periph` profile passes 1,536 cases/restores across three peripheral-
+window destinations (`0020`, `0033`, `005f`), four values, sixteen dual
+modifier combinations on AR2/AR3, two pages and four snapshots. Address
+selection/modification occurs once at Access (4), RAM is sampled at Read
+(5), the extra wait is paid at 6, and the retained word publishes at 7.
+Pointer and source poisoning checks that the wait and replay cannot repeat
+address modification, reads or writes. These destinations are test sinks
+in the CPU fixture, not independent device validation. Peripheral sources,
+CPU-register operands and repeated peripheral transfers remain excluded;
+IRQ composition and silicon phase placement are not claimed. Existing
+ordinary/repeated MVDD (49,152/221,184 replays), T/TRN moves, peripheral
+logic, long peripheral stores and actual McBSP control also pass (seven
+profiles total), along with 78 verifier tests, evidence validation and
+native 5110 save-state restoration. No new CPU saved fields are required.
+
 The original run passes BACC A at `03:9de4`, long-offset
 AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
-T to AR1) at `03:9ba2`, then stops at MVDD (`e501`) at `03:9c70`
-on the register/peripheral-operand guard (live PC `03:9c73`). All 48,261 program and
+T to AR1) at `03:9ba2` and MVDD (`e501`) at `03:9c70`. A read-only
+observation at the former MVDD guard found AR2=`14b2`, AR3=`0033` and
+source word `007f`: ordinary RAM to the bench's McBSP2 transmit path,
+not a CPU-register transfer. Original firmware now emits the pin-decoded
+acknowledgement `007f,0001,0055`, then stops at ABS A,A (`f485`) at
+`02:e5e5` (live PC `02:e5e7`). The input cursor is 9/50 delivered words,
+not nine parsed commands. This acknowledgement is not a completed command
+transaction, and the physical DA150 register map remains unverified.
+All 48,261 program and
 3,656 compared resident data words still match. This remains partial
 initialization, not complete board boot, native speech or a completed
 service transaction.

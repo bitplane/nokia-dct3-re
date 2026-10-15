@@ -2516,7 +2516,7 @@ void tms320c54x_device::pipeline_step()
 		(staged_memory_load(m_pipeline_word[3]) || staged_bitfield(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_memory_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || (m_pipeline_word[3] & 0xfe80) == 0x4800 || staged_memory_dp(m_pipeline_word[3])) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
 	bool const write_peripheral = m_pipeline_valid[4] &&
-		(((staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
+		(((staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
 		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || staged_timer_control(m_pipeline_word[4]));
 	if (read_peripheral && write_peripheral)
 	{
@@ -3290,7 +3290,8 @@ void tms320c54x_device::pipeline_step()
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
 		m_pipeline_immediate[3] = m_ar[xar];
 		m_pipeline_operand_address[3] = m_ar[yar];
-		if (m_pipeline_immediate[3] < 0x60 || m_pipeline_operand_address[3] < 0x60)
+		bool const peripheral_destination = m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] < 0x60;
+		if (m_pipeline_immediate[3] < 0x60 || m_pipeline_operand_address[3] < 0x20 || (peripheral_destination && m_pipeline_repeat_active))
 		{
 			logerror("%s: staged MVDD register/peripheral operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

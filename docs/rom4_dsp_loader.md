@@ -74,9 +74,14 @@ Mapped/peripheral sources, repeats and control-delay composition remain
 fail-closed, with 24 exclusion cases. Mapped MVMD (`730e 0011`, T to AR1)
 at `03:9ba2` now executes too. T/TRN sources use the existing retained
 move path; 432 replay cases cover all eight AR destinations and BK.
-Producer/interrupt composition is outside that fixture. The next stop is
-MVDD (`e501`) at `03:9c70`, rejected for a register/peripheral operand
-(live PC `03:9c73`).
+Producer/interrupt composition is outside that fixture. MVDD (`e501`) at
+`03:9c70` now sends RAM `14b2=007f` to the bench's McBSP2 TX register
+`0033`. RAM-to-peripheral transfers retain their operands and pay the
+Class-14 extra cycle; 1,536 replay cases and ordinary/repeated RAM controls
+pass. The original firmware emits the pin-decoded acknowledgement
+`007f,0001,0055`, then stops at ABS A,A (`f485`) at `02:e5e5`
+(live PC `02:e5e7`). This is not a complete command transaction or native
+audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve

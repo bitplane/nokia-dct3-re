@@ -508,6 +508,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVMD ST1: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 status_writes=1 destination_reads=0 consumer_latency=unvalidated interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD ST1 complete",
     ),
+    "mvdd-periph": (
+        "TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated peripheral MVDD complete",
+    ),
     "mvmd-t": (
         "TMS320C54x staged MVMD T/TRN: PASS cases=432 restore=432 sources=2 destinations=AR0_to_AR7,BK values=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 producer_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD T/TRN complete",
