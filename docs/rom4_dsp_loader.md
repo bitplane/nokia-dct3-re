@@ -49,14 +49,17 @@ snapshots; `stack-irq-return` passes 80 replays, adding RETE, caller cleanup
 and snapshots of the retained return operand and returned caller. The
 original readiness gate reaches 1. The mapped-ST1 LDU at `03:8f13` now
 passes through the existing retained Read path, with 288 focused replay
-cases and the existing 384-case IMR control. The next boundary is short
-CMPM at `03:91eb`, not full boot. Resident loading remains exact;
+cases and the existing 384-case IMR control. Short CMPM at `03:91eb` is
+now admitted for direct RAM through the existing retained
+operand path. Its 384-case DP/SP branch/replay fixture and 96-case absolute
+control pass; mapped/peripheral and indirect comparisons remain excluded.
+The next stop is STM to timer PRD at `02:6d47` (`7725`), not full boot.
+Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
-question. The full 288-marker regression, all 41 isolated profiles, 59
-verifier tests and native 5110 save-state gate pass with the SP correction.
-The later operand-admission change adds the ST1 fixture and passes 60
-verifier tests and native restoration; no fresh broad-suite claim is made
-for that narrow addition.
+question. Verification baseline: the full 288-marker regression and all 41
+isolated profiles passed with the SP correction. The later ST1/direct-CMPM
+admissions have their focused controls, 61 verifier tests and native 5110
+restoration, without a fresh broad-suite claim.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses

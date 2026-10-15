@@ -196,9 +196,10 @@ constexpr bool staged_immediate_multiply(u16 word)
 
 constexpr bool staged_bitfield(u16 word)
 {
-	// CMPM shares BITF's retained address/literal path; only absolute CMPM
-	// is admitted until the other addressing forms have composition coverage.
-	return ((word & 0xff00) == 0x6100 && u8(word) <= 0xf8) || word == 0x60f8;
+	// CMPM shares BITF's retained address/literal path. Direct and absolute
+	// RAM forms have composition coverage; indirect forms remain excluded.
+	return ((word & 0xff00) == 0x6100 && u8(word) <= 0xf8) ||
+		((word & 0xff00) == 0x6000 && (u8(word) < 0x80 || u8(word) == 0xf8));
 }
 
 constexpr bool staged_extended_bitfield(u16 word)
@@ -3156,7 +3157,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged SUBS mapped-register source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (m_pipeline_word[3] == 0x60f8 && source < 0x60)
+		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60)
 		{
 			logerror("%s: staged CMPM mapped-register source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;

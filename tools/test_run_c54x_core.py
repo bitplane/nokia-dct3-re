@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_direct_cmpm_scope(self):
+        marker, ending = EXTRA_PROFILES['cmpm-direct']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='cmpm-direct')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('address_retained=1', 'address_retained=0'),
+                    output.replace('mapped_source_acceptance=0', 'mapped_source_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='cmpm-direct')
+
     def test_ldu_status_scope(self):
         marker, ending = EXTRA_PROFILES['ldu-st1']
         output = marker + '\n' + ending + '\n'

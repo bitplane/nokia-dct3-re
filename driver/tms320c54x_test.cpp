@@ -7427,6 +7427,31 @@ private:
 		m_phase = 253010; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_direct_cmpm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const value = std::array<u16, 4>{0, 1, 0x7f, 0x8000}[variant % 4], literal = (variant / 16) % 2 ? 0x7f : 1;
+		bool const tc = (variant / 4) % 2, initial_tc = (variant / 8) % 2, cpl = (variant / 32) % 2;
+		u16 const source = cpl ? 0x4014 : 0x1694;
+		u32 const base = (variant / 64) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		std::array<u16, 7> const code{0x6014, literal, 0xf495, u16(0xf820 | (tc << 4)), 0x700, 0xe811, 0xf4e1};
+		for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x600 + i, code[i]);
+		program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa62d | (initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cpl ? 0x4800 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x4000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678); data.write_word(source, value);
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "direct_cmpm_read", [this, source, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == source && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6, "Direct CMPM reads its retained DP/SP address once"); ++m_pipeline_operand_reads; });
+		m_operand_data_tap = program.install_read_tap(base + 0x601, base + 0x601, "direct_cmpm_literal", [this, literal](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == literal && !m_pipeline_drained_fetches, "Direct CMPM captures one comparison literal"); ++m_pipeline_drained_fetches; });
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "direct_cmpm_branch", [this, tc, value, literal](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return; expect((value == literal) == tc && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 10, "TC/NTC branch consumes the retained CMPM result"); ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "direct_cmpm_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "CMPM and its branch do not write data memory"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254030;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_bitfield_ar7(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -10360,6 +10385,7 @@ private:
 		if (!strcmp(machine().options().bios(), "t-peripheral")) { start_t_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
+		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
 		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
 		if (!strcmp(machine().options().bios(), "mac-smem")) { start_mac_smem(); return; }
@@ -35969,6 +35995,28 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253940) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253930; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254030)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{3, 6, 7}[variant / 128];
+			u16 const value = std::array<u16, 4>{0, 1, 0x7f, 0x8000}[variant % 4], literal = (variant / 16) % 2 ? 0x7f : 1;
+			bool const tc = (variant / 4) % 2, initial_tc = (variant / 8) % 2, cpl = (variant / 32) % 2, result = value == literal, taken = result == tc;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == (tick < 7 ? initial_tc : result), "Direct CMPM publishes only TC at Execute");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 64) % 2 ? 0x20000 : 0) + 0x601, 0xdead); }
+			if (tick == 5) { m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa633 | (initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x6000); }
+			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(cpl ? 0x4014 : 0x1694, 0x7777); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_drained_fetches}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save direct CMPM source/literal and TC ownership"); }
+			if (tick == 30)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_drained_fetches == 1 && m_pipeline_extensions_reads == unsigned(taken) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa633 | (result ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (cpl ? 0x4800 : 0x800), "Direct CMPM retains its original address/value/literal through branch and status mutations");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore direct CMPM without duplicate source or literal reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254040; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_direct_cmpm(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged direct CMPM: PASS cases=384 restore=384 layouts=DP,SP values=4 literals=2 initial_tc=2 conditions=TC,NTC pages=2 snapshots=3 source_read=6 tc_publish=7 target_fetch=10 reads=1 writes=0 literal_fetches=1 address_retained=1 mapped_source_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated direct CMPM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254040) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254030; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254010)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 8) % 3, read = form == 1 ? 6 : 5;
@@ -37768,6 +37816,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(58, "stack-irq", "Staged stack updates and interrupt entry ordering")
 	ROM_SYSTEM_BIOS(59, "stack-irq-return", "Staged stack interrupt return round trip")
 	ROM_SYSTEM_BIOS(60, "ldu-st1", "Staged unsigned mapped-status register read")
+	ROM_SYSTEM_BIOS(61, "cmpm-direct", "Staged direct DP/SP comparison and branch")
 ROM_END
 
 ROM_START(tms54rom4)

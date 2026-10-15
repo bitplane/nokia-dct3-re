@@ -3256,11 +3256,26 @@ source. The existing 384-case IMR unsigned-read control also passes.
 The resident audit still matches 48,261 program and 3,656 data words. The
 1,024-case IPTR fixture and 59 verifier tests pass. The full 288-marker CPU
 regression, all 41 additional isolated profiles and native 5110 save-state
-gate pass with the SP correction. The original now stops at short
-CMPM `03:91eb` (`6014`, live PC `03:91ed`); only absolute CMPM has staged
-composition coverage so far. This operand-admission addition has focused
+gate pass with the SP correction. The ST1 operand-admission addition has focused
 288/384-case controls, 60 verifier tests and native 5110 save-state coverage;
 the preceding broad CPU checkpoint remains the SP-ordering run above.
+
+Short direct CMPM now shares the retained BITF/absolute-CMPM path for RAM
+sources. The `cmpm-direct` fixture passes 384 cases/restores over DP/SP
+layouts, four source words, two comparison literals, both initial TC states,
+TC/NTC branch conditions, two pages and snapshots at clocks 3/6/7. Address
+capture survives later DP/SP mutation; source and literal survive later
+replacement. Read is at 6, TC publication at 7 and the following branch's
+taken target Fetch at 10 (one intervening NOP). One source read, one literal
+fetch and zero writes are checked. The 96-case absolute-CMPM control passes.
+Indirect CMPM and all mapped/peripheral CMPM sources remain excluded.
+The original gets past `03:91eb`; the pre-admission stop had CPL set,
+SP=1246 and candidate direct source 125a. It now stops at `02:6d47`,
+`7725` (STM immediate to PRD), live PC `02:6d49`. Timer-register write
+ownership is the next contract, not an invitation to use DAGEN's early-write
+path for a peripheral. This addressing extension passes 61 verifier tests
+and native 5110 restoration; its verification scope is the focused fixtures,
+not a fresh broad-core run.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

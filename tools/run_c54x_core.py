@@ -312,6 +312,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "cmpm-direct": (
+        "TMS320C54x staged direct CMPM: PASS cases=384 restore=384 layouts=DP,SP values=4 literals=2 initial_tc=2 conditions=TC,NTC pages=2 snapshots=3 source_read=6 tc_publish=7 target_fetch=10 reads=1 writes=0 literal_fetches=1 address_retained=1 mapped_source_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated direct CMPM complete",
+    ),
     "ldu-st1": (
         "TMS320C54x staged LDU ST1: PASS cases=288 restore=288 forms=direct,absolute,indirect values=8 accumulators=2 pages=2 snapshots=3 register_reads=1 writes=0 source_retained=1 unsigned_full_word=1 producer_latency_claim=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated LDU ST1 complete",
