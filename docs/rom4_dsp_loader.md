@@ -61,8 +61,10 @@ executes conditional return `fc43` at `02:3e44` after the full signed
 accumulator predicate family gained 768-case replay coverage. Repeated PSHD
 at `02:3f7e`, EXP B (`f58e`) at `02:3fa8` and ADDS at `02:3fad` also
 execute. Syntax-5 LD Xmem at `02:3fbc` and CALA B at `02:40e1` also
-execute; the next stop is repeated MVDD (`e598`)
-at `02:a169`, not full boot.
+execute. Repeated MVDD (`e598`) at `02:a169` and absolute OR
+(`1af8 b582`) at `03:abca` now execute too; the next stop is repeated
+POPD (`8b8f`) at `02:4062`, restoring mapped registers through AR7.
+The exact resident program/data comparison still passes; this is not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve
 owned registers with 288 Access/Read/Execute replays, retaining one source

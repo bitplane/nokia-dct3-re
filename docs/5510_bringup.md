@@ -3293,8 +3293,8 @@ checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
 `02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
-at `02:a169`, reaching unsupported `1af8` at `03:abca`
-(live PC `03:abcc`); all
+at `02:a169` and absolute OR (`1af8 b582`) at `03:abca`, reaching
+unsupported repeated POPD (`8b8f`) at `02:4062` (live PC `02:4064`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3328,12 +3328,11 @@ modifying self-AR aliases and peripheral sources remain fail-closed, as
 do memory-sourced repeat counts. This establishes the declared stage model,
 not measured silicon bus-phase timing. `4b97` increments AR7 (`MOD=2`);
 the former decrement interpretation was incorrect.
-The repeated-push CPU checkpoint passes the full 288-marker regression, all 46
-isolated profiles, 64 verifier tests and native 5110 save-state restoration.
+The combined acceptance below also covers this repeated-push contract.
 The original resident load still matches all 48,261 program and 3,656 data
 words. These are execution/model checks, not a full-board boot, physical
 DA150 bus-map validation or native speech claim.
-The next original sequence is `LDU ...,B; EXP B; LD #1e,A; LDM T,B`.
+EXP appears in the original sequence `LDU ...,B; EXP B; LD #1e,A; LDM T,B`.
 SPRU172C 4-52 defines EXP's signed exponent in T without accumulator or
 status changes, including zero's special result of zero. SPRU131G table
 7-13 requires one instruction of T-consumer latency; the original has that
@@ -3388,10 +3387,9 @@ word. The held clock remains even without FCALA's second bus write.
 three conflicting upper-target fields, four snapshots and no interrupt/
 IRQ/NMI, including RET and exact caller-page restoration. `cala-producer`
 passes another 216 cases with DLD producers and gaps 0/1/2; RAM and
-accumulator mutation after capture cannot change the target. Existing
-FCALA, FCALA-producer and stack-IRQ controls, 68 verifier tests and native
-5110 restoration pass. No new saved CPU field was needed. CALAD, repeated
-calls, other producer families and producer-plus-interrupt composition
+accumulator mutation after capture cannot change the target. Coverage includes
+FCALA, FCALA-producer and stack-IRQ controls. No new saved CPU field was
+needed. CALAD, repeated calls, other producer families and producer-plus-interrupt composition
 are outside this acceptance; stage placement remains a declared model.
 
 A read-only executed-address trace starts after CALA at `02:40e1` in
@@ -3425,12 +3423,34 @@ PSHD and MVDD share the retained repeat issuer and its saved remaining-issue
 count. Mapped/peripheral MVDD operands and memory-count repeats remain
 fail-closed; external-bank contention and silicon phase accuracy are not
 established by these DARAM fixtures. The original run passes this worker
-and still compares all 48,261 program and 3,656 data words successfully;
-its next unsupported form is `1af8` at `03:abca`. This is not complete
-resident initialization, board boot or decoded audio.
-Focused PSHD-repeat, near/far accumulator-call and stack-IRQ controls,
-69 verifier unit tests, evidence validation and native 5110 save-state
-restoration pass. This is not a fresh full-core acceptance run.
+and still compares all 48,261 program and 3,656 data words successfully.
+These focused fixtures do not establish complete resident initialization,
+board boot or decoded audio.
+
+Absolute AND/OR/XOR now retain the address extension through Decode,
+capture the resolved address at Access, sample one zero-extended word at
+Read and update only the selected accumulator at Execute. SPRU172C
+4-11/4-123/4-201 specifies one additional word/cycle for absolute Smem and
+no status changes. `logic-absolute` passes 1,536 cases/restores over all
+three operations, both accumulators, four RAM addresses (including the
+original `b582`), four value pairs, SXM=0/1, two pages and four snapshots.
+Literal mutation after Fetch and RAM mutation after Read cannot change
+the result; the next instruction is reached without executing the literal.
+Mapped/peripheral operands, interrupt composition and control-delay
+composition are not established by this fixture. No new saved CPU field
+is required. The original run stops at `RPT #4; POPD *AR7-` at
+`02:4061..4062`. The preceding ROM words are `STM #001d,AR7`, so the
+sequence restores PMST/REA/RSA/BRC/BK; that restoration has not executed
+in the staged run. It requires both repeated stack reads and mapped-register
+destination semantics, not repeat admission alone. Resident-memory
+comparison remains exact. This does not establish
+complete initialization or native audio.
+
+Combined pipeline acceptance at the absolute-logic checkpoint passes the full
+288-marker core regression, all 54 isolated profiles, 70 verifier unit tests,
+evidence validation and native 5110 save-state restoration. The individual
+contracts above retain their stated exclusions; this does not validate
+uncovered instruction combinations, physical bus ownership or silicon phases.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

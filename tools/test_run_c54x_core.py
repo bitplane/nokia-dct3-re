@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_absolute_logic_scope(self):
+        marker, ending = EXTRA_PROFILES['logic-absolute']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='logic-absolute')
+        for bad in (output.replace('restore=1536', 'restore=0'),
+                    output.replace('retained_address=1', 'retained_address=0'),
+                    output.replace('retained_source=1', 'retained_source=0'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='logic-absolute')
+
     def test_mvdd_scope(self):
         for name, cases in (('mvdd', 49152), ('mvdd-repeat', 221184)):
             marker, ending = EXTRA_PROFILES[name]
