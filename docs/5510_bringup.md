@@ -24,24 +24,35 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`MAX A` (`f486`) at `03:dced` (live PC `03:dcef`) within a five-second observation,
+`STL B,*AR4+0` (`81b4`) at Decode instruction address `03:dd9a`
+(live PC `03:dcc6`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-The original dual-memory MPY now reaches Execute: a passive hook records one
-entry at `03:dda3`, with one positive-control entry at `03:dda1`. Before
-dual-memory ADD admission the younger unsupported ADD stopped Decode before
-that multiply could execute. A moved unsupported-opcode frontier alone therefore
-does not prove retirement of its prefix.
+Passive Execute hooks record 114 dual-memory MPY entries at `03:dda3` and
+38 MAX entries at `03:dced` in that observation, with no observer writes.
+This establishes execution, not just Decode admission; a younger unsupported
+instruction can otherwise stop the pipeline before an admitted prefix executes.
 
 ## Retained recorder execution contracts
 
-At the indexed-MAR checkpoint, the full default CPU run passes all 288
-required markers and its terminal completion check. This renews the earlier
-`20286907` checkpoint, not every additional isolated profile or native audio
-acceptance. The tool suite passes 2,819 tests with one skip; the native 5110
+At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
+required markers and its terminal completion check. The subsequent MAX/MIN
+change has focused acceptance, not a renewed full default run. Neither covers
+every additional isolated profile or native audio acceptance.
+The tool suite passes 2,820 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+MAX/MIN (`f486/f586/f487/f587`, SPRU172C 4-99/100) compares signed 40-bit
+accumulators in Execute and replaces only the selected destination and carry.
+Equality selects B and sets carry; SXM and OVM do not change comparison or
+saturate the selected value. `minmax` passes 65,536 cases/restores: all four
+selectors, 256 value pairs, eight status combinations, two pages and four
+snapshots. Guard-bit patterns distinguish signed 40-bit from signed 32-bit or
+unsigned comparison. Replacing both accumulators after Read proves Execute
+ownership; no data access occurs. This is not an instruction-driven adjacent
+producer or interrupt-composition proof. Signed-XC and EXP/NORM controls pass.
 
 Indexed MAR now admits the AR0 subtraction/addition forms (`6da8..6db7`).
 SPRU131G table 5-4 defines ordinary 16-bit auxiliary arithmetic, not reverse

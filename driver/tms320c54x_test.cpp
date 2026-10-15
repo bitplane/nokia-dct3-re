@@ -10759,6 +10759,46 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct minmax_fixture
+	{
+		unsigned selector, snapshot;
+		u32 base;
+		u64 a, b, result;
+		u16 st0, st1, result_st0;
+	};
+	static minmax_fixture minmax_case(unsigned v)
+	{
+		static constexpr std::array<u64, 16> values{0, 1, 0xffffffffffULL, 0x7fffffff, 0x80000000, 0xff80000000ULL, 0xff7fffffffULL, 0x7fffffffffULL, 0x8000000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL, 0xedcba98765ULL, 0x7fffff, 0xffffff, 0xffff000000ULL};
+		minmax_fixture f{};
+		f.a = values[v % 16]; f.b = values[(v / 16) % 16]; f.selector = (v / 256) % 4;
+		unsigned const flags = (v / 1024) % 8;
+		f.st0 = 0xa002 | (flags & 1 ? 0x800 : 0) | (v & 1 ? 0x600 : 0);
+		f.st1 = 0x800 | (flags & 2 ? 0x200 : 0) | (flags & 4 ? 0x100 : 0);
+		s64 const a = BIT(f.a, 39) ? s64(f.a) - (s64(1) << 40) : s64(f.a);
+		s64 const b = BIT(f.b, 39) ? s64(f.b) - (s64(1) << 40) : s64(f.b);
+		bool const choose_a = f.selector & 2 ? a < b : a > b;
+		f.result = choose_a ? f.a : f.b; f.result_st0 = (f.st0 & ~0x800) | (choose_a ? 0 : 0x800);
+		f.base = (v / 8192) % 2 ? 0x20000 : 0; f.snapshot = v / 16384;
+		return f;
+	}
+	void start_minmax(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = minmax_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xf486 | ((f.selector & 1) << 8) | (f.selector >> 1)); program.write_word(f.base + 0x601, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "minmax_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "MAX MIN never reads data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "minmax_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "MAX MIN never writes data memory"); });
+		m_pipeline_extensions_reads = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "minmax_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "MAX MIN opcode is fetched once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254940;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct indexed_mar_fixture
 	{
 		unsigned ar, selected, snapshot;
@@ -12194,6 +12234,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
+		if (!strcmp(machine().options().bios(), "minmax")) { start_minmax(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -39344,6 +39385,27 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254940)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = minmax_case(variant);
+			u64 const a = tick < 6 ? f.a ^ 0xffffffffffULL : !(f.selector & 1) ? f.result : f.a;
+			u64 const b = tick < 6 ? f.b ^ 0xffffffffffULL : f.selector & 1 ? f.result : f.b;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? f.result_st0 : f.st0), "MAX MIN compares signed 40-bit Execute operands and changes only destination and carry");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "MAX MIN ignores SXM OVM and preserves T and status");
+			if (tick == 5) { m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); }
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 6, 8}[f.snapshot];
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MAX MIN before or after Execute operand publication"); }
+			if (tick == 12)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1, "MAX MIN completes with one opcode fetch");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MAX MIN without resampling or duplicate execution"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254950; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 65535) { start_minmax(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MAX MIN: PASS cases=65536 restore=65536 selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MAX MIN complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254920)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_mar_case(variant);
@@ -41053,6 +41115,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(136, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
 	ROM_SYSTEM_BIOS(137, "mac-t-imm", "Immediate MAC retained T literal and accumulator selection")
 	ROM_SYSTEM_BIOS(138, "mar-index", "Indexed MAR AR0 arithmetic and restoration")
+	ROM_SYSTEM_BIOS(139, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
 ROM_END
 
 ROM_START(tms54rom4)

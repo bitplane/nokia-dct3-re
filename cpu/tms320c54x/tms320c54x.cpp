@@ -36,6 +36,11 @@ constexpr bool staged_norm(u16 word)
 	return (word & 0xfcff) == 0xf48f;
 }
 
+constexpr bool staged_minmax(u16 word)
+{
+	return (word & 0xfefe) == 0xf486;
+}
+
 constexpr bool staged_dual_multiply(u16 word)
 {
 	return (word & 0xfe00) == 0xa400;
@@ -2886,7 +2891,7 @@ void tms320c54x_device::pipeline_step()
 		bool const long_arithmetic = staged_long_arithmetic(word);
 		// These one-word forms use only live accumulators in Execute; their
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || (word & 0xfeff) == 0xf48e;
+		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48e;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);
@@ -3865,6 +3870,13 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
 			if (m_op == 0x46f8) ++m_pc;
+		}
+		else if (staged_minmax(m_op))
+		{
+			s64 const a = s64(m_a << 24) >> 24, b = s64(m_b << 24) >> 24;
+			bool const choose_a = BIT(m_op, 0) ? a < b : a > b;
+			accumulator(BIT(m_op, 8)) = choose_a ? m_a : m_b;
+			m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
 		}
 		else if (staged_norm(m_op))
 		{

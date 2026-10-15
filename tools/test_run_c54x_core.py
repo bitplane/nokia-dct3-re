@@ -861,6 +861,18 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_minmax_profile_scope(self):
+        marker, ending = EXTRA_PROFILES['minmax']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='minmax')
+        for old, new in (('restore=65536', 'restore=0'),
+                         ('operands=Execute', 'operands=Read'),
+                         ('signed_bits=40', 'signed_bits=32'),
+                         ('equality=B', 'equality=A'),
+                         ('producer_composition=unvalidated', 'producer_composition=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='minmax')
+
     def test_indexed_mar_profile_scope(self):
         marker, ending = EXTRA_PROFILES['mar-index']
         output = marker + '\n' + ending + '\n'
