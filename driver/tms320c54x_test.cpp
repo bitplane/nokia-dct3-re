@@ -10759,6 +10759,46 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct indexed_mar_fixture
+	{
+		unsigned ar, selected, snapshot;
+		bool add, compatibility;
+		u32 base;
+		u16 index, result, st0;
+		std::array<u16, 8> initial;
+	};
+	static indexed_mar_fixture indexed_mar_case(unsigned v)
+	{
+		indexed_mar_fixture f{};
+		f.ar = v % 8; f.add = (v / 8) % 2; f.compatibility = (v / 16) % 2;
+		f.selected = f.compatibility && !f.ar ? 4 : f.ar;
+		f.index = std::array<u16, 8>{0, 1, 0xffff, 3, 0x8000, 0x7fff, 0x1234, 0xfffe}[(v / 32) % 8];
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = (v / 256) % 2 ? 0xfffe - i : 0x1000 + i;
+		f.initial[0] = f.index;
+		f.result = f.add ? f.initial[f.selected] + f.index : f.initial[f.selected] - f.index;
+		f.st0 = f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
+		f.base = (v / 512) % 2 ? 0x20000 : 0; f.snapshot = v / 1024;
+		return f;
+	}
+	void start_indexed_mar(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = indexed_mar_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, (f.add ? 0x6db0 : 0x6da8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "indexed_mar_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indexed MAR never reads data memory"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "indexed_mar_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indexed MAR never writes data memory"); });
+		m_pipeline_extensions_reads = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "indexed_mar_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Indexed MAR opcode is fetched once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254920;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct dual_multiply_fixture
 	{
 		unsigned x, y, destination, snapshot, flags;
@@ -12153,6 +12193,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -39303,6 +39344,26 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254920)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_mar_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)), "Indexed MAR preserves accumulators T and ST1");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 4 ? f.st0 : 0x8608), "Indexed MAR publishes only compatibility ARP at Access");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick > 4 ? 0x2200 + i : tick == 4 && i == f.selected ? f.result : f.initial[i]), "Indexed MAR updates the selected register once at Access using original AR0");
+			if (tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
+			unsigned const checkpoint = 3 + f.snapshot;
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed MAR before or after Access update"); }
+			if (tick == 12)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1, "Indexed MAR completes without extension fetch or duplicate opcode");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed MAR without repeating its auxiliary update"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254930; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 3071) { start_indexed_mar(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged indexed MAR: PASS cases=3072 restore=3072 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 starts=2 pages=2 snapshots=3 publication=Access data_accesses=0 alias_AR0=1 duplicate_updates=0 producer_latency=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated indexed MAR complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254900)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -40991,6 +41052,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(135, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
 	ROM_SYSTEM_BIOS(136, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
 	ROM_SYSTEM_BIOS(137, "mac-t-imm", "Immediate MAC retained T literal and accumulator selection")
+	ROM_SYSTEM_BIOS(138, "mar-index", "Indexed MAR AR0 arithmetic and restoration")
 ROM_END
 
 ROM_START(tms54rom4)

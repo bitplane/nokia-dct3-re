@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`MAR` indirect modifier (`6daa`) at `03:dcdb` (live PC `03:dcdd`) within a five-second observation,
+`MAX A` (`f486`) at `03:dced` (live PC `03:dcef`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
@@ -35,6 +35,24 @@ that multiply could execute. A moved unsupported-opcode frontier alone therefore
 does not prove retirement of its prefix.
 
 ## Retained recorder execution contracts
+
+At the indexed-MAR checkpoint, the full default CPU run passes all 288
+required markers and its terminal completion check. This renews the earlier
+`20286907` checkpoint, not every additional isolated profile or native audio
+acceptance. The tool suite passes 2,819 tests with one skip; the native 5110
+save-state round trip and exact original recorder resident-memory comparison
+also pass. The first 128 ordered low-page reads remain unchanged.
+
+Indexed MAR now admits the AR0 subtraction/addition forms (`6da8..6db7`).
+SPRU131G table 5-4 defines ordinary 16-bit auxiliary arithmetic, not reverse
+carry or circular indexing; SPRU172C MAR defines CMPT/ARP selection. Both
+index and selected register are consumed by the existing Access-owned modifier.
+`mar-index` passes 3,072 cases/restores: both directions, eight AR fields,
+both compatibility states, eight indices, two starting layouts, two pages and
+three snapshots. AR0 may also be the destination. Replacing every AR after
+Access proves retirement and restoration do not reapply the update; no data
+read, data write or extension fetch occurs. Adjacent AR0/CMPT producer latency
+and physical phase timing are not established by this fixture.
 
 Immediate MAC (`f067/f167/f267/f367`, SPRU172C syntax 3) retains its literal
 and Read-owned signed T operand through the existing Class-2 path. Execute
@@ -48,10 +66,7 @@ STLM-to-T producers, all four accumulator selections, 64 operand pairs and
 alter the retained operands. Zero-gap STLM sequences check the prototype's
 stale-T projection, not a guaranteed silicon result. Adjacent accumulator
 producer timing, repeat and interrupt composition remain unvalidated.
-The tool suite passes 2,818 tests with one skip, and the exact resident-memory
-comparison still passes at the new original recorder boundary.
-The 86,016-case immediate-MPY control and native 5110 save-state round trip
-also pass. This is focused acceptance, not a renewed full default CPU run.
+The 86,016-case immediate-MPY control also passes after sharing this path.
 
 Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
 address/read machinery as dual MPY, but does not load T. Both operands are
@@ -64,10 +79,8 @@ linear/circular addressing, 64 value pairs, 32 status combinations, two pages
 and three snapshots. These are factored matrices, not a full cross-product.
 `alu-dual-edge` adds 32 low-page operand exclusions before reads or pointer
 updates. Physical bank timing, repeat composition and general producer latency
-remain unvalidated. The tool suite passes 2,817 tests with one skip.
-The full 43,008-case dual-MPY control and native 5110 save-state round trip
-also pass after sharing the retained dual-read path. The resident-memory
-comparison remains exact; the default CPU suite has not been renewed here.
+remain unvalidated. The full 43,008-case dual-MPY control also passes after
+sharing the retained dual-read path.
 
 Dual-memory MPY (`a400..a5ff`) captures both addresses before modifying either
 auxiliary register. SPRU131G section 5.5.4 gives Xmod priority when both operands
@@ -81,8 +94,7 @@ pairs and 32 status combinations. These are factored matrices, not their full
 Cartesian product. `mpy-dual-edge` passes 16 exclusions for low-page CPU and
 peripheral sources before reads or pointer updates. Physical bank arbitration
 and repeat composition remain unvalidated; these exclusions are not silicon
-trap claims. The tool suite passes 2,816 tests with one skip. This does not
-renew the full CPU checkpoint below.
+trap claims.
 The EXP/NORM, mapped repeated-MVDD and XC controls pass, as does the native
 5110 save-state round trip. The original resident-memory comparison still
 passes independently of the new Decode boundary.
@@ -118,9 +130,6 @@ forms, eight offset pairs, both CMPT states, two pages and both delay layouts.
 Later literal/AR/BK changes cannot alter the captured decision or duplicate
 the auxiliary update. No data-memory transaction is performed by the branch.
 Physical stage timing remains unvalidated.
-The full default CPU conformance run passes all 288 required markers
-at CPU checkpoint `20286907`. This renews the default-suite checkpoint, not every
-additional isolated profile or native audio acceptance.
 
 WRITA `7f00` at `02:8931` now executes as a retained data-to-program transfer.
 Its wrapper loads A with `032e00`; common-window mapping projects that to
