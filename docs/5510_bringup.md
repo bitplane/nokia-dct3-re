@@ -35,10 +35,10 @@ admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
 
-At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
-required markers and its terminal completion check. Subsequent changes have
-focused acceptance, not a renewed full default run.
-Neither covers every additional isolated profile or native audio acceptance.
+The [core regression checkpoint](#core-regression-checkpoint) distinguishes
+default-suite coverage from isolated-profile coverage. Instruction contracts
+below retain their focused acceptance and explicit limits; none establishes
+complete native audio or every composition of supported instructions.
 The tool suite passes 2,832 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
@@ -394,8 +394,8 @@ and physical program-RAM readback. `write-a-edge` passes 12 cases/restores
 rejecting CPU/peripheral sources, RPT, RPTB, control-delay and XC composition
 before any data read or program write. Those excluded combinations remain
 work to implement, not hardware-invalid forms. Mapped READA, PMST mapping,
-MVDD source repeats and load/return controls pass. This focused WRITA coverage
-does not renew the full default CPU checkpoint above.
+MVDD source repeats and load/return controls pass. WRITA's focused acceptance
+is separate from the versioned aggregate regression scopes.
 
 Compact Xmem arithmetic (`9000..93ff`) retains its RAM address and performs
 one pointer update at Access, samples the word at Read and publishes ADD/SUB
@@ -480,13 +480,9 @@ rejected words never become a nested instruction or data write.
 `xc-controls` passes 212 existing cases/restores covering unconditional IRQ
 protection, arithmetic/IRQ composition, TC/NTC and equality sampling. This
 guards the common mechanism; signed-predicate/IRQ composition is not separately
-established. The original `XC 1,ALT` at `03:dea4` now executes and advances to
-the current multiply boundary without a firmware branch override.
-
-The runner's 107 unit tests pass; the full tool suite passes 2,815 tests with
-one skip. Load/return, carry-branch and EXP/NORM controls also pass, as does
-native 5110 save-state restoration. These focused changes do not renew the
-default-suite checkpoint.
+established. The original `XC 1,ALT` at `03:dea4` executes without a firmware
+branch override. Aggregate test counts and the current execution boundary
+are maintained above, not repeated for this instruction family.
 
 The original recorder subsequently emits NAND data writes through firmware
 at `02:891c`, then reaches the current unsupported form. NAND traffic alone
@@ -591,26 +587,35 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The CPU at `1fe0df59` passes the full 288-marker native core regression,
-all 93 named isolated profiles registered at that checkpoint, and all seven
-additional runner scopes: `--bus-registers`, `--bus-io`, `--atomic-io`,
-`--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
-Native 5110 save-state restoration also passes. At that checkpoint the tool
-suite ran 2,800 tests with one skip, including 92 core-result verifier tests.
-SIP lifecycle unit tests require local loopback socket permission.
-The original staged MU4 probe retains exact comparison of 48,261 program
-and 3,656 data words. This checkpoint reaches the earlier CMPM frontier;
-the subsequent focused extensions and current recorder stop are described in
-[Current boundary](#current-boundary). The separate atomic `bootreplay`
-control also passes original bootstrap loading, pin-level status service
-and mid-byte save/replay, including equality of its selected emulation
-state and unchanged NAND. This does not establish staged transaction
-completion.
+Versioned aggregate acceptance has two distinct scopes:
 
-This is the shared regression checkpoint for the instruction contracts
-below, superseding their earlier focused-only acceptance notes. It does
-not expand any fixture's declared opcode, composition, physical timing,
-bus ownership or handset-feature scope. No native speech is claimed.
+- CPU source at `6e92f509`: renewed full default run, all 288 required markers
+  exactly once, expected completion exit and terminal completion check. This
+  includes the shared-path changes through AR0-indexed plain loads.
+- `1fe0df59`: full default run, all 93 named isolated profiles registered at
+  that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
+  `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
+  The separate atomic `bootreplay` control also passed bootstrap loading,
+  pin-level status service and mid-byte save/replay with selected-state
+  equality and unchanged NAND; this is not staged transaction completion.
+
+Current isolated profiles are enumerated by `EXTRA_PROFILES` in
+`tools/run_c54x_core.py`; the older 93-profile population is revision-bound.
+A renewed default run does not imply a renewed run of every isolated profile
+or of the seven additional scopes.
+Each fixture retains its own opcode, composition, physical timing and bus
+ownership limits. Latest tool counts, native 5110 restoration and original
+resident-memory checks are recorded above; the recorder stop is in
+[Current boundary](#current-boundary). SIP lifecycle unit tests require local
+loopback socket permission. No aggregate scope establishes native speech.
+
+Default-scope reproduction (serialize with other native runs):
+
+```sh
+mkdir -p tmp/native-gates
+env TMPDIR=$PWD/tmp/native-gates python3 tools/run_c54x_core.py \
+  --mame mame/mame --rompath roms --output-root tmp
+```
 
 ## Recorder low-page copy
 
@@ -654,8 +659,8 @@ read-clear peripheral endpoints and crossing the peripheral-window boundary.
 Twelve exclusion cases reject CPU-register destinations, dual-peripheral
 transfers and repeated peripheral writes before side effects. These use a
 plain fixture RAM map: the older test map's `0060..0061` IRQ probes are not
-ordinary low-page RAM. Nine focused CPU profiles pass; this does not renew
-the earlier full-suite checkpoint. Unknown physical register identities,
+ordinary low-page RAM. Focused MVDD acceptance and aggregate regression
+scopes are recorded separately. Unknown physical register identities,
 especially data `002a`, remain separate from transaction conformance.
 
 For execution tracing, `pc=0073f9` is an executed startup address in the
@@ -3867,11 +3872,8 @@ one stack read at Read and publishes once at Execute; changing the stack word
 after capture must not change the published PMST. SP advances exactly once.
 The ordinary branch is separated by three NOPs, so this fixture does not
 establish every adjacent-consumer latency or interrupt-vector composition.
-The original now passes `8a1d` and stops at `8a1c` (POPM REA) at
-`02:8b3c`, live PC `02:8b3e`; the 48,261 program / 3,656 data word audit
-still passes. The earlier `8a1d` stop above is the banked pre-prototype
-checkpoint, not the current unbanked frontier. Verification scope is detailed
-below; interrupt composition is not yet part of PMST acceptance.
+The current original-firmware stop and resident-memory comparison are maintained
+above; this PMST fixture does not establish interrupt composition.
 
 The shared-core 288-marker conformance run now passes with saved physical
 Prefetch addresses. The `pmst-map`, `pmst-pop` and `pmst-prefetch` isolated
@@ -3880,7 +3882,7 @@ conformance fixture: it changes PMST after the first Prefetch, with an illegal
 opcode in the newly selected bank, and saves at clocks 1/2/5/6. Fetch must use
 the original selected bank, including after restoration; subsequent slots
 use the new mapping. This establishes retained slot ownership, not an
-organic firmware transition or every table-7-26 consumer latency. Dedicated
+organic firmware transition or every table-7-26 consumer latency.
 The `pmst-iptr` fixture exposed an early vector-page selection: with a pop
 publishing `PMST=0000` during the foreground drain, the first run executed
 the old vector page's `0066` marker. SPRU131G 7.5.9 and example 7-18 put
