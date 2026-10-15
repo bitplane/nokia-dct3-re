@@ -739,6 +739,17 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(f'{key}={old}', f'{key}={new}'),
                              3, profile='ret-load')
 
+    def test_carry_branch_scope(self):
+        marker, ending = EXTRA_PROFILES['carry-branch']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='carry-branch')
+        for old, new in (('restore=384', 'restore=0'),
+                         ('conditions=C,NC', 'conditions=C'),
+                         ('duplicate_fetches=0', 'duplicate_fetches=1'),
+                         ('arithmetic_producers=unvalidated', 'arithmetic_producers=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='carry-branch')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

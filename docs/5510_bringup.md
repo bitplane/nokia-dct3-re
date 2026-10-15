@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`f808` at `03:e6be` (live PC `03:e6c0`). This is not complete recording or
+`6eea` at `02:94c5` (live PC `02:94c7`). This is not complete recording or
 validated audio.
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
@@ -43,6 +43,13 @@ Sequential prefetch preserves the existing taken/untaken cadence. The 768-case
 isolated return fixture, conditional-call and stack/IRQ-return controls pass;
 the 97 runner unit tests pass. These are focused checks, not a renewed full
 CPU-suite checkpoint or physical bus-phase validation.
+The following `BC ...,NC` (`f808 e6bc`) at `03:e6be` now executes through
+the retained branch machinery. `carry-branch` passes 384 cases/restores:
+C/NC, BC/BCD, both flag values, status-bit producers with gaps 0/1/2,
+two pages, four snapshots and post-evaluation flag mutation. Branch target
+and literal fetches remain exactly once. Arithmetic carry producers are not
+covered by this fixture. TC, BIO and adjacent-load return controls also pass;
+the runner has 98 passing unit tests. This does not renew full-suite acceptance.
 The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
