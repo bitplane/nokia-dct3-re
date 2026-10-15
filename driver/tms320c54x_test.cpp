@@ -5414,10 +5414,11 @@ private:
 	}
 	void start_pipeline_pmst(unsigned variant = 0)
 	{
+		bool const popd = !strcmp(machine().options().bios(), "pmst-popd");
 		bool const repeat = !strcmp(machine().options().bios(), "pop-repeat");
 		bool const iptr = !strcmp(machine().options().bios(), "pmst-iptr");
 		bool const boundary = !strcmp(machine().options().bios(), "pmst-prefetch");
-		bool const pop = repeat || iptr || boundary || !strcmp(machine().options().bios(), "pmst-pop");
+		bool const pop = popd || repeat || iptr || boundary || !strcmp(machine().options().bios(), "pmst-pop");
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_pipeline_peripheral_case = variant;
@@ -5434,7 +5435,7 @@ private:
 		for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x9000 + i, code[i]);
 		if (pop)
 		{
-			std::array<u16, 6> const pop_code{u16(0x8a00 | destination), 0xf495, 0xf495, 0xf495, 0xf073, target};
+			std::array<u16, 6> const pop_code{u16(popd ? 0x8b87 : 0x8a00 | destination), 0xf495, 0xf495, 0xf495, 0xf073, target};
 			for (unsigned i = 0; i < pop_code.size(); ++i)
 			{
 				program.write_word(base + entry + i, pop_code[i]);
@@ -5476,6 +5477,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, iptr ? 0 : 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		if (popd) m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x1d);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, iptr ? u16(1U << (variant / 64)) : 0);
@@ -12595,6 +12597,7 @@ private:
 	{
 		unsigned body_reads = 0, body_writes = 0, mapped_reads = 0, saved_writes = 0;
 		unsigned restore_reads = 0, control_writes = 0, frame_reads = 0, frame_writes = 0;
+		unsigned pmst_reads = 0, pmst_saves = 0, pmst_pops = 0, pmst_writes = 0;
 	};
 	u16 repeat_context_word(repeat_context_fixture const &f, unsigned part) const
 	{
@@ -12602,6 +12605,8 @@ private:
 	}
 	void start_repeat_context(unsigned variant = 0)
 	{
+		bool const pmst = !strcmp(machine().options().bios(), "repeat-pmst");
+		bool const indirect = !strcmp(machine().options().bios(), "repeat-popd");
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = repeat_context_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + f.start() + i, 0xf495); }
@@ -12627,6 +12632,25 @@ private:
 			program.write_word(f.base + 0x703, 0x8a1c); program.write_word(f.base + 0x704, 0x8a1b); program.write_word(f.base + 0x705, 0x8a1a);
 			program.write_word(f.base + 0x70c, 0xfc00);
 		}
+		if (indirect)
+		{
+			unsigned const first = f.replace ? 0x701 : 0x705;
+			if (!f.replace)
+			{
+				program.write_word(f.base + 0x703, 0xf495); program.write_word(f.base + 0x704, 0xf495);
+				program.write_word(f.base + 0x70c, 0xf495); program.write_word(f.base + 0x70e, 0xfc00);
+			}
+			program.write_word(f.base + first, 0x8b80);
+			program.write_word(f.base + first + 1, 0x8b81);
+			program.write_word(f.base + first + 2, 0x8b85);
+		}
+		if (pmst)
+		{
+			program.write_word(f.base + (f.replace ? 0x70d : 0x70c), 0xf495);
+			program.write_word(f.base + 0x70e, 0x4a1d);
+			program.write_word(f.base + 0x711, 0x8b80);
+			program.write_word(f.base + 0x718, 0xfc00);
+		}
 		// Six NOP words after the BRC pop separate restoration from a loop
 		// endpoint (SPRU131G table 7-25); shorter gaps are not accepted here.
 		for (unsigned i = 0; i < 16; ++i) { data.write_word(0x5000 + i, 0x1357 ^ (i * 0x2345)); data.write_word(0x6000 + i, 0xdead); }
@@ -12636,17 +12660,28 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.replace ? 3 : f.count); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x1700);
+		if (pmst) m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1d);
+		if (indirect)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1b);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1a);
+		}
 		m_repeat_context_counts = {}; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_context_reads", [this, f](offs_t at, u16 &word, u16) {
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_context_reads", [this, f, pmst](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
 			auto &c = m_repeat_context_counts;
+			if (pmst && at == 0x1d) { expect(!word && c.pmst_reads == c.pmst_writes, "PSHM captures unchanged PMST once per active-context call"); ++c.pmst_reads; return; }
+			if (pmst && at == f.sp - 2 && c.pmst_saves > c.pmst_pops) { expect(!word, "POPD captures the saved PMST once"); ++c.pmst_pops; auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xffff); return; }
 			if (at >= 0x1a && at <= 0x1c) { unsigned const part = c.mapped_reads++ % 3; expect(!f.replace && at == 0x1a + part && word == repeat_context_word(f, 2 - part), "PSHM captures the actual current repeat context in order"); return; }
 			if (at == f.sp - 1) { expect(c.frame_reads < f.calls() && word == (f.replace ? f.start() : 0x60a), "Near return captures the CPU-published context continuation once"); ++c.frame_reads; auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return; }
 			if (at >= f.sp - 4 && at <= f.sp - 2) { unsigned const part = c.restore_reads++ % 3; expect(at == f.sp - 4 + part && word == repeat_context_word(f, part), "POPM reads one retained REA RSA BRC frame in order"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return; }
 			unsigned const i = c.body_reads++; expect(i < f.copies() && at == 0x5000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Restored repeat context owns each ordered body source once"); });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_context_writes", [this, f](offs_t at, u16 &word, u16) {
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_context_writes", [this, f, pmst](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
 			auto &c = m_repeat_context_counts;
+			if (pmst && at == 0x1d) { expect(!word && c.pmst_writes < c.pmst_pops, "POPD publishes retained PMST once outside the active body"); ++c.pmst_writes; return; }
+			if (pmst && at == f.sp - 2 && c.pmst_reads > c.pmst_saves) { expect(!word, "PSHM publishes its retained PMST frame once"); ++c.pmst_saves; return; }
 			if (at >= 0x1a && at <= 0x1c) { unsigned const part = c.control_writes++ % 3; expect(at == 0x1c - part && word == repeat_context_word(f, part) && c.control_writes <= c.restore_reads, "POPM publishes the captured repeat registers once in order"); return; }
 			if (at == f.sp - 1) { bool const replacement = f.replace && c.frame_writes; expect(c.frame_writes < (f.replace ? 2U : f.calls()) && word == (replacement ? f.start() : 0x60a), "Only CPU call and explicit context-switch ST publish the return frame"); ++c.frame_writes; return; }
 			if (at >= f.sp - 4 && at <= f.sp - 2) { unsigned const part = c.saved_writes++ % 3; expect(!f.replace && at == f.sp - 2 - part && word == repeat_context_word(f, 2 - part), "PSHM saves BRC RSA REA once before their corresponding pops"); return; }
@@ -13279,6 +13314,7 @@ private:
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
+		if (!strcmp(machine().options().bios(), "pmst-popd")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-prefetch")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-iptr")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pop-repeat")) { start_pipeline_pmst(); return; }
@@ -13379,6 +13415,8 @@ private:
 		if (!strcmp(machine().options().bios(), "cond-cd-edge")) { start_delayed_conditional_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-ccd")) { start_block_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-context")) { start_repeat_context(); return; }
+		if (!strcmp(machine().options().bios(), "repeat-pmst")) { start_repeat_context(); return; }
+		if (!strcmp(machine().options().bios(), "repeat-popd")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "push-pop-same")) { start_push_pop_same(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala")) { start_accumulator_call(); return; }
@@ -35825,10 +35863,11 @@ private:
 		}
 		if (m_phase == 252270)
 		{
+			bool const popd = !strcmp(machine().options().bios(), "pmst-popd");
 			bool const repeat = !strcmp(machine().options().bios(), "pop-repeat");
 			bool const iptr = !strcmp(machine().options().bios(), "pmst-iptr");
 			bool const boundary = !strcmp(machine().options().bios(), "pmst-prefetch");
-			bool const pop = repeat || iptr || boundary || !strcmp(machine().options().bios(), "pmst-pop");
+			bool const pop = popd || repeat || iptr || boundary || !strcmp(machine().options().bios(), "pmst-pop");
 			unsigned const variant = m_pipeline_peripheral_case;
 			u16 const value = (repeat ? std::array<u16, 4>{0, 1, 0x8000, 0xffff} : iptr ? std::array<u16, 4>{0, 0x20, 0x2020, 0x3020} : std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa})[variant % 4];
 			u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
@@ -35890,6 +35929,12 @@ private:
 					{
 						osd_printf_info("TMS320C54x staged PMST prefetch ownership: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 snapshots=4 debugger_state_fixture=1 firmware_ordering_claim=0\n");
 						throw emu_fatalerror(3, "TMS320C54x isolated PMST prefetch complete");
+					}
+					if (popd)
+					{
+						expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1d, "Indirect POPD preserves its nonmodifying destination register");
+						osd_printf_info("TMS320C54x staged POPD PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 active_repeat_claim=0 silicon_phase_claim=0\n");
+						throw emu_fatalerror(3, "TMS320C54x isolated POPD PMST complete");
 					}
 					osd_printf_info("TMS320C54x staged POPM PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 silicon_phase_claim=0\n");
 					throw emu_fatalerror(3, "TMS320C54x isolated POPM PMST complete");
@@ -38816,12 +38861,15 @@ private:
 		if (m_phase == 255510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255500; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255480)
 		{
+			bool const pmst = !strcmp(machine().options().bios(), "repeat-pmst");
+			bool const indirect = !strcmp(machine().options().bios(), "repeat-popd");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_context_case(variant);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeat-context restoration outside the loop body remains admitted");
 			if (tick == f.checkpoint && !m_pipeline_replay) { m_repeat_context_saved_counts = m_repeat_context_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save active repeat context around push pop publication and return"); }
 			if (tick == 600)
 			{
 				auto const &c = m_repeat_context_counts; unsigned const calls = f.calls();
+				if (pmst) expect(c.pmst_reads == calls && c.pmst_saves == calls && c.pmst_pops == calls && c.pmst_writes == calls && !m_cpu->state_int(tms320c54x_device::STATE_PMST), "Active-repeat PMST restoration preserves one complete stack transaction per call");
 				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(STATE_GENPC) != f.base + f.end() + 3 || c.body_reads != f.copies())
 					osd_printf_info("Repeat-context mismatch: case=%u replay=%u replace=%u pc=%06x brc=%04x rsa=%04x rea=%04x st1=%04x reads=%u writes=%u restore_reads=%u publications=%u\n", variant, unsigned(m_pipeline_replay), unsigned(f.replace), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_RSA)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_REA)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), c.body_reads, c.body_writes, c.restore_reads, c.control_writes);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end() + 3 && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == f.start() && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end() &&
@@ -38833,6 +38881,16 @@ private:
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_repeat_context_counts = m_repeat_context_saved_counts; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore suspended repeat context without duplicate stack or body work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255490; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 383) { start_repeat_context(variant + 1); return; }
+				if (indirect)
+				{
+					osd_printf_info("TMS320C54x active repeat POPD context: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated active repeat POPD context complete");
+				}
+				if (pmst)
+				{
+					osd_printf_info("TMS320C54x active repeat POPD PMST: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 pmst_unchanged=1 stack_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated active repeat POPD PMST complete");
+				}
 				osd_printf_info("TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated active repeat context complete");
 			}
@@ -42939,6 +42997,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(172, "rptb-ccd", "Delayed conditional calls inside repeat blocks and at endpoints")
 	ROM_SYSTEM_BIOS(173, "repeat-context", "Outside-body restoration of same or replaced active repeat contexts")
 	ROM_SYSTEM_BIOS(174, "push-pop-same", "Adjacent PSHM POPM same-location source and destination ownership")
+	ROM_SYSTEM_BIOS(175, "pmst-popd", "Indirect PMST stack restoration and retained program mapping")
+	ROM_SYSTEM_BIOS(176, "repeat-pmst", "Indirect unchanged PMST restoration outside an active repeat body")
+	ROM_SYSTEM_BIOS(177, "repeat-popd", "Indirect active repeat-context restoration outside the loop body")
 ROM_END
 
 ROM_START(tms54rom4)

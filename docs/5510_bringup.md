@@ -30,10 +30,20 @@ executes 2,048 times, and the callee entry at `03:dada` executes 1,601
 times. The call's delay span ends at the active block endpoint `03:db3a`;
 this is covered by the retained loop/call contract below. The REA, RSA and
 BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
-The next stop is a POPD destination exclusion (`8b8f`, destination `001d`,
-PMST) while block-repeat state remains active; live PC is `03:1f04` and
-terminal `illegal=1`. The open question is the PMST restore's mapping and
-pipeline ownership, not an absent repeat-context pop.
+The next stop is unadmitted opcode `b0a0` at `03:d636`; live PC is
+`03:d638` and terminal `illegal=1`. Its operand and addressing contract
+must be decoded before admission. The intervening indirect PMST and
+repeat-control restore exclusions are covered by the bounded tests below.
+The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
+AR7 is `001d`, SP is `5cd3`, and its pending stack word `202c` matches
+current PMST. RSA/REA remain `db51/db56`, outside this restore routine.
+OVLY maps this low-half instruction to physical program `001f02`; a raw
+read at `031f02` returns zero and is not evidence of missing code. The
+surrounding sequence sets AR7 to `001d`, pops PMST, then sets AR7 to
+`0016` for another indirect pop. These observations identify the next
+conformance case. Unchanged PMST restoration outside the active body is
+now admitted by the bounded contract below; other active POPD control
+destinations inside the loop body remain excluded.
 These are passive observations, not firmware writes or a claim of complete
 recording or validated audio.
 
@@ -45,6 +55,23 @@ admission. A moved Decode frontier alone is not retirement evidence.
 ## Retained recorder execution contracts
 
 ### Active repeat context and stack bypass
+
+`pmst-popd` passes 64 cases/restores for indirect POPD PMST: four values,
+two source pages, lower/upper targets and four snapshots. It checks one
+retained stack read, one publication and subsequent program mapping.
+`repeat-pmst` adds 384 cases/restores using the same/replaced loop-context
+matrix below, with an actual PSHM/POPD PMST pair outside the loop body,
+ordered stack transactions and independently checked iteration counts.
+The active PMST case restores unchanged PMST only. `repeat-popd` adds
+384 cases/restores for indirect REA/RSA/BRC restoration outside the loop
+body, using the same/replaced-context matrix and checking retained source
+words, ordered publications and actual loop iterations. Its PSHM and
+POPD sequences are separated; adjacent PSHM-to-POPD bypass is not claimed.
+Active PMST mapping changes and in-body control writes remain excluded;
+these tests do not establish interrupt composition or physical
+bus-phase timing. Existing `pmst-pop`, `pmst-prefetch`, `repeat-context`
+and `pop-repeat` profiles also pass on this source. The full default
+checkpoint below remains revision-bound, not renewed by these profiles.
 
 Separated POPM REA/RSA/BRC writes outside the active loop body are admitted;
 in-body writes remain excluded. A near return into the restored bounds,
@@ -218,7 +245,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,843 tests with one skip; the native 5110
+The tool suite passes 2,846 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

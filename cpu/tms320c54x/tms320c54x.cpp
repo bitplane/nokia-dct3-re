@@ -3271,7 +3271,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = basic_address(3, mode);
 		u16 const destination = m_pipeline_operand_address[3];
 		bool const mapped = (destination >= 8 && destination <= 0x17) || (destination >= 0x19 && destination <= 0x1d);
-		if ((destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active))
+		if ((destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active && m_pipeline_block_body[3]))
 		{
 			logerror("%s: staged POPD status/SP/peripheral or active repeat-control destination is unsupported (word=%04x destination=%04x block_active=%u)\n", machine().describe_context(), m_pipeline_word[3], destination, unsigned(m_pipeline_block_active));
 			m_illegal = true; return;
@@ -3636,9 +3636,10 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xff00) == 0x8a00 || (m_pipeline_word[4] & 0xff00) == 0x8b00))
 	{
 		// Class 17A: retain the stack word before destination publication.
-		// Read-owned SP increment is a partial placement model; POPM excludes
-		// XPC and active repeat-control destinations. POPD also excludes SP,
-		// status and peripheral destinations until their contracts are covered.
+		// Read-owned SP increment is a partial placement model. In-body
+		// repeat-control writes remain excluded; separated outside-body
+		// restoration is covered. POPD still excludes SP, ST0/ST1 and
+		// peripheral destinations; active PMST changes are checked below.
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && m_sp < 0x60)
 		{
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
@@ -3654,6 +3655,13 @@ void tms320c54x_device::pipeline_step()
 			(m_pipeline_word[5] & 0xffe0) == 0x4a00 && m_pipeline_operand_address[5] == late_popm_address;
 		if (!late_popm_read) m_pipeline_operand[4] = data_read(late_popm_address);
 		u16 const destination = (m_pipeline_word[4] & 0xff00) == 0x8a00 ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4];
+		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && destination == 0x1d && m_pipeline_block_active && m_pipeline_operand[4] != m_pmst)
+		{
+			// The active-context contract covers restoration without remapping.
+			// Changing PMST while retaining a loop needs separate Prefetch tests.
+			logerror("%s: staged active-context POPD PMST mapping change is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		if (destination >= 0x10 && destination <= 0x19)
 		{
 			// Table 7-4 gives POPM/POPD DAGEN an early Read write; an older

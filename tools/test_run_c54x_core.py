@@ -586,6 +586,39 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='pmst-pop')
 
+    def test_pmst_popd_scope(self):
+        marker, ending = EXTRA_PROFILES['pmst-popd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pmst-popd')
+        for bad in (output.replace('restore=64', 'restore=0'),
+                    output.replace('stack_reads=1', 'stack_reads=2'),
+                    output.replace('active_repeat_claim=0', 'active_repeat_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmst-popd')
+
+    def test_repeat_pmst_scope(self):
+        marker, ending = EXTRA_PROFILES['repeat-pmst']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='repeat-pmst')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('pmst_unchanged=1', 'pmst_unchanged=0'),
+                    output.replace('actual_iterations=1', 'actual_iterations=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='repeat-pmst')
+
+    def test_repeat_popd_scope(self):
+        marker, ending = EXTRA_PROFILES['repeat-popd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='repeat-popd')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('source_retained=1', 'source_retained=0'),
+                    output.replace('actual_iterations=1', 'actual_iterations=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='repeat-popd')
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'

@@ -800,6 +800,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged POPM PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated POPM PMST complete",
     ),
+    "pmst-popd": (
+        "TMS320C54x staged POPD PMST: PASS cases=64 restore=64 values=4 source_pages=2 target_regions=2 stack_reads=1 writes=1 source_retained=1 active_repeat_claim=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated POPD PMST complete",
+    ),
+    "repeat-pmst": (
+        "TMS320C54x active repeat POPD PMST: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 pmst_unchanged=1 stack_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated active repeat POPD PMST complete",
+    ),
+    "repeat-popd": (
+        "TMS320C54x active repeat POPD context: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated active repeat POPD context complete",
+    ),
     "pmst-map": (
         "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
         "Fatal error: TMS320C54x isolated PMST mapping complete",
