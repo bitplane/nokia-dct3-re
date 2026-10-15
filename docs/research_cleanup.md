@@ -154,6 +154,10 @@ Some recurring mistakes need stronger checks than ordinary source review:
   and nonzero-buffer step size; an out-of-domain modulo oracle does not prove
   a CPU arithmetic defect. Keep empirical behavior outside that domain
   separately scoped rather than silently generalizing it.
+- A repeated PC does not identify one pipeline instance. Lifetime release
+  must respect the owning instruction's age/stage, so an older loop iteration
+  cannot clear a younger instruction's protection. Include the shortest
+  legal loops with pending interrupts and save/replay in composition tests.
 
 ## Protect surprising facts
 

@@ -600,6 +600,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0",
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
+    "block-xc": (
+        "TMS320C54x block XC: PASS cases=5760 restore=5760 predicates=15 layouts=XC1_single,XC2_two_single,XC2_one_double counts=0,1,2,7 positions=interior,endpoint pages=2 snapshots=4 source_rotations=2 ordered_reads=1 selected_writes=1 rejected_writes=0 opcode_literal=1 counter_braf_owned=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated block XC complete",
+    ),
+    "block-xc-edge": (
+        "TMS320C54x block XC exclusions: PASS cases=24 restore=24 forms=XC1,XC2 cross_end_positions=2 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated block XC exclusions complete",
+    ),
+    "block-xc-irq": (
+        "TMS320C54x short block XC protection: PASS cases=384 restore=384 counts=0,1,3,7 forms=XC1,XC2 loop_words=3,4,5 sources=IRQ,NMI pages=2 snapshots=4 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated short block XC protection complete",
+    ),
     "ld-circular": (
         "TMS320C54x circular LD: PASS cases=393216 restore=393216 ram_cases=368640 excluded_cases=24576 modifiers=4 registers=8 compatibility_states=2 destinations=2 bk=0,1,7,16,8192 index_patterns=4 valid_nonzero_steps=1 memory_values=4 sxm_ovm_sst=8 pages=2 snapshots=3 bk_sample=Decode address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_repeat_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated circular LD complete",

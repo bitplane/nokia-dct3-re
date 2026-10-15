@@ -31,10 +31,13 @@ and following instruction `03:e1d3`; this is not merely an advanced live PC.
 The signed circular load `11df` at `03:dc39` and its following instruction
 each have 49 observed Execute entries. Passive reads begin at `aa5a` and
 advance by two with AR0=`2`, BK=`0`; no firmware state is injected.
-The current stop is the in-block conditional-execute exclusion at `03:da85`,
-word `fd4b` (`XC 1,BLT`), inside block `03:da71..03:da93`, with terminal
-PC `03:da87`, `illegal=1`. Protected-slot and block-accounting composition
-is the next unresolved boundary; complete recording remains unproven.
+In-block XC executes through `03:da71..03:da93`: Execute-entry hooks
+observe `03:da85` (`XC 1,BLT`) and `03:da8f` (`XC 2,TC`) 1,168 times each,
+and continuation `03:da94` twice. The alternate `03:da79` signed-XC route
+has zero Execute entries in this run; its static presence is not runtime proof.
+The current stop is unsupported word `fe76` at `02:6609`, with terminal
+PC `02:660b`, `illegal=1`. Its decode/retained-control contract is the next
+unresolved boundary; NAND writes alone do not prove complete recording.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -456,7 +459,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,859 tests with one skip; the native 5110
+The tool suite passes 2,861 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
@@ -899,16 +902,42 @@ established. The original `XC 1,ALT` at `03:dea4` executes without a firmware
 branch override. Aggregate test counts and the current execution boundary
 are maintained above, not repeated for this instruction family.
 
-The unchanged `aa88` upload contains two pertinent in-block forms:
+The unchanged `aa88` upload contains two pertinent signed in-block forms:
 `ff4a` at `03:da79` is `XC 2,BGEQ`, protecting `32f8 0009` (a two-word
 ASM load); `fd4b` at `03:da85` is `XC 1,BLT`, protecting `ed11`
 (`LD #-15,ASM`). Both spans finish inside `03:da71..03:da93`.
-SPRU131G example 7-57 explicitly uses XC within RPTB; the current exclusion
-is a model boundary, not a hardware prohibition. Before admitting it, verify
-taken/skipped words and literals, per-iteration counter/BRAF ownership and
-pending IRQ/NMI through the two-word protected span. Include the shortest
-legal loops: repeated PCs must not let retirement from an older iteration
-clear a newer XC's protection. That ownership question is not yet tested.
+SPRU131G example 7-57 explicitly uses XC within RPTB. The frontend admits
+its supported predicates when both interrupt-protected words remain inside
+the block. Selected instructions and substituted NOPs preserve their original
+block/end tags, including a two-word instruction ending at REA.
+
+`block-xc` passes 5,760 cases/restores over 15 predicates (12 signed A/B
+conditions, TC/NTC and UNC), three slot layouts, counts 0/1/2/7, interior/end
+placement, two pages, four snapshots and two source rotations. It verifies
+ordered source reads, selected writes, absent rejected writes, opcode-shaped
+literals, pointer updates and per-iteration BRC/BRAF ownership.
+`block-xc-edge` passes 24 cases/restores rejecting spans crossing the block
+end before data access or pointer effects. This exclusion is a bounded model
+boundary, not a claimed silicon trap.
+
+A younger decoded XC extends interrupt protection: older retirement at the
+same PC in a previous iteration must not release that younger span. Release
+therefore checks the live Decode/Access/Read owners, using already-saved
+pipeline state rather than a new timing counter. PC-only release can admit a
+pending IRQ before the complete protected group retires.
+`block-xc-irq` passes 384 cases/restores for XC1/XC2, three-/four-/five-word
+loops, counts 0/1/3/7, IRQ/NMI, two pages and four snapshots. The source is
+asserted by the first protected RAM write; speculative opcode fetches are not
+treated as Execute entries. The pipeline's overlapping groups finish before
+one vector fetch and stack write. This is a declared pipeline-ownership
+contract, not measured interrupt latency for physical NOP gaps. Restoring
+IFR/NMI state does not resubmit an external line before scheduler settlement.
+
+`xc-controls`, `xc-signed`, `rptb-br-edges`, `rptbd-edge`, `rptb-bcd`,
+`rptb-single` and `repeat-rearm` pass as focused controls. Predicated control
+transfers, crossing loop boundaries and silicon phase timing remain outside
+this composition scope. Original-firmware execution is separately counted
+in [Current boundary](#current-boundary), not inferred from static bytes.
 
 Original recorder NAND data writes are observed at `02:891c`. NAND traffic alone
 does not establish a valid recording, completed file, PCM or physical audio.
@@ -4848,8 +4877,9 @@ phases.
 The `rptb-br-edges` fixture passes 32 fail-closed replay cases for targets below
 and above the block, delayed control, conditional near calls, nested blocks and far
 branches, with no control frame or body write. Branches occupying the
-endpoint, XC/IDLE in the block and software loop-control modification
-remain excluded by the existing RPTB guards. Non-delayed far-call acceptance
+endpoint, XC spans crossing the block end, IDLE in the block and software
+loop-control modification remain excluded by the RPTB guards. Wholly in-block
+XC is specified in the retained contract above. Non-delayed far-call acceptance
 and backward-loop acceptance are specified in the retained contracts above;
 near-call, outside-block branch and delayed compositions are not promoted.
 The shared broad baseline remains the versioned checkpoint above, independently

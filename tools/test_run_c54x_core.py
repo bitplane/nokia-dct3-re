@@ -12,6 +12,27 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_block_xc_scopes(self):
+        for profile in ('block-xc', 'block-xc-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for bad in (output.replace('restore=5760', 'restore=0').replace('restore=24', 'restore=0'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
+    def test_short_block_xc_protection_scope(self):
+        marker, ending = EXTRA_PROFILES['block-xc-irq']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='block-xc-irq')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('all_stores_before_vector=1', 'all_stores_before_vector=0'),
+                    output.replace('vector_fetches=1', 'vector_fetches=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='block-xc-irq')
+
     def test_circular_load_scope(self):
         marker, ending = EXTRA_PROFILES['ld-circular']
         output = marker + '\n' + ending + '\n'

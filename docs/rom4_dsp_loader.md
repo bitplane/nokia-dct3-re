@@ -4010,15 +4010,18 @@ reads at clocks 9+5i and writes at 14+5i, with no loop padding. Twenty-four
 IRQ/NMI cases save before/through interrupt acceptance, use the existing
 same-page vector contract and return through RETE. Sixteen further replay
 cases cover one-word MAR and two-word LD endpoints and twelve fail-closed
-cases: delayed RPTBD, a backward branch occupying the endpoint, STLM BRC, endpoints inside opcode
+cases: nested RPTBD, a backward branch occupying the endpoint, STLM BRC, endpoints inside opcode
 or extension words, and an aliased STL to BRC. All block-prefetch tags,
 retained extension tags, active context and speculative count are saved.
 Terminal BRC remains zero in this declared model, matching the atomic
 frontend; exact silicon terminal-counter and phase behavior are not claimed.
-RPTBD, nested repeats, in-block calls/XC/IDLE and loop-register
-modification latencies remain excluded. In-block branches are accepted
-only for the forward near B/nondelayed BC subset below. ISR-side loop-register replacement,
-wrapped endpoints and measured silicon timing remain unvalidated.
+This fixture is not the frontend's complete composition surface. Separate
+RPTBD, branch/call, XC and context-restoration scopes are maintained in
+[the retained execution contracts](5510_bringup.md#retained-recorder-execution-contracts).
+Nested block repeats, IDLE inside a block, general in-loop register-modification
+latencies, wrapped endpoints and measured silicon timing remain outside those
+bounded contracts. The forward near B/nondelayed BC cases below establish
+their own subset, not an exclusion of separately validated compositions.
 These tests do not establish complete DSP startup or speech.
 
 Forward near B/BC may target the same block at or after the sequential

@@ -3024,8 +3024,9 @@ void tms320c54x_device::pipeline_step()
 		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
+		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !internal_delayed_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
-			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || staged_xc(word) || word == 0xf4e1 ||
+			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
 			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
@@ -4267,7 +4268,13 @@ void tms320c54x_device::pipeline_step()
 			pipeline_begin_repeat_stream();
 		unsigned const xc_retired_words = m_op == 0x46f8 ? 2 : ((staged_shifted_smem(m_op) || staged_memory_immediate_multiply(m_op)) && u8(m_op) >= 0xe0) || staged_extended_banz(m_op) || staged_extended_bitfield(m_op) || staged_extended_rmw(m_op) || staged_extended_move(m_op) || staged_extended_data_copy(m_op) ? 3 : staged_port_read(m_op) ? (u8(m_op) == 0xf8 ? 3 : 2) : staged_extended_immediate_store(m_op) ? 3 : staged_data_copy(m_op) ? 2 : staged_banz(m_op) || staged_extended_dld(m_op) || staged_offset_load(m_op) || staged_bitfield(m_op) || staged_absolute_add(m_op) || staged_extended_smem_arithmetic(m_op) || staged_extended_smem_special(m_op) || staged_shifted_smem(m_op) || staged_extended_accumulator_store(m_op) || staged_extended_dst(m_op) || staged_extended_long_arithmetic(m_op) ? 2 : ((staged_rmw(m_op) && u8(m_op) == 0xf8) || m_op == 0x76f8) ? 3 :
 			(staged_far_call(m_op) || (staged_absolute_load(m_op) || staged_extended_logic(m_op)) || staged_far_branch(m_op) || staged_long_mar(m_op) || staged_move(m_op) || staged_call(m_op) || staged_conditional_branch(m_op) || staged_immediate_alu(m_op) || (m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || staged_immediate_multiply(m_op) || staged_rmw(m_op) || (m_op & 0xff00) == 0x7700 || (m_op & 0xff00) == 0x7600 || staged_block_repeat(m_op) || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
-		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
+		// A younger decoded XC extends protection. In a short repeat loop,
+		// an older instance can retire at the same PC as the newer span's end;
+		// that older retirement must not clear the younger owner's protection.
+		bool younger_xc = false;
+		for (unsigned stage = 2; stage < 5; ++stage)
+			younger_xc |= m_pipeline_valid[stage] && staged_xc(m_pipeline_word[stage]);
+		if (m_pipeline_xc_active && !younger_xc && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
 			u16(m_pipeline_xc_end - address) < xc_retired_words)
 			m_pipeline_xc_active = false;
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
