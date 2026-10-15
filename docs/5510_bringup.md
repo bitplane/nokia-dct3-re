@@ -15,8 +15,8 @@ words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. It also compares the
 recorder overlay's 73,762 RAM destination words before execution (four
 register words excluded) and enters original recorder startup at `0073f9`.
-Execution stops at absolute STH A (`82f8 0011`) at `03:f7dd`, whose
-mapped AR1 destination is not yet admitted (live PC `03:f7e2`).
+Execution stops at short-indirect LD Smem,TS,A (`1481`) at `03:f0f6`
+(live PC `03:f0f8`).
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -123,7 +123,7 @@ suite ran 2,800 tests with one skip, including 92 core-result verifier tests.
 SIP lifecycle unit tests require local loopback socket permission.
 The original staged MU4 probe retains exact comparison of 48,261 program
 and 3,656 data words. This checkpoint reaches the earlier CMPM frontier;
-the subsequent focused extension and current recorder stop are described in
+the subsequent focused extensions and current recorder stop are described in
 [Current boundary](#current-boundary). The separate atomic `bootreplay`
 control also passes original bootstrap loading, pin-level status service
 and mid-byte save/replay, including equality of its selected emulation
@@ -3456,6 +3456,32 @@ than merely moving to another instruction in the resident initializer.
 Failure diagnostics report the retained logical instruction separately
 from the ahead live PC. For folded multiword forms, `last_fetch_physical`
 identifies the final extension fetch, not the opcode's physical address.
+
+Extended STL/STH now admits mapped AR0..AR7 destinations only. SPRU131G
+table 7-3 groups these writes with STLM: publication is in Execute, and the
+following two words must not use that AR. The `st-extended-ar` fixture
+passes 24,576 cases/restores across absolute, long-offset, preincrement and
+circular-preincrement forms, eight destinations, A/B high/low stores,
+four accumulator patterns, SST/SXM combinations, self/other pointer aliases
+and two program pages. Snapshots at clocks 4/6/7 bracket literal capture,
+destination resolution and publication. Replacing every AR after address
+capture cannot retarget the write; replacing the source accumulator after
+Read verifies the retained path's Execute-live source convention. One
+write at clock 7, one literal fetch, no destination read and independent
+signed/unsigned store-saturation arithmetic are checked.
+
+The `st-ar-consumer` fixture adds 6,144 cases/restores with legal gaps of
+two or three NOP words before an unsigned indirect load. It checks one
+AR write and one load of the selected sample, including replay after its
+Read. No behavior inside the manual's forbidden two-word window is
+claimed. Extended SP, BK and other register/peripheral destinations remain
+excluded, as do new control-delay or interrupt-composition claims.
+Focused controls cover these two profiles plus `store-delay`,
+`st-delay-edge`, `stlm-bk`, `mvmd-bk`, `cmpm-smem`, `cmpm-branch` and
+`stack-irq-return`. The tool suite runs 2,802 tests with one skip, including
+94 core-result verifier tests; native 5110 save-state restoration also
+passes. Original recorder STH A (`82f8 0011`) at `03:f7dd` now executes;
+the next stop is maintained in [Current boundary](#current-boundary).
 The original CMPM at `03:91eb` executes with CPL set, SP=`1246` and
 direct source `125a`. The `7725` at `02:6d47` is STM immediate to PRD,
 covered by the timer-register contract below. The new Smem and adjacent-branch

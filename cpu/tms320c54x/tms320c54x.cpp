@@ -3051,7 +3051,10 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] :
 				long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4);
-			if (m_pipeline_operand_address[4] < 0x60)
+			// Table 7-3 groups STL/STH AR writes with STLM: publish in
+			// Execute, without forwarding to the next two address words.
+			if (m_pipeline_operand_address[4] < 0x60 &&
+				(m_pipeline_operand_address[4] < 0x10 || m_pipeline_operand_address[4] > 0x17))
 			{
 				logerror("%s: staged extended accumulator store register/peripheral destination is unsupported instruction=%06x last_fetch_physical=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[4]), unsigned(m_pipeline_physical_address[4]), m_pipeline_word[4], m_pipeline_operand_address[4]);
 				m_illegal = true; return;

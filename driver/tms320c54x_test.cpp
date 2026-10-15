@@ -6056,6 +6056,84 @@ private:
 		if (!((variant / 64) % 2) || pattern == 1) return 0xffff;
 		return pattern == 2 ? 0 : 0xf495;
 	}
+	struct extended_ar_store_fixture
+	{
+		unsigned form, reg, selected, kind, flags, gap;
+		u16 literal, initial_ar, next_ar, result;
+		u64 value;
+		u32 base;
+	};
+	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer)
+	{
+		extended_ar_store_fixture f{};
+		unsigned v = variant;
+		if (!consumer) { f.form = v % 4; v /= 4; }
+		f.reg = v % 8; v /= 8;
+		f.kind = v % 4; v /= 4;
+		f.value = std::array<u64, 4>{0x123456789aULL, 0x0180001200ULL, 0xff7fff1200ULL, 0xfffffff495ULL}[v % 4]; v /= 4;
+		f.flags = v % 4; v /= 4; // SST and SXM, not arithmetic OVM.
+		bool const alias = !consumer && v % 2;
+		if (consumer) f.gap = 2 + v % 2;
+		v /= 2;
+		f.base = v % 2 ? 0x20000 : 0;
+		f.selected = alias ? f.reg : (f.reg + 3) % 8;
+		u16 const target = 0x10 + f.reg;
+		f.literal = f.form == 0 ? target : f.form == 1 ? u16(target - 0x40) : 1;
+		f.initial_ar = f.form == 0 ? 0x4000 + f.selected : f.form == 1 ? 0x40 : f.form == 2 ? target - 1 : 0x10 + (f.reg + 7) % 8;
+		f.next_ar = f.form < 2 ? f.initial_ar : target;
+		u32 stored = u32(f.value);
+		if (f.flags & 1)
+		{
+			if (f.flags & 2)
+			{
+				s64 const signed_value = s64(f.value << 24) >> 24;
+				stored = signed_value < -0x80000000LL ? 0x80000000U : signed_value > 0x7fffffffLL ? 0x7fffffffU : u32(signed_value);
+			}
+			else if (f.value > 0xffffffffULL) stored = 0xffffffffU;
+		}
+		f.result = (f.kind & 2) ? stored >> 16 : stored;
+		return f;
+	}
+	void start_extended_ar_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer");
+		auto const f = extended_ar_store_case(variant, consumer);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		u16 const mode = f.form == 0 ? 0xf8 : f.form == 1 ? 0xe0 | f.selected : f.form == 2 ? 0xe8 | f.selected : 0xf0 | f.selected;
+		program.write_word(f.base + 0x600, 0x8000 | (f.kind << 8) | mode);
+		program.write_word(f.base + 0x601, f.literal);
+		if (consumer) program.write_word(f.base + 0x602 + f.gap, 0x1280 | (((f.kind & 1) ^ 1) << 8) | f.reg);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | ((f.flags & 2) ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x4000 + ar);
+		if (f.form) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial_ar);
+		if (consumer) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, (f.kind & 1) ? 0xdead : consumer ? f.value : 0x11112222);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, (f.kind & 1) ? consumer ? f.value : 0x11112222 : 0xdead);
+		if (consumer && f.result >= 0x60) data.write_word(f.result, 0xbbbb);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "extended_ar_store_reads", [this, f, consumer](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(consumer && !m_pipeline_operand_reads && at == f.result && word == (f.result ? 0xbbbb : 0) && m_cpu->pipeline_cycles() == 7 + f.gap,
+				"Accumulator store has no destination read; legal-gap LDU consumes the published AR once"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "extended_ar_store_publication", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(!m_pipeline_store_writes && at == 0x10 + f.reg && word == f.result && m_cpu->pipeline_cycles() == 7,
+				"Extended STL/STH publishes the Execute-live saturated accumulator word to retained AR destination once"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "extended_ar_store_literal", [this, f](offs_t, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(!m_pipeline_extensions_reads && word == f.literal, "Extended AR store retains one address or offset literal"); ++m_pipeline_extensions_reads; });
+		m_phase = 254560; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_stlm(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11465,6 +11543,7 @@ private:
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-smem")) { start_pipeline_bitfield(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-branch")) { start_pipeline_bitfield_ar7(); return; }
+		if (!strcmp(machine().options().bios(), "st-extended-ar") || !strcmp(machine().options().bios(), "st-ar-consumer")) { start_extended_ar_store(); return; }
 		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
 		if (!strcmp(machine().options().bios(), "mac-smem")) { start_mac_smem(); return; }
@@ -34553,6 +34632,73 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252510;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 254560)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer");
+			auto const f = extended_ar_store_case(variant, consumer);
+			unsigned const checkpoint = consumer ? std::array<unsigned, 3>{4, 7, 7 + f.gap}[variant / 2048] : std::array<unsigned, 3>{4, 6, 7}[variant / 8192];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Extended accumulator store owns its mapped AR destination");
+			if (tick == 4)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
+			}
+			if (tick == 6 && !consumer)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar)
+				{
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (f.form && ar == f.selected ? f.next_ar : 0x4000 + ar),
+						"Extended store resolves its address and implicit pointer modification before explicit AR publication");
+					m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5000 + ar);
+				}
+				m_cpu->set_state_int((f.kind & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
+			}
+			if (consumer && tick == 7 + f.gap && f.result >= 0x60)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.result, 0xcccc);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended AR store address, Execute write or legal-gap consumer");
+			}
+			if (tick == 24)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar)
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.reg ? f.result : (consumer ? 0x4000 : 0x5000) + ar),
+						"Only the retained destination receives the explicit accumulator store");
+				expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(consumer) &&
+					m_cpu->state_int((f.kind & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.value &&
+					m_cpu->state_int((f.kind & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (consumer ? (f.result ? 0xbbbb : 0) : 0xdead) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x4800 | ((f.flags & 2) ? 0x100 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_BK) == 8,
+					"Extended AR store preserves arithmetic state, source and legal-gap consumer across replay");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore extended AR store without recapturing its address or duplicating its write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254570; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (consumer ? 6143 : 24575)) { start_extended_ar_store(variant + 1); return; }
+				if (consumer)
+				{
+					osd_printf_info("TMS320C54x extended AR store consumer: PASS cases=6144 restore=6144 destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 legal_gaps=2,3 pages=2 snapshots=3 publish_clock=7 consumer_reads=1 ar_writes=1 literal_fetches=1 forbidden_gap_claim=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated extended AR consumer complete");
+				}
+				osd_printf_info("TMS320C54x extended AR stores: PASS cases=24576 restore=24576 forms=absolute,offset,preincrement,circular destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 aliases=self,other pages=2 snapshots=3 publish_clock=7 destination_reads=0 writes=1 literal_fetches=1 execute_live_source=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated extended AR stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254570)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254560;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
 		if (m_phase == 252530)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, reg = variant % 8, source = (variant / 8) % 2, gap = (variant / 64) % 4;
@@ -39676,6 +39822,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(108, "mpy-delay-edge", "Rejected multiply straddling a control delay")
 	ROM_SYSTEM_BIOS(109, "cmpm-smem", "Retained Smem equality and indirect address ownership")
 	ROM_SYSTEM_BIOS(110, "cmpm-branch", "Short indirect comparison and adjacent TC branch")
+	ROM_SYSTEM_BIOS(111, "st-extended-ar", "Extended accumulator stores to retained AR destinations")
+	ROM_SYSTEM_BIOS(112, "st-ar-consumer", "Extended AR stores with legal-gap indirect consumers")
 ROM_END
 
 ROM_START(tms54rom4)
