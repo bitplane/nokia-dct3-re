@@ -197,7 +197,7 @@ constexpr bool staged_memory_dp(u16 word)
 
 constexpr bool staged_extended_banz(u16 word)
 {
-	return (word & 0xff00) == 0x6c00 && u8(word) >= 0xe0 && u8(word) < 0xf8;
+	return (word & 0xfd00) == 0x6c00 && u8(word) >= 0xe0 && u8(word) < 0xf8;
 }
 
 constexpr bool staged_banz(u16 word)

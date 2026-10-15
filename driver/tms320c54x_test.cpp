@@ -7844,13 +7844,14 @@ private:
 	void start_pipeline_extended_banz(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = extended_banz_case(variant);
+		bool const delayed = !strcmp(machine().options().bios(), "banzd-long"), two_word = delayed && variant >= 2304;
+		auto const f = extended_banz_case(variant % 2304);
 		bool const compatibility = (variant / 192) % 2;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
-		program.write_word(f.base + 0x600, 0x6c00 | (0xe0 + f.form * 8 + f.reg));
+		program.write_word(f.base + 0x600, (delayed ? 0x6e00 : 0x6c00) | (0xe0 + f.form * 8 + f.reg));
 		program.write_word(f.base + 0x601, f.offset); program.write_word(f.base + 0x602, 0x700);
-		program.write_word(f.base + 0x603, 0xe811); program.write_word(f.base + 0x604, 0xe922);
+		program.write_word(f.base + 0x603, two_word ? 0xf020 : 0xe811); program.write_word(f.base + 0x604, two_word ? 0x33 : 0xe922);
 		program.write_word(f.base + 0x700, 0xe844); program.write_word(f.base + 0x740, 0xe866);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -11777,6 +11778,7 @@ private:
 		if (!strcmp(machine().options().bios(), "logic-short")) { start_pipeline_memory_logic(); return; }
 		if (!strcmp(machine().options().bios(), "logic-peripheral")) { start_pipeline_peripheral_logic(); return; }
 		if (!strcmp(machine().options().bios(), "load-offset")) { start_pipeline_offset_load(); return; }
+		if (!strcmp(machine().options().bios(), "banzd-long")) { start_pipeline_extended_banz(); return; }
 		if (!strcmp(machine().options().bios(), "ret-load")) { start_return_load(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
@@ -36593,10 +36595,15 @@ private:
 		if (m_phase == 253090)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = extended_banz_case(variant);
+			bool const delayed = !strcmp(machine().options().bios(), "banzd-long"), two_word = delayed && variant >= 2304;
+			auto const f = extended_banz_case(variant % 2304);
 			bool const compatibility = (variant / 192) % 2;
-			unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 6}[variant / 768];
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 6}[(variant % 2304) / 768];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset BANZ owns its predicate, offset and target");
+			if (delayed && tick == 10)
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (two_word ? 0x33 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (two_word ? 0 : 0x22),
+					"Both delay words execute before the target can overwrite their accumulator result");
 			if (tick == 5)
 			{
 				auto const disable = machine().disable_side_effects();
@@ -36619,8 +36626,8 @@ private:
 			{
 				u16 const st0 = compatibility && f.reg ? (0x6608 & ~0xe000) | (f.reg << 13) : compatibility ? 0x6608 : 0x608;
 				expect(m_pipeline_extensions_reads == 2 && m_pipeline_operand_reads == unsigned(f.resolved != 0) &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.resolved ? 0x44 : 0x11) &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == (f.resolved ? 0 : 0x22) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.resolved ? 0x44 : two_word ? 0x33 : 0x11) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed ? two_word ? 0 : 0x22 : f.resolved ? 0 : 0x22) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (compatibility ? 0x20 : 0)) &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == (f.resolved ? 0 : 1),
 					"BANZ retains its predicate and target despite later AR/BK/literal changes, without data-memory access or flag changes");
@@ -36633,7 +36640,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253100; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 2303) { start_pipeline_extended_banz(variant + 1); return; }
+				if (variant < (delayed ? 4607 : 2303)) { start_pipeline_extended_banz(variant + 1); return; }
+				if (delayed)
+				{
+					osd_printf_info("TMS320C54x staged long-offset BANZD: PASS cases=4608 restore=4608 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 delay_forms=two_single,one_double offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated long BANZD complete");
+				}
 				osd_printf_info("TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
 				start_pipeline_immediate_arithmetic(); return;
 			}
@@ -40280,6 +40292,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(117, "mvdd-source-edge", "Rejected mapped dual-transfer endpoint combinations")
 	ROM_SYSTEM_BIOS(118, "ret-load", "Adjacent load and conditional return replay")
 	ROM_SYSTEM_BIOS(119, "carry-branch", "Carry branch retained decision and delay replay")
+	ROM_SYSTEM_BIOS(120, "banzd-long", "Long-offset delayed BANZ ownership and replay")
 ROM_END
 
 ROM_START(tms54rom4)

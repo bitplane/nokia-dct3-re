@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`6eea` at `02:94c5` (live PC `02:94c7`). This is not complete recording or
+`7f00` at `02:8931` (live PC `02:8933`). This is not complete recording or
 validated audio.
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
@@ -50,6 +50,19 @@ two pages, four snapshots and post-evaluation flag mutation. Branch target
 and literal fetches remain exactly once. Arithmetic carry producers are not
 covered by this fixture. TC, BIO and adjacent-load return controls also pass;
 the runner has 98 passing unit tests. This does not renew full-suite acceptance.
+Long-offset BANZD `6eea ffff 949b` at `02:94c5` now shares the existing
+retained offset-address and delayed-branch machinery. Offset `-1` and target
+`949b` are separate retained extensions; the following `7006 0012` is one
+two-word delay instruction, not another branch operand. `banzd-long` passes
+4,608 cases/restores covering all eight registers, offset/preincrement/circular
+forms, eight offset pairs, both CMPT states, two pages and both delay layouts.
+Later literal/AR/BK changes cannot alter the captured decision or duplicate
+the auxiliary update. No data-memory transaction is performed by the branch.
+The runner has 99 passing unit tests and the full tool suite passes 2,807 tests
+with one skip; physical stage timing remains unvalidated.
+The full default CPU conformance run also passes all 288 required markers
+on this CPU revision. This renews the default-suite checkpoint, not every
+additional isolated profile or native audio acceptance.
 The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words

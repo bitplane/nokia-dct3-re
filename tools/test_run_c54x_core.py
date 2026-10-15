@@ -750,6 +750,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(output.replace(old, new), 3, profile='carry-branch')
 
+    def test_long_delayed_banz_scope(self):
+        marker, ending = EXTRA_PROFILES['banzd-long']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='banzd-long')
+        for old, new in (('restore=4608', 'restore=0'),
+                         ('delay_forms=two_single,one_double', 'delay_forms=two_single'),
+                         ('offset_fetches=1', 'offset_fetches=2'),
+                         ('data_accesses=0', 'data_accesses=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='banzd-long')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

@@ -404,6 +404,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "banzd-long": (
+        "TMS320C54x staged long-offset BANZD: PASS cases=4608 restore=4608 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 delay_forms=two_single,one_double offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated long BANZD complete",
+    ),
     "carry-branch": (
         "TMS320C54x staged carry branches: PASS cases=384 forms=BC,BCD conditions=C,NC producer=status_bit gaps=0,1,2 pages=2 restore=384 post_evaluate_change=0,1 duplicate_fetches=0 arithmetic_producers=unvalidated",
         "Fatal error: TMS320C54x isolated carry branches complete",
