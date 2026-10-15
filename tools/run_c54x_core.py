@@ -404,6 +404,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "cmp-delay-edge": (
+        "TMS320C54x delayed comparison exclusions: PASS cases=48 restore=48 controls=BD,BCD_TC,BCD_NTC operations=2 layouts=last_word,three_word pages=2 snapshots=2 operand_reads=0 data_writes=0 register_publication=0 literal_prefetch=unclaimed silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated delayed comparison exclusions complete",
+    ),
+    "compare-delay": (
+        "TMS320C54x delayed CMPM BITF: PASS cases=27648 restore=27648 controls=BD,BCD_TC,BCD_NTC operations=2 forms=DP,SP,postincrement value_pairs=16 initial_tc=2 prefix=none,BITF sources=none,IRQ,NMI pages=2 snapshots=4 branch_decision=retained literal_reads=once operand_writes=0 interrupt_after_publication=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed comparison complete",
+    ),
     "store-index": (
         "TMS320C54x staged indexed STL STH: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 selectors=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read data=Execute destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated indexed STL STH complete",

@@ -23,27 +23,45 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the staged control-delay
-exclusion for `CMPM` (`6002`) at `03:e6e9`, in the two-word delay span of
-the conditional delayed branch at `03:e6e7` (live PC `03:e6ea`),
-within a five-second observation,
+pin-decoded response words before stopping at unsupported staged
+`LD Smem,ASM` (`3202`) at `03:e6f0` (live PC `03:e6f2`) within a five-second
+observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record 147 MAX entries at `03:dced` and 57 indexed-store
-entries at `03:dd9a` in that observation, with no observer writes.
-This establishes execution, not just Decode admission; a younger unsupported
-instruction can otherwise stop the pipeline before an admitted prefix executes.
+Passive Execute hooks record one branch entry at `03:e6e7` but zero entries
+for its delayed CMPM at `03:e6e9`, with no observer writes. CMPM is now admitted
+and passes the isolated composition fixture below, but the younger unsupported
+instruction stops Decode before it executes in this original sequence. A moved
+Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
 
 At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
-required markers and its terminal completion check. Subsequent MAX/MIN and
-indexed-store changes have focused acceptance, not a renewed full default run.
+required markers and its terminal completion check. Subsequent changes have
+focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,821 tests with one skip; the native 5110
+The tool suite passes 2,822 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Short two-word CMPM/BITF is admitted in a complete BD/BCD delay span. The
+owner is recovered from retained pipeline slots, not reread from program
+memory; calls and returns remain excluded. SPRU131G section 6.3.2 permits one
+two-word instruction after a delayed conditional branch and requires that its
+effects do not change the condition already tested. `compare-delay` passes
+27,648 cases/restores across BD/BCD TC/BCD NTC, CMPM/BITF, DP/SP/postincrement
+RAM sources, 16 value pairs, both initial TC states, an optional instruction-
+driven BITF prefix, none/IRQ/NMI, two pages and four snapshots. The comparison
+may overwrite TC without retargeting the branch. Replaced literals, RAM and
+postincrement pointers cannot change retained inputs; IRQ/NMI acknowledgement
+follows TC publication. Interrupt return is checked by the selected continuation,
+balanced SP and restored status, not an IDLE bit that the interrupt may wake.
+`cmp-delay-edge` adds 48 exclusions for a two-word instruction starting in the
+last delay word or a three-word comparison, before operand reads or register
+publication. Speculative literal prefetch is not claimed absent, and rejection
+is not a silicon trap claim. MVDM-delay, standalone CMPM-branch and delayed-store
+controls pass. These tests do not establish measured physical phase timing.
 
 AR0-indexed STL/STH now admits low-byte modes `a8..af` and `b0..b7` for
 opcode upper bytes `80..83`. The existing store path retains the address and
@@ -59,8 +77,6 @@ ARs after Read also detects duplicate pointer updates. Low-page CPU/peripheral
 destinations fail closed before update/write; this is not a silicon trap claim.
 Instruction-driven producer and delayed-control composition, and physical bus
 phase timing, remain unvalidated. Store-bypass and indexed-MAR controls pass.
-The new CMPM delay exclusion is a composition boundary, not evidence that the
-standalone comparison opcode is missing.
 
 MAX/MIN (`f486/f586/f487/f587`, SPRU172C 4-99/100) compares signed 40-bit
 accumulators in Execute and replaces only the selected destination and carry.

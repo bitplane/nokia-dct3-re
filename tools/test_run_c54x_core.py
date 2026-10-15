@@ -861,6 +861,22 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_delayed_comparison_profile_scope(self):
+        marker, ending = EXTRA_PROFILES['cmp-delay-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='cmp-delay-edge')
+        with self.assertRaises(ValueError):
+            check_result(output.replace('restore=48', 'restore=0'), 3, profile='cmp-delay-edge')
+        marker, ending = EXTRA_PROFILES['compare-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='compare-delay')
+        for old, new in (('restore=27648', 'restore=0'),
+                         ('branch_decision=retained', 'branch_decision=reevaluated'),
+                         ('literal_reads=once', 'literal_reads=twice'),
+                         ('interrupt_after_publication=1', 'interrupt_after_publication=0')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='compare-delay')
+
     def test_indexed_store_profile_scope(self):
         marker, ending = EXTRA_PROFILES['store-index']
         output = marker + '\n' + ending + '\n'
