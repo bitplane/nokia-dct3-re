@@ -34,9 +34,11 @@ The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
 times in a five-second passive observation. Reverse-carry MAR `6dbb` at
 `03:c84a` reaches Execute once. The internal delayed branch `fa42` at
 `03:c852` and its join at `03:c85e` each reach Execute 510 times. The next
-stop is unsupported `8793` at `03:e0c9` (live/terminal PC `03:e0cb`,
-`illegal=1`). Immediate ASM load `ed1e` at `03:cfb7` reaches Execute once.
-The next opcode's instruction contract remains to be decoded. The post-loop
+stop is a control-delay exclusion for `6f00` at `03:d01d`, owned by control
+`03:d01b` with four control words (live/terminal PC `03:d01e`, `illegal=1`).
+Its extension and complete delay-word contract remain to be decoded.
+ASM stores at `03:e0c9` and `03:e0e7` each reach Execute 128 times;
+immediate ASM load `ed1e` at `03:cfb7` reaches Execute once. The post-loop
 BRC reload has separate write-stage ownership, as described below.
 The intervening indirect PMST and repeat-control restore exclusions are
 covered by the bounded tests below.
@@ -59,6 +61,31 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### ASM-controlled accumulator stores
+
+`8793` at `03:e0c9` is `STH B,ASM,*AR3+`; `84b5` at `03:e0e7` is
+`STL A,ASM,*AR5+0`. The frontend admits short DP/SP/basic-indirect and
+AR0-indexed add/subtract forms, with RAM destinations only. The existing
+Read-owned address update retains ASM before older Execute publications;
+the accumulator and SXM/SST handling remain Execute-owned. Dedicated
+ASM loads forward their publication to meet SPRU131G example 7-52's
+zero-gap contract. Ordinary ST1 writes do not receive that forwarding
+(table 7-22). This is a partial stage model, not measured bus timing.
+
+`asm-store` and `asm-store-ld` each pass 122,880 cases/restores: four
+STL/STH A/B selectors, all 32 shifts, eight accumulator patterns, four
+SXM/SST states, DP/SP/postincrement/indexed-sub/indexed-add forms, two
+pages and three snapshots. The second profile prefixes an immediate ASM
+load without a gap. After Read, ASM/address/index mutations must not
+change the write, while accumulator mutation must affect it. Independent
+shift/saturation expectations check one Execute write and no data reads.
+The indexed composition uses AR5 and AR0=3; the broader ordinary indexed
+store matrix remains a separate address-generation regression. Final-tree
+store-index/bypass/preincrement/delay and immediate-ASM/block-branch
+controls pass separately. Long-offset, preincrement, reverse/circular ASM
+store forms, mapped destinations, general ST1-producer latency and
+interrupt/repeat/delay composition are not established by these matrices.
 
 ### Immediate ASM publication
 
@@ -354,7 +381,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,852 tests with one skip; the native 5110
+The tool suite passes 2,853 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

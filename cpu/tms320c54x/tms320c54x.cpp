@@ -427,11 +427,16 @@ constexpr bool staged_extended_accumulator_store(u16 word)
 	return (word & 0xfc00) == 0x8000 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
 }
 
+constexpr bool staged_asm_store(u16 word)
+{
+	return (word & 0xfc00) == 0x8400 && (u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8));
+}
+
 constexpr bool staged_store(u16 word)
 {
 	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xa0) ||
 		((word & 0xfc00) == 0x8000 && u8(word) >= 0xa8 && u8(word) < 0xb8) ||
-		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || staged_extended_accumulator_store(word);
+		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || staged_extended_accumulator_store(word) || staged_asm_store(word);
 }
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
@@ -3193,6 +3198,14 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 		else m_pipeline_operand_address[4] = basic_address(4, mode);
+		if (staged_asm_store(m_pipeline_word[4]))
+		{
+			if (m_pipeline_operand_address[4] < 0x60)
+			{
+				logerror("%s: staged ASM store register/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			m_pipeline_immediate[4] = m_st1 & 0x1f;
+		}
 		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && mode >= 0xa8 && mode < 0xb8 && m_pipeline_operand_address[4] < 0x60)
 		{
 			logerror("%s: staged AR0-indexed accumulator store low-page destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -4045,9 +4058,15 @@ void tms320c54x_device::pipeline_step()
 			data_write(u8(m_op), u16(saturated_store(accumulator(BIT(m_op, 8)))));
 		else if (staged_store(m_op))
 		{
+			u64 value = accumulator(BIT(m_op, 8));
+			if (staged_asm_store(m_op))
+			{
+				int const shift = s8((m_pipeline_immediate[5] & 31) << 3) >> 3;
+				value = shift < 0 ? BIT(m_st1, 8) ? arithmetic_shift_right(value, -shift) : value >> -shift : (value << shift) & ACC_MASK;
+			}
 			data_write(m_pipeline_operand_address[5], (m_op & 0xfe00) == 0x8c00
 				? (BIT(m_op, 8) ? m_trn : m_t)
-				: u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));
+				: u16(saturated_store(value) >> (BIT(m_op, 9) ? 16 : 0)));
 			if (staged_extended_accumulator_store(m_op)) ++m_pc;
 		}
 		else if (staged_rmw(m_op))
@@ -4254,6 +4273,11 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (m_pipeline_valid[4] && staged_asm_store(m_pipeline_word[4]) && m_pipeline_valid[5] &&
+		(staged_immediate_asm(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x3200))
+		// SPRU131G example 7-52: dedicated ASM loads forward with no gap;
+		// ordinary ST1 writes retain the pre-Execute Read sample (table 7-22).
+		m_pipeline_immediate[4] = m_st1 & 0x1f;
 	if (late_popm_read)
 	{
 		// SPRU131G 7.3.2: a same-location on-chip read can consume a

@@ -840,6 +840,14 @@ EXTRA_PROFILES = {
         "TMS320C54x immediate ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero data_reads=0 data_writes=0 opcode_mutation_after_fetch=1 publication=Execute physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated immediate ASM consumers complete",
     ),
+    "asm-store": (
+        "TMS320C54x short ASM stores: PASS cases=122880 restore=122880 selectors=4 shifts=32 patterns=8 sxm_sst=4 forms=DP,SP,postincrement,indexed_sub,indexed_add pages=2 snapshots=3 source=Execute address_and_shift=Read writes=1 data_reads=0 asm_load_prefix=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated short ASM stores complete",
+    ),
+    "asm-store-ld": (
+        "TMS320C54x short ASM stores: PASS cases=122880 restore=122880 selectors=4 shifts=32 patterns=8 sxm_sst=4 forms=DP,SP,postincrement,indexed_sub,indexed_add pages=2 snapshots=3 source=Execute address_and_shift=Read writes=1 data_reads=0 asm_load_prefix=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated short ASM stores complete",
+    ),
     "pmst-map": (
         "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
         "Fatal error: TMS320C54x isolated PMST mapping complete",
