@@ -12,6 +12,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_store_bypass_scope(self):
+        marker, ending = EXTRA_PROFILES['store-bypass']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='store-bypass')
+        for bad in (output.replace('restore=288', 'restore=0'),
+                    output.replace('alias_reads=0', 'alias_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='store-bypass')
+
     def test_peripheral_ldu_scope(self):
         marker, ending = EXTRA_PROFILES['ldu-periph']
         output = marker + '\n' + ending + '\n'

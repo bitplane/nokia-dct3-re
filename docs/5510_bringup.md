@@ -13,10 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-an ADD decoded as `0000` at logical `02:2050`, source `001d`
-(live PC `02:2053`). This disagrees with the resident image's `4a1e`
-at that logical address; mapping/write history must be established before
-expanding arithmetic acceptance. The memory load at `02:9edc`
+STLM B,BK (`8919`) at `02:e1e7` (live PC `02:e1e9`). Ordinary
+store-to-load bypass now prevents stale stack locals from corrupting IMR
+and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
 its physical ownership remains unknown. Software INTR 25
 (`f7d9`) at `02:9c74` now executes. Forward
@@ -1692,6 +1691,23 @@ The bench currently backs this unowned gap with RAM. Its DA150 hardware
 meaning remains unverified; execution beyond this access is bench behavior,
 not validation of a new peripheral or Nokia register map.
 
+SPRU131G 7.3.2 specifies an internal-bus bypass when a younger on-chip
+data read addresses the same location as a pending write. The retained
+frontend applies it to STL/STH A/B and T/TRN stores, in addition to RMW
+producers. The `store-bypass` fixture covers 288 cases/restores over six
+producers, unsigned-load consumers targeting both accumulators, adjacent/NOP-separated loads,
+same/different locations, two pages and three snapshots. An adjacent
+same-location load consumes the pending value without a backing read;
+the real store still writes once at Execute. Different locations and
+NOP-separated loads perform one real read. Stack instructions retain their
+separate ordering contract, and peripheral/bank contention is not covered.
+In original MU4 object initialization, `02:a39d/a39e` and `02:a386/a387`
+are adjacent store/load pairs. Reading stale locals selected an invalid
+object branch, wrote `bf7a` through a null pointer into IMR and accepted
+source 4 into the self-loop at vector `2050`. Repeated pushes eventually
+overwrote PMST and exposed zero program memory. This was not missing ADD
+support or an absent resident word; the ordinary-store bypass removes it.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3359,9 +3375,8 @@ transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 (`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
 inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
-unowned `002a` location. The next stop is a decoded `0000` at logical
-`02:2050` (source `001d`, live PC `02:2053`), unlike the resident
-image's `4a1e`; program mapping/write history is unresolved. All
+unowned `002a` location. The next stop is STLM B,BK (`8919`) at
+`02:e1e7` (live PC `02:e1e9`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3657,9 +3672,8 @@ recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
 decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
 inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
-`02:9edc`. The next stop is decoded `0000` at logical `02:2050`,
-source `001d`, unlike resident word `4a1e`; establish program mapping
-and write history before accepting this as a genuine ADD instruction.
+`02:9edc`. The next stop is STLM B,BK (`8919`) at `02:e1e7`,
+live PC `02:e1e9`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,

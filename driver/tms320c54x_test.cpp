@@ -8542,6 +8542,34 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254380;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static u16 store_bypass_value(unsigned variant)
+	{
+		return std::array<u16, 6>{0x789a, 0x9876, 0x3456, 0xdcba, 0xbeef, 0x8001}[variant % 6];
+	}
+	void start_store_bypass(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const kind = variant % 6, gap = (variant / 12) % 2;
+		bool const destination = (variant / 6) % 2, alias = (variant / 24) % 2;
+		u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
+		u16 const value = store_bypass_value(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, std::array<u16, 6>{0x8082, 0x8182, 0x8282, 0x8382, 0x8c82, 0x8d82}[kind]);
+		program.write_word(base + 0x601 + gap, 0x1283 | (destination ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x8001);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, alias ? 0x5000 : 0x5001);
+		data.write_word(0x5000, 0xdead); data.write_word(0x5001, 0xcafe);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "store_bypass_read", [this, value, gap, alias](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!(alias && !gap) && at == (alias ? 0x5000 : 0x5001) && word == (alias ? value : 0xcafe) && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == 6 + gap, "Only non-bypassed loads read the backing memory once"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "store_bypass_write", [this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x5000 && word == value && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == 6, "Bypass preserves one real Execute-owned store"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254440;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_software_intr(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11209,6 +11237,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "store-bypass")) { start_store_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "software-intr")) { start_software_intr(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-br-edges")) { start_block_branch_edge(); return; }
 		if (!strcmp(machine().options().bios(), "signed-branch")) { start_pipeline_signed_branch(); return; }
@@ -37790,6 +37819,27 @@ private:
 		}
 		if (m_phase == 254370) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 254371; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254440)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / 96, gap = (variant / 12) % 2;
+			bool const destination = (variant / 6) % 2, alias = (variant / 24) % 2;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store-to-load bypass remains staged");
+			if (tick == 5) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000);
+			if (tick == 5 + gap) m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x6001);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before, during and after a same-location store bypass"); }
+			if (tick == 18)
+			{
+				u16 const value = alias ? store_bypass_value(variant) : 0xcafe;
+				expect(m_pipeline_operand_reads == unsigned(!alias || gap) && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (destination ? 0x123456789aULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (destination ? value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Same-location load consumes the pending store without stale memory, duplicate writes or status changes");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay same-location bypass from retained pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254450; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_store_bypass(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged store bypass: PASS cases=288 restore=288 producers=STL_A,STL_B,STH_A,STH_B,T,TRN destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated store bypass complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254450) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254440; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254400)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 128 ? 5 : 3;
@@ -39300,6 +39350,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(96, "plain-branch", "Existing held-word conditional branch controls")
 	ROM_SYSTEM_BIOS(97, "software-intr", "Retained software interrupt entry and return")
 	ROM_SYSTEM_BIOS(98, "ldu-periph", "Retained unsigned peripheral bus loads")
+	ROM_SYSTEM_BIOS(99, "store-bypass", "Same-location store and load bus bypass")
 ROM_END
 
 ROM_START(tms54rom4)

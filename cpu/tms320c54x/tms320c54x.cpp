@@ -3293,7 +3293,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (source < 0x60 && (source < (multiply || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !(bitfield && source >= 0x20))
 		{
-			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), m_pipeline_word[3], source);
+			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x physical=%06x word=%04x source=%04x pmst=%04x\n", machine().describe_context(), shifted ? "shifted load" : multiply ? "memory multiply" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), unsigned(m_pipeline_physical_address[3]), m_pipeline_word[3], source, m_pmst);
 			m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);
@@ -4195,7 +4195,15 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
-	// this partial model covers retained RMW producers, not bank contention.
+	// This partial model covers retained RMW and ordinary store producers,
+	// not bank contention or stack instructions' separate read ordering.
+	if (address >= 0x60 && m_pipeline_valid[5] && staged_store(m_pipeline_word[5]) &&
+		address == m_pipeline_operand_address[5])
+	{
+		u16 const word = m_pipeline_word[5];
+		return (word & 0xfe00) == 0x8c00 ? (BIT(word, 8) ? m_trn : m_t) :
+			u16(saturated_store(accumulator(BIT(word, 8))) >> (BIT(word, 9) ? 16 : 0));
+	}
 	if (address >= 0x60 && m_pipeline_valid[5] && staged_rmw(m_pipeline_word[5]) &&
 		address == m_pipeline_operand_address[5])
 	{

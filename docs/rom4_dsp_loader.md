@@ -89,10 +89,10 @@ output words `0580,0a09` are observed. Forward near B/BC inside
 `02:a0ea..02:a0fd` now executes, with 12,288 IRQ/NMI/replay cases and
 32 exclusion cases. Software INTR 25 (`f7d9`) at `02:9c74` now
 executes, as does unsigned load `1281` at `02:9edc`. Its source `002a`
-is backed by bench RAM, not an identified DA150 register. The next stop
-decodes `0000` at logical `02:2050` (source `001d`, live PC `02:2053`),
-where the resident image contains `4a1e`. Program mapping/write history
-must be resolved before treating this as an arithmetic-coverage gap.
+is backed by bench RAM, not an identified DA150 register. Same-location
+STL/STH/T/TRN-to-load bypass is now covered by 288 replay cases, avoiding
+stale stack locals and the resulting IMR corruption/default-vector loop.
+The next stop is STLM B,BK (`8919`) at `02:e1e7` (live PC `02:e1e9`).
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.
