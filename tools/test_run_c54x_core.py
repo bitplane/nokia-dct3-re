@@ -861,6 +861,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_block_backward_profile_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-back']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-back')
+        for old, new in (('restore=1536', 'restore=0'),
+                         ('outer_counts_preserved=1', 'outer_counts_preserved=0'),
+                         ('held_words_restored=1', 'held_words_restored=0')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rptb-back')
+
     def test_block_far_call_profile_scope(self):
         edge, end = EXTRA_PROFILES['rptb-fcall-edge']
         check_result(edge + '\n' + end + '\n', 3, profile='rptb-fcall-edge')

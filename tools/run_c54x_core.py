@@ -397,7 +397,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated software INTR complete",
     ),
     "rptb-br-edges": (
-        "TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 backward_targets=1 outside_targets=1 delayed_control=1 calls=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
+        "TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 below_block_targets=1 outside_targets=1 delayed_control=1 conditional_call=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block branch exclusions complete",
     ),
     "signed-branch": (
@@ -431,6 +431,10 @@ EXTRA_PROFILES = {
     "t-load-control": (
         "TMS320C54x T load control: PASS load_cases=55296 pair_cases=768 restore=56064 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated T load control complete",
+    ),
+    "rptb-back": (
+        "TMS320C54x backward in-block branches: PASS cases=1536 restore=1536 outer_counts=4 inner_counts=4 forms=conditional_back,unconditional_back accumulators=2 pages=2 sources=none,IRQ,NMI snapshots=4 ordered_copies=1 outer_counts_preserved=1 held_words_restored=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated backward in-block branches complete",
     ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",

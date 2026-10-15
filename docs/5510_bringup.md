@@ -23,14 +23,14 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the active-block control/count
-exclusion for conditional branch `f84a` at `02:a39f` inside block
-`02:a384..02:a3a5` (live PC `02:a3a2`) within a five-second observation,
+pin-decoded response words before stopping at the long-memory control-delay
+exclusion for `10e1` at `03:a5b4`, following control at `03:a5b2`
+(live PC `03:a5b6`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record three `MACSU` entries at `03:dc95` and one
-non-delayed far call (`f983`) at `02:a395`, with no observer writes.
+Passive Execute hooks record 220 far-call entries at `02:a395` and 221
+conditional-branch entries at `02:a39f`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +40,29 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,829 tests with one skip; the native 5110
+The tool suite passes 2,830 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Near B and non-delayed BC admit backward as well as forward targets inside
+the current block, provided the complete branch precedes REA. A taken branch
+rebuilds discarded endpoint predictions from Decode-owned BRC; an untaken BC
+retains the held word's block metadata. Back edges do not consume outer
+iterations. Conditional calls are explicitly excluded from this branch class,
+despite sharing the generic conditional-control predicate.
+
+`rptb-back` passes 1,536 cases/restores across outer counts 0/1/2/7, inner
+counts 1/2/4/8, conditional GE back edges or LT exits plus unconditional back
+edges, both accumulators, two pages, none/IRQ/NMI and four snapshots. Each
+outer iteration initializes its inner accumulator counter; the inner loop
+copies ordered RAM words until negative. The test checks exactly
+`(outer+1)*inner` copies, one outer suffix, final counters/BRAF, continuation,
+balanced interrupt frames and restored held words. Interrupts arrive after
+the first copy, not at every clock. The 32-case `rptb-br-edges` control now
+tests below/above-block targets and a conditional call instead of treating
+ordinary backward branches as unsupported. Unconditional near calls remain
+covered by `rptb-fcall-edge`. Outside-block branches, delayed back edges and
+measured physical phase timing remain unvalidated.
 
 Non-delayed FCALL is admitted from inside a block when the complete call
 precedes the endpoint and its target is outside that block. Existing retained
@@ -4340,12 +4360,13 @@ evidence validation and native 5110 restoration. No new
 CPU saved fields are introduced. The shared broad checkpoint also covers
 these profiles without promoting untested compositions.
 
-Forward near B and nondelayed BC now retain block-loop ownership. The
-two-word branch must finish before REA and target the same block at or
-after its sequential continuation. A taken redirect reconstructs the
+Near B and nondelayed BC retain block-loop ownership. The two-word branch
+must finish before REA and target the same block; forward and backward
+targets are supported. Conditional calls are not branches for this admission.
+A taken redirect reconstructs the
 discarded endpoint-fetch prediction from Decode-owned BRC. An untaken
 BC restores its held word's body/endpoint/final-first tags alongside its
-word and address. Those three additional saved booleans belong to the
+word and address. Those three saved booleans belong to the
 CPU's pending instruction state; they are reset and registered for replay.
 BRC decrement and final-iteration BRAF timing remain as specified by
 SPRU131G sections 6.8/7.5.8.
@@ -4362,18 +4383,16 @@ settle before a coincident save, and restored pin changes settle before
 CPU resumption. These are declared model clocks, not measured silicon
 phases.
 
-The `rptb-br-edges` fixture passes 32 fail-closed replay cases for backward
-and out-of-block targets, delayed control, near calls, nested blocks and far
+The `rptb-br-edges` fixture passes 32 fail-closed replay cases for targets below
+and above the block, delayed control, conditional near calls, nested blocks and far
 branches, with no control frame or body write. Branches occupying the
 endpoint, XC/IDLE in the block and software loop-control modification
-remain excluded by the existing RPTB guards. Original RPTB/IRQ/NMI and
-edge controls, ordinary accumulator/TC/BIO/held-word branches, conditional
-call/return, stack-IRQ round trips, IPTR/prefetch and repeated POPD pass
-(14 profiles total including the new fixtures). All 82 core-result tests,
-the 2,790-test tool suite (one skip), evidence validation and native 5110
-restoration pass. The shared broad baseline remains the versioned
-checkpoint above. Backward/outside/call/delayed compositions and physical
-silicon phase claims are not promoted.
+remain excluded by the existing RPTB guards. Non-delayed far-call acceptance
+and backward-loop acceptance are specified in the retained contracts above;
+near-call, outside-block branch and delayed compositions are not promoted.
+The shared broad baseline remains the versioned checkpoint above, independently
+of focused acceptance added since that run. These are not measured silicon
+phase claims.
 
 All 48,261 program and
 3,656 compared resident data words still match. This remains partial

@@ -2961,13 +2961,13 @@ void tms320c54x_device::pipeline_step()
 		bool const block_setup = word == 0xf072;
 		bool const block_word = m_pipeline_block_body[2];
 		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
-		bool const forward_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !BIT(word, 9))) &&
-			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_address[2] + 2 && block_branch_target <= m_pipeline_block_end_address;
+		bool const internal_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
+			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
 		bool const block_far_call = staged_far_call(word) && !BIT(word, 9) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address &&
 			(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
-		if (m_pipeline_valid[2] && block_word && ((branch && !forward_block_branch && !block_far_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !block_far_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
