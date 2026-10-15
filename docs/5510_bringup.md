@@ -23,13 +23,13 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at unsupported opcode `10b3`
-at `03:dd3a` (live PC `03:dd3c`) within a five-second observation,
+pin-decoded response words before stopping at unsupported staged `RPTBD`
+(`f272`) at `03:d9c4` (live PC `03:d9c6`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record 221 conditional-branch entries at `02:a39f`
-and one delayed offset-load entry at `03:a5b4`, with no observer writes.
+Passive Execute hooks record one delayed offset-load entry at `03:a5b4`
+and one AR0-indexed load entry at `03:dd3a`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -39,9 +39,27 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,831 tests with one skip; the native 5110
+The tool suite passes 2,832 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Plain LD through `*ARx-0` or `*ARx+0` captures its old source address and
+AR0-sized postmodify in Access. Read samples the retained RAM address;
+Execute sign-extends or zero-extends according to SXM without rewriting the
+pointer or changing carry/overflow. CMPT selects the indirect AR and may
+publish ARP as for existing basic indirect consumers. AR0 selecting itself
+uses the same pre-update value as address and index.
+
+`ld-ar0-index` passes 98,304 cases/restores: 96,000 RAM cases and 2,304 low
+mapped/peripheral exclusions before Read or pointer publication. The matrix
+crosses eight AR fields, plus/minus, CMPT, both destinations, eight index
+values, four RAM words, SXM/SST/OVM, two pages and three snapshots. SST and
+OVM do not alter the word load. Pointer/index replacement after Decode checks
+Access ownership; pointer replacement after Access and RAM replacement after
+Read cannot affect the retained operand or duplicate updates. The exclusions
+are prototype limits, not silicon faults. General producer latency,
+interrupt/delay composition, other unadmitted address modifiers and measured
+physical phase timing remain unvalidated.
 
 Plain LD Smem,A/B with a long-offset address can occupy a complete two-word
 control-delay span. Decode counts both words before admission; existing

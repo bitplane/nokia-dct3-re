@@ -11370,6 +11370,32 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254960;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static indexed_store_fixture indexed_load_case(unsigned v)
+	{
+		auto f = indexed_store_case(v);
+		f.st1 = (f.st1 & ~0x200) | (f.selector & 2 ? 0x200 : 0);
+		f.word = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 1024) % 4];
+		f.value = u64(f.st1 & 0x100 ? s64(s16(f.word)) : s64(f.word)) & 0xffffffffffULL;
+		return f;
+	}
+	void start_indexed_load(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = indexed_load_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x1000 | ((f.selector & 1) << 8) | (f.add ? 0xb0 : 0xa8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
+		if (!f.excluded) data.write_word(f.address, f.word);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "indexed_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "AR0-indexed LD reads one retained old-address RAM word"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "indexed_load_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "AR0-indexed LD has no data writes"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "indexed_load_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Indexed LD fetches its single word once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255300;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct minmax_fixture
 	{
 		unsigned selector, snapshot;
@@ -12881,6 +12907,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-back")) { start_block_back(); return; }
 		if (!strcmp(machine().options().bios(), "load-delay")) { start_delay_load(); return; }
 		if (!strcmp(machine().options().bios(), "ld-delay-edge")) { start_delay_load_edge(); return; }
+		if (!strcmp(machine().options().bios(), "ld-ar0-index")) { start_indexed_load(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -40033,6 +40060,27 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255300)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_load_case(variant);
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 4), "Indexed LD admits RAM and excludes low mapped sources before effects");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.excluded && tick >= 6 && !(f.selector & 1) ? f.value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!f.excluded && tick >= 6 && (f.selector & 1) ? f.value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!f.excluded && tick >= 4 ? f.st0 : 0x8608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Indexed LD publishes a signed or unsigned word only in Execute without SST OVM or status side effects");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick <= 3 ? 0x3300 + i : f.excluded ? f.initial[i] : tick == 4 ? i == f.selected ? f.final_ar : f.initial[i] : 0x2200 + i), "Indexed LD samples AR and AR0 in Access and modifies its pointer exactly once");
+			if (tick == 3) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+			if (!f.excluded && tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
+			if (!f.excluded && tick == 5) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, f.word ^ 0xffff); }
+			if (tick == 3 + f.snapshot && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed LD around Decode address capture and RAM Read"); }
+			if (tick == 12)
+			{
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1, "Indexed LD completes one source transaction or rejects without one");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = 3 + f.snapshot; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed LD without resampling pointers RAM or applying its index twice"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255310; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 98303) { start_indexed_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x AR0 indexed LD: PASS cases=98304 restore=98304 ram_cases=96000 excluded_cases=2304 registers=8 index_directions=2 compatibility_states=2 destinations=2 index_values=8 memory_values=4 sxm_sst_ovm=8 pages=2 snapshots=3 address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated AR0 indexed LD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255310) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255300; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255280)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, guard = variant < 16 ? 6 : 5, checkpoint = guard - 1 + (variant < 16 ? variant / 8 : (variant - 16) / 6);
@@ -42132,6 +42180,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(160, "rptb-back", "Finite backward inner loops within block repeat")
 	ROM_SYSTEM_BIOS(161, "load-delay", "Complete offset LD in control delay words")
 	ROM_SYSTEM_BIOS(162, "ld-delay-edge", "Delay LD spill and unsupported load family exclusions")
+	ROM_SYSTEM_BIOS(163, "ld-ar0-index", "AR0 indexed plain LD address read and replay ownership")
 ROM_END
 
 ROM_START(tms54rom4)
