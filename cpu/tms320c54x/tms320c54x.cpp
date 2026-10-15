@@ -16,6 +16,11 @@ constexpr bool staged_xmem_bit(u16 word)
 	return (word & 0xff00) == 0x9600;
 }
 
+constexpr bool staged_xmem_load(u16 word)
+{
+	return (word & 0xfe00) == 0x9400;
+}
+
 constexpr bool staged_immediate_alu(u16 word)
 {
 	u16 const form = word & 0xfcf0;
@@ -2802,7 +2807,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || staged_timer_control(word);
 		if (m_pipeline_valid[2] && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_short_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
+			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -3229,13 +3234,13 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
-	if (m_pipeline_valid[3] && staged_xmem_bit(m_pipeline_word[3]))
+	if (m_pipeline_valid[3] && (staged_xmem_bit(m_pipeline_word[3]) || staged_xmem_load(m_pipeline_word[3])))
 	{
 		u8 const xmem = m_pipeline_word[3] >> 4;
 		m_pipeline_operand_address[3] = m_ar[2 + (xmem & 3)];
 		if (m_pipeline_operand_address[3] < 0x60)
 		{
-			logerror("%s: staged BIT register/peripheral source is unsupported\n", machine().describe_context());
+			logerror("%s: staged Xmem register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		dual_modify(xmem);
@@ -3250,7 +3255,7 @@ void tms320c54x_device::pipeline_step()
 		}
 	}
 	bool const read_memory_operand = m_pipeline_valid[4] && (staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_short_logic(m_pipeline_word[4]) ||
-		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800);
+		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_t_memory_operation(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || staged_xmem_load(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800);
 	// SPRU131G table 7-28: a two-word MPY has zero mapped-accumulator
 	// consumer latency. Finish this retained Read after its older Execute;
 	// do not change the one-word producer restriction or other bus reads.
@@ -3661,6 +3666,8 @@ void tms320c54x_device::pipeline_step()
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
 		}
+		else if (staged_xmem_load(m_op))
+			accumulator(BIT(m_op, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), m_op & 15, BIT(m_op, 8));
 		else if (staged_xmem_bit(m_op))
 			m_st0 = (m_st0 & ~u16(0x1000)) | (BIT(m_pipeline_operand[5], 15 - (m_op & 15)) ? 0x1000 : 0);
 		else if (staged_bitfield(m_op))

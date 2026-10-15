@@ -3291,8 +3291,8 @@ stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
-`02:3f7e`, EXP B at `02:3fa8` and ADDS at `02:3fad`, reaching
-syntax-5 LD Xmem (`9421`) at `02:3fbc` (live PC `02:3fbe`); all
+`02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
+`02:3fbc`, reaching CALA B (`f5e3`) at `02:40e1` (live PC `02:40e3`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3360,8 +3360,24 @@ one source read and no data writes are observed. Mapped/peripheral sources
 remain excluded. The shared fixture's SUBS control still passes 55,296
 cases/restores; EXP, push and LDU controls, 66 verifier tests and native
 5110 restoration also pass. The broad baseline remains the repeated-push
-checkpoint, not a fresh full-core run. The next form is `LD Xmem,SHFT,A`
-(syntax 5), not another unsigned ADD or a stray extension word.
+checkpoint, not a fresh full-core run. `9421` at the following load is
+`LD Xmem,SHFT,A` (syntax 5), not another unsigned ADD or a stray extension word.
+
+Syntax-5 LD now shares Xmem BIT's captured AR2..AR5 address and one-time
+Access modifier, retains its RAM word in Read and shifts that word at
+Execute through the existing signed/unsigned load helper. SPRU172C 4-66
+defines all 512 encodings (two destinations, sixteen Xmem modes and shifts
+0..15). The `xmem-load` fixture covers those encodings with eight data words,
+eight flag configurations, two pages and three snapshots: 196,608 replays.
+Distinct AR2..AR5 addresses detect incorrect register selection; percent
+addressing covers BK=0 linear behavior and a nonzero-BK wrap. Pointer and
+source mutation after capture must not retarget or change the load. The
+old accumulator remains through Read at clock 5 and the shifted result
+publishes at Execute at clock 6; other accumulator, T and status stay intact.
+There is one opcode fetch and one data read, with no data writes. Mapped/
+peripheral sources, repeats and interrupt composition remain outside this
+acceptance. The next original form is a near accumulator-indirect call,
+CALA B, requiring retained target and single-word return-frame ownership.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

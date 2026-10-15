@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_xmem_load_scope(self):
+        marker, ending = EXTRA_PROFILES['xmem-load']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='xmem-load')
+        for bad in (output.replace('restore=196608', 'restore=0'),
+                    output.replace('captured_source=1', 'captured_source=0'),
+                    output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
+                    output.replace('repeat_acceptance=0', 'repeat_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='xmem-load')
+
     def test_unsigned_add_scope(self):
         marker, ending = EXTRA_PROFILES['adds']
         output = marker + '\n' + ending + '\n'

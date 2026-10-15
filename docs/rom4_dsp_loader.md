@@ -60,7 +60,8 @@ it does not claim new running-timer timing validation. Original R060 now
 executes conditional return `fc43` at `02:3e44` after the full signed
 accumulator predicate family gained 768-case replay coverage. Repeated PSHD
 at `02:3f7e`, EXP B (`f58e`) at `02:3fa8` and ADDS at `02:3fad` also
-execute; the next stop is syntax-5 LD Xmem (`9421`) at `02:3fbc`, not full boot.
+execute. Syntax-5 LD Xmem at `02:3fbc` also executes; the next stop is
+CALA B (`f5e3`) at `02:40e1`, not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve
 owned registers with 288 Access/Read/Execute replays, retaining one source
@@ -83,15 +84,21 @@ fixture. The unsigned operand ignores SXM; carry, sticky destination overflow,
 OVM saturation, retained address/literal/read operands and single-access
 counts are checked over all eighteen covered forms. Its SUBS control also
 passes 55,296 replays. Mapped/peripheral sources remain excluded.
+Syntax-5 Xmem LD covers all 512 encodings in 196,608 replay cases, retaining
+the selected AR2..AR5 RAM address and Read word before Execute's shift.
+Distinct source pointers, source mutation, BK=0/nonzero wrap, both
+destinations, all sixteen shifts and three snapshots are checked. T,
+unselected accumulator and status are preserved. Mapped/peripheral sources,
+repeats and interrupt composition are not covered.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. The repeated-push broad baseline passes the full
 288-marker regression, all 46 isolated profiles, 64 verifier tests and
 native 5110 save-state restoration. These checks establish the declared
 execution models, not full MU4 boot, the physical DA150 map or native speech.
-The subsequent EXP/ADDS admissions have their focused fixtures and LDU/push/
-return controls, 66 verifier tests and native 5110 restoration; no new full-core
-regression is claimed.
+The subsequent EXP/ADDS/Xmem-load admissions have their focused fixtures and
+LDU/push/return controls, 67 verifier tests and native 5110 restoration; no new
+full-core regression is claimed.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
