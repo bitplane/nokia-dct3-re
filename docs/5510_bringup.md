@@ -17,9 +17,10 @@ recorder overlay's 73,762 RAM destination words before execution (four
 register words excluded) and enters original recorder startup at `0073f9`.
 Execution stops at repeated MVDD (`e598`) at `03:8eda`, before its first
 transfer from low-page source `0000` to RAM `0e35` (live PC `03:8edc`).
-The source pointer's provenance must be resolved before extending the
-staged register/peripheral-read contract; an intentional register-page copy
-is not established by this stop alone.
+The zero source is shared with the atomic control, not a demonstrated
+staged-only pointer defect; see [Recorder low-page copy](#recorder-low-page-copy).
+Retained MVDD low-page reads, register aliases and peripheral wait/side-effect
+ownership remain unvalidated. The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -137,6 +138,53 @@ This is the shared regression checkpoint for the instruction contracts
 below, superseding their earlier focused-only acceptance notes. It does
 not expand any fixture's declared opcode, composition, physical timing,
 bus ownership or handset-feature scope. No native speech is claimed.
+
+## Recorder low-page copy
+
+The first zero MVDD source has an explicit firmware path. Startup initializes
+the object at `fe76`, including zero field `fe78`. The common-window callback
+dispatcher passes that object's address to `03:8e91`; `71e1 0002 0013` at
+`03:8e9d` reads `[AR1+2]` into AR3. Selector `05b8` reads zero, so the
+comparison with two at `03:8ed2` does not take the TC branch. The firmware
+sets AR2=`0e35`, executes `RPT #127` and reaches `e598` at `03:8eda` with
+AR3 still zero. Do not infer a missing initializer from this zero alone.
+
+The paired `bootrecstage` and atomic `bootrecsave` probes use identical
+retained NAND bytes, the same acquired R060 image and the same pin-command
+sequence. With a one-second stop bound:
+
+- staged execution reads zero from `fe78`, observes no nonzero publication
+  to it and rejects the first low-page MVDD before any source read;
+- atomic execution also starts that copy at zero, performs 128 ordered
+  reads of `0000..007f`, then publishes `1800` followed by `1880` to `fe78`
+  through the existing firmware buffer path (write context `02:1c96`);
+- both observe selector `05b8` as zero on the first callback.
+
+`tools/mu4_recorder_source_observe.lua` reproduces these guest-access
+observations without debugger support, memory reads of its own or DUT writes.
+Attach it with `-autoboot_script /absolute/path/to/tools/mu4_recorder_source_observe.lua
+-autoboot_delay 0` to the existing recorder commands, retaining
+`-nonvram_save`. Compare the two NVRAM inputs byte-for-byte before the run;
+the BIOS-specific NAND tags are `mu4nand_25` and `mu4nand_24`, respectively.
+The atomic summary requires `first_copy_reads=128`, `order_errors=0` and
+`first_copy_before_nonzero=1`; the staged summary has zero source reads and
+the existing CPU guard identifies source `0000`. Later field-access totals
+are observation-window counts, not cadence or acceptance constants.
+
+This falsifies a staged-only source-pointer explanation. It does not prove
+that a physical DA150 deliberately reads this page before its first buffer
+is published: both frontends share board models and provisional mappings.
+Do not seed `fe78` or suppress the callback to bypass the guard. The next
+CPU work is retained MVDD read ownership across CPU registers and the
+supplied peripheral map, including repeat waits and exactly-once side
+effects. Unknown physical register identities, especially data `002a`,
+remain separate from transaction conformance.
+
+For execution tracing, `pc=0073f9` is an executed startup address in the
+observed run. Debugger disassembly of common-window PCs on nonzero pages
+is not reliable: use the explicit loader projection of program records
+(for example `02:1f83` to physical `001f83`), not a merged data/program
+dictionary or a missing-word-as-zero fallback.
 
 ## Reproducible input normalization
 

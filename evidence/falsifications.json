@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_recorder_first_zero_mvdd_source_is_staged_only",
+      "status": "disproven",
+      "hypothesis": "The first repeated recorder MVDD source 0000 is introduced by the staged TS load or staged pointer execution, while the equivalent atomic recorder uses a nonzero initialized source",
+      "conclusion": "Byte-identical own NAND inputs, the same R060 image and paired bootrecstage/bootrecsave pin sequences produce the same initial field fe78=0000. The callback receives object fe76; MVDK at 03:8e9d loads [AR1+2] into AR3, and selector 05b8=0000 selects the first 128-word copy to 0e35 at 03:8eda. Staged execution rejects source 0000 before Read. The passive atomic observer records 128 ordered reads of 0000..007f before any nonzero write to fe78; the original firmware subsequently publishes 1800 and 1880 through context 02:1c96. This rules out a staged-only zero-source defect, not a shared board-model or physical-ordering defect. The atomic control is not a silicon oracle. Do not seed the pointer or suppress the callback; retained MVDD mapped-read, repeat-wait and exactly-once side-effect contracts must be tested independently, while DA150 physical register ownership remains unresolved.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_recorder_source_observe.lua", "driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp"]
+    },
+    {
       "id": "mu4_staged_2050_zero_word_is_missing_add_or_resident_code",
       "status": "disproven",
       "hypothesis": "A staged ADD decoded as 0000 at logical 02:2050, where the resident image contains 4a1e, identifies a missing arithmetic form or missing resident program data",

@@ -152,6 +152,9 @@ compact caution when a fact is easy to misread, corrects a common assumption,
 or was expensive to discover. Current examples include:
 
 - swap16 byte-lane handling for byte tables;
+- keeping data/program spaces and logical/physical addresses distinct: an
+  absent image word is not a zero word, and overlay projection must follow
+  a proven mapping rather than a merged numeric-address dictionary;
 - PC hooks firing only at actual branch targets;
 - Lua tap subscriptions needing a live owner for the entire observation
   window; retain them in a callback/upvalue and validate positive-control
