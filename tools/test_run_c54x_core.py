@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_timer_stm_scope(self):
+        marker, ending = EXTRA_PROFILES['timer-stm']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='timer-stm')
+        for bad in (output.replace('restore=36', 'restore=0'),
+                    output.replace('publish_clock=8', 'publish_clock=5'),
+                    output.replace('trb_reload=1', 'trb_reload=0'),
+                    output.replace('psc_write_mask=1', 'psc_write_mask=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='timer-stm')
+
     def test_direct_cmpm_scope(self):
         marker, ending = EXTRA_PROFILES['cmpm-direct']
         output = marker + '\n' + ending + '\n'

@@ -144,6 +144,7 @@ private:
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
 	bool staged_bus_control(u16 op) const { return m_c5416_bus_profile && (op == 0x7728 || op == 0x7729 || op == 0x772b); }
+	bool staged_timer_control(u16 op) const { return op >= 0x7724 && op <= 0x7726; }
 	void retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
 		bool repeat_was_armed, bool delayed, bool xc_guarded);
 	bool service_interrupt();

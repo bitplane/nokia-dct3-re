@@ -53,13 +53,21 @@ cases and the existing 384-case IMR control. Short CMPM at `03:91eb` is
 now admitted for direct RAM through the existing retained
 operand path. Its 384-case DP/SP branch/replay fixture and 96-case absolute
 control pass; mapped/peripheral and indirect comparisons remain excluded.
-The next stop is STM to timer PRD at `02:6d47` (`7725`), not full boot.
+Immediate TIM/PRD/TCR writes now use retained literals and one peripheral
+wait before Execute publication. The `timer-stm` profile passes 36 replay
+cases checking stopped-timer register effects, writable masks and TRB reload;
+it does not claim new running-timer timing validation. Original R060 now
+stops at conditional return `fc43` at `02:3e44`, not full boot.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. Verification baseline: the full 288-marker regression and all 41
 isolated profiles passed with the SP correction. The later ST1/direct-CMPM
 admissions have their focused controls, 61 verifier tests and native 5110
 restoration, without a fresh broad-suite claim.
+The timer-write addition passes all 44 current isolated profiles, the
+separate bus-STM control, native 5110 restoration and 62 verifier tests;
+this does not replace the
+earlier full-core checkpoint with a new full-core claim.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses

@@ -3271,11 +3271,28 @@ fetch and zero writes are checked. The 96-case absolute-CMPM control passes.
 Indirect CMPM and all mapped/peripheral CMPM sources remain excluded.
 The original gets past `03:91eb`; the pre-admission stop had CPL set,
 SP=1246 and candidate direct source 125a. It now stops at `02:6d47`,
-`7725` (STM immediate to PRD), live PC `02:6d49`. Timer-register write
-ownership is the next contract, not an invitation to use DAGEN's early-write
-path for a peripheral. This addressing extension passes 61 verifier tests
+`7725` (STM immediate to PRD), live PC `02:6d49`, was the next missing form.
+This addressing extension passes 61 verifier tests
 and native 5110 restoration; its verification scope is the focused fixtures,
 not a fresh broad-core run.
+
+Immediate TIM/PRD/TCR writes (`7724..7726`) now retain their literal and
+publish through the timer's existing register writer at Execute, after one
+peripheral-access clock; they do not use the DAGEN early-write path. The
+`timer-stm` profile passes 36 cases/restores across three registers, four
+values per register and snapshots before/during the wait and after publication.
+It checks one literal fetch, no destination reads, one write at clock 8,
+stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
+read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
+checks, not new running-timer or silicon-phase claims. Original R060 now
+reaches conditional return `fc43` at `02:3e44` (live PC `02:3e46`); all
+48,261 program and 3,656 compared data words still match. This remains
+partial resident initialization, not full boot or decoded audio.
+The complete 44-profile isolated batch and the separate 36-case bus-STM
+control pass on this tree, along with 62 verifier tests and native 5110
+save-state restoration. The full 288-marker
+CPU regression baseline remains the SP-ordering checkpoint above; it was
+not re-run for this opcode-admission change.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM
