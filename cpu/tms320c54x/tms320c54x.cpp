@@ -74,7 +74,11 @@ constexpr bool staged_tc_branch(u16 word)
 
 constexpr bool staged_conditional_call(u16 word)
 {
-	return (word & 0xfff7) == 0xf945; // Nondelayed CC AEQ/BEQ only.
+	// Preserve the existing nondelayed AEQ/BEQ surface. CCD additionally
+	// admits the six signed predicates for either 40-bit accumulator.
+	u8 const condition = word;
+	return (word & 0xfff7) == 0xf945 || ((word & 0xff00) == 0xfb00 &&
+		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_conditional_return(u16 word)
@@ -2563,8 +2567,9 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_cc_pending)
 	{
-		// Class 31B adds one clock on both paths. Only a taken predicate
-		// owns a stack write; retain that decision through the held clock.
+		// The retained nondelayed Class 31B model holds one clock on both
+		// paths. Only a taken predicate owns a stack write; retain that
+		// decision through the held clock.
 		if (m_pipeline_immediate[4]) data_write(m_pipeline_operand_address[4], u16(m_pipeline_address[4] + 2));
 		m_pipeline_cc_pending = false;
 		return;
@@ -2839,7 +2844,7 @@ void tms320c54x_device::pipeline_step()
 				for (unsigned stage = 3; stage < 6; ++stage)
 					if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 						delay_compare = m_pipeline_word[stage] == 0xf273 ||
-							((m_pipeline_word[stage] & 0xfe00) == 0xfa00 && staged_conditional_branch(m_pipeline_word[stage]));
+							((m_pipeline_word[stage] & 0xfe00) == 0xfa00 && staged_conditional_branch(m_pipeline_word[stage]) && !staged_conditional_call(m_pipeline_word[stage]));
 			if (!m_pipeline_decode_remaining && staged_software_intr(word)) { logerror("%s: staged software INTR in a control delay is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_conditional_return(word)) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
@@ -2970,7 +2975,7 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
 		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active)
 		{
-			logerror("%s: staged POPM active repeat-control write is unsupported\n", machine().describe_context());
+			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word);
 			m_illegal = true; return;
 		}
 		bool const frame = (word & 0xff00) == 0xee00;
@@ -2984,7 +2989,10 @@ void tms320c54x_device::pipeline_step()
 		bool const block_far_call = staged_far_call(word) && !BIT(word, 9) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address &&
 			(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
-		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !block_far_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
+			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
+			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
+		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -3837,6 +3845,19 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = m_pipeline_operand[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
+			if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
+				(address < m_pipeline_block_start || address > m_pipeline_block_end_address))
+			{
+				u32 const after_end = (m_pipeline_block_end_address & 0x7f0000) | u16(m_pipeline_block_end_address + 1);
+				if ((m_pipeline_fetch_address >= m_pipeline_block_start && m_pipeline_fetch_address <= m_pipeline_block_end_address) || m_pipeline_fetch_address == after_end)
+				{
+					// A call retains PC+4 even when its delay span ends at REA.
+					// Decode already consumed that endpoint; reconstitute only
+					// the discarded fetch prediction from the remaining loop state.
+					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+					if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = m_pipeline_block_start;
+				}
+			}
 			m_pipeline_flush_front = false;
 			if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);
 		}
@@ -3859,6 +3880,10 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_conditional_branch(m_op))
 		{
 			++m_pc;
+			// CCD retains its Read decision and one-word frame. Do not add
+			// the nondelayed CC hold to the complete two-word delay span.
+			if (staged_conditional_call(m_op) && BIT(m_op, 9) && m_pipeline_immediate[5])
+				data_write(m_pipeline_operand_address[5], u16(address + 4));
 			if (m_pipeline_immediate[5] && BIT(m_op, 9))
 			{
 				m_pipeline_fetch_address = (address & 0x7f0000) | m_pipeline_operand[5];
@@ -4220,11 +4245,6 @@ void tms320c54x_device::pipeline_step()
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
 		}
 	}
-	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
-	{
-		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + 2); }
-		m_pipeline_cc_pending = true;
-	}
 	if (m_pipeline_valid[2] && staged_accumulator_far_call(m_pipeline_word[2]))
 		m_pipeline_far_call_page[2] = (m_pipeline_address[2] >> 16) & 0x7f;
 	if (m_pipeline_valid[3] && staged_accumulator_call(m_pipeline_word[3]))
@@ -4263,6 +4283,13 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_immediate[4] = staged_tc_branch(m_pipeline_word[4]) ? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) :
 			(m_pipeline_word[4] & 0xfdfb) == 0xf808 ? BIT(m_st0, 11) == BIT(m_pipeline_word[4], 2) :
 			staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
+	}
+	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
+	{
+		// CCD must replace its target literal with the retained predicate
+		// before deciding whether the call owns any stack reservation.
+		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + (BIT(m_pipeline_word[4], 9) ? 4 : 2)); }
+		if (!BIT(m_pipeline_word[4], 9)) m_pipeline_cc_pending = true;
 	}
 	if (m_pipeline_valid[4] && staged_conditional_return(m_pipeline_word[4]))
 	{

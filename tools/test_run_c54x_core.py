@@ -12,6 +12,36 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_delayed_conditional_call_block_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-ccd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-ccd')
+        for bad in (output.replace('restore=1024', 'restore=0'),
+                    output.replace('balanced_frames=1', 'balanced_frames=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptb-ccd')
+
+    def test_delayed_conditional_call_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['cond-cd-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='cond-cd-edge')
+        for bad in (output.replace('restore=32', 'restore=0'),
+                    output.replace('stack_reservation=0', 'stack_reservation=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='cond-cd-edge')
+
+    def test_delayed_conditional_call_scope(self):
+        marker, ending = EXTRA_PROFILES['conditional-cd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='conditional-cd')
+        for bad in (output.replace('restore=1920', 'restore=0'),
+                    output.replace('taken_frame=PC+4', 'taken_frame=PC+2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='conditional-cd')
+
     def test_mapped_mvdk_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['mvdk-map-edge']
         output = marker + '\n' + ending + '\n'

@@ -472,6 +472,18 @@ EXTRA_PROFILES = {
         "TMS320C54x mapped MVDK exclusions: PASS cases=48 restore=48 sources=12 pages=2 snapshots=2 data_reads=0 data_writes=0 destination_publication=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated mapped MVDK exclusions complete",
     ),
+    "conditional-cd": (
+        "TMS320C54x delayed conditional call: PASS cases=1920 restore=1920 conditions=12 patterns=8 delay_layouts=2 pages=2 snapshots=5 target_literals=1 delay_words=2 delay_effects=once predicate_retained=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed conditional call complete",
+    ),
+    "cond-cd-edge": (
+        "TMS320C54x delayed conditional call exclusions: PASS cases=32 restore=32 conditions=8 pages=2 snapshots=2 stack_reads=0 stack_writes=0 stack_reservation=0 status_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated delayed conditional call exclusions complete",
+    ),
+    "rptb-ccd": (
+        "TMS320C54x delayed conditional calls in block: PASS cases=1024 restore=1024 counts=0,1,2,7 conditions=AEQ,ANEQ,BEQ,BNEQ outcomes=2 positions=middle,endpoint delay_layouts=2 pages=2 snapshots=4 ordered_copies=1 balanced_frames=1 stack_return=PC+4 outer_count=Decode interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed conditional calls in block complete",
+    ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block far call exclusions complete",

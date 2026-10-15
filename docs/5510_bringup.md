@@ -23,15 +23,16 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words. Its `RPTBD` at `03:d9c4` now reaches Execute
-once, its two-word MAR delay reaches Execute once, and its first body
-instruction at `03:d9c8` reaches Execute 1,024 times. It subsequently stops
-after executing `MVDK *(0x0008),AR3` at `03:dafe` (`71f8 0008 0013`,
-mapped AL source) and its following instruction at `03:db03` once each.
-The next unsupported staged form is `fb44 dada` at `03:db37`,
-`CCD 0xdada,ANEQ` under SPRU172C 4-29 (live PC `03:db39`, terminal
-`illegal=1`). These are passive Execute observations,
-not firmware writes or a claim of complete recording or validated audio.
+pin-decoded response words. In a five-second passive Execute observation,
+the mapped MVDK at `03:dafe` executes twice, `CCD 0xdada,ANEQ` at
+`03:db37` executes 2,048 times, its first delay instruction at `03:db39`
+executes 2,048 times, and the callee entry at `03:dada` executes 1,601
+times. The call's delay span ends at the active block endpoint `03:db3a`;
+this is covered by the retained loop/call contract below. The next stop is
+the active repeat-control restoration exclusion at `03:9568`, `POPM REA`
+(`8a1c`; live PC `03:956a`, terminal `illegal=1`).
+These are passive observations, not firmware writes or a claim of complete
+recording or validated audio.
 
 Passive Execute hooks record one delayed offset-load entry at `03:a5b4`
 and one AR0-indexed load entry at `03:dd3a`, with no observer writes.
@@ -39,6 +40,47 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Delayed conditional calls
+
+CCD admits AGEQ/ALT/ANEQ/AEQ/AGT/ALEQ and their B equivalents. SPRU172C
+4-29 specifies the two-word delay span, a taken frame containing `PC+4`,
+and no stack transaction for an untaken call. The retained Read-stage
+predicate is evaluated after older Execute publications and before stack
+reservation. Only a taken call publishes its one-word frame in Execute;
+the existing delayed-branch flow executes the two delay words on either
+path without adding the nondelayed CC model's held clock. No new CPU save
+fields are introduced. Physical phase timing is not independently measured.
+
+`conditional-cd` passes 1,920 cases/restores across 12 signed accumulator
+conditions, eight 40-bit patterns, two delay layouts (two single-word
+instructions or one two-word instruction), two pages and five snapshots.
+Delay instructions change the tested accumulator without changing the
+retained decision. Fetched target/delay words and sampled return frames
+are replaced afterward to detect rereads. Both paths execute delay work
+once; only the taken path visits the callee, balances a frame and returns
+to the shared continuation. `cond-cd-edge` adds 32 cases/restores for eight
+unadmitted condition encodings on two pages, before/after the Decode guard.
+They stop before stack reservation, data transactions or status changes;
+these are prototype exclusions, not silicon traps.
+
+An in-block CCD may target an outside callee when its complete header and
+two delay words fit within the block, including a delay span ending at REA.
+The frame remains `PC+4`, even when that equals the address after REA.
+On a near return from outside the block, remaining Decode-owned BRC state
+rebuilds discarded fetch predictions. Returning after REA wraps to RSA only
+while the outer block remains active; the final iteration falls through.
+Neither the stack frame nor firmware RAM is patched to select that path.
+
+`rptb-ccd` passes 1,024 cases/restores across counts 0/1/2/7, AEQ/ANEQ/
+BEQ/BNEQ, both outcomes, middle/endpoint placement, both delay layouts,
+two pages and four snapshots. Every iteration performs one ordered RAM
+copy and the expected delay/callee/suffix work, with balanced `PC+4` frames
+and final BRC/BRAF/RSA/REA checks. Interrupt composition, nested loop-control
+changes in callees, other conditional-call families and physical timing
+remain unvalidated. Nondelayed CC/RC, RPTB, RPTBD IRQ/NMI, in-block far
+calls, backward branches and inner single repeats retain their focused
+acceptance; this does not renew every isolated CPU profile.
 
 ### Mapped MVDK sources
 
@@ -73,9 +115,10 @@ repeat-control and peripheral sources on two pages with snapshots before/
 after the guard. They stop before data transactions or destination writes;
 these are prototype exclusions, not silicon traps. Existing MVMD accumulator,
 MVMD ST1, T/TRN move, mapped multiply and RPTBD interrupt controls pass.
-The original recorder's MVDK and following instruction each reach Execute
-once with zero observer writes. Resident-memory and low-page-copy controls
-remain unchanged; this is not complete recording or validated audio.
+Passive Execute hooks verify the original recorder's MVDK and following
+instruction, with zero observer writes; current execution counts and the
+stop are stated above. Resident-memory and low-page-copy controls remain
+unchanged; this is not complete recording or validated audio.
 
 ### Delayed block-repeat boundary
 
@@ -146,7 +189,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,838 tests with one skip; the native 5110
+The tool suite passes 2,841 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
