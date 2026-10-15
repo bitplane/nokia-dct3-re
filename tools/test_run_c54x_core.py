@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_exponent_t_scope(self):
+        marker, ending = EXTRA_PROFILES['exp-t']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='exp-t')
+        for bad in (output.replace('restore=12288', 'restore=0'),
+                    output.replace('adjacent_T=old', 'adjacent_T=new'),
+                    output.replace('retained_consumer=1', 'retained_consumer=0'),
+                    output.replace('norm_acceptance=0', 'norm_acceptance=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='exp-t')
+
     def test_repeated_pshd_scope(self):
         marker, ending = EXTRA_PROFILES['pshd-repeat']
         output = marker + '\n' + ending + '\n'

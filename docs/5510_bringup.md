@@ -3291,7 +3291,8 @@ stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
 checks, not new running-timer or silicon-phase claims. Original R060 now
 passes conditional return `fc43` at `02:3e44` and repeated PSHD at
-`02:3f7e`, reaching EXP B (`f58e`) at `02:3fa8` (live PC `02:3faa`); all
+`02:3f7e` and EXP B at `02:3fa8`, reaching ADDS (`023e`) at `02:3fad`
+(live PC `02:3faf`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3325,7 +3326,7 @@ modifying self-AR aliases and peripheral sources remain fail-closed, as
 do memory-sourced repeat counts. This establishes the declared stage model,
 not measured silicon bus-phase timing. `4b97` increments AR7 (`MOD=2`);
 the former decrement interpretation was incorrect.
-The current CPU checkpoint passes the full 288-marker regression, all 46
+The repeated-push CPU checkpoint passes the full 288-marker regression, all 46
 isolated profiles, 64 verifier tests and native 5110 save-state restoration.
 The original resident load still matches all 48,261 program and 3,656 data
 words. These are execution/model checks, not a full-board boot, physical
@@ -3334,8 +3335,19 @@ The next original sequence is `LDU ...,B; EXP B; LD #1e,A; LDM T,B`.
 SPRU172C 4-52 defines EXP's signed exponent in T without accumulator or
 status changes, including zero's special result of zero. SPRU131G table
 7-13 requires one instruction of T-consumer latency; the original has that
-gap. A staged EXP fixture must preserve this producer/consumer distinction,
-not simply make the opcode stop disappear.
+gap. The `exp-t` fixture now passes 12,288 cases/restores across both
+accumulators, sixteen 40-bit vectors, zero/one/two-gap LDM consumers,
+eight status configurations, adjacent unsigned LDU producers, two pages
+and four snapshots. EXP publishes T in Execute without changing its source
+or flags; the adjacent LDM retains old T while a gap exposes the new
+exponent. Mutating T after the consumer Read must not alter its result.
+The unsigned producer's RAM input is also changed after Read, checking
+that EXP sees its retained published value rather than stale accumulator
+state or a reread. NORM and interrupt composition are not admitted by this
+fixture. The addition passes its focused LDU, push and conditional-return
+controls and 65 verifier tests; the broad baseline remains the repeated-push
+checkpoint above. ADDS at the new stop is a real one-word opcode, not
+an unconsumed extension of the preceding SFTL.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

@@ -9743,6 +9743,57 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253570;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct exponent_fixture
+	{
+		u64 value;
+		bool b, producer;
+		unsigned gap;
+		u16 st0, st1;
+		u32 base;
+		u64 source() const { return producer ? u16(value) : value; }
+		u16 exponent() const
+		{
+			if (!source()) return 0;
+			u64 magnitude = source();
+			if (magnitude & 0x8000000000ULL) magnitude = (~magnitude) & 0xffffffffffULL;
+			unsigned significant = 0;
+			while (magnitude) { ++significant; magnitude >>= 1; }
+			return u16(s16(31 - int(significant)));
+		}
+	};
+	static exponent_fixture exponent_case(unsigned v)
+	{
+		unsigned const flags = (v / 96) % 8;
+		return {std::array<u64, 16>{0, 1, 2, 0x7fff, 0x8000, 0x7fffffff, 0x80000000ULL, 0xffffffffULL, 0x0100000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0xffffffffcbULL, 0x0785432105ULL, 0xff80000000ULL, 0xff00000000ULL}[v % 16],
+			bool((v / 16) % 2), bool((v / 768) % 2), (v / 32) % 3, u16(0xa602 | (flags & 4 ? 0x1800 : 0)), u16(0x800 | ((flags & 3) << 8)), (v / 1536) % 2 ? 0x20000U : 0};
+	}
+	void start_exponent(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = exponent_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		unsigned const prefix = unsigned(f.producer);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.producer) program.write_word(f.base + 0x600, f.b ? 0x1350 : 0x1250);
+		program.write_word(f.base + 0x600 + prefix, f.b ? 0xf58e : 0xf48e);
+		program.write_word(f.base + 0x601 + prefix + f.gap, f.b ? 0x480e : 0x490e);
+		program.write_word(f.base + 0x602 + prefix + f.gap, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.producer ? 0x5555555555ULL : f.value);
+		m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8123);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); data.write_word(0x150, u16(f.value));
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_fast_stack_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "exponent_inputs", [this, f, prefix](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x150) { expect(f.producer && !m_pipeline_operand_reads && word == u16(f.value) && m_cpu->pipeline_cycles() == 5, "LDU owns the retained input before EXP"); ++m_pipeline_operand_reads; }
+			else { expect(at == 0x0e && !m_pipeline_extensions_reads && word == (f.gap ? f.exponent() : 0x8123) && m_cpu->pipeline_cycles() == 6 + prefix + f.gap, "LDM samples old T adjacent to EXP and new T after its documented gap"); ++m_pipeline_extensions_reads; }
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "exponent_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "EXP and its register consumer do not write data memory"); } });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600 + prefix, f.base + 0x600 + prefix, "exponent_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_fast_stack_reads, "EXP owns one opcode fetch"); ++m_fast_stack_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254100;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct repeat_push_fixture
 	{
 		unsigned count, kind, interrupt;
@@ -10512,6 +10563,7 @@ private:
 		if (!strcmp(machine().options().bios(), "timer-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-mapped")) { start_mapped_pshd(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-repeat")) { start_repeat_push(); return; }
+		if (!strcmp(machine().options().bios(), "exp-t")) { start_exponent(); return; }
 		if (!strcmp(machine().options().bios(), "bus-io-compose")) { start_atomic_io_composition(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && (!strcmp(machine().options().bios(), "bus-io") || atomic_bus_io())) { start_bus_io_test(); return; }
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "bus-registers"))
@@ -36677,6 +36729,36 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253620) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253610; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254100)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = exponent_case(variant); unsigned const prefix = unsigned(f.producer);
+			unsigned const checkpoint = std::array<unsigned, 4>{3, 5 + prefix, 6 + prefix + f.gap, 8 + prefix + f.gap}[variant / 3072];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "EXP remains in the staged frontend");
+			if (tick == 5 && f.producer) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x150, 0xdead); }
+			if (tick == 6 + prefix) expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.exponent(), "EXP publishes the complete signed exponent at Execute");
+			if (tick == 6 + prefix + f.gap) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4321);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes, m_fast_stack_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save EXP producer, Execute publication and retained T consumer");
+			}
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.source() && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.gap ? f.exponent() : 0x8123) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4321, "EXP preserves its source and the consumer retains its sampled word after T changes");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_pipeline_operand_reads == prefix && m_pipeline_extensions_reads == 1 && !m_pipeline_store_writes && m_fast_stack_reads == 1, "EXP preserves flags and owns exactly its producer read, T read and opcode fetch");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore EXP and the T consumer without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254110; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 12287) { start_exponent(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged EXP T: PASS cases=12288 restore=12288 accumulators=2 vectors=16 gaps=0,1,2 status_states=8 producers=none,LDU pages=2 snapshots=4 publish=Execute adjacent_T=old gap_T=new retained_consumer=1 flags_preserved=1 data_writes=0 norm_acceptance=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated EXP T complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254110) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254100; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254070)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_push_case(variant);
@@ -38041,6 +38123,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(62, "timer-stm", "Staged timer immediate writes and retained peripheral wait")
 	ROM_SYSTEM_BIOS(63, "pshd-mapped", "Staged mapped-register PSHD source ownership")
 	ROM_SYSTEM_BIOS(64, "pshd-repeat", "Staged repeated PSHD with retained per-iteration operands")
+	ROM_SYSTEM_BIOS(65, "exp-t", "Staged exponent publication and T consumer latency")
 ROM_END
 
 ROM_START(tms54rom4)
