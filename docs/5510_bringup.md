@@ -15,12 +15,21 @@ words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. It also compares the
 recorder overlay's 73,762 RAM destination words before execution (four
 register words excluded) and enters original recorder startup at `0073f9`.
-Execution stops at repeated MVDD (`e598`) at `03:8eda`, before its first
-transfer from low-page source `0000` to RAM `0e35` (live PC `03:8edc`).
-The zero source is shared with the atomic control, not a demonstrated
-staged-only pointer defect; see [Recorder low-page copy](#recorder-low-page-copy).
-Retained MVDD low-page reads, register aliases and peripheral wait/side-effect
-ownership remain unvalidated. The atomic control is not a physical oracle.
+The repeated MVDD (`e598`) at `03:8eda` now completes its first 128 ordered
+source reads from `0000..007f` into RAM beginning at `0e35`. Firmware then
+publishes buffer pointers `1800` and `1880`. The zero source is shared with
+the atomic control, not a demonstrated staged-only pointer defect; see
+[Recorder low-page copy](#recorder-low-page-copy). Execution subsequently
+reaches `CALA A` at `00:1c4c` with A zero and transfers to unacquired program
+address zero. The preceding `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48`
+requires a producer/conditional-return timing audit; retirement-time A is
+not evidence of the earlier predicate sample. Later wild-page execution is
+a downstream symptom, not the first identified control-flow boundary.
+SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
+pipeline latency) from memory-mapped accumulator reads. The existing
+conditional-return fixture deliberately excludes adjacent producers; its
+Access-owned predicate therefore does not establish this pair's correctness.
+The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -153,8 +162,9 @@ The paired `bootrecstage` and atomic `bootrecsave` probes use identical
 retained NAND bytes, the same acquired R060 image and the same pin-command
 sequence. With a one-second stop bound:
 
-- staged execution reads zero from `fe78`, observes no nonzero publication
-  to it and rejects the first low-page MVDD before any source read;
+- the pre-admission staged CPU at `046271df` rejected the first low-page
+  MVDD before any source read; the mapped-source implementation now performs
+  128 ordered reads and observes the subsequent `1800`, `1880` publications;
 - atomic execution also starts that copy at zero, performs 128 ordered
   reads of `0000..007f`, then publishes `1800` followed by `1880` to `fe78`
   through the existing firmware buffer path (write context `02:1c96`);
@@ -166,19 +176,23 @@ Attach it with `-autoboot_script /absolute/path/to/tools/mu4_recorder_source_obs
 -autoboot_delay 0` to the existing recorder commands, retaining
 `-nonvram_save`. Compare the two NVRAM inputs byte-for-byte before the run;
 the BIOS-specific NAND tags are `mu4nand_25` and `mu4nand_24`, respectively.
-The atomic summary requires `first_copy_reads=128`, `order_errors=0` and
-`first_copy_before_nonzero=1`; the staged summary has zero source reads and
-the existing CPU guard identifies source `0000`. Later field-access totals
+The source-copy summary requires `first_copy_reads=128`, `order_errors=0` and
+`first_copy_before_nonzero=1`. The observer arms from the actual field and
+selector reads rather than a frontend-dependent live PC. Later field-access totals
 are observation-window counts, not cadence or acceptance constants.
 
 This falsifies a staged-only source-pointer explanation. It does not prove
 that a physical DA150 deliberately reads this page before its first buffer
 is published: both frontends share board models and provisional mappings.
-Do not seed `fe78` or suppress the callback to bypass the guard. The next
-CPU work is retained MVDD read ownership across CPU registers and the
-supplied peripheral map, including repeat waits and exactly-once side
-effects. Unknown physical register identities, especially data `002a`,
-remain separate from transaction conformance.
+Do not seed `fe78` or suppress the callback. Mapped-source MVDD now has
+49,152 scalar and 400 repeated save/replay cases, including CPU aliases,
+read-clear peripheral endpoints and crossing the peripheral-window boundary.
+Twelve exclusion cases reject CPU-register destinations, dual-peripheral
+transfers and repeated peripheral writes before side effects. These use a
+plain fixture RAM map: the older test map's `0060..0061` IRQ probes are not
+ordinary low-page RAM. Nine focused CPU profiles pass; this does not renew
+the earlier full-suite checkpoint. Unknown physical register identities,
+especially data `002a`, remain separate from transaction conformance.
 
 For execution tracing, `pc=0073f9` is an executed startup address in the
 observed run. Debugger disassembly of common-window PCs on nonzero pages

@@ -8,6 +8,8 @@ local field_writes, field_reads, nonzero_writes = 0, 0, 0
 local first_copy_reads, order_errors = 0, 0
 local first_copy_before_nonzero = false
 local selector_reads = 0
+local source_field
+local copy_armed = false
 
 local function context()
     return cpu.state['GENPC'].value
@@ -21,21 +23,25 @@ handles[1] = data:install_write_tap(0xfe78, 0xfe78, 'mu4_recorder_source_field_w
     end
 end)
 handles[2] = data:install_read_tap(0xfe78, 0xfe78, 'mu4_recorder_source_field_read', function(_, value)
+    source_field = value
     field_reads = field_reads + 1
     if field_reads <= 4 then
         machine:logerror(string.format('mu4_recorder_source_field_read: value=%04x context_pc=%06x t=%.9f\n', value, context(), machine.time:as_double()))
     end
 end)
 handles[3] = data:install_read_tap(0x05b8, 0x05b8, 'mu4_recorder_source_selector', function(_, value)
+    local pc = context()
+    if first_copy_reads == 0 and source_field == 0 and value == 0 and pc >= 0x38ed2 and pc <= 0x38eda then
+        copy_armed = true
+    end
     if selector_reads < 4 then
         machine:logerror(string.format('mu4_recorder_source_selector: value=%04x context_pc=%06x t=%.9f\n', value, context(), machine.time:as_double()))
     end
     selector_reads = selector_reads + 1
 end)
 handles[4] = data:install_read_tap(0, 0x7f, 'mu4_recorder_first_low_page_copy', function(address, value)
-    -- Atomic MVDD executes at 03:8eda; its PC has advanced before data Read.
-    -- The staged guard rejects this source before any such Read occurs.
-    if cpu.state['XPC'].value ~= 3 or cpu.state['PC'].value ~= 0x8edb or first_copy_reads >= 128 then return end
+    -- Arm on the firmware's selector access, not an ahead live PC at Read.
+    if not copy_armed or first_copy_reads >= 128 then return end
     if first_copy_reads == 0 then first_copy_before_nonzero = nonzero_writes == 0 end
     if address ~= first_copy_reads then order_errors = order_errors + 1 end
     first_copy_reads = first_copy_reads + 1

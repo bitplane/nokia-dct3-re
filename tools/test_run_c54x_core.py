@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mapped_mvdd_source_scope(self):
+        for name in ('mvdd-source', 'mvdd-source-rpt', 'mvdd-source-edge'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('source_opcode_fetches=1', 'source_opcode_fetches=2'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_ts_load_scope(self):
         for name in ('ld-ts', 'ld-ts-producer'):
             marker, ending = EXTRA_PROFILES[name]

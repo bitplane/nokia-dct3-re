@@ -312,6 +312,18 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "mvdd-source-edge": (
+        "TMS320C54x mapped MVDD exclusions: PASS cases=12 restore=12 cpu_register_destination=4 dual_peripheral=4 repeated_peripheral_write=4 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 source_opcode_fetches=1 atomic_fallback=0",
+        "Fatal error: TMS320C54x isolated mapped MVDD exclusions complete",
+    ),
+    "mvdd-source": (
+        "TMS320C54x mapped MVDD sources: PASS cases=49152 restore=49152 source_addresses=96 patterns=4 x_modifiers=4 y_modifiers=4 pages=2 snapshots=4 source_reads=1 guest_writes=1 source_opcode_fetches=1 peripheral_extra_clock=1 ram_extra_clock=0 register_aliases=Read_owned read_clear=retained endpoint_identities=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped MVDD sources complete",
+    ),
+    "mvdd-source-rpt": (
+        "TMS320C54x mapped MVDD repeat: PASS cases=400 restore=400 layouts=zero_page,enter_peripheral,leave_peripheral,AR_alias,read_clear lengths=128,4 patterns=4 prefixes=short,long pages=2 snapshots=5 reads=11520 writes=11520 source_opcode_fetches=1 peripheral_waits=once register_values=Read_owned endpoint_identities=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped MVDD repeat complete",
+    ),
     "ld-ts": (
         "TMS320C54x TS loads: PASS cases=221184 restore=221184 forms=18 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated TS loads complete",

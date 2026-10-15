@@ -11237,6 +11237,134 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253810;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static bool mvdd_source_owned(u16 address)
+	{
+		return address <= 1 || (address >= 6 && address <= 0x1e) || (address >= 0x24 && address <= 0x26) || address == 0x58;
+	}
+	static u64 mvdd_source_a(unsigned pattern)
+	{
+		return std::array<u64, 4>{0, 0x123456789aULL, 0xff80000001ULL, 0xffffffffffULL}[pattern];
+	}
+	static u64 mvdd_source_b(unsigned pattern)
+	{
+		return std::array<u64, 4>{0xffffffffffULL, 0xabcdef0123ULL, 0x007fffffffULL, 0}[pattern];
+	}
+	static u16 mvdd_source_word(u16 address, unsigned pattern, u32 base, u16 ar2, u16 ar3)
+	{
+		if (address == 0) return 0x1234;
+		if (address == 1) return 0;
+		if (address == 6) return 0xa608;
+		if (address == 7) return 0x900;
+		if (address >= 8 && address <= 0xa) return mvdd_source_a(pattern) >> ((address - 8) * 16);
+		if (address >= 0xb && address <= 0xd) return mvdd_source_b(pattern) >> ((address - 0xb) * 16);
+		if (address == 0xe) return 0x7000 | pattern;
+		if (address == 0xf) return 0xa500 | pattern;
+		if (address >= 0x10 && address <= 0x17)
+			return address == 0x10 ? 3 : address == 0x12 ? ar2 : address == 0x13 ? ar3 : 0x4000 + address - 0x10;
+		if (address == 0x18) return 0x6000;
+		if (address == 0x1e) return base >> 16;
+		if (address >= 0x19 && address <= 0x1d) return 0;
+		if (address == 0x24) return 0x1234;
+		if (address == 0x25) return 0x5678;
+		if (address == 0x26) return 0x10;
+		if (address == 0x58) return 0;
+		return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern];
+	}
+	struct mvdd_source_fixture
+	{
+		unsigned source, pattern, xmode, ymode, prefix, count, snapshot;
+		bool repeated, fixed;
+		u32 base;
+		u16 destination = 0x1000;
+		u16 address(unsigned i) const { return source + (fixed ? 0 : i); }
+		unsigned read_clock(unsigned i) const
+		{
+			unsigned waits = 0;
+			for (unsigned n = 0; n <= i; ++n) waits += address(n) >= 0x20 && address(n) < 0x60;
+			return 5 + prefix + i + waits;
+		}
+		unsigned write_clock(unsigned i) const { return repeated && i + 1 < count ? read_clock(i + 1) : read_clock(i) + 1; }
+		u16 word(unsigned i) const
+		{
+			if (fixed && i) return 0;
+			unsigned const issued = std::min(i + 2, count);
+			return mvdd_source_word(address(i), pattern, base, repeated ? 0x1000 + issued : 0x2222, repeated ? source + (fixed ? 0 : issued) : 0x3333);
+		}
+	};
+	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated, bool edge = false)
+	{
+		mvdd_source_fixture f{}; f.repeated = repeated;
+		if (edge)
+		{
+			unsigned const kind = variant % 3;
+			f.source = std::array<unsigned, 3>{0, 0x20, 0x1000}[kind]; f.destination = kind ? 0x33 : 0x10;
+			f.prefix = kind == 2 ? 1 : 0; f.count = kind == 2 ? 2 : 1; f.xmode = f.ymode = 2;
+			f.base = (variant / 3) % 2 ? 0x20000 : 0; f.snapshot = variant / 6;
+			return f;
+		}
+		unsigned v = variant;
+		if (repeated)
+		{
+			unsigned const layout = v % 5; v /= 5;
+			f.source = std::array<unsigned, 5>{0, 0x1f, 0x5f, 0x12, 0x33}[layout];
+			f.count = layout == 0 ? 128 : 4; f.fixed = layout == 4;
+			f.xmode = f.fixed ? 0 : 2; f.ymode = 2;
+		}
+		else { f.source = v % 96; v /= 96; f.count = 1; }
+		f.pattern = v % 4; v /= 4;
+		if (repeated) { f.prefix = 1 + v % 2; v /= 2; }
+		else { f.xmode = v % 4; v /= 4; f.ymode = v % 4; v /= 4; }
+		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v;
+		return f;
+	}
+	void start_mvdd_source(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const repeated = !strcmp(machine().options().bios(), "mvdd-source-rpt");
+		bool const edge = !strcmp(machine().options().bios(), "mvdd-source-edge");
+		auto const f = mvdd_source_case(variant, repeated, edge);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (f.prefix) program.write_word(f.base + 0x600, f.prefix == 1 ? 0xec00 | (f.count - 1) : 0xf070);
+		if (f.prefix == 2) program.write_word(f.base + 0x601, f.count - 1);
+		program.write_word(f.base + 0x600 + f.prefix, 0xe500 | ((1 | (f.xmode << 2)) << 4) | (f.ymode << 2));
+		program.write_word(f.base + 0x601 + f.prefix, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, mvdd_source_a(f.pattern)); m_cpu->set_state_int(tms320c54x_device::STATE_B, mvdd_source_b(f.pattern));
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x7000 | f.pattern); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xa500 | f.pattern);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0); m_cpu->set_state_int(tms320c54x_device::STATE_RSA, 0); m_cpu->set_state_int(tms320c54x_device::STATE_REA, 0);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == 0 ? 3 : ar == 2 ? f.destination : ar == 3 ? f.source : 0x4000 + ar);
+		for (unsigned address = 0; address < 128; ++address)
+			if (!mvdd_source_owned(address)) data.write_word(address, mvdd_source_word(address, f.pattern, f.base, 0, 0));
+		if (!edge) for (unsigned i = 0; i < f.count; ++i) data.write_word(f.destination + i, 0xaaaa);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdd_mapped_source", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_pipeline_operand_reads;
+			if (i >= f.count || at != f.address(i) || word != f.word(i) || m_cpu->pipeline_cycles() != f.read_clock(i))
+				osd_printf_info("Mapped MVDD Read mismatch: case=%u index=%u address=%04x expected_address=%04x word=%04x expected_word=%04x cycle=%llu expected_cycle=%u ar2=%04x ar3=%04x\n", m_pipeline_peripheral_case, i, unsigned(at), f.address(i), word, f.word(i), (unsigned long long)m_cpu->pipeline_cycles(), f.read_clock(i), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
+			expect(i < f.count && at == f.address(i) && word == f.word(i) && m_cpu->pipeline_cycles() == f.read_clock(i), "MVDD reads each mapped source once at its paid Read clock"); ++m_pipeline_operand_reads;
+			if (at >= 0x20 && at < 0x60 && !mvdd_source_owned(at))
+			{
+				// Synthetic read-clear endpoint, not a DA150 register identity.
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0);
+			}
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdd_mapped_copy", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_pipeline_store_writes;
+			if (i >= f.count || at != 0x1000 + i || word != f.word(i) || m_cpu->pipeline_cycles() != f.write_clock(i))
+				osd_printf_info("Mapped MVDD Write mismatch: case=%u index=%u address=%04x expected_address=%04x word=%04x expected_word=%04x cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, i, unsigned(at), 0x1000 + i, word, f.word(i), (unsigned long long)m_cpu->pipeline_cycles(), f.write_clock(i));
+			expect(i < f.count && at == 0x1000 + i && word == f.word(i) && m_cpu->pipeline_cycles() == f.write_clock(i), "MVDD writes retained mapped data once after all owned waits"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600 + f.prefix, f.base + 0x600 + f.prefix, "mvdd_mapped_opcode", [this](offs_t, u16 &, u16) {
+			if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Repeated mapped MVDD fetches one retained opcode"); ++m_pipeline_extensions_reads; } });
+		m_phase = 254600; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_mvdd_peripheral(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11587,6 +11715,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
+		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
@@ -12030,6 +12159,10 @@ private:
 	{
 		map(0x0000, 0xffff).ram();
 		map(0x0060, 0x0061).rw(FUNC(tms320c54x_test_state::repeat_irq_r), FUNC(tms320c54x_test_state::stack_mmr_w));
+	}
+	void plain_data_map(address_map &map) ATTR_COLD
+	{
+		map(0, 0xffff).ram();
 	}
 	void io_map(address_map &map) ATTR_COLD
 	{
@@ -34708,6 +34841,92 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252510;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 254600)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const repeated = !strcmp(machine().options().bios(), "mvdd-source-rpt");
+			bool const edge = !strcmp(machine().options().bios(), "mvdd-source-edge");
+			auto const f = mvdd_source_case(variant, repeated, edge);
+			if (edge)
+			{
+				unsigned const checkpoint = 2 + f.prefix + f.snapshot;
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= 4 + f.prefix) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.destination && m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.source,
+					"Excluded mapped MVDD destinations reject before source Read or pointer modification");
+				if (tick == checkpoint && !m_pipeline_replay)
+				{
+					m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded mapped MVDD before Access");
+				}
+				if (tick == 4 + f.prefix)
+				{
+					expect(m_pipeline_extensions_reads == 1, "Rejected mapped MVDD has no atomic fallback or duplicate opcode fetch");
+					if (!m_pipeline_replay)
+					{
+						m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+						expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded mapped MVDD without consuming either endpoint");
+						m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254610; m_check_timer->enable(true); return;
+					}
+					m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+					if (variant < 11) { start_mvdd_source(variant + 1); return; }
+					osd_printf_info("TMS320C54x mapped MVDD exclusions: PASS cases=12 restore=12 cpu_register_destination=4 dual_peripheral=4 repeated_peripheral_write=4 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 source_opcode_fetches=1 atomic_fallback=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDD exclusions complete");
+				}
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			unsigned first_peripheral = 0;
+			if (f.source == 0) first_peripheral = 32;
+			else if (f.source == 0x1f) first_peripheral = 1;
+			unsigned const checkpoint = repeated ? std::array<unsigned, 5>{4, f.read_clock(first_peripheral) - 1, f.read_clock(first_peripheral), f.read_clock(f.count - 1), f.write_clock(f.count - 1)}[f.snapshot] : std::array<unsigned, 4>{3, 4, 5, 6}[f.snapshot];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped-source MVDD retains its addresses through all access waits");
+			if (!repeated && tick == 4)
+			{
+				auto modify = [](u16 value, unsigned mode) -> u16 { return mode == 0 ? value : mode == 1 ? value - 1 : mode == 2 ? value + 1 : value + 3; };
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == modify(0x1000, f.ymode) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == modify(f.source, f.xmode), "MVDD updates its two selected pointers once before mapped Read");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x3333);
+			}
+			if (!repeated && tick == f.read_clock(0))
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x4444); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5555);
+				if (f.source == 0xe) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped MVDD before/after a read-clear access or peripheral wait");
+			}
+			if (tick == f.write_clock(f.count - 1) + 12)
+			{
+				expect(m_pipeline_operand_reads == f.count && m_pipeline_store_writes == f.count && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == (repeated ? 0x1000 + f.count : 0x4444) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == (repeated ? f.source + (f.fixed ? 0 : f.count) : 0x5555),
+					"Mapped MVDD completes each read/write once with no repeated wait, late retarget or stale register alias");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped MVDD without repeating source side effects or destination writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254610; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (repeated ? 399 : 49151)) { start_mvdd_source(variant + 1); return; }
+				if (repeated)
+				{
+					osd_printf_info("TMS320C54x mapped MVDD repeat: PASS cases=400 restore=400 layouts=zero_page,enter_peripheral,leave_peripheral,AR_alias,read_clear lengths=128,4 patterns=4 prefixes=short,long pages=2 snapshots=5 reads=11520 writes=11520 source_opcode_fetches=1 peripheral_waits=once register_values=Read_owned endpoint_identities=unvalidated silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDD repeat complete");
+				}
+				osd_printf_info("TMS320C54x mapped MVDD sources: PASS cases=49152 restore=49152 source_addresses=96 patterns=4 x_modifiers=4 y_modifiers=4 pages=2 snapshots=4 source_reads=1 guest_writes=1 source_opcode_fetches=1 peripheral_extra_clock=1 ram_extra_clock=0 register_aliases=Read_owned read_clear=retained endpoint_identities=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDD sources complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254610)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254600;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
 		if (m_phase == 254580)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -39470,6 +39689,8 @@ void tms320c54x_test_state::test(machine_config &config)
 	});
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	if (!strcmp(config.options().bios(), "mcbsp-control")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::mcbsp_control_map);
+	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
+	else if (!strncmp(config.options().bios(), "mvdd-source", 11)) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
 	else m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
 	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);
 }
@@ -39967,6 +40188,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(112, "st-ar-consumer", "Extended AR stores with legal-gap indirect consumers")
 	ROM_SYSTEM_BIOS(113, "ld-ts", "Retained T-controlled Smem loads")
 	ROM_SYSTEM_BIOS(114, "ld-ts-producer", "Legal T producers followed by T-controlled loads")
+	ROM_SYSTEM_BIOS(115, "mvdd-source", "Retained mapped-source dual transfers")
+	ROM_SYSTEM_BIOS(116, "mvdd-source-rpt", "Repeated mapped-source copies and read-clear endpoints")
+	ROM_SYSTEM_BIOS(117, "mvdd-source-edge", "Rejected mapped dual-transfer endpoint combinations")
 ROM_END
 
 ROM_START(tms54rom4)
