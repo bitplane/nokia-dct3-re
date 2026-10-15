@@ -600,6 +600,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0",
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
+    "asm-store-bp": (
+        "TMS320C54x staged ASM store bypass: PASS cases=24576 restore=24576 selectors=4 shifts=32 sxm_sst=4 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 retained_shift=1 alias_reads=0 writes=1 physical_banks=unvalidated",
+        "Fatal error: TMS320C54x isolated ASM store bypass complete",
+    ),
     "xmem-store-bp": (
         "TMS320C54x staged Xmem store bypass: PASS cases=288 restore=288 producers=6 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated",
         "Fatal error: TMS320C54x isolated Xmem store bypass complete",

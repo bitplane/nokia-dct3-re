@@ -90,14 +90,17 @@ controls pass separately. Long-offset, preincrement, reverse/circular ASM
 store forms, mapped destinations, general ST1-producer latency and
 interrupt/repeat/delay composition are not established by these matrices.
 
-Known shared-path defect at `e05f575b`: the pending-write branch in
-`pipeline_read_data()` classifies ASM stores as ordinary stores but computes
-their bypass value without the retained ASM shift. An adjacent same-address
-load can therefore disagree with the real Execute write. The standalone
-store matrices and existing ordinary/Xmem bypass matrices do not cover this
-combination. A native failing fixture and a shared store-value calculation
-are required before claiming ASM-store/load composition; this takes priority
-over extending the next BRC destination.
+The Execute write and pending-write bypass share one store-word calculation,
+including the retained ASM shift, live Execute accumulator and SXM/SST
+handling. `asm-store-bp` passes 24,576 cases/restores over four selectors,
+all 32 shifts, four SXM/SST states, both unsigned-load destinations,
+adjacent/NOP-separated consumers, same/different addresses, two pages and
+three snapshots. Changing ASM after Read cannot change either publication.
+The adjacent alias suppresses the backing read while the real store still
+writes once. This fixture failed against the earlier unshifted bypass even
+though the actual RAM write was correct. Ordinary and Xmem bypass controls
+also pass; explicit-shift Smem stores, bank contention and stack ordering
+remain outside this ASM composition scope.
 
 ### Immediate ASM publication
 
@@ -399,7 +402,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,855 tests with one skip; the native 5110
+The tool suite passes 2,856 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
@@ -952,7 +955,8 @@ Versioned aggregate acceptance has two distinct scopes:
   renews the default population after the shared-path changes through active
   context restoration, write-stage ownership, ASM stores and shifted control
   delays. Their additional isolated matrices remain separately scoped above;
-  default acceptance does not cover the known ASM-store/load bypass defect.
+  default acceptance does not cover ASM-store/load bypass composition, whose
+  additional isolated matrix is documented above.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.

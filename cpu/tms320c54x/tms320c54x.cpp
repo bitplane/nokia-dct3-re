@@ -4065,15 +4065,7 @@ void tms320c54x_device::pipeline_step()
 			data_write(u8(m_op), u16(saturated_store(accumulator(BIT(m_op, 8)))));
 		else if (staged_store(m_op))
 		{
-			u64 value = accumulator(BIT(m_op, 8));
-			if (staged_asm_store(m_op))
-			{
-				int const shift = s8((m_pipeline_immediate[5] & 31) << 3) >> 3;
-				value = shift < 0 ? BIT(m_st1, 8) ? arithmetic_shift_right(value, -shift) : value >> -shift : (value << shift) & ACC_MASK;
-			}
-			data_write(m_pipeline_operand_address[5], (m_op & 0xfe00) == 0x8c00
-				? (BIT(m_op, 8) ? m_trn : m_t)
-				: u16(saturated_store(value) >> (BIT(m_op, 9) ? 16 : 0)));
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
 			if (staged_extended_accumulator_store(m_op)) ++m_pc;
 		}
 		else if (staged_rmw(m_op))
@@ -4122,8 +4114,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_xmem_store(m_op))
 		{
-			u64 const shifted = (accumulator(BIT(m_op, 8)) << (m_op & 15)) & ACC_MASK;
-			data_write(m_pipeline_operand_address[5], u16(saturated_store(shifted) >> (BIT(m_op, 9) ? 16 : 0)));
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
 		}
 		else if (staged_xmem_arithmetic(m_op))
 		{
@@ -4613,6 +4604,24 @@ bool tms320c54x_device::pipeline_mapped_accumulator_write(u16 address) const
 		(staged_store(m_pipeline_word[5]) && m_pipeline_operand_address[5] == address));
 }
 
+u16 tms320c54x_device::pipeline_store_word() const
+{
+	// Younger Read bypass and the real Execute write must publish the same
+	// word, including the store's retained shift rather than live ST1.ASM.
+	u16 const word = m_pipeline_word[5];
+	if ((word & 0xfe00) == 0x8c00)
+		return BIT(word, 8) ? m_trn : m_t;
+	u64 value = BIT(word, 8) ? m_b : m_a;
+	if (staged_asm_store(word))
+	{
+		int const shift = s8((m_pipeline_immediate[5] & 31) << 3) >> 3;
+		value = shift < 0 ? BIT(m_st1, 8) ? arithmetic_shift_right(value, -shift) : value >> -shift : (value << shift) & ACC_MASK;
+	}
+	else if (staged_xmem_store(word))
+		value = (value << (word & 15)) & ACC_MASK;
+	return u16(saturated_store(value) >> (BIT(word, 9) ? 16 : 0));
+}
+
 u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
@@ -4621,13 +4630,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 	// not bank contention or stack instructions' separate read ordering.
 	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5])) &&
 		address == m_pipeline_operand_address[5])
-	{
-		u16 const word = m_pipeline_word[5];
-		if (staged_xmem_store(word))
-			return u16(saturated_store((accumulator(BIT(word, 8)) << (word & 15)) & ACC_MASK) >> (BIT(word, 9) ? 16 : 0));
-		return (word & 0xfe00) == 0x8c00 ? (BIT(word, 8) ? m_trn : m_t) :
-			u16(saturated_store(accumulator(BIT(word, 8))) >> (BIT(word, 9) ? 16 : 0));
-	}
+		return pipeline_store_word();
 	if (address >= 0x60 && m_pipeline_valid[5] && staged_rmw(m_pipeline_word[5]) &&
 		address == m_pipeline_operand_address[5])
 	{
