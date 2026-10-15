@@ -3300,13 +3300,17 @@ void tms320c54x_device::pipeline_step()
 		}
 		u16 const source = staged_direct_mvmd(m_pipeline_word[3]) ? mode : extended ? (mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3)) : basic_address(3, mode);
-		if (source < 0x60 && !staged_direct_mvmd(m_pipeline_word[3]))
+		if (source < 0x60 && (source < 8 || source > 0x19) && !staged_direct_mvmd(m_pipeline_word[3]))
 		{
 			logerror("%s: staged MVDK register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true;
 			return;
 		}
-		bool const mapped_write = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && pipeline_mapped_accumulator_write(source);
+		// Retain the resolved mapped address as well as the word. A preceding
+		// mapped accumulator write may publish later in this same clock;
+		// direct ALU producers deliberately retain their documented latency.
+		m_pipeline_operand_address[3] = source;
+		bool const mapped_write = pipeline_mapped_accumulator_write(source);
 		if (!mapped_write) m_pipeline_operand[3] = m_data.read_word(source);
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
@@ -3318,7 +3322,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[3] = conflict;
 			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
-			if (!conflict)
+			if (!conflict && !mapped_write)
 			{
 				data_write(destination, m_pipeline_operand[3]);
 				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
@@ -4202,12 +4206,20 @@ void tms320c54x_device::pipeline_step()
 		// Publish at the move's Read clock, not its later Execute clock:
 		// SPRU131G table 7-14 permits an immediately following RPTB.
 		data_write(7, m_pipeline_operand[4]);
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) &&
-		pipeline_mapped_accumulator_write(u8(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && staged_move(m_pipeline_word[3]) &&
+		pipeline_mapped_accumulator_write(m_pipeline_operand_address[3]))
+	{
 		// SPRU131G 7.5.10/example 7-67: a mapped write followed by a
 		// mapped read has no accumulator conflict. Sample after older mapped
 		// Execute, without changing direct-ALU producer latency.
-		m_pipeline_operand[3] = m_data.read_word(u8(m_pipeline_word[3]));
+		m_pipeline_operand[3] = m_data.read_word(m_pipeline_operand_address[3]);
+		u16 const destination = m_pipeline_immediate[3];
+		if (destination >= 0x10 && destination <= 0x19 && !m_pipeline_early_write_deferred[3])
+		{
+			data_write(destination, m_pipeline_operand[3]);
+			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
+		}
+	}
 	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
 	{
 		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + 2); }

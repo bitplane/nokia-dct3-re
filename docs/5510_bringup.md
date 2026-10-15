@@ -26,8 +26,10 @@ The original recorder continues through repeated callbacks and emits its
 pin-decoded response words. Its `RPTBD` at `03:d9c4` now reaches Execute
 once, its two-word MAR delay reaches Execute once, and its first body
 instruction at `03:d9c8` reaches Execute 1,024 times. It subsequently stops
-on staged `MVDK *(0x0008),AR3` at `03:dafe` (`71f8 0008 0013`): its
-source is mapped AL, currently excluded (live PC `03:db03`, terminal
+after executing `MVDK *(0x0008),AR3` at `03:dafe` (`71f8 0008 0013`,
+mapped AL source) and its following instruction at `03:db03` once each.
+The next unsupported staged form is `fb44 dada` at `03:db37`,
+`CCD 0xdada,ANEQ` under SPRU172C 4-29 (live PC `03:db39`, terminal
 `illegal=1`). These are passive Execute observations,
 not firmware writes or a claim of complete recording or validated audio.
 
@@ -37,6 +39,43 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Mapped MVDK sources
+
+MVDK admits sources `0008..0019` (accumulator words, T/TRN, AR0..AR7,
+SP and BK). Access resolves and retains the source address and word before
+source-pointer modification or destination publication. Source/destination
+aliases therefore use the old sampled word. The existing destination timing
+is preserved: DAGEN registers publish in Access, RAM and T/TRN in Read.
+No new CPU save fields or atomic fallback are introduced.
+
+SPRU172C 4-108 specifies the move and addressing forms; SPRU131G 7.5.10
+distinguishes direct accumulator-producer latency from mapped-write/read
+no-conflict ordering. A same-clock mapped STL/POPM accumulator publication
+is sampled after Execute and can still publish a DAGEN destination in the
+move's Access clock. A direct ALU producer is not forwarded by that rule.
+
+`mvdk-mapped` passes 14,256 cases/restores: 18 sources, direct/postincrement/
+absolute forms, 11 destinations (eight ARs, T/TRN and RAM), four patterns,
+two pages and three snapshots. Guard words use eight bits; the indirect
+AR6-source self-alias uses its actual address value. Replacing fetched
+literals and changing the source after Access cannot change the retained
+transfer. `mvdk-producer` passes 5,184 cases/restores across six accumulator
+words, three forms, STL/POPM/direct LD, gaps 0/1, AR3/RAM, four input
+patterns, two pages and three snapshots. LD's immediate is eight bits.
+The unseparated short-form direct-LD case checks an Access-owned pipeline
+projection, not a guaranteed silicon result for violating the latency rule.
+STLM-to-accumulator sources, general producer/interrupt/repeat compositions
+and measured physical timing remain unvalidated.
+
+`mvdk-map-edge` passes 48 cases/restores for 12 still-unadmitted status,
+repeat-control and peripheral sources on two pages with snapshots before/
+after the guard. They stop before data transactions or destination writes;
+these are prototype exclusions, not silicon traps. Existing MVMD accumulator,
+MVMD ST1, T/TRN move, mapped multiply and RPTBD interrupt controls pass.
+The original recorder's MVDK and following instruction each reach Execute
+once with zero observer writes. Resident-memory and low-page-copy controls
+remain unchanged; this is not complete recording or validated audio.
 
 ### Delayed block-repeat boundary
 
@@ -107,7 +146,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,835 tests with one skip; the native 5110
+The tool suite passes 2,838 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

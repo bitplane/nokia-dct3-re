@@ -12,6 +12,37 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mapped_mvdk_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['mvdk-map-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdk-map-edge')
+        for bad in (output.replace('restore=48', 'restore=0'),
+                    output.replace('data_reads=0', 'data_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdk-map-edge')
+
+    def test_mapped_mvdk_producer_scope(self):
+        marker, ending = EXTRA_PROFILES['mvdk-producer']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdk-producer')
+        for bad in (output.replace('restore=5184', 'restore=0'),
+                    output.replace('mapped_no_conflict=1', 'mapped_no_conflict=0'),
+                    output.replace('direct_ld_gap0=projection_only', 'direct_ld_gap0=silicon'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdk-producer')
+
+    def test_mapped_mvdk_scope(self):
+        marker, ending = EXTRA_PROFILES['mvdk-mapped']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvdk-mapped')
+        for bad in (output.replace('restore=14256', 'restore=0'),
+                    output.replace('source_reads=1', 'source_reads=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdk-mapped')
+
     def test_delayed_block_repeat_interrupt_scope(self):
         marker, ending = EXTRA_PROFILES['rptbd-irq']
         output = marker + '\n' + ending + '\n'

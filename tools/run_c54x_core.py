@@ -460,6 +460,18 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed block repeat interrupts: PASS cases=768 restore=768 counts=0,1,2,7 delay_layouts=4 pages=2 sources=IRQ,NMI arrivals=delay,first_write snapshots=6 delay_effects=once ordered_copies=1 balanced_frames=1 retained_words=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed block repeat interrupts complete",
     ),
+    "mvdk-mapped": (
+        "TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped MVDK complete",
+    ),
+    "mvdk-producer": (
+        "TMS320C54x mapped MVDK producers: PASS cases=5184 restore=5184 sources=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 destinations=AR3,RAM patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 direct_alu_latency=retained direct_ld_gap0=projection_only mapped_no_conflict=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped MVDK producers complete",
+    ),
+    "mvdk-map-edge": (
+        "TMS320C54x mapped MVDK exclusions: PASS cases=48 restore=48 sources=12 pages=2 snapshots=2 data_reads=0 data_writes=0 destination_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated mapped MVDK exclusions complete",
+    ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block far call exclusions complete",
