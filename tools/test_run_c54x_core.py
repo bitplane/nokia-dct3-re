@@ -12,6 +12,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_delayed_block_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd')
+        for bad in (output.replace('restore=512', 'restore=0'),
+                    output.replace('delay_effects=once', 'delay_effects=repeated'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptbd')
+
+    def test_delayed_block_repeat_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd-edge')
+        for bad in (output.replace('restore=28', 'restore=0'),
+                    output.replace('data_reads=0', 'data_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptbd-edge')
+
     def test_mapped_mvdd_source_scope(self):
         for name in ('mvdd-source', 'mvdd-source-rpt', 'mvdd-source-edge'):
             marker, ending = EXTRA_PROFILES[name]

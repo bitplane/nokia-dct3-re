@@ -23,10 +23,12 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at unsupported staged `RPTBD`
-(`f272`) at `03:d9c4` (live PC `03:d9c6`) within a five-second observation,
-with terminal `illegal=1`. This is not complete recording or
-validated audio.
+pin-decoded response words. Its `RPTBD` at `03:d9c4` now reaches Execute
+once, its two-word MAR delay reaches Execute once, and its first body
+instruction at `03:d9c8` reaches Execute 1,024 times. It subsequently stops
+on an unsupported staged MVDK register/peripheral source (live PC
+`03:db03`), with terminal `illegal=1`. These are passive Execute observations,
+not firmware writes or a claim of complete recording or validated audio.
 
 Passive Execute hooks record one delayed offset-load entry at `03:a5b4`
 and one AR0-indexed load entry at `03:dd3a`, with no observer writes.
@@ -60,19 +62,40 @@ modification in RPTBD delay slots and describes producer latency before
 RPTB[D]; the preceding STLM-to-BRC sequence needs that ownership checked,
 not a blanket immediate forwarding rule.
 
-The staged implementation remains unsupported. Its acceptance must retain
-the endpoint literal and complete delay instruction across Fetch, execute
-delay work once, preserve loop state across interrupts and save/restore,
-and reject still-unimplemented nested/control-register modifications before
-side effects. An original-firmware Execute observation is required separately
-from synthetic conformance or a moved Decode stop. None of this static
-evidence proves RPTBD retirement or complete recording.
+The staged implementation shares RPTB's saved loop state and the existing
+control-delay machinery. Complete Decode establishes the loop; the Access
+redirect preserves both prefetched delay words. No new scalar CPU save fields
+are needed. The `rptbd` profile passes 512 cases/restores across counts
+0/1/2/7, four delay layouts (two MAR words, STM T, offset LD and the original
+two-word MAR), four data patterns, two pages and four snapshots. Replacing
+the endpoint and delay words after Fetch, and the delay-load source after
+Read, cannot change retained work. Ordered body reads/writes, final memory,
+RSA/REA/BRC/BRAF, once-only delay effects and unrelated registers are checked.
+
+`rptbd-edge` passes 28 cases/restores across seven exclusions, two pages and
+snapshots before/after the guard: STM/STLM/POPM BRC in the delay span, a
+branch, a two-word spill into one remaining delay word, and nested RPTBD
+in the body or delay span. They stop before data transactions, pointer
+updates or count modification. These are bounded prototype exclusions,
+not silicon traps or exhaustive coverage of indirect control-register writes.
+The existing RPTB edge fixture now tests nested RPTBD rather than rejecting
+all RPTBD instructions.
+
+The separate original-firmware run records one RPTBD Execute entry, one
+delay-MAR entry and 1,024 first-body entries with zero observer writes. Its
+resident-memory comparison and first 128 ordered low-page reads still pass.
+RPTB (6,168 cases/restores plus 16 edge cases), backward in-block branches,
+in-block far calls, delayed LD (147,456 cases/restores) and the native 5110
+save-state control pass on this implementation. This is not a renewed full
+default-suite checkpoint: the full checkpoint below remains tied to its
+documented source revision. RPTBD interrupt composition, instruction-produced
+BRC latency matrices and measured physical phase timing remain unvalidated.
 
 The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,832 tests with one skip; the native 5110
+The tool suite passes 2,834 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

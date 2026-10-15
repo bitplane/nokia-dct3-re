@@ -448,6 +448,14 @@ EXTRA_PROFILES = {
         "TMS320C54x backward in-block branches: PASS cases=1536 restore=1536 outer_counts=4 inner_counts=4 forms=conditional_back,unconditional_back accumulators=2 pages=2 sources=none,IRQ,NMI snapshots=4 ordered_copies=1 outer_counts_preserved=1 held_words_restored=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated backward in-block branches complete",
     ),
+    "rptbd": (
+        "TMS320C54x delayed block repeat: PASS cases=512 restore=512 counts=0,1,2,7 delay_layouts=4 patterns=4 pages=2 snapshots=4 delay_effects=once ordered_copies=1 retained_words=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed block repeat complete",
+    ),
+    "rptbd-edge": (
+        "TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated delayed block repeat exclusions complete",
+    ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block far call exclusions complete",
