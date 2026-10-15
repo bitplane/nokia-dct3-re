@@ -670,6 +670,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rptb-bcd')
 
+    def test_immediate_asm_scope(self):
+        marker, ending = EXTRA_PROFILES['asm-immediate']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='asm-immediate')
+        for bad in (output.replace('restore=9216', 'restore=0'),
+                    output.replace('data_reads=0', 'data_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='asm-immediate')
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'

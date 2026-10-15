@@ -220,6 +220,11 @@ constexpr bool staged_immediate_arp(u16 word)
 	return (word & 0xfff8) == 0xf4a0;
 }
 
+constexpr bool staged_immediate_asm(u16 word)
+{
+	return (word & 0xffe0) == 0xed00;
+}
+
 constexpr bool staged_read_a(u16 word)
 {
 	return (word & 0xff00) == 0x7e00 && (u8(word) < 0x98 || u8(word) == 0xf8);
@@ -3011,7 +3016,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_brc = word == 0x771a;
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || staged_timer_control(word);
-		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && !staged_immediate_asm(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -4208,6 +4213,9 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_immediate_arp(m_op))
 			; // Access publication must not overwrite a younger indirect ARP update.
+		else if (staged_immediate_asm(m_op))
+			// SPRU131G example 7-52: the following ASM consumer has no gap.
+			m_st1 = (m_st1 & ~u16(0x001f)) | (m_op & 0x001f);
 		else if ((m_op & 0xfcf8) == 0xf4a8)
 			m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);
 		else if (staged_mar(m_op))

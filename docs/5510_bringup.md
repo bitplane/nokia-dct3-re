@@ -34,8 +34,9 @@ The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
 times in a five-second passive observation. Reverse-carry MAR `6dbb` at
 `03:c84a` reaches Execute once. The internal delayed branch `fa42` at
 `03:c852` and its join at `03:c85e` each reach Execute 510 times. The next
-stop is unsupported `ed1e` at `03:cfb7` (live/terminal PC `03:cfb9`,
-`illegal=1`). Its instruction contract remains to be decoded. The post-loop
+stop is unsupported `8793` at `03:e0c9` (live/terminal PC `03:e0cb`,
+`illegal=1`). Immediate ASM load `ed1e` at `03:cfb7` reaches Execute once.
+The next opcode's instruction contract remains to be decoded. The post-loop
 BRC reload has separate write-stage ownership, as described below.
 The intervening indirect PMST and repeat-control restore exclusions are
 covered by the bounded tests below.
@@ -58,6 +59,23 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Immediate ASM publication
+
+`ed1e` is `LD #-2,ASM` (SPRU172C 4-70/4-71). All 32 encoded signed
+five-bit values update only ST1.ASM in Execute, using the retained opcode
+without a data access or atomic-interpreter fallback. SPRU131G example
+7-52 requires zero latency to the following ASM consumer; the existing
+Read-after-older-Execute ordering supplies that visibility.
+
+`asm-immediate` passes 9,216 cases/restores for LD/ADD/SUB consumers,
+all 32 shifts, two accumulator patterns, four SXM/OVM states, zero/one
+intervening NOP, two pages and three snapshots. Replacing the opcode
+after Fetch must not alter its immediate. Per-clock checks cover ASM,
+other status, accumulator results and absence of data transactions.
+The memory-sourced `asm-consumer`, `asm-edge` and `asm-mapped` profiles
+also pass separately. This does not establish every immediate-ASM
+store consumer, interrupt/delay composition or physical phase timing.
 
 ### Delayed internal block branches
 
@@ -336,7 +354,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,851 tests with one skip; the native 5110
+The tool suite passes 2,852 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

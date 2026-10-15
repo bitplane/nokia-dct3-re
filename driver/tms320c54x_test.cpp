@@ -11308,10 +11308,11 @@ private:
 	void start_asm_load(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const consumer = !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
+		bool const immediate = !strcmp(machine().options().bios(), "asm-immediate");
+		bool const consumer = immediate || !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0x3200 | f.mode); if (f.form >= 3) program.write_word(f.base + 0x601, f.form == 5 ? 0x1002 : 3);
+		program.write_word(f.base + 0x600, immediate ? 0xed00 | f.raw : 0x3200 | f.mode); if (f.form >= 3) program.write_word(f.base + 0x601, f.form == 5 ? 0x1002 : 3);
 		unsigned const words = f.form >= 3 ? 2 : 1;
 		if (consumer) program.write_word(f.base + 0x600 + words + f.gap, std::array<u16, 3>{0xf582, 0xf580, 0xf581}[f.operation]);
 		program.write_word(f.base + 0x600 + words + (consumer ? 1 + f.gap : 0), 0xf4e1); data.write_word(0x1002, f.word);
@@ -11321,7 +11322,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
 		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "asm_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x1002 && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "LD ASM retains one RAM source in Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "asm_load_read", [this, f, immediate](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!immediate && at == 0x1002 && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Memory LD ASM reads one retained word; immediate ASM never reads data"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "asm_load_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "LD ASM and register consumers never write data memory"); });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "asm_load_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 3) return; expect(word == (f.form == 5 ? 0x1002 : 3) && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 3, "LD ASM retains its address literal once"); ++m_pipeline_extensions_reads; });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255020;
@@ -13440,6 +13441,7 @@ private:
 		if (!strcmp(machine().options().bios(), "compare-delay")) { start_delay_compare(); return; }
 		if (!strcmp(machine().options().bios(), "cmp-delay-edge")) { start_delay_compare_edge(); return; }
 		if (!strcmp(machine().options().bios(), "asm-load") || !strcmp(machine().options().bios(), "asm-consumer")) { start_asm_load(); return; }
+		if (!strcmp(machine().options().bios(), "asm-immediate")) { start_asm_load(); return; }
 		if (!strcmp(machine().options().bios(), "asm-edge")) { start_asm_edge(); return; }
 		if (!strcmp(machine().options().bios(), "t-load-control")) { start_pipeline_memory_multiply(165888); return; }
 		if (!strcmp(machine().options().bios(), "ts-alu") || !strcmp(machine().options().bios(), "ts-alu-producer")) { start_ts_arithmetic(); return; }
@@ -41265,22 +41267,25 @@ private:
 		if (m_phase == 255050) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255040; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255020)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
+			bool const immediate = !strcmp(machine().options().bios(), "asm-immediate");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = immediate || !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
 			u16 const expected_st0 = consumer && tick >= f.consumer_clock ? f.final_st0 : !consumer && tick >= f.read - 1 ? f.final_st0 : f.st0;
 			bool const state_ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick > f.read ? (f.st1 & ~31) | f.raw : f.st1) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected_st0 && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == (consumer && tick >= f.consumer_clock ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5;
 			if (!state_ok) osd_printf_info("asm_load_state: consumer=%u case=%u tick=%u st0=%llx expected=%04x st1=%llx expected=%04x b=%llx expected=%llx\n", unsigned(consumer), variant, tick, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), expected_st0, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), tick > f.read ? (f.st1 & ~31) | f.raw : f.st1, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)(consumer && tick >= f.consumer_clock ? f.result : f.b));
 			expect(state_ok, "LD ASM updates only five ST1 bits at Execute and adjacent consumers use the published shift");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick < f.read - 1 ? f.initial[i] : tick == f.read - 1 ? f.final[i] : 0x2200 + i), "LD ASM retains Access-owned address updates without retirement duplication");
 			if (tick == f.read - 1) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
+			if (immediate && tick == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x600, 0xed00 | (f.raw ^ 31)); }
 			if (tick == 3 && f.form >= 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
 			if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002, f.word ^ 31); }
 			if (tick == f.checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save LD ASM and immediate consumer around retained Read and Execute"); }
 			if (tick == 16)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 3), "LD ASM has one source read and no repeated extension fetch");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(!immediate) && m_pipeline_extensions_reads == unsigned(f.form >= 3), "LD ASM has its owned source count and no repeated extension fetch");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore LD ASM without repeating reads pointer updates or consumer effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255030; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant + 1 < (consumer ? 9216U : 73728U)) { start_asm_load(variant + 1); return; }
+				if (immediate) { osd_printf_info("TMS320C54x immediate ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero data_reads=0 data_writes=0 opcode_mutation_after_fetch=1 publication=Execute physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated immediate ASM consumers complete"); }
 				if (consumer) { osd_printf_info("TMS320C54x LD ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero source_reads=1 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated ASM consumers complete"); }
 				osd_printf_info("TMS320C54x staged LD ASM: PASS cases=73728 restore=73728 forms=DP,SP,postincrement,offset,preincrement,absolute registers=8 shifts=32 status_states=4 compatibility_states=2 pages=2 snapshots=3 source_reads=1 publish=Execute t_unchanged=1 pointer_updates=once mapped_sources=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated LD ASM complete");
 			}
@@ -43161,6 +43166,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(181, "rearm-edge", "Access-owned in-body BRC publication exclusion")
 	ROM_SYSTEM_BIOS(182, "mar-reverse", "AR0 reverse-carry MAR updates with retained Access ownership")
 	ROM_SYSTEM_BIOS(183, "rptb-bcd", "Delayed signed conditional branches within a repeat block")
+	ROM_SYSTEM_BIOS(184, "asm-immediate", "Immediate ASM publication and zero-latency accumulator consumers")
 ROM_END
 
 ROM_START(tms54rom4)
