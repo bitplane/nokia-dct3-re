@@ -160,6 +160,7 @@ private:
 	void push(u16 value);
 	u16 pop();
 	u64 data_operand(u16 value) const;
+	u64 shifted_by_t(u16 memory, u16 t) const;
 	u16 add_memory_word(u16 value, u16 immediate, bool publish_status = true);
 	u16 pipeline_read_data(u16 address);
 	bool pipeline_mapped_accumulator_write(u16 address) const;

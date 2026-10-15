@@ -322,7 +322,7 @@ constexpr bool staged_memory_load(u16 word)
 {
 	return (((word & 0xfc00) == 0x1000 &&
 		(BIT(word, 9) || u8(word) < 0xa0 || u8(word) >= 0xe0)) ||
-		(word & 0xfe00) == 0x4400) && u8(word) <= 0xf8;
+		(word & 0xfe00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_shifted_smem(u16 word)
@@ -1834,6 +1834,15 @@ u64 tms320c54x_device::data_operand(u16 value) const
 	return value;
 }
 
+u64 tms320c54x_device::shifted_by_t(u16 memory, u16 t) const
+{
+	const int shift = s8(u8(t << 2)) >> 2;
+	const u64 source = data_operand(memory);
+	return shift < 0 ?
+		(BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
+		(source << shift) & ACC_MASK;
+}
+
 u64 tms320c54x_device::shifted_load(u64 source, int shift, bool destination_b)
 {
 	source &= ACC_MASK;
@@ -3242,6 +3251,11 @@ void tms320c54x_device::pipeline_step()
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
 		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
+		if ((m_pipeline_word[3] & 0xfe00) == 0x1400 && m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged TS load mapped/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
+			m_illegal = true; return;
+		}
 		bool const unsigned_control = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
 			(m_pipeline_operand_address[3] == 0 || m_pipeline_operand_address[3] == 7);
 		bool const unsigned_peripheral = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
@@ -3347,7 +3361,7 @@ void tms320c54x_device::pipeline_step()
 		bool const peripheral_destination = m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] < 0x60;
 		if (m_pipeline_immediate[3] < 0x60 || m_pipeline_operand_address[3] < 0x20 || (peripheral_destination && m_pipeline_repeat_active))
 		{
-			logerror("%s: staged MVDD register/peripheral operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged MVDD register/peripheral operand is unsupported instruction=%06x word=%04x source=%04x destination=%04x repeated=%u\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_immediate[3], m_pipeline_operand_address[3], unsigned(m_pipeline_repeat_active)); m_illegal = true; return;
 		}
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
@@ -3407,6 +3421,10 @@ void tms320c54x_device::pipeline_step()
 		m_st1 |= 0x0800;
 		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
 	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe00) == 0x1400)
+		// Like the multiplier's T input, TS belongs to Read before an
+		// older accumulator-to-T store can publish in Execute (table 7-3).
+		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf000) == 0x2000)
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
@@ -3726,7 +3744,8 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_memory_load(m_op))
 		{
 			u64 const value = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
+			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x1400 ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) :
+				(m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
 		if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xfe80) == 0x4800)
@@ -4800,14 +4819,6 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0;
 		return indirect_read(low);
 	};
-	const auto shifted_by_t = [this](u16 memory)
-	{
-		const int shift = s8(u8(m_t << 2)) >> 2;
-		const u64 source = data_operand(memory);
-		return shift < 0 ?
-			(BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
-			(source << shift) & ACC_MASK;
-	};
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
@@ -4909,7 +4920,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0500: // ADD Smem, TS, B
 	{
 		u64 &destination = accumulator(BIT(op, 8));
-		destination = add_sub(destination, shifted_by_t(alu_smem()), false, BIT(op, 8));
+		u16 const memory = alu_smem();
+		destination = add_sub(destination, shifted_by_t(memory, m_t), false, BIT(op, 8));
 		return;
 	}
 	case 0x0600: // ADDC Smem, A
@@ -4938,7 +4950,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0d00: // SUB Smem, TS, B
 	{
 		u64 &destination = accumulator(BIT(op, 8));
-		destination = add_sub(destination, shifted_by_t(alu_smem()), true, BIT(op, 8));
+		u16 const memory = alu_smem();
+		destination = add_sub(destination, shifted_by_t(memory, m_t), true, BIT(op, 8));
 		return;
 	}
 	case 0x0e00: // SUBB Smem, A
@@ -4951,8 +4964,11 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x1400: // LD Smem, TS, A
 	case 0x1500: // LD Smem, TS, B
-		accumulator(BIT(op, 8)) = shifted_by_t(alu_smem());
+	{
+		u16 const memory = alu_smem();
+		accumulator(BIT(op, 8)) = shifted_by_t(memory, m_t);
 		return;
+	}
 	case 0x1600: // LDR Smem, A
 	case 0x1700: // LDR Smem, B (SPRU172C 4-78)
 		accumulator(BIT(op, 8)) = ((data_operand(alu_smem()) << 16) | 0x8000) & ACC_MASK;

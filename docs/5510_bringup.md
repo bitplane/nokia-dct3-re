@@ -15,8 +15,11 @@ words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. It also compares the
 recorder overlay's 73,762 RAM destination words before execution (four
 register words excluded) and enters original recorder startup at `0073f9`.
-Execution stops at short-indirect LD Smem,TS,A (`1481`) at `03:f0f6`
-(live PC `03:f0f8`).
+Execution stops at repeated MVDD (`e598`) at `03:8eda`, before its first
+transfer from low-page source `0000` to RAM `0e35` (live PC `03:8edc`).
+The source pointer's provenance must be resolved before extending the
+staged register/peripheral-read contract; an intentional register-page copy
+is not established by this stop alone.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -3482,6 +3485,45 @@ Focused controls cover these two profiles plus `store-delay`,
 94 core-result verifier tests; native 5110 save-state restoration also
 passes. Original recorder STH A (`82f8 0011`) at `03:f7dd` now executes;
 the next stop is maintained in [Current boundary](#current-boundary).
+
+TS-controlled memory loads (`14xx`/`15xx`, SPRU172C LD syntax 2) use the
+shared retained Smem address path and capture both memory and T in Read.
+TS is T's signed low six bits (-32..31). SXM selects sign extension and
+arithmetic right shifting; OVM does not saturate this load form, and carry
+and accumulator-overflow flags are preserved. Atomic and staged execution
+share the same shift arithmetic, but only the staged frontend retains the
+Read-owned count. Address/offset literals are consumed before this count
+occupies the retained immediate slot; PC accounting still uses the original
+opcode's instruction length. Mapped/peripheral sources below `0060` remain
+excluded from the staged TS path.
+
+The `ld-ts` fixture passes 221,184 cases/restores over 18 addressing forms,
+all 64 shift encodings, four input words, SXM/OVM combinations, both
+accumulator destinations and compatibility modes. AR selection and program
+page rotate with shift encoding/destination; this is not their full Cartesian
+cross-product. Three snapshots bracket address capture and Read. Pointer,
+literal, memory and T replacement after their owned phases must not alter
+the result. An independent bit-at-a-time 40-bit shift model checks the
+result and unchanged arithmetic flags; each case has one data read and no
+data write. Short Read/Execute clocks are 5/6, extended forms 6/7.
+
+The `ld-ts-producer` fixture adds 4,608 cases/restores for immediate STM T,
+memory LD T and accumulator STLM T, eight shift encodings, four input words,
+SXM/OVM combinations, both destinations and two program pages. STM/LD T
+have adjacent consumers; STLM T has the required intervening NOP word
+(SPRU131G table 7-3). The consumer retains its count when T is replaced
+after Read, without duplicating producer reads/writes or literals on replay.
+No behavior inside STLM T's forbidden one-word window, new SXM-producer
+latency, repeat or control-delay composition is established by these cases.
+Focused acceptance passes `ld-ts`, `ld-ts-producer`, `cmpm-smem`,
+`st-extended-ar`, `st-ar-consumer`, `move-t`, `mpy-t-imm`, `mpy-mapped`,
+`load-offset` and `stack-irq-return`. The tool suite runs 2,803 tests with
+one skip, including 95 core-result verifier tests; native 5110 save-state
+restoration passes. The atomic `bootreplay` bootstrap/status control also
+passes pin-level exchange, selected-state replay equality and unchanged
+NAND after the shared arithmetic extraction. Original `1481` at `03:f0f6` now executes. The
+current MVDD stop and exact resident/overlay comparison are recorded in
+[Current boundary](#current-boundary), not a completed recorder transaction.
 The original CMPM at `03:91eb` executes with CPL set, SP=`1246` and
 direct source `125a`. The `7725` at `02:6d47` is STM immediate to PRD,
 covered by the timer-register contract below. The new Smem and adjacent-branch
