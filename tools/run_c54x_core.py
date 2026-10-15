@@ -404,6 +404,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "alu-dual": (
+        "TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated",
+        "Fatal error: TMS320C54x isolated dual ALU complete",
+    ),
+    "alu-dual-edge": (
+        "TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated dual ALU exclusions complete",
+    ),
     "mpy-dual": (
         "TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated",
         "Fatal error: TMS320C54x isolated dual MPY complete",

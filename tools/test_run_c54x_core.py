@@ -861,6 +861,20 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_dual_arithmetic_profile_scopes(self):
+        for profile, restores in (('alu-dual', 86016), ('alu-dual-edge', 32)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        marker, ending = EXTRA_PROFILES['alu-dual']
+        for old, new in (('x_alias_priority=1', 'x_alias_priority=0'),
+                         ('t_unchanged=1', 't_unchanged=0'),
+                         ('physical_banks=unvalidated', 'physical_banks=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='alu-dual')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

@@ -10754,9 +10754,11 @@ private:
 		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0;
 		u64 result;
 	};
-	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge)
+	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false)
 	{
 		dual_multiply_fixture f{};
+		bool const subtract = alu && variant >= (edge ? 16U : 43008U);
+		if (alu) variant %= edge ? 16U : 43008U;
 		bool const arithmetic = variant >= 18432 && !edge;
 		unsigned const v = edge ? variant : arithmetic ? variant - 18432 : variant;
 		unsigned const layout = edge || arithmetic ? 0 : (v / 512) % 3;
@@ -10796,15 +10798,26 @@ private:
 		bool const overflow = product < -2147483648LL || product > 2147483647LL;
 		f.result = u64(overflow && (f.flags & 2) ? (product < 0 ? -2147483648LL : 2147483647LL) : product) & 0xffffffffffULL;
 		f.result_st0 = f.st0 | (overflow ? f.destination ? 0x200 : 0x400 : 0);
+		if (alu)
+		{
+			s64 const left = s64(f.flags & 8 ? s16(f.xword) : s32(f.xword)) * 65536;
+			s64 const right = s64(f.flags & 8 ? s16(f.yword) : s32(f.yword)) * 65536;
+			s64 const result = subtract ? left - right : left + right;
+			bool const ov = result < -2147483648LL || result > 2147483647LL;
+			bool const carry = subtract ? f.xword >= f.yword : u32(f.xword) + f.yword > 65535;
+			f.result = u64(ov && (f.flags & 2) ? (result < 0 ? -2147483648LL : 2147483647LL) : result) & 0xffffffffffULL;
+			f.result_st0 = (f.st0 & ~0x800) | (carry ? 0x800 : 0) | (ov ? f.destination ? 0x200 : 0x400 : 0);
+		}
 		return f;
 	}
 	void start_dual_multiply(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge"); auto const f = dual_multiply_case(variant, edge);
+		bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
+		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0xa400 | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : 0xa400) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -12132,7 +12145,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
-		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge")) { start_dual_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual") || !strcmp(machine().options().bios(), "alu-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
 		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
@@ -39273,7 +39286,8 @@ private:
 		if (m_phase == 254900)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge"); auto const f = dual_multiply_case(variant, edge);
+			bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
+			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu);
 			unsigned const checkpoint = 3 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual MPY publishes product and sticky destination overflow only at Execute");
@@ -39284,7 +39298,7 @@ private:
 			}
 			if (!edge && tick == 5)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.xword, "Dual MPY publishes X into T in Read after older Execute");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (alu ? 0xabcd : f.xword), "Dual memory Read publishes T only for multiply");
 				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
 				auto const disable = machine().disable_side_effects();
 				m_cpu->space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu->space(AS_DATA).write_word(f.yaddress, 0xbeef);
@@ -39305,7 +39319,17 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254910; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < (edge ? 16U : 43008U)) { start_dual_multiply(variant + 1); return; }
+				if (variant + 1 < (edge ? 16U : 43008U) * (alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return; }
+				if (alu)
+				{
+					if (edge)
+					{
+						osd_printf_info("TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+						throw emu_fatalerror(0, "TMS320C54x isolated dual ALU exclusions complete");
+					}
+					osd_printf_info("TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated dual ALU complete");
+				}
 				if (edge)
 				{
 					osd_printf_info("TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
@@ -40944,6 +40968,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(132, "xc-controls", "Existing XC sampling and interrupt controls")
 	ROM_SYSTEM_BIOS(133, "mpy-dual", "Dual-memory multiply addresses and arithmetic replay")
 	ROM_SYSTEM_BIOS(134, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
+	ROM_SYSTEM_BIOS(135, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
+	ROM_SYSTEM_BIOS(136, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
 ROM_END
 
 ROM_START(tms54rom4)

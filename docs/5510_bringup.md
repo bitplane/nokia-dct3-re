@@ -24,16 +24,33 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-dual-memory ADD (`a19a`) at `03:dda5` (live PC `03:dda7`) within a five-second observation,
+`MAC #lk,B,B` (`f367`) at `03:ddaa` (live PC `03:ddac`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-The preceding dual-memory MPY is admitted but has not executed in this original
-sequence: a passive Execute-hook control records one entry at `03:dda1` and
-zero at `03:dda3`. The younger unsupported ADD stops Decode first. A moved
-unsupported-opcode frontier therefore does not prove retirement of its prefix.
+The original dual-memory MPY now reaches Execute: a passive hook records one
+entry at `03:dda3`, with one positive-control entry at `03:dda1`. Before
+dual-memory ADD admission the younger unsupported ADD stopped Decode before
+that multiply could execute. A moved unsupported-opcode frontier alone therefore
+does not prove retirement of its prefix.
 
 ## Retained recorder execution contracts
+
+Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
+address/read machinery as dual MPY, but does not load T. Both operands are
+extended according to SXM and shifted left by 16; their sum/difference replaces
+the destination independently of its previous value. Execute publishes carry,
+sticky destination overflow and OVM saturation through the shared arithmetic
+helper. `alu-dual` passes 86,016 cases/restores: 36,864 address cases and 49,152
+arithmetic cases across ADD/SUB, all 1,024 encodings, three alias layouts,
+linear/circular addressing, 64 value pairs, 32 status combinations, two pages
+and three snapshots. These are factored matrices, not a full cross-product.
+`alu-dual-edge` adds 32 low-page operand exclusions before reads or pointer
+updates. Physical bank timing, repeat composition and general producer latency
+remain unvalidated. The tool suite passes 2,817 tests with one skip.
+The full 43,008-case dual-MPY control and native 5110 save-state round trip
+also pass after sharing the retained dual-read path. The resident-memory
+comparison remains exact; the default CPU suite has not been renewed here.
 
 Dual-memory MPY (`a400..a5ff`) captures both addresses before modifying either
 auxiliary register. SPRU131G section 5.5.4 gives Xmod priority when both operands
