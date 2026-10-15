@@ -24,11 +24,34 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`MPY Xmem,Ymem,A` (`a49a`) at `03:dda3` (live PC `03:dda5`) within a five-second observation,
+dual-memory ADD (`a19a`) at `03:dda5` (live PC `03:dda7`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
+The preceding dual-memory MPY is admitted but has not executed in this original
+sequence: a passive Execute-hook control records one entry at `03:dda1` and
+zero at `03:dda3`. The younger unsupported ADD stops Decode first. A moved
+unsupported-opcode frontier therefore does not prove retirement of its prefix.
+
 ## Retained recorder execution contracts
+
+Dual-memory MPY (`a400..a5ff`) captures both addresses before modifying either
+auxiliary register. SPRU131G section 5.5.4 gives Xmod priority when both operands
+use the same AR. Two logical reads supply signed 16-bit operands; X publishes T
+in Read, while the product publishes in Execute with FRCT and destination
+overflow/OVM handling. Execute does not rewrite a newer T value.
+`mpy-dual` passes 43,008 cases/restores: an 18,432-case address matrix covers
+all 512 encodings, three alias layouts, linear/circular addressing, two pages
+and three snapshots; a separate 24,576-case arithmetic matrix covers 64 value
+pairs and 32 status combinations. These are factored matrices, not their full
+Cartesian product. `mpy-dual-edge` passes 16 exclusions for low-page CPU and
+peripheral sources before reads or pointer updates. Physical bank arbitration
+and repeat composition remain unvalidated; these exclusions are not silicon
+trap claims. The tool suite passes 2,816 tests with one skip. This does not
+renew the full CPU checkpoint below.
+The EXP/NORM, mapped repeated-MVDD and XC controls pass, as does the native
+5110 save-state round trip. The original resident-memory comparison still
+passes independently of the new Decode boundary.
 
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing

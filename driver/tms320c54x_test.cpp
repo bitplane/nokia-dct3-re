@@ -10745,6 +10745,83 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct dual_multiply_fixture
+	{
+		unsigned x, y, destination, snapshot, flags;
+		bool linear;
+		u32 base;
+		std::array<u16, 4> initial, final;
+		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0;
+		u64 result;
+	};
+	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge)
+	{
+		dual_multiply_fixture f{};
+		bool const arithmetic = variant >= 18432 && !edge;
+		unsigned const v = edge ? variant : arithmetic ? variant - 18432 : variant;
+		unsigned const layout = edge || arithmetic ? 0 : (v / 512) % 3;
+		f.x = edge || arithmetic ? 8 : v & 15; f.y = edge || arithmetic ? 9 : (v >> 4) & 15;
+		f.destination = arithmetic ? (v / 64) % 2 : edge ? 0 : (v / 256) % 2;
+		f.flags = arithmetic ? (v / 128) % 32 : edge ? 0 : ((v / 64) ^ (v / 512)) % 32;
+		f.linear = edge || arithmetic || (v / 1536) % 2;
+		f.base = (edge ? (v / 4) % 2 : arithmetic ? (v / 4096) % 2 : (v / 3072) % 2) ? 0x20000 : 0;
+		f.snapshot = edge ? v / 8 : arithmetic ? v / 8192 : v / 6144;
+		for (unsigned i = 0; i < 4; ++i) f.initial[i] = layout == 2 ? 0x1048 + i : 0x100f + (layout ? 0 : 0x100 * i);
+		if (edge)
+		{
+			unsigned const kind = v % 4;
+			if (kind < 2) f.initial[0] = kind ? 0x20 : 0x0e;
+			else f.initial[1] = kind == 2 ? 0x0e : 0x33;
+		}
+		f.xaddress = f.initial[f.x & 3]; f.yaddress = f.initial[f.y & 3];
+		static constexpr std::array<u16, 8> words{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa};
+		f.xword = words[arithmetic ? v % 8 : (v / 16) % 8];
+		f.yword = f.xaddress == f.yaddress ? f.xword : words[arithmetic ? (v / 8) % 8 : (v / 128) % 8];
+		f.final = f.initial;
+		auto modify = [&f](u16 a, unsigned mode) -> u16 {
+			if (mode == 1) return a - 1;
+			if (mode == 2) return a + 1;
+			if (mode == 3) return f.linear ? a + 3 : (a & 0xfff0) | ((a + 3) & 15);
+			return a;
+		};
+		if (!edge)
+		{
+			f.final[f.x & 3] = modify(f.initial[f.x & 3], f.x >> 2);
+			if ((f.x & 3) != (f.y & 3)) f.final[f.y & 3] = modify(f.initial[f.y & 3], f.y >> 2);
+		}
+		f.st0 = 0xa002 | (f.flags & 16 ? 0x1e00 : 0);
+		f.st1 = 0x800 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.flags & 8 ? 0x100 : 0) | (v & 1 ? 0x4020 : 0);
+		f.pmst = f.flags & 4 ? 2 : 0;
+		s64 const product = s64(s16(f.xword)) * s64(s16(f.yword)) * (f.flags & 1 ? 2 : 1);
+		bool const overflow = product < -2147483648LL || product > 2147483647LL;
+		f.result = u64(overflow && (f.flags & 2) ? (product < 0 ? -2147483648LL : 2147483647LL) : product) & 0xffffffffffULL;
+		f.result_st0 = f.st0 | (overflow ? f.destination ? 0x200 : 0x400 : 0);
+		return f;
+	}
+	void start_dual_multiply(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge"); auto const f = dual_multiply_case(variant, edge);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xa400 | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
+		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
+		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "Dual MPY reads each captured logical operand once in Read, including aliased addresses"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Dual MPY never writes data memory"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "dual_multiply_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Dual MPY opcode is fetched once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254900;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -12055,6 +12132,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
 		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
@@ -39192,6 +39270,53 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254900)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge"); auto const f = dual_multiply_case(variant, edge);
+			unsigned const checkpoint = 3 + f.snapshot;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual MPY publishes product and sticky destination overflow only at Execute");
+			if (tick == 4)
+			{
+				for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Dual MPY captures both addresses before one X-priority alias update"); if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
+				if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			}
+			if (!edge && tick == 5)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.xword, "Dual MPY publishes X into T in Read after older Execute");
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu->space(AS_DATA).write_word(f.yaddress, 0xbeef);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save dual MPY around address, paired Read and T publication");
+			}
+			if (tick == 12)
+			{
+				expect(m_pipeline_operand_reads == (edge ? 0 : 2) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? 0xabcd : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Dual MPY retains both words, does not rewrite T at Execute, and preserves other status");
+				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "Dual MPY never reapplies its address modification");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore dual MPY without resampling data, refetching or duplicate pointer updates");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254910; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 16U : 43008U)) { start_dual_multiply(variant + 1); return; }
+				if (edge)
+				{
+					osd_printf_info("TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated dual MPY exclusions complete");
+				}
+				osd_printf_info("TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated dual MPY complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254910) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254900; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254880)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -40817,6 +40942,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(130, "exp-norm", "EXP producer and normalization T latency")
 	ROM_SYSTEM_BIOS(131, "xc-signed", "Signed XC predicate and protected-slot replay")
 	ROM_SYSTEM_BIOS(132, "xc-controls", "Existing XC sampling and interrupt controls")
+	ROM_SYSTEM_BIOS(133, "mpy-dual", "Dual-memory multiply addresses and arithmetic replay")
+	ROM_SYSTEM_BIOS(134, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
 ROM_END
 
 ROM_START(tms54rom4)

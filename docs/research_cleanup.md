@@ -156,6 +156,9 @@ or was expensive to discover. Current examples include:
   absent image word is not a zero word, and overlay projection must follow
   a proven mapping rather than a merged numeric-address dictionary;
 - PC hooks firing only at actual branch targets;
+- a staged CPU's unsupported Decode frontier not proving that preceding
+  instructions reached Execute; validate retirement with a positive-controlled
+  stage observation rather than the reported PC alone;
 - Lua tap subscriptions needing a live owner for the entire observation
   window; retain them in a callback/upvalue and validate positive-control
   detail records, not just counters, before interpreting absent events;
