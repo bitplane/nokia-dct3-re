@@ -2629,6 +2629,8 @@ void tms320c54x_device::pipeline_step()
 	}
 	u8 const entry_stage = m_interrupt_entry_stage;
 	bool prefetch_bubble = false;
+	bool late_popm_read = false;
+	u16 late_popm_address = 0;
 	for (unsigned stage = 5; stage; --stage)
 	{
 		m_pipeline_valid[stage] = m_pipeline_valid[stage - 1];
@@ -2973,7 +2975,7 @@ void tms320c54x_device::pipeline_step()
 		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
 		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
-		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active)
+		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_pipeline_block_body[2])
 		{
 			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word);
 			m_illegal = true; return;
@@ -3271,7 +3273,7 @@ void tms320c54x_device::pipeline_step()
 		bool const mapped = (destination >= 8 && destination <= 0x17) || (destination >= 0x19 && destination <= 0x1d);
 		if ((destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active))
 		{
-			logerror("%s: staged POPD status/SP/peripheral or active repeat-control destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged POPD status/SP/peripheral or active repeat-control destination is unsupported (word=%04x destination=%04x block_active=%u)\n", machine().describe_context(), m_pipeline_word[3], destination, unsigned(m_pipeline_block_active));
 			m_illegal = true; return;
 		}
 		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
@@ -3647,7 +3649,10 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_direct_sp[4] = m_sp;
 			pipeline_delay_compiler_sp(m_sp);
 		}
-		m_pipeline_operand[4] = data_read(m_sp++);
+		late_popm_address = m_sp++;
+		late_popm_read = (m_pipeline_word[4] & 0xff00) == 0x8a00 && late_popm_address >= 0x60 && m_pipeline_valid[5] &&
+			(m_pipeline_word[5] & 0xffe0) == 0x4a00 && m_pipeline_operand_address[5] == late_popm_address;
+		if (!late_popm_read) m_pipeline_operand[4] = data_read(late_popm_address);
 		u16 const destination = (m_pipeline_word[4] & 0xff00) == 0x8a00 ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4];
 		if (destination >= 0x10 && destination <= 0x19)
 		{
@@ -3656,7 +3661,7 @@ void tms320c54x_device::pipeline_step()
 			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[4] = conflict;
-			if (!conflict)
+			if (!conflict && !late_popm_read)
 			{
 				data_write(destination, m_pipeline_operand[4]);
 				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
@@ -3848,12 +3853,17 @@ void tms320c54x_device::pipeline_step()
 			if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
 				(address < m_pipeline_block_start || address > m_pipeline_block_end_address))
 			{
-				u32 const after_end = (m_pipeline_block_end_address & 0x7f0000) | u16(m_pipeline_block_end_address + 1);
-				if ((m_pipeline_fetch_address >= m_pipeline_block_start && m_pipeline_fetch_address <= m_pipeline_block_end_address) || m_pipeline_fetch_address == after_end)
+				u32 const restored_start = (m_pipeline_fetch_address & 0x7f0000) | m_rsa;
+				u32 const restored_end = (m_pipeline_fetch_address & 0x7f0000) | m_rea;
+				u32 const after_end = (m_pipeline_fetch_address & 0x7f0000) | u16(m_rea + 1);
+				if ((m_pipeline_fetch_address >= restored_start && m_pipeline_fetch_address <= restored_end) || m_pipeline_fetch_address == after_end)
 				{
 					// A call retains PC+4 even when its delay span ends at REA.
-					// Decode already consumed that endpoint; reconstitute only
-					// the discarded fetch prediction from the remaining loop state.
+					// Outside-body context pops may also have replaced the loop
+					// registers. Rebuild the discarded fetch prediction from those
+					// architectural values, not a previous context's cached bounds.
+					m_pipeline_block_start = restored_start;
+					m_pipeline_block_end_address = restored_end;
 					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 					if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = m_pipeline_block_start;
 				}
@@ -4218,6 +4228,20 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (late_popm_read)
+	{
+		// SPRU131G 7.3.2: a same-location on-chip read can consume a
+		// pending write through an internal bus. Represent PSHM->POPM by
+		// sampling after the older Execute in this same clock; the stack
+		// address and SP increment still belong to the pop's Read stage.
+		m_pipeline_operand[4] = data_read(late_popm_address);
+		u16 const destination = u8(m_pipeline_word[4]);
+		if (destination >= 0x10 && destination <= 0x19 && !m_pipeline_early_write_deferred[4])
+		{
+			data_write(destination, m_pipeline_operand[4]);
+			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
+		}
+	}
 	if (late_mapped_multiply_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);

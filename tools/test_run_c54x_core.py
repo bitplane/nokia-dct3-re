@@ -12,6 +12,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_adjacent_push_pop_scope(self):
+        marker, ending = EXTRA_PROFILES['push-pop-same']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='push-pop-same')
+        for bad in (output.replace('restore=2048', 'restore=0'),
+                    output.replace('logical_bypass=1', 'logical_bypass=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='push-pop-same')
+
+    def test_active_repeat_context_scope(self):
+        marker, ending = EXTRA_PROFILES['repeat-context']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='repeat-context')
+        for bad in (output.replace('restore=384', 'restore=0'),
+                    output.replace('source_reads=once', 'source_reads=twice'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='repeat-context')
+
     def test_delayed_conditional_call_block_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-ccd']
         output = marker + '\n' + ending + '\n'

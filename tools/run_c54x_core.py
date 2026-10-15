@@ -484,6 +484,14 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed conditional calls in block: PASS cases=1024 restore=1024 counts=0,1,2,7 conditions=AEQ,ANEQ,BEQ,BNEQ outcomes=2 positions=middle,endpoint delay_layouts=2 pages=2 snapshots=4 ordered_copies=1 balanced_frames=1 stack_return=PC+4 outer_count=Decode interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed conditional calls in block complete",
     ),
+    "repeat-context": (
+        "TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated active repeat context complete",
+    ),
+    "push-pop-same": (
+        "TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated adjacent PSHM POPM complete",
+    ),
     "rptb-fcall-edge": (
         "TMS320C54x in-block far call exclusions: PASS cases=16 restore=16 forms=delayed,endpoint,internal_target,near_call pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block far call exclusions complete",

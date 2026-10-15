@@ -12574,6 +12574,124 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255460;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeat_context_fixture
+	{
+		bool replace, span;
+		unsigned count, checkpoint;
+		u32 base;
+		u16 sp;
+		u16 old_end() const { return 0x60b + unsigned(span); }
+		u16 start() const { return replace ? span ? 0x1800 : 0x800 : 0x604; }
+		u16 end() const { return replace ? start() + 2 : old_end(); }
+		unsigned copies() const { return count + 1 + unsigned(replace); }
+		unsigned calls() const { return replace ? 1 : count + 1; }
+	};
+	static repeat_context_fixture repeat_context_case(unsigned v)
+	{
+		return {bool(v % 2), bool((v / 8) % 2), std::array<unsigned, 4>{0, 1, 2, 7}[(v / 2) % 4],
+			std::array<unsigned, 6>{4, 12, 18, 22, 26, 34}[v / 64], (v / 16) % 2 ? 0x20000U : 0U, u16(0x3000 + (v / 32) % 2)};
+	}
+	struct repeat_context_observations
+	{
+		unsigned body_reads = 0, body_writes = 0, mapped_reads = 0, saved_writes = 0;
+		unsigned restore_reads = 0, control_writes = 0, frame_reads = 0, frame_writes = 0;
+	};
+	u16 repeat_context_word(repeat_context_fixture const &f, unsigned part) const
+	{
+		return part == 0 ? f.end() : part == 1 ? f.start() : f.replace ? f.count : f.count - (m_repeat_context_counts.body_reads - 1);
+	}
+	void start_repeat_context(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = repeat_context_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + f.start() + i, 0xf495); }
+		program.write_word(f.base + 0x600, 0xf272); program.write_word(f.base + 0x601, f.old_end());
+		program.write_word(f.base + 0x604, 0xe589); program.write_word(f.base + 0x605, 0xe800);
+		program.write_word(f.base + 0x606, 0xfb45); program.write_word(f.base + 0x607, 0x700);
+		program.write_word(f.base + 0x60a, 0x6d94); program.write_word(f.base + f.old_end() + 1, 0x6d97); program.write_word(f.base + f.old_end() + 2, 0xf4e1);
+		if (f.replace)
+		{
+			// A synthetic CPU context-switch program, not a handset fixture:
+			// restore a RAM frame and replace the return PC through an actual ST.
+			program.write_word(f.base + 0x700, 0xeefd);
+			program.write_word(f.base + 0x701, 0x8a1c); program.write_word(f.base + 0x702, 0x8a1b); program.write_word(f.base + 0x703, 0x8a1a);
+			program.write_word(f.base + 0x704, 0x76f8); program.write_word(f.base + 0x705, f.sp - 1); program.write_word(f.base + 0x706, f.start());
+			program.write_word(f.base + 0x70d, 0xfc00);
+			data.write_word(f.sp - 4, f.end()); data.write_word(f.sp - 3, f.start()); data.write_word(f.sp - 2, f.count);
+			program.write_word(f.base + f.start(), 0xe589); program.write_word(f.base + f.start() + 1, 0x6d94);
+			program.write_word(f.base + f.end() + 1, 0x6d97); program.write_word(f.base + f.end() + 2, 0xf4e1);
+		}
+		else
+		{
+			program.write_word(f.base + 0x700, 0x4a1a); program.write_word(f.base + 0x701, 0x4a1b); program.write_word(f.base + 0x702, 0x4a1c);
+			program.write_word(f.base + 0x703, 0x8a1c); program.write_word(f.base + 0x704, 0x8a1b); program.write_word(f.base + 0x705, 0x8a1a);
+			program.write_word(f.base + 0x70c, 0xfc00);
+		}
+		// Six NOP words after the BRC pop separate restoration from a loop
+		// endpoint (SPRU131G table 7-25); shorter gaps are not accepted here.
+		for (unsigned i = 0; i < 16; ++i) { data.write_word(0x5000 + i, 0x1357 ^ (i * 0x2345)); data.write_word(0x6000 + i, 0xdead); }
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.replace ? 3 : f.count); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x1700);
+		m_repeat_context_counts = {}; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_context_reads", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_repeat_context_counts;
+			if (at >= 0x1a && at <= 0x1c) { unsigned const part = c.mapped_reads++ % 3; expect(!f.replace && at == 0x1a + part && word == repeat_context_word(f, 2 - part), "PSHM captures the actual current repeat context in order"); return; }
+			if (at == f.sp - 1) { expect(c.frame_reads < f.calls() && word == (f.replace ? f.start() : 0x60a), "Near return captures the CPU-published context continuation once"); ++c.frame_reads; auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return; }
+			if (at >= f.sp - 4 && at <= f.sp - 2) { unsigned const part = c.restore_reads++ % 3; expect(at == f.sp - 4 + part && word == repeat_context_word(f, part), "POPM reads one retained REA RSA BRC frame in order"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return; }
+			unsigned const i = c.body_reads++; expect(i < f.copies() && at == 0x5000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Restored repeat context owns each ordered body source once"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_context_writes", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_repeat_context_counts;
+			if (at >= 0x1a && at <= 0x1c) { unsigned const part = c.control_writes++ % 3; expect(at == 0x1c - part && word == repeat_context_word(f, part) && c.control_writes <= c.restore_reads, "POPM publishes the captured repeat registers once in order"); return; }
+			if (at == f.sp - 1) { bool const replacement = f.replace && c.frame_writes; expect(c.frame_writes < (f.replace ? 2U : f.calls()) && word == (replacement ? f.start() : 0x60a), "Only CPU call and explicit context-switch ST publish the return frame"); ++c.frame_writes; return; }
+			if (at >= f.sp - 4 && at <= f.sp - 2) { unsigned const part = c.saved_writes++ % 3; expect(!f.replace && at == f.sp - 2 - part && word == repeat_context_word(f, 2 - part), "PSHM saves BRC RSA REA once before their corresponding pops"); return; }
+			unsigned const i = c.body_writes++; expect(i < f.copies() && at == 0x6000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Restored context owns each ordered body destination once"); });
+		m_phase = 255480; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	struct push_pop_same_fixture
+	{
+		u16 source, destination, value, sp;
+		u32 base;
+		unsigned checkpoint;
+	};
+	static push_pop_same_fixture push_pop_same_case(unsigned v)
+	{
+		u16 const source = 8 + v % 8;
+		u16 value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 8) % 4];
+		if (source == 0x0a || source == 0x0d) value &= 0xff;
+		return {source, std::array<u16, 4>{0x0e, 0x13, 0x19, 0x18}[(v / 32) % 4], value, u16(0x3000 + (v / 128) % 2),
+			(v / 256) % 2 ? 0x20000U : 0U, std::array<unsigned, 4>{4, 5, 6, 7}[v / 512]};
+	}
+	void start_push_pop_same(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = push_pop_same_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x4a00 | f.source); program.write_word(f.base + 0x601, 0x8a00 | f.destination); program.write_word(f.base + 0x602, 0xf4e1);
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		data.write_word(f.source, f.value); data.write_word(f.sp - 1, 0xbeef);
+		m_pipeline_operand_reads = m_fast_stack_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "push_pop_same_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == f.source) { expect(!m_pipeline_operand_reads && word == f.value && m_cpu->pipeline_cycles() == 5, "PSHM captures the mapped source once before later mutation"); ++m_pipeline_operand_reads; return; }
+			expect(at == f.sp - 1 && word == f.value && !m_fast_stack_reads && m_pipeline_store_writes == 1 && m_cpu->pipeline_cycles() == 6, "Adjacent POPM receives the pending PSHM word, not old RAM"); ++m_fast_stack_reads;
+			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xbeef); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "push_pop_same_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == f.sp - 1) { expect(!m_pipeline_store_writes && word == f.value && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == 6, "PSHM publishes its retained word once in Execute"); ++m_pipeline_store_writes; return; }
+			expect(at == f.destination && word == f.value && !m_pipeline_register_writes && m_fast_stack_reads == 1 && m_cpu->pipeline_cycles() == (f.destination == 0x0e ? 7 : 6), "POPM publishes the captured word at the destination's existing owned clock"); ++m_pipeline_register_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255500;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_conditional_call(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -13260,6 +13378,8 @@ private:
 		if (!strcmp(machine().options().bios(), "conditional-cd")) { start_delayed_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "cond-cd-edge")) { start_delayed_conditional_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-ccd")) { start_block_conditional_call(); return; }
+		if (!strcmp(machine().options().bios(), "repeat-context")) { start_repeat_context(); return; }
+		if (!strcmp(machine().options().bios(), "push-pop-same")) { start_push_pop_same(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala")) { start_accumulator_call(); return; }
 		if (!strcmp(machine().options().bios(), "cala-producer")) { start_accumulator_call(); return; }
@@ -38674,6 +38794,51 @@ private:
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253330; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 255500)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = push_pop_same_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Adjacent stack pair stays within admitted forms");
+			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads, m_pipeline_store_writes, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PSHM capture, pending write or retained POPM operand"); }
+			if (tick == 16)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x603 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.destination == 0x18 ? f.value : f.sp) &&
+					m_pipeline_operand_reads == 1 && m_fast_stack_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_cpu->space(AS_DATA).read_word(f.destination) == f.value, "Adjacent PSHM POPM preserves the forwarded word, stack ownership and flags across replay"); }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore adjacent stack pair without rereading or duplicating either publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255510; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 2047) { start_push_pop_same(variant + 1); return; }
+				osd_printf_info("TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated adjacent PSHM POPM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255500; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255480)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_context_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeat-context restoration outside the loop body remains admitted");
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_repeat_context_saved_counts = m_repeat_context_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save active repeat context around push pop publication and return"); }
+			if (tick == 600)
+			{
+				auto const &c = m_repeat_context_counts; unsigned const calls = f.calls();
+				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(STATE_GENPC) != f.base + f.end() + 3 || c.body_reads != f.copies())
+					osd_printf_info("Repeat-context mismatch: case=%u replay=%u replace=%u pc=%06x brc=%04x rsa=%04x rea=%04x st1=%04x reads=%u writes=%u restore_reads=%u publications=%u\n", variant, unsigned(m_pipeline_replay), unsigned(f.replace), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_RSA)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_REA)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), c.body_reads, c.body_writes, c.restore_reads, c.control_writes);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end() + 3 && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == f.start() && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end() &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + f.copies() && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + f.copies() && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400 + f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701 &&
+					c.body_reads == f.copies() && c.body_writes == f.copies() && c.mapped_reads == (f.replace ? 0 : 3 * calls) && c.saved_writes == (f.replace ? 0 : 3 * calls) && c.restore_reads == 3 * calls && c.control_writes == 3 * calls && c.frame_reads == calls && c.frame_writes == (f.replace ? 2 : calls),
+					"Same or replaced active repeat context resumes its actual saved registers with ordered copies and balanced frames");
+				{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < f.copies(); ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == u16(0x1357 ^ (i * 0x2345)), "Restored repeat context final buffer matches independent oracle"); }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_repeat_context_counts = m_repeat_context_saved_counts; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore suspended repeat context without duplicate stack or body work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255490; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_repeat_context(variant + 1); return; }
+				osd_printf_info("TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated active repeat context complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255480; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255460)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_conditional_call_case(variant); unsigned const iterations = f.count + 1, calls = f.taken() ? iterations : 0;
@@ -41943,6 +42108,7 @@ private:
 	bool m_pipeline_replay = false;
 	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0, acks = 0, stack_reads = 0, stack_writes = 0; };
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
+	repeat_context_observations m_repeat_context_counts, m_repeat_context_saved_counts;
 	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
@@ -42771,6 +42937,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(170, "conditional-cd", "Delayed signed accumulator conditional calls and replay")
 	ROM_SYSTEM_BIOS(171, "cond-cd-edge", "Unadmitted delayed conditional call predicate exclusions")
 	ROM_SYSTEM_BIOS(172, "rptb-ccd", "Delayed conditional calls inside repeat blocks and at endpoints")
+	ROM_SYSTEM_BIOS(173, "repeat-context", "Outside-body restoration of same or replaced active repeat contexts")
+	ROM_SYSTEM_BIOS(174, "push-pop-same", "Adjacent PSHM POPM same-location source and destination ownership")
 ROM_END
 
 ROM_START(tms54rom4)

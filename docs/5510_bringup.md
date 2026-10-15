@@ -28,11 +28,12 @@ the mapped MVDK at `03:dafe` executes twice, `CCD 0xdada,ANEQ` at
 `03:db37` executes 2,048 times, its first delay instruction at `03:db39`
 executes 2,048 times, and the callee entry at `03:dada` executes 1,601
 times. The call's delay span ends at the active block endpoint `03:db3a`;
-this is covered by the retained loop/call contract below. The next stop is
-the active repeat-control restoration exclusion at `03:9568`, `POPM REA`
-(`8a1c`; live PC `03:956a`, terminal `illegal=1`). The open question is
-which loop context this pop restores and how BRC/RSA/REA/BRAF values
-replace the currently active pipeline state.
+this is covered by the retained loop/call contract below. The REA, RSA and
+BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
+The next stop is a POPD destination exclusion (`8b8f`, destination `001d`,
+PMST) while block-repeat state remains active; live PC is `03:1f04` and
+terminal `illegal=1`. The open question is the PMST restore's mapping and
+pipeline ownership, not an absent repeat-context pop.
 These are passive observations, not firmware writes or a claim of complete
 recording or validated audio.
 
@@ -42,6 +43,32 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Active repeat context and stack bypass
+
+Separated POPM REA/RSA/BRC writes outside the active loop body are admitted;
+in-body writes remain excluded. A near return into the restored bounds,
+or immediately after their endpoint, rebinds the retained loop bounds and
+iteration count from RSA/REA/BRC while preserving BRAF. `repeat-context`
+passes 384 cases/restores: same and replaced contexts, four counts, two
+layouts, two pages, two stack alignments and six snapshots. Ordered copies
+and actual iteration counts are checked, not just register readback. Six
+NOPs separate BRC restoration from return. Inactive-to-active BRAF changes,
+general nested/interrupt contexts and other reentry routes are unvalidated.
+
+Adjacent direct PSHM/POPM on a RAM stack requires same-clock write/read
+bypass: the younger Read samples the older Execute publication, retaining
+its already allocated stack address. SPRU131G section 7.3.2 documents the
+on-chip pending-write bypass. `push-pop-same` passes 2,048 cases/restores
+across eight sources, T/AR3/BK/SP destinations, four patterns, two pages,
+two stack alignments and four snapshots. Source and stack mutation after
+capture detect rereads. This does not establish PSHD/POPD composition,
+peripheral stacks or physical bus-phase timing.
+
+In the original context wrapper, a Decode-time stop sees SP before two
+older pending pops have read their operands: REA/RSA/BRC are then at
+SP+2..4, not SP..2. That observation must not be diagnosed as a corrupt
+saved frame without accounting for the older pipeline slots.
 
 ### Delayed conditional calls
 
@@ -191,7 +218,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,841 tests with one skip; the native 5110
+The tool suite passes 2,843 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
@@ -4004,7 +4031,8 @@ publication ownership; the distinct Prefetch/IPTR checks below delimit that
 coverage. MP/MC and DROM physical decoding remain separate scope, not
 implied by an OVLY result. POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`) also
 require their own block-repeat ownership contract, not a blanket pop-range
-change; active-context restoration is the current open boundary.
+change; separated outside-body active restoration is covered by the
+[retained context contract](#active-repeat-context-and-stack-bypass).
 For POPM BRC followed by a new RPTB, SPRU131G table 7-24 and example
 7-54(d) require one intervening instruction; STM BRC has zero latency.
 This is distinct from the in-loop BRC-write latency in table 7-25. A
