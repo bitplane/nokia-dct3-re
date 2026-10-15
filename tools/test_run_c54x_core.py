@@ -12,6 +12,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mvmd_bk_scope(self):
+        marker, ending = EXTRA_PROFILES['mvmd-bk']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mvmd-bk')
+        for bad in (output.replace('restore=432', 'restore=0'),
+                    output.replace('source_retained=1', 'source_retained=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvmd-bk')
+
     def test_absolute_add_bk_scope(self):
         for name in ('add-bk', 'add-absolute'):
             marker, ending = EXTRA_PROFILES[name]

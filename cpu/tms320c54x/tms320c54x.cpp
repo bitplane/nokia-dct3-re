@@ -142,7 +142,7 @@ constexpr bool staged_extended_move(u16 word)
 
 constexpr bool staged_direct_mvmd(u16 word)
 {
-	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f;
+	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f || word == 0x7319;
 }
 
 constexpr bool staged_move(u16 word)

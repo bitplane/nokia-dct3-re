@@ -13,9 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-MVMD BK,AR0 (`7319 0010`) at `02:e1e9`
-(live PC `02:e1eb`). Absolute ADD from BK at `02:e1e5` and
-STLM B,BK are now admitted. Ordinary
+long-offset STL (`80e2 0001`) at `02:e206`, inside the delayed branch
+`f273 e209` at `02:e204` (live PC `02:e208`). Absolute ADD from BK,
+STLM B,BK and MVMD BK,AR0 are now admitted. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1736,6 +1736,17 @@ result. One source read and literal fetch are preserved, with independent
 keeps the existing 2,048 AR/RAM cases unchanged. This does not admit SP,
 status/peripheral sources or short-form ADD from BK.
 
+MVMD also accepts BK as its direct register source, sharing the existing
+retained register-to-AR/BK move path. The `mvmd-bk` profile has 432
+cases/restores: isolated transfers and STLM A,BK followed by NOP/MVMD,
+all eight AR destinations plus BK self-copy, four source words, two pages
+and three snapshots. It verifies one source read and destination write
+(plus the producer's one write), source changes after capture, exact
+publication clocks and preservation of other registers/status. The existing
+432 T/TRN cases remain controls through the same fixture. Immediate
+STLM/MVMD DAGEN-write conflicts and control-delay composition are not
+claimed by this acceptance surface.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3404,8 +3415,9 @@ transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
 unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
-and STLM B,BK are admitted. The next rejecting stage is MVMD BK,AR0
-`7319 0010` at `02:e1e9` (live PC `02:e1eb`). All
+and STLM B,BK/MVMD BK,AR0 are admitted. The next rejecting stage is
+long-offset STL `80e2 0001` at `02:e206`, inside the delayed branch
+at `02:e204` (live PC `02:e208`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3702,8 +3714,9 @@ decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
 inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
 `02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
-are admitted. The next stop is MVMD BK,AR0 (`7319 0010`) at
-`02:e1e9`, live PC `02:e1eb`.
+and MVMD BK,AR0 are admitted. The next stop is long-offset STL
+`80e2 0001` at `02:e206`, inside delayed branch `f273 e209` at
+`02:e204`, live PC `02:e208`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,
