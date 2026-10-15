@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`7f00` at `02:8931` (live PC `02:8933`). This is not complete recording or
+`9008` at `03:838b` (live PC `03:838d`). This is not complete recording or
 validated audio.
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
@@ -32,7 +32,7 @@ isolated conditional-return fixture alone excludes adjacent producers; its
 former Access-owned predicate did not establish this pair's correctness.
 With the same retained NAND, the atomic zero-entry control returns from
 `1c48` to `1c59` (SP `6f12`, AR2 `8002`, A zero), then restarts the table
-walk through `1c54`. The staged trace instead falls through to `1c49..1c4c`
+walk through `1c54`. The staged trace instead fell through to `1c49..1c4c`
 and called zero before the correction. This was a frontend decision
 divergence, not evidence that the table needs a synthetic nonzero terminator.
 The `ret-load` fixture reproduces the old defect and passes 64 cases/restores
@@ -40,16 +40,14 @@ after correction: A/B, zero/nonzero results opposed to the old accumulator,
 adjacent/one-NOP separation, two pages and four snapshots. Conditional return
 now decides after older Execute publications and retains its stack sample.
 Sequential prefetch preserves the existing taken/untaken cadence. The 768-case
-isolated return fixture, conditional-call and stack/IRQ-return controls pass;
-the 97 runner unit tests pass. These are focused checks, not a renewed full
-CPU-suite checkpoint or physical bus-phase validation.
+isolated return fixture, conditional-call and stack/IRQ-return controls pass.
+These checks do not establish physical bus-phase timing.
 The following `BC ...,NC` (`f808 e6bc`) at `03:e6be` now executes through
 the retained branch machinery. `carry-branch` passes 384 cases/restores:
 C/NC, BC/BCD, both flag values, status-bit producers with gaps 0/1/2,
 two pages, four snapshots and post-evaluation flag mutation. Branch target
 and literal fetches remain exactly once. Arithmetic carry producers are not
-covered by this fixture. TC, BIO and adjacent-load return controls also pass;
-the runner has 98 passing unit tests. This does not renew full-suite acceptance.
+covered by this fixture. TC, BIO and adjacent-load return controls also pass.
 Long-offset BANZD `6eea ffff 949b` at `02:94c5` now shares the existing
 retained offset-address and delayed-branch machinery. Offset `-1` and target
 `949b` are separate retained extensions; the following `7006 0012` is one
@@ -58,11 +56,36 @@ two-word delay instruction, not another branch operand. `banzd-long` passes
 forms, eight offset pairs, both CMPT states, two pages and both delay layouts.
 Later literal/AR/BK changes cannot alter the captured decision or duplicate
 the auxiliary update. No data-memory transaction is performed by the branch.
-The runner has 99 passing unit tests and the full tool suite passes 2,807 tests
-with one skip; physical stage timing remains unvalidated.
-The full default CPU conformance run also passes all 288 required markers
-on this CPU revision. This renews the default-suite checkpoint, not every
+Physical stage timing remains unvalidated.
+The full default CPU conformance run passes all 288 required markers
+at CPU checkpoint `20286907`. This renews the default-suite checkpoint, not every
 additional isolated profile or native audio acceptance.
+
+WRITA `7f00` at `02:8931` now executes as a retained data-to-program transfer.
+Its wrapper loads A with `032e00`; common-window mapping projects that to
+program RAM `2e00`. Source DAGEN belongs to Access, the data word is sampled
+once in Read, and the program destination is retained after older Execute
+publications. Four held clocks model Class 26's additional latency; their
+bus-phase placement is provisional, not measured silicon timing. Later source,
+AR, A or PMST mutations cannot redirect or resample the retained write.
+The wait counter and mapped program destination are save-state registered.
+
+`write-a` passes 3,584 cases/restores: DP, CPL, short postincrement, absolute,
+offset, long preincrement and circular sources; eight registers, four values,
+two logical code pages, two mapping states and four snapshots. It checks one
+source read and one program write, no destination read, status preservation
+and physical program-RAM readback. `write-a-edge` passes 12 cases/restores
+rejecting CPU/peripheral sources, RPT, RPTB, control-delay and XC composition
+before any data read or program write. Those excluded combinations remain
+work to implement, not hardware-invalid forms. Mapped READA, PMST mapping,
+MVDD source repeats and load/return controls pass. This focused WRITA coverage
+does not renew the full default CPU checkpoint above.
+The runner's 101 unit tests pass; the full tool suite passes 2,809 tests with
+one skip. Native 5110 save-state restoration also passes.
+
+The original recorder subsequently emits NAND data writes through firmware
+at `02:891c`, then reaches the current unsupported form. NAND traffic alone
+does not establish a valid recording, completed file, PCM or physical audio.
 The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words

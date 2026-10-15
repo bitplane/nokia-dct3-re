@@ -761,6 +761,25 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(output.replace(old, new), 3, profile='banzd-long')
 
+    def test_write_a_scope(self):
+        marker, ending = EXTRA_PROFILES['write-a']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='write-a')
+        for old, new in (('restore=3584', 'restore=0'), ('mapping=2', 'mapping=1'),
+                         ('program_writes=1', 'program_writes=2'),
+                         ('repeat=unvalidated', 'repeat=validated')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='write-a')
+
+    def test_write_a_exclusions(self):
+        marker, ending = EXTRA_PROFILES['write-a-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='write-a-edge')
+        for old, new in (('restore=12', 'restore=0'), ('source_reads=0', 'source_reads=1'),
+                         ('program_writes=0', 'program_writes=1'), ('atomic_fallback=0', 'atomic_fallback=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='write-a-edge')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'
