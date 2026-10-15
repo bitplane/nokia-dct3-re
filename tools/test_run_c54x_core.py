@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_accumulator_branch_scope(self):
+        for name in ('bacc', 'fbacc', 'bacc-producer', 'fbacc-producer'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('frame_words=0', 'frame_words=1'),
+                        output.replace('target_retained=1', 'target_retained=0'),
+                        output.replace('delayed_acceptance=0', 'delayed_acceptance=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_popd_edges_scope(self):
         for name in ('popd-edges', 'popd-ram'):
             marker, ending = EXTRA_PROFILES[name]

@@ -64,8 +64,10 @@ execute. Syntax-5 LD Xmem at `02:3fbc` and CALA B at `02:40e1` also
 execute. Repeated MVDD (`e598`) at `02:a169` and absolute OR
 (`1af8 b582`) at `03:abca` now execute too, as do both repeated POPD
 restoration loops at `02:4062`/`02:4066`. Mapped AR/BK writes retain their
-Read-stage ownership, including older-store conflicts. The next stop is
-BACC A (`f4e2`) at `03:9de4`, a Class 30A accumulator-target branch.
+Read-stage ownership, including older-store conflicts. BACC A (`f4e2`) at
+`03:9de4` now retains the accumulator target after READA's mapped write,
+without allocating a call frame. The next stop is long-offset AND
+(`18e2 1462`) at `03:9dff`.
 The exact resident program/data comparison still passes; this is not full boot.
 Single PSHD now reads CPU-register sources `0000..000f` through the
 existing mapped Read path. The `pshd-mapped` fixture covers the twelve

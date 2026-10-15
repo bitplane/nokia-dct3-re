@@ -3294,8 +3294,9 @@ passes conditional return `fc43` at `02:3e44` and repeated PSHD at
 `02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
 `02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
 at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
-POPD restoration loops at `02:4062`/`02:4066`. It stops at unsupported
-BACC A (`f4e2`) at `03:9de4` (live PC `03:9de6`); all
+POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
+It stops at long-offset AND (`18e2 1462`) at `03:9dff`
+(live PC `03:9e01`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3488,20 +3489,54 @@ its setup flush/refetch rather than treating its body as an ordinary stream.
 The existing `popd-ram` 50-case control retains compiler SP latency and the
 original descriptor-copy ordering.
 
-The focused POPD checkpoint passes twelve isolated profiles: the four POPD
+The POPD checkpoint `862b0ce1` passed twelve isolated profiles: the four POPD
 profiles, POPM BRC/repeat controls, PMST pop/prefetch controls, both stack-IRQ
-controls and PSHD/MVDD repeats. The 72 verifier unit tests, evidence validation
-and native 5110 save-state restoration also pass. The full 288-marker/all-54-
+controls and PSHD/MVDD repeats, plus native 5110 save-state restoration.
+The full 288-marker/all-54-
 profile baseline is the preceding absolute-logic checkpoint `690ace59`, not
 a fresh full-suite claim for this change.
 
-The original staged run passes both restoration loops and reaches BACC A
-(`f4e2`) at `03:9de4`, after `READA *(0008)`. SPRU172C 4-15 defines this
-as a nonrepeatable Class 30A branch to A's low sixteen bits on the current
-logical page. Retained target sampling and branch-front ownership
-are the next missing instruction contract. All 48,261 program and 3,656
-compared resident data words still match. This is partial initialization,
-not complete board boot, native speech or a completed service transaction.
+Nondelayed BACC/FBACC A/B share the retained Class 30 transfer boundary
+with CALA/FCALA, but allocate no stack words and leave RTN unchanged.
+SPRU172C 4-15/4-54 and class 30A specify six cycles, no status changes and
+no repeat support. BACC uses the source's low sixteen bits on the retained
+caller page; FBACC selects the low 23 bits, including XPC. The target is
+sampled after older Execute publications and retained through the modeled
+held boundary, front flush and redirected Fetch. Only calls allocate or
+publish a call frame. The existing saved pending/target fields are renamed
+from `acc_call` to `acc_transfer`; no new CPU save member is added. Stage
+placement remains a declared model, not measured silicon phases.
+
+`bacc` and `fbacc` each pass 216 cases/restores over both accumulators,
+three caller pages, three conflicting upper-target fields, four snapshots
+and no interrupt/IRQ0/NMI. They verify target sample at clock 5, Fetch at
+8 and first target Execute at 12, post-sample accumulator poisoning, no
+call frame or RTN update, flushed sequential writes and balanced IRQ return
+to the retained target. Interrupt entry, not the branch, owns RTN in IRQ
+cases. Pin pulses precede every snapshot.
+
+`bacc-producer` and `fbacc-producer` each pass 432 cases/restores over
+DLD and absolute READA producers, both accumulators, gaps 0/1/2, three
+caller pages, three upper-target fields and four snapshots. DLD's two RAM
+reads and READA's program-table read are retained despite input mutation.
+READA performs one AL/BL publication at clock 11 before a zero-gap branch
+samples its target in the same clock. The original `READA *(0008); BACC A`
+composition therefore uses the published accumulator, not a stale target.
+Producer-plus-interrupt composition, delayed forms and block-loop interaction
+are outside this acceptance.
+
+The branch checkpoint passes these four profiles plus CALA/FCALA and their
+producer profiles, conditional call/return, both stack-IRQ controls, PMST
+prefetch and repeated POPD (14 profiles total). The 73 verifier unit tests,
+evidence validation and native 5110 save-state restoration pass. The full
+suite baseline remains `690ace59`; this is focused acceptance.
+
+The original run now passes BACC A at `03:9de4` and stops at long-offset
+AND (`18e2 1462`) at `03:9dff`. Retained extended Smem addressing for the
+logical family is the next instruction boundary. All 48,261 program and
+3,656 compared resident data words still match. This remains partial
+initialization, not complete board boot, native speech or a completed
+service transaction.
 
 The former bad return produced a zero-filled walk, a bootstrap restart and
 a later FRET into page 8. These were downstream symptoms, not missing ROM

@@ -9959,6 +9959,76 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254220;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct accumulator_branch_fixture
+	{
+		bool near, b;
+		unsigned producer, irq, prefix, wait, snapshot;
+		u32 base, destination, table;
+		u16 hint, st0, st1;
+		u64 initial, other;
+		unsigned sample() const { return 5 + prefix + wait; }
+		u16 opcode() const { return (near ? 0xf4e2 : 0xf4e6) | (b ? 0x100 : 0); }
+		u16 marker() const { return b ? u16(other) : 0xbeef; }
+	};
+	accumulator_branch_fixture accumulator_branch_case(unsigned v)
+	{
+		accumulator_branch_fixture f{};
+		char const *const bios = machine().options().bios();
+		f.near = !strcmp(bios, "bacc") || !strcmp(bios, "bacc-producer");
+		bool const producer = !strcmp(bios, "bacc-producer") || !strcmp(bios, "fbacc-producer");
+		f.b = v & 1;
+		unsigned const caller = std::array<unsigned, 3>{0, 2, 0x7f}[(v / 2) % 3];
+		f.hint = std::array<unsigned, 3>{0, 3, 0x7f}[(v / 6) % 3];
+		f.base = caller << 16; f.destination = ((f.near ? caller : f.hint) << 16) | 0x700; f.table = (u32(f.hint) << 16) | 0x900;
+		f.producer = producer ? 1 + v / 216 : 0;
+		unsigned const gap = producer ? (v / 18) % 3 : 0;
+		f.prefix = f.producer ? f.producer + gap : 0; f.wait = f.producer == 2 ? 4 : 0;
+		f.irq = producer ? 0 : v / 72;
+		f.st0 = f.producer == 1 ? 0xa628 : 0xa608; f.st1 = 0x100 | (f.irq == 1 ? 0 : 0x800);
+		f.initial = f.producer == 1 ? 0xbad0 : 0x5500000000ULL | (u32(f.hint) << 16) | (f.producer == 2 ? 0x900 : 0x700);
+		f.other = f.b ? (f.producer == 2 ? 0x5500000000ULL | f.table : 0x1234) : 0x2345;
+		unsigned const checkpoint = producer ? (v / 54) % 4 : (v / 18) % 4;
+		f.snapshot = std::array<unsigned, 4>{4, f.sample(), f.sample() + 1, f.sample() + 3}[checkpoint];
+		return f;
+	}
+	void start_accumulator_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_acc_branch_fixture = accumulator_branch_case(variant); auto const f = m_acc_branch_fixture;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.destination + i, 0xf495); }
+		if (f.producer == 1) { program.write_word(f.base + 0x600, f.b ? 0x5700 : 0x5600); data.write_word(0x1400, 0x8000 | f.hint); data.write_word(0x1401, 0x700); }
+		if (f.producer == 2) { program.write_word(f.base + 0x600, 0x7ef8); program.write_word(f.base + 0x601, f.b ? 0x0b : 0x08); program.write_word(f.table, 0x700); }
+		program.write_word(f.base + 0x600 + f.prefix, f.opcode()); program.write_word(f.base + 0x601 + f.prefix, 0x880f);
+		program.write_word(f.destination, 0x880e); program.write_word(f.destination + 1, 0xf4e1);
+		program.write_word((f.destination & 0x7f0000) | 4, 0xf4eb); program.write_word((f.destination & 0x7f0000) | 0x40, 0xf4eb);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_RTN, 0x5555); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xaaaa); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.b ? f.other : f.initial); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ? f.initial : f.other);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 ? 1 : 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_register_writes = m_vector_acks = m_port_reads = m_fast_stack_reads = m_pipeline_drained_fetches = m_acc_branch_mapped_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "acc_branch_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (f.producer == 1 && (at == 0x1400 || at == 0x1401)) { unsigned const part = m_port_reads++; expect(part < 2 && at == 0x1400 + part && word == (part ? 0x700 : 0x8000 | f.hint) && m_cpu->pipeline_cycles() == 5, "DLD captures both target words before branch sampling"); return; }
+			expect(f.irq && at == 0xfff && word == 0x700 && !m_pipeline_operand_reads, "Accumulator branch owns no data read except the later IRQ return"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "acc_branch_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (f.producer == 2 && at == (f.b ? 0x0b : 0x08)) { expect(!m_acc_branch_mapped_writes && word == 0x700 && m_cpu->pipeline_cycles() == 11, "READA owns one mapped accumulator publication before branch sampling"); ++m_acc_branch_mapped_writes; return; }
+			if (at == 0x0e) { expect(!m_pipeline_register_writes && word == f.marker() && (f.irq ? m_vector_acks == 1 && m_cpu->pipeline_cycles() >= 12 : m_cpu->pipeline_cycles() == f.sample() + 7), "Branch target executes once at the Class 30A boundary or after interrupt return"); ++m_pipeline_register_writes; return; }
+			expect(f.irq && at == 0xfff && word == 0x700 && !m_pipeline_store_writes && m_vector_acks == 1, "Branch creates no call frame; IRQ stacks only the retained target PC"); ++m_pipeline_store_writes;
+		});
+		m_pipeline_fetch_tap = program.install_read_tap(0, 0x7fffff, "acc_branch_program", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == f.base + 0x600 + f.prefix) { expect(word == f.opcode() && !m_pipeline_drained_fetches, "Accumulator branch opcode is fetched once"); ++m_pipeline_drained_fetches; }
+			if (at == f.destination) { expect(word == 0x880e && (f.irq ? m_pipeline_extensions_reads < 2 : !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.sample() + 3), "Accumulator branch retains the target across later source mutation"); ++m_pipeline_extensions_reads; }
+			if (f.producer == 2 && at == f.table) { expect(word == 0x700 && !m_fast_stack_reads && m_cpu->pipeline_cycles() == 10, "READA samples one program-table target before mapped accumulator publication"); ++m_fast_stack_reads; }
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254240;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct absolute_logic_fixture
 	{
 		unsigned kind, snapshot;
@@ -10859,6 +10929,7 @@ private:
 		if (!strcmp(machine().options().bios(), "popd-mapped") || !strcmp(machine().options().bios(), "popd-repeat")) { start_popd_mapped(); return; }
 		if (!strcmp(machine().options().bios(), "popd-edges")) { start_popd_edges(); return; }
 		if (!strcmp(machine().options().bios(), "popd-ram")) { start_pipeline_data_pop(); return; }
+		if (!strcmp(machine().options().bios(), "bacc") || !strcmp(machine().options().bios(), "fbacc") || !strcmp(machine().options().bios(), "bacc-producer") || !strcmp(machine().options().bios(), "fbacc-producer")) { start_accumulator_branch(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
@@ -37216,6 +37287,33 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254230) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254220; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254240)
+		{
+			auto const &f = m_acc_branch_fixture; unsigned const tick = ++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BACC/FBACC stays in the retained frontend");
+			if (tick == 3 && f.irq) { if (f.irq == 1) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1); else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); } }
+			if (f.producer == 1 && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1400, 0xdead); m_cpu->space(AS_DATA).write_word(0x1401, 0xbeef); }
+			if (f.producer == 2 && tick == 10) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.table, 0xdead); }
+			if (tick == f.sample()) m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0xdeadbeef);
+			if (tick == f.snapshot && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_register_writes, m_vector_acks, m_port_reads, m_fast_stack_reads, m_pipeline_drained_fetches, m_acc_branch_mapped_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save accumulator branch before/after target sampling, held Read and redirected Fetch"); }
+			if (tick == 64)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.destination + 2 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (f.irq ? 0x700 : 0x5555) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x1357 && m_cpu->state_int(tms320c54x_device::STATE_T) == f.marker(), "Accumulator branch neither creates a call frame nor executes flushed sequential words");
+				expect(m_pipeline_register_writes == 1 && m_pipeline_drained_fetches == 1 && m_pipeline_extensions_reads == (f.irq ? 2 : 1) && m_pipeline_store_writes == unsigned(bool(f.irq)) && m_pipeline_operand_reads == unsigned(bool(f.irq)) && m_vector_acks == unsigned(bool(f.irq)) && m_port_reads == (f.producer == 1 ? 2 : 0) && m_fast_stack_reads == unsigned(f.producer == 2) && m_acc_branch_mapped_writes == unsigned(f.producer == 2), "Accumulator branch and producer own exact, nonduplicated transactions through replay and IRQ return");
+				expect(m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0xdeadbeef && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == f.other && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 & ~(f.irq ? 0x800 : 0)), "Branch preserves accumulators and flags apart from deliberate capture mutation and IRQ INTM handling");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.snapshot; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_vector_acks = m_recurring_irq_snapshot[4]; m_port_reads = m_recurring_irq_snapshot[5]; m_fast_stack_reads = m_recurring_irq_snapshot[6]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[7]; m_acc_branch_mapped_writes = m_recurring_irq_snapshot[8];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained branch target without resampling, creating a frame or duplicating an interrupt"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254250; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < (f.producer ? 431 : 215)) { start_accumulator_branch(m_pipeline_peripheral_case + 1); return; }
+				if (f.producer) { osd_printf_info(f.near ? "TMS320C54x staged BACC producer: PASS cases=432 restore=432 producers=DLD,READA accumulators=2 gaps=0,1,2 caller_pages=3 upper_targets=3 snapshots=4 frame_words=0 target_retained=1 mapped_publication=1 delayed_acceptance=0 silicon_phase_claim=0\n" : "TMS320C54x staged FBACC producer: PASS cases=432 restore=432 producers=DLD,READA accumulators=2 gaps=0,1,2 caller_pages=3 upper_targets=3 snapshots=4 frame_words=0 target_retained=1 mapped_publication=1 delayed_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, f.near ? "TMS320C54x isolated BACC producer complete" : "TMS320C54x isolated FBACC producer complete"); }
+				osd_printf_info(f.near ? "TMS320C54x staged BACC: PASS cases=216 restore=216 accumulators=2 caller_pages=3 upper_targets=3 snapshots=4 target_sample=5 target_fetch=8 target_execute=12 sources=none,IRQ,NMI frame_words=0 target_retained=1 sequential_flushed=1 delayed_acceptance=0 silicon_phase_claim=0\n" : "TMS320C54x staged FBACC: PASS cases=216 restore=216 accumulators=2 caller_pages=3 upper_targets=3 snapshots=4 target_sample=5 target_fetch=8 target_execute=12 sources=none,IRQ,NMI frame_words=0 target_retained=1 sequential_flushed=1 delayed_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, f.near ? "TMS320C54x isolated staged BACC complete" : "TMS320C54x isolated staged FBACC complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254250) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254240; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254120)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 65536; auto const f = xmem_load_case(variant);
@@ -38005,6 +38103,8 @@ private:
 	// Immutable case inputs remain unchanged across each manual replay.
 	mvdd_fixture m_mvdd_fixture = {};
 	popd_fixture m_popd_fixture = {};
+	accumulator_branch_fixture m_acc_branch_fixture = {};
+	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
 	std::stringstream m_saved_repeat;
 	bool m_far_save_return = false;
@@ -38023,6 +38123,7 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
 		if (m_phase == 254140) { auto const &f = m_mvdd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "MVDD acknowledges IRQ/NMI only after the final retained destination write"); ++m_vector_acks; }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
+		if (m_phase == 254240) { auto const &f = m_acc_branch_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && !m_pipeline_store_writes && !m_pipeline_register_writes, "Accumulator branch completes target selection before IRQ without allocating a call frame"); ++m_vector_acks; }
 		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
 		if (m_phase == 253890) { expect(line == (m_pipeline_peripheral_case & 8 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "Full status publication completes before interrupt entry without an RSBX-specific guard"); m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN); expect(m_timer_probe_return_pc >= 0x602 && m_timer_probe_return_pc <= 0x621, "IRQ/NMI retains an unexecuted foreground continuation"); ++m_vector_acks; }
 		if (m_phase == 253790) { unsigned const interrupt = m_pipeline_peripheral_case / 72; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == (near_accumulator_fixture() ? 1 : 2), "IRQ/NMI cannot split the retained accumulator-call frame"); ++m_vector_acks; }
@@ -38660,6 +38761,10 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(74, "popd-repeat", "Retained repeated POPD and mapped context restoration")
 	ROM_SYSTEM_BIOS(75, "popd-ram", "Existing RAM POPD and compiler latency controls")
 	ROM_SYSTEM_BIOS(76, "popd-edges", "POPD exclusions and DAGEN conflict replay")
+	ROM_SYSTEM_BIOS(77, "bacc", "Retained near accumulator branches without call frames")
+	ROM_SYSTEM_BIOS(78, "fbacc", "Retained far accumulator branches without call frames")
+	ROM_SYSTEM_BIOS(79, "bacc-producer", "Near accumulator branches after DLD and mapped READA")
+	ROM_SYSTEM_BIOS(80, "fbacc-producer", "Far accumulator branches after DLD and mapped READA")
 ROM_END
 
 ROM_START(tms54rom4)
