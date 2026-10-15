@@ -14,15 +14,8 @@ profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
 short-indirect CMPM (`6081`) at `02:a6b1` (live PC `02:a6b3`).
-Absolute MPY from AR7 in FCALLD's delay at `02:e10f` now executes,
-as do MVMD AR6,T and the delayed STL at `02:e206`. Ordinary
-store-to-load bypass now prevents stale stack locals from corrupting IMR
-and entering an unhandled interrupt vector. The memory load at `02:9edc`
-(`1281`, source `002a`) now executes against the bench's RAM-backed gap;
-its physical ownership remains unknown. Software INTR 25
-(`f7d9`) at `02:9c74` now executes. Forward
-near B/BC control flow in the recorder's block `02:a0ea..02:a0fd` now
-executes with retained loop metadata. Output words
+The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
+gap whose physical ownership remains unknown. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
 transaction or physical DA150 mapping is established.
 
@@ -118,20 +111,25 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The CPU at `1a790619` passes the full 288-marker native core regression,
-all 74 named isolated profiles registered at that checkpoint, and all seven
+The CPU at `1fe0df59` passes the full 288-marker native core regression,
+all 93 named isolated profiles registered at that checkpoint, and all seven
 additional runner scopes: `--bus-registers`, `--bus-io`, `--atomic-io`,
 `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
 Native 5110 save-state restoration also passes. At that checkpoint the tool
-suite ran 2,788 tests with one skip, including 80 core-result verifier tests.
+suite ran 2,800 tests with one skip, including 92 core-result verifier tests.
 SIP lifecycle unit tests require local loopback socket permission.
+The original staged MU4 probe retains exact comparison of 48,261 program
+and 3,656 data words and reaches the CMPM frontier in
+[Current boundary](#current-boundary). The separate atomic `bootreplay`
+control also passes original bootstrap loading, pin-level status service
+and mid-byte save/replay, including equality of its selected emulation
+state and unchanged NAND. This does not establish staged transaction
+completion.
 
 This is the shared regression checkpoint for the instruction contracts
 below, superseding their earlier focused-only acceptance notes. It does
 not expand any fixture's declared opcode, composition, physical timing,
-bus ownership or handset-feature scope. The subsequent forward in-block
-branch change has the focused acceptance below, not a fresh full-core or
-all-profile claim. No native speech is claimed.
+bus ownership or handset-feature scope. No native speech is claimed.
 
 ## Reproducible input normalization
 
@@ -3364,10 +3362,9 @@ not an asynchronous pin-edge or handset fixture. Both physical banks carry
 the same vector marker, so this checks IPTR, not vector OVLY bank ownership.
 The ISR does not return. A further mapping change between ISR Prefetch and
 Fetch, other interrupt sources and full return composition remain separate
-acceptance work. The full 288-marker core regression passes with this
-correction, as do the 55 verifier tests. A fresh original resident audit
-still matches all 48,261 program and 3,656 data words and stops at POPM REA
-(`02:8b3c`), not a completed board boot.
+acceptance work. Broad regression coverage is indexed in
+[Core regression checkpoint](#core-regression-checkpoint); current resident
+execution is described separately in [Current boundary](#current-boundary).
 
 The `pop-repeat` prototype admits direct POPM BRC/RSA/REA only
 outside an active staged repeat. Its 192 cases/restores cover the three
@@ -3383,8 +3380,7 @@ and snapshots at clocks 4/5/6. It places one NOP between POPM BRC and RPTB,
 mutates the captured stack source, checks one stack read/write publication,
 and independently observes count-plus-one byte-swap reads/writes. The
 zero-latency `stm-brc` control also passes. Active-loop writes and interrupt
-composition are not accepted by these cases. The full 288-marker CPU
-regression and 57 verifier tests pass with the admitted control pops.
+composition are not accepted by these cases.
 
 Staged interrupt Access reserves its stack slot
 after older foreground Read-owned SP changes in the same clock. The atomic
@@ -3417,12 +3413,9 @@ against the captured mode, separately from the preserved arithmetic flags.
 One register read and no writes are observed. This is raw mapped-register
 read acceptance, not a claim about every ST1 producer latency or peripheral
 source. The existing 384-case IMR unsigned-read control also passes.
-The resident audit still matches 48,261 program and 3,656 data words. The
-1,024-case IPTR fixture and 59 verifier tests pass. The full 288-marker CPU
-regression, all 41 additional isolated profiles and native 5110 save-state
-gate pass with the SP correction. The ST1 operand-admission addition has focused
-288/384-case controls, 60 verifier tests and native 5110 save-state coverage;
-the preceding broad CPU checkpoint remains the SP-ordering run above.
+Broad regression and native 5110 save-state coverage are indexed in
+[Core regression checkpoint](#core-regression-checkpoint), rather than
+inherited from the chronology of these individual instruction admissions.
 
 Short direct CMPM now shares the retained BITF/absolute-CMPM path for RAM
 sources. The `cmpm-direct` fixture passes 384 cases/restores over DP/SP
@@ -3446,27 +3439,10 @@ values per register and snapshots before/during the wait and after publication.
 It checks one literal fetch, no destination reads, one write at clock 8,
 stopped TIM persistence, PRD without implicit TIM reload, TCR writable masks,
 read-only PSC and TRB reload of TIM/PSC. These are stopped-timer transaction
-checks, not new running-timer or silicon-phase claims. Original R060 now
-passes conditional return `fc43` at `02:3e44` and repeated PSHD at
-`02:3f7e`, EXP B at `02:3fa8`, ADDS at `02:3fad` and syntax-5 LD at
-`02:3fbc`, CALA B at `02:40e1` and repeated MVDD (`e598`)
-at `02:a169`, absolute OR (`1af8 b582`) at `03:abca` and both repeated
-POPD restoration loops at `02:4062`/`02:4066`, then BACC A at `03:9de4`.
-Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
-T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
-executes, sending the first acknowledgement word to the modeled serial
-transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
-(`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
-inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
-now executes, as does LDU `1281` at `02:9edc` against the bench's
-unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
-and STLM B,BK/MVMD BK,AR0 are admitted, as is the two-word STL in
-the delayed branch at `02:e204`. MVMD AR6,T at `02:e109` also
-executes, as does absolute MPY `20f8 0017` at `02:e10f` in
-FCALLD's delay. The next rejecting stage is short-indirect CMPM
-`6081` at `02:a6b1` (live PC `02:a6b3`). All
-48,261 program and 3,656 compared data words still match. This remains
-partial resident initialization, not full boot or decoded audio.
+checks, not new running-timer or silicon-phase claims. The original firmware's
+current execution boundary and resident-memory comparison are maintained
+in [Current boundary](#current-boundary), not inferred from individual
+instruction fixtures.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
 twelve stack pushes read the mapped register window `000b..0016`, not
 ordinary source RAM. The repeat contract covers fresh source sampling,
@@ -3747,31 +3723,14 @@ logic, long peripheral stores and actual McBSP control also pass (seven
 profiles total), along with evidence validation and
 native 5110 save-state restoration. No new CPU saved fields are required.
 
-The original run passes BACC A at `03:9de4`, long-offset
-AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
-T to AR1) at `03:9ba2` and MVDD (`e501`) at `03:9c70`. A read-only
-observation at the former MVDD guard found AR2=`14b2`, AR3=`0033` and
-source word `007f`: ordinary RAM to the bench's McBSP2 transmit path,
-not a CPU-register transfer. Original firmware now emits the pin-decoded
-acknowledgement `007f,0001,0055`. ABS A,A/B,B (`f485`/`f785`) at
-`02:e5e5`/`02:e5e7` and MPY (`62f8 0008 012c`, mapped AL times
-immediate 300) at `03:95b5` now execute. Original firmware enters the
-recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
-decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
-inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
-`02:9c74` now executes, as does peripheral-window LDU `1281` at
-`02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
-and MVMD BK,AR0 are admitted, as is long-offset STL `80e2 0001`
-at `02:e206` in delayed branch `f273 e209` at `02:e204`.
-MVMD AR6,T (`7316 000e`) at `02:e109` and
-absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in FCALLD
-`02:e10d`, now execute. The next stop is short-indirect CMPM
-(`6081`) at `02:a6b1`, live PC `02:a6b3`.
-Guard diagnostics report
-the decoded instruction separately from the potentially ahead live PC.
-The input cursor is 9/50 delivered words,
-not nine parsed commands. This acknowledgement is not a completed command
-transaction, and the physical DA150 register map remains unverified.
+At original MVDD `03:9c70`, AR2=`14b2`, AR3=`0033` and source word
+`007f`: this is ordinary RAM to the bench's McBSP2 TX register, not a
+CPU-register transfer. Original recorder entry is `02:9e90`. The input
+cursor counts delivered words, not parsed commands; pin-decoded acknowledgement
+and output traffic do not establish a completed transaction or decoded audio.
+Failure diagnostics distinguish the decoded instruction from the potentially
+ahead live PC. See [Current boundary](#current-boundary) for the single
+authoritative staged stop; physical DA150 mapping remains unverified.
 ABS uses the existing Class-1 register ALU Execute path and shared atomic
 arithmetic (SPRU172C, ABS instruction). The `absolute` profile passes
 13,824 cases/restores over all four accumulator selections, sixteen

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_staged_2050_zero_word_is_missing_add_or_resident_code",
+      "status": "disproven",
+      "hypothesis": "A staged ADD decoded as 0000 at logical 02:2050, where the resident image contains 4a1e, identifies a missing arithmetic form or missing resident program data",
+      "conclusion": "The first wrong values arise in adjacent ordinary STL/LD pairs at 02:a39d/a39e and 02:a386/a387: the younger Read sampled old RAM while the older store published to the same location in Execute. That selected an invalid object branch and wrote bf7a through a null pointer into IMR. Source 4 then entered the intentionally self-looping default vector 2050; repeated pushes eventually overwrote PMST at stack address 001d, disabled OVLY and exposed zero physical program memory at 02:2050. SPRU131G 7.3.2 specifies a same-location on-chip internal-bus bypass. Extending the existing RMW bypass to ordinary STL/STH/T/TRN producers passes 288 red/green replay cases, preserves one real store and removes the original failure without accepting the spurious ADD or changing the resident map. Stack-return read-first ordering remains separate; this does not validate physical RAM banks, external-memory contention or the full recorder transaction.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "c54x_explicit_sp_publication_is_immediate_compiler_base",
       "status": "disproven",
       "hypothesis": "Publishing SP through staged POPM SP, STM/MVDK SP or FRAME makes the new value immediately usable by a basic compiler-mode LD/ST",

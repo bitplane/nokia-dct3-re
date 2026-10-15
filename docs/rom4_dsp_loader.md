@@ -139,16 +139,11 @@ trace confirms CALA's `02:3e55 -> 02:40e2` return path; the later MVDD
 worker is entered by FCALL at `02:993d`, not directly by this near call.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
-question. The CPU at `1a790619` passes the full 288-marker regression,
-all 74 then-registered isolated profiles, all seven legacy runner scopes and native
-5110 save-state restoration. The tool suite runs 2,788 tests with one skip,
-including 80 passing core-result verifier tests. See the authoritative
+question. Suite version, profile counts, runner scopes and native 5110
+restoration coverage have one authoritative home in the
 [core regression checkpoint](5510_bringup.md#core-regression-checkpoint).
 These checks establish the declared execution models, not full MU4 boot,
-the physical DA150 map or native speech. Subsequent forward in-block
-branch acceptance is focused: 14 profiles, 82 verifier tests, the complete
-2,790-test tool suite (one skip) and native 5110 restoration pass; no new
-full-suite claim is made for that CPU change.
+the physical DA150 map or native speech.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
@@ -3958,11 +3953,10 @@ arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
 FCALAD remains excluded.
 Serial output does not prove audio or full board boot.
-Resident program/data memory still matches exactly. The peripheral/control/IMR
-checkpoint passes full CPU conformance (288 markers), native
-5110 restoration, all 33 isolated profiles in `run_c54x_core.py`,
-135 targeted Python tests and evidence validation. Excluded instruction
-and producer/interrupt compositions remain unaccepted.
+Resident program/data memory still matches exactly. Shared regression and
+native 5110 restoration coverage are indexed in the
+[core regression checkpoint](5510_bringup.md#core-regression-checkpoint).
+Excluded instruction and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained
 Read values. Producer cases distinguish the short-consumer one-word
