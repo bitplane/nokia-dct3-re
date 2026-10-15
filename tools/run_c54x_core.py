@@ -312,6 +312,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "move-t": (
+        "TMS320C54x staged T/TRN moves: PASS cases=1920 restore=1920 forms=MVMD_AR,MVDK_direct,MVDK_short,MVDK_offset,MVDK_absolute destinations=T,TRN values=4 frct_ovm=4 gaps=0,1 pages=2 snapshots=3 source_reads=1 destination_writes=1 consumers=MPY,LDM silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated T/TRN moves complete",
+    ),
     "st-delay-edge": (
         "TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
         "Fatal error: TMS320C54x isolated delay store boundary complete",

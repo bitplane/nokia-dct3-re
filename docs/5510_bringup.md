@@ -13,9 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-MVMD AR6,T (`7316 000e`) at `02:e109` (live PC `02:e10c`).
-The two-word long-offset STL in the delayed branch at `02:e204`
-now executes with retained literal/address ownership. Ordinary
+absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in the
+FCALLD at `02:e10d` (live PC `02:e111`). MVMD AR6,T and the
+two-word STL in the delayed branch at `02:e204` now execute. Ordinary
 store-to-load bypass now prevents stale stack locals from corrupting IMR
 and entering an unhandled interrupt vector. The memory load at `02:9edc`
 (`1281`, source `002a`) now executes against the bench's RAM-backed gap;
@@ -1764,6 +1764,19 @@ frontend projections, not physical timing measurements. Interrupt arrival
 during a long delay store and far-control composition remain outside this
 new fixture's acceptance scope.
 
+MVMD non-accumulator sources and MVDK RAM sources may target T/TRN
+through the retained move path. Source Access captures one word; the
+move's Read publishes it without repeating the source access. Following
+T consumers need no additional NOP (SPRU131G table 7-3/category 6 and
+table 7-12). `move-t` passes 1,920 cases/restores over MVMD AR6 and
+direct/short/offset/absolute MVDK, both destinations, four source values,
+FRCT/OVM, gaps zero/one, two pages and three snapshots. It mutates the
+source after capture and the destination after consumer sampling, checking
+one move write and independent signed-MPY or mapped-LDM results, status
+and saturation. Accumulator-sourced MVMD to T/TRN, other control-register
+destinations, delayed-control and interrupt composition are not admitted
+by this acceptance claim.
+
 ### Streaming worker mode and software dispatch
 
 Passive instruction-boundary probes in the unchanged 20-second `startup`
@@ -3433,8 +3446,9 @@ inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
 now executes, as does LDU `1281` at `02:9edc` against the bench's
 unowned `002a` location. Absolute ADD `01f8 0019` at `02:e1e5`
 and STLM B,BK/MVMD BK,AR0 are admitted, as is the two-word STL in
-the delayed branch at `02:e204`. The next rejecting stage is MVMD
-AR6,T (`7316 000e`) at `02:e109` (live PC `02:e10c`). All
+the delayed branch at `02:e204`. MVMD AR6,T at `02:e109` also
+executes. The next rejecting stage is absolute MPY `20f8 0017` at
+`02:e10f`, inside FCALLD `02:e10d` (live PC `02:e111`). All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3732,8 +3746,10 @@ inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
 `02:9c74` now executes, as does peripheral-window LDU `1281` at
 `02:9edc`. Absolute ADD `01f8 0019` at `02:e1e5` and STLM B,BK
 and MVMD BK,AR0 are admitted, as is long-offset STL `80e2 0001`
-at `02:e206` in delayed branch `f273 e209` at `02:e204`. The next
-stop is MVMD AR6,T (`7316 000e`) at `02:e109`, live PC `02:e10c`.
+at `02:e206` in delayed branch `f273 e209` at `02:e204`.
+MVMD AR6,T (`7316 000e`) at `02:e109` now executes. The next
+stop is absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`, in
+FCALLD `02:e10d`, live PC `02:e111`.
 Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,

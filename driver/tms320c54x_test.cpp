@@ -8544,6 +8544,46 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254380;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct t_move_fixture
+	{
+		unsigned form, destination, flags, gap, checkpoint;
+		u16 value, source;
+		u32 base;
+		unsigned words() const { return form >= 3 ? 3 : 2; }
+		unsigned read() const { return 5 + unsigned(form >= 3); }
+		unsigned consume() const { return read() + (destination ? 2 : 3) + gap; }
+	};
+	static t_move_fixture t_move_case(unsigned variant)
+	{
+		unsigned const form = variant % 5, destination = (variant / 5) % 2, flags = (variant / 40) % 4, gap = (variant / 160) % 2;
+		unsigned const read = 5 + unsigned(form >= 3), consume = read + (destination ? 2 : 3) + gap;
+		return {form, destination, flags, gap, std::array<unsigned, 3>{3, read, consume}[variant / 640],
+			std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 10) % 4],
+			std::array<u16, 5>{0x16, 0x400, 0x5000, 0x5003, 0x5000}[form], (variant / 320) % 2 ? 0x20000U : 0};
+	}
+	void start_t_register_move(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = t_move_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, std::array<u16, 5>{0x7316, 0x7100, 0x7182, 0x71e2, 0x71f8}[f.form]);
+		if (f.form >= 3) program.write_word(f.base + 0x601, f.form == 3 ? 3 : f.source);
+		program.write_word(f.base + 0x5ff + f.words(), 0x0e + f.destination);
+		unsigned const consumer = 0x600 + f.words() + f.gap;
+		program.write_word(f.base + consumer, f.destination ? 0x480f : 0xf066);
+		if (!f.destination) program.write_word(f.base + consumer + 1, 0x8000);
+		program.write_word(f.base + consumer + (f.destination ? 1 : 2), 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2468); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000);
+		data.write_word(f.source, f.value); m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "t_move_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_operand_reads++; expect((i == 0 && at == f.source && word == f.value && m_cpu->pipeline_cycles() == f.read()) || (i == 1 && f.destination && at == 0x0f && word == f.value && m_cpu->pipeline_cycles() == f.consume()), "T/TRN move and consumer each sample their owned source once"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "t_move_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x0e + f.destination && word == f.value && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == f.read() + 1, "T/TRN move publishes once at Read after its retained source Access"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254520;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct delay_store_fixture
 	{
 		unsigned kind, operation, mode, checkpoint;
@@ -11323,6 +11363,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "move-t")) { start_t_register_move(); return; }
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
 		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute")) { start_pipeline_absolute_add(); return; }
@@ -37920,6 +37961,28 @@ private:
 		}
 		if (m_phase == 254370) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 254371; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254520)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = t_move_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "T/TRN register destinations use retained move execution");
+			if (tick == f.read()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
+			if (tick == f.consume()) m_cpu->set_state_int(f.destination ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T, 0xdead);
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save T/TRN move source, publication and consumer sample"); }
+			if (tick == 24)
+			{
+				s64 const product = s64(s16(f.value)) * -32768 * (f.flags & 1 ? 2 : 1);
+				bool const overflow = !f.destination && product > 0x7fffffffLL;
+				u64 const result = f.destination ? f.value : u64(overflow && (f.flags & 2) ? 0x7fffffffLL : product) & 0xffffffffffULL;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 + f.destination && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == result && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (f.destination ? 0xbeef : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (f.destination ? 0xdead : 0x2468) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa008 | (overflow ? 0x400 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0)), "Moves give following MPY/LDM the new retained word with independent arithmetic and status results");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay T/TRN publication and consumer without duplicate bus accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254530; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1919) { start_t_register_move(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged T/TRN moves: PASS cases=1920 restore=1920 forms=MVMD_AR,MVDK_direct,MVDK_short,MVDK_offset,MVDK_absolute destinations=T,TRN values=4 frct_ovm=4 gaps=0,1 pages=2 snapshots=3 source_reads=1 destination_writes=1 consumers=MPY,LDM silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated T/TRN moves complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254520; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254500)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 8 ? 3 : 5;
@@ -39514,6 +39577,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(103, "mvmd-bk", "Retained BK transfers and STLM producer composition")
 	ROM_SYSTEM_BIOS(104, "store-delay", "Complete two-word stores in control delays")
 	ROM_SYSTEM_BIOS(105, "st-delay-edge", "Rejected stores straddling a control delay")
+	ROM_SYSTEM_BIOS(106, "move-t", "Retained T and TRN move destinations with consumers")
 ROM_END
 
 ROM_START(tms54rom4)

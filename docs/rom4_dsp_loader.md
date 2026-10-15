@@ -95,8 +95,9 @@ stale stack locals and the resulting IMR corruption/default-vector loop.
 Absolute ADD from BK (`01f8 0019`) at `02:e1e5` and STLM B,BK
 and MVMD BK,AR0 are admitted. Long-offset STL `80e2 0001` at
 `02:e206` fits the complete two-word delay of `f273 e209` at `02:e204`
-and now executes. The next stop is MVMD AR6,T (`7316 000e`) at
-`02:e109` (live PC `02:e10c`).
+and now executes, as does MVMD AR6,T (`7316 000e`) at `02:e109`.
+The next stop is absolute MPY (`20f8 0017`, AR7 source) at `02:e10f`,
+in FCALLD `02:e10d` (live PC `02:e111`).
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.
