@@ -861,6 +861,21 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile='mpy-dual')
 
+    def test_t_store_profile_scopes(self):
+        for profile, restores in (('st-t', 49152), ('st-t-consumer', 15360), ('st-t-edge', 64)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        for profile, old, new in (('st-t', 'address=Read', 'address=Access'),
+                                  ('st-t', 'data=Execute', 'data=Read'),
+                                  ('st-t-consumer', 'short_gap0=projection', 'short_gap0=legal'),
+                                  ('st-t-consumer', 'younger_ld_t_wins=1', 'younger_ld_t_wins=0')):
+            marker, ending = EXTRA_PROFILES[profile]
+            with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
+                check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile=profile)
+
     def test_ts_arithmetic_profile_scopes(self):
         for profile, restores in (('ts-alu', 154368), ('ts-alu-producer', 18432), ('ts-alu-edge', 320)):
             marker, ending = EXTRA_PROFILES[profile]

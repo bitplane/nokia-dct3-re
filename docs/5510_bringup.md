@@ -23,14 +23,13 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
-pin-decoded response words before stopping at the mapped-destination exclusion
-for `STL B,*(000e)` (`81f8 000e`, destination T) at `03:de88`
-(live PC `03:de8d`) within a five-second observation,
+pin-decoded response words before stopping at the mapped/peripheral-source
+exclusion for `LD Smem,ASM` (live PC `03:dfe2`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
-Passive Execute hooks record two ASM-load entries at `03:e6f0` and one
-T-shifted ADD entry at `03:df52`, with no observer writes.
+Passive Execute hooks record one T-shifted ADD entry at `03:df52` and one
+`STL B,*(000e)` entry at `03:de88`, with no observer writes.
 These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
@@ -40,9 +39,31 @@ At indexed-MAR checkpoint `739fc09c`, the full default CPU run passes all 288
 required markers and its terminal completion check. Subsequent changes have
 focused acceptance, not a renewed full default run.
 Neither covers every additional isolated profile or native audio acceptance.
-The tool suite passes 2,825 tests with one skip; the native 5110
+The tool suite passes 2,826 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
+
+Extended STL/STH A/B stores admit mapped T (`000e`) alongside the existing
+AR destinations. The destination and any auxiliary update belong to Read;
+the accumulator value and SST conversion belong to Execute, which publishes
+one T write without reading the destination. `st-t` passes 49,152 cases and
+restores across four stores, absolute/offset/preincrement/circular addressing,
+eight AR fields, eight accumulator patterns, SST/SXM, CMPT, two pages and
+three snapshots. Literal, pointer and accumulator replacement at their stage
+boundaries checks that ownership without duplicated transactions.
+
+SPRU131G section 7.5.6, table 7-13 requires separation after a store to T for
+Category I consumers, including short-address TS loads, but excludes long-offset
+consumers from that category. `st-t-consumer` passes 15,360 cases/restores with
+short and long TS consumers at gaps 0/1, four stores, eight patterns, SST/SXM,
+four RAM values, two pages and three snapshots. Short gap 0 checks only the
+prototype's old-T projection, not guaranteed silicon behavior; long gap 0 uses
+the new T. Its 3,072 overlapping younger LD T cases preserve Read-owned
+publication after the older store's Execute, with no retirement rewrite.
+`st-t-edge` adds 64 cases/restores retaining the exclusion of four other low
+mapped/peripheral destinations before data reads, writes or register results.
+These exclusions are prototype limits, not silicon traps. General interrupt/
+control-delay composition and measured physical phases remain unvalidated.
 
 ADD/SUB Smem,TS,A/B retains both the RAM word and T in Read before older
 Execute publications, then shifts and adds/subtracts in Execute. Only T bits

@@ -10759,6 +10759,73 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct t_store_fixture
+	{
+		unsigned form, reg, selected, kind, flags, layout, consumer_read, checkpoint;
+		bool consumer, compatibility, long_consumer, merge;
+		u32 base;
+		u16 mode, literal, word, memory, st0, st1, pmst, final_st0;
+		u64 value, result;
+		std::array<u16, 8> initial, final;
+	};
+	static t_store_fixture t_store_case(unsigned v, bool consumer)
+	{
+		// SPRU131G 7.5.6: short TS gap 0 is only a prototype projection;
+		// long-address consumers are legal without a gap. LD T must retain
+		// its younger Read publication over the older store's Execute.
+		t_store_fixture f{}; f.consumer = consumer;
+		unsigned pattern, snapshot;
+		if (consumer) { f.layout = v % 5; f.kind = (v / 5) % 4; pattern = (v / 20) % 8; f.flags = (v / 160) % 4; f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 640) % 4]; f.base = (v / 2560) % 2 ? 0x20000 : 0; snapshot = v / 5120; f.form = 0; f.reg = 2; }
+		else { f.form = v % 4; f.reg = (v / 4) % 8; f.kind = (v / 32) % 4; pattern = (v / 128) % 8; f.flags = (v / 1024) % 4; f.compatibility = (v / 4096) % 2; f.base = (v / 8192) % 2 ? 0x20000 : 0; snapshot = v / 16384; }
+		f.selected = f.compatibility && !f.reg ? 4 : f.reg;
+		f.mode = f.form == 0 ? 0xf8 : (0xe0 + (f.form - 1) * 8) | f.reg;
+		f.literal = f.form == 0 ? 0x0e : f.form == 1 ? 0xffce : 1;
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x2000 + i;
+		f.initial[f.selected] = f.form == 0 ? 0x4000 + f.selected : f.form == 1 ? 0x40 : 0x0d; f.final = f.initial;
+		if (f.form >= 2) f.final[f.selected] = 0x0e;
+		f.value = std::array<u64, 8>{0, 1, 0x000f000f, 0x001f001f, 0x00300030, 0x003f003f, 0x0180008000ULL, 0xff7fff8000ULL}[pattern];
+		f.pmst = f.flags & 1; f.st0 = 0x8e20; f.st1 = 0x800 | (f.flags & 2 ? 0x100 : 0) | (f.compatibility ? 0x20 : 0);
+		f.final_st0 = f.compatibility && f.reg && f.form ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0;
+		u32 stored = u32(f.value);
+		if (f.pmst) { if (f.flags & 2) { s64 const value = BIT(f.value, 39) ? s64(f.value) - (s64(1) << 40) : s64(f.value); stored = u32(std::clamp(value, s64(-2147483648LL), s64(2147483647LL))); } else if (f.value > 0xffffffffULL) stored = 0xffffffffU; }
+		f.word = f.kind & 2 ? stored >> 16 : stored;
+		f.long_consumer = consumer && (f.layout == 2 || f.layout == 3); f.merge = consumer && f.layout == 4;
+		f.consumer_read = 7 + unsigned(f.layout == 1 || f.layout == 3) + unsigned(f.long_consumer);
+		f.result = ts_load_expected(f.memory, consumer && f.layout == 0 ? 3 : f.word, f.flags & 2);
+		f.checkpoint = consumer ? std::array<unsigned, 3>{6, f.consumer_read, f.consumer_read + 1}[snapshot] : std::array<unsigned, 3>{3, 6, 7}[snapshot];
+		return f;
+	}
+	void start_t_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const consumer = !strcmp(machine().options().bios(), "st-t-consumer"); auto const f = t_store_case(variant, consumer); unsigned const gap = f.layout == 1 || f.layout == 3;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x8000 | (f.kind << 8) | f.mode); program.write_word(f.base + 0x601, f.literal);
+		if (consumer) { program.write_word(f.base + 0x602 + gap, f.merge ? 0x3002 : 0x1400 | (!(f.kind & 1) << 8) | (f.long_consumer ? 0xf8 : 2)); if (f.long_consumer) program.write_word(f.base + 0x603 + gap, 0x1002); }
+		program.write_word(f.base + 0x602 + (consumer ? gap + 1 + unsigned(f.long_consumer) : 0), 0xf4e1); data.write_word(0x1002, f.memory);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.kind & 1 ? 0x2233445566ULL : f.value ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.kind & 1 ? f.value ^ 0xffffffffffULL : 0x2233445566ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "t_store_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.consumer && at == 0x1002 && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.consumer_read, "Mapped T store never reads its destination; the following consumer reads one RAM word"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "t_store_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x0e && word == f.word && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7, "Extended accumulator store publishes exactly one T word in Execute"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x604, "t_store_literals", [this, f, gap](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == f.base + 0x601) { expect(word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 3, "T store owns its retained destination literal"); ++m_pipeline_extensions_reads; } else if (f.long_consumer && at == f.base + 0x603 + gap) { expect(word == 0x1002 && m_pipeline_extensions_reads == 1, "Long TS consumer owns its separate source literal"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255100;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_t_store_edge(unsigned variant = 0)
+	{
+		unsigned const kind = variant % 4, destination = (variant / 4) % 4, page = (variant / 16) % 2;
+		start_t_store(kind * 32 + page * 8192);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_cpu->space(AS_PROGRAM).write_word((page ? 0x20000 : 0) + 0x601, std::array<u16, 4>{7, 15, 25, 32}[destination]);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "t_store_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "t_store_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_phase = 255120; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	struct ts_arithmetic_fixture
 	{
 		memory_arithmetic_fixture address;
@@ -12530,6 +12597,8 @@ private:
 		if (!strcmp(machine().options().bios(), "t-load-control")) { start_pipeline_memory_multiply(165888); return; }
 		if (!strcmp(machine().options().bios(), "ts-alu") || !strcmp(machine().options().bios(), "ts-alu-producer")) { start_ts_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "ts-alu-edge")) { start_ts_arithmetic_edge(); return; }
+		if (!strcmp(machine().options().bios(), "st-t") || !strcmp(machine().options().bios(), "st-t-consumer")) { start_t_store(); return; }
+		if (!strcmp(machine().options().bios(), "st-t-edge")) { start_t_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-source") || !strcmp(machine().options().bios(), "mvdd-source-rpt") || !strcmp(machine().options().bios(), "mvdd-source-edge")) { start_mvdd_source(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-t") || !strcmp(machine().options().bios(), "mvmd-bk")) { start_mvmd_word_register(); return; }
@@ -39681,6 +39750,49 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255120)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = variant % 4, checkpoint = 5 + variant / 32;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= 6) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Other extended store MMR destinations remain excluded before data transactions");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (kind & 1 ? 0x2233445566ULL : 0xffffffffffULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (kind & 1 ? 0xffffffffffULL : 0x2233445566ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x8e20 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Excluded store publishes no register result");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x3300 + i, "Excluded absolute store never updates ARs");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended store exclusion before or after rejection"); }
+			if (tick == 12)
+			{
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded store without register or bus publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255130; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_t_store_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x mapped T store exclusions: PASS cases=64 restore=64 stores=4 other_destinations=4 pages=2 snapshots=2 data_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated T store exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255130) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255120; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255100)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = !strcmp(machine().options().bios(), "st-t-consumer"); auto const f = t_store_case(variant, consumer);
+			u64 const source = tick <= 6 ? f.value ^ 0xffffffffffULL : f.value, other = consumer && !f.merge && tick > f.consumer_read ? f.result : 0x2233445566ULL;
+			u16 const expected_t = tick < 7 ? 3 : !consumer ? tick == 7 ? f.word : 0xbeef : tick > f.consumer_read ? f.merge ? 0xbeef : f.word ^ 63 : f.merge && tick == f.consumer_read ? f.memory : f.word;
+			bool const ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.kind & 1 ? other : source) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.kind & 1 ? source : other) && m_cpu->state_int(tms320c54x_device::STATE_T) == expected_t && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? f.final_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst;
+			if (!ok) osd_printf_info("t_store_state: consumer=%u case=%u tick=%u t=%llx expected_t=%04x a=%llx b=%llx result=%llx st0=%llx expected_st0=%04x\n", unsigned(consumer), variant, tick, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_T), expected_t, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)f.result, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), tick >= 6 ? f.final_st0 : f.st0);
+			expect(ok, "Mapped T store publishes in Execute with correct SST and consumer ownership");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick <= 5 ? 0x3300 + i : tick == 6 ? f.final[i] : 0x2200 + i), "T store owns Read-phase auxiliary addressing without duplicate updates");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == 5) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+			if (tick == 6) { for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); m_cpu->set_state_int(f.kind & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); }
+			if ((!consumer && tick == 7) || (consumer && tick == f.consumer_read)) { m_cpu->set_state_int(tms320c54x_device::STATE_T, !consumer || f.merge ? 0xbeef : f.word ^ 63); if (consumer) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002, f.memory ^ 0xffff); } }
+			if (tick == f.checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped T store around address data and consumer publication"); }
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(consumer) && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 + unsigned(f.long_consumer), "Mapped T store and consumer complete with exactly owned bus transactions");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped T publication without repeating writes or losing a younger Read"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255110; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (consumer ? 15360U : 49152U)) { start_t_store(variant + 1); return; }
+				if (consumer) { osd_printf_info("TMS320C54x mapped T store consumers: PASS cases=15360 restore=15360 merge_cases=3072 stores=4 patterns=8 sst_sxm=4 memory_values=4 layouts=short_gap0,short_gap1,long_gap0,long_gap1,LD_T_merge pages=2 snapshots=3 short_gap0=projection long_gap0=legal younger_ld_t_wins=1 retirement_rewrite=0 writes=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated T store consumers complete"); }
+				osd_printf_info("TMS320C54x mapped T stores: PASS cases=49152 restore=49152 stores=STL_A,STL_B,STH_A,STH_B forms=absolute,offset,preincrement,circular registers=8 patterns=8 sst_sxm=4 compatibility_states=2 pages=2 snapshots=3 address=Read data=Execute writes=1 destination_reads=0 pointer_updates=once physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated T stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255110) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255100; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255080)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const mapped = variant >= 256; unsigned const v = mapped ? variant - 256 : variant;
@@ -41568,6 +41680,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(147, "ts-alu", "Retained memory arithmetic with T-selected shifts")
 	ROM_SYSTEM_BIOS(148, "ts-alu-producer", "Instruction-driven T shift arithmetic latency")
 	ROM_SYSTEM_BIOS(149, "ts-alu-edge", "TS arithmetic unsupported shift and source exclusions")
+	ROM_SYSTEM_BIOS(150, "st-t", "Extended accumulator stores to mapped T")
+	ROM_SYSTEM_BIOS(151, "st-t-consumer", "Mapped T store shift latency and younger Read merge")
+	ROM_SYSTEM_BIOS(152, "st-t-edge", "Mapped T store neighboring destination exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

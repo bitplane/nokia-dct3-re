@@ -404,6 +404,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "st-t-edge": (
+        "TMS320C54x mapped T store exclusions: PASS cases=64 restore=64 stores=4 other_destinations=4 pages=2 snapshots=2 data_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated T store exclusions complete",
+    ),
+    "st-t": (
+        "TMS320C54x mapped T stores: PASS cases=49152 restore=49152 stores=STL_A,STL_B,STH_A,STH_B forms=absolute,offset,preincrement,circular registers=8 patterns=8 sst_sxm=4 compatibility_states=2 pages=2 snapshots=3 address=Read data=Execute writes=1 destination_reads=0 pointer_updates=once physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated T stores complete",
+    ),
+    "st-t-consumer": (
+        "TMS320C54x mapped T store consumers: PASS cases=15360 restore=15360 merge_cases=3072 stores=4 patterns=8 sst_sxm=4 memory_values=4 layouts=short_gap0,short_gap1,long_gap0,long_gap1,LD_T_merge pages=2 snapshots=3 short_gap0=projection long_gap0=legal younger_ld_t_wins=1 retirement_rewrite=0 writes=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated T store consumers complete",
+    ),
     "ts-alu": (
         "TMS320C54x TS arithmetic: PASS address_cases=6912 arithmetic_cases=147456 restore=154368 operations=ADD,SUB selectors=4 address_forms=18 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated TS arithmetic complete",
