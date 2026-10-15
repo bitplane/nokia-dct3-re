@@ -11207,6 +11207,46 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253790;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_return_load(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const b = variant & 1, zero = variant & 2;
+		unsigned const gap = (variant >> 2) & 1;
+		u32 const base = variant & 8 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x1292 | (b ? 0x100 : 0));
+		program.write_word(base + 0x601 + gap, b ? 0xfc4d : 0xfc45);
+		program.write_word(base + 0x602 + gap, 0xf4e1);
+		program.write_word(base + 0x700, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1200, zero ? 0 : 1);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1200);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1234 : unsigned(zero));
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? unsigned(zero) : 0x2345);
+		m_pipeline_operand_reads = m_fast_stack_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "return_load_reads",
+			[this, zero](offs_t at, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x1200) { expect(!m_pipeline_operand_reads, "Return producer reads once"); ++m_pipeline_operand_reads; }
+				else { expect(zero && at == 0x1000 && !m_fast_stack_reads, "Only zero producer owns one return stack read"); ++m_fast_stack_reads; }
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "return_load_writes",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Load and return never write data memory"); } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254700;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_conditional_call(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11733,6 +11773,7 @@ private:
 		if (!strcmp(machine().options().bios(), "logic-short")) { start_pipeline_memory_logic(); return; }
 		if (!strcmp(machine().options().bios(), "logic-peripheral")) { start_pipeline_peripheral_logic(); return; }
 		if (!strcmp(machine().options().bios(), "load-offset")) { start_pipeline_offset_load(); return; }
+		if (!strcmp(machine().options().bios(), "ret-load")) { start_return_load(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
@@ -37831,6 +37872,40 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253840) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253830; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254700)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const b = variant & 1, zero = variant & 2;
+			unsigned const gap = (variant >> 2) & 1, checkpoint = 4 + (variant >> 4);
+			u32 const base = variant & 8 ? 0x20000 : 0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Load/return composition stays admitted");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads, m_pipeline_store_writes, 0};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save load/return around producer and predicate");
+			}
+			if (tick == 24)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + (zero ? 0x701 : 0x603 + gap), "RC consumes the preceding load result, not the opposite old accumulator");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(zero) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1201 && m_pipeline_operand_reads == 1 && m_fast_stack_reads == unsigned(zero) && !m_pipeline_store_writes, "Load/return owns exactly one producer and conditional stack read");
+				expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == unsigned(!zero) && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (b ? 0x1234 : 0x2345), "Load/return preserves unselected accumulator");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore load/return without duplicate accesses");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254710; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_return_load(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged load return: PASS cases=64 restore=64 accumulators=2 values=2 gaps=2 pages=2 snapshots=4 producer_reads=1 conditional_stack_reads=1 data_writes=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated load return complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254710) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254700; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253810)
 		{
 			bool const returning = !strcmp(machine().options().bios(), "conditional-ret");
@@ -37846,7 +37921,7 @@ private:
 			if (!taken) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Untaken CC leaves SP unchanged throughout the transaction");
 			if (returning) expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == (tick >= (taken ? 11 : 9)), "RC preserves Class 32's five-cycle taken and three-cycle untaken cadence");
 			if (tick == 5) { auto const disable = machine().disable_side_effects(); if (returning) m_cpu->space(AS_DATA).write_word(0x1000, 0xdead); else m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); }
-			if (tick == (returning ? 4 : 6)) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, changed);
+			if (tick == (returning ? 5 : 6)) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, changed);
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save CC around predicate, held clock and conditional publication");
@@ -40191,6 +40266,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(115, "mvdd-source", "Retained mapped-source dual transfers")
 	ROM_SYSTEM_BIOS(116, "mvdd-source-rpt", "Repeated mapped-source copies and read-clear endpoints")
 	ROM_SYSTEM_BIOS(117, "mvdd-source-edge", "Rejected mapped dual-transfer endpoint combinations")
+	ROM_SYSTEM_BIOS(118, "ret-load", "Adjacent load and conditional return replay")
 ROM_END
 
 ROM_START(tms54rom4)

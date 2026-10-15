@@ -729,6 +729,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='conditional-ret')
 
+    def test_load_return_scope(self):
+        marker, ending = EXTRA_PROFILES['ret-load']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='ret-load')
+        for key, old, new in (('restore', '64', '0'), ('producer_reads', '1', '0'),
+                              ('data_writes', '0', '1'), ('gaps', '2', '1')):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                check_result(output.replace(f'{key}={old}', f'{key}={new}'),
+                             3, profile='ret-load')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

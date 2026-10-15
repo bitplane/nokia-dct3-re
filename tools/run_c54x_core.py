@@ -656,6 +656,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated staged SUBS complete",
     ),
+    "ret-load": (
+        "TMS320C54x staged load return: PASS cases=64 restore=64 accumulators=2 values=2 gaps=2 pages=2 snapshots=4 producer_reads=1 conditional_stack_reads=1 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated load return complete",
+    ),
     "conditional-ret": (
         "TMS320C54x staged conditional return: PASS cases=768 restore=768 conditions=AGEQ,ALT,ANEQ,AEQ,AGT,ALEQ,BGEQ,BLT,BNEQ,BEQ,BGT,BLEQ patterns=8 pages=2 snapshots=4 taken_reads=1 data_writes=0 untaken_stack_accesses=0 predicate_retained=1 stack_target_retained=1 delayed_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated conditional return complete",

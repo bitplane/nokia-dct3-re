@@ -3511,14 +3511,10 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[3] && staged_conditional_return(m_pipeline_word[3]))
 	{
-		bool const taken = staged_accumulator_condition(m_pipeline_word[3], accumulator(BIT(m_pipeline_word[3], 3)));
-		m_pipeline_immediate[3] = taken;
-		if (taken) m_pipeline_operand_address[3] = m_sp++;
-		else
-		{
-			m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | u16(m_pipeline_address[3] + 1);
-			m_pipeline_flush_front = false; m_pipeline_decode_flush = 0;
-		}
+		// Retain sequential Prefetch while the condition awaits the older
+		// producer. Decode stays flushed until the Read decision is known.
+		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | u16(m_pipeline_address[3] + 1);
+		m_pipeline_flush_front = false;
 	}
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
 	if (m_pipeline_valid[4] && staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4]))
@@ -3617,8 +3613,6 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_word[4] == 0xfe00)
 			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
 	}
-	if (m_pipeline_valid[4] && staged_conditional_return(m_pipeline_word[4]) && m_pipeline_immediate[4])
-		m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[5])
 	{
 		u32 const address = m_pipeline_address[5];
@@ -4027,6 +4021,23 @@ void tms320c54x_device::pipeline_step()
 		// clock. Retain the predicate after older Execute writes (example 7-17).
 		m_pipeline_immediate[4] = staged_tc_branch(m_pipeline_word[4]) ? BIT(m_st0, 12) == BIT(m_pipeline_word[4], 4) :
 			staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
+	}
+	if (m_pipeline_valid[4] && staged_conditional_return(m_pipeline_word[4]))
+	{
+		// Direct accumulator consumers have no producer latency (SPRU131G
+		// 7.5.10). Decide after older Execute, not in the earlier Access slot.
+		bool const taken = staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
+		m_pipeline_immediate[4] = taken;
+		if (taken)
+		{
+			m_pipeline_flush_front = true;
+			m_pipeline_operand_address[4] = m_sp++;
+			m_pipeline_operand[4] = data_read(m_pipeline_operand_address[4]);
+		}
+		else
+		{
+			m_pipeline_flush_front = false; m_pipeline_decode_flush = 0;
+		}
 	}
 	if (m_pipeline_valid[4] && staged_memory_dp(m_pipeline_word[4]))
 	{

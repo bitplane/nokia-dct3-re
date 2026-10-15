@@ -19,16 +19,30 @@ The repeated MVDD (`e598`) at `03:8eda` now completes its first 128 ordered
 source reads from `0000..007f` into RAM beginning at `0e35`. Firmware then
 publishes buffer pointers `1800` and `1880`. The zero source is shared with
 the atomic control, not a demonstrated staged-only pointer defect; see
-[Recorder low-page copy](#recorder-low-page-copy). Execution subsequently
-reaches `CALA A` at `00:1c4c` with A zero and transfers to unacquired program
-address zero. The preceding `LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48`
-requires a producer/conditional-return timing audit; retirement-time A is
-not evidence of the earlier predicate sample. Later wild-page execution is
-a downstream symptom, not the first identified control-flow boundary.
+[Recorder low-page copy](#recorder-low-page-copy). The adjacent
+`LDU *AR2+,A` / `RC AEQ` pair at `1c47..1c48` now consumes the load's result
+and returns on the zero terminator instead of calling program address zero.
+The original recorder continues through repeated callbacks and emits its
+pin-decoded response words before stopping at unsupported staged form
+`f808` at `03:e6be` (live PC `03:e6c0`). This is not complete recording or
+validated audio.
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The existing
-conditional-return fixture deliberately excludes adjacent producers; its
-Access-owned predicate therefore does not establish this pair's correctness.
+isolated conditional-return fixture alone excludes adjacent producers; its
+former Access-owned predicate did not establish this pair's correctness.
+With the same retained NAND, the atomic zero-entry control returns from
+`1c48` to `1c59` (SP `6f12`, AR2 `8002`, A zero), then restarts the table
+walk through `1c54`. The staged trace instead falls through to `1c49..1c4c`
+and called zero before the correction. This was a frontend decision
+divergence, not evidence that the table needs a synthetic nonzero terminator.
+The `ret-load` fixture reproduces the old defect and passes 64 cases/restores
+after correction: A/B, zero/nonzero results opposed to the old accumulator,
+adjacent/one-NOP separation, two pages and four snapshots. Conditional return
+now decides after older Execute publications and retains its stack sample.
+Sequential prefetch preserves the existing taken/untaken cadence. The 768-case
+isolated return fixture, conditional-call and stack/IRQ-return controls pass;
+the 97 runner unit tests pass. These are focused checks, not a renewed full
+CPU-suite checkpoint or physical bus-phase validation.
 The atomic control is not a physical oracle.
 The load at `02:9edc` (`1281`, source `002a`) uses a bench RAM-backed
 gap whose physical ownership remains unknown. Output words
@@ -3208,15 +3222,15 @@ now execute. The `conditional-ret` gate passes 768 cases/restores for all
 twelve nondelayed signed A/B predicates (GEQ, LT, NEQ, EQ, GT, LEQ),
 eight 40-bit patterns, two pages and four snapshots. Sign is determined by
 bit 39, including positive values with bit 31 set and nonzero guard words.
-Access samples the
-predicate before a conditional SP increment. Only a taken return reads
+Read samples the predicate after older Execute publications, before a
+conditional SP increment. Only a taken return reads
 its captured stack address at clock 5; later stack-word changes cannot
 change the return target. Untaken returns preserve SP on every clock
 and never read or write data memory. Accumulators, non-INTM status and
-INTM are preserved. Changing the selected accumulator after Access to an
+INTM are preserved. Changing the selected accumulator after Read to an
 opposite-predicate value does not change the decision. RCD, other condition
-groups, adjacent producers and
-IRQ/NMI composition remain unaccepted.
+groups and IRQ/NMI composition remain unaccepted. Adjacent unsigned loads
+have the separate `ret-load` composition coverage described above.
 
 The isolated runner rejects MAME driver-validity `Errors:` output even
 when the conformance marker and intentional completion exit are present.
