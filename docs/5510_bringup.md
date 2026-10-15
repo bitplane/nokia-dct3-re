@@ -30,10 +30,12 @@ executes 2,048 times, and the callee entry at `03:dada` executes 1,601
 times. The call's delay span ends at the active block endpoint `03:db3a`;
 this is covered by the retained loop/call contract below. The REA, RSA and
 BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
-The next stop is unadmitted opcode `b0a0` at `03:d636`; live PC is
-`03:d638` and terminal `illegal=1`. Its operand and addressing contract
-must be decoded before admission. The intervening indirect PMST and
-repeat-control restore exclusions are covered by the bounded tests below.
+The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
+times in a five-second passive observation. The next stop is the in-block
+loop-register-write guard (context PC `03:d6a1`, terminal PC `03:d69d`,
+`illegal=1`); its exact writer and loop ownership remain to be mapped.
+The intervening indirect PMST and repeat-control restore exclusions are
+covered by the bounded tests below.
 The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
 AR7 is `001d`, SP is `5cd3`, and its pending stack word `202c` matches
 current PMST. RSA/REA remain `db51/db56`, outside this restore routine.
@@ -53,6 +55,26 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Signed dual-memory MAC
+
+SPRU172C 4-82/4-83 identifies `b0a0` as
+`MAC *AR4+,*AR2,A,A`: signed X/Y product plus the source accumulator,
+with X also published to T in Read. This Class-7, one-word instruction
+reuses paired address capture and retained RAM reads. The accumulator
+remains Execute-owned, with FRCT, SMUL product handling, OVM and sticky
+destination overflow handled by the existing arithmetic helpers.
+
+`mac-dual` passes 215,040 cases/restores: 18,432 addressing cases and
+196,608 arithmetic cases, 512 same-accumulator encodings, three layouts,
+two BK modes, 64 input pairs, eight accumulator patterns, 32 flag states,
+two pages and three snapshots. Operand/pointer/BK mutation after capture
+detects rereads or repeated updates; accumulator mutation before Execute
+checks feedback ownership. `mac-dual-edge` rejects 16 low mapped operand
+cases before reads or pointer updates. Cross-accumulator MAC, rounded
+MACR, MAS/MASR, physical bank timing and interrupt/repeat composition are
+not admitted by this contract. Execution of the original MAC is not proof
+of valid recording or audio.
 
 ### Active repeat context and stack bypass
 
@@ -245,7 +267,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,846 tests with one skip; the native 5110
+The tool suite passes 2,847 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 

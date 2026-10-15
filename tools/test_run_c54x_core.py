@@ -619,6 +619,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-popd')
 
+    def test_dual_mac_scope(self):
+        for profile in ('mac-dual', 'mac-dual-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for bad in (output.replace('restore=', 'restore=0'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_pmst_mapping_scope(self):
         marker, ending = EXTRA_PROFILES['pmst-map']
         output = marker + '\n' + ending + '\n'

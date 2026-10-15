@@ -11564,7 +11564,7 @@ private:
 		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0;
 		u64 result;
 	};
-	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false)
+	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false, bool signed_mac = false)
 	{
 		dual_multiply_fixture f{};
 		bool const subtract = alu && variant >= (edge ? 16U : 43008U);
@@ -11610,7 +11610,7 @@ private:
 		f.result_st0 = f.st0 | (overflow ? f.destination ? 0x200 : 0x400 : 0);
 		if (macsu)
 		{
-			s64 product = s64(f.xword) * s16(f.yword) * (f.flags & 1 ? 2 : 1);
+			s64 product = (signed_mac ? s64(s16(f.xword)) : s64(f.xword)) * s16(f.yword) * (f.flags & 1 ? 2 : 1);
 			if ((f.flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
 			u64 const seed = dual_macsu_seed(variant, edge);
 			s64 const result = (BIT(seed, 39) ? s64(seed) - (s64(1) << 40) : s64(seed)) + product;
@@ -11639,11 +11639,12 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-		bool const macsu = !strncmp(machine().options().bios(), "macsu-dual", 10);
-		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu);
+		bool const signed_mac = !strncmp(machine().options().bios(), "mac-dual", 8);
+		bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
+		bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : macsu ? 0xa600 : 0xa400) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : signed_mac ? 0xb000 : macsu ? 0xa600 : 0xa400) | (signed_mac ? f.destination << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -13387,6 +13388,7 @@ private:
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual") || !strcmp(machine().options().bios(), "alu-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "macsu-dual") || !strcmp(machine().options().bios(), "macsu-dual-edge")) { start_dual_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mac-dual") || !strcmp(machine().options().bios(), "mac-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
 		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
@@ -41254,8 +41256,9 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-			bool const macsu = !strncmp(machine().options().bios(), "macsu-dual", 10);
-			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu);
+			bool const signed_mac = !strncmp(machine().options().bios(), "mac-dual", 8);
+			bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
+			bool const edge = !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac);
 			unsigned const checkpoint = 3 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
 			u64 const before = dual_macsu_seed(variant, edge) ^ (!edge && tick <= 5 ? 0xffffffffffULL : 0);
@@ -41292,6 +41295,11 @@ private:
 				if (variant + 1 < (edge ? 16U : macsu ? 215040U : 43008U) * (alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return; }
 				if (macsu)
 				{
+					if (signed_mac)
+					{
+						if (edge) { osd_printf_info("TMS320C54x dual MAC exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC exclusions complete"); }
+						osd_printf_info("TMS320C54x staged dual MAC: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 signed_operands=1 source_equals_destination=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC complete");
+					}
 					if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
 					osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
 				}
@@ -43000,6 +43008,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(175, "pmst-popd", "Indirect PMST stack restoration and retained program mapping")
 	ROM_SYSTEM_BIOS(176, "repeat-pmst", "Indirect unchanged PMST restoration outside an active repeat body")
 	ROM_SYSTEM_BIOS(177, "repeat-popd", "Indirect active repeat-context restoration outside the loop body")
+	ROM_SYSTEM_BIOS(178, "mac-dual", "Signed dual-memory MAC with retained reads and accumulator feedback")
+	ROM_SYSTEM_BIOS(179, "mac-dual-edge", "Signed dual-memory MAC low-page operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
