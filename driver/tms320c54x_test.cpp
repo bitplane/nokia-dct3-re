@@ -10829,6 +10829,80 @@ private:
 		return {std::array<u64, 16>{0, 1, 2, 0x7fff, 0x8000, 0x7fffffff, 0x80000000ULL, 0xffffffffULL, 0x0100000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0xffffffffcbULL, 0x0785432105ULL, 0xff80000000ULL, 0xff00000000ULL}[v % 16],
 			bool((v / 16) % 2), bool((v / 768) % 2), (v / 32) % 3, u16(0xa602 | (flags & 4 ? 0x1800 : 0)), u16(0x800 | ((flags & 3) << 8)), (v / 1536) % 2 ? 0x20000U : 0};
 	}
+	struct normalization_fixture
+	{
+		unsigned selector, prefix, gap, read_cycle, execute_cycle;
+		u16 t, st0, st1, result_st0;
+		u32 base;
+		std::array<u64, 2> before, after;
+	};
+	static normalization_fixture normalization_case(unsigned variant, bool producer, bool edge)
+	{
+		unsigned const selector = variant % 4;
+		unsigned const pattern = producer ? (variant / 4) % 16 : edge ? 6 : (variant / 192) % 8;
+		unsigned const flags = producer ? (variant / 192) % 4 : edge ? 7 : (variant / 1536) % 8;
+		unsigned const gap = producer ? (variant / 64) % 3 : 0, prefix = unsigned(producer);
+		u32 const base = (producer ? (variant / 768) % 2 : edge ? (variant / 64) % 2 : (variant / 12288) % 2) ? 0x20000 : 0;
+		std::array<u64, 2> before = producer ? std::array<u64, 2>{exponent_case(pattern).value, exponent_case((pattern + 7) % 16).value} : std::array<u64, 2>{
+			std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0x123456789aULL}[pattern],
+			std::array<u64, 8>{1, 0xffffffffULL, 0xff80000000ULL, 0x7fffffff, 0xffffffffffULL, 0x123456789aULL, 0x8000000000ULL, 0x7fffffffffULL}[pattern]};
+		u64 const source = before[selector >> 1];
+		u16 const st0 = 0x1004 | ((producer ? pattern & 1 : flags & 4) ? 0x0e00 : 0);
+		u16 const st1 = 0x813 | ((flags & 3) << 8);
+		int const basic_shift = int((variant / 4) % 48) - 16;
+		u16 const t = producer ? 0xa5c1 : edge ? u16(0xa5e0 | ((variant / 4) % 16)) : u16(0xa5c0 | (basic_shift & 63));
+		exponent_fixture const exponent{source, false, false, 0, 0, 0, 0};
+		int const shift = producer ? gap ? s16(exponent.exponent()) : 1 : basic_shift;
+		u64 result = 0;
+		bool overflow = false;
+		if (!edge)
+		{
+			bool const sign = source & 0x8000000000ULL;
+			for (int bit = 0; bit < 40; ++bit)
+			{
+				int const from = bit - shift;
+				if ((from >= 0 && from < 40 && BIT(source, from)) || (shift < 0 && from >= 40 && (flags & 1) && sign)) result |= u64(1) << bit;
+			}
+			if (shift >= 0)
+				// Inspect the wide mathematical result without overflowing s64
+				// when a 40-bit source is shifted left by as many as 31 bits.
+				for (int bit = 31; bit <= 70; ++bit)
+				{
+					int const from = bit - shift;
+					bool const value = from < 0 ? false : from < 40 ? bool(BIT(source, from)) : sign;
+					overflow |= value != sign;
+				}
+			if (overflow && (flags & 2)) result = sign ? 0xff80000000ULL : 0x7fffffff;
+		}
+		auto after = before;
+		if (!edge) after[selector & 1] = result;
+		return {selector, prefix, gap, 5 + prefix + gap, 6 + prefix + gap, t, st0, st1,
+			u16(st0 | (!edge && overflow ? selector & 1 ? 0x200 : 0x400 : 0)), base, before, after};
+	}
+	void start_normalization(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const producer = !strcmp(machine().options().bios(), "exp-norm"), edge = !strcmp(machine().options().bios(), "norm-edge");
+		auto const f = normalization_case(variant, producer, edge);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		if (producer) program.write_word(f.base + 0x600, 0xf48e | ((f.selector >> 1) << 8));
+		program.write_word(f.base + 0x600 + f.prefix + f.gap, 0xf48f | ((f.selector >> 1) << 9) | ((f.selector & 1) << 8));
+		program.write_word(f.base + 0x601 + f.prefix + f.gap, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.before[0]); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.before[1]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "norm_no_data_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "NORM has no data-memory source"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "norm_no_data_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "NORM and EXP never write data memory"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600 + f.prefix + f.gap, f.base + 0x600 + f.prefix + f.gap, "norm_opcode", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "NORM opcode is fetched once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254860;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_exponent(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -11936,6 +12010,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-acc") || !strcmp(machine().options().bios(), "mvmd-st1")) { start_mvmd_accumulator(); return; }
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
 		if (!strcmp(machine().options().bios(), "drsub") || !strcmp(machine().options().bios(), "long-pair")) { start_pipeline_long_pair(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-store")) { start_xmem_store(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-load") || !strcmp(machine().options().bios(), "xmem-alu")) { start_xmem_load(); return; }
@@ -39065,6 +39140,47 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254860)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const producer = !strcmp(machine().options().bios(), "exp-norm"), edge = !strcmp(machine().options().bios(), "norm-edge");
+			auto const f = normalization_case(variant, producer, edge);
+			unsigned const checkpoint = edge ? 3 + variant / 128 : producer ? std::array<unsigned, 4>{3, f.read_cycle - 1, f.read_cycle, f.execute_cycle + 1}[variant / 1536] : 3 + variant / 24576;
+			bool const retired = !edge && tick >= f.execute_cycle;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_cycle), "NORM admits the documented TS range and rejects unsupported shifts at Read");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (retired ? f.after[0] : f.before[0]) && m_cpu->state_int(tms320c54x_device::STATE_B) == (retired ? f.after[1] : f.before[1]) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (retired ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "NORM publishes its shifted result/sticky overflow only at Execute and preserves carry and other status");
+			if (!edge && tick == f.read_cycle) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot[0] = m_pipeline_extensions_reads; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save NORM across TS sampling, producer publication and Execute");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? f.t : 0xdead), "NORM retains TS despite later T mutation and never rewrites T");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay NORM without resampling T or refetching its opcode");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254870; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				unsigned const count = edge ? 256 : producer ? 6144 : 98304;
+				if (variant + 1 < count) { start_normalization(variant + 1); return; }
+				if (edge)
+				{
+					osd_printf_info("TMS320C54x staged NORM exclusions: PASS cases=256 restore=256 selectors=4 ts_codes=32..47 pages=2 snapshots=2 register_publication=0 data_accesses=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated NORM exclusions complete");
+				}
+				if (producer)
+					osd_printf_info("TMS320C54x staged EXP NORM: PASS cases=6144 restore=6144 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0\n");
+				else
+					osd_printf_info("TMS320C54x staged NORM: PASS cases=98304 restore=98304 selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, producer ? "TMS320C54x isolated EXP NORM complete" : "TMS320C54x isolated NORM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254870) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254860; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254840)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + (variant % 196608) / 65536;
@@ -40614,6 +40730,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(125, "xmem-store-bp", "Compact Xmem store and load bus bypass")
 	ROM_SYSTEM_BIOS(126, "drsub", "Retained reversed long-word subtraction")
 	ROM_SYSTEM_BIOS(127, "long-pair", "DADD and DSUB retained long-pair controls")
+	ROM_SYSTEM_BIOS(128, "norm", "Retained normalization shift sampling and replay")
+	ROM_SYSTEM_BIOS(129, "norm-edge", "Unsupported normalization shift-domain controls")
+	ROM_SYSTEM_BIOS(130, "exp-norm", "EXP producer and normalization T latency")
 ROM_END
 
 ROM_START(tms54rom4)

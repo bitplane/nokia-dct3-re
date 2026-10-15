@@ -404,6 +404,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
+    "norm": (
+        "TMS320C54x staged NORM: PASS cases=98304 restore=98304 selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated NORM complete",
+    ),
+    "norm-edge": (
+        "TMS320C54x staged NORM exclusions: PASS cases=256 restore=256 selectors=4 ts_codes=32..47 pages=2 snapshots=2 register_publication=0 data_accesses=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated NORM exclusions complete",
+    ),
+    "exp-norm": (
+        "TMS320C54x staged EXP NORM: PASS cases=6144 restore=6144 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated EXP NORM complete",
+    ),
     "drsub": (
         "TMS320C54x staged DRSUB: PASS cases=6912 restore=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated DRSUB complete",

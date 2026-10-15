@@ -31,6 +31,11 @@ constexpr bool staged_xmem_store(u16 word)
 	return (word & 0xfc00) == 0x9800;
 }
 
+constexpr bool staged_norm(u16 word)
+{
+	return (word & 0xfcff) == 0xf48f;
+}
+
 constexpr bool staged_mvdd(u16 word)
 {
 	return (word & 0xff00) == 0xe500;
@@ -2872,7 +2877,7 @@ void tms320c54x_device::pipeline_step()
 		bool const long_arithmetic = staged_long_arithmetic(word);
 		// These one-word forms use only live accumulators in Execute; their
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || (word & 0xfeff) == 0xf48e;
+		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || (word & 0xfeff) == 0xf48e;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);
@@ -3483,6 +3488,17 @@ void tms320c54x_device::pipeline_step()
 		m_st1 |= 0x0800;
 		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
 	}
+	if (m_pipeline_valid[4] && staged_norm(m_pipeline_word[4]))
+	{
+		// SPRU172C 4-122 samples TS in Read. EXP needs one separating
+		// word (SPRU131G table 7-13); do not sample after older Execute.
+		m_pipeline_immediate[4] = m_t;
+		unsigned const code = m_t & 63;
+		if (code >= 32 && code < 48)
+		{
+			logerror("%s: staged NORM shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
+		}
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe00) == 0x1400)
 		// Like the multiplier's T input, TS belongs to Read before an
 		// older accumulator-to-T store can publish in Execute (table 7-3).
@@ -3820,6 +3836,11 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
 			if (m_op == 0x46f8) ++m_pc;
+		}
+		else if (staged_norm(m_op))
+		{
+			int const code = m_pipeline_immediate[5] & 63;
+			accumulator(BIT(m_op, 8)) = shifted_load(accumulator(BIT(m_op, 9)), code >= 32 ? code - 64 : code, BIT(m_op, 8));
 		}
 		else if (staged_long_arithmetic(m_op))
 		{

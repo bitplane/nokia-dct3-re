@@ -822,6 +822,17 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
                     check_result(output.replace(old, new), 3, profile=profile)
 
+    def test_normalization_profile_scopes(self):
+        for profile, restores in (('norm', 98304), ('norm-edge', 256), ('exp-norm', 6144)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                check_result(output.replace(f'restore={restores}', 'restore=0'), 3, profile=profile)
+        marker, ending = EXTRA_PROFILES['exp-norm']
+        with self.assertRaises(ValueError):
+            check_result(marker.replace('zero_gap=projection_only', 'zero_gap=validated') + '\n' + ending + '\n', 3, profile='exp-norm')
+
     def test_conditional_call_scope(self):
         marker, ending = EXTRA_PROFILES['conditional-call']
         output = marker + '\n' + ending + '\n'

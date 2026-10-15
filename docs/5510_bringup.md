@@ -24,7 +24,7 @@ the atomic control, not a demonstrated staged-only pointer defect; see
 and returns on the zero terminator instead of calling program address zero.
 The original recorder continues through repeated callbacks and emits its
 pin-decoded response words before stopping at unsupported staged form
-`NORM B,B` (`f78f`) at `03:de9b` (live PC `03:de9d`) within a five-second observation,
+`XC 1,ALT` (`fd43`) at `03:dea4` (live PC `03:dea6`) within a five-second observation,
 with terminal `illegal=1`. This is not complete recording or
 validated audio.
 
@@ -134,10 +134,28 @@ AR/SP and memory changes cannot alter the retained address or word pair.
 as controls. CPU low-page pairs remain excluded; physical phase timing and
 general producer/interrupt composition are not established by these fixtures.
 
-The runner's 105 unit tests pass; the full tool suite passes 2,813 tests with
-one skip. Load/return, carry-branch, PMST mapping and WRITA exclusion controls
-also pass, as does native 5110 save-state restoration. These focused changes
-do not renew the default-suite checkpoint.
+NORM (`f48f/f58f/f68f/f78f`) retains T in Read before older Execute publishes
+and uses that signed six-bit shift at Execute. SPRU172C 4-122 defines its
+supported shift domain as -16..31. Raw TS codes 32..47 are rejected by the
+staged prototype before register publication; this is not a silicon trap claim.
+The shared shift helper supplies SXM right shifts, sticky destination overflow
+and OVM saturation while preserving carry and the unselected accumulator.
+`norm` passes 98,304 cases/restores over all selectors, 48 supported shifts,
+eight 40-bit patterns, eight status combinations, two pages and four snapshots.
+Later T mutation cannot change the captured count. `norm-edge` adds 256
+save/replay exclusions for the unsupported codes.
+
+SPRU131G table 7-13 and example 7-40 require one separating word after EXP.
+`exp-norm` passes 6,144 cases/restores over all selectors, 16 patterns,
+gaps 0/1/2, SXM/OVM, two pages and four snapshots. Gap zero checks the
+prototype's stale-T projection, not a guaranteed hardware result for an
+invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
+`03:de97..de9b` has the required separation and now executes.
+
+The runner's 106 unit tests pass; the full tool suite passes 2,814 tests with
+one skip. EXP, TS-load producer, load/return and long-pair controls also pass,
+as does native 5110 save-state restoration. These focused changes do not renew
+the default-suite checkpoint.
 
 The original recorder subsequently emits NAND data writes through firmware
 at `02:891c`, then reaches the current unsupported form. NAND traffic alone
@@ -3665,7 +3683,11 @@ the next stop is maintained in [Current boundary](#current-boundary).
 
 TS-controlled memory loads (`14xx`/`15xx`, SPRU172C LD syntax 2) use the
 shared retained Smem address path and capture both memory and T in Read.
-TS is T's signed low six bits (-32..31). SXM selects sign extension and
+The current implementation projects all six-bit codes to -32..31; coverage of
+raw codes 32..47 is not evidence that their behavior is architecturally defined.
+In particular, NORM's documented -16..31 domain is independently enforced;
+do not use this memory-load fixture as a NORM shift-domain oracle.
+SXM selects sign extension and
 arithmetic right shifting; OVM does not saturate this load form, and carry
 and accumulator-overflow flags are preserved. Atomic and staged execution
 share the same shift arithmetic, but only the staged frontend retains the
