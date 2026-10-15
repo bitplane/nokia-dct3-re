@@ -2991,6 +2991,8 @@ void tms320c54x_device::pipeline_step()
 		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
 		bool const internal_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
+		bool const internal_delayed_block_branch = staged_accumulator_branch(word) && BIT(word, 9) &&
+			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
 		bool const block_far_call = staged_far_call(word) && !BIT(word, 9) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address &&
@@ -2998,7 +3000,7 @@ void tms320c54x_device::pipeline_step()
 		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
-		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !internal_delayed_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			word == 0xf070 || word == 0x47f8 || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -3910,6 +3912,9 @@ void tms320c54x_device::pipeline_step()
 			{
 				m_pipeline_fetch_address = (address & 0x7f0000) | m_pipeline_operand[5];
 				m_pipeline_decode_flush = 1;
+				if (m_pipeline_block_body[5] && !staged_conditional_call(m_op))
+					// Annul fall-through endpoint predictions, not Decode's count.
+					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 			}
 		}
 		else if (staged_accumulator_transfer(m_op))

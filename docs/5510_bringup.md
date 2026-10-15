@@ -32,11 +32,11 @@ this is covered by the retained loop/call contract below. The REA, RSA and
 BRC restore instructions at `03:9568..956a` each reach Execute 313 times.
 The signed dual-memory MAC `b0a0` at `03:d636` now reaches Execute 512
 times in a five-second passive observation. Reverse-carry MAR `6dbb` at
-`03:c84a` reaches Execute once. The next stop is a block-control exclusion
-for `fa42` at `03:c852`, in block `03:c851..03:c862` (live/terminal PC
-`03:c855`, `illegal=1`). Its conditional-branch composition must be mapped
-before admission. The post-loop BRC reload has separate write-stage
-ownership, as described below.
+`03:c84a` reaches Execute once. The internal delayed branch `fa42` at
+`03:c852` and its join at `03:c85e` each reach Execute 510 times. The next
+stop is unsupported `ed1e` at `03:cfb7` (live/terminal PC `03:cfb9`,
+`illegal=1`). Its instruction contract remains to be decoded. The post-loop
+BRC reload has separate write-stage ownership, as described below.
 The intervening indirect PMST and repeat-control restore exclusions are
 covered by the bounded tests below.
 The preceding PMST exclusion was `POPD *AR7` at logical `03:1f02`:
@@ -58,6 +58,32 @@ These now reach Execute in the original sequence, not just Decode
 admission. A moved Decode frontier alone is not retirement evidence.
 
 ## Retained recorder execution contracts
+
+### Delayed internal block branches
+
+The original `BCD c85e,AGEQ` at `03:c852` has delay words `5692` and
+`578a` at `03:c854..c855`, entirely inside the block `03:c851..c862`.
+Both delay words execute regardless of the captured predicate. Admission
+is limited to signed accumulator conditions with an internal target and
+the complete delay span strictly before the endpoint. A taken redirect
+restarts speculative Fetch accounting from the Decode-owned BRC without
+consuming an extra iteration; it does not reset the architectural count.
+
+`rptb-bcd` passes 3,072 cases/restores: 12 signed A/B predicates, counts
+0/1/2/7, four source patterns, two one-word delay operations or one two-word
+operation, two pages and four snapshots. It checks ordered source reads,
+one selected-arm write per iteration, both delay words, final pointers,
+status and count. Delay arithmetic can change the tested accumulator
+after its decision; source RAM changes after Read cannot change the
+captured word. Existing nondelayed/negative/backward block-branch,
+delayed-call and interrupt-loop profiles pass separately. This fixture
+does not establish its own IRQ/NMI composition, endpoint-overlapping delay
+spans, outside-block targets or physical phase timing.
+
+Passive original Execute counts are 510 at the branch, 510 at its first
+delay address, 8,702 at the second delay address and 510 at the join. The
+extra second-address visits are not classified by this observer; these
+totals must not be interpreted as a paired per-branch execution trace.
 
 ### Reverse-carry MAR
 
@@ -310,7 +336,7 @@ The [core regression checkpoint](#core-regression-checkpoint) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.
-The tool suite passes 2,850 tests with one skip; the native 5110
+The tool suite passes 2,851 tests with one skip; the native 5110
 save-state round trip and exact original recorder resident-memory comparison
 also pass. The first 128 ordered low-page reads remain unchanged.
 
