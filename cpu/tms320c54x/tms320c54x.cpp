@@ -90,6 +90,11 @@ constexpr bool staged_call(u16 word)
 	return word == 0xf074 || word == 0xf274;
 }
 
+constexpr bool staged_software_intr(u16 word)
+{
+	return (word & 0xffe0) == 0xf7c0;
+}
+
 constexpr bool staged_far_branch(u16 word)
 {
 	return (word & 0xff80) == 0xf880; // Non-delayed FB only.
@@ -2597,6 +2602,12 @@ void tms320c54x_device::pipeline_step()
 		if (entry_stage == 1) m_pc = m_pipeline_return_pc;
 		interrupt_entry_step();
 	}
+	// INTR's vector Prefetch precedes this clock's older Execute writes.
+	// This preserves the IPTR setup latency in SPRU131G table 7-26.
+	bool const software_intr_prefetch = m_pipeline_valid[3] && staged_software_intr(m_pipeline_word[3]);
+	u32 const software_intr_target = software_intr_prefetch ? (m_pipeline_address[3] & 0x7f0000) |
+		(m_pmst & 0xff80) | ((m_pipeline_word[3] & 31) << 2) : 0;
+	u32 const software_intr_physical = software_intr_prefetch ? physical_program_address(software_intr_target) : 0;
 	if (m_pipeline_valid[1])
 	{
 		u32 const address = m_pipeline_address[1];
@@ -2730,6 +2741,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
+			if (!m_pipeline_decode_remaining && staged_software_intr(word)) { logerror("%s: staged software INTR in a control delay is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (staged_conditional_return(word)) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_t_memory_operation(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_accumulator_store(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
@@ -2793,6 +2805,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
+		bool const software_intr = staged_software_intr(word);
 		bool const short_repeat = staged_short_repeat(word);
 		if (m_pipeline_valid[2] && short_repeat)
 		{
@@ -2863,7 +2876,7 @@ void tms320c54x_device::pipeline_step()
 		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
 		bool const forward_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !BIT(word, 9))) &&
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_address[2] + 2 && block_branch_target <= m_pipeline_block_end_address;
-		if (m_pipeline_valid[2] && block_word && ((branch && !forward_block_branch) || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		if (m_pipeline_valid[2] && block_word && ((branch && !forward_block_branch) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			word == 0xf070 || word == 0x47f8 || word == 0x771a || short_repeat || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -2874,7 +2887,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_brc = word == 0x771a;
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || staged_timer_control(word);
-		if (m_pipeline_valid[2] && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && word != 0x47f8 && !staged_immediate_arp(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -3370,6 +3383,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}
+	if (m_pipeline_valid[4] && staged_software_intr(m_pipeline_word[4]))
+	{
+		unsigned const vector = m_pipeline_word[4] & 31;
+		m_st1 |= 0x0800;
+		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
+	}
 	if (m_pipeline_valid[4] && staged_t_memory_operation(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf000) == 0x2000)
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
@@ -3589,6 +3608,8 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid.fill(false);
 			if (m_nmi_pending || (m_ifr & m_imr)) leave_idle();
 		}
+		else if (staged_software_intr(m_op))
+			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
 		else if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
 		else if (staged_conditional_return(m_op))
@@ -4020,6 +4041,23 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
 		m_pipeline_flush_front = false;
 	}
+	if (software_intr_prefetch)
+	{
+		// Allocate after older Read-owned SP updates, as for hardware entry.
+		m_pipeline_operand_address[3] = --m_sp;
+		m_interrupt_vector_pc = u16(software_intr_target);
+		m_pipeline_fetch_address = software_intr_target;
+	}
+	if (m_pipeline_valid[2] && staged_software_intr(m_pipeline_word[2]))
+	{
+		if (m_interrupt_entry_stage || m_pipeline_vector_pending) { logerror("%s: overlapping staged software interrupt entry is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+		m_pipeline_immediate[2] = u16(m_pipeline_address[2] + 1);
+		m_rtn = m_pipeline_immediate[2];
+		m_pipeline_control_address = m_pipeline_address[2];
+		m_pipeline_control_words = 1;
+		m_pipeline_decode_flush = 2;
+		m_pipeline_vector_pending = true;
+	}
 	// SPRU172C 4-116: MVMM reads in Decode and writes in Access.
 	// Order both after older publications; forward an Access write to a
 	// younger Decode read without resampling the older move's operand.
@@ -4062,7 +4100,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
 		// SPRU131G 7.5.9: program mapping belongs to Prefetch, not Fetch.
-		m_pipeline_physical_address[0] = physical_program_address(m_pipeline_fetch_address);
+		m_pipeline_physical_address[0] = software_intr_prefetch ? software_intr_physical : physical_program_address(m_pipeline_fetch_address);
 		m_pipeline_valid[0] = true;
 		m_pipeline_block_first_final[0] = m_pipeline_block_end[0] = false;
 		m_pipeline_block_body[0] = false;

@@ -12,6 +12,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_software_intr_scope(self):
+        marker, ending = EXTRA_PROFILES['software-intr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='software-intr')
+        for bad in (output.replace('restore=256', 'restore=0'),
+                    output.replace('frame_writes=1', 'frame_writes=2'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='software-intr')
+
     def test_block_branch_exclusions_and_existing_controls(self):
         for name in ('rptb-br-edges', 'signed-branch', 'tc-branch', 'bio-branch', 'plain-branch'):
             marker, ending = EXTRA_PROFILES[name]

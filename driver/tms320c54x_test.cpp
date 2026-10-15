@@ -8542,6 +8542,39 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254380;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_software_intr(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 64 ? 0x20000 : 0;
+		unsigned const vector = variant % 32;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0xf7c0 | vector);
+		program.write_word(base + 0x601, 0x890f);
+		program.write_word(base + 0x602, 0xf4e1);
+		program.write_word(base + 0x100 + vector * 4, 0x880e);
+		program.write_word(base + 0x101 + vector * 4, 0xfc00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant & 32 ? 0x900 : 0x100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1111);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2222);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "software_intr_read", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x2fff && word == 0x601 && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == 9, "Software INTR return reads exactly its own continuation at Read"); });
+		// SPRU172C RET[D]: nondelayed RET takes five cycles, so the continuation executes at 15.
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "software_intr_write", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; bool const valid = i < 3 && at == std::array<unsigned, 3>{0x2fff, 0x0e, 0x0f}[i] && word == std::array<u16, 3>{0x601, 0x789a, 0x9876}[i] && m_cpu->pipeline_cycles() == std::array<unsigned, 3>{6, 9, 15}[i]; if (!valid) osd_printf_info("software_intr_write: case=%u replay=%u index=%u address=%04x word=%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), i, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles()); expect(valid, "Software INTR publishes one frame, handler result and return result at their Execute clocks"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254400;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct immediate_multiply_fixture
 	{
 		bool producer, source, destination;
@@ -11151,6 +11184,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "software-intr")) { start_software_intr(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-br-edges")) { start_block_branch_edge(); return; }
 		if (!strcmp(machine().options().bios(), "signed-branch")) { start_pipeline_signed_branch(); return; }
 		if (!strcmp(machine().options().bios(), "tc-branch")) { start_pipeline_tc_branch(); return; }
@@ -37709,6 +37743,29 @@ private:
 		}
 		if (m_phase == 254370) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 254371; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254400)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 128 ? 5 : 3;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Software INTR executes without atomic fallback");
+			u32 const base = variant & 64 ? 0x20000 : 0;
+			if (tick == 3) { expect(m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601, "Software INTR captures RTN at Decode"); m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xf495); }
+			if (tick == 5) m_cpu->space(AS_PROGRAM).write_word(base + 0x100 + (variant % 32) * 4, 0xf495);
+			if (tick == 9) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x2fff, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained software interrupt entry"); }
+			if (tick == 32)
+			{
+				unsigned const vector = variant % 32;
+				expect(m_cpu->state_int(STATE_GENPC) == base + 0x603 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x100 && m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Software INTR preserves program page, configuration and arithmetic state");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x789a && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x9876 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == (vector < 16 ? 0xffff : 0xffff ^ (1U << (vector - 16))), "Software INTR masks interrupts, clears only its IFR bit and returns to the preserved page");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay software interrupt without duplicate frame or handler writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254410; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 255) { start_software_intr(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged software INTR: PASS cases=256 restore=256 vectors=32 masks=2 pages=2 snapshots=2 frame_writes=1 return_reads=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated software INTR complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254410) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254400; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254380)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 16 ? 3 : 8;
@@ -39194,6 +39251,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(94, "tc-branch", "Existing TC branch controls")
 	ROM_SYSTEM_BIOS(95, "bio-branch", "Existing BIO branch controls")
 	ROM_SYSTEM_BIOS(96, "plain-branch", "Existing held-word conditional branch controls")
+	ROM_SYSTEM_BIOS(97, "software-intr", "Retained software interrupt entry and return")
 ROM_END
 
 ROM_START(tms54rom4)

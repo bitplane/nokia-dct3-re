@@ -13,7 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-software INTR 25 (`f7d9`) at `02:9c74` (live PC `02:9c76`). Forward
+the memory load at `02:9edc` (`1281`, source `002a`), whose peripheral
+source is not yet admitted by the staged frontend. Software INTR 25
+(`f7d9`) at `02:9c74` now executes. Forward
 near B/BC control flow in the recorder's block `02:a0ea..02:a0fd` now
 executes with retained loop metadata. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
@@ -1659,6 +1661,19 @@ branches to `02:9a32`. This software invocation is not proof of a physical
 host transaction. The next acceptance contract must identify the original
 consumer's command/data inputs and verify its output beyond the initial DIN
 prefix; traffic volume alone is not audio correctness.
+
+The retained frontend has a separate `software-intr` acceptance profile:
+256 cases and restores cover all 32 vectors, both initial INTM states,
+pages 0/2 and snapshots at Decode/vector Fetch. With IPTR `0100` and
+IMR zero, the fixture checks one frame write at clock 6, handler Execute
+at 9, one RET stack read at 9, and continuation Execute at 15 (RET takes
+five cycles). Changing the source opcode, fetched handler word and
+already-read stack word cannot change retained execution. Arithmetic
+state, PMST and page are preserved; INTM is set and only the selected
+maskable IFR bit is cleared. These are manual-derived pipeline projections,
+not measured silicon phases. IPTR-producer latency, nested software entry,
+pin-level IACK and INTR inside repeats/control delays are not accepted by
+this fixture; MAME's external IRQ-source callback is not a physical IACK pin.
 
 ### Streaming worker mode and software dispatch
 
@@ -3325,8 +3340,9 @@ T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
 executes, sending the first acknowledgement word to the modeled serial
 transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
 (`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
-inside `02:a0ea..02:a0fd`. The next stop is software INTR 25 (`f7d9`)
-at `02:9c74` (live PC `02:9c76`); all
+inside `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at `02:9c74`
+now executes; the next stop is the peripheral-source memory load
+`1281` at `02:9edc`, source `002a`. All
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3620,8 +3636,9 @@ acknowledgement `007f,0001,0055`. ABS A,A/B,B (`f485`/`f785`) at
 immediate 300) at `03:95b5` now execute. Original firmware enters the
 recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
 decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
-inside block `02:a0ea..02:a0fd`. The next stop is software INTR 25
-(`f7d9`) at `02:9c74`, with live PC `02:9c76`. Guard diagnostics report
+inside block `02:a0ea..02:a0fd`. Software INTR 25 (`f7d9`) at
+`02:9c74` now executes; the next stop is `1281` at `02:9edc`,
+reading peripheral source `002a`. Guard diagnostics report
 the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,
 not nine parsed commands. This acknowledgement is not a completed command
