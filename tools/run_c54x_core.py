@@ -312,6 +312,34 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rptb-br-edges": (
+        "TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 backward_targets=1 outside_targets=1 delayed_control=1 calls=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated in-block branch exclusions complete",
+    ),
+    "signed-branch": (
+        "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
+        "Fatal error: TMS320C54x isolated signed branches complete",
+    ),
+    "tc-branch": (
+        "TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0",
+        "Fatal error: TMS320C54x isolated TC branches complete",
+    ),
+    "bio-branch": (
+        "TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated BIO branches complete",
+    ),
+    "plain-branch": (
+        "TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0",
+        "Fatal error: TMS320C54x isolated plain conditional branches complete",
+    ),
+    "rptb": (
+        "TMS320C54x staged RPTB: PASS cases=6144 irq_nmi_cases=24 restore=6168 counts=0,1,2,7 zero_overhead_body=5 counter=Decode final_braf=Decode silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated RPTB complete",
+    ),
+    "rptb-branch": (
+        "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated in-block branches complete",
+    ),
     "mpy-mem-imm": (
         "TMS320C54x memory immediate MPY: PASS cases=106496 restore=106496 forms=13 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated memory immediate MPY complete",

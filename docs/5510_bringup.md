@@ -13,8 +13,9 @@ The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. Execution stops at
-conditional branch `f84b a0f4` at `02:a0ef` because control flow inside
-the active block `02:a0ea..02:a0fd` remains excluded. Output words
+software INTR 25 (`f7d9`) at `02:9c74` (live PC `02:9c76`). Forward
+near B/BC control flow in the recorder's block `02:a0ea..02:a0fd` now
+executes with retained loop metadata. Output words
 `0580,0a09` are not decoded audio. No complete staged boot, service
 transaction or physical DA150 mapping is established.
 
@@ -111,18 +112,19 @@ not permission to borrow another handset's keypad or UI completion events.
 ## Core regression checkpoint
 
 The CPU at `1a790619` passes the full 288-marker native core regression,
-all 74 named isolated profiles in `tools/run_c54x_core.py`, and all seven
+all 74 named isolated profiles registered at that checkpoint, and all seven
 additional runner scopes: `--bus-registers`, `--bus-io`, `--atomic-io`,
 `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
-Native 5110 save-state restoration also passes. The complete tool suite
-runs 2,788 tests with one skip; its 80 core-result verifier tests pass.
+Native 5110 save-state restoration also passes. At that checkpoint the tool
+suite ran 2,788 tests with one skip, including 80 core-result verifier tests.
 SIP lifecycle unit tests require local loopback socket permission.
 
 This is the shared regression checkpoint for the instruction contracts
 below, superseding their earlier focused-only acceptance notes. It does
 not expand any fixture's declared opcode, composition, physical timing,
-bus ownership or handset-feature scope. In particular, the staged
-in-block branch exclusion remains intact, and no native speech is claimed.
+bus ownership or handset-feature scope. The subsequent forward in-block
+branch change has the focused acceptance below, not a fresh full-core or
+all-profile claim. No native speech is claimed.
 
 ## Reproducible input normalization
 
@@ -3322,9 +3324,9 @@ Long-offset AND (`18e2 1462`) at `03:9dff` and mapped MVMD (`730e 0011`,
 T to AR1) at `03:9ba2` now execute. MVDD (`e501`) at `03:9c70` also
 executes, sending the first acknowledgement word to the modeled serial
 transmitter. ABS A,A/B,B at `02:e5e5`/`02:e5e7` and MPY
-(`62f8 0008 012c`) at `03:95b5` now execute. The next stop is conditional
-branch `f84b a0f4` at `02:a0ef`, rejected inside the active repeat block
-`02:a0ea..02:a0fd` (live PC `02:a0f2`); all
+(`62f8 0008 012c`) at `03:95b5` now execute, as does forward branching
+inside `02:a0ea..02:a0fd`. The next stop is software INTR 25 (`f7d9`)
+at `02:9c74` (live PC `02:9c76`); all
 48,261 program and 3,656 compared data words still match. This remains
 partial resident initialization, not full boot or decoded audio.
 The register-save loop is `STM #000b,AR7; RPT #000b; PSHD *AR7+`:
@@ -3617,10 +3619,10 @@ acknowledgement `007f,0001,0055`. ABS A,A/B,B (`f485`/`f785`) at
 `02:e5e5`/`02:e5e7` and MPY (`62f8 0008 012c`, mapped AL times
 immediate 300) at `03:95b5` now execute. Original firmware enters the
 recorder routine at `02:9e90` and emits words `0580,0a09`; these are not
-decoded audio. The next stop is the in-block control-flow guard at
-`02:a0ef` (`f84b a0f4`), inside block `02:a0ea..02:a0fd`.
-The diagnostic now reports decoded instruction and block addresses:
-live PC `02:a0f2` does not identify the rejected instruction.
+decoded audio. The conditional `f84b a0f4` at `02:a0ef` now executes
+inside block `02:a0ea..02:a0fd`. The next stop is software INTR 25
+(`f7d9`) at `02:9c74`, with live PC `02:9c76`. Guard diagnostics report
+the decoded instruction separately from the potentially ahead live PC.
 The input cursor is 9/50 delivered words,
 not nine parsed commands. This acknowledgement is not a completed command
 transaction, and the physical DA150 register map remains unverified.
@@ -3661,6 +3663,41 @@ MVDD also pass (six profiles including the new fixture), along with
 evidence validation and native 5110 restoration. No new
 CPU saved fields are introduced. The shared broad checkpoint also covers
 these profiles without promoting untested compositions.
+
+Forward near B and nondelayed BC now retain block-loop ownership. The
+two-word branch must finish before REA and target the same block at or
+after its sequential continuation. A taken redirect reconstructs the
+discarded endpoint-fetch prediction from Decode-owned BRC. An untaken
+BC restores its held word's body/endpoint/final-first tags alongside its
+word and address. Those three additional saved booleans belong to the
+CPU's pending instruction state; they are reset and registered for replay.
+BRC decrement and final-iteration BRAF timing remain as specified by
+SPRU131G sections 6.8/7.5.8.
+
+The `rptb-branch` fixture passes 12,288 cases/restores across a two-arm
+join and a BC immediately before an endpoint NOP, counts 0/1/2/7, four
+taken/untaken patterns, both accumulators, two pages, eight save points,
+four IRQ/NMI arrival clocks and an uninterrupted control. Source and
+selected-arm writes occur once per iteration, with exact terminal
+counters, pointers, status and one balanced interrupt frame when requested.
+A later ordinary branch clears the held tags before replay, requiring
+restoration of the earlier loop-owned tags. Pin arrivals are allowed to
+settle before a coincident save, and restored pin changes settle before
+CPU resumption. These are declared model clocks, not measured silicon
+phases.
+
+The `rptb-br-edges` fixture passes 32 fail-closed replay cases for backward
+and out-of-block targets, delayed control, calls, nested blocks and far
+branches, with no control frame or body write. Branches occupying the
+endpoint, XC/IDLE in the block and software loop-control modification
+remain excluded by the existing RPTB guards. Original RPTB/IRQ/NMI and
+edge controls, ordinary accumulator/TC/BIO/held-word branches, conditional
+call/return, stack-IRQ round trips, IPTR/prefetch and repeated POPD pass
+(14 profiles total including the new fixtures). All 82 core-result tests,
+the 2,790-test tool suite (one skip), evidence validation and native 5110
+restoration pass. The shared broad baseline remains the versioned
+checkpoint above. Backward/outside/call/delayed compositions and physical
+silicon phase claims are not promoted.
 
 All 48,261 program and
 3,656 compared resident data words still match. This remains partial

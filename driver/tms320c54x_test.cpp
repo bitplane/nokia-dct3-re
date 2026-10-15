@@ -8480,6 +8480,68 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254340;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static unsigned block_branch_count(unsigned variant) { return std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; }
+	static u16 block_branch_source(unsigned variant, unsigned i)
+	{
+		unsigned const pattern = (variant / 4) % 4;
+		return pattern == 0 ? 0 : pattern == 1 ? 1 : pattern == 2 ? i & 1 : i == block_branch_count(variant) ? 0 : 1;
+	}
+	void start_block_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const interrupt = variant / 4096;
+		bool const endpoint = (variant / 16) % 2, b = (variant / 32) % 2;
+		u32 const base = (variant / 64) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, endpoint ? 0x607 : 0x60d);
+		program.write_word(base + 0x602, b ? 0x1192 : 0x1092);
+		if (endpoint)
+		{
+			program.write_word(base + 0x603, 0x7693); program.write_word(base + 0x604, 0x1111);
+			program.write_word(base + 0x605, b ? 0xf84d : 0xf845); program.write_word(base + 0x606, 0x607); program.write_word(base + 0x608, 0xf4e1);
+		}
+		else
+		{
+			program.write_word(base + 0x603, b ? 0xf84d : 0xf845); program.write_word(base + 0x604, 0x60a);
+			program.write_word(base + 0x605, 0x7693); program.write_word(base + 0x606, 0x1111);
+			program.write_word(base + 0x607, 0xf073); program.write_word(base + 0x608, 0x60c);
+			program.write_word(base + 0x60a, 0x7693); program.write_word(base + 0x60b, 0x2222);
+			program.write_word(base + 0x60c, b ? 0xf300 : 0xf000); program.write_word(base + 0x60d, 1);
+		}
+		// A later ordinary branch replaces the held tags before restoration,
+		// so replay must recover the saved in-block tags rather than stale ones.
+		unsigned const tail = endpoint ? 0x608 : 0x60e;
+		program.write_word(base + tail, b ? 0xf84a : 0xf842); program.write_word(base + tail + 1, tail + 2); program.write_word(base + tail + 2, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt == 1 ? 0x100 : 0x900);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt == 1 ? 4 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		unsigned const vector = interrupt == 2 ? 4 : 0x48; program.write_word(base + vector, 0xf495); program.write_word(base + vector + 1, 0xf4eb);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2345); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5100); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, block_branch_count(variant));
+		for (unsigned i = 0; i <= block_branch_count(variant); ++i) { data.write_word(0x5000 + i, block_branch_source(variant, i)); data.write_word(0x5100 + i, 0xaaaa); }
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_vector_acks = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_branch_read", [this, variant, interrupt](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(interrupt && !m_fast_stack_reads && m_pipeline_register_writes == 1 && word >= 0x602 && word <= 0x610, "Block branch RETE consumes its retained foreground continuation once"); ++m_fast_stack_reads; return; } unsigned const i = m_pipeline_operand_reads++; expect(i <= block_branch_count(variant) && at == 0x5000 + i && word == block_branch_source(variant, i), "Block branches consume exactly count-plus-one ordered source words"); expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == block_branch_count(variant) - i && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (i < block_branch_count(variant)), "Branch redirects preserve Decode-owned BRC and final-iteration BRAF"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_branch_write", [this, variant, endpoint, interrupt](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(interrupt && !m_pipeline_register_writes && word >= 0x602 && word <= 0x610, "Block branch interrupt stacks one unexecuted foreground continuation"); ++m_pipeline_register_writes; return; } unsigned const i = m_pipeline_store_writes++; bool const valid = i <= block_branch_count(variant) && at == 0x5100 + i && word == (!endpoint && !block_branch_source(variant, i) ? 0x2222 : 0x1111); if (!valid) osd_printf_info("block_branch_write: case=%u replay=%u i=%u address=%04x word=%04x cycle=%llu\n", variant, unsigned(m_pipeline_replay), i, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles()); expect(valid, "Only the selected block arm publishes once per iteration"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254360;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_block_branch_edge(unsigned variant = 0)
+	{
+		start_block_branch(variant & 8 ? 64 : 0);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		u32 const base = variant & 8 ? 0x20000 : 0;
+		unsigned const kind = variant % 8;
+		m_cpu->space(AS_PROGRAM).write_word(base + 0x603, std::array<u16, 8>{0xf073, 0xf073, 0xf273, 0xf845, 0xf845, 0xf074, 0xf072, 0xf880}[kind]);
+		m_cpu->space(AS_PROGRAM).write_word(base + 0x604, kind == 0 || kind == 3 ? 0x602 : kind == 1 || kind == 4 ? 0x700 : 0x60a);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_branch_edge_read", [this](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x5000 && !m_pipeline_operand_reads, "Rejected block control permits only an older legal source read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_branch_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254380;
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct immediate_multiply_fixture
 	{
 		bool producer, source, destination;
@@ -11089,6 +11151,12 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-br-edges")) { start_block_branch_edge(); return; }
+		if (!strcmp(machine().options().bios(), "signed-branch")) { start_pipeline_signed_branch(); return; }
+		if (!strcmp(machine().options().bios(), "tc-branch")) { start_pipeline_tc_branch(); return; }
+		if (!strcmp(machine().options().bios(), "bio-branch")) { start_pipeline_bio_branch(); return; }
+		if (!strcmp(machine().options().bios(), "plain-branch")) { start_pipeline_plain_branch(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
@@ -32217,6 +32285,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 47) { start_pipeline_plain_branch(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0\n");
+				if (!strcmp(machine().options().bios(), "plain-branch")) throw emu_fatalerror(0, "TMS320C54x isolated plain conditional branches complete");
 				start_pipeline_delayed_return(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -34594,6 +34663,7 @@ private:
 				if (variant < 255) { start_pipeline_bio_branch(variant + 1); return; }
 				m_bio_level = 1;
 				osd_printf_info("TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "bio-branch")) throw emu_fatalerror(0, "TMS320C54x isolated BIO branches complete");
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				start_pipeline_mmr_move(); return;
 			}
@@ -35082,6 +35152,7 @@ private:
 				if (variant < 1535) { start_pipeline_tc_branch(variant + 1); return; }
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				osd_printf_info("TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0\n");
+				if (!strcmp(machine().options().bios(), "tc-branch")) throw emu_fatalerror(0, "TMS320C54x isolated TC branches complete");
 				start_pipeline_long_rmw(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -35357,6 +35428,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 12287) { start_pipeline_signed_branch(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0\n");
+				if (!strcmp(machine().options().bios(), "signed-branch")) throw emu_fatalerror(0, "TMS320C54x isolated signed branches complete");
 				start_pipeline_signed_branch_producer(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -37614,6 +37686,45 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254360)
+		{
+			// Input changes are scheduler events, not yet saved CPU latches.
+			// Defer a coincident snapshot until the next emulated clock.
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = block_branch_count(variant), interrupt = variant / 4096, arrival = std::array<unsigned, 4>{9, 10, 12, 14}[(variant / 1024) % 4], requested_checkpoint = std::array<unsigned, 8>{3, 8, 9, 10, 11, 12, 15, 24}[(variant % 1024) / 128], checkpoint = requested_checkpoint + unsigned(interrupt && requested_checkpoint == arrival);
+			bool const endpoint = (variant / 16) % 2, b = (variant / 32) % 2;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Forward block branches must use owned branch and loop state");
+			if (interrupt && tick == arrival) m_cpu->set_input_line(interrupt == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads, m_vector_acks}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save in-block branch decisions, held words and speculative loop state"); }
+			if (tick == 256)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5001 + count && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5101 + count && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (interrupt ? 0x100 : 0x900) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_pipeline_register_writes == unsigned(bool(interrupt)) && m_fast_stack_reads == unsigned(bool(interrupt)) && m_vector_acks == unsigned(bool(interrupt)), "In-block branches complete the loop once with exact counters, pointers, interrupt frame and status");
+				expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == block_branch_source(variant, count) + unsigned(!endpoint) && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (b ? 0x1234 : 0x2345), "Both branch arms join the endpoint without corrupting the other accumulator");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_vector_acks = m_recurring_irq_snapshot[4]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay block branches without duplicate body reads or writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254370; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 12287) { start_block_branch(variant + 1); return; }
+				osd_printf_info("TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated in-block branches complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254370) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 254371; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 254380)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 16 ? 3 : 8;
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before excluded in-block control decoding"); }
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_store_writes, "Unaccepted in-block control remains fail-closed without a control frame or body write");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded branch without atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254390; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 31) { start_block_branch_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 backward_targets=1 outside_targets=1 delayed_control=1 calls=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated in-block branch exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 254390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254120)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 65536; auto const f = xmem_load_case(variant);
@@ -38421,6 +38532,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
 		if (m_phase == 254140) { auto const &f = m_mvdd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "MVDD acknowledges IRQ/NMI only after the final retained destination write"); ++m_vector_acks; }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
@@ -39076,6 +39188,12 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(88, "absolute", "Staged accumulator ABS conformance")
 	ROM_SYSTEM_BIOS(89, "mpy-mem-imm", "Retained memory and immediate multiply")
 	ROM_SYSTEM_BIOS(90, "mpy-t-imm", "Existing T and immediate multiply control")
+	ROM_SYSTEM_BIOS(91, "rptb-branch", "Forward near branches inside block repeats")
+	ROM_SYSTEM_BIOS(92, "rptb-br-edges", "In-block branch exclusions")
+	ROM_SYSTEM_BIOS(93, "signed-branch", "Existing accumulator branch controls")
+	ROM_SYSTEM_BIOS(94, "tc-branch", "Existing TC branch controls")
+	ROM_SYSTEM_BIOS(95, "bio-branch", "Existing BIO branch controls")
+	ROM_SYSTEM_BIOS(96, "plain-branch", "Existing held-word conditional branch controls")
 ROM_END
 
 ROM_START(tms54rom4)

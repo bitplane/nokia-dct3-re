@@ -1164,6 +1164,9 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_bc_held));
 	save_item(NAME(m_pipeline_bc_word));
 	save_item(NAME(m_pipeline_bc_address));
+	save_item(NAME(m_pipeline_bc_block_body));
+	save_item(NAME(m_pipeline_bc_block_end));
+	save_item(NAME(m_pipeline_bc_block_first_final));
 	save_item(NAME(m_pipeline_retd_stage));
 	save_item(NAME(m_pipeline_retd_words));
 	save_item(NAME(m_pipeline_retd_addresses));
@@ -2337,6 +2340,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_bc_held = false;
 	m_pipeline_bc_word = 0;
 	m_pipeline_bc_address = 0;
+	m_pipeline_bc_block_body = m_pipeline_bc_block_end = m_pipeline_bc_block_first_final = false;
 	m_pipeline_retd_stage = 0;
 	m_pipeline_retd_words.fill(0);
 	m_pipeline_retd_addresses.fill(0);
@@ -2661,6 +2665,9 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_bc_held = m_pipeline_valid[2];
 		m_pipeline_bc_word = m_pipeline_word[2];
 		m_pipeline_bc_address = m_pipeline_address[2];
+		m_pipeline_bc_block_body = m_pipeline_block_body[2];
+		m_pipeline_bc_block_end = m_pipeline_block_end[2];
+		m_pipeline_bc_block_first_final = m_pipeline_block_first_final[2];
 		m_pipeline_valid[2] = false;
 	}
 	if (m_pipeline_valid[4] && staged_conditional_branch(m_pipeline_word[4]) && !BIT(m_pipeline_word[4], 9))
@@ -2674,12 +2681,18 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 			m_pipeline_decode_flush = 1; // Discard the already fetched i5 next clock.
 			m_pipeline_fetch_address = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
+			// Discard endpoint predictions belonging to the annulled path.
+			// Decode still owns BRC; the redirected path starts in this iteration.
+			if (m_pipeline_block_body[4]) m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 		}
 		else if (m_pipeline_bc_held)
 		{
 			m_pipeline_valid[2] = true;
 			m_pipeline_word[2] = m_pipeline_bc_word;
 			m_pipeline_address[2] = m_pipeline_bc_address;
+			m_pipeline_block_body[2] = m_pipeline_bc_block_body;
+			m_pipeline_block_end[2] = m_pipeline_bc_block_end;
+			m_pipeline_block_first_final[2] = m_pipeline_bc_block_first_final;
 		}
 		m_pipeline_bc_held = false;
 	}
@@ -2847,7 +2860,10 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = staged_banz(word) || word == 0xf072 || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || staged_accumulator_near_branch(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word) || staged_accumulator_far_branch(word)));
 		bool const block_setup = word == 0xf072;
 		bool const block_word = m_pipeline_block_body[2];
-		if (m_pipeline_valid[2] && block_word && (branch || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
+		bool const forward_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !BIT(word, 9))) &&
+			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_address[2] + 2 && block_branch_target <= m_pipeline_block_end_address;
+		if (m_pipeline_valid[2] && block_word && ((branch && !forward_block_branch) || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			word == 0xf070 || word == 0x47f8 || word == 0x771a || short_repeat || staged_xc(word) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -2981,6 +2997,7 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G examples 7-2/3: the target word's Access starts target
 		// Prefetch; the following two sequential words are delay or flush slots.
 		m_pipeline_fetch_address = (staged_far_branch(m_pipeline_word[3]) || staged_far_call(m_pipeline_word[3]) ? u32(m_pipeline_word[3] & 0x7f) << 16 : m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+		if (m_pipeline_block_body[3]) m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 		if (staged_call(m_pipeline_word[3])) m_rtn = m_pipeline_immediate[3];
 		if (staged_far_call(m_pipeline_word[3])) m_pipeline_far_call_stack[3] = --m_sp;
 	}

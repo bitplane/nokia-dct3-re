@@ -335,6 +335,9 @@ private:
 	bool m_pipeline_bc_held = false;
 	u16 m_pipeline_bc_word = 0;
 	u32 m_pipeline_bc_address = 0;
+	bool m_pipeline_bc_block_body = false;
+	bool m_pipeline_bc_block_end = false;
+	bool m_pipeline_bc_block_first_final = false;
 	u8 m_pipeline_retd_stage = 0;
 	std::array<u16, 2> m_pipeline_retd_words = {};
 	std::array<u32, 2> m_pipeline_retd_addresses = {};

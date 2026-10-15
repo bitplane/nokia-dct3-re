@@ -85,9 +85,10 @@ cases and an unchanged NEG control. MPY (`62f8 0008 012c`, mapped AL
 times immediate 300) at `03:95b5` now executes through retained
 memory/immediate operands, with Read-owned T publication and 106,496
 replay cases. The original recorder routine at `02:9e90` is entered and
-output words `0580,0a09` are observed. The next stop is the existing
-in-block control-flow exclusion: conditional branch `f84b a0f4` at
-`02:a0ef`, in block `02:a0ea..02:a0fd` (live PC `02:a0f2`).
+output words `0580,0a09` are observed. Forward near B/BC inside
+`02:a0ea..02:a0fd` now executes, with 12,288 IRQ/NMI/replay cases and
+32 exclusion cases. The next stop is software INTR 25 (`f7d9`) at
+`02:9c74` (live PC `02:9c76`).
 This is not a complete command transaction or native
 audio, and the physical DA150 register map remains unverified.
 The exact resident program/data comparison still passes; this is not full boot.
@@ -129,12 +130,15 @@ worker is entered by FCALL at `02:993d`, not directly by this near call.
 Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. The CPU at `1a790619` passes the full 288-marker regression,
-all 74 named isolated profiles, all seven legacy runner scopes and native
+all 74 then-registered isolated profiles, all seven legacy runner scopes and native
 5110 save-state restoration. The tool suite runs 2,788 tests with one skip,
 including 80 passing core-result verifier tests. See the authoritative
 [core regression checkpoint](5510_bringup.md#core-regression-checkpoint).
 These checks establish the declared execution models, not full MU4 boot,
-the physical DA150 map, in-block branch support or native speech.
+the physical DA150 map or native speech. Subsequent forward in-block
+branch acceptance is focused: 14 profiles, 82 verifier tests, the complete
+2,790-test tool suite (one skip) and native 5110 restoration pass; no new
+full-suite claim is made for that CPU change.
 
 [TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
@@ -3972,8 +3976,9 @@ LDM reads. The context tool pins the original nine-word sequence:
 `891a f495 f072 32f4 1386 f678 f3e8 f1a0 8196`.
 Its intervening NOP satisfies SPRU131G table 7-3 category 9's BRC-store
 spacing rule; the requested block spans `00:32f0`--`00:32f4`.
-Straight-line block execution now has bounded conformance below;
-delayed/nested/control-changing blocks remain outside it.
+Straight-line block execution and the forward near-branch subset have
+bounded conformance below; delayed/nested and other control-changing
+blocks remain outside it.
 Zero-gap LDM cases test the declared pipeline
 projection, not silicon forwarding or RPTB latency.
 
@@ -3999,15 +4004,32 @@ reads at clocks 9+5i and writes at 14+5i, with no loop padding. Twenty-four
 IRQ/NMI cases save before/through interrupt acceptance, use the existing
 same-page vector contract and return through RETE. Sixteen further replay
 cases cover one-word MAR and two-word LD endpoints and twelve fail-closed
-cases: delayed RPTBD, an in-block branch, STLM BRC, endpoints inside opcode
+cases: delayed RPTBD, a backward branch occupying the endpoint, STLM BRC, endpoints inside opcode
 or extension words, and an aliased STL to BRC. All block-prefetch tags,
 retained extension tags, active context and speculative count are saved.
 Terminal BRC remains zero in this declared model, matching the atomic
 frontend; exact silicon terminal-counter and phase behavior are not claimed.
-RPTBD, nested repeats, in-block branches/calls/XC/IDLE and loop-register
-modification latencies remain excluded. ISR-side loop-register replacement,
+RPTBD, nested repeats, in-block calls/XC/IDLE and loop-register
+modification latencies remain excluded. In-block branches are accepted
+only for the forward near B/nondelayed BC subset below. ISR-side loop-register replacement,
 wrapped endpoints and measured silicon timing remain unvalidated.
 These tests do not establish complete DSP startup or speech.
+
+Forward near B/BC may target the same block at or after the sequential
+continuation, but neither word of the branch may occupy REA. Taken
+redirects rebuild the discarded endpoint prediction from architectural
+BRC. Untaken BC restores held block tags, including a held endpoint;
+three pending-tag booleans are explicitly saved. The `rptb-branch` profile
+passes 12,288 replays over two layouts, counts 0/1/2/7, four data patterns,
+both accumulators, two pages, eight snapshots and IRQ/NMI arrivals at
+model clocks 9/10/12/14, plus uninterrupted controls. Each iteration has
+one source read and selected write, with Decode-owned BRC/BRAF and
+balanced ISR return. A later outside branch changes the held tags before
+restoration. Thirty-two `rptb-br-edges` cases preserve rejection of backward,
+outside, delayed, call, nested and far-branch compositions without a frame
+or body write. Forward branch interrupt composition is covered by these
+fixtures; arbitrary control flow, software BRC/BRAF changes and measured
+silicon timing are not.
 
 The original block has a concrete data oracle: `1386` is
 `LDU *AR6,B`; `f678` is `SFTA B,-8,A`; `f3e8` is

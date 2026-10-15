@@ -12,6 +12,27 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_block_branch_exclusions_and_existing_controls(self):
+        for name in ('rptb-br-edges', 'signed-branch', 'tc-branch', 'bio-branch', 'plain-branch'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
+    def test_in_block_branch_scope(self):
+        for name in ('rptb-branch', 'rptb'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('counter=Decode', 'counter=Execute').replace('brc_decode=1', 'brc_decode=0'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+
     def test_memory_immediate_multiply_scope(self):
         for name in ('mpy-mem-imm', 'mpy-t-imm', 'mpy-mapped'):
             marker, ending = EXTRA_PROFILES[name]
