@@ -2851,7 +2851,7 @@ void tms320c54x_device::pipeline_step()
 			bool const delay_store = staged_extended_accumulator_store(word);
 			bool const delay_load = staged_offset_load(word) && (word & 0xfe00) == 0x1000;
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
-			bool const delay_multiply = (word & 0xfe00) == 0x2000 &&
+			bool const delay_multiply = ((word & 0xfe00) == 0x2000 || (word & 0xf800) == 0x2800) &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			bool delay_compare = false;
 			bool delayed_block_owner = false;

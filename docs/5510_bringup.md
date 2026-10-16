@@ -48,11 +48,13 @@ occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
 its source is mapped BL, not RAM. Memory SUB `08f8` at `03:d309` now
 reads mapped BK (`0019`). Immediate store `76b2` at `03:df3e` now uses
 `*AR2+0` addressing. FCALAD B (`f7e7`) at `03:b3a2` also executes.
-Signed MAC `29f8` at `03:b305` now reads mapped BK (`0019`). The current
-exclusion is two-word MAC `28f8 0015` at `03:cc06`, reading mapped AR5 in
-the control delay owned by `fb83` at `03:cc04`. Live terminal PC is
-`03:cc08`; it is not the owning instruction address. NAND writes alone
-do not prove complete recording.
+Signed MAC `29f8` at `03:b305` now reads mapped BK (`0019`), and
+two-word MAC `28f8 0015` at `03:cc06` reads mapped AR5 in the FCALLD
+delay owned by `fb83 cb1e` at `03:cc04`. The current exclusion is
+`56e3 0010` at `02:a4d3`: DLD `*AR3($0010),A` filling both delay words
+of BD `f273 a4dc` at `02:a4d1`, inside the `a4cb..a4dd` block repeat.
+Live terminal PC is `02:a4d5`, not the owning instruction address;
+SP=`5cc4`, BRC=`000b`. NAND writes alone do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -90,6 +92,25 @@ other BK operand families, additional special registers, control-delay
 composition and physical silicon phase placement are not established here.
 The original recorder executes the BK MAC and reaches the separate
 control-delay exclusion in [Current boundary](#current-boundary).
+
+### Signed MAC/MAS in control delay words
+
+`--profile mac-delay` passes 147,456 cases and save/replays: all four
+signed accumulating operations, BD, taken/untaken BCD, CALLD, cross-page
+FCALLD and RETD; short, absolute RAM, absolute AR5 and offset sources;
+both destinations, sixteen T/memory pairs, eight FRCT/OVM/SMUL combinations,
+two pages and three checkpoints. Expected arithmetic independently rounds
+the accumulation/subtraction, not the product. The conditional branch
+decides from the original accumulator before the delay operation changes it.
+
+The fixture mutates the address literal after Fetch, the pointer after
+Access, and memory/T after Read. It checks one source read, retained T,
+unchanged other accumulator, overflow/saturation and stack/page ownership;
+the selected target copies the completed result. This reuses the existing
+MAC execution path and complete delay-word accounting, with no new CPU state.
+`mac-delay-edge` separately checks that a two-word MAC cannot start in the
+last one-word slot. Interrupt arrival during these MAC delays, waited
+memory and physical phase timing remain unvalidated.
 
 ### Software-saved repeat context
 
@@ -1358,6 +1379,12 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Aggregate acceptance includes these separately scoped checkpoints:
 
+- Control-delay MAC/MAS acceptance: `mac-delay` passes 147,456 cases
+  and save/replays; `mac-delay-edge` passes sixteen. The shared fixture's
+  `mpy-delay` and the controls `mpy-delay-edge`, `st-delay-edge`,
+  `add-delay` and `fcala-delay` also pass. Native 5110 save-state,
+  exact MU4 resident-memory comparison and 2,873 tooling tests (one skip)
+  pass. The full default population was not rerun for this delay admission.
 - BK MAC/MAS acceptance: `mac-bk` passes 98,304 cases and save/replays;
   the shared fixture's original `mac-smem` passes 73,728. The controls
   `arith-bk`, `arith-ar`, `add-bk`, `add-delay`, `fcala-delay`,
@@ -3114,8 +3141,9 @@ after Read and the literal after Fetch. The selected callee copies the
 product, verifying availability at the boundary as well as independent
 40-bit arithmetic, overflow/saturation, frame/page ownership and one source
 read. Sixteen `mpy-delay-edge` cases reject straddling instructions without
-data accesses or atomic fallback. Rounded/unsigned MPY, MAC/MAS and
-immediate-multiply delay compositions remain excluded. Exact stages remain
+data accesses or atomic fallback. The signed MAC/MAS extension is covered
+separately in [Signed MAC/MAS in control delay words](#signed-macmas-in-control-delay-words).
+Rounded/unsigned MPY and immediate-multiply delay compositions remain excluded. Exact stages remain
 manual-derived frontend projections, not silicon measurements.
 
 ### Streaming worker mode and software dispatch
@@ -4299,8 +4327,9 @@ pairs, 16 FRCT/OVM/SMUL/SXM combinations and three checkpoint positions.
 Rounding, product saturation, sticky target overflow, the untouched
 accumulator and absence of T/data republishing are checked. Later source,
 T and extension changes cannot alter the sampled inputs. SQUR's staged
-T side effect and repeat/control-delay MAC forms remain excluded; other
-accumulator-producer compositions need separate acceptance.
+T side effect and repeated MAC forms remain excluded. Complete control-delay
+MAC composition has separate acceptance above; other accumulator-producer
+compositions need separate acceptance.
 
 The original MAC executes. MVKD `7084 0013` at
 `02:dfd8` copies AR3 to the RAM word addressed by AR4 in both delay

@@ -8875,36 +8875,57 @@ private:
 		u16 memory, t, source;
 		u32 caller, target;
 		u64 a, b, result;
+		bool accumulate = false;
+		unsigned operation = 0;
 		unsigned delay() const { return kind == 5 ? 1 : 2; }
 		static unsigned operand_read(unsigned kind, unsigned form) { return 7 + unsigned(form != 0) + unsigned(kind == 5 || ((kind == 1 || kind == 2) && form)); }
 		unsigned read() const { return operand_read(kind, form); }
 		unsigned literal_clock() const { return kind == 5 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
-		bool overflow() const { return s64(s16(memory)) * s16(t) * (flags & 1 ? 2 : 1) > 0x7fffffffLL; }
+		s64 arithmetic() const
+		{
+			s64 product = s64(s16(memory)) * s16(t) * (flags & 1 ? 2 : 1);
+			if ((flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
+			if (!accumulate) return product;
+			u64 const source = destination ? b : a;
+			s64 sum = (BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source)) + (operation & 2 ? -product : product);
+			return operation & 1 ? (sum + 32768) & ~s64(65535) : sum;
+		}
+		bool overflow() const { return arithmetic() < -2147483648LL || arithmetic() > 2147483647LL; }
 	};
-	static delay_multiply_fixture delay_multiply_case(unsigned variant)
+	static delay_multiply_fixture delay_multiply_case(unsigned variant, bool mac = false)
 	{
+		unsigned const group = mac ? variant / 18432 : 0;
+		variant %= 18432;
 		unsigned const kind = variant % 6, form = (variant / 6) % 4, destination = (variant / 24) % 2, pair = (variant / 48) % 16, flags = (variant / 768) % 4;
 		u16 const memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair % 4], t = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair / 4];
 		u32 const caller = (variant / 3072) % 2 ? 0x20000 : 0, target = kind == 4 ? caller ^ 0x20000 : caller;
 		s64 const product = s64(s16(memory)) * s16(t) * (flags & 1 ? 2 : 1);
 		u64 const result = u64(product > 0x7fffffffLL && (flags & 2) ? 0x7fffffffLL : product) & 0xffffffffffULL;
 		unsigned const read = delay_multiply_fixture::operand_read(kind, form);
-		return {kind, form, destination, flags, std::array<unsigned, 3>{3, read - 1, read}[variant / 6144], memory, t,
-			std::array<u16, 4>{0x5000, 0x5000, 0x17, 0x5003}[form], caller, target,
+		delay_multiply_fixture f{kind, form, destination, flags, std::array<unsigned, 3>{3, read - 1, read}[variant / 6144], memory, t,
+			std::array<u16, 4>{0x5000, 0x5000, u16(mac ? 0x15 : 0x17), 0x5003}[form], caller, target,
 			kind == 1 ? 0 : kind == 2 ? 1 : 0x123456789aULL, 0xfedcba9876ULL, result};
+		if (mac)
+		{
+			f.accumulate = true; f.operation = group % 4; f.flags |= group / 4 ? 4 : 0;
+			s64 const value = f.arithmetic();
+			f.result = u64(f.overflow() && (f.flags & 2) ? std::clamp(value, s64(-2147483648LL), s64(2147483647LL)) : value) & 0xffffffffffULL;
+		}
+		return f;
 	}
 	void start_delay_multiply(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = delay_multiply_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		bool const mac = !strcmp(machine().options().bios(), "mac-delay");
+		auto const f = delay_multiply_case(variant, mac); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.caller + 0x600 + i, 0xf495);
 		program.write_word(f.caller + 0x600, f.kind == 4 ? 0xfb80 | (f.target >> 16) : std::array<u16, 6>{0xf273, 0xfa45, 0xfa45, 0xf274, 0, 0xfe00}[f.kind]);
 		if (f.kind != 5) program.write_word(f.caller + 0x601, 0x700);
-		program.write_word(f.caller + 0x600 + f.delay(), 0x2000 | (f.destination << 8) | (f.form == 0 ? 0x82 : f.form == 3 ? 0xe2 : 0xf8));
+		program.write_word(f.caller + 0x600 + f.delay(), (mac ? 0x2800 + f.operation * 0x200 : 0x2000) | (f.destination << 8) | (f.form == 0 ? 0x82 : f.form == 3 ? 0xe2 : 0xf8));
 		if (f.form) program.write_word(f.caller + 0x601 + f.delay(), f.form == 3 ? 3 : f.source);
 		for (u32 at : {f.caller + 0x604, f.target + 0x700}) { program.write_word(at, 0x880f | (f.destination << 8)); program.write_word(at + 1, 0xf4e1); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 4 ? 2 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2468);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); data.write_word(0x3000, 0x700); data.write_word(f.source, f.memory);
@@ -9009,7 +9030,7 @@ private:
 		unsigned const fixture = (variant % 4) * 20 + ((variant / 4) % 2) * 480;
 		start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, (!strcmp(machine().options().bios(), "mpy-delay-edge") ? 0x2000 : 0x8000) | f.mode); program.write_word(f.base + 0x604, f.literal);
+		program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, (!strcmp(machine().options().bios(), "mac-delay-edge") ? 0x2800 : !strcmp(machine().options().bios(), "mpy-delay-edge") ? 0x2000 : 0x8000) | f.mode); program.write_word(f.base + 0x604, f.literal);
 		m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -14037,8 +14058,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-block")) { start_mvmd_status_block(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
-		if (!strcmp(machine().options().bios(), "mpy-delay")) { start_delay_multiply(); return; }
-		if (!strcmp(machine().options().bios(), "mpy-delay-edge")) { start_delay_store_edge(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-delay") || !strcmp(machine().options().bios(), "mac-delay")) { start_delay_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-delay-edge") || !strcmp(machine().options().bios(), "mac-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "move-t")) { start_t_register_move(); return; }
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
@@ -41599,11 +41620,12 @@ private:
 		if (m_phase == 254371) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254540)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_multiply_case(variant);
+			bool const mac = !strcmp(machine().options().bios(), "mac-delay");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_multiply_case(variant, mac);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "A complete memory MPY fits its control-delay words");
 			if (f.form && tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.caller + 0x601 + f.delay(), 0x5010); }
 			if (tick == f.read() - 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000);
-			if (tick == f.read()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
+			if (tick == f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "Smem multiply/accumulate preserves T through Read"); auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
 			if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save delayed multiply Decode, Access and retained Read operands"); }
 			if (tick == 24)
 			{
@@ -41611,7 +41633,8 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == continuation && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == (f.kind == 4 ? 2U : unsigned(f.kind == 3)) && m_fast_stack_reads == unsigned(f.kind == 5) && m_pipeline_extensions_reads == unsigned(f.form != 0) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? f.a : f.result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa008 | (f.overflow() ? f.destination ? 0x200 : 0x400 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 4 ? 0x2ffe : f.kind == 3 ? 0x2fff : f.kind == 5 ? 0x3001 : 0x3000), "Delayed MPY preserves independent signed arithmetic, status, frames and target page through replay");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay delayed multiply without repeated source reads or callee publications"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254550; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 18431) { start_delay_multiply(variant + 1); return; }
+				if (variant < (mac ? 147455 : 18431)) { start_delay_multiply(variant + 1); return; }
+				if (mac) { osd_printf_info("TMS320C54x staged delay MAC/MAS: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=MAC,MACR,MAS,MASR forms=short,absolute_RAM,absolute_AR5,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 t_retained=1 callee_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS complete"); }
 				osd_printf_info("TMS320C54x staged delay MPY: PASS cases=18432 restore=18432 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=short,absolute_RAM,absolute_AR,offset destinations=2 operand_pairs=16 frct_ovm=4 pages=2 snapshots=3 source_reads=1 callee_observes_result=1 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated delay MPY complete");
 			}
@@ -41650,6 +41673,7 @@ private:
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore the rejected delay without a memory write or atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254510; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 15) { start_delay_store_edge(variant + 1); return; }
+				if (!strcmp(machine().options().bios(), "mac-delay-edge")) { osd_printf_info("TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS boundary complete"); }
 				if (!strcmp(machine().options().bios(), "mpy-delay-edge")) { osd_printf_info("TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay MPY boundary complete"); }
 				osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
@@ -44083,6 +44107,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(204, "imm-index", "AR0-indexed immediate stores with retained literals")
 	ROM_SYSTEM_BIOS(205, "fcala-delay", "Delayed accumulator far-call frame and interrupt composition")
 	ROM_SYSTEM_BIOS(206, "mac-bk", "Mapped BK signed multiply-accumulate operand ownership")
+	ROM_SYSTEM_BIOS(207, "mac-delay", "Retained signed multiply-accumulate in complete control delays")
+	ROM_SYSTEM_BIOS(208, "mac-delay-edge", "Rejected multiply-accumulate straddling a control delay")
 ROM_END
 
 ROM_START(tms54rom4)
