@@ -86,6 +86,21 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 &&
+						((address >= 0x23e64 && address <= 0x23ef7) || (address >= 0x293da && address <= 0x293ed)))
+					{
+						std::array<u32, 6> const sites{0x23e64, 0x23e84, 0x23e99, 0x23ef7, 0x293da, 0x293ed};
+						std::array<u16, 6> const words{0x4a11, 0xf020, 0x62f8, 0xf4e4, 0x10f8, 0xf982};
+						auto const found = std::find(sites.begin(), sites.end(), address);
+						if (found != sites.end())
+						{
+							unsigned const site = found - sites.begin();
+							if (opcode != words[site]) ++m_playback_method_mismatch;
+							else if (++m_playback_method_entries[site] <= 8)
+								logerror("mu4_playback_method_entry: site=%u address=%06x opcode=%04x ordinal=%u t=%.9f identity=Execute_entry observer_writes=0\n",
+									site, unsigned(address), opcode, m_playback_method_entries[site], machine().time().as_double());
+						}
+					}
 					if (m_playback_execute_entries[1] == 1 && address == 0x201b3 && opcode == 0xf7b8 && ++m_playback_notify_samples <= 8)
 					{
 						unsigned const p = m_playback_history_next;
@@ -399,6 +414,8 @@ private:
 	std::array<u16, 128> m_playback_path_word{};
 	u8 m_playback_path_next = 0;
 	u16 m_playback_path_count = 0;
+	std::array<u32, 6> m_playback_method_entries{};
+	u32 m_playback_method_mismatch = 0;
 	std::array<u32, 4> m_playback_activation_pc{};
 	std::array<u16, 4> m_playback_activation_word{};
 	double m_playback_activation_time = 0;
@@ -862,6 +879,9 @@ private:
 	}
 	void report_playback_parent()
 	{
+		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
+			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
 		unsigned unique = 0; u64 entries = 0;
 		for (unsigned i = 0; i < PLAYBACK_RANGE_WORDS; ++i)
 			if (m_playback_range_counts[i])
@@ -2077,6 +2097,7 @@ private:
 			save_item(NAME(m_playback_notify_samples));
 			save_item(NAME(m_playback_path_pc)); save_item(NAME(m_playback_path_word));
 			save_item(NAME(m_playback_path_next)); save_item(NAME(m_playback_path_count));
+			save_item(NAME(m_playback_method_entries)); save_item(NAME(m_playback_method_mismatch));
 			save_item(NAME(m_playback_activation_pc)); save_item(NAME(m_playback_activation_word)); save_item(NAME(m_playback_activation_time));
 			save_item(NAME(m_playback_range_counts)); save_item(NAME(m_playback_range_opcodes)); save_item(NAME(m_playback_range_changes));
 			save_item(NAME(m_playback_dma_min)); save_item(NAME(m_playback_dma_max)); save_item(NAME(m_playback_dma_last_nonzero));
@@ -2292,6 +2313,7 @@ private:
 		m_playback_callback_samples = 0;
 		m_playback_notify_samples = 0;
 		m_playback_path_pc = {}; m_playback_path_word = {}; m_playback_path_next = 0; m_playback_path_count = 0;
+		m_playback_method_entries = {}; m_playback_method_mismatch = 0;
 		m_playback_activation_pc = {}; m_playback_activation_word = {}; m_playback_activation_time = 0;
 		m_playback_range_counts = {}; m_playback_range_opcodes = {}; m_playback_range_changes = 0;
 		m_playback_dma_min = 0xffff; m_playback_dma_max = 0; m_playback_dma_last_nonzero = 0;

@@ -7,10 +7,28 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_callback_reads,
     verify_playback_notify_context,
     verify_playback_path,
+    verify_playback_method,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_method_coverage_preserves_absence_and_checks_source_and_totals(self):
+        terminal = ('mu4_playback_method_terminal: entry=1 early=0 body=0 returned=0 result=0 publish=0 '
+                    'opcode_mismatch=0 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0')
+        entry = ('mu4_playback_method_entry: site=0 address=023e64 opcode=4a11 ordinal=1 '
+                 't=1.000000000 identity=Execute_entry observer_writes=0')
+        text = entry + '\n' + terminal
+        self.assertEqual(verify_playback_method(text, {0x23e64: 0x4a11}, [0.8, 2.2])['entry'], 1)
+        self.assertEqual(verify_playback_method(terminal.replace('entry=1', 'entry=0'), {}, [0.8, 2.2])['entry'], 0)
+        for old, new in (('site=0', 'site=1'), ('opcode=4a11', 'opcode=4a10'), ('ordinal=1', 'ordinal=2'),
+                         ('entry=1 early', 'entry=2 early'), ('opcode_mismatch=0', 'opcode_mismatch=1'),
+                         ('t=1.000000000', 't=2.200000000')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_method(text.replace(old, new), {0x23e64: 0x4a11}, [0.8, 2.2])
+        for bad in (entry, terminal, terminal + '\n' + entry, text + '\n' + terminal):
+            with self.assertRaises(ValueError):
+                verify_playback_method(bad, {0x23e64: 0x4a11}, [0.8, 2.2])
+
     def test_bounded_path_requires_source_order_and_first_callback_pairing(self):
         words = {0x201d0: 0xf050, 0x201d2: 0xf844, 0x201dd: 0xe734, 0x201de: 0xf074}
         history = [f'{a:06x}/{op:04x}' for a, op in words.items()]

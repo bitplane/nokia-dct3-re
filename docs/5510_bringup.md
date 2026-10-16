@@ -4532,10 +4532,10 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** how does method 9 reached through receiver reference
-`15eb` return its result, and why does varying-input playback not take
-the `0293da..0293ed` publication path? Do not force a wakeup, node,
-callback, method result or input value.
+**Open question:** what establishes method `023e64`'s control words
+`ba4f` and `ba51`, and why does varying-input playback never take its
+longer body? Do not force a wakeup, node, callback, method result or input
+value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
 2.368206564 (constant) / 1.726312648 (varying). Source-checked observation
@@ -4626,6 +4626,36 @@ The path checker rejects missing/duplicate terminals, wrong counts/indices,
 source mismatches, reordered entries and disagreement with the immediate
 history; the observer ring is bounded, reset/saved and never changes CPU
 execution. Fresh paired runs reproduce the established counts.
+
+Separate first-session Execute counters now establish the method split:
+
+| Selected method entry | Constant | Varying input |
+| --- | ---: | ---: |
+| Entry `023e64` | 331 | 332 |
+| Early-result entry `023e84` | 284 | 332 |
+| Longer-body entry `023e99` | 47 | 0 |
+| Epilogue return `023ef7` | 331 | 332 |
+| Caller result access `0293da` | 331 | 332 |
+| Publication call `0293ed` | 47 | 0 |
+
+The varying file therefore reaches and returns from the method; it is
+not missing the virtual dispatch. Both files initially take the early
+path. Its observed writes include `15f0=0485`, followed by the caller's
+`15f0=090a` transformation. These are numeric result words, not a decoded
+error-name or codec-validity claim. The source initializes AR2 to zero,
+tests `ba4f`/`ba51`, sets AR2 to one only on the nonzero/zero combination,
+copies AR2 into result offset 3, then branches to `023e99` when nonzero.
+The other branch sets result offset 2 to `0485` and exits. The globals'
+literal references are enumerable: `ba4f` at
+`023d7f,023d93,023dbf,023e74,025811,0273cd`; `ba51` at
+`023da1,023db0,023dbb,023e78,0273d3`. These are references, not a closed
+writer census. Their nearby setup includes comparisons with literals
+`4144` and `4946`; neither that signature nor an early result alone proves
+the saved file's format, validity or the missing behavior. The method
+checker verifies original words, bounded per-site samples, totals and
+first-session ordering without requiring a guessed successful outcome.
+Both fresh runs retain prior range counts, and the full tool suite passes
+(2,963 tests, one skipped).
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,

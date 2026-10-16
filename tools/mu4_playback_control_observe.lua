@@ -5,6 +5,17 @@ local cpu = assert(machine.devices[':cpu'])
 local data = assert(cpu.spaces.data)
 local handles, read_counts, latch_writes, sampling = {}, {}, 0, false
 local queue_counts = {}
+local result_counts = {}
+handles[#handles + 1] = data:install_write_tap(0x15ee, 0x15f8, 'mu4_playback_method_result', function(address, value, mask)
+    local time = machine.time:as_double()
+    if time < 0.8182 or time > 1.7 then return end
+    result_counts[address] = (result_counts[address] or 0) + 1
+    if result_counts[address] <= 8 then
+        machine:logerror(string.format(
+            'mu4_playback_result_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+            address, value, mask, result_counts[address], time, cpu.state.GENPC.value))
+    end
+end)
 for _, range in ipairs({{0x8044, 0x8049}, {0x80a3, 0x80a5}}) do
     handles[#handles + 1] = data:install_write_tap(range[1], range[2], 'mu4_playback_queue_' .. range[1],
         function(address, value, mask)

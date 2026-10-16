@@ -463,6 +463,35 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
     return result
 
 
+def verify_playback_method(text, words, session):
+    terminals = list(re.finditer(
+        r'mu4_playback_method_terminal: entry=(\d+) early=(\d+) body=(\d+) returned=(\d+) result=(\d+) publish=(\d+) '
+        r'opcode_mismatch=0 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0$',
+        text, re.MULTILINE))
+    rows = list(re.finditer(
+        r'mu4_playback_method_entry: site=([0-5]) address=([0-9a-f]{6}) opcode=([0-9a-f]{4}) ordinal=(\d+) '
+        r't=(\d+\.\d{9}) identity=Execute_entry observer_writes=0$', text, re.MULTILINE))
+    if not terminals and not rows and 'mu4_playback_method_' not in text:
+        return None
+    if len(terminals) != 1 or text.count('mu4_playback_method_terminal:') != 1 or len(rows) != text.count('mu4_playback_method_entry:'):
+        raise ValueError('missing, malformed or duplicate method coverage')
+    sites = ((0x23e64, 0x4a11), (0x23e84, 0xf020), (0x23e99, 0x62f8),
+             (0x23ef7, 0xf4e4), (0x293da, 0x10f8), (0x293ed, 0xf982))
+    counts, previous = [0] * 6, session[0]
+    for row in rows:
+        site, address, opcode, ordinal, time = int(row[1]), int(row[2], 16), int(row[3], 16), int(row[4]), float(row[5])
+        counts[site] += 1
+        if (address, opcode) != sites[site] or words.get(address) != opcode:
+            raise ValueError('method coverage disagrees with original source or selected site')
+        if ordinal != counts[site] or row.end() >= terminals[0].start() or not previous <= time < session[1]:
+            raise ValueError('method coverage ordinal, session or terminal ordering mismatch')
+        previous = time
+    totals = list(map(int, terminals[0].groups()))
+    if counts != [min(count, 8) for count in totals]:
+        raise ValueError('method coverage samples disagree with terminal totals')
+    return dict(zip(('entry', 'early', 'body', 'returned', 'result', 'publish'), totals))
+
+
 def verify_playback_path(text, words, callbacks):
     terminals = list(re.finditer(
         r'mu4_playback_path_terminal: entries=(\d+) t=(\d+\.\d{9}) '
@@ -560,6 +589,7 @@ def verify_playback_range(text, words):
             'activation_context_history': activation_history,
             'callback_context_history': callback_history,
             'callback_producer_path': verify_playback_path(text, words, callback_history),
+            'method_coverage': verify_playback_method(text, words, parent['first_session']),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'notify_context_history': notify_history,
             'notify_raw_register_context': verify_playback_notify_context(text, notify_history),
