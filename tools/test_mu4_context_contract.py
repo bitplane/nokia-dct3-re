@@ -39,6 +39,8 @@ class ContextContractTest(unittest.TestCase):
             '8bae a8cc a98a 4ee0 9987 ef84 8767 2609 7bc7 b5fc b37d 3193 cd0f 1a4a ca87 bf1b').split()]
         self.assertEqual(reference_transform_block(0xf9ff, 0x8050, state), (0x8bca, 0x3641))
         self.assertEqual(reference_transform_block(0x8bca, 0x3641, state, reverse=False), (0xf9ff, 0x8050))
+        # Fresh native recording playback supplies zero input under the same state.
+        self.assertEqual(reference_transform_block(0, 0, state), (0xc641, 0x474f))
 
     def test_prefix_transform_domain_and_roundtrip_controls(self):
         self.assertEqual(reference_transform_block(0x1234, 0xabcd, [0] * 82), (0xabcd, 0x1234))

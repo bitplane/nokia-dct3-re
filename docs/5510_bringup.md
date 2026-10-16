@@ -4937,11 +4937,60 @@ not initialization, all blocks, a named cipher or valid native packaging.
 The earlier `ef76,bdc5` prefix belongs to the pre-correction core, not the
 current fixture oracle.
 
-The generated control still fails native playback; original recorded media
-also predates this correction. Next, regenerate an organic recording on
-the corrected core and compare its saved framing/playback before attributing
-the remaining failure to packaging or another CPU operation. Keep the
-processing initializer and format selection explicitly unresolved.
+The generated control still fails native playback. Keep the processing
+initializer and format selection explicitly unresolved; host AAC validity
+does not identify the native file contract.
+
+#### Fresh Native Recording/Playback Control
+
+A new `bootrecac` run on the shifted-store-corrected core starts from the
+untouched firmware-created NAND seed, uses ordinary serial recording/stop/
+metadata requests and closes with native metadata success. Exact resident
+comparison passes (48,261 program plus 3,656 data words). The converted-input
+checker observes 871,742 generated stereo frames and actual DMA symbol-read
+counts `201120,201155,201141,201134`; these are digital bench observations,
+not analog input or valid encoding. The saved endpoint changes 285 data
+pages and no spare pages. Independent 7z extraction yields:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Native saved NAND | 69,206,016 | `e845f9aebdf6ef0a5877fe953dd49c2a989d4c77fca794ab20c1d654492413e7` |
+| Extracted `TEST` | 143,680 | `c9da011f76ca98b91d3680d032439efea68454ee87c9ad7918bb63a264a7f231` |
+
+The new file differs from the pre-bypass varying capture in 40,478 bytes,
+starting at offset 622. Its declared ID3 body remains 100 bytes, followed
+by 512 zero bytes at offsets `[110,622)`. It still has 336 candidate ADTS
+headers. The initial declared-length chain is `995 -> 1367 -> 1739 -> 9529`;
+the third candidate declares 7,790 bytes/channel 1/two raw blocks. That is
+not validated framing or a reason to trim the file to the first sync.
+
+Independent cold `bootplaystage` reaches its complete 20-second endpoint
+with `illegal=0`, verified title/overlay and a completed first AA99 session.
+It still produces no nonzero samples: 1,125,070 actual channel-3 reads,
+1,402,561 TX words and 1,691,842 DIN words are all zero. The strict DMA and
+source-range observation checks pass; the deliberate audio-completion
+diagnostic still rejects acceptance. All 17 sampled bit-reader pairs match
+the bounded scalar model; method `023e64` takes its early result on all
+332 calls and never publishes its longer-body result.
+
+The first captured processing input is 32 zero bytes under the same
+82-word state as the generated-media control. The independent block model
+maps its first zero pair to `c641,474f`, exactly matching the bit reader's
+packed words `41c6,4f47`. This supports local processing arithmetic, not
+the association with a unique file offset: the file has multiple zero
+regions and no retained file-cursor ownership was captured here.
+The next boundary is the native record's leading-region/finalization and
+playback-start contract, including the recording-side transform input/state.
+Do not remove the zero region, change a seek or synthesize header bytes to
+claim playback. The recorder contains an exact copy of the 23-word nibble
+helper at AA88 `03f0e6`, a software-accessible anchor for that comparison.
+
+The Lua observer detaches its 16 bus taps after the last 2.4-second
+observation window instead of retaining hot-stack callbacks for the entire
+run. A separate three-second repeat reproduces all 708 selected first-window
+lines exactly and closes the taps at 2.416666667 seconds. That is observer
+equivalence over the stated window, not a shorter substitute for the complete
+20-second playback observation or decoded-audio acceptance.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
 acceptance constraints. A separate broader AAC-LC control (MPEG-2
@@ -4955,7 +5004,8 @@ but parseable headers, missing boundaries and read-only CLI operation.
 The complete tool suite passes (2,984 tests, one skipped), including eight
 generated-media tests covering authoring boundaries and failure paths.
 
-All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
+In the pre-bypass constant-file control, all 1,125,032 actual channel-3
+source reads in `1000..137f` remain zero,
 as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are
 `fc93daf5`/`1e4f2315`; clocks/frames remain 230,090,537/845,921. The strict
 `--playback-dma` observation check passes without any changes, and the

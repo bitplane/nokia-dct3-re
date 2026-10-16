@@ -177,6 +177,7 @@ handles[#handles + 1] = data:install_read_tap(0xd7b0, 0xd7b5, 'mu4_playback_call
     end
 end)
 local times, next_sample = {0.9, 1.1, 1.4}, 1
+local taps_closed = false
 local function words(pointer)
     if pointer < 0x80 or pointer > 0xffe0 then return 'unobserved' end
     local values = {}
@@ -185,6 +186,13 @@ local function words(pointer)
 end
 emu.register_frame_done(function()
     local time = machine.time:as_double()
+    -- Filtering inside a Lua tap still charges every hot-stack bus access.
+    -- All observation windows end by 2.4 seconds; detach instead of lingering.
+    if not taps_closed and time > 2.4 then
+        for _, tap in ipairs(handles) do tap:remove() end
+        taps_closed = true
+        machine:logerror(string.format('mu4_playback_taps_closed: count=%u t=%.9f observer_writes=0\n', #handles, time))
+    end
     if next_sample > #times or time < times[next_sample] then return end
     sampling = true
     local receiver = data:read_u16(0xaa59)
