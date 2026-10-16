@@ -275,11 +275,14 @@ control owners remain independently guarded. Memory-sourced `RPT Smem`
 and repeated immediate/ASM-shift accumulator loads have independent
 count, arithmetic, interrupt and replay coverage. Original playback now
 passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
-`02:9fae`, and the long-offset PSHD at `02:a13d`. The current stop is
-`02:a270`, `8be1 0004`, the corresponding long-offset `POPD` destination.
-Its opcode and address extension match original AA99;
-this remains an instruction-composition boundary, not evidence of
-missing external hardware. The generic 16-bit
+`02:9fae`, the long-offset PSHD at `02:a13d`, and long-offset
+`POPD` (`8be1 0004`) at `02:a270`. At the 20-second observation, the
+unaltered original playback run has PC `02:a2d5`, `illegal=0`, three
+bootstrap-entry observations, 24 resident entries and 6,767,711 NAND reads.
+The current boundary is active execution, not an unsupported opcode;
+the repeated entry counts and PCM/peripheral progress need characterization.
+The acceptance gate remains failed: it expects a single bootstrap/resident
+entry, and decoded audio has not been established. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4808,16 +4811,42 @@ silicon exceptions. Older-producer, adjacent-stack and compound-loop
 compositions need their own coverage. Long MOD=13 preincrement is a
 read-capable addressing mode, unlike short write-only MOD=3.
 
-### REL long-offset pop boundary
+### Extended POPD and playback execution boundary
 
-Original playback, rechecked after the read-domain corrections, passes
-`4be1 0004` at `02:a13d` and stops on
-`8be1 0004` at `02:a270`, with live PC `02:a272`. AA99 contains
-`8a10 8be1 0004 f4e4` at `02:a26f..a272`; this is a long-offset POPD
-followed by FRET, not a missing source image. The source-address grammar,
-SP/Read ownership, destination publication and replay need independent
-coverage before admitting that pop. The encoded AR1 plus literal must
-not be mistaken for a fixed destination address.
+POPD's encoded Smem is a destination. SPRU172C 4-127 specifies one extra
+word and cycle for long-offset/absolute addressing. The staged path retains
+the extension in Decode, resolves the destination in Access, reads the old
+stack top and increments SP in Read, then writes the captured word in Execute.
+It advances past both instruction words. Its isolated clocks are 3/5/6/7
+for extension/Access/Read/Execute, a partial model rather than silicon timing.
+Address-preview AR/ARP effects are rolled back on rejected destinations.
+
+`popd-ram` requires its existing 50 short/composition cases plus 16,128
+extended cases/restores over all 25 encodings, four values, CMPT/CPL,
+two pages and three snapshots. Circular cases require BK=9, a valid index
+and bounded steps; zero-BK circular cases are omitted with raw IDs preserved.
+Literal poisoning, later AR changes and stack-memory mutation require one
+retained address, one stack read and one destination write, including a
+destination aliasing the old stack top. `popd-edges` retains its 31 existing
+checks and adds 64 rejection/replay cases for extended mapped/SP/peripheral
+destinations, an unadmitted mode and delay/repeat/block/XC owners. Rejection
+performs no operand transaction, stack allocation or pointer change.
+Extended mapped destinations, IRQ composition and physical timing are not
+accepted by these fixtures. Eight neighboring stack/control profiles,
+native 5110 save-state and 2,929 tool tests (one skipped) pass.
+
+AA99 contains `8a10 8be1 0004 f4e4` at `02:a26f..a272`; the admitted
+long-offset POPD is followed by FRET, not a missing source image. On the
+unchanged protected NAND, original playback now runs the 20-second window
+without an illegal instruction: PC `02:a2d5`, one request/inspection/decoder
+load, 14 replies, cursor 12, and verified title/overlay. It reports three
+bootstrap-entry observations, 24 resident entries, 6,767,711 NAND reads and
+1,568,462 stream words. PC `a2d5` is inside AA99's paired arithmetic loop
+beginning at `a2c6`; this sample alone does not prove correct loop progress
+or audio output. The existing exact-one entry gate still fails; it was not
+weakened or re-banked as playback success. The next boundary is to distinguish
+normal repeated processing from unintended lifecycle re-entry and observe
+the native PCM/peripheral path.
 
 The current broad CPU regression and remaining operand-domain audit are
 summarized under [Short-preincrement fixture audit](#short-preincrement-fixture-audit).

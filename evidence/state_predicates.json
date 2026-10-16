@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_original_rel_playback_audio",
+      "owner": "mu4_native_dsp",
+      "status": "unresolved",
+      "predicate": "Original REL playback has a characterized lifecycle and produces independently verified decoded PCM through its native peripheral boundary",
+      "current": "After independently tested long-offset POPD support, the unchanged protected NAND and serial request run the 20-second observation window with PC 02:a2d5 and illegal=0. Title and overlay verification pass, with one request/inspection/decoder load, 14 replies and cursor 12. Bootstrap-entry observations rise to 3, resident entries to 24, NAND reads to 6767711 and stream words to 1568462. AA99 places the sampled PC inside a paired arithmetic loop, not an unsupported opcode. These counts do not distinguish correct repeated processing from unintended re-entry and do not establish PCM output. The exact-one bootstrap/resident gate remains failed and audio_acceptance remains zero; neither was relaxed. The input NAND SHA256 remains 93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8. Extended POPD's focused acceptance covers RAM destinations, not mapped destinations, IRQ/delay/repeat/block composition or physical timing.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/run_c54x_core.py", "Makefile"]
+    },
+    {
       "id": "nsb6_authenticated_dualband_full_arm_restore",
       "owner": "nsb6_firmware",
       "status": "satisfied",

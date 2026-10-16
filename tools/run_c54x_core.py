@@ -1010,11 +1010,17 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated FBACC producer complete",
     ),
     "popd-edges": (
-        "TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0",
+        (
+            "TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0",
+            "TMS320C54x extended POPD exclusions: PASS cases=64 restore=64 forms=mapped,SP,peripheral,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated POPD edges complete",
     ),
     "popd-ram": (
-        "TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0",
+        (
+            "TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0",
+            "TMS320C54x extended POPD: PASS cases=16128 restore=16128 forms=25 values=4 cmpt=2 cpl=2 pages=2 snapshots=3 circular_bk=9 circular_steps_bounded=1 literal_fetches=1 stack_reads=1 destination_writes=1 pointer_updates=once source_retained=1 mapped_acceptance=0 irq_acceptance=0 physical_phase_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated RAM POPD complete",
     ),
     "popd-mapped": (

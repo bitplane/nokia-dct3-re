@@ -9109,6 +9109,37 @@ private:
 			expect(f.irq && at == 0x2ffe && !m_rptbd_counts.stack_writes++ && word >= 0x602 && word <= 0x60f && m_rptbd_counts.writes == 1, "Interrupt stack allocation follows the older extended push"); m_rptbd_return = word; });
 		m_phase = 310560; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static extended_push_fixture extended_pop_case(unsigned variant)
+	{
+		// Reuse address/value domains, excluding IRQ dimensions (not yet accepted for extended POPD).
+		return extended_push_case(variant % 6400 + (variant / 6400) * 32000);
+	}
+	void start_extended_pop(unsigned variant = 0)
+	{
+		while (variant < 19199 && extended_pop_case(variant).mode >= 0xf0 && extended_pop_case(variant).mode < 0xf8 && !extended_pop_case(variant).bk) ++variant;
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_pop_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x8b00 | f.mode); program.write_word(f.base + 0x601, f.literal);
+		program.write_word(f.base + 0x602, 0xe955); program.write_word(f.base + 0x60f, 0xf4e1);
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		data.write_word(f.address, 0xaaaa); data.write_word(0x3000, f.value);
+		m_rptbd_counts = {}; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "extended_pop_literal", [this, f](offs_t, u16 &word, u16) {
+			if (!machine().side_effects_disabled()) expect(word == f.literal && !m_rptbd_counts.fetches++ && m_cpu->pipeline_cycles() == 3, "Extended POPD fetches its retained address word once"); });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "extended_pop_source", [this, f](offs_t at, u16 &word, u16) {
+			if (!machine().side_effects_disabled()) expect(at == 0x3000 && word == f.value && !m_rptbd_counts.reads++ && m_cpu->pipeline_cycles() == 6, "Extended POPD reads one stack word, never its destination"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "extended_pop_destination", [this, f](offs_t at, u16 &word, u16) {
+			if (!machine().side_effects_disabled()) expect(at == f.address && word == f.value && !m_rptbd_counts.writes++ && m_cpu->pipeline_cycles() == 7, "Extended POPD writes its retained destination once"); });
+		m_phase = 310620; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_extended_push_edge(unsigned variant = 0)
 	{
 		unsigned const seed = ((variant / 8) % 2 ? 3200 : 0) + ((variant / 16) % 2 ? 400 : 0); start_extended_push(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -9120,6 +9151,20 @@ private:
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_push_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_push_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
 		m_phase = 310580; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
+	void start_extended_pop_edge(unsigned variant = 0)
+	{
+		unsigned const seed = ((variant / 8) % 2 ? 400 : 0) + ((variant / 16) % 2 ? 3200 : 0);
+		start_extended_pop(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_pop_case(seed); auto &program = m_cpu->space(AS_PROGRAM); unsigned const kind = variant % 8;
+		m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5007);
+		program.write_word(f.base + 0x600, kind < 3 ? 0x8beb : kind == 3 ? 0x8bf9 : 0xf495);
+		program.write_word(f.base + 0x601, u16((kind == 0 ? 0x0e : kind == 1 ? 0x18 : 0x24) - 0x5007));
+		if (kind == 4 || kind == 6) { program.write_word(f.base + 0x600, kind == 4 ? 0xf273 : 0xf072); program.write_word(f.base + 0x601, kind == 4 ? 0x610 : 0x604); program.write_word(f.base + 0x602, 0x8be3); program.write_word(f.base + 0x603, 4); }
+		if (kind == 5 || kind == 7) { program.write_word(f.base + 0x600, kind == 5 ? 0xec00 : 0xfd30); program.write_word(f.base + 0x601, 0x8be3); program.write_word(f.base + 0x602, 4); }
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_pop_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_pop_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
+		m_phase = 310640; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	}
 	struct stlm_pmst_fixture
 	{
@@ -36823,7 +36868,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 49) { start_pipeline_data_pop(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0\n");
-				if (!strcmp(machine().options().bios(), "popd-ram")) throw emu_fatalerror(0, "TMS320C54x isolated RAM POPD complete");
+				if (!strcmp(machine().options().bios(), "popd-ram")) { start_extended_pop(); return; }
 				start_pipeline_register_store(); return;
 			}
 			++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -41429,6 +41474,57 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310640)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 32 ? 2 : 10;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5007 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb608, "Excluded extended POPD leaves operands, stack, pointer and ARP unchanged");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended POPD rejection before or after Decode/Access"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Unaccepted extended POPD composition rejects explicitly");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded extended POPD without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310650; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_extended_pop_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x extended POPD exclusions: PASS cases=64 restore=64 forms=mapped,SP,peripheral,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated POPD edges complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310650) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310640; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310620)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_pop_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a &&
+				(tick > 7 || m_cpu->state_int(tms320c54x_device::STATE_B) == f.b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick < 5 ? f.st0 : f.final_st0), "Extended POPD preserves arithmetic state and applies only the address-owned ARP update");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick > 5 ? 0x6a00 + i : tick < 5 ? f.initial[i] : f.final[i]), "Extended POPD captures its destination before later pointer changes");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (tick < 6 ? 0x3000 : 0x3001), "Extended POPD consumes one stack word in Read");
+			if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == 5) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x6a00 + i);
+			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000, 0xdead); }
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_rptbd_saved_counts = m_rptbd_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended POPD across literal, address and publication ownership");
+			}
+			if (tick == 24)
+			{
+				expect(m_rptbd_counts.fetches == 1 && m_rptbd_counts.reads == 1 && m_rptbd_counts.writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x610 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == f.t && m_cpu->state_int(tms320c54x_device::STATE_TRN) == f.trn && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk, "Extended POPD reaches the actual two-word continuation with one transfer and unrelated state preserved");
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.address) == f.value, "Extended POPD retains its stack sample after backing-memory mutation"); }
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore extended POPD without refetching, retargeting or consuming another stack word");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310630; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 19199) { start_extended_pop(variant + 1); return; }
+				osd_printf_info("TMS320C54x extended POPD: PASS cases=16128 restore=16128 forms=25 values=4 cmpt=2 cpl=2 pages=2 snapshots=3 circular_bk=9 circular_steps_bounded=1 literal_fetches=1 stack_reads=1 destination_writes=1 pointer_updates=once source_retained=1 mapped_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated RAM POPD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310630) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310620; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310560)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_push_case(variant);
@@ -43191,7 +43287,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 30) { start_popd_edges(variant + 1); return; }
-				osd_printf_info("TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated POPD edges complete");
+				osd_printf_info("TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0\n"); start_extended_pop_edge(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}

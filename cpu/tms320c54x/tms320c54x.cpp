@@ -281,6 +281,11 @@ constexpr bool staged_extended_push(u16 word)
 	return (word & 0xff00) == 0x4b00 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
 }
 
+constexpr bool staged_extended_pop(u16 word)
+{
+	return (word & 0xff00) == 0x8b00 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
+}
+
 constexpr bool staged_absolute_add(u16 word)
 {
 	return (word & 0xfeff) == 0x00f8;
@@ -2879,9 +2884,9 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
-			if (!m_pipeline_decode_remaining && staged_extended_push(word))
+			if (!m_pipeline_decode_remaining && (staged_extended_push(word) || staged_extended_pop(word)))
 			{
-				logerror("%s: staged delay extended PSHD is unsupported\n", machine().describe_context()); m_illegal = true; return;
+				logerror("%s: staged delay extended stack transfer is unsupported\n", machine().describe_context()); m_illegal = true; return;
 			}
 			if (!m_pipeline_decode_remaining && (word & 0xfeff) == 0x881d)
 			{
@@ -2960,7 +2965,7 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 		else if (staged_extended_push(m_pipeline_word[2]) || (staged_write_a(m_pipeline_word[2]) && u8(m_pipeline_word[2]) >= 0xe0) || staged_shifted_smem(m_pipeline_word[2]) || staged_extended_dld(m_pipeline_word[2]) || staged_offset_load(m_pipeline_word[2]) || staged_bitfield(m_pipeline_word[2]) || staged_extended_smem_arithmetic(m_pipeline_word[2]) || staged_extended_smem_special(m_pipeline_word[2]) || staged_port_read(m_pipeline_word[2]) || staged_port_write(m_pipeline_word[2]) || staged_absolute_add(m_pipeline_word[2]) || m_pipeline_word[2] == 0x47f8 || staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || (staged_absolute_load(m_pipeline_word[2]) || staged_extended_logic(m_pipeline_word[2])) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
-			(m_pipeline_word[2] & 0xfeff) == 0xf062 || staged_immediate_multiply(m_pipeline_word[2]) || staged_extended_accumulator_store(m_pipeline_word[2]) || staged_extended_dst(m_pipeline_word[2]) || staged_extended_long_arithmetic(m_pipeline_word[2]) || staged_data_copy(m_pipeline_word[2]) ||
+			(m_pipeline_word[2] & 0xfeff) == 0xf062 || staged_extended_pop(m_pipeline_word[2]) || staged_immediate_multiply(m_pipeline_word[2]) || staged_extended_accumulator_store(m_pipeline_word[2]) || staged_extended_dst(m_pipeline_word[2]) || staged_extended_long_arithmetic(m_pipeline_word[2]) || staged_data_copy(m_pipeline_word[2]) ||
 			m_pipeline_word[2] == 0xf070 || staged_block_repeat(m_pipeline_word[2]) || m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x46f8 || m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x771a || m_pipeline_word[2] == 0x7700 || staged_bus_control(m_pipeline_word[2]) || staged_timer_control(m_pipeline_word[2]) || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0xa0 || staged_indexed_immediate_store(m_pipeline_word[2]) || staged_extended_immediate_store(m_pipeline_word[2]))) ||
@@ -3062,11 +3067,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
 		bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
-		if (m_pipeline_valid[2] && staged_extended_push(word) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
+		if (m_pipeline_valid[2] && (staged_extended_push(word) || staged_extended_pop(word)) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
-			logerror("%s: staged extended PSHD conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
+		bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
 		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
 		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_pipeline_block_body[2])
 		{
@@ -3401,15 +3406,19 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x8b00)
 	{
 		u8 const mode = m_pipeline_word[3];
-		m_pipeline_operand_address[3] = basic_address(3, mode);
+		bool const extended = staged_extended_pop(m_pipeline_word[3]);
+		unsigned const ar = indirect_ar(mode, 3); u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		m_pipeline_operand_address[3] = !extended ? basic_address(3, mode) : mode == 0xf8 ? m_pipeline_immediate[3] : long_offset_address(mode, ar, s16(m_pipeline_immediate[3]), 3);
 		u16 const destination = m_pipeline_operand_address[3];
 		bool const mapped = (destination >= 8 && destination <= 0x17) || (destination >= 0x19 && destination <= 0x1d);
-		if ((destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active && m_pipeline_block_body[3]))
+		if ((extended && destination < 0x60) || (destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active && m_pipeline_block_body[3]))
 		{
+			// Extended mapped destinations need their own DAGEN/write arbitration tests.
+			if (extended) { m_ar[ar] = previous_ar; m_st0 = previous_st0; }
 			logerror("%s: staged POPD status/SP/peripheral or active repeat-control destination is unsupported (word=%04x destination=%04x block_active=%u)\n", machine().describe_context(), m_pipeline_word[3], destination, unsigned(m_pipeline_block_active));
 			m_illegal = true; return;
 		}
-		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
+		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[3] && staged_mar(m_pipeline_word[3]))
 	{
@@ -4194,6 +4203,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const destination = m_pipeline_operand_address[5];
 			if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
 				data_write(destination, m_pipeline_operand[5]);
+			if (staged_extended_pop(m_op)) ++m_pc;
 		}
 		else if (staged_accumulator_mmr_store(m_op))
 			// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.

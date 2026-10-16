@@ -1000,11 +1000,24 @@ class CoreResultTests(unittest.TestCase):
 
     def test_popd_edges_scope(self):
         for name in ('popd-edges', 'popd-ram'):
-            marker, ending = EXTRA_PROFILES[name]
-            output = marker + '\n' + ending + '\n'
+            markers, ending = EXTRA_PROFILES[name]
+            output = '\n'.join((*markers, ending)) + '\n'
             check_result(output, 3, profile=name)
+            for marker in markers:
+                with self.subTest(profile=name, marker=marker), self.assertRaises(ValueError):
+                    check_result(output.replace(marker, ''), 3, profile=name)
             with self.subTest(profile=name), self.assertRaises(ValueError):
                 check_result(output.replace('restore=', 'missing_restore='), 3, profile=name)
+
+    def test_extended_popd_scope(self):
+        markers, ending = EXTRA_PROFILES['popd-ram']
+        output = '\n'.join((*markers, ending)) + '\n'
+        for old, new in (('restore=16128', 'restore=0'), ('forms=25', 'forms=3'),
+                         ('stack_reads=1', 'stack_reads=2'), ('destination_writes=1', 'destination_writes=2'),
+                         ('circular_steps_bounded=1', 'circular_steps_bounded=0'),
+                         ('irq_acceptance=0', 'irq_acceptance=1'), ('mapped_acceptance=0', 'mapped_acceptance=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='popd-ram')
 
     def test_popd_scope(self):
         for name, cases in (('popd-mapped', 4032), ('popd-repeat', 6528)):
