@@ -312,6 +312,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rptb-page": (
+        "TMS320C54x repeat page comparator: PASS cases=192 restore=192 frontends=atomic,staged counts=0,1,2,7 caller_pages=0,2,127 targets=foreign hazard_controls=2 snapshots=4 rea_width=16 wrap_page=current balanced_frames=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeat page comparator complete",
+    ),
     "instr-observer": (
         "TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0",
         "Fatal error: TMS320C54x isolated instruction observer complete",

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_repeat_endpoint_is_xpc_qualified",
+      "status": "disproven",
+      "hypothesis": "An active C54x repeat block belongs to its setup XPC, so a matching low PC on a foreign program page cannot consume its count or reload RSA",
+      "conclusion": "TI SPRA599A section 2 page 4 explicitly documents an unintended repeat when another thread's foreign-page low PC matches REA. The comparator is 16-bit; an RSA reload changes PC without restoring the setup XPC. The old staged page qualifier hides this hardware hazard, while the atomic frontend already exposes it. A paired 192-case replay fixture covers BRC 0/1/2/7, caller pages 0/2/127, foreign-page collisions and safe controls. Its minimal failing staged case has BRC=1: the old model calls twice from the original page, whereas the documented comparator consumes the loop in one foreign callee and executes its prefix once. The corrected staged path matches the independent counts and balances every PC/page frame through replay. This does not certify silicon phases or unrestricted far-call/repeat compositions, and does not justify copying the C55x compatibility mode's BRAF-clearing rule. The original REL delayed-call composition remains separately guarded.",
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "mu4_recorder_first_zero_mvdd_source_is_staged_only",
       "status": "disproven",
       "hypothesis": "The first repeated recorder MVDD source 0000 is introduced by the staged TS load or staged pointer execution, while the equivalent atomic recorder uses a nonzero initialized source",

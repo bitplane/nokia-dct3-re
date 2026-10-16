@@ -95,8 +95,10 @@ four low-window words remain excluded. Native execution now passes the
 mapped-SP MVKD and stops at `02:6116`, `fb82 510c`: a delayed far call
 inside the active block-repeat body `02:6116..6120`. Delayed far calls
 and block repeats have separate coverage, but this combination remains
-guarded pending reconciliation with TI's far-call/block-repeat restriction,
-then any justified frame/delay/loop-restoration tests.
+guarded pending its frame/delay/loop-restoration tests and reconciliation
+with TI's far-call/block-repeat restriction. The generic 16-bit repeat
+comparator has independent TI documentation and focused acceptance;
+it must not be made XPC-private to avoid the documented page hazard.
 This is a failed coverage diagnostic, not a playback acceptance or an
 unavailable-ROM boundary.
 
@@ -4309,13 +4311,32 @@ call before its frame is allocated. This is not automatically a legal
 composition waiting for a test: TI's [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
 FCALL[D] page 4-57 and RPTB[D] page 4-148, explicitly restricts far calls
 inside block repeats. This restriction does not define a hardware trap or
-prove that the supplied program is invalid. Reconcile the supplied C5416
-program with that restriction before choosing loop semantics; neither the existing
-nondelayed in-block fixture nor a new self-conformance test proves silicon
-behavior. If independent evidence supports this composition, its tests
-must establish call/return frame balance, both delay words, actual repeat
-counts and save/replay through the callee. Otherwise retain the guard and
-document the unresolved variant/architecture boundary.
+prove that the supplied program is invalid. TI's separate
+[extended-addressing report](rom4_dsp_loader.md#repeat-endpoint-and-page-hazard)
+establishes that REA compares only the low PC, including on foreign pages.
+The repaired staged comparator passes the paired atomic/staged hazard
+fixture; this does not rescind the instruction-reference restriction or
+by itself validate the delayed call.
+
+`mu4_context_contract.py` pins all 25 caller words and all 55 callee words.
+The callee has one forward BGT branch at `02:5117`, with a two-word
+`STM #a858,AR3` delay, and a sole FRET at `02:5142`. Both paths converge
+at `02:512e`. It has no calls, repeat setups, backward edges, BRC/RSA/REA
+writes or BRAF/CPL writes. Its fixed stores target `a858..a859`, `b331`
+and `a854`; it pushes AL and pops that word into AR0. Direct offset zero
+requires incoming CPL=1. Do not assign the following routine's BRC write
+at `02:5170` to this callee: the separate prologue starts at `02:5143`.
+
+The read-only native snapshot matches all 25 loop words in the common
+program window. At the guard it has PMST=`202c`, ST1=`e104`, SP=`d6f6`,
+BRC=`0006`, RSA=`6116` and REA=`6120`; source image and live code agree
+on the same-page `02:510c` call and both delay words. Initial overlay
+comparison also covers the pinned callee. This excludes a missing loop
+word or unclassified callee-owned repeat setup, not the provisional
+physical DA150 map or all call/loop hazards. The next admission must
+establish call/return frame balance, both delay words, actual repeat
+counts and replay through the callee, without synthesizing its return or
+replacing the bitstream input. The existing guard stays until then.
 
 ```sh
 python3 tools/run_c54x_core.py --profile mvkd-sp \

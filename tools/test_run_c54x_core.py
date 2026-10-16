@@ -12,6 +12,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeat_page_comparator_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-page']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-page')
+        for bad in (output.replace('rea_width=16', 'rea_width=23'),
+                    output.replace('wrap_page=current', 'wrap_page=caller'),
+                    output.replace('restore=192', 'restore=0'),
+                    output.replace('physical_phase_claim=0', 'physical_phase_claim=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptb-page')
+
     def test_instruction_observer_scope(self):
         marker, ending = EXTRA_PROFILES['instr-observer']
         output = marker + '\n' + ending + '\n'

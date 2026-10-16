@@ -4589,12 +4589,13 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_fetch_address = (m_pipeline_fetch_address & 0x7f0000) | u16(m_pipeline_fetch_address + 1);
 		if (m_pipeline_block_active && m_pipeline_block_fetch_enabled)
 		{
-			m_pipeline_block_body[0] = (m_pipeline_address[0] & 0x7f0000) == (m_pipeline_block_start & 0x7f0000) &&
-				u16(m_pipeline_address[0] - m_pipeline_block_start) <= u16(m_pipeline_block_end_address - m_pipeline_block_start);
-			m_pipeline_block_first_final[0] = m_pipeline_address[0] == m_pipeline_block_start && m_pipeline_block_fetch_remaining == 1;
-			m_pipeline_block_end[0] = m_pipeline_address[0] == m_pipeline_block_end_address;
+			// SPRA599A section 2: REA does not compare XPC. A foreign
+			// page can consume this loop; RSA reload changes PC, not XPC.
+			m_pipeline_block_body[0] = u16(m_pipeline_address[0] - m_pipeline_block_start) <= u16(m_pipeline_block_end_address - m_pipeline_block_start);
+			m_pipeline_block_first_final[0] = u16(m_pipeline_address[0]) == m_rsa && m_pipeline_block_fetch_remaining == 1;
+			m_pipeline_block_end[0] = u16(m_pipeline_address[0]) == m_rea;
 			if (m_pipeline_block_end[0] && m_pipeline_block_fetch_remaining)
-				if (--m_pipeline_block_fetch_remaining) m_pipeline_fetch_address = m_pipeline_block_start;
+				if (--m_pipeline_block_fetch_remaining) m_pipeline_fetch_address = (m_pipeline_address[0] & 0x7f0000) | m_rsa;
 		}
 	}
 	pipeline_accept_interrupt();

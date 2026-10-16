@@ -24,6 +24,40 @@ flat DSP image into `0x2000..0x27ff`. Its old explanation was wrong: loader2
 does not clear that range. Loader1 itself populates the resident branch table
 with a repeated MVDP data-to-program transfer.
 
+## Repeat endpoint and page hazard
+
+The C54x repeat-end comparator is 16-bit, not XPC-qualified. An active
+loop can be consumed by code on another program page if its low PC reaches
+REA; an RSA reload retains that code's current XPC. TI documents this
+extended-addressing hazard in [SPRA599A, section 2, page 4](https://www.ti.com/lit/an/spra599a/spra599a.pdf).
+Do not make a repeat loop page-private to protect a caller or ISR. The
+instruction-reference restriction on far calls inside repeat blocks does
+not specify a page-qualified comparator or a hardware trap, and does not
+justify importing the C55x compatibility mode's automatic BRAF clearing.
+
+The `rptb-page` fixture checks 192 cases with replay: both atomic and staged
+frontends, BRC 0/1/2/7, caller pages 0/2/127, foreign-page REA collisions
+and safe controls, with four save points. In the colliding case, a foreign
+callee consumes the remaining loop count and repeats at its own page's
+RSA. Caller iteration counts, foreign prefix/endpoint counts, BRC/BRAF,
+SP, return PC/page and ordered two-word frames are checked independently.
+The former staged page qualifier suppresses this result; the atomic
+frontend already follows the 16-bit comparator. This is a manual-derived
+regression, not a silicon timing measurement or permission to admit every
+far-call/repeat composition.
+
+```sh
+python3 tools/run_c54x_core.py --profile rptb-page \
+  --mame mame/mame --rompath roms --output-root tmp
+```
+
+The 25 focused repeat/control profiles, native 5110 save-state gate and
+MU4 cold saved-track catalogue gate pass. The delayed far-call guard at
+the [REL playback boundary](5510_bringup.md#saved-track-playback-boundary)
+remains separate. The reference PDF is retained locally at
+`roms/reference-docs/c54x/ti_tms320c54x_extended_addressing_spra599a.pdf`,
+SHA-256 `fbbe43aa06609af2491e71213b19145f11db3d05169939daae5358efcea52432`.
+
 ## Extended program overlay
 
 The staged frontend retains the physical program address selected by each

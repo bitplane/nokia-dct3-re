@@ -12,9 +12,55 @@ from tools.mu4_context_contract import BOOTSTRAP_BASE, BOOTSTRAP_WITNESS, decode
 from tools.mu4_context_contract import BOOT_MEMORY_SHIFT_BASE, BOOT_MEMORY_SHIFT_WITNESS, decode_boot_memory_shift, decode_extended_shift_load
 from tools.mu4_context_contract import BOOT_BLOCK_REPEAT_BASE, BOOT_BLOCK_REPEAT_WITNESS, decode_boot_block_repeat
 from tools.mu4_context_contract import decode_block_repeat_setup
+from tools.mu4_context_contract import REL_REPEAT_BASE, REL_REPEAT_WITNESS, REL_CALLEE_BASE, REL_CALLEE_WITNESS, decode_rel_repeat_call
 
 
 class ContextContractTest(unittest.TestCase):
+    @staticmethod
+    def rel_words():
+        return {**dict(enumerate(REL_REPEAT_WITNESS, REL_REPEAT_BASE)),
+                **dict(enumerate(REL_CALLEE_WITNESS, REL_CALLEE_BASE))}
+
+    def test_rel_call_geometry_and_complete_callee(self):
+        result = decode_rel_repeat_call(self.rel_words())
+        self.assertEqual(result['pinned_words'], 80)
+        self.assertEqual(result['loop']['setup']['rsa'], 0x6116)
+        self.assertEqual(result['loop']['setup']['rea'], 0x6120)
+        self.assertEqual(result['loop']['nominal_body_executions'], 7)
+        self.assertEqual(result['call']['target'], '02510c')
+        self.assertEqual(result['call']['return_address'], '02611a')
+        self.assertEqual(result['call']['stack_words'], 2)
+        self.assertEqual(result['call']['argument_a'], 1)
+        self.assertEqual(result['callee']['pinned_words'], 55)
+        self.assertEqual(result['callee']['last_word'], '025142')
+        self.assertEqual(result['callee']['branch']['paths'], 2)
+        self.assertEqual(result['callee']['branch']['backward_edges'], 0)
+        self.assertEqual(result['callee']['repeat_control_writes'], [])
+        self.assertEqual(result['callee']['braf_writes'], 0)
+        self.assertEqual(result['callee']['cpl_writes'], 0)
+        self.assertEqual(result['callee']['calls'], 0)
+        self.assertIn('no physical mapping', result['scope'])
+
+    def test_rel_callee_fixed_stores_are_not_loop_control(self):
+        stores = decode_rel_repeat_call(self.rel_words())['callee']['fixed_ram_writes']
+        self.assertEqual([store['instruction'] for store in stores],
+                         ['025127', '02512a', '02512d', '025130'])
+        self.assertEqual([store['destination'] for store in stores],
+                         ['a858', 'b331', 'a854', 'a854'])
+        self.assertEqual([store['words'] for store in stores], [2, 1, 1, 1])
+
+    def test_rel_every_word_is_required_and_pinned(self):
+        original = self.rel_words()
+        for address in original:
+            with self.subTest(address=f'{address:06x}'):
+                words = original.copy()
+                words[address] ^= 1
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_repeat_call(words)
+                del words[address]
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_repeat_call(words)
+
     def test_block_repeat_architectural_setup(self):
         for opcode, words, cycles in ((0xF072, 2, 4), (0xF272, 4, 2)):
             for address in (0, 0x32EE, 0xFFFF, 0x12FFFF, 0x7FFFFF):

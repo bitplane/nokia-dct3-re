@@ -61,6 +61,69 @@ BOOT_MEMORY_SHIFT_WITNESS = (0x6FE6, 0x0010, 0x0D48)
 BOOT_BLOCK_REPEAT_BASE = 0x32EC
 BOOT_BLOCK_REPEAT_WITNESS = (0x891A, 0xF495, 0xF072, 0x32F4,
                              0x1386, 0xF678, 0xF3E8, 0xF1A0, 0x8196)
+REL_REPEAT_BASE = 0x2610C
+REL_REPEAT_WITNESS = (
+    0x4A11, 0xEEFF, 0xF7B8, 0x771A, 0x0006, 0x8811, 0xF272, 0x6120,
+    0x7600, 0x0001, 0xFB82, 0x510C, 0xE801, 0xF495, 0xFA44, 0x611F,
+    0xE901, 0x1000, 0x8091, 0x0100, 0x8100, 0x8181, 0xEE01, 0x8A11,
+    0xF4E4,
+)
+REL_CALLEE_BASE = 0x2510C
+REL_CALLEE_WITNESS = (
+    0xED00, 0xF6B6, 0xF6B7, 0xF7B8, 0xF6B9, 0x4A08, 0x7712, 0xA854,
+    0x1182, 0xF310, 0x0010, 0xFA4E, 0x512E, 0x7713, 0xA858, 0x7714,
+    0xB331, 0x7715, 0xB332, 0x1085, 0x0084, 0x8815, 0x5783, 0xF74F,
+    0xF741, 0x1285, 0xF2A0, 0x4E83, 0xE901, 0x0184, 0x8184, 0xE910,
+    0x0182, 0x8182, 0x1182, 0x0900, 0x8182, 0x8A10, 0xF300, 0xFFF0,
+    0xF784, 0x890E, 0x5683, 0xF48F, 0xF450, 0x32F8, 0x0010, 0xE901,
+    0xF782, 0xF310, 0x0001, 0xF280, 0xF030, 0xFFFF, 0xF4E4,
+)
+
+
+def decode_rel_repeat_call(words):
+    """Pinned logical AA99 instructions, not a generic call/loop census."""
+    for base, witness in ((REL_REPEAT_BASE, REL_REPEAT_WITNESS),
+                          (REL_CALLEE_BASE, REL_CALLEE_WITNESS)):
+        for offset, expected in enumerate(witness):
+            address = base + offset
+            if words.get(address) != expected:
+                raise ValueError(f'REL call witness changed or absent at {address:06x}')
+    setup_address, call_address = 0x26112, 0x26116
+    opcode = words[call_address]
+    return {
+        'segment': 'aa99', 'pinned_words': len(REL_REPEAT_WITNESS) + len(REL_CALLEE_WITNESS),
+        'loop': {
+            'setup_address': f'{setup_address:06x}',
+            'setup': decode_block_repeat_setup(words[setup_address], words[setup_address + 1], setup_address),
+            'count_initializer': {'address': '02610f', 'destination': 'BRC', 'value': 6},
+            'nominal_body_executions': 7,
+        },
+        'call': {
+            'address': f'{call_address:06x}', 'opcode': f'{opcode:04x}',
+            'target': f'{((opcode & 0x7f) << 16) | words[call_address + 1]:06x}',
+            'return_address': f'{call_address + 4:06x}', 'stack_words': 2,
+            'delay_words': ['e801', 'f495'], 'argument_a': 1,
+        },
+        'callee': {
+            'first_word': '02510c', 'last_word': '025142', 'pinned_words': len(REL_CALLEE_WITNESS),
+            'entry_cpl_required': 1,
+            'branch': {'address': '025117', 'condition': 'BGT', 'target': '02512e',
+                       'delay_words': ['7713', 'a858'], 'delay_operation': 'STM #a858,AR3',
+                       'paths': 2, 'backward_edges': 0},
+            'calls': 0, 'repeat_setups': 0, 'repeat_control_writes': [],
+            'braf_writes': 0, 'cpl_writes': 0,
+            'fixed_ram_writes': [
+                {'instruction': '025127', 'destination': 'a858', 'words': 2},
+                {'instruction': '02512a', 'destination': 'b331', 'words': 1},
+                {'instruction': '02512d', 'destination': 'a854', 'words': 1},
+                {'instruction': '025130', 'destination': 'a854', 'words': 1},
+            ],
+            'local_stack': ['PSHM AL at 025111', 'POPM AR0 at 025131'],
+            'return': {'address': '025142', 'operation': 'FRET'},
+        },
+        'scope': '80 pinned logical-source words and two callee paths; no physical mapping, '
+                 'far-call/block-repeat legality, execution completion or audio acceptance',
+    }
 
 
 def decode_block_repeat_setup(opcode, literal, address):
@@ -398,6 +461,7 @@ def contract(source):
     result['bootstrap_repeat'] = decode_bootstrap_repeat(bootstrap_words)
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
+    result['rel_repeat_call'] = decode_rel_repeat_call(uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99'))
     return result
 
 

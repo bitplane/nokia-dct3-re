@@ -11728,6 +11728,51 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255240;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct block_page_fixture
+	{
+		unsigned count, checkpoint;
+		u32 caller, callee;
+		bool staged, hazard;
+	};
+	static block_page_fixture block_page_case(unsigned variant)
+	{
+		unsigned const page = (variant / 8) % 3;
+		return {std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4],
+			std::array<unsigned, 4>{6, 10, 16, 24}[variant / 48],
+			std::array<u32, 3>{0, 0x20000, 0x7f0000}[page],
+			std::array<u32, 3>{0x20000, 0x7f0000, 0}[page],
+			bool((variant / 4) % 2), bool((variant / 24) % 2)};
+	}
+	void start_block_page(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = block_page_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(f.caller + 0x600 + i, 0xf495); program.write_word(f.callee + 0x600 + i, 0xf495); }
+		program.write_word(f.caller + 0x600, 0xf072); program.write_word(f.caller + 0x601, 0x609);
+		program.write_word(f.caller + 0x602, 0x6d94);
+		program.write_word(f.caller + 0x603, 0xf980 | (f.callee >> 16)); program.write_word(f.caller + 0x604, f.hazard ? 0x608 : 0x610);
+		program.write_word(f.caller + 0x60a, 0xf4e1);
+		program.write_word(f.callee + 0x602, 0x6d95);
+		program.write_word(f.callee + 0x609, 0x6d96); program.write_word(f.callee + 0x60a, 0xf4e4);
+		program.write_word(f.callee + 0x610, 0x6d96); program.write_word(f.callee + 0x611, 0xf4e4);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1500); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1600);
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_idle_fixture_tick = 0; m_pipeline_replay = false;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_page_frame_writes",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const part = m_pipeline_store_writes++ % 2;
+				expect(at == 0x2fff - part && word == (part ? f.caller >> 16 : 0x605), "Cross-page FCALL publishes one ordered PC/page frame"); });
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_page_frame_reads",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const part = m_pipeline_operand_reads++ % 2;
+				expect(at == 0x2ffe + part && word == (part ? 0x605 : f.caller >> 16), "Cross-page FRET consumes the matching page/PC frame"); });
+		m_cpu->set_state_int(STATE_GENPC, f.caller + 0x600); m_cpu->set_pipeline_frontend(f.staged);
+		m_phase = 294000; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct block_far_call_fixture
 	{
 		unsigned count, layout, depth, interrupt, checkpoint;
@@ -14452,6 +14497,7 @@ private:
 		if (!strcmp(machine().options().bios(), "asm-mapped")) { start_asm_mapped(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-single")) { start_block_single(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-rpt-edge")) { start_block_single_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-page")) { start_block_page(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-fcall")) { start_block_far_call(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-fcall-edge")) { start_block_far_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-back")) { start_block_back(); return; }
@@ -37482,6 +37528,38 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 292010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 292000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 294000)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_page_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Cross-page repeat hazard uses retained ordinary instructions and a balanced far call");
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before, during or after the foreign-page repeat endpoint");
+			}
+			if (tick == 240)
+			{
+				unsigned const calls = f.hazard ? 1 : f.count + 1;
+				if (m_cpu->state_int(tms320c54x_device::STATE_AR4) != 0x1400 + calls || m_cpu->state_int(tms320c54x_device::STATE_AR5) != 0x1500 + (f.hazard ? f.count : 0))
+					osd_printf_info("block_page_mismatch: case=%u staged=%u hazard=%u count=%u caller=%06x callee=%06x ar4=%04x ar5=%04x ar6=%04x pc=%06x brc=%04x st1=%04x stack_writes=%u stack_reads=%u\n", variant, unsigned(f.staged), unsigned(f.hazard), f.count, unsigned(f.caller), unsigned(f.callee), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), m_pipeline_store_writes, m_pipeline_operand_reads);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.caller + 0x60b && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400 + calls && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1500 + (f.hazard ? f.count : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + f.count + 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x609 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
+					m_pipeline_store_writes == 2 * calls && m_pipeline_operand_reads == 2 * calls,
+					"REA compares only the low PC; a foreign-page match consumes the loop and wraps within that foreign page");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore the actual page, repeat count and pending call frame without duplicating work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 294010; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 191) { start_block_page(variant + 1); return; }
+				osd_printf_info("TMS320C54x repeat page comparator: PASS cases=192 restore=192 frontends=atomic,staged counts=0,1,2,7 caller_pages=0,2,127 targets=foreign hazard_controls=2 snapshots=4 rea_width=16 wrap_page=current balanced_frames=1 physical_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeat page comparator complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 294010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 294000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 293000)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -44755,6 +44833,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(215, "add-sp", "Retained absolute ADD from SP and stack-update contexts")
 	ROM_SYSTEM_BIOS(216, "instr-observer", "Execute-owned instruction observation without program-read aliases")
 	ROM_SYSTEM_BIOS(217, "mvkd-sp", "Retained MVKD and MVDM from mapped SP with stack-update contexts")
+	ROM_SYSTEM_BIOS(218, "rptb-page", "Low-PC repeat endpoint and foreign-page hazard")
 ROM_END
 
 ROM_START(tms54rom4)
