@@ -110,6 +110,27 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_mapped_ar_arithmetic_scope(self):
+        marker, ending = EXTRA_PROFILES['arith-ar']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='arith-ar')
+        for bad in (output.replace('restore=1024', 'restore=0'),
+                    output.replace('duplicate_reads=0', 'duplicate_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='arith-ar')
+
+    def test_mapped_bk_arithmetic_scope(self):
+        marker, ending = EXTRA_PROFILES['arith-bk']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='arith-bk')
+        for bad in (output.replace('restore=1024', 'restore=0'),
+                    output.replace('post_read_change=1', 'post_read_change=0'),
+                    output.replace('duplicate_reads=0', 'duplicate_reads=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='arith-bk')
+
     def test_delayed_absolute_add_scope(self):
         marker, ending = EXTRA_PROFILES['add-delay']
         output = marker + '\n' + ending + '\n'

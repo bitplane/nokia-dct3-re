@@ -45,9 +45,10 @@ the isolated interrupt fixture, and the original recorder advances past
 The internal BD (`f273`) at `03:da7e` and extended BANZ (`6ce0`) at
 `02:a4cb` also execute. Absolute ADD `00f8 000b` at `02:9e9d` now
 occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
-its source is mapped BL, not RAM. The current exclusion is memory SUB
-`08f8` at `03:d309`, reading mapped BK (`0019`). Live terminal PC is
-`03:d30d`; it is not the owning instruction address. NAND writes alone
+its source is mapped BL, not RAM. Memory SUB `08f8` at `03:d309` now
+reads mapped BK (`0019`). The current unsupported form is immediate
+store `76b2` at `03:df3e`, using `*AR2+0` addressing. Live terminal PC
+is `03:df40`; it is not the owning instruction address. NAND writes alone
 do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
@@ -198,6 +199,28 @@ Absolute ADD/BK controls, both shared delay-load profiles and their exclusion
 profiles, internal BD/BANZ, native 5110 save-state and 2,867 tooling tests
 (one skip) pass. The original resident-memory comparison remains exact.
 The full default CPU run was not repeated for this delay-admission change.
+
+### BK as an ordinary arithmetic operand
+
+BK (`0019`) is admitted as a side-effect-free 16-bit source for ordinary
+ADD/SUB, matching the existing absolute-ADD BK contract. This does not
+admit SP, repeat-control or peripheral registers, or other arithmetic families
+whose mapped inputs remain excluded. Existing Read capture and arithmetic
+helpers own the operand and result; no synthetic register value is supplied.
+
+`--profile arith-bk` passes 1,024 cases and save/replays across ADD/SUB,
+both destinations, direct/absolute forms, eight input patterns (including
+zero BK), SXM/OVM, two pages and two checkpoints. Changing BK to `2222`
+after Read does not alter the result. Source-read count, carry, sticky
+overflow, saturation, untouched accumulator and absence of data writes are
+checked. `--profile arith-ar` separately reproduces the existing 1,024-case
+auxiliary-register control through the same fixture. Absolute-ADD/BK,
+delay-ADD, BK move/store and internal BANZ controls also pass. The original
+recorder passes its SUB and reaches the immediate-store exclusion above;
+native recording and physical pipeline phases remain unproved.
+The native 5110 save-state gate, exact resident-memory comparison and
+2,869 tooling tests (one skip) pass. The full default core run was not
+repeated for this mapped-source admission.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

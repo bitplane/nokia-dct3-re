@@ -7452,13 +7452,14 @@ private:
 		m_phase = 252910; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	static memory_arithmetic_fixture register_arithmetic_case(unsigned variant)
+	static memory_arithmetic_fixture register_arithmetic_case(unsigned variant, bool bk = false)
 	{
-		unsigned const reg = variant % 8, selector = (variant / 8) % 4, flags = (variant / 32) % 4, pattern = 2 + (variant / 128) % 2;
-		bool const absolute = (variant / 256) % 2;
+		unsigned const reg = bk ? (variant / 256) % 2 ? 6 : 0 : variant % 8, selector = bk ? variant % 4 : (variant / 8) % 4, flags = (variant / 32) % 4, pattern = bk ? (variant / 4) % 8 : 2 + (variant / 128) % 2;
+		bool const absolute = (variant / (bk ? 128 : 256)) % 2;
 		auto f = memory_arithmetic_case(selector * 144 + pattern * 576 + flags * 4608);
+		if (bk && !pattern) { f.memory = 0; f.result = 0; f.result_st0 = (f.st0 & ~0x800) | (selector & 2 ? 0x800 : 0); }
 		f.reg = f.selected = reg; f.form = absolute ? 17 : 0; f.read_cycle = absolute ? 6 : 5;
-		f.address = f.literal = 0x10 + reg;
+		f.address = f.literal = bk ? 0x19 : 0x10 + reg;
 		f.opcode = (f.opcode & 0xff00) | (absolute ? 0xf8 : f.address);
 		f.st0 &= ~0x1ff; f.result_st0 &= ~0x1ff;
 		return f;
@@ -7466,7 +7467,8 @@ private:
 	void start_pipeline_register_arithmetic(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = register_arithmetic_case(variant);
+		bool const bk = !strcmp(machine().options().bios(), "arith-bk");
+		auto const f = register_arithmetic_case(variant, bk);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -7475,7 +7477,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, f.memory);
+		m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg, f.memory);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -13968,6 +13970,7 @@ private:
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
 		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute")) { start_pipeline_absolute_add(); return; }
+		if (!strcmp(machine().options().bios(), "arith-bk") || !strcmp(machine().options().bios(), "arith-ar")) { start_pipeline_register_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bk")) { start_stlm_bk(); return; }
 		if (!strcmp(machine().options().bios(), "store-bypass") || !strcmp(machine().options().bios(), "xmem-store-bp") || !strcmp(machine().options().bios(), "asm-store-bp")) { start_store_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "software-intr")) { start_software_intr(); return; }
@@ -38452,10 +38455,11 @@ private:
 		if (m_phase == 252930)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = register_arithmetic_case(variant);
+			bool const bk = !strcmp(machine().options().bios(), "arith-bk");
+			auto const f = register_arithmetic_case(variant, bk);
 			unsigned const checkpoint = variant / 512 ? f.read_cycle : f.read_cycle - 1;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR arithmetic sources have staged ownership");
-			if (tick == f.read_cycle) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, 0x2222);
+			if (tick == f.read_cycle) m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg, 0x2222);
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads};
@@ -38467,7 +38471,7 @@ private:
 				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == 0x2222,
+					m_cpu->state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg) == 0x2222,
 					"Mapped AR source is retained without duplicate reads or register publication");
 				if (!m_pipeline_replay)
 				{
@@ -38478,7 +38482,9 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 1023) { start_pipeline_register_arithmetic(variant + 1); return; }
+				if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
 				osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
+				if (!strcmp(machine().options().bios(), "arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
 				start_pipeline_signed_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -43965,6 +43971,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(199, "rptb-bd", "Unconditional delayed branches within a repeat block")
 	ROM_SYSTEM_BIOS(200, "rptb-banz", "Long-offset BANZ within a repeat block")
 	ROM_SYSTEM_BIOS(201, "add-delay", "Absolute mapped and RAM ADD within a control delay")
+	ROM_SYSTEM_BIOS(202, "arith-bk", "Mapped BK operand capture for ordinary ADD and SUB")
+	ROM_SYSTEM_BIOS(203, "arith-ar", "Existing mapped auxiliary-register arithmetic controls")
 ROM_END
 
 ROM_START(tms54rom4)
