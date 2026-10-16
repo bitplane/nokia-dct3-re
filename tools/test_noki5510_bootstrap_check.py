@@ -5,10 +5,24 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input, verify_playback_parent, verify_playback_range,
     verify_playback_switch_history,
     verify_playback_callback_reads,
+    verify_playback_notify_context,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_notify_register_context_is_not_an_unpaired_operand_claim(self):
+        text = ('mu4_playback_notify_context: ordinal=1 ar1=d796 ar2=d7ac '
+                'a=0000000001 b=0000000002 t=1.000000000 context_only=1 observer_writes=0')
+        history = [{'time': 1.0}]
+        self.assertEqual(verify_playback_notify_context(text, history)[0]['ar2'], 'd7ac')
+        for old, new in (('ordinal=1', 'ordinal=2'), ('t=1.000000000', 't=1.000000001'),
+                         ('context_only=1', 'context_only=0'), ('observer_writes=0', 'observer_writes=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_notify_context(text.replace(old, new), history)
+        for bad in ('', text + '\n' + text):
+            with self.assertRaises(ValueError):
+                verify_playback_notify_context(bad, history)
+
     def test_callback_bus_reads_require_original_initializer_and_scoped_ordinals(self):
         text = ('mu4_playback_callback_descriptor_read: address=d7b1 value=0419 ordinal=1 '
                 't=1.000000000 context_pc=020490 reader_identity=unvalidated observer_writes=0')

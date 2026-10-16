@@ -437,6 +437,7 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
         'enqueue': ('address=0202d7 opcode=487e ar2=8044', 'live_ar2_context'),
         'activation': ('address=020419 opcode=f6be paired_ar2=8044', 'paired_enqueue_ar2_context'),
         'callback': ('address=020478 opcode=10e4 ar4=d7b0', 'live_ar4_context'),
+        'notify': ('address=0201b3 opcode=f7b8', 'entry_address_context'),
     }
     if kind not in formats:
         raise ValueError('unknown playback transfer history kind')
@@ -459,6 +460,21 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
             raise ValueError('playback switch history disagrees with original AA99 source')
         result.append({'time': time, 'history': [f'{a:06x}/{op:04x}' for a, op in history]})
         previous = time
+    return result
+
+
+def verify_playback_notify_context(text, history):
+    rows = list(re.finditer(
+        r'mu4_playback_notify_context: ordinal=(\d+) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) '
+        r'a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=(\d+\.\d{9}) context_only=1 observer_writes=0$',
+        text, re.MULTILINE))
+    if len(rows) != len(history) or len(rows) != text.count('mu4_playback_notify_context:'):
+        raise ValueError('missing or malformed notify register context')
+    result = []
+    for ordinal, (row, entry) in enumerate(zip(rows, history), 1):
+        if int(row[1]) != ordinal or float(row[6]) != entry['time']:
+            raise ValueError('notify register context is not paired with its Execute entry')
+        result.append(dict(zip(('ar1', 'ar2', 'a', 'b'), row.group(2, 3, 4, 5))))
     return result
 
 
@@ -506,6 +522,7 @@ def verify_playback_range(text, words):
         raise ValueError('range entry totals disagree with the complete census')
     enqueue_history = verify_playback_switch_history(text, words, parent['first_session'], kind='enqueue')
     activation_history = verify_playback_switch_history(text, words, parent['first_session'], kind='activation')
+    notify_history = verify_playback_switch_history(text, words, parent['first_session'], kind='notify')
     if activation_history and (len(activation_history) != len(enqueue_history) or any(
             a['time'] >= e['time'] for a, e in zip(activation_history, enqueue_history))):
         raise ValueError('activation history does not precede its paired enqueue entries')
@@ -515,6 +532,8 @@ def verify_playback_range(text, words):
             'activation_context_history': activation_history,
             'callback_context_history': verify_playback_switch_history(text, words, parent['first_session'], kind='callback'),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
+            'notify_context_history': notify_history,
+            'notify_raw_register_context': verify_playback_notify_context(text, notify_history),
             'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
             'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
             'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '

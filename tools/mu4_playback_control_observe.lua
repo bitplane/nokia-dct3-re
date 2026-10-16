@@ -21,7 +21,7 @@ for _, range in ipairs({{0x8044, 0x8049}, {0x80a3, 0x80a5}}) do
 end
 handles[#handles + 1] = data:install_read_tap(0x804a, 0x804f, 'mu4_playback_descriptor_reads', function(address, value)
     local time = machine.time:as_double()
-    if sampling or time < 0.8 or time > 2.4 then return end
+    if sampling or machine:side_effects_disabled() or time < 0.8 or time > 2.4 then return end
     read_counts[address] = (read_counts[address] or 0) + 1
     if read_counts[address] <= 8 then
         machine:logerror(string.format(
@@ -43,7 +43,7 @@ _G.mu4_playback_control_taps = handles
 local callback_reads = {}
 handles[#handles + 1] = data:install_read_tap(0xd7b0, 0xd7b5, 'mu4_playback_callback_descriptor', function(address, value)
     local time = machine.time:as_double()
-    if sampling or time < 0.8182 or time > 1.7 then return end
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end
     callback_reads[address] = (callback_reads[address] or 0) + 1
     if callback_reads[address] <= 8 then
         machine:logerror(string.format(

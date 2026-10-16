@@ -4530,161 +4530,105 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 `02:a2c6` arithmetic loop. This differs from the constant-input file's
 87,390 completed calls and twelve resident entries. It is an input-dependent
 earlier/different route, not evidence of a stuck filter or missing opcode.
-The divergence is now bounded upstream of that loop. In the first verified
-AA99 session, a source-checked census covers all 3,122 contiguous words at
-`0200a0..020cd1`: constant playback visits 1,162 addresses with 957,582
-Execute entries; varying-input playback visits 954 with 336,192 entries.
-Both have zero opcode mismatches against the original upload. These are
-instruction-entry observations, not retirement or complete branch outcomes.
-The parent at `02a10c` is entered 1,478 times for constant playback and zero
-for varying input. Its method-9 dispatch at `0205d0` is likewise absent in
-the latter; the nearer method-15 selector at `0205ac` is absent too. The
-getter's word 13 therefore is not an evidenced cause of this divergence.
+#### Playback reactivation contract
 
-The earlier service entry `020495` runs only once for varying input.
-Its `0204b3..0204d5` path reads latch `aa56`; if still zero, the branch at
-`0204d4` bypasses normal processing to `0205ae`. Constant playback reaches
-`0204d6` 743 times; varying playback never does. Fixed-time RAM snapshots
-show `aa56` becoming one only in constant playback, but cannot identify
-its transient operands or writer. In particular, the area referenced by
-`aa59` must not yet be named a buffer descriptor: `7211 aa59` stores AR1,
-and the sampled words include return-like addresses.
+**Open question:** which producer reaches helper `020454` with the context
+that leads to the `d7b0` callback, and why does varying-input playback not
+reach that context? Do not force a wakeup, node, callback or input value.
 
-A literal census of all 49,843 mapped AA99 words finds one `0495` at
-`02716a`, in the data sequence `804a,0002,0495,d7b8,d796,0001,054f,0002`.
-The preceding word `0006` at `027167` makes this a count/destination/data
-initialization record: six words `0002,0495,d7b8,d796,0001,054f` are copied
-to data `804a..804f`. The existing C-initialization parser confirms this
-when walking from `027000` to exclusive end `027692` (228 records); that
-walk alone does not establish the table's true beginning or runtime
-initialization ownership. Thus the entry pointer is initialized RAM data,
-not a standalone invocation packet. Its runtime interpreter, descriptor
-field meanings and complete indirect-call ownership remain open.
-Separate three-second constant/varying-input runs sample data `804a`
-at 0.9, 1.116666667 and 1.4 seconds. All six descriptor words retain
-their initialized values in both runs. This excludes a changed descriptor
-at those sample times, not transient corruption, consumer identity or a
-complete resume-state contract. Nearby RAM words do change and are not
-silently included in that equality claim. The read-only
-`mu4_playback_control_observe.lua` captures both this descriptor and the
-separate control-area snapshots; it neither changes their state nor
-attributes them to an instruction.
-With snapshot-generated reads excluded from bus taps, varying-input
-playback reads `804e=0001`, then `804a..804d=0002,0495,d7b8,d796`
-at 0.834083490--0.834083631 seconds. The reported live PCs lie in
-`020478..020494`; that source sequence is now pinned as the candidate
-context-switch consumer, not asserted as each access's instruction owner.
-The latch receives zero at 0.823371263 (initialization context) and
-0.834084523 (bypass context). The same run preserves the source-checked
-954 visited addresses and 336,192 first-session Execute entries.
-At 1.741077 seconds, after that AA99 session ends at 1.726312648,
-the same RAM addresses instead yield `0002,8f56,12a2,1280` near a
-different context-switch location. Therefore these addresses must remain
-qualified by overlay/session: they are not permanent playback objects.
-The matching constant-input bus run first re-reads the unchanged descriptor
-at 1.022782 seconds, then again at 1.043100 seconds; its fourth observed
-latch write is `aa56=0001` at 1.043100872. This distinguishes missing
-reactivation from a permanently unsuitable method-15 return value.
-The source census finds five immediate-call encoding candidates targeting
-`020478`: `02018b,0201de,0201ec,02023d,020375`. Their respective first-session
-Execute-entry counts are `7,1571,2,1131,4271` for constant playback and
-`2,1,2,601,1669` for varying playback. These are not receiver-qualified call
-counts or indirect-call closure. In particular, `0201de` is not yet a
-causal reactivation frontier: the service helpers `020454` and `02046b`
-call `0201b3` at `02045d`/`020472`. Their entry counts are 787/784 for
-constant playback and 1/0 for varying playback, summing exactly to the
-respective `0201b3`/`0201de` counts. This is consistent with a downstream
-processing consequence, not an independently missing wakeup. Both runs
-also visit `0201d2` and `0201dd` equally within this path and never enter
-`0201d6` or `0202a4`; that status branch does not distinguish them.
-Executed history now locates that caller. At trampoline Execute entry
-`020478/10e4`, a bounded selector observes live `AR4=804a` and retains the
-preceding four Execute entries. All eight sampled constant-input visits
-have `02036f/f030,020371/f050,020373/f945,020375/f074`; the sole varying-input
-visit has the identical sequence. First entry is 0.834083498 seconds in
-both; constant playback's second is 1.022782161. These words match the
-original AA99 source and identify the immediate caller at `020375` in
-the loop beginning `020341`. The AR4 selector remains context, not a new
-instruction-operand ownership API. The observation counter is reset/saved,
-and the strict range checker rejects malformed histories, out-of-session
-timestamps and source-word mismatches. Both fresh runs reproduce the
-previous range counts exactly. The next boundary is that loop's descriptor
-selection/requeue contract, rather than `0201de` or an injected wakeup.
-The initialization record immediately before the descriptor writes
-`8044..8049=ffff,80a4,0010,0000,0000,0000`. Bounded data-write taps
-over this prefix and candidate links `80a3..80a5` use the common first-session
-interval 0.8182--1.7 seconds. Both runs write `8044=ffff` at 0.834083281
-after the initial selection. Constant playback writes `8044=0000` again
-at 1.022780877, then `ffff` at 1.022781944 before the second descriptor
-entry. It repeats the zero/ffff pattern for later entries. Varying playback
-has only the three initial writes to `8044` (zero, zero, ffff) throughout
-that interval; the per-address cap is 32, so this is not cap exhaustion.
-The observed zero writes have live PC context `0202e1`, near the generic
-enqueue helper at `0202d7`; source `1282,8292,fc45` loads the node's first
-word, stores zero and returns if the loaded word was zero. The nonzero
-path goes on to update links. Conversely, the scheduler writes ffff near
-`02035c..020363`. These observations support an enqueue/dequeue distinction,
-but live PC alone does not identify the exact bus-owning instruction.
-The next boundary is the executed caller/trigger that enqueues this node
-again for constant playback, rather than changing the node or descriptor.
-Execute history at enqueue entry `0202d7/487e`, selected by live
-`AR2=8044`, identifies `02041f/f074` in all eight bounded constant samples
-and both varying-input samples. The preceding entries are
-`02041b/8812,02041c/46f8,02041e/f495`. The source-pinned wrapper at
-`020419` moves its A input to AR2, calls the enqueue helper and returns;
-it does not create a missing event. Constant playback's third wrapper
-request is at 1.022780785 seconds; varying playback has no third selected
-request in its first session. Source-checked history and previous range
-counts reproduce on the new build. The three immediate far-call encoding
-candidates for `020419` at `020cba,0295c8,038c40` are preceded by literals
-`8052,8060,807c`, respectively, not `8044`. Initialized `02:0419` references
-also occur in the control-area data. These facts prioritize the indirect
-caller of the wrapper; they do not close computed or cross-overlay callers
-or establish that each reference is a completion callback. Full tool tests
-pass (2,959 tests, one skipped); native audio acceptance remains unmet.
-Paired wrapper-entry history now identifies `02048f/f5e7` (`FCALA B`)
-as the indirect transfer into `020419` for all eight bounded constant
-requests and both varying-input requests. The preceding Execute words
-are `02048c/1b94,02048d/4b94,02048e/1094`. The first two entry times match
-at 0.820210499 and 0.834081781 seconds; only constant playback has the
-third at 1.022780685. The original C-initialization record at `027079`
-copies `0002,0419,0000,8044,0001,054f` to `d7b0..d7b5`, supplying a
-concrete candidate callback descriptor rather than an invented event.
-Its actual runtime use remains to be correlated with the transfer.
-The observer retains history at every wrapper entry and reports it only
-when the subsequent enqueue entry selects live AR2=8044; a live-A match
-at wrapper entry did not recover these calls and is not an absence proof.
-Paired entry timestamps, ordinal order and original source words are
-checked independently; retained observer state is reset/saved. The fresh
-paired runs preserve the previous source-checked range counts. The next
-boundary is which descriptor invokes this trampoline and what condition
-produces its later activation, not the wrapper's enqueue semantics.
-Runtime bus reads confirm the `d7b0` descriptor connection. In constant
-playback the first selected trampoline entry is 1.022780485 seconds;
-its executed predecessors end at `0201de/f074`, and the bus reads
-`d7b4=0001`, then `d7b0..d7b3=0002,0419,0000,8044`. Subsequent bounded
-entries also include the distinct `02018b/f074` caller. All eight sampled
-reads of each of these five fields match the original initialization.
-Varying playback has no selected `d7b0` entries in its first session and
-no reads of these fields in the common 0.8182--1.7-second interval.
-The strict checker validates field values, bounded per-address ordinals,
-session/time selection and read-only scope without claiming bus-owner
-instruction identity. Both fresh runs preserve the established range
-counts. Thus `0201de` is relevant when qualified by this descriptor,
-despite its aggregate counts being insufficient to establish causality.
-The next question is which input/context reaches `0201b3` and selects
-`d7b0` for that first post-startup callback, with the `02018b` path kept
-separate rather than conflating their shared target.
-The only five `aa56`
-literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
-an explicit zero initialization. Initialization also sets `aa59=d796`
-at `027a0d`. Computed aliases remain outside this literal census.
-The next boundary is the invocation/resume contract for `020495` and the
-transient predicate that sets `aa56`, not forced filter entry or input tuning.
-`mu4_context_contract.py` now checks these literal locations and initialization
-words against the original upload, rejecting extra references and changed
-witnesses. `--playback-range --source-a00` checks the paired runtime census
-against source bytes; it deliberately makes no audio acceptance claim.
+The first verified AA99 sessions start at 0.818115786 seconds and end at
+2.368206564 (constant) / 1.726312648 (varying). Source-checked observation
+covers all 3,122 words at `0200a0..020cd1`, with zero opcode mismatches:
+
+| Execute-entry observation | Constant | Varying input |
+| --- | ---: | ---: |
+| Distinct visited addresses | 1,162 | 954 |
+| Total entries in range | 957,582 | 336,192 |
+| Parent `02a10c` | 1,478 | 0 |
+| Service `020495` | 791 | 1 |
+| Processing entry `0204d6` | 743 | 0 |
+
+These are entry observations, not retirement or complete branch outcomes.
+The method-9 dispatch at `0205d0` and method-15 selector at `0205ac` are
+absent in varying playback; the getter's word 13 is not an evidenced cause.
+If latch `aa56` remains zero, `0204d4` bypasses processing to `0205ae`.
+Constant playback first writes one at 1.043100872 seconds. Fixed-time
+snapshots miss transient operands and cannot establish writer ownership.
+`7211 aa59` stores AR1; the referenced area contains return-like words
+and must not be named a buffer descriptor from its shape.
+
+**Original initialization and source coverage.** The AA99 literal census
+covers 49,843 mapped words. Its sole `0495` at `02716a` belongs to a
+count/destination/data record, not a standalone invocation packet:
+
+| Source record | RAM destination | Initialized words |
+| --- | --- | --- |
+| `027167` | `804a..804f` | `0002,0495,d7b8,d796,0001,054f` |
+| `027079` | `d7b0..d7b5` | `0002,0419,0000,8044,0001,054f` |
+
+The preceding structure is
+`8044..8049=ffff,80a4,0010,0000,0000,0000`.
+The C-initialization parser walks 228 records from `027000` to exclusive
+end `027692`; this alone does not establish the table's true beginning
+or runtime initialization ownership. The only `aa56` literals are at
+`0204b4,0204d0,0204d3,0205af,027a05`; the last is zero initialization.
+Initialization also sets `aa59=d796` at `027a0d`. Computed aliases remain
+outside this literal census. All six `804a` descriptor words match their
+initialization at 0.9, 1.116666667 and 1.4 seconds in both runs, not proof
+against transient corruption. After varying playback's first session,
+reads at 1.741077 seconds instead yield `0002,8f56,12a2,1280` at the same
+RAM addresses: identities must stay overlay/session-qualified.
+
+**Observed activation chain.** Actual descriptor reads and source-checked
+executed histories establish:
+`d7b0` descriptor -> trampoline `020478..020494` / `02048f FCALA B` ->
+wrapper `020419` -> `02041f CALL 0202d7` -> node `8044` insertion ->
+scheduler `020341` / `020375 CALL 020478` -> service `020495`.
+
+Both runs initially select the service descriptor at 0.834083498 seconds.
+Constant playback's later callback reaches the trampoline at 1.022780485,
+wrapper at 1.022780685 and enqueue helper at 1.022780785. The node is
+written zero at 1.022780877, then ffff at 1.022781944 before the next
+service entry at 1.022782161. Varying playback has only the initial three
+node writes (zero, zero, ffff), ending at 0.834083281, throughout the
+common 0.8182--1.7-second observation interval; this is below the cap of
+32 per address. Source `1282,8292,fc45` near `0202d7` loads the node's
+first word, writes zero and returns if the loaded word was zero;
+the nonzero path updates links. The scheduler writes ffff near
+`02035c..020363`. Live PC is context, not bus-owning instruction identity.
+
+The first `d7b0` transfer comes through `0201de`; later samples also use
+`02018b`. Constant playback reads `d7b4=0001`, then
+`d7b0..d7b3=0002,0419,0000,8044`; all eight sampled reads of each field
+match original initialization. Varying playback has no selected `d7b0`
+entries in its first session and no reads in the common interval.
+Helper `0201b3` entry history begins at call `02045d` in `020454`:
+initial raw context is AR1=`d7b8`, AR2=`d7cb` at 0.820211608.
+Constant playback's later entry at 1.022780152 has AR1=`0000`,
+AR2=`d7a9`, A=`0008000000`, B=`0000023e64`. These are raw contexts,
+not retained operands or proof of the referenced structure's identity.
+
+**Do not infer ownership from aggregate counts.** Immediate-call encoding
+candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,
+with counts `7,1571,2,1131,4271` / `2,1,2,601,1669`.
+Helpers `020454` / `02046b` call `0201b3` at `02045d` / `020472`;
+their counts 787/784 versus 1/0 sum to the respective `0201de` counts.
+This neither proves nor excludes a particular callback's causal role.
+Both runs skip `0201d6` and `0202a4`; that status branch is not the
+distinction. Direct far-call candidates for wrapper `020419` at
+`020cba,0295c8,038c40` carry preceding literals `8052,8060,807c`, not
+`8044`; indirect/cross-overlay caller closure remains unproved.
+
+**Observation safeguards.** `mu4_context_contract.py` pins source
+relationships and rejects changed witnesses/extra census references.
+`--playback-range --source-a00` checks the complete source range, bounded
+histories, register-context pairing, callback field values and time/ordinal
+scope. Histories select live AR4/AR2 only as context, not an operand-ownership
+API. A live-A wrapper selector missed observed calls and is not an absence
+proof; wrapper history is retained unconditionally and paired at enqueue.
+Observation state is reset/saved. Lua bus taps exclude snapshots and
+side-effects-disabled C++ reads. No observer writes firmware state and no
+observation check accepts decoded audio.
 
 All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
 as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are
