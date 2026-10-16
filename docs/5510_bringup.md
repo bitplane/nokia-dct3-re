@@ -88,6 +88,15 @@ assertions pass without weakening the exact-one condition. The separate
 staged cold-open fixture below rereads the saved catalogue and title from
 NAND. File/audio completeness and playback remain open.
 
+The active `bootplaystage` diagnostic sends an original playback request
+through serial pins and loads the matching `RELSI16` image. Its 49,839
+compared program/data words match original marker `aa99` before startup;
+four low-window words remain excluded. Native execution stops at
+`02:a81e`, `7090 0018`: MVKD from mapped SP to `*AR0+`. The staged source
+guard remains in place pending independent Read/producer/retention tests.
+This is a failed coverage diagnostic, not a playback acceptance or an
+unavailable-ROM boundary.
+
 The empty-field fixture observes 2,108 NAND program setups, 2,107 confirms and
 1,098,240 data writes, but track count is zero and the recorded file is not
 verified. Exact resident-memory comparison still passes (48,261 program
@@ -3662,6 +3671,10 @@ named-file loader at `03:a9c3`. This is static argument/state flow, not an
 executed media-decode result. The parser's format contract and suffix
 provenance at that lifecycle remain to verify; do not force its subtype,
 the readiness bit or descriptor selection to claim decoder activation.
+For a non-LSE file, `02:a227 -> a286` instead passes the existing extension
+pointer to the prefix copy. It skips the AAC source assignment at `a284`;
+the common copy call does not make every input AAC. The original REL input
+selects `RELSI16`, as confirmed by the native overlay comparison below.
 
 `02:c824` is the LockStream header recognizer, with its real entry at that
 address (not a mid-routine tap). It expands packed bytes and fields using
@@ -4234,6 +4247,55 @@ The extracted file's SHA-256 is
 This verifies independent filesystem/extent readback of these bytes, not
 their audio correctness. `ffprobe` rejects the file as generic audio;
 that is not proof that the original Nokia consumer rejects its REL format.
+
+### Saved-Track Playback Boundary
+
+`bootplaystage` starts from the same saved endpoint with the recorder's
+provisional shared-DARAM mapping, but it does not request recording.
+The original dispatcher receives this twelve-byte external request:
+
+```text
+1e 06 aa 01 30 02 00 01 00 01 81 55
+```
+
+Class 1, selector `30`, parameter 2 are followed by no-shuffle value zero,
+track ordinal one and reply-cookie zero, then sequence token one and XOR
+`81`. At `03:b3b0` the firmware checks the nonempty catalogue; `02:9d8c`
+handles the shuffle field, and `02:9d1d` selects track one and advances
+its own lifecycle. No mode, selection index, decoder pointer or internal
+message is supplied by the bench. The shared media peer validates and
+acknowledges the native frames; its `mu4_native_recorder_response` prefix
+is retained for compatibility and does not classify playback as recording.
+
+The verified run enters the original request and inspection paths once,
+reaches the named-loader call at `03:a9c3`, and materializes original
+`RELSI16 .BIN` (`aa99`), not `AACSI16`. At the common vector entry the
+independent final-write comparison accounts for all 3,127 source records,
+49,843 written words and 49,839 compared RAM words, with four low-window
+words excluded. Incoming replies have class/selector/size
+`1/58/12`, `0/02/16`, `0/03/20`, and each receives the normal pin ACK.
+Those replies do not alone establish decoder completion or sample output.
+
+Execution reaches REL instruction `02:a81e`, `7090 0018`
+(`MVKD $0018, *AR0+`). The source is CPU SP (`0018`), not a missing
+peripheral. The destination intent is the ordinary RAM context pointed to
+by AR0 (`a8ab` at the stop). Neighboring instructions copy AR1, AR6 and AR7;
+the adjacent restore sequence uses MVDK to restore SP. Do not admit SP by
+removing the guard alone: establish mapped-source Read timing, separation
+from compiler-mode address generation, stack-update producers, retained
+address/data, save/replay and neighboring exclusions first.
+
+```sh
+make check-mu4-bootstrap-original \
+  MU4_BOOTSTRAP_BIOS=bootplaystage \
+  MU4_BOOTSTRAP_SOURCE_RUN=/path/to/completed-retained-run \
+  MU4_BOOTSTRAP_INPUT_NAND=/path/to/bootrecmeta-run/mu4_recorder_endpoint.nand
+```
+
+This diagnostic deliberately returns failure while audio completion is
+unvalidated. Even if later CPU coverage passes the present stop, it cannot
+silently become a playback gate. It preserves the source NAND and claims
+neither REL audio validity, completed decoding, analog output nor handset boot.
 
 ### Atomic Metadata Negative Control
 

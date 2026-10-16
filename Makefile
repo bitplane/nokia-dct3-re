@@ -1176,7 +1176,7 @@ check-mu4-bootstrap-original: build
 		test -f "$$input" && test "$$(wc -c < "$$input")" -eq 69206016 || \
 			{ echo 'MU4 bootstrap input must be one complete 69,206,016-byte NAND image' >&2; exit 1; }; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; bootopenstage) nvtag=mu4nand_27;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; bootopenstage) nvtag=mu4nand_27;; bootplaystage) nvtag=mu4nand_28;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
 		tmp="$(if $(MU4_BOOTSTRAP_RUN_DIR),$(abspath $(MU4_BOOTSTRAP_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-bootstrap.XXXXXX"))"; \

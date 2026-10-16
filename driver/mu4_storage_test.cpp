@@ -35,7 +35,7 @@ public:
 		m_cpu->set_reset_clkmd(0);
 		// Only the fail-closed original-firmware diagnostic opts into bus waits.
 		// Program/data bank ownership and physical READY wiring remain unvalidated.
-		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootopenstage")) m_cpu->set_c5416_bus_profile(true);
+		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootopenstage") || !strcmp(config.options().bios(), "bootplaystage")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -47,12 +47,20 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
-			if (cold_saved_profile())
+			if (cold_catalog_profile() && !m_playback_decoder_loads)
 			{
 				if (address == 0x3941d) ++m_cold_catalog_scans;
 				if (address == 0x39fe9) ++m_cold_metadata_reads;
 				if (address == 0x395af) observe_cold_title(opcode);
+				if (playback_profile())
+				{
+					if (address == 0x3b3b0) ++m_playback_requests;
+					if (address == 0x2a1ed) ++m_playback_inspections;
+					if (address == 0x3a9c3) ++m_playback_decoder_loads;
+				}
 			}
+			if (playback_profile() && m_playback_decoder_loads && !m_playback_overlay_checked && (address & 0xffff) == 0x2000)
+				verify_media_overlay(true);
 			if (address != 0x73f8 || !m_recorder_loader_calls) return;
 			++m_recorder_startup_entries;
 			logerror("mu4_native_recorder_startup: pc=%06x opcode=%04x pmst=%04x identity=execute_entry\n",
@@ -220,6 +228,8 @@ private:
 	unsigned m_cold_notifications = 0, m_cold_response_begin = 14;
 	unsigned m_cold_title_publications = 0;
 	bool m_cold_title_verified = false;
+	unsigned m_playback_requests = 0, m_playback_inspections = 0, m_playback_decoder_loads = 0;
+	bool m_playback_overlay_checked = false;
 	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
 	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
@@ -775,7 +785,7 @@ private:
 		if (m_command_wire_decoded.size() != m_command_tx_words.size() + 1 || m_command_wire_decoded.back() != value)
 			fatalerror("MU4 serial pin decoder disagrees with McBSP transmit word");
 		m_command_tx_words.push_back(value);
-		if (recorder_profile())
+		if (media_command_profile())
 		{
 			if (m_command_tx_words.size() == 3)
 			{
@@ -1081,6 +1091,8 @@ private:
 		if (m_phase != 30 || system_bios() < 8) return;
 		// Original parser framing and selector 0x49: read-only software status query.
 		static constexpr u8 status[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
+		// 03:b3b0/02:9d8c/02:9d1d: no shuffle, first track, reply cookie zero.
+		static constexpr u8 playback[] = {0x1e, 6, 0xaa, 1, 0x30, 2, 0, 1, 0, 1, 0x81, 0x55};
 		static constexpr u8 measurement[] = {0x1e, 2, 0xaa, 1, 0x40, 1, 0xf6, 0x55};
 		// Payload class, selector and parameter are distinct from sequence token 1.
 		static constexpr u8 recorder[] = {0x1e, 3, 0xaa, 1, 0x36, 5, 1, 0x84, 0x55};
@@ -1105,12 +1117,12 @@ private:
 			return bytes[0] == 0x1e && bytes[2] == 0xaa && bytes[1] + 6 == std::size(bytes) &&
 				bytes[std::size(bytes) - 2] == checksum && bytes[std::size(bytes) - 1] == 0x55;
 		};
-		static_assert(valid_packet(status) && valid_packet(measurement) && valid_packet(recorder) && valid_packet(recorder_control) &&
+		static_assert(valid_packet(status) && valid_packet(playback) && valid_packet(measurement) && valid_packet(recorder) && valid_packet(recorder_control) &&
 			valid_packet(recorder_poll) && valid_packet(recorder_polled_control) &&
 			valid_packet(recorder_resident_poll) && valid_packet(recorder_metadata_empty) && valid_packet(recorder_metadata_full));
 		if (metadata_size != recorder_metadata_size()) fatalerror("MU4 metadata fixture length differs from acceptance contract");
-		u8 const *packet = recorder_profile() ? recorder : measurement_profile() ? measurement : status;
-		unsigned const first_size = recorder_profile() ? std::size(recorder) : std::size(status);
+		u8 const *packet = playback_profile() ? playback : recorder_profile() ? recorder : measurement_profile() ? measurement : status;
+		unsigned const first_size = playback_profile() ? std::size(playback) : recorder_profile() ? std::size(recorder) : std::size(status);
 		unsigned const packet_size = first_size + (recorder_control_profile() ? std::size(recorder_control) : 0) +
 			(recorder_poll_profile() ? std::size(recorder_poll) : 0) +
 			(recorder_save_profile() ? std::size(recorder_resident_poll) + metadata_size : 0);
@@ -1233,12 +1245,15 @@ private:
 	}
 	bool staged_recorder_profile() const { return system_bios() == 26 || system_bios() == 27; }
 	bool cold_saved_profile() const { return system_bios() == 28; }
-	bool staged_original_profile() const { return staged_recorder_profile() || cold_saved_profile(); }
+	bool playback_profile() const { return system_bios() == 29; }
+	bool cold_catalog_profile() const { return cold_saved_profile() || playback_profile(); }
+	bool staged_original_profile() const { return staged_recorder_profile() || cold_catalog_profile(); }
 	bool full_metadata_profile() const { return system_bios() == 27; }
 	unsigned recorder_metadata_size() const { return full_metadata_profile() ? 24 : 16; }
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 28; }
-	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
-	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile(); }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 29; }
+	bool recorder_profile() const { return system_bios() == 21 || system_bios() == 22 || recorder_control_profile(); }
+	bool media_command_profile() const { return recorder_profile() || playback_profile(); }
+	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile() || playback_profile(); }
 	bool recorder_control_profile() const { return system_bios() == 23 || recorder_poll_profile(); }
 	bool recorder_poll_profile() const { return system_bios() == 24 || recorder_save_profile(); }
 	bool recorder_save_profile() const { return system_bios() == 25 || staged_recorder_profile(); }
@@ -1325,7 +1340,7 @@ private:
 		logerror("mu4_original_resident_data: %s checked_words=%u mismatch_words=%u excluded_register_words=%u source_data_words=%u before_resident_execution=1 physical_mapping=unvalidated full_boot=0\n",
 			data_mismatches ? "MISMATCH" : "PASS", unsigned(expected_data.size()), data_mismatches, register_words, data_words);
 	}
-	void verify_recorder_overlay()
+	void verify_media_overlay(bool playback = false)
 	{
 		auto const disable = machine().disable_side_effects();
 		auto word = [this](unsigned offset) -> u16
@@ -1334,7 +1349,8 @@ private:
 			return (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
 		};
 		unsigned segment = 0;
-		while (word(segment) != 0xaa88)
+		u16 const marker = playback ? 0xaa99 : 0xaa88;
+		while (word(segment) != marker)
 			segment += 10 + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
 		unsigned cursor = segment + 6, records = 0, total = 0, registers = 0;
 		unsigned const end = cursor + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
@@ -1360,7 +1376,7 @@ private:
 			total += count;
 			++records;
 		}
-		if (cursor + 2 != end || total != 73766) fatalerror("MU4 recorder loader coverage mismatch");
+		if (cursor + 2 != end || total != (playback ? 49843 : 73766)) fatalerror("MU4 media loader coverage mismatch marker=%04x words=%u", marker, total);
 		for (auto const &[location, value] : expected)
 		{
 			auto const &[program, address] = location;
@@ -1369,9 +1385,10 @@ private:
 				fatalerror("MU4 recorder DMA destination mismatch space=%s address=%06x actual=%04x expected=%04x",
 					program ? "program" : "data", unsigned(address), actual, value);
 		}
-		m_recorder_overlay_checked = true;
-		logerror("mu4_native_recorder_overlay: PASS marker=aa88 records=%u words=%u checked_ram_words=%u excluded_register_words=%u before_execution=1\n",
-			records, total, unsigned(expected.size()), registers);
+		if (playback) m_playback_overlay_checked = true;
+		else m_recorder_overlay_checked = true;
+		logerror("%s: PASS marker=%04x records=%u words=%u checked_ram_words=%u excluded_register_words=%u before_execution=1\n",
+			playback ? "mu4_native_playback_overlay" : "mu4_native_recorder_overlay", marker, records, total, unsigned(expected.size()), registers);
 	}
 	bool measurement_profile() const { return system_bios() == 13 || system_bios() == 20; }
 	void observe_cold_title(u16 opcode)
@@ -1556,7 +1573,7 @@ private:
 					{
 						if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1 &&
 							m_recorder_loader_calls && !m_recorder_overlay_checked)
-							verify_recorder_overlay();
+							verify_media_overlay();
 					});
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x29e90, 0x29fa8, "mu4_recorder_loader",
 					[this](offs_t address, u16 &, u16)
@@ -1578,7 +1595,7 @@ private:
 				[this](offs_t address, u16 &, u16) {
 					if (machine().side_effects_disabled() || (m_cpu->pc() & 0xffff) != address + 1) return;
 					++m_native_bootstrap_resident_entries;
-					if ((recorder_save_profile() || cold_saved_profile()) && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
+					if ((recorder_save_profile() || cold_catalog_profile()) && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
 				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
 				[this](offs_t address, u16 &, u16)
@@ -1736,10 +1753,15 @@ private:
 			save_item(NAME(m_cold_catalog_scans)); save_item(NAME(m_cold_metadata_reads));
 			save_item(NAME(m_cold_notifications)); save_item(NAME(m_cold_response_begin));
 			save_item(NAME(m_cold_title_publications)); save_item(NAME(m_cold_title_verified));
+			save_item(NAME(m_playback_requests)); save_item(NAME(m_playback_inspections)); save_item(NAME(m_playback_decoder_loads));
+			save_item(NAME(m_playback_overlay_checked));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
-			if (recorder_profile())
+			if (media_command_profile())
 			{
 				save_item(NAME(m_recorder_response_begin)); save_item(NAME(m_recorder_responses));
+			}
+			if (recorder_profile())
+			{
 				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
@@ -1925,6 +1947,8 @@ private:
 		m_cold_catalog_scans = m_cold_metadata_reads = 0;
 		m_cold_notifications = 0; m_cold_response_begin = 14;
 		m_cold_title_publications = 0; m_cold_title_verified = false;
+		m_playback_requests = m_playback_inspections = m_playback_decoder_loads = 0;
+		m_playback_overlay_checked = false;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
@@ -2255,6 +2279,10 @@ private:
 	{
 		if (original_bootstrap_profile())
 		{
+			if (playback_profile())
+				logerror("mu4_native_playback_observe: requests=%u inspections=%u decoder_loads=%u replies=%u input_cursor=%u title_verified=%u overlay_verified=%u pc=%06x illegal=%u audio_acceptance=0\n",
+					m_playback_requests, m_playback_inspections, m_playback_decoder_loads, m_recorder_responses, m_native_command_cursor,
+					unsigned(m_cold_title_verified), unsigned(m_playback_overlay_checked), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
 			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 			{
 				if (staged_original_profile())
@@ -2352,7 +2380,8 @@ private:
 				logerror("mu4_native_recorder_dispatch: PASS pin_input=1 original_loader=1 firmware_state_forcing=0 music_recording=0\n");
 			}
 			else if (measurement_profile()) verify_native_measurement();
-			else if (system_bios() >= 17) verify_native_status();
+			else if (system_bios() >= 17 && !playback_profile()) verify_native_status();
+			if (playback_profile()) fatalerror("MU4 playback coverage diagnostic: audio completion is not validated");
 			if (cold_saved_profile())
 			{
 				bool valid = m_cold_catalog_scans == 1 && m_cold_metadata_reads == 1 && m_cold_notifications &&
@@ -3977,6 +4006,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(25, "bootrecstage", "Staged original recorder coverage diagnostic (fail-closed)")
 	ROM_SYSTEM_BIOS(26, "bootrecmeta", "Staged recorder with nonempty ID3 title and artist input")
 	ROM_SYSTEM_BIOS(27, "bootopenstage", "Staged original cold saved-track catalogue and status")
+	ROM_SYSTEM_BIOS(28, "bootplaystage", "Staged original saved-track playback coverage diagnostic")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
