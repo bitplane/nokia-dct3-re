@@ -1614,6 +1614,19 @@ class CoreResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_result(output, 3, profile='mvdm-delay')
 
+    def test_mac_bk_profile_is_separate(self):
+        marker, ending = EXTRA_PROFILES['mac-bk']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mac-bk')
+        for bad in (output.replace('restore=98304', 'restore=0'),
+                    output.replace('bk_retained=1', 'bk_retained=0'),
+                    output.replace('t_retained=1', 't_retained=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mac-bk')
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
     def test_mac_profile_is_separate(self):
         marker, ending = EXTRA_PROFILES['mac-smem']
         output = marker + '\n' + ending + '\n'

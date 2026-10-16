@@ -62,6 +62,15 @@ unchanged for the accumulator form. The local atomic handler already uses
 that 17-bit operand; its staged admission needs independent signed-width,
 FRCT/OVM, untouched-T and producer-ordering tests, not a copied handler.
 
+The reviewed Smem MAC handlers are likewise not a result oracle. Their
+`FC00/2800` match includes MACR but treats opcode bit 9 as subtraction,
+preceding the separate MACR handler; that handler also rounds the product
+before accumulation. TI SPRU172C section 4-82 instead specifies rounding
+the accumulated result, with opcode bit 9 selecting rounding for this form.
+Use the shared Smem addressing grammar as a decoding lead, then validate
+operation, rounding and untouched-T independently. The local `mac-bk` and
+`mac-smem` fixtures exercise these contracts without importing reference code.
+
 ## Resulting local boundary
 
 The faithful direction is:

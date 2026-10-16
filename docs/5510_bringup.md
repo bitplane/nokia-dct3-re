@@ -48,9 +48,11 @@ occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
 its source is mapped BL, not RAM. Memory SUB `08f8` at `03:d309` now
 reads mapped BK (`0019`). Immediate store `76b2` at `03:df3e` now uses
 `*AR2+0` addressing. FCALAD B (`f7e7`) at `03:b3a2` also executes.
-The current exclusion is multiply-form `29f8` at `03:b305`, reading mapped
-BK (`0019`). Live terminal PC is `03:b309`; it is not the owning
-instruction address. NAND writes alone do not prove complete recording.
+Signed MAC `29f8` at `03:b305` now reads mapped BK (`0019`). The current
+exclusion is two-word MAC `28f8 0015` at `03:cc06`, reading mapped AR5 in
+the control delay owned by `fb83` at `03:cc04`. Live terminal PC is
+`03:cc08`; it is not the owning instruction address. NAND writes alone
+do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -69,6 +71,25 @@ recording, validated audio or handset boot.
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#core-regression-checkpoint).
+
+### Signed MAC/MAS with a BK operand
+
+`--profile mac-bk` passes 98,304 cases and save/replays: MAC, MACR, MAS
+and MASR, both destinations, direct/absolute BK addressing, 64 T/BK pairs,
+16 FRCT/OVM/SMUL/SXM combinations, two pages and three checkpoints.
+The existing multiply-accumulate pipeline samples BK once in Read, preserves
+T, and publishes the signed accumulation/subtraction with optional rounding,
+saturation and sticky overflow. Poisoning BK and T after Read proves that
+the operation retains its operands and does not overwrite their later values.
+The non-destination accumulator, status and absence of data writes are checked.
+
+The shared fixture's original `mac-smem` population also passes 73,728
+cases and save/replays, now with an explicit unchanged-T assertion at Read.
+Admission is limited to the signed accumulating `28xx..2fxx` family;
+other BK operand families, additional special registers, control-delay
+composition and physical silicon phase placement are not established here.
+The original recorder executes the BK MAC and reaches the separate
+control-delay exclusion in [Current boundary](#current-boundary).
 
 ### Software-saved repeat context
 
@@ -1337,6 +1358,13 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Aggregate acceptance includes these separately scoped checkpoints:
 
+- BK MAC/MAS acceptance: `mac-bk` passes 98,304 cases and save/replays;
+  the shared fixture's original `mac-smem` passes 73,728. The controls
+  `arith-bk`, `arith-ar`, `add-bk`, `add-delay`, `fcala-delay`,
+  `mpy-mapped` and `mac-t-imm` also pass, as do native 5110 save-state,
+  exact MU4 resident-memory comparison and 2,872 tooling tests (one skip).
+  The full default population was not rerun for this guard extension;
+  its last renewal is the FCALAD checkpoint below.
 - FCALAD acceptance: renewed full default run, all 288 required markers
   exactly once with the expected terminal completion; the separate 648-case
   `fcala-delay` profile; the eight existing accumulator-call/branch profiles

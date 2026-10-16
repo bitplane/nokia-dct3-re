@@ -12523,15 +12523,16 @@ private:
 		u16 opcode, memory, t, st0, st1, pmst, address, result_st0;
 		u64 a, b, result;
 		unsigned read;
+		u32 base = 0;
 	};
-	static mac_smem_fixture mac_smem_case(unsigned variant)
+	static mac_smem_fixture mac_smem_case(unsigned variant, bool bk = false)
 	{
-		unsigned const v = variant % 24576, form = v % 3, selector = (v / 3) % 8, pair = (v / 24) % 64, flags = v / 1536;
+		unsigned const forms = bk ? 2 : 3, v = variant % (forms * 8192), form = v % forms, selector = (v / forms) % 8, pair = (v / (forms * 8)) % 64, flags = v / (forms * 512);
 		unsigned const operation = selector / 2, tp = pair / 8, mp = pair % 8;
 		u16 const t = std::array<u16, 8>{0, 1, 0xffff, 0x7fff, 0x8000, 0x8001, 0x1234, 0xabcd}[tp];
 		u16 const memory = std::array<u16, 8>{0, 1, 0xffff, 0x7fff, 0x8000, 0x8001, 0x5678, 0xfedc}[mp];
 		u64 const source = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x1234567833ULL, 0x80aa001234ULL}[tp];
-		u16 const st0 = 0xa604 | (tp & 1 ? 0x600 : 0) | (mp & 1 ? 0x800 : 0);
+		u16 const st0 = (0xa604 | (tp & 1 ? 0x600 : 0) | (mp & 1 ? 0x800 : 0)) & (bk ? 0xfe00 : 0xffff);
 		u16 const st1 = 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0) | (flags & 8 ? 0x100 : 0);
 		s64 product = s64(s16(t)) * s16(memory) * (flags & 1 ? 2 : 1);
 		if ((flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
@@ -12540,15 +12541,18 @@ private:
 		if (operation & 1) result = (result + 32768) & ~s64(65535);
 		bool const overflow = result < -2147483648LL || result > 2147483647LL;
 		u64 const stored = u64(overflow && (flags & 2) ? result < 0 ? -2147483648LL : 2147483647LL : result) & 0xffffffffffULL;
-		return {u16((0x2800 + operation * 0x200) | ((selector & 1) << 8) | (form ? 0xf8 : 0x81)), memory, t, st0, st1, u16(flags & 4 ? 2 : 0), u16(form == 2 ? 0x11 : 0x500), u16(st0 | (overflow ? selector & 1 ? 0x200 : 0x400 : 0)), selector & 1 ? 0x246813579aULL : source, selector & 1 ? source : 0x246813579aULL, stored, 5 + unsigned(form != 0)};
+		mac_smem_fixture f{u16((0x2800 + operation * 0x200) | ((selector & 1) << 8) | (form ? 0xf8 : bk ? 0x19 : 0x81)), memory, t, st0, st1, u16(flags & 4 ? 2 : 0), u16(bk ? 0x19 : form == 2 ? 0x11 : 0x500), u16(st0 | (overflow ? selector & 1 ? 0x200 : 0x400 : 0)), selector & 1 ? 0x246813579aULL : source, selector & 1 ? source : 0x246813579aULL, stored, 5 + unsigned(form != 0)};
+		f.base = bk && (variant / 16384) % 2 ? 0x20000 : 0;
+		return f;
 	}
 	void start_mac_smem(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = mac_smem_case(variant); bool const absolute = u8(f.opcode) == 0xf8;
+		bool const bk = !strcmp(machine().options().bios(), "mac-bk");
+		auto const f = mac_smem_case(variant, bk); bool const absolute = u8(f.opcode) == 0xf8;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, f.opcode); if (absolute) program.write_word(0x601, f.address);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.opcode); if (absolute) program.write_word(f.base + 0x601, f.address);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x500);
@@ -12559,10 +12563,10 @@ private:
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == f.address && word == f.memory && m_cpu->pipeline_cycles() == f.read, "MAC/MAS retain one RAM or mapped-register source in Read"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mac_smem_no_write",
 			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "MAC/MAS must not write data memory or republish T"); } });
-		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "mac_smem_literal",
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "mac_smem_literal",
 			[this, f, absolute](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || !absolute) return; expect(!m_pipeline_extensions_reads && word == f.address, "MAC/MAS own one absolute source extension"); ++m_pipeline_extensions_reads; });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253690;
-		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_mvmd_ar(unsigned variant = 0)
 	{
@@ -14144,7 +14148,7 @@ private:
 		if (!strcmp(machine().options().bios(), "ld-ts") || !strcmp(machine().options().bios(), "ld-ts-producer")) { start_ts_load(); return; }
 		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
-		if (!strcmp(machine().options().bios(), "mac-smem")) { start_mac_smem(); return; }
+		if (!strcmp(machine().options().bios(), "mac-smem") || !strcmp(machine().options().bios(), "mac-bk")) { start_mac_smem(); return; }
 		if (!strcmp(machine().options().bios(), "far-call-delay")) { start_delayed_far_call(); return; }
 		if (!strcmp(machine().options().bios(), "mvdm-delay") || mvkd_delay()) { start_mvdm_delay(); return; }
 		if (!strcmp(machine().options().bios(), "mvdm-ar")) { start_mvdm_ar(); return; }
@@ -41106,12 +41110,13 @@ private:
 		if (m_phase == 253720) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253710; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253690)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mac_smem_case(variant);
-			unsigned const checkpoint = f.read - 1 + variant / 24576;
+			bool const bk = !strcmp(machine().options().bios(), "mac-bk");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mac_smem_case(variant, bk);
+			unsigned const checkpoint = f.read - 1 + variant / (bk ? 32768 : 24576);
 			bool const absolute = u8(f.opcode) == 0xf8, destination_b = BIT(f.opcode, 8);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MAC/MAS execute without an atomic fallback");
-			if (tick == 4 && absolute) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xdead); }
-			if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
+			if (tick == 4 && absolute) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == f.read) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "MAC/MAS must not republish their memory operand into T in Read"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
@@ -41121,13 +41126,15 @@ private:
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? f.a : f.result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "MAC/MAS retain memory/T, preserve the other accumulator and apply rounding/SMUL/OVM/sticky overflow");
 				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes && m_pipeline_extensions_reads == unsigned(absolute), "MAC/MAS never repeat their sampled source or extension");
+				if (bk) expect(m_cpu->state_int(tms320c54x_device::STATE_BK) == 0xdead, "MAC/MAS do not overwrite the later BK value");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay MAC/MAS retained operands and result publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253700; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 73727) { start_mac_smem(variant + 1); return; }
+				if (variant < (bk ? 98303 : 73727)) { start_mac_smem(variant + 1); return; }
+				if (bk) { osd_printf_info("TMS320C54x staged BK MAC/MAS: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=direct,absolute pairs=64 flags=16 pages=2 snapshots=3 source_reads=1 data_writes=0 bk_retained=1 t_retained=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated BK MAC/MAS complete"); }
 				osd_printf_info("TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated MAC/MAS complete");
 			}
@@ -44075,6 +44082,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(203, "arith-ar", "Existing mapped auxiliary-register arithmetic controls")
 	ROM_SYSTEM_BIOS(204, "imm-index", "AR0-indexed immediate stores with retained literals")
 	ROM_SYSTEM_BIOS(205, "fcala-delay", "Delayed accumulator far-call frame and interrupt composition")
+	ROM_SYSTEM_BIOS(206, "mac-bk", "Mapped BK signed multiply-accumulate operand ownership")
 ROM_END
 
 ROM_START(tms54rom4)
