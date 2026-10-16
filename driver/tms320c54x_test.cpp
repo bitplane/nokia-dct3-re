@@ -8854,6 +8854,13 @@ private:
 		unsigned const kind = variant % 8;
 		m_cpu->space(AS_PROGRAM).write_word(base + 0x603, std::array<u16, 8>{0xf073, 0xf073, 0xf273, 0xf845, 0xf845, 0xf945, 0xf072, 0xf880}[kind]);
 		m_cpu->space(AS_PROGRAM).write_word(base + 0x604, kind == 0 || kind == 3 ? 0x601 : kind == 1 || kind == 4 ? 0x700 : 0x60a);
+		if (kind == 2)
+		{
+			// Internal BD is admitted, but its complete delay span must end
+			// before REA; endpoint/control ownership is a separate contract.
+			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x606);
+			m_cpu->space(AS_PROGRAM).write_word(base + 0x604, 0x602);
+		}
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_branch_edge_read", [this](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x5000 && !m_pipeline_operand_reads, "Rejected block control permits only an older legal source read"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_branch_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
@@ -12984,6 +12991,8 @@ private:
 	void start_block_bcd(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const unconditional = !strcmp(machine().options().bios(), "rptb-bd");
+		if (unconditional) variant *= 6;
 		unsigned const count = std::array<unsigned, 4>{0, 1, 2, 7}[(variant / 12) % 4];
 		bool const b = variant % 12 >= 6, wide = (variant / 192) % 2;
 		u32 const base = (variant / 384) % 2 ? 0x20000 : 0;
@@ -12991,7 +13000,7 @@ private:
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, 0xf272); program.write_word(base + 0x601, 0x610);
 		program.write_word(base + 0x604, b ? 0x1192 : 0x1092);
-		program.write_word(base + 0x605, 0xfa42 + variant % 6 + (b ? 8 : 0)); program.write_word(base + 0x606, 0x60d);
+		program.write_word(base + 0x605, unconditional ? 0xf273 : 0xfa42 + variant % 6 + (b ? 8 : 0)); program.write_word(base + 0x606, 0x60d);
 		program.write_word(base + 0x607, wide ? b ? 0xf300 : 0xf000 : 0x6d94); program.write_word(base + 0x608, wide ? 1 : 0x6d95);
 		program.write_word(base + 0x609, 0x7693); program.write_word(base + 0x60a, 0x1111);
 		program.write_word(base + 0x60b, 0xf073); program.write_word(base + 0x60c, 0x60f);
@@ -13010,7 +13019,7 @@ private:
 			unsigned const i = m_pipeline_operand_reads++; expect(i <= count && at == 0x5000 + i && word == block_bcd_source(variant, i) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == count - i && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (i < count), "Delayed internal branches retain ordered sources and Decode-owned loop counters");
 			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, word ^ 0xffff);
 		});
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_bcd_write", [this, variant, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; expect(i <= count && at == 0x6000 + i && word == (block_bcd_taken(variant, block_bcd_source(variant, i)) ? 0x2222 : 0x1111), "BCD publishes only the arm selected before its delay instructions"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_bcd_write", [this, variant, count, unconditional](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; expect(i <= count && at == 0x6000 + i && word == (unconditional || block_bcd_taken(variant, block_bcd_source(variant, i)) ? 0x2222 : 0x1111), "Delayed branch publishes only its selected arm"); });
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x606, base + 0x606, "block_bcd_target", [this, count](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled()) { expect(word == 0x60d && m_pipeline_extensions_reads <= count, "BCD captures its internal target exactly once per iteration"); ++m_pipeline_extensions_reads; } });
 		m_phase = 255560; m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -13990,7 +13999,7 @@ private:
 		if (!strcmp(machine().options().bios(), "repeat-popd")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-rearm")) { start_repeat_rearm(); return; }
 		if (!strcmp(machine().options().bios(), "rearm-edge")) { start_repeat_rearm(); return; }
-		if (!strcmp(machine().options().bios(), "rptb-bcd")) { start_block_bcd(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-bcd") || !strcmp(machine().options().bios(), "rptb-bd")) { start_block_bcd(); return; }
 		if (!strcmp(machine().options().bios(), "asm-store") || !strcmp(machine().options().bios(), "asm-store-ld")) { start_asm_store(); return; }
 		if (!strcmp(machine().options().bios(), "push-pop-same")) { start_push_pop_same(); return; }
 		if (!strcmp(machine().options().bios(), "fcala-producer")) { start_accumulator_call(); return; }
@@ -39477,7 +39486,8 @@ private:
 		if (m_phase == 255590) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255580; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255560)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 2, 7}[(variant / 12) % 4], checkpoint = std::array<unsigned, 4>{7, 10, 12, 16}[variant / 768];
+			bool const unconditional = !strcmp(machine().options().bios(), "rptb-bd");
+			unsigned const case_index = m_pipeline_peripheral_case, variant = unconditional ? case_index * 6 : case_index, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 2, 7}[(variant / 12) % 4], checkpoint = std::array<unsigned, 4>{7, 10, 12, 16}[variant / 768];
 			bool const b = variant % 12 >= 6, wide = (variant / 192) % 2;
 			u32 const base = (variant / 384) % 2 ? 0x20000 : 0;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Complete delayed internal branch remains admitted within its repeat block");
@@ -39489,7 +39499,8 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x613 && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5001 + count && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6001 + count && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400 + (wide ? 0 : count + 1) && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1500 + (wide ? 0 : count + 1) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1601 + count && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (b ? 0x1234 : 0x2345) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && !m_cpu->state_int(tms320c54x_device::STATE_BRC), "BCD retains decisions, runs both delay words once and completes each block iteration exactly once");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed block branch without duplicate arms, delays or source reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255570; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 3071) { start_block_bcd(variant + 1); return; }
+				if (case_index < (unconditional ? 511 : 3071)) { start_block_bcd(case_index + 1); return; }
+				if (unconditional) { osd_printf_info("TMS320C54x unconditional delayed block branches: PASS cases=512 restore=512 counts=0,1,2,7 patterns=4 accumulators=2 delay_layouts=2 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 delay_words_once=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated unconditional delayed block branches complete"); }
 				osd_printf_info("TMS320C54x delayed internal block branches: PASS cases=3072 restore=3072 predicates=12 counts=0,1,2,7 patterns=4 delay_layouts=2 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 delay_decision_retained=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated delayed internal block branches complete");
 			}
@@ -43892,6 +43903,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(196, "imm-forward", "Immediate RAM store forwarding and producer replay")
 	ROM_SYSTEM_BIOS(197, "repeat-isr", "Software-saved callback repeat and interrupted CCD resumption")
 	ROM_SYSTEM_BIOS(198, "squr", "Accumulator square with signed 17-bit operand")
+	ROM_SYSTEM_BIOS(199, "rptb-bd", "Unconditional delayed branches within a repeat block")
 ROM_END
 
 ROM_START(tms54rom4)

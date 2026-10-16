@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_unconditional_delayed_block_branch_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-bd']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-bd')
+        for bad in (output.replace('restore=512', 'restore=0'),
+                    output.replace('delay_words_once=1', 'delay_words_once=0'),
+                    output.replace('actual_iterations=1', 'actual_iterations=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptb-bd')
+
     def test_accumulator_square_scope(self):
         marker, ending = EXTRA_PROFILES['squr']
         output = marker + '\n' + ending + '\n'

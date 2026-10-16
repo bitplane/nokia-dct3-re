@@ -42,9 +42,10 @@ the subsequent interval count, so its DST zero-fill no longer wraps into the
 register window. Software-saved repeat replacement/restoration now passes
 the isolated interrupt fixture, and the original recorder advances past
 `RPTB 03:faa5`. Accumulator SQUR (`f48d`) at `03:dbe6` also executes.
-The current exclusion is RETD (`f273`) at `03:da7e`, inside repeated
-block `03:da71..03:da93`, with live terminal PC `03:da81`. NAND writes
-alone do not prove complete recording.
+The internal BD (`f273`) at `03:da7e` also executes. The current exclusion
+is extended BANZ (`6ce0`) at `02:a4cb`, inside repeated block
+`02:a4cb..02:a4dd`, with live terminal PC `02:a4cf`. NAND writes alone
+do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -115,11 +116,35 @@ and ST1, preserved non-destination accumulator and no data-memory access.
 The implementation reuses the existing multiply-result contract. Other
 producer compositions and physical pipeline phases are not established by
 this fixture. Original recorder execution now passes SQUR and reaches the
-separate in-block RETD exclusion at `03:da7e`.
+internal BD at `03:da7e`.
 The shared MAX/MIN fixture, memory-MAC and saved-repeat profiles, native
 5110 save-state gate and 2,864 tooling tests (one skip) pass with this
 admission. The full 288-marker default CPU run belongs to the preceding
 repeat-restoration checkpoint; it was not rerun for this opcode-only change.
+
+### Unconditional delayed branch in a block
+
+`f273` is two-word BD, not RETD. The original instruction at `03:da7e`
+targets `03:da8b`, with delay instructions at `03:da80..03:da81`; all
+belong to the repeated range `03:da71..03:da93`. Admission now includes
+unconditional BD when its target is inside that block and both delay words
+end strictly before REA. The existing Access-owned target redirect already
+rebuilds the fetch count from Decode-owned BRC; no separate redirect or
+saved state was added.
+
+`--profile rptb-bd` passes 512 cases and save/replays across counts
+`0,1,2,7`, four source patterns, both accumulator delay consumers, one
+two-word or two single-word delay instructions, two pages and four snapshots.
+It checks ordered source reads, selected writes, exact iterations and delay
+effects. `rptb-br-edges` retains 32 exclusions, with its delayed-control case
+now testing a BD delay span at REA rather than an admitted internal BD.
+The original recorder passes this branch and stops at extended BANZ
+`02:a4cb`. Interrupt composition and measured physical phases remain outside
+this fixture's claim.
+The conditional, nondelayed and backward block-branch profiles, exclusion
+profile, saved-repeat and SQUR profiles, native 5110 save-state gate and
+2,865 tooling tests (one skip) pass at this boundary. The default broad CPU
+run was not repeated for this admission-only change.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute
@@ -5021,13 +5046,15 @@ CPU resumption. These are declared model clocks, not measured silicon
 phases.
 
 The `rptb-br-edges` fixture passes 32 fail-closed replay cases for targets below
-and above the block, delayed control, conditional near calls, nested blocks and far
+and above the block, delayed control at REA, conditional near calls, nested blocks and far
 branches, with no control frame or body write. Branches occupying the
 endpoint, XC spans crossing the block end, IDLE in the block and software
 loop-control modification remain excluded by the RPTB guards. Wholly in-block
 XC is specified in the retained contract above. Non-delayed far-call acceptance
 and backward-loop acceptance are specified in the retained contracts above;
-near-call, outside-block branch and delayed compositions are not promoted.
+near-call, outside-block branch and other delayed compositions are not promoted.
+The bounded internal BD and signed BCD contracts have their own focused
+profiles; this exclusion set does not reject those admitted forms.
 The shared broad baseline remains the versioned checkpoint above, independently
 of focused acceptance added since that run. These are not measured silicon
 phase claims.
