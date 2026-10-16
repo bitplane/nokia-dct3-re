@@ -11717,7 +11717,7 @@ private:
 		u8 mode;
 		std::array<u16, 8> initial;
 	};
-	static indexed_store_fixture indexed_store_case(unsigned v)
+	static indexed_store_fixture indexed_store_case(unsigned v, bool immediate = false)
 	{
 		indexed_store_fixture f{};
 		f.ar = v % 8; f.add = (v / 8) % 2; f.compatibility = (v / 16) % 2; f.selector = (v / 32) % 4;
@@ -11736,16 +11736,20 @@ private:
 			else { s64 const value = BIT(f.value, 39) ? s64(f.value) - (s64(1) << 40) : s64(f.value); stored = u32(std::clamp(value, s64(-2147483648LL), s64(2147483647LL))); }
 		}
 		f.word = f.selector & 2 ? stored >> 16 : stored;
+		if (immediate) f.word = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[f.selector];
 		f.st0 = !f.excluded && f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
 		f.base = (v / 16384) % 2 ? 0x20000 : 0; f.snapshot = v / 32768;
 		return f;
 	}
 	void start_indexed_store(unsigned variant = 0)
 	{
-		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = indexed_store_case(variant);
+		bool const immediate = !strcmp(machine().options().bios(), "imm-index");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = indexed_store_case(variant, immediate);
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0x8000 | (f.selector << 8) | (f.add ? 0xb0 : 0xa8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (immediate ? 0x7600 : 0x8000 | (f.selector << 8)) | (f.add ? 0xb0 : 0xa8) | f.ar);
+		if (immediate) program.write_word(f.base + 0x601, f.word);
+		program.write_word(f.base + (immediate ? 0x602 : 0x601), 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -11754,8 +11758,8 @@ private:
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
 		m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "indexed_store_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indexed STL STH never reads its destination"); });
-		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "indexed_store_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && m_cpu->pipeline_cycles() == 6 && !m_pipeline_store_writes, "Indexed STL STH writes its retained Read address once with Execute-owned accumulator data"); ++m_pipeline_store_writes; });
-		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "indexed_store_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Indexed store fetches its opcode once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "indexed_store_write", [this, f, immediate](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && m_cpu->pipeline_cycles() == (immediate ? 7 : 6) && !m_pipeline_store_writes, "Indexed store writes its retained address and selected data once"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + (immediate ? 0x601 : 0x600), "indexed_store_fetch", [this, f, immediate](offs_t at, u16 &word, u16) { if (!machine().side_effects_disabled()) { unsigned const i = m_pipeline_extensions_reads++; expect(i < (immediate ? 2U : 1U) && at == f.base + 0x600 + i && (!i || word == f.word), "Indexed store fetches each opcode/literal once"); } });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254960;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -13985,7 +13989,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "mar-reverse")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "minmax") || !strcmp(machine().options().bios(), "squr")) { start_minmax(); return; }
-		if (!strcmp(machine().options().bios(), "store-index")) { start_indexed_store(); return; }
+		if (!strcmp(machine().options().bios(), "store-index") || !strcmp(machine().options().bios(), "imm-index")) { start_indexed_store(); return; }
 		if (!strcmp(machine().options().bios(), "compare-delay")) { start_delay_compare(); return; }
 		if (!strcmp(machine().options().bios(), "cmp-delay-edge")) { start_delay_compare_edge(); return; }
 		if (!strcmp(machine().options().bios(), "asm-load") || !strcmp(machine().options().bios(), "asm-consumer")) { start_asm_load(); return; }
@@ -42120,21 +42124,24 @@ private:
 		if (m_phase == 254990) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254980; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254960)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_store_case(variant);
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 5), "Indexed store excludes low-page destinations before pointer or data effects");
-			u64 const value = !f.excluded && tick > 5 ? f.value : f.value ^ 0xffffffffffULL;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.selector & 1 ? 0x33445566 : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.selector & 1 ? value : 0x33445566) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 5 ? f.st0 : 0x8608), "Indexed store preserves distinct accumulators T and status except compatibility ARP");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick <= 4 ? 0x3300 + i : !f.excluded && tick > 5 ? 0x2200 + i : !f.excluded && i == f.selected ? f.final_ar : f.initial[i]), "Indexed store consumes Read-owned address and AR0 then modifies AR once");
-			if (tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-			if (!f.excluded && tick == 5) { for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); }
-			unsigned const checkpoint = 4 + f.snapshot;
+			bool const immediate = !strcmp(machine().options().bios(), "imm-index");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, read = immediate ? 6 : 5; auto const f = indexed_store_case(variant, immediate);
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= read), "Indexed store excludes low-page destinations before pointer or data effects");
+			u64 const value = !f.excluded && tick > read ? f.value : f.value ^ 0xffffffffffULL;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.selector & 1 ? 0x33445566 : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.selector & 1 ? value : 0x33445566) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= read ? f.st0 : 0x8608), "Indexed store preserves distinct accumulators T and status except compatibility ARP");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick < read ? 0x3300 + i : !f.excluded && tick > read ? 0x2200 + i : !f.excluded && i == f.selected ? f.final_ar : f.initial[i]), "Indexed store consumes Read-owned address and AR0 then modifies AR once");
+			if (tick == read - 1) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+			if (immediate && tick == 4) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (!f.excluded && tick == read) { for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); }
+			unsigned const checkpoint = read - 1 + f.snapshot;
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed store before or after address and data publication"); }
 			if (tick == 12)
 			{
-				expect(m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded, "Indexed store performs exactly one write or zero effects on exclusion");
+				expect(m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == (immediate ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded, "Indexed store performs exactly one write or zero effects on exclusion");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed store without resampling address or repeating writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254970; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 98303) { start_indexed_store(variant + 1); return; }
+				if (immediate) { osd_printf_info("TMS320C54x staged indexed immediate ST: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 literals=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 accumulator_patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read literal=retained destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated indexed immediate ST complete"); }
 				osd_printf_info("TMS320C54x staged indexed STL STH: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 selectors=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read data=Execute destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated indexed STL STH complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -43973,6 +43980,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(201, "add-delay", "Absolute mapped and RAM ADD within a control delay")
 	ROM_SYSTEM_BIOS(202, "arith-bk", "Mapped BK operand capture for ordinary ADD and SUB")
 	ROM_SYSTEM_BIOS(203, "arith-ar", "Existing mapped auxiliary-register arithmetic controls")
+	ROM_SYSTEM_BIOS(204, "imm-index", "AR0-indexed immediate stores with retained literals")
 ROM_END
 
 ROM_START(tms54rom4)

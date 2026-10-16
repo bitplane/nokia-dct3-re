@@ -46,10 +46,10 @@ The internal BD (`f273`) at `03:da7e` and extended BANZ (`6ce0`) at
 `02:a4cb` also execute. Absolute ADD `00f8 000b` at `02:9e9d` now
 occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
 its source is mapped BL, not RAM. Memory SUB `08f8` at `03:d309` now
-reads mapped BK (`0019`). The current unsupported form is immediate
-store `76b2` at `03:df3e`, using `*AR2+0` addressing. Live terminal PC
-is `03:df40`; it is not the owning instruction address. NAND writes alone
-do not prove complete recording.
+reads mapped BK (`0019`). Immediate store `76b2` at `03:df3e` now uses
+`*AR2+0` addressing. The current unsupported form is FCALAD B (`f7e7`)
+at `03:b3a2`. Live terminal PC is `03:b3a4`; it is not the owning
+instruction address. NAND writes alone do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -221,6 +221,32 @@ native recording and physical pipeline phases remain unproved.
 The native 5110 save-state gate, exact resident-memory comparison and
 2,869 tooling tests (one skip) pass. The full default core run was not
 repeated for this mapped-source admission.
+
+### AR0-indexed immediate stores
+
+Immediate ST admits short `*ARn-0` and `*ARn+0` modes, reusing Read-owned
+address capture and AR modification. Its two-word Decode retains the literal
+for Execute; accumulator saturation and later accumulator changes do not
+select its data. An indexed destination below `0060` is rejected before
+pointer modification or a data write. This does not change the established
+direct/absolute immediate-store register contracts. Reverse-carry and circular
+short immediate-store forms remain outside this admission.
+
+`--profile imm-index` passes 98,304 cases and save/replays, including 96,000
+RAM stores and 2,304 low-page exclusions. The matrix covers eight AR selectors,
+CMPT and AR0 aliasing, eight signed/wrapping indices, both directions, four
+literals, four accumulator patterns, SST/SXM, two pages and three checkpoints.
+Pointers change before and after Read, the literal is replaced after capture,
+and accumulators change before Execute. Checks require one literal/opcode fetch,
+no destination read, one correct write, preserved status except compatibility
+ARP and no pointer update on exclusion. Producer compositions and physical
+pipeline phases are not established. Original firmware passes this store and
+reaches the separate FCALAD B exclusion above.
+Indexed accumulator-store/load and MAR, immediate forwarding, store-delay,
+mapped-BK and saved-repeat profiles pass as controls, along with native
+5110 save-state and 2,870 tooling tests (one skip). The resident-memory
+comparison remains exact; the full default CPU run was not repeated for
+this indexed-mode admission.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

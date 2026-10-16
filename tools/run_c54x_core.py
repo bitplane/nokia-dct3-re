@@ -312,6 +312,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "imm-index": (
+        "TMS320C54x staged indexed immediate ST: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 literals=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 accumulator_patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read literal=retained destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated indexed immediate ST complete",
+    ),
     "arith-ar": (
         "TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0",
         "Fatal error: TMS320C54x isolated mapped AR arithmetic complete",

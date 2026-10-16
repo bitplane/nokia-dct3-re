@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_indexed_immediate_store_scope(self):
+        marker, ending = EXTRA_PROFILES['imm-index']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='imm-index')
+        for bad in (output.replace('restore=98304', 'restore=0'),
+                    output.replace('excluded_pointer_updates=0', 'excluded_pointer_updates=1'),
+                    output.replace('literal=retained', 'literal=reread'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='imm-index')
+
     def test_mapped_ar_arithmetic_scope(self):
         marker, ending = EXTRA_PROFILES['arith-ar']
         output = marker + '\n' + ending + '\n'
