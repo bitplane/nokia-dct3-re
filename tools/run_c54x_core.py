@@ -975,7 +975,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated long logic exclusions complete",
     ),
     "logic-short": (
-        "TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0",
+        (
+            "TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0",
+            "TMS320C54x logic transfer MOD3 exclusions: PASS cases=2560 restore=2560 opcode_classes=10 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated short memory logic complete",
     ),
     "logic-peripheral": (

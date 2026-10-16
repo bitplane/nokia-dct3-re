@@ -953,13 +953,26 @@ class CoreResultTests(unittest.TestCase):
 
     def test_logic_controls_and_exclusions(self):
         for name in ('logic-edges', 'logic-short', 'logic-peripheral', 'load-offset'):
-            marker, ending = EXTRA_PROFILES[name]
-            output = marker + '\n' + ending + '\n'
+            markers, ending = EXTRA_PROFILES[name]
+            markers = (markers,) if isinstance(markers, str) else markers
+            output = '\n'.join((*markers, ending)) + '\n'
             check_result(output, 3, profile=name)
+            for marker in markers:
+                with self.subTest(profile=name, marker=marker), self.assertRaises(ValueError):
+                    check_result(output.replace(marker, ''), 3, profile=name)
             for bad in (output.replace('restore=', 'missing_restore='),
-                        marker + '\n' + output, output + 'late output\n'):
+                        markers[0] + '\n' + output, output + 'late output\n'):
                 with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=name)
+
+    def test_logic_transfer_mod3_exclusions(self):
+        markers, ending = EXTRA_PROFILES['logic-short']
+        output = '\n'.join((*markers, ending)) + '\n'
+        for old, new in (('restore=2560', 'restore=0'), ('opcode_classes=10', 'opcode_classes=6'),
+                         ('frontends=2', 'frontends=1'), ('initial_tc=2', 'initial_tc=1'),
+                         ('program_writes=0', 'program_writes=1'), ('io_writes=0', 'io_writes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='logic-short')
 
     def test_long_memory_logic_scope(self):
         marker, ending = EXTRA_PROFILES['logic-offset']

@@ -944,6 +944,12 @@
       "hypothesis": "The shared paired-word address path makes short-preincrement Lmem legal for DADD, DSUB, DRSUB and their T variants",
       "conclusion": "SPRU172C defines these Lmem operands as reads, while SPRU131G table 5-4 reserves short MOD=3 for writes, including paired accesses. The atomic paired-read families and staged DADD/DSUB/DRSUB classifier reject before operand effects. Positive fixtures omit form 4 with stable raw IDs, retaining 6144 DSUB, 12288 DADD and 6144 DRSUB cases/restores over eight forms. Both focused gates additionally require 3584 rejection/replay cases over all 14 opcode classes, all ARs, CMPT and C16 settings, pages, frontends and snapshots, with unchanged data, pointers and arithmetic state. The legacy atomic prefix, DLD and write-side preincrement controls pass. This does not admit positive staged T variants, reject paired stores or long MOD=13 reads, decide implicit-copy/read-modify-write grammar, validate physical timing or constitute a fresh full staged-suite run.",
       "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
+      "id": "c54x_short_mod3_is_a_valid_logic_or_transfer_source", "status": "disproven",
+      "hypothesis": "Short MOD=3 can feed logical operations or source-side transfers because the transfer eventually writes a different memory space",
+      "conclusion": "SPRU172C defines AND/OR/XOR, MVDK, MVMD, PORTW and WRITA's encoded operands as reads. SPRU131G table 5-4 restricts short MOD=3 to write accesses. Their atomic entry points now reject before operand effects, matching their staged exclusions. The logic-short gate retains 576 positive cases and requires 2560 rejection/replay cases across ten opcode classes, ARs, CMPT settings, initial TC states, pages, frontends and snapshots. Independent data, program and I/O taps require no operand/output transactions, pointer or arithmetic effects. Thirteen neighboring profiles and three external-I/O controls pass. Destination-side MVKD/MVDM, PORTR and MVPD must not inherit the source restriction. This does not settle implicit-copy/RMW instructions, MMR long-form handling, circular fixture domains or physical timing; it is not a fresh full staged-suite run. POPD's encoded operand remains a destination.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     }
   ]
 }

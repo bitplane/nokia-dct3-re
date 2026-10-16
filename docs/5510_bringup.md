@@ -93,6 +93,23 @@ preincrement and previous load/multiply rejection controls pass. These are
 focused regressions, not a fresh full staged-suite run or physical-timing
 acceptance. Implicit copies and read/modify/write remain unclassified.
 
+AND/OR/XOR and source-side MVDK, MVMD, PORTW and WRITA reject short
+MOD=3 in the atomic frontend; their staged classifiers already exclude it.
+The encoded operand is a read even when the instruction writes another
+data location, a port or program memory. Conversely MVKD/MVDM, PORTR and
+MVPD encode a destination and must not inherit this source restriction.
+`logic-short` requires the unchanged 576 positive logic cases and 2,560
+rejection/replay cases over ten opcode classes, all ARs, CMPT settings,
+initial TC values, pages, frontends and two snapshots. It observes data,
+program and I/O writes independently and requires no operand effects.
+Thirteen neighboring profiles and three external-I/O controls pass,
+including long-offset logic, source/destination transfers, short write-side
+preincrement, the atomic prefix and paired reads. Native 5110 save-state
+restoration and 2,928 tool tests (one skipped) pass. This is a focused
+source-domain correction, not closure of implicit-copy/RMW semantics,
+MMR long forms, circular inputs or physical timing. Those independent
+questions do not change POPD's encoded destination role.
+
 Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
 MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
 extension before rejecting; STL/STH extensions are unchanged. The
