@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_metadata_update_is_sole_cause_of_silent_playback",
+      "status": "disproven",
+      "hypothesis": "The native parameter-7 metadata rewrite removes the POCP marker or changes the recorded payload, and this update alone explains silent playback",
+      "conclusion": "A buffer-only NAND snapshot immediately before the first metadata-request byte leaves the final NAND identical to the existing corrected-core recorder endpoint (523e9417a37fd2353edbcf3ad4d3f8bdc5231c184e8ac88ec8ae9639da8fc2f8). Independent FAT extraction yields REL_001.REL before and TEST afterward. Only 33 common bytes change, within the first 56 ID3 bytes; the remaining common extent is identical. POCP is already absent before the update. EOF extends from 142958 to 143168 with 210 ff bytes, whose correctness remains unresolved. Playing the untouched pre-request NAND for 20 seconds still yields zero TX/DIN and 1363518 zero DMA reads in 1000..137f, illegal=0, the same PC 02:b5e1 and 87390 completed arithmetic-loop calls as the post-update input. The pre-update title begins 000908 rather than MAME, so title_verified=0 and the strict title checker remains rejecting; this is coverage evidence, not playback acceptance. The result excludes metadata as the sole cause of silence, not other container/encoder/decoder defects or a possible response to the constant converted-ADC bench input. Audio provenance and the EOF extension remain open.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_recorder_media_inventory.py", "tools/test_mu4_recorder_media_inventory.py", "tools/noki5510_bootstrap_check.py", "Makefile"]
+    },
+    {
       "id": "c54x_dma_enable_relatches_live_element_count",
       "status": "disproven",
       "hypothesis": "Re-enabling a C54x DMA channel must replace its per-frame count shadow with the current decremented DMCTR value",

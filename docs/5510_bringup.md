@@ -4458,6 +4458,26 @@ FAT or codec syntax. Synthetic tests cover changed ranges, appended bytes,
 shortening, empty inputs, read-only CLI behavior and incompatible export
 options. All 2,950 tool tests pass (one skipped).
 
+The untouched pre-request NAND also runs the original player for 20 seconds:
+`illegal=0`, PC `02:b5e1`, 87,390 completed arithmetic-loop calls, one
+bootstrap/twelve resident/24 loader-API Execute entries and fourteen replies.
+Its 1,524,209 TX words, 1,691,842 DIN words and 1,363,518 actual DMA source
+reads are all zero, with the same hashes and `1000..137f` source range as
+post-update playback. This falsifies the metadata step, including its EOF
+extension, as the sole cause of the observed silence; it does not explain
+the extension or establish valid recorded audio. This is a negative coverage
+experiment, not a passing playback gate. Its title publication begins
+packed `3030,3039,3038` (`000908`), not `MAME`; `title_verified=0` is retained,
+and the existing strict playback-observation checker does not accept it.
+The native audio diagnostic still intentionally fails. No verifier was
+relaxed to bank this comparison.
+
+The converted-ADC fixture supplies constant `1234`/`5678` channel values.
+A varying-input recorder/playback experiment is still required before
+using nonzero output as an audio expectation. Native filtering behavior,
+input consumption and decoded-sample provenance must be established rather
+than assuming that the constant bench input should survive unchanged.
+
 ### Cold Saved-Track Catalogue
 
 `bootopenstage` starts a fresh process at the original serial bootstrap,
