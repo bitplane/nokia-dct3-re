@@ -16,6 +16,37 @@ and fixtures still require a domain audit. Passing those mechanically decoded
 read cases is not hardware-legality evidence. Long-offset MOD=13 preincrement
 is a distinct read-capable form and must not be removed by that audit.
 
+### Short-preincrement fixture audit
+
+SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 (`*+ARx`,
+encoded Smem byte `98..9f`) to write accesses. The following positive
+fixture domains still violate that restriction; their existing PASS markers
+are prototype regressions, not proof of legal read execution:
+
+| Fixture generator | Confirmed invalid positive domain | Required correction |
+| --- | --- | --- |
+| `start_pipeline_indirect_case` | `1099` and `1199`: 2 of 8 cases | Replace those legs with rejection checks before address modification/read, retaining the 6 valid load cases and their restore checks. |
+| `memory_repeat_case` SUBC bank | Form 4 uses `1e99`/`1f99`: 7,680 of 46,080 cases | Remove this form from positive division coverage; test rejection separately, including active repeat state. |
+| `memory_immediate_case` | Form 4 uses `629a`/`639a`: 8,192 of 106,496 cases | Remove this form from positive MPY coverage and test rejection without operand reads or T/AR publication. |
+
+These counts are derived from the current generators, not new execution
+results. They identify confirmed defects, not an exhaustive opcode census.
+The remaining legal positive domains in the latter two banks are 38,400 and
+98,304 cases respectively; preserve their Cartesian dimensions rather than
+substituting duplicate valid forms to keep old totals.
+
+Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
+grammars, and Smem destination writes are eligible for short preincrement.
+For example, operand-fetch case 45 uses `7c9a` (MVPD destination), not a
+read-source defect. The repeated immediate-ST bank currently excludes form 4
+already. Long MOD=13 (`e8..ef` plus offset) remains read-capable.
+Read/modify/write and implicit-copy instructions require instruction-specific
+classification; this audit does not settle them. For `6fxx`, classify the
+operation extension before deciding whether the encoded Smem is a source or
+destination. Correct both execution frontends and their fixture domains before
+claiming the legality audit complete; disassembler recognition alone is not
+execution acceptance evidence.
+
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
