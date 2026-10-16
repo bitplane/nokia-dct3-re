@@ -23,20 +23,21 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='instr-observer')
 
-    def test_add_sp_requires_arithmetic_contexts_and_exclusions(self):
-        markers, ending = EXTRA_PROFILES['add-sp']
-        output = '\n'.join((*markers, ending)) + '\n'
-        check_result(output, 3, profile='add-sp')
-        for marker in markers:
-            for bad in (output.replace(marker + '\n', ''), marker + '\n' + output):
-                with self.subTest(marker=marker, bad=bad), self.assertRaises(ValueError):
-                    check_result(bad, 3, profile='add-sp')
-        for bad in (output.replace('restore=576', 'restore=0'),
-                    output.replace('operand_reads=0', 'operand_reads=1'), output + 'late output\n'):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                check_result(bad, 3, profile='add-sp')
-        with self.assertRaises(ValueError):
-            check_result(output, 0, profile='add-sp')
+    def test_sp_sources_require_operation_contexts_and_exclusions(self):
+        for profile in ('add-sp', 'mvkd-sp'):
+            markers, ending = EXTRA_PROFILES[profile]
+            output = '\n'.join((*markers, ending)) + '\n'
+            check_result(output, 3, profile=profile)
+            for marker in markers:
+                for bad in (output.replace(marker + '\n', ''), marker + '\n' + output):
+                    with self.subTest(profile=profile, marker=marker, bad=bad), self.assertRaises(ValueError):
+                        check_result(bad, 3, profile=profile)
+            for bad in (output.replace('restore=576', 'restore=0'),
+                        output.replace('operand_reads=0', 'operand_reads=1'), output + 'late output\n'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+            with self.assertRaises(ValueError):
+                check_result(output, 0, profile=profile)
 
     def test_ram_forwarding_scopes(self):
         for profile in ('imm-forward', 'rmw-forward'):

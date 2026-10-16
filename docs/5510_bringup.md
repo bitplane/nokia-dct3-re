@@ -91,9 +91,12 @@ NAND. File/audio completeness and playback remain open.
 The active `bootplaystage` diagnostic sends an original playback request
 through serial pins and loads the matching `RELSI16` image. Its 49,839
 compared program/data words match original marker `aa99` before startup;
-four low-window words remain excluded. Native execution stops at
-`02:a81e`, `7090 0018`: MVKD from mapped SP to `*AR0+`. The staged source
-guard remains in place pending independent Read/producer/retention tests.
+four low-window words remain excluded. Native execution now passes the
+mapped-SP MVKD and stops at `02:6116`, `fb82 510c`: a delayed far call
+inside the active block-repeat body `02:6116..6120`. Delayed far calls
+and block repeats have separate coverage, but this combination remains
+guarded pending reconciliation with TI's far-call/block-repeat restriction,
+then any justified frame/delay/loop-restoration tests.
 This is a failed coverage diagnostic, not a playback acceptance or an
 unavailable-ROM boundary.
 
@@ -4276,14 +4279,48 @@ words excluded. Incoming replies have class/selector/size
 `1/58/12`, `0/02/16`, `0/03/20`, and each receives the normal pin ACK.
 Those replies do not alone establish decoder completion or sample output.
 
-Execution reaches REL instruction `02:a81e`, `7090 0018`
-(`MVKD $0018, *AR0+`). The source is CPU SP (`0018`), not a missing
-peripheral. The destination intent is the ordinary RAM context pointed to
-by AR0 (`a8ab` at the stop). Neighboring instructions copy AR1, AR6 and AR7;
-the adjacent restore sequence uses MVDK to restore SP. Do not admit SP by
-removing the guard alone: establish mapped-source Read timing, separation
-from compiler-mode address generation, stack-update producers, retained
-address/data, save/replay and neighboring exclusions first.
+Mapped-SP MVKD is supported through the existing retained data-copy path.
+SP (`0018`) is a Read-owned data operand, separate from the earlier
+compiler-mode destination address. `mvkd-sp` independently verifies 384
+copy cases and their replays: direct DP/CPL, indirect pointer modifiers,
+absolute/offset destinations and direct MVDM to an AR; four source patterns,
+both CPL states, two program pages and three save points. It changes SP
+after address formation and again after Read, and replaces fetched
+literals, so a reread or recomputed address fails. Another 576 replayed
+cases cover older FRAME/PSHM/POPM/STM producers, zero/one/three-word gaps,
+a younger FRAME and preserved accumulator patterns. Twenty rejected
+control/peripheral-source cases and five rejected control destinations
+remain fail-closed. The same fixture fails at the source guard before the
+admission; the existing ADD-SP profile also remains green. These are
+bounded pipeline-model checks, not measured silicon phase timing.
+The complete 288-marker default core suite and the native 5110 save-state
+gate also pass with this admission. They protect their existing scopes;
+neither is a REL playback or complete native-handset acceptance.
+
+The original REL sequence at `02:a81e`, `7090 0018`
+(`MVKD $0018, *AR0+`) now executes. Neighboring instructions copy AR1,
+AR6 and AR7, and the adjacent restore sequence uses MVDK to restore SP;
+that context-shaped layout does not by itself identify a task or RTOS ABI.
+Native execution subsequently stops at `02:6116`, `fb82 510c`
+(`FCALLD $02:510c`), the first instruction of active block `02:6116..6120`.
+The block count is initialized to six at `02:610f`; the call's delay words
+are `e801 f495`. The staged block-control guard rejects the delayed far
+call before its frame is allocated. This is not automatically a legal
+composition waiting for a test: TI's [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+FCALL[D] page 4-57 and RPTB[D] page 4-148, explicitly restricts far calls
+inside block repeats. This restriction does not define a hardware trap or
+prove that the supplied program is invalid. Reconcile the supplied C5416
+program with that restriction before choosing loop semantics; neither the existing
+nondelayed in-block fixture nor a new self-conformance test proves silicon
+behavior. If independent evidence supports this composition, its tests
+must establish call/return frame balance, both delay words, actual repeat
+counts and save/replay through the callee. Otherwise retain the guard and
+document the unresolved variant/architecture boundary.
+
+```sh
+python3 tools/run_c54x_core.py --profile mvkd-sp \
+  --mame mame/mame --rompath roms --output-root tmp
+```
 
 ```sh
 make check-mu4-bootstrap-original \

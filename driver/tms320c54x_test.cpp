@@ -6099,6 +6099,7 @@ private:
 	void start_pipeline_add_sp_context(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const copy = !strcmp(machine().options().bios(), "mvkd-sp");
 		unsigned const producer = variant % 4, gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
 		u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
 		bool const compiler = BIT(variant / 24, 0), b = BIT(variant / 96, 0);
@@ -6110,8 +6111,8 @@ private:
 		program.write_word(base + 0x600, std::array<u16, 4>{0xeefc, 0x4a11, 0x8a11, 0x7718}[producer]);
 		if (producer == 3) program.write_word(base + 0x601, operand);
 		unsigned const add = 0x600 + (producer == 3 ? 2 : 1) + gap;
-		program.write_word(base + add, b ? 0x01f8 : 0x00f8); program.write_word(base + add + 1, 0x18);
-		// A younger FRAME must not change the older ADD's sampled SP.
+		program.write_word(base + add, copy ? 0x7092 : b ? 0x01f8 : 0x00f8); program.write_word(base + add + 1, 0x18);
+		// A younger FRAME must not change the older instruction's sampled SP.
 		program.write_word(base + add + 2, 0xee02);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -6120,6 +6121,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, initial_sp);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1357);
+		if (copy) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0 : 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -6133,24 +6135,32 @@ private:
 				expect(word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_tick,
 					"Mapped SP ADD reads the older stack update once before the younger FRAME"); ++m_pipeline_operand_reads;
 			});
-		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(initial_sp - 1, initial_sp - 1, "add_sp_context_stack",
-			[this](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled()) { expect(word == 0x1357 && !m_pipeline_store_writes, "PSHM retains one ordered stack write"); ++m_pipeline_store_writes; } });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x60, 0xffff, "mapped_sp_context_writes",
+			[this, copy, initial_sp, operand](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (copy && at == 0x1400) { expect(word == operand && !m_pipeline_extensions_reads, "MVKD retains one SP publication after an older stack update"); ++m_pipeline_extensions_reads; }
+				else { expect(at == u16(initial_sp - 1) && word == 0x1357 && !m_pipeline_store_writes, "PSHM retains one ordered stack write"); ++m_pipeline_store_writes; } });
+		m_pipeline_extensions_reads = 0;
 		m_phase = 291000; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pipeline_add_sp_exclusion(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		u16 const source = std::array<u16, 10>{0, 1, 6, 7, 0x1a, 0x1b, 0x1c, 0x1d, 0x24, 0x58}[variant % 10];
+		bool const copy = !strcmp(machine().options().bios(), "mvkd-sp");
+		bool const destination_edge = copy && variant >= 20;
+		u16 const source = destination_edge ? 0x18 : std::array<u16, 10>{0, 1, 6, 7, 0x1a, 0x1b, 0x1c, 0x1d, 0x24, 0x58}[variant % 10];
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, variant >= 10 ? 0x01f8 : 0x00f8); program.write_word(0x601, source);
+		program.write_word(0x600, copy ? destination_edge ? 0x70f8 : variant >= 10 ? 0x7212 : 0x7092 : variant >= 10 ? 0x01f8 : 0x00f8);
+		program.write_word(0x601, destination_edge ? std::array<u16, 5>{0, 0x18, 0x19, 0x1a, 0x1f}[variant - 20] : source);
+		if (destination_edge) program.write_word(0x602, source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		if (copy) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400); m_cpu->space(AS_DATA).write_word(0x1400, 0xaaaa); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -6645,6 +6655,63 @@ private:
 			[this, opcode](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
 				expect(word == opcode && !m_pipeline_extensions_reads, "Accumulator logic opcode is fetched once across replay"); ++m_pipeline_extensions_reads; });
 		m_phase = 252570; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	struct mvkd_sp_fixture
+	{
+		unsigned form, read, checkpoint;
+		u16 opcode, literal, destination, next_ar, value;
+		u32 base;
+		bool compiler;
+	};
+	static mvkd_sp_fixture mvkd_sp_case(unsigned variant)
+	{
+		unsigned const form = variant % 8, read = form == 5 || form == 6 ? 7 : 6;
+		bool const compiler = BIT(variant / 32, 0);
+		u16 const destination = std::array<u16, 8>{u16(compiler ? 0x1002 : 0x402), 0x1400, 0x1400, 0x1400, 0x1401, 0x1500, 0x1403, 0x13}[form];
+		return {form, read, std::array<unsigned, 3>{4, read, read + 1}[variant / 128],
+			std::array<u16, 8>{0x7002, 0x7082, 0x7092, 0x708a, 0x709a, 0x70f8, 0x70e2, 0x7213}[form],
+			u16(form == 5 ? destination : form == 6 ? 3 : 0x18), destination,
+			u16(form == 2 || form == 4 ? 0x1401 : form == 3 ? 0x13ff : 0x1400),
+			std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 8) % 4],
+			BIT(variant / 64, 0) ? 0x20000U : 0, compiler};
+	}
+	void start_mvkd_sp(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = mvkd_sp_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, f.literal);
+		if (f.form == 5 || f.form == 6) program.write_word(f.base + 0x602, 0x18);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		if (f.destination >= 0x60) m_cpu->space(AS_DATA).write_word(f.destination, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvkd_sp_source",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == 0x18 && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read,
+					"MVKD reads mapped SP in Read, independently of the earlier compiler address"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mvkd_sp_destination",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				expect(at == f.destination && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.read + (f.form != 7),
+					"MVKD publishes the retained SP word once to its retained RAM or AR destination"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + (f.read == 7 ? 0x602 : 0x601), "mvkd_sp_literals",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const part = m_pipeline_extensions_reads++;
+				expect(part < (f.read == 7 ? 2 : 1) && at == f.base + 0x601 + part && word == (part ? 0x18 : f.literal),
+					"MVKD retains the original source and optional destination literal exactly once"); });
+		m_phase = 293000; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	struct mvkd_fixture
@@ -14353,6 +14420,7 @@ private:
 		if (!strcmp(machine().options().bios(), "move-t")) { start_t_register_move(); return; }
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
+		if (!strcmp(machine().options().bios(), "mvkd-sp")) { start_mvkd_sp(); return; }
 		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute") || !strcmp(machine().options().bios(), "add-sp")) { start_pipeline_absolute_add(); return; }
 		if (!strcmp(machine().options().bios(), "instr-observer")) { start_instruction_observer(); return; }
 		if (!strcmp(machine().options().bios(), "arith-bk") || !strcmp(machine().options().bios(), "arith-ar")) { start_pipeline_register_arithmetic(); return; }
@@ -37414,9 +37482,54 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 292010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 292000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 293000)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = mvkd_sp_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVKD mapped SP is an admitted data source, not a compiler address");
+			if (tick == f.read - 2)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
+				if (f.read == 7) m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xbeef);
+			}
+			if (tick == f.read - 1)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.next_ar, "MVKD changes its pointer only once during Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.value);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.compiler ? 0 : 0x4000));
+			}
+			if (tick == f.read)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0xbeef);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2468);
+			}
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped SP copy before Read, after Read or after publication");
+			}
+			if (tick == 20)
+			{
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination) == f.value && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.read == 7 ? 2 : 1) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.compiler ? 0 : 0x4000)), "Mapped SP copy retains address, word and status across post-Read source replacement"); }
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped SP copy without duplicate reads, updates or writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 293010; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_mvkd_sp(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged MVKD SP: PASS cases=384 restore=384 forms=DP,CPL,indirect,postincrement,postdecrement,preincrement,absolute,offset,MVDM values=4 cpl_states=2 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_retained=1 address_retained=1 silicon_phase_claim=0\n");
+				start_pipeline_add_sp_context(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 293010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 293000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 291000)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, producer = variant % 4;
+			bool const copy = !strcmp(machine().options().bios(), "mvkd-sp");
 			unsigned const gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
 			u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
 			u16 const operand = initial_sp + std::array<int, 4>{-4, -1, 1, -8}[producer];
@@ -37431,7 +37544,7 @@ private:
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
-				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SP producer, retained ADD input or younger FRAME state");
 			}
@@ -37439,24 +37552,26 @@ private:
 			{
 				u64 const expected = u64(s64(s16(operand))) & 0xffffffffffULL;
 				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(producer == 1) &&
-					m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+					m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (copy ? 0 : expected) &&
 					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2468 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == (producer == 2 ? 0xbeef : 0x1357) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008 &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (compiler ? 0x4000 : 0)),
 					"Mapped SP ADD retains the producer value independently of CPL, younger FRAME and later SP replacement");
+				if (copy) { auto const disable = machine().disable_side_effects(); expect(m_pipeline_extensions_reads == 1 && m_cpu->space(AS_DATA).read_word(0x1400) == operand && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1401, "Mapped SP copy retains the older stack value and modifies its destination pointer once"); }
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped-SP operand without duplicate stack effects or reads");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 291010; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 575) { start_pipeline_add_sp_context(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged absolute ADD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
+				if (copy) osd_printf_info("TMS320C54x staged MVKD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
+				else osd_printf_info("TMS320C54x staged absolute ADD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
 				start_pipeline_add_sp_exclusion(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -37464,14 +37579,21 @@ private:
 		if (m_phase == 291010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 291000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 291020)
 		{
+			bool const copy = !strcmp(machine().options().bios(), "mvkd-sp");
 			if (++m_idle_fixture_tick == 12)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008,
 					"SP admission does not admit control, repeat, mapping or peripheral sources");
+				if (copy) { auto const disable = machine().disable_side_effects(); expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1400 && m_cpu->space(AS_DATA).read_word(0x1400) == 0xaaaa, "Excluded MVKD and MVDM do not update the destination pointer or publish data"); }
 				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 19) { start_pipeline_add_sp_exclusion(m_pipeline_peripheral_case + 1); return; }
+				if (m_pipeline_peripheral_case < (copy ? 24 : 19)) { start_pipeline_add_sp_exclusion(m_pipeline_peripheral_case + 1); return; }
+				if (copy)
+				{
+					osd_printf_info("TMS320C54x staged MVKD SP exclusions: PASS cases=25 sources=10 source_cases=20 destination_cases=5 forms=MVKD,MVDM operand_reads=0 architectural_results=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated MVKD SP complete");
+				}
 				osd_printf_info("TMS320C54x staged absolute ADD SP exclusions: PASS cases=20 sources=10 accumulators=2 operand_reads=0 architectural_results=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated absolute ADD SP complete");
 			}
@@ -44632,6 +44754,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(214, "repeat-body-isr", "Software-saved ISR repeat returning directly into an outer body")
 	ROM_SYSTEM_BIOS(215, "add-sp", "Retained absolute ADD from SP and stack-update contexts")
 	ROM_SYSTEM_BIOS(216, "instr-observer", "Execute-owned instruction observation without program-read aliases")
+	ROM_SYSTEM_BIOS(217, "mvkd-sp", "Retained MVKD and MVDM from mapped SP with stack-update contexts")
 ROM_END
 
 ROM_START(tms54rom4)

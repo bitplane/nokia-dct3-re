@@ -456,6 +456,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVMD BK: PASS cases=432 restore=432 contexts=isolated,STLM_NOP destinations=AR0_to_AR7,BK values=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_retained=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD BK complete",
     ),
+    "mvkd-sp": (
+        (
+            "TMS320C54x staged MVKD SP: PASS cases=384 restore=384 forms=DP,CPL,indirect,postincrement,postdecrement,preincrement,absolute,offset,MVDM values=4 cpl_states=2 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_retained=1 address_retained=1 silicon_phase_claim=0",
+            "TMS320C54x staged MVKD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0",
+            "TMS320C54x staged MVKD SP exclusions: PASS cases=25 sources=10 source_cases=20 destination_cases=5 forms=MVKD,MVDM operand_reads=0 architectural_results=0",
+        ),
+        "Fatal error: TMS320C54x isolated MVKD SP complete",
+    ),
     "add-sp": (
         (
             "TMS320C54x staged absolute ADD SP: PASS cases=4096 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=SP,RAM pages=2 cpl_states=2 restore=4096 duplicate_reads=0 independent_arithmetic=1 source_retained=1",
