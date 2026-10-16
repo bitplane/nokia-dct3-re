@@ -8,6 +8,52 @@ import struct
 import sys
 
 
+def adts_header(source, offset):
+    """Decode a candidate fixed header, not AAC payload or CRC validity."""
+    if offset < 0 or offset + 7 > len(source):
+        return None
+    h = source[offset:offset + 7]
+    if h[0] != 0xff or h[1] & 0xf6 != 0xf0:
+        return None
+    header_bytes = 7 if h[1] & 1 else 9
+    frame_bytes = ((h[3] & 3) << 11) | (h[4] << 3) | (h[5] >> 5)
+    if frame_bytes < header_bytes or offset + header_bytes > len(source):
+        return None
+    return {'offset': offset, 'header_hex': h.hex(), 'header_bytes': header_bytes,
+            'mpeg_version': 2 if h[1] & 8 else 4, 'profile_bits': h[2] >> 6,
+            'sampling_index': (h[2] >> 2) & 15,
+            'channel_configuration': ((h[2] & 1) << 2) | (h[3] >> 6),
+            'frame_bytes': frame_bytes, 'buffer_fullness': ((h[5] & 31) << 6) | (h[6] >> 2),
+            'raw_data_blocks_minus_one': h[6] & 3,
+            'frame_within_file': offset + frame_bytes <= len(source)}
+
+
+def adts_inventory(source):
+    headers = {}
+    for offset in range(max(0, len(source) - 6)):
+        if source[offset] == 0xff:
+            header = adts_header(source, offset)
+            if header is not None:
+                headers[offset] = header
+    chain, stop, reason = [], None, 'no_candidate'
+    if headers:
+        stop = min(headers)
+        while stop in headers:
+            header = headers[stop]
+            chain.append(stop)
+            if not header['frame_within_file']:
+                reason = 'truncated_frame'
+                break
+            stop += header['frame_bytes']
+        else:
+            reason = 'exact_eof' if stop == len(source) else 'missing_header_at_declared_end'
+    return {'file_bytes': len(source), 'sha256': hashlib.sha256(source).hexdigest(),
+            'candidate_count': len(headers), 'candidates': list(headers.values()),
+            'first_candidate_chain': chain, 'chain_stop': stop, 'chain_stop_reason': reason,
+            'scope': 'candidate ADTS headers and declared-length chain from first candidate only; '
+                     'not correct start offset, fixed frame size, CRC/payload validity, REL identity or decoded audio'}
+
+
 def file_inventory(source, endpoint):
     """Compare externally extracted files, without interpreting their format."""
     common = min(len(source), len(endpoint))
@@ -112,10 +158,16 @@ def main():
                         help='write a new data-only volume image from the original InitDisk fixture endpoint')
     mode.add_argument('--extracted-files', action='store_true',
                       help='compare independent file readbacks instead of raw NAND captures')
+    parser.add_argument('--adts-headers', action='store_true',
+                        help='inventory candidate ADTS headers in both independently extracted files')
     args = parser.parse_args()
+    if args.adts_headers and not args.extracted_files:
+        parser.error('--adts-headers requires --extracted-files')
     try:
         source, endpoint = args.source.read_bytes(), args.endpoint.read_bytes()
         report = file_inventory(source, endpoint) if args.extracted_files else inventory(source, endpoint)
+        if args.adts_headers:
+            report['adts_header_candidates'] = {'source': adts_inventory(source), 'endpoint': adts_inventory(endpoint)}
         if args.export_fixture_volume:
             metadata, volume = fixture_volume(endpoint)
             with args.export_fixture_volume.open('xb') as output:

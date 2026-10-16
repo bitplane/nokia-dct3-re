@@ -4532,10 +4532,10 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** what earlier parsing/stream-position contract makes the
-varying file reach `025354` with a one bit, and is that position consistent
-with the recorded payload? Do not force a bit, wakeup, node, callback,
-saved context, method result or input value.
+**Open question:** can an independently validated, generated AAC media
+fixture separate native playback behavior from recorder-output/framing
+defects? Retain the recorded files as controls. Do not force a bit, wakeup,
+node, callback, saved context, method result or input value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
 2.368206564 (constant) / 1.726312648 (varying). Source-checked observation
@@ -4773,6 +4773,45 @@ proof; wrapper history is retained unconditionally and paired at enqueue.
 Observation state is reset/saved. Lua bus taps exclude snapshots and
 side-effects-disabled C++ reads. No observer writes firmware state and no
 observation check accepts decoded audio.
+
+#### Saved-file ADTS candidates
+
+Read-only `mu4_recorder_media_inventory.py --extracted-files --adts-headers`
+decodes candidate fixed headers and follows declared lengths from the first
+candidate. It does not invent a 372-byte grid, discard inconvenient headers,
+validate CRC/payload or assume that the first candidate is the correct start.
+Both independently extracted files yield the same initial chain:
+
+| Byte Offset | Raw Fixed Header | Declared Bytes | Channel Config | Blocks Minus One |
+| --- | --- | ---: | ---: | ---: |
+| 995 | `fff950802e8600` | 372 | 2 | 0 |
+| 1367 | `fff950802e8600` | 372 | 2 | 0 |
+| 1739 | `fff950442518c7` | 296 | 1 | 3 |
+
+The next declared boundary is 2035, with no candidate header; another
+candidate exists at 2111. These headers encode profile bits 1 and sampling
+index 4, but that does not establish valid AAC payload. The constant file
+has 335 candidate headers, varying 336. Payload false positives, leading
+data, legitimate configuration changes, storage layout and recorder defects
+remain distinct possibilities. In particular, this shared chain break is
+not proof that changing the converted input alone broke the encoder.
+The ID3 header declares a 100-byte tag body (audio region begins at 110);
+this alone does not identify subsequent framing or explain its leading data.
+
+The next discriminating control is generated, independently decoded AAC
+media in a separately authored copy of this bench's own storage fixture,
+with independent file readback before execution. This is external media,
+not donor provisioning or a firmware-state patch. Preserve original hashes,
+the native command/receive path and failing audio acceptance until actual
+decoded PCM is independently established. Generating media is software-only
+(`ffmpeg`/`ffprobe` are available); filesystem authoring must use a proven
+writer and checked fixture row mapping rather than ad hoc FAT pokes.
+
+The inventory handles MPEG-2/4 header IDs, CRC-dependent header size,
+declared length, raw block count and file truncation. Tests include embedded
+sync candidates that must not replace the declared-length chain, divergent
+but parseable headers, missing boundaries and read-only CLI operation.
+The complete tool suite passes (2,972 tests, one skipped).
 
 All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
 as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are

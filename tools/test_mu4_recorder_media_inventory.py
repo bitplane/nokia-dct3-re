@@ -6,10 +6,70 @@ import json
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
-from tools.mu4_recorder_media_inventory import inventory, fixture_volume, file_inventory, main
+from tools.mu4_recorder_media_inventory import inventory, fixture_volume, file_inventory, main, adts_header, adts_inventory
 
 
 class RecorderMediaInventoryTest(unittest.TestCase):
+    def test_adts_cli_requires_file_mode_and_does_not_modify_inputs(self):
+        with patch('sys.argv', ['inventory', 'missing', 'missing', '--adts-headers']), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as error:
+                main()
+        self.assertEqual(error.exception.code, 2)
+        frame = bytes.fromhex('fff950802e8600') + bytes(365)
+        with tempfile.TemporaryDirectory() as directory:
+            source, endpoint = Path(directory) / 'source', Path(directory) / 'endpoint'
+            source.write_bytes(frame)
+            endpoint.write_bytes(frame * 2)
+            output = io.StringIO()
+            with patch('sys.argv', ['inventory', str(source), str(endpoint), '--extracted-files', '--adts-headers']), contextlib.redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            report = json.loads(output.getvalue())['adts_header_candidates']
+            self.assertEqual(report['source']['first_candidate_chain'], [0])
+            self.assertEqual(report['endpoint']['first_candidate_chain'], [0, 372])
+            self.assertEqual(source.read_bytes(), frame)
+            self.assertEqual(endpoint.read_bytes(), frame * 2)
+
+    def test_adts_candidate_fields_are_not_payload_acceptance(self):
+        frame = bytes.fromhex('fff950802e8600') + bytes(365)
+        header = adts_header(frame, 0)
+        self.assertEqual((header['frame_bytes'], header['mpeg_version'], header['profile_bits'],
+                          header['sampling_index'], header['channel_configuration'], header['raw_data_blocks_minus_one']),
+                         (372, 2, 1, 4, 2, 0))
+        self.assertEqual(header['header_bytes'], 7)
+        self.assertTrue(header['frame_within_file'])
+        crc = bytes.fromhex('fff850802e8600') + bytes(365)
+        self.assertEqual(adts_header(crc, 0)['header_bytes'], 9)
+        mpeg4 = bytes.fromhex('fff150802e8600') + bytes(365)
+        self.assertEqual(adts_header(mpeg4, 0)['mpeg_version'], 4)
+        for invalid in (b'', frame[:6], bytes.fromhex('ffff50802e8600'), bytes.fromhex('fff95080000000')):
+            self.assertIsNone(adts_header(invalid, 0))
+
+    def test_adts_chain_walks_declared_lengths_and_keeps_divergent_candidates(self):
+        frame = bytes.fromhex('fff950802e8600') + bytes(365)
+        source = b'prefix' + frame * 2
+        report = adts_inventory(source)
+        self.assertEqual(report['first_candidate_chain'], [6, 378])
+        self.assertEqual(report['chain_stop_reason'], 'exact_eof')
+        divergent = bytes.fromhex('fff950442518c7') + bytes(365)
+        report = adts_inventory(b'prefix' + frame * 2 + divergent + frame)
+        self.assertEqual(report['candidate_count'], 4)
+        self.assertEqual(report['first_candidate_chain'], [6, 378, 750])
+        self.assertEqual(report['chain_stop'], 1046)
+        self.assertEqual(report['chain_stop_reason'], 'missing_header_at_declared_end')
+        self.assertEqual(report['candidates'][2]['channel_configuration'], 1)
+        self.assertEqual(report['candidates'][2]['raw_data_blocks_minus_one'], 3)
+        self.assertEqual(adts_inventory(frame[:20])['chain_stop_reason'], 'truncated_frame')
+        self.assertEqual(adts_inventory(bytes(20))['chain_stop_reason'], 'no_candidate')
+
+    def test_adts_payload_sync_candidate_does_not_replace_declared_chain(self):
+        frame = bytes.fromhex('fff950802e8600') + bytes(365)
+        first = bytearray(frame)
+        first[20:27] = frame[:7]
+        report = adts_inventory(bytes(first) + frame)
+        self.assertEqual(report['candidate_count'], 3)
+        self.assertEqual(report['first_candidate_chain'], [0, 372])
+        self.assertEqual(report['chain_stop_reason'], 'exact_eof')
+
     def test_file_delta_separates_common_changes_from_added_tail(self):
         report = file_inventory(b'abcdef', b'abXYeZ\xff\xff')
         self.assertEqual(report['common_extent_bytes'], 6)
