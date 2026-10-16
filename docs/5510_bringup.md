@@ -43,11 +43,12 @@ register window. Software-saved repeat replacement/restoration now passes
 the isolated interrupt fixture, and the original recorder advances past
 `RPTB 03:faa5`. Accumulator SQUR (`f48d`) at `03:dbe6` also executes.
 The internal BD (`f273`) at `03:da7e` and extended BANZ (`6ce0`) at
-`02:a4cb` also execute. The current exclusion is absolute ADD `00f8 000b`
-at `02:9e9d`, occupying the two-word delay span of FCALLD `03:dc44` at
-`02:9e9b`. The source is mapped BL, not RAM. Live terminal PC is
-`02:9e9f`; it is not the owning instruction address. NAND writes alone do
-not prove complete recording.
+`02:a4cb` also execute. Absolute ADD `00f8 000b` at `02:9e9d` now
+occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
+its source is mapped BL, not RAM. The current exclusion is memory SUB
+`08f8` at `03:d309`, reading mapped BK (`0019`). Live terminal PC is
+`03:d30d`; it is not the owning instruction address. NAND writes alone
+do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -171,6 +172,32 @@ delay sequence above; this is not full recorder acceptance.
 The native 5110 save-state gate, resident-memory comparison and 2,866
 tooling tests (one skip) pass. The full default core run was not repeated
 for this bounded block-composition change.
+
+### Absolute ADD in a control delay
+
+Absolute ADD `00f8/01f8` uses two words and may occupy a complete
+two-word control-delay span. The original `00f8 000b` at `02:9e9d`
+adds BL to A before the far-call target `03:dc44` observes A. The existing
+Access address capture, Read operand and Execute arithmetic implement the
+operation; admission now counts both words and retains the delay-span bound.
+Control/peripheral sources outside the admitted register set remain excluded.
+
+`--profile add-delay` passes 18,432 cases and save/replays across BD,
+CALLD, FCALLD and RETD; RAM, AR3, AL, AH, BL and BH sources; both
+destinations; four operand/initial patterns; SXM/OVM; two pages and three
+snapshots. Aliased accumulator fields are included in the independent
+arithmetic expectation. Carry, sticky overflow, saturation, preserved T/ST1,
+one source read, one address-literal fetch, owned call/return frames and the
+target's observed result are checked. RAM is replaced after Read to detect
+rereads; mapped accumulator inputs are not overwritten after Read, since
+that could also change the Execute-owned destination. Conditional controls,
+adjacent producer ordering and measured physical phases are not established
+by this fixture. Original execution passes the sequence and reaches the
+separate mapped-BK SUB exclusion at `03:d309`.
+Absolute ADD/BK controls, both shared delay-load profiles and their exclusion
+profiles, internal BD/BANZ, native 5110 save-state and 2,867 tooling tests
+(one skip) pass. The original resident-memory comparison remains exact.
+The full default CPU run was not repeated for this delay-admission change.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

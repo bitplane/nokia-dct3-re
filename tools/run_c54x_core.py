@@ -312,6 +312,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "add-delay": (
+        "TMS320C54x delayed absolute ADD: PASS cases=18432 restore=18432 controls=BD,CALLD,FCALLD,RETD sources=RAM,AR3,AL,AH,BL,BH destinations=2 memory_values=4 initial_values=4 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 literal_fetches=1 call_frames=owned target_observes_result=1 conditional_composition=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed absolute ADD complete",
+    ),
     "rptb-banz": (
         "TMS320C54x long BANZ within block: PASS cases=768 restore=768 counts=0,1,2,7 forms=offset,preincrement,circular offset_pairs=8 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 ar_updates_once=1 actual_iterations=1 compatibility_composition=unvalidated interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated long BANZ within block complete",

@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_delayed_absolute_add_scope(self):
+        marker, ending = EXTRA_PROFILES['add-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='add-delay')
+        for bad in (output.replace('restore=18432', 'restore=0'),
+                    output.replace('call_frames=owned', 'call_frames=unvalidated'),
+                    output.replace('target_observes_result=1', 'target_observes_result=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='add-delay')
+
     def test_long_banz_block_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-banz']
         output = marker + '\n' + ending + '\n'
