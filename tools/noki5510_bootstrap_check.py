@@ -464,6 +464,55 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
     return result
 
 
+def compare_playback_bit_context(text, words, session):
+    if __package__:
+        from .mu4_context_contract import reference_bit_window
+    else:
+        from mu4_context_contract import reference_bit_window
+    rows = list(re.finditer(
+        r'mu4_playback_bit_context: boundary=(entry|return) ordinal=(\d+) address=([0-9a-f]{6}) '
+        r'a=([0-9a-f]{10}) remaining=([0-9a-f]{4}) reservoir=([0-9a-f]{8}) index=([0-9a-f]{4}) '
+        r'base=([0-9a-f]{4}) next=([0-9a-f]{4}|unobserved) caller=([0-9a-f]{6}) t=(\d+\.\d{9}) '
+        r'identity=Execute_entry context_only=1 observer_writes=0$', text, re.MULTILINE))
+    if len(rows) != text.count('mu4_playback_bit_context:') or len(rows) % 2 or len(rows) > 48:
+        raise ValueError('malformed or unpaired bit-reader context')
+    result, previous, source_counts = [], session[0], [0, 0, 0]
+    for index in range(0, len(rows), 2):
+        entry, returned = rows[index:index + 2]
+        for boundary, row, address, opcode in (('entry', entry, 0x2510c, 0xed00), ('return', returned, 0x25142, 0xf4e4)):
+            time = float(row[11])
+            if row[1] != boundary or int(row[2]) != index // 2 + 1 or int(row[3], 16) != address or words.get(address) != opcode:
+                raise ValueError('bit-reader boundary, ordinal or original source mismatch')
+            if not previous <= time < session[1]:
+                raise ValueError('bit-reader context outside ordered first session')
+            previous = time
+        raw_request, remaining = int(entry[4], 16) & 0xffff, int(entry[5], 16)
+        caller = int(entry[10], 16)
+        if entry[10] != returned[10] or caller not in words:
+            raise ValueError('bit-reader caller context is unpaired or absent from original source')
+        source = 1 if caller == 0x25354 else 2 if caller == 0x25e2d else 0
+        source_counts[source] += 1
+        if source_counts[source] > 8:
+            raise ValueError('bit-reader caller selection exceeds its bounded samples')
+        literal = words.get(caller - 1)
+        literal_request = literal & 0xff if words.get(caller) == 0xf982 and words.get(caller + 1) == 0x510c and literal is not None and literal & 0xff00 == 0xe800 else None
+        row = {'raw_request': raw_request, 'caller': entry[10], 'preceding_literal_candidate': literal_request,
+               'literal_candidate_agrees': None if literal_request is None else literal_request == raw_request,
+               'entry_time': float(entry[11]), 'return_time': float(returned[11]),
+               'scope': 'raw context comparison, not retained operands or CPU/codec acceptance'}
+        if not 0 <= raw_request <= 16 or remaining > 32 or (remaining <= 16 and entry[9] == 'unobserved') or (literal_request is not None and literal_request != raw_request):
+            row['comparison'] = 'unvalidated_input_context'
+        else:
+            expected = reference_bit_window(remaining, int(entry[6], 16), int(entry[7], 16),
+                                            int(entry[9], 16) if entry[9] != 'unobserved' else 0, raw_request)
+            observed = dict(zip(('value', 'remaining', 'reservoir', 'index'),
+                                (int(returned[4], 16) & 0xffff, int(returned[5], 16), int(returned[6], 16), int(returned[7], 16))))
+            row.update(comparison='matches' if observed == expected and entry[8] == returned[8] else 'differs',
+                       expected=expected, observed=observed, base_unchanged=entry[8] == returned[8])
+        result.append(row)
+    return result
+
+
 def verify_playback_gates(text, session):
     terminals = list(re.finditer(
         r'mu4_playback_gate_terminal: direction=(read|write) address=(ba4f|ba51) accesses=(\d+) samples=(\d+) '
@@ -646,6 +695,7 @@ def verify_playback_range(text, words):
             'restore_producer_path': verify_playback_path(text, words, restore_history, kind='restore'),
             'method_coverage': verify_playback_method(text, words, parent['first_session']),
             'method_gate_accesses': verify_playback_gates(text, parent['first_session']),
+            'bit_context_comparisons': compare_playback_bit_context(text, words, parent['first_session']),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'notify_context_history': notify_history,
             'notify_raw_register_context': verify_playback_notify_context(text, notify_history),

@@ -23,9 +23,40 @@ from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapt
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
+from tools.mu4_context_contract import reference_bit_window
+from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, decode_bit_window
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_original_bit_reader_source_is_pinned_without_cross_overlay_aliases(self):
+        words = dict(enumerate(BIT_WINDOW_WITNESS, BIT_WINDOW_BASE))
+        self.assertEqual(decode_bit_window(words)['pinned_words'], 55)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_bit_window(changed)
+        with self.assertRaises(ValueError):
+            decode_bit_window({address - 0x10000: value for address, value in words.items()})
+
+    def test_bit_window_reference_uses_msb_order_and_one_word_refill(self):
+        for width in range(17):
+            for remaining in range(33):
+                for word in (0, 0xffff, 0x8001, 0x1234):
+                    reservoir = 0x89abcdef
+                    refill = remaining <= 16
+                    payload = ((reservoir << 16) | word) & 0xffffffff if refill else reservoir
+                    available = remaining + (16 if refill else 0)
+                    bits = f'{payload:032b}'[32 - available:]
+                    result = reference_bit_window(remaining, reservoir, 0xffff, word, width)
+                    self.assertEqual(result['value'], int('0' + bits[:width], 2))
+                    self.assertEqual(result['remaining'], available - width)
+                    self.assertEqual(result['index'], 0 if refill else 0xffff)
+                    self.assertEqual(result['reservoir'], payload)
+        for args in ((33, 0, 0, 0, 1), (0, 0, 0, 0, -1), (0, 0, 0, 0, 17)):
+            with self.assertRaises(ValueError):
+                reference_bit_window(*args)
+
     def test_playback_control_census_rejects_missing_extra_and_changed_records(self):
         words = dict(enumerate((6, 0x804a, 2, 0x495, 0xd7b8, 0xd796, 1, 0x54f, 2), 0x27167))
         words.update(dict(enumerate((0x76f8, 0xaa56, 0), 0x27a04)))

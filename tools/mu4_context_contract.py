@@ -15,6 +15,44 @@ else:
 
 
 BASE = 0x23D73
+BIT_WINDOW_BASE = 0x2510C
+BIT_WINDOW_WITNESS = (
+    0xED00, 0xF6B6, 0xF6B7, 0xF7B8, 0xF6B9, 0x4A08, 0x7712, 0xA854,
+    0x1182, 0xF310, 0x0010, 0xFA4E, 0x512E, 0x7713, 0xA858, 0x7714,
+    0xB331, 0x7715, 0xB332, 0x1085, 0x0084, 0x8815, 0x5783, 0xF74F,
+    0xF741, 0x1285, 0xF2A0, 0x4E83, 0xE901, 0x0184, 0x8184, 0xE910,
+    0x0182, 0x8182, 0x1182, 0x0900, 0x8182, 0x8A10, 0xF300, 0xFFF0,
+    0xF784, 0x890E, 0x5683, 0xF48F, 0xF450, 0x32F8, 0x0010, 0xE901,
+    0xF782, 0xF310, 0x0001, 0xF280, 0xF030, 0xFFFF, 0xF4E4,
+)
+
+
+def decode_bit_window(words):
+    for offset, expected in enumerate(BIT_WINDOW_WITNESS):
+        if words.get(BIT_WINDOW_BASE + offset) != expected:
+            raise ValueError('AA99 bit-reader source witness changed or absent')
+    return {'segment': 'aa99', 'entry': '02510c', 'return': '025142',
+            'pinned_words': len(BIT_WINDOW_WITNESS), 'remaining': '00a854',
+            'reservoir_high_low': ['00a858', '00a859'], 'index': '00b331', 'base': '00b332',
+            'refill_branch': '025117 BCD BGT', 'refill_when': 'remaining <= 16',
+            'model_width_domain': [0, 16], 'model_remaining_domain': [0, 32],
+            'scope': 'Pinned scalar source and bounded reference model; not all callers, retained operands, CPU acceptance or codec validity'}
+
+
+def reference_bit_window(remaining, reservoir, index, next_word, width):
+    """Independent MSB-window extraction hypothesis; not codec or CPU acceptance."""
+    if not (0 <= remaining <= 32 and 0 <= reservoir <= 0xffffffff and
+            0 <= index <= 0xffff and 0 <= next_word <= 0xffff and 0 <= width <= 16):
+        raise ValueError('bit window outside recovered scalar domain')
+    if remaining <= 16:
+        reservoir = ((reservoir << 16) | next_word) & 0xffffffff
+        index = (index + 1) & 0xffff
+        remaining += 16
+    remaining -= width
+    return {'value': (reservoir >> remaining) & ((1 << width) - 1),
+            'remaining': remaining, 'reservoir': reservoir, 'index': index}
+
+
 FILTER_PARENT_WITNESSES = (
     (0x2A10C, (0x4A11, 0x4A16, 0x4A17, 0x4A07, 0x8811, 0x1006,
                0x8816, 0x1107, 0x8917, 0xF620, 0xF845, 0xA123)),
@@ -849,6 +887,7 @@ def contract(source):
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
     result['filter_parent'] = decode_filter_parent(rel_words)
+    result['bit_reader'] = decode_bit_window(rel_words)
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

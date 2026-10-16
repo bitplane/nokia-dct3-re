@@ -9,10 +9,29 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_path,
     verify_playback_method,
     verify_playback_gates,
+    compare_playback_bit_context,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_bit_context_comparison_does_not_promote_context_to_operand_acceptance(self):
+        entry = ('mu4_playback_bit_context: boundary=entry ordinal=1 address=02510c a=0000000001 '
+                 'remaining=0000 reservoir=00000000 index=0000 base=1000 next=8001 caller=025354 t=1.000000000 '
+                 'identity=Execute_entry context_only=1 observer_writes=0')
+        returned = entry.replace('boundary=entry', 'boundary=return').replace('address=02510c', 'address=025142').replace(
+            'remaining=0000 reservoir=00000000 index=0000', 'remaining=000f reservoir=00008001 index=0001').replace(
+            't=1.000000000', 't=1.000001000')
+        text = entry + '\n' + returned
+        words = {0x2510c: 0xed00, 0x25142: 0xf4e4, 0x25353: 0xe801, 0x25354: 0xf982, 0x25355: 0x510c}
+        self.assertEqual(compare_playback_bit_context(text, words, [0.8, 2.2])[0]['comparison'], 'matches')
+        self.assertEqual(compare_playback_bit_context(text.replace('boundary=return ordinal=1 address=025142 a=0000000001',
+            'boundary=return ordinal=1 address=025142 a=0000000000'), words, [0.8, 2.2])[0]['comparison'], 'differs')
+        self.assertEqual(compare_playback_bit_context(text.replace('a=0000000001', 'a=0000000011'), words, [0.8, 2.2])[0]['comparison'], 'unvalidated_input_context')
+        for bad in (entry, returned + '\n' + entry, text.replace('context_only=1', 'context_only=0'),
+                    text.replace('t=1.000001000', 't=2.200000000')):
+            with self.assertRaises(ValueError):
+                compare_playback_bit_context(bad, words, [0.8, 2.2])
+
     def test_gate_accesses_require_all_identities_and_observed_terminal_values(self):
         reports = [f'mu4_playback_gate_terminal: direction={direction} address={address} accesses=0 samples=0 last=unobserved '
                    'selection=common_first_session_window observer_writes=0 audio_acceptance=0'

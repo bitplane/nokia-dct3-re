@@ -86,6 +86,9 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 &&
+						((address == 0x2510c && opcode == 0xed00) || (address == 0x25142 && opcode == 0xf4e4)))
+						observe_playback_bits(address);
 					if (m_playback_execute_entries[1] == 1 && address == 0x24538 && opcode == 0xeefe && ++m_playback_restore_samples <= 8)
 					{
 						unsigned const p = m_playback_history_next;
@@ -421,6 +424,10 @@ private:
 	std::array<u32, 6> m_playback_method_entries{};
 	u32 m_playback_method_mismatch = 0;
 	u32 m_playback_restore_samples = 0;
+	std::array<u32, 2> m_playback_bit_samples{};
+	std::array<u8, 3> m_playback_bit_source_samples{};
+	bool m_playback_bit_selected = false;
+	u32 m_playback_bit_caller = 0;
 	std::array<u32, 4> m_playback_activation_pc{};
 	std::array<u16, 4> m_playback_activation_word{};
 	double m_playback_activation_time = 0;
@@ -881,6 +888,28 @@ private:
 				m_playback_parent[site], receiver, ram_words(receiver).c_str(), ar1,
 				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)), machine().time().as_double());
 		}
+	}
+	void observe_playback_bits(offs_t address)
+	{
+		unsigned const boundary = address == 0x2510c ? 0 : 1;
+		if (!boundary)
+		{
+			m_playback_bit_caller = m_playback_history_pc[(m_playback_history_next + 3) & 3];
+			unsigned const source = m_playback_bit_caller == 0x25354 ? 1 : m_playback_bit_caller == 0x25e2d ? 2 : 0;
+			m_playback_bit_selected = m_playback_bit_source_samples[source] < 8;
+			if (m_playback_bit_selected) ++m_playback_bit_source_samples[source];
+		}
+		if (!m_playback_bit_selected) return;
+		++m_playback_bit_samples[boundary];
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const index = data.read_word(0xb331), base = data.read_word(0xb332);
+		u16 const pointer = base + index;
+		std::string const next = pointer >= 0x80 ? util::string_format("%04x", data.read_word(pointer)) : "unobserved";
+		logerror("mu4_playback_bit_context: boundary=%s ordinal=%u address=%06x a=%010llx remaining=%04x reservoir=%04x%04x index=%04x base=%04x next=%s caller=%06x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+			boundary ? "return" : "entry", m_playback_bit_samples[boundary], unsigned(address),
+			static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+			data.read_word(0xa854), data.read_word(0xa858), data.read_word(0xa859), index, base, next.c_str(), m_playback_bit_caller, machine().time().as_double());
 	}
 	void report_playback_path(char const *prefix, char const *selection)
 	{
@@ -2113,6 +2142,9 @@ private:
 			save_item(NAME(m_playback_path_next)); save_item(NAME(m_playback_path_count));
 			save_item(NAME(m_playback_method_entries)); save_item(NAME(m_playback_method_mismatch));
 			save_item(NAME(m_playback_restore_samples));
+			save_item(NAME(m_playback_bit_samples));
+			save_item(NAME(m_playback_bit_source_samples));
+			save_item(NAME(m_playback_bit_selected)); save_item(NAME(m_playback_bit_caller));
 			save_item(NAME(m_playback_activation_pc)); save_item(NAME(m_playback_activation_word)); save_item(NAME(m_playback_activation_time));
 			save_item(NAME(m_playback_range_counts)); save_item(NAME(m_playback_range_opcodes)); save_item(NAME(m_playback_range_changes));
 			save_item(NAME(m_playback_dma_min)); save_item(NAME(m_playback_dma_max)); save_item(NAME(m_playback_dma_last_nonzero));
@@ -2330,6 +2362,9 @@ private:
 		m_playback_path_pc = {}; m_playback_path_word = {}; m_playback_path_next = 0; m_playback_path_count = 0;
 		m_playback_method_entries = {}; m_playback_method_mismatch = 0;
 		m_playback_restore_samples = 0;
+		m_playback_bit_samples = {};
+		m_playback_bit_source_samples = {};
+		m_playback_bit_selected = false; m_playback_bit_caller = 0;
 		m_playback_activation_pc = {}; m_playback_activation_word = {}; m_playback_activation_time = 0;
 		m_playback_range_counts = {}; m_playback_range_opcodes = {}; m_playback_range_changes = 0;
 		m_playback_dma_min = 0xffff; m_playback_dma_max = 0; m_playback_dma_last_nonzero = 0;

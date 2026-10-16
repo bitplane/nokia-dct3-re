@@ -4532,9 +4532,9 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** what input/return predicates drive the observed restore
-calls at `02535c`, `02587e` and `025e35`, and how do their bit-reading
-paths differ between the files? Do not force a wakeup, node, callback,
+**Open question:** what earlier parsing/stream-position contract makes the
+varying file reach `025354` with a one bit, and is that position consistent
+with the recorded payload? Do not force a bit, wakeup, node, callback,
 saved context, method result or input value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
@@ -4697,6 +4697,49 @@ method counts and full selected-range counts. Input bits, saved-stream
 positions and the return-value predicates now need independent checking;
 neither a numeric restore result nor a generic file probe establishes
 invalid media or a missing peripheral.
+
+**Bit-reader comparison.** The scalar routine `02510c..025142` uses
+remaining count `a854`, a 32-bit high/low reservoir at `a858/a859`, word
+index `b331` and base pointer `b332`. An independent host model appends a
+16-bit word when the remaining count is **at most** 16 (the source branch
+is BGT, not BGEQ), then extracts the requested MSB-side window and reduces
+the count. A zero-width request still permits refill; the bounded scalar
+domain is widths 0--16 and remaining counts 0--32. Model tests independently
+compare binary-string slicing across all widths/counts and four words;
+these are model tests, not executable CPU coverage of every case. The
+contract pins all 55 original routine words and tests every word mutation
+and a wrong-page alias.
+
+Fresh runs retain eight initial calls and up to eight calls separately
+from each of `025354` and `025e2d`, preventing one caller from starving
+the other. Constant playback records 16 pairs; varying records 17.
+All 33 raw entry/return contexts agree with the model's returned value,
+remaining count, reservoir, index and unchanged base. The observations
+cover widths 0, 1 and 15, not every width or all calls. Source-adjacent
+literal candidates are reported separately from raw requests; neither is
+promoted to a retained-operand API. Counters, selection and pairing state
+are reset/saved. Malformed pairs, source/caller mismatches and out-of-session
+timestamps fail the observation checker, while an actual model disagreement
+is reported as a research result rather than hidden or accepted as audio.
+
+The varying file's `025354` call at 1.008694075 seconds has raw width one,
+remaining `0010`, reservoir `bc2cce39`, index `01d7`, base `162e` and next
+word `3785`. It returns one, remaining `001f`, reservoir `ce393785`,
+index `01d8` and next word `99c7` at 1.008694551. The local byte sequence
+`bc2cce39378599c7` occurs exactly once in independently extracted `TEST`,
+at byte offset 1048; the selected MSB of `ce39` is at byte 1050 and is one.
+This ties the particular input window to the saved data, not a global
+file-offset mapping, valid container/codec interpretation or decoder
+correctness. Constant playback has no captured `025354` call in this
+session, so comparing the same file offset is not a matched parsing proof.
+
+The pulse/TNS/gain-control tail in the upstream
+[FAAD2 AAC syntax parser](https://raw.githubusercontent.com/knik0/faad2/master/libfaad/syntax.c)
+provides a candidate interpretation for the consecutive optional-field
+checks around `025354`. This is a syntax clue only: assigning a gain-control
+name requires mapping the preceding fields and stream position in this ROM.
+No external implementation is imported, and neither that analogy nor the
+observed one bit proves invalid media or justifies clearing it.
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,
