@@ -4860,9 +4860,36 @@ MPY/MAC conformance verifies the accessor alongside operand mutation,
 exact access counts and save-state replay (98,304 MPY, 262,144 MAC and
 1,664 exclusion cases). This does not make the complete parser valid.
 
-The next question is which parser operation writes `a88b=000a` and whether
-that path is valid for this supplied external media, before treating the
-out-of-domain request as a CPU defect or replaying the complete bit reader.
+The bounded parser-record write trace observes `a888..a88c` becoming
+`0001,000f,0003,000a,000e`, with `a88b=000a` written at
+0.993186456 seconds (bus context PC `0242eb`). The source sequence is
+`0242e6: e804; 0242e7: f982 510c; 0242e9: f495;
+0242ea: 80e6 0003`: a four-bit reader call followed by a store.
+The larger field-width/order sequence resembles an AAC program-configuration
+element, including five-bit channel entries. This is a syntax hypothesis,
+cross-checked against [FFmpeg's PCE decoder](https://ffmpeg.org/doxygen/trunk/libavcodec_2aac_2aacdec_8c_source.html),
+not proof of correct stream alignment or an imported codec implementation.
+
+More importantly, the native buffer does not retain the host-valid header.
+Independent write taps on `162e..1631` observe:
+
+| Time (seconds, first word) | Words | Bus Context PC |
+| --- | --- | --- |
+| 0.983259227 | `f9ff 8050 9f26 defc` | `003356` |
+| 0.988100171 | `fff9 5080 269f fcde` | `0032f5` |
+| 0.988777742 | `ef76 bdc5 269f fcde` | `029e7a` |
+
+The middle row matches the generated ADTS header exactly; the last row
+matches the bit reader's observed initial words. Thus a later native
+buffer transformation, not authoring/readback alone, lies between valid
+stored AAC and parser input. Nearby source is
+`029e74: e8ff 9508 18e2 0001 f2a0 8093 6dea 0002`.
+Bus PCs are context, not a retained writer-identity API. Neither the
+transformation's purpose nor the native external-media packaging contract
+is established; do not call this proof of corruption, decryption, or a CPU
+arithmetic defect. The next question is the input/key contract of this
+transformation and whether plain AAC in a REL-named record selects it.
+Host-valid AAC alone is not proof of valid native REL packaging.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
 acceptance constraints. A separate broader AAC-LC control (MPEG-2

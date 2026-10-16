@@ -39,6 +39,28 @@ end)
 _G.mu4_playback_gate_stop = gate_stop
 local queue_counts = {}
 local result_counts = {}
+local parser_writes = {}
+local prefix_writes = {}
+handles[#handles + 1] = data:install_write_tap(0x162e, 0x1631, 'mu4_playback_buffer_prefix', function(address, value, mask)
+    local time = machine.time:as_double()
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end
+    prefix_writes[address] = (prefix_writes[address] or 0) + 1
+    if prefix_writes[address] <= 32 then
+        machine:logerror(string.format(
+            'mu4_playback_prefix_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+            address, value, mask, prefix_writes[address], time, cpu.state.GENPC.value))
+    end
+end)
+handles[#handles + 1] = data:install_write_tap(0xa888, 0xa88c, 'mu4_playback_parser_fields', function(address, value, mask)
+    local time = machine.time:as_double()
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end
+    parser_writes[address] = (parser_writes[address] or 0) + 1
+    if parser_writes[address] <= 32 then
+        machine:logerror(string.format(
+            'mu4_playback_parser_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+            address, value, mask, parser_writes[address], time, cpu.state.GENPC.value))
+    end
+end)
 handles[#handles + 1] = data:install_write_tap(0x15ee, 0x15f8, 'mu4_playback_method_result', function(address, value, mask)
     local time = machine.time:as_double()
     if time < 0.8182 or time > 1.7 then return end
