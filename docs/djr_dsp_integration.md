@@ -31,6 +31,37 @@ hashes and provenance are recorded in `roms/README.md`.
 | Host-side PCM sinks, resampling, injected samples, and environment gates | implementation conveniences | do not adopt as hardware behavior; host audio is a consumer/producer beyond the emulated COBBA analogue pins |
 | NSE-8 and NHM-5 MCU firmware independently publish tone oscillator words at shared byte offsets `0x0ae`/`0x0b0`, amplitude at `0x0b6`, with oscillator values in quarter-Hz units | local paired-ROM traces; the common `0x0e10` value produces 900 Hz | `nokia_dsp_hle_device` owns this typed mailbox contract and drives the temporary MAME tone sinks; `nokia_dspif_device` remains transport-only |
 
+## CPU comparison leads
+
+The reviewed `b93a7f7` interpreter's block-repeat endpoint test uses the
+sequential continuation `PC == REA + 1`, rather than a numeric `PC > REA`
+test. Its explanation identifies calls whose targets lie outside the loop:
+the callee must execute before its return completes the endpoint. This is
+a useful hypothesis for the MU4 recorder's outside-body CCD/interrupt path;
+the local `repeat-isr` fixture exercises both an in-body return and REA+1.
+
+This is not an independent timing oracle. The reference executes instructions
+atomically, whereas the local staged core must retain operands and order
+overlapping accesses. The reference also keeps a separate `rptb_active` flag;
+its ST1 write path alone does not establish reactivation after an inner loop
+finishes and firmware restores BRAF. Validate that composition against TI's
+architectural contract and executable fixtures, not the existence of RPTB or
+FRETE handlers in another emulator. Use small shared instruction programs to
+compare architectural results; do not import its implementation or assume
+that its 5510 scaffold validates the separate MU4 recorder.
+
+One concrete incompatibility is the reviewed header's `ST1_BRAF` at bit 14.
+TI SPRU131G figure 4-2/table 4-2 assigns BRAF to bit 15 and CPL to bit 14,
+matching the local core. Compare architectural flag meanings before raw
+status words; do not adopt the reference mask as an expected value for
+saved-context tests.
+
+For `f48d/f58d` SQUR, the reference squares a signed 16-bit high word.
+SPRU172C section 4-161 specifies A(32-16), a 17-bit operand, and leaves T
+unchanged for the accumulator form. The local atomic handler already uses
+that 17-bit operand; its staged admission needs independent signed-width,
+FRCT/OVM, untouched-T and producer-ordering tests, not a copied handler.
+
 ## Resulting local boundary
 
 The faithful direction is:

@@ -39,11 +39,10 @@ The delayed far return at `03:d95c` now reaches its original caller's
 continuation `03:a1a9`; the former transfer into page `42` and eventual
 `fe76` data execution are eliminated. Immediate-store forwarding also corrects
 the subsequent interval count, so its DST zero-fill no longer wraps into the
-register window. The current stop is the nested staged block-repeat exclusion
-while decoding `RPTB` at `03:faa3` (`f072 faa5`), with live terminal PC
-`03:faa2`, `illegal=1`. The firmware has saved the outer repeat registers;
-the next implementation boundary is replacement/restoration of a software-saved
-repeat context across the post-interrupt callback. NAND writes alone
+register window. Software-saved repeat replacement/restoration now passes
+the isolated interrupt fixture, and the original recorder advances past
+`RPTB 03:faa5`. The current unsupported staged instruction is `SQUR A,A`
+(`f48d`) at `03:dbe6`, with live terminal PC `03:dbe8`. NAND writes alone
 do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
@@ -82,13 +81,26 @@ Section 6.8 establishes that there is only one physical set of repeat
 registers; software must save outer contexts for nesting.
 
 The callback reaches `03:fa5e` with the outer BRAF still set and later
-publishes its own BRC=`003f` before `RPTB 03:faa5`. The model currently
-rejects that setup. An executable replacement/restoration fixture must cover
-an interrupt during the outside-body CCD callee, an ISR/callback-owned inner
-repeat, restoration from firmware stack words, FRETE to the leaf, and its
-near return to REA+1. Retain endpoint accounting, flags and save/replay;
-do not substitute an easier direct-to-loop return for this composition.
-No nested-repeat execution or successful outer-loop resumption is yet claimed.
+publishes its own BRC=`003f` before `RPTB 03:faa5`. An outside-body RPTB
+now replaces the one loop controller; a near return rebuilds its fetch
+prediction from restored architectural BRAF/BRC/RSA/REA, even after an
+inner loop has finished. There is no automatic context stack.
+
+`--profile repeat-isr` passes 3,840 cases and save/replays: five outer counts
+(`0,1,2,7,56`), four inner counts (`0,1,3,63`), IRQ/NMI, two pages, two
+stack alignments, FRETE/FRETED and six checkpoints. Physical input interrupts
+an outside-body CCD callee. The ISR saves repeat/status registers, executes
+its own loop and restores the saved words; FRETE returns to the leaf, whose
+near return targets either the body or REA+1. Ordered copies, balanced
+frames, retained stack operands and final register state are checked. The
+original firmware now reaches `03:dbe6`; this is not a complete recording
+or a claim that every original outer-loop iteration has settled.
+
+Regression coverage for this boundary includes all 288 default core markers,
+the `repeat-context`, `repeat-pmst`, `repeat-popd`, `repeat-rearm`, `rptb-ccd`,
+`rptbd-irq` and `rptb-fcall-edge` profiles, the native 5110 save-state round
+trip and 2,863 tooling tests (one skip). The original resident-memory gate
+still compares 48,261 program and 3,656 data words exactly.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

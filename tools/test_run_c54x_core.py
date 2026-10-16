@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_software_saved_interrupt_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['repeat-isr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='repeat-isr')
+        for bad in (output.replace('restore=3840', 'restore=0'),
+                    output.replace('balanced_frames=1', 'balanced_frames=0'),
+                    output.replace('leaf_return=inside,REA_plus_1', 'leaf_return=inside'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='repeat-isr')
+
     def test_delayed_conditional_call_block_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-ccd']
         output = marker + '\n' + ending + '\n'

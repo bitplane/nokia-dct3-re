@@ -13021,6 +13021,108 @@ private:
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_rearm_write", [this, second, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && at == 0x1a && word == second && !m_pipeline_store_writes, "Only the post-loop STM publishes the next BRC once"); ++m_pipeline_store_writes; });
 		m_phase = edge ? 255540 : 255520; m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct saved_repeat_fixture
+	{
+		unsigned count, inner, snapshot;
+		bool after_end, nmi, delayed;
+		u32 base;
+		u16 sp;
+		u16 end() const { return after_end ? 0x609 : 0x60b; }
+		u16 saved_count() const { return count - unsigned(after_end && count); }
+		u16 saved_st1() const { return 0x900 | (count ? 0x8000 : 0); }
+		u16 vector() const { return nmi ? 4 : 0x40; }
+	};
+	static saved_repeat_fixture saved_repeat_case(unsigned v)
+	{
+		return {std::array<unsigned, 5>{0, 1, 2, 7, 56}[v % 5], std::array<unsigned, 4>{0, 1, 3, 63}[(v / 5) % 4], v / 640,
+			bool((v / 20) % 2), bool((v / 40) % 2), bool((v / 320) % 2), (v / 80) % 2 ? 0x20000U : 0U, u16(0x3000 + (v / 160) % 2)};
+	}
+	struct saved_repeat_observations
+	{
+		unsigned outer_reads = 0, outer_writes = 0, leaves = 0, inner_writes = 0;
+		unsigned assertions = 0, vectors = 0, mapped_reads = 0, stack_reads = 0, stack_writes = 0, controls = 0, resumed = 0;
+		u16 return_pc = 0;
+		u64 vector_cycle = 0, inner_cycle = 0, restore_cycle = 0, st1_cycle = 0, resume_cycle = 0;
+	};
+	u16 saved_repeat_word(saved_repeat_fixture const &f, unsigned slot) const
+	{
+		return slot == 1 ? 0x60a : slot == 2 ? m_saved_repeat_counts.return_pc : slot == 3 ? f.base >> 16 :
+			slot == 4 ? 0xa608 : slot == 5 ? f.saved_st1() : slot == 6 ? f.saved_count() : slot == 7 ? 0x604 : f.end();
+	}
+	void start_saved_repeat(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = saved_repeat_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + 0x900 + i, 0xf495); }
+		program.write_word(f.base + 0x600, 0xf272); program.write_word(f.base + 0x601, f.end());
+		program.write_word(f.base + 0x604, 0xe589); program.write_word(f.base + 0x605, 0xe801);
+		program.write_word(f.base + 0x606, 0xfb44); program.write_word(f.base + 0x607, 0x700);
+		program.write_word(f.base + 0x60a, 0x6d96);
+		program.write_word(f.base + f.end() + 1, 0x6d97); program.write_word(f.base + f.end() + 2, 0xf4e1);
+		program.write_word(f.base + 0x701, 0x7695); program.write_word(f.base + 0x702, 0x1357);
+		program.write_word(f.base + 0x71c, 0xfc00);
+		program.write_word(f.base + f.vector(), 0x4a1e);
+		program.write_word(f.base + f.vector() + 1, 0xf880 | (f.base >> 16)); program.write_word(f.base + f.vector() + 2, 0x900);
+		std::array<u16, 25> const handler{0x4a06, 0x4a07, 0x4a1a, 0x4a1b, 0x4a1c, 0xf495,
+			0x771a, u16(f.inner), 0xf072, 0x90b, 0x7694, 0x55aa, 0xf495,
+			0x8a1c, 0x8a1b, 0x8a1a, 0xf495, 0xf495, 0xf495, 0xf495, 0xf495, 0xf495,
+			0x8a07, 0x8a06, u16(f.delayed ? 0xf6e5 : 0xf4e5)};
+		for (unsigned i = 0; i < handler.size(); ++i) program.write_word(f.base + 0x900 + i, handler[i]);
+		for (unsigned i = 0; i < 128; ++i) { data.write_word(0x5000 + i, 0x1357 ^ (i * 0x2345)); data.write_word(0x6000 + i, 0xdead); data.write_word(0x7000 + i, 0xdead); data.write_word(0x7100 + i, 0xdead); }
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2345);
+		for (unsigned ar = 2; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, std::array<u16, 6>{0x5000, 0x6000, 0x7100, 0x7000, 0x1600, 0x1700}[ar - 2]);
+		m_saved_repeat_counts = {}; m_saved_repeat_checkpoint = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "saved_repeat_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts;
+			if (at >= 0x5000 && at < 0x5080) { unsigned const i = c.outer_reads++; expect(i <= f.count && at == 0x5000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Restored outer loop reads each ordered source once"); return; }
+			if (at >= f.sp - 8 && at < f.sp)
+			{
+				expect(word == saved_repeat_word(f, f.sp - at), "Return and context pops capture the firmware-published stack word"); ++c.stack_reads;
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return;
+			}
+			std::array<u16, 6> const registers{0x1e, 6, 7, 0x1a, 0x1b, 0x1c};
+			if (c.mapped_reads >= registers.size() || at != registers[c.mapped_reads] || word != saved_repeat_word(f, c.mapped_reads + 3))
+				osd_printf_info("Saved-repeat register mismatch: case=%u read=%u at=%04x word=%04x expected=%04x\n", m_pipeline_peripheral_case, c.mapped_reads, unsigned(at), word, saved_repeat_word(f, c.mapped_reads + 3));
+			expect(c.mapped_reads < registers.size() && at == registers[c.mapped_reads] && word == saved_repeat_word(f, c.mapped_reads + 3), "ISR saves XPC status and the interrupted repeat registers in order"); ++c.mapped_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "saved_repeat_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts;
+			if (at >= 0x6000 && at < 0x6080) { unsigned const i = c.outer_writes++; expect(i <= f.count && at == 0x6000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Outer repeat resumes without skipped or duplicated copies"); return; }
+			if (at >= 0x7000 && at < 0x7080)
+			{
+				unsigned const i = c.leaves++; expect(i <= f.count && at == 0x7000 + i && word == 0x1357, "CCD enters its outside-body leaf exactly once per outer iteration");
+				if (!c.assertions) { ++c.assertions; m_cpu->set_input_line(f.nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE); } return;
+			}
+			if (at >= 0x7100 && at < 0x7180) { unsigned const i = c.inner_writes++; expect(i <= f.inner && at == 0x7100 + i && word == 0x55aa, "Callback repeat owns its independent count and ordered destinations"); if (!i) c.inner_cycle = m_cpu->pipeline_cycles(); return; }
+			if (at >= f.sp - 8 && at < f.sp)
+			{
+				if (at == f.sp - 2) { expect(c.vectors == 1 && word >= 0x703 && word < 0x71c, "Hardware interrupts inside the CCD leaf, not after its return"); c.return_pc = word; }
+				expect(word == saved_repeat_word(f, f.sp - at), "Calls hardware entry and software saves publish the balanced frame"); ++c.stack_writes; return;
+			}
+			std::array<u16, 6> const registers{0x1a, 0x1c, 0x1b, 0x1a, 7, 6};
+			std::array<u16, 6> const words{u16(f.inner), f.end(), 0x604, f.saved_count(), f.saved_st1(), 0xa608};
+			expect(c.controls < registers.size() && at == registers[c.controls] && word == words[c.controls], "Inner setup then firmware pops restore REA RSA BRC before ST1"); ++c.controls;
+			if (c.controls == 4) c.restore_cycle = m_cpu->pipeline_cycles();
+			if (c.controls == 5) c.st1_cycle = m_cpu->pipeline_cycles();
+		});
+		m_vector_prefetch_tap = program.install_read_tap(f.base + f.vector(), f.base + f.vector(), "saved_repeat_vector", [this, f](offs_t, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts; expect(c.assertions == 1 && !c.vectors && word == 0x4a1e, "One physical request reaches its real vector"); ++c.vectors; c.vector_cycle = m_cpu->pipeline_cycles(); m_cpu->set_input_line(f.nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
+		});
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x703, f.base + 0x71b, "saved_repeat_resumed_leaf", [this, f](offs_t at, u16 &, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts;
+			if (c.controls == 6 && c.leaves == 1 && at == f.base + c.return_pc) { expect(!c.resumed, "FRETE fetches its retained outside-body continuation once"); ++c.resumed; c.resume_cycle = m_cpu->pipeline_cycles(); }
+		});
+		m_phase = 255800; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct repeat_context_fixture
 	{
 		bool replace, span;
@@ -13869,6 +13971,7 @@ private:
 		if (!strcmp(machine().options().bios(), "conditional-cd")) { start_delayed_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "cond-cd-edge")) { start_delayed_conditional_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-ccd")) { start_block_conditional_call(); return; }
+		if (!strcmp(machine().options().bios(), "repeat-isr")) { start_saved_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-context")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-pmst")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-popd")) { start_repeat_context(); return; }
@@ -39416,6 +39519,48 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255520; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 255800)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = saved_repeat_case(variant); auto const &c = m_saved_repeat_counts;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Software-saved callback repeat and architectural resumption remain admitted");
+			u64 const cycle = m_cpu->pipeline_cycles();
+			bool const checkpoint = f.snapshot == 0 ? tick == 4 : f.snapshot == 1 ? c.vectors && cycle >= c.vector_cycle + 2 :
+				f.snapshot == 2 ? c.inner_writes && cycle >= c.inner_cycle + 2 : f.snapshot == 3 ? c.controls >= 4 && cycle >= c.restore_cycle + 2 :
+				f.snapshot == 4 ? c.controls >= 5 && cycle >= c.st1_cycle + 1 : c.resumed && cycle >= c.resume_cycle + 2;
+			if (checkpoint && !m_pipeline_replay && m_saved_repeat_checkpoint == 0)
+			{
+				m_saved_repeat_checkpoint = tick; m_saved_repeat_snapshot = c; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save actual IRQ repeat state after queued input edges settle");
+			}
+			if (m_cpu->state_int(tms320c54x_device::STATE_IDLE) || tick == 5000)
+			{
+				unsigned const iterations = f.count + 1;
+				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || c.outer_writes != iterations)
+					osd_printf_info("Saved-repeat mismatch: case=%u replay=%u pc=%06x brc=%04x rsa=%04x rea=%04x st1=%04x outer=%u inner=%u leaves=%u controls=%u stack_reads=%u stack_writes=%u\n",variant,unsigned(m_pipeline_replay),unsigned(m_cpu->state_int(STATE_GENPC)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_RSA)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_REA)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),c.outer_writes,c.inner_writes,c.leaves,c.controls,c.stack_reads,c.stack_writes);
+				expect(m_saved_repeat_checkpoint && c.outer_reads == iterations && c.outer_writes == iterations && c.leaves == iterations && c.inner_writes == f.inner + 1 &&
+					c.assertions == 1 && c.vectors == 1 && c.mapped_reads == 6 && c.stack_reads == iterations + 7 && c.stack_writes == iterations + 7 && c.controls == 6 && c.resumed == 1,
+					"One IRQ owns one saved context and inner loop; all outer calls and frames settle exactly");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end() + 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2345 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x100 &&
+					!m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x604 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end() &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7101 + f.inner &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + (f.after_end ? 0 : iterations) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701,
+					"Firmware-restored loop registers resume the leaf then the outer endpoint without a hidden loop stack");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_saved_repeat_checkpoint; m_saved_repeat_counts = m_saved_repeat_snapshot;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore software-saved repeat state without resubmitting physical input");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255810; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 3839) { start_saved_repeat(variant + 1); return; }
+				osd_printf_info("TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated software-saved IRQ repeat complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255810) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255800; m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == 255480)
 		{
 			bool const pmst = !strcmp(machine().options().bios(), "repeat-pmst");
@@ -42876,6 +43021,8 @@ private:
 	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0, acks = 0, stack_reads = 0, stack_writes = 0; };
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
 	repeat_context_observations m_repeat_context_counts, m_repeat_context_saved_counts;
+	saved_repeat_observations m_saved_repeat_counts, m_saved_repeat_snapshot;
+	unsigned m_saved_repeat_checkpoint = 0;
 	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
@@ -43728,6 +43875,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(194, "block-xc", "Conditional block slots and loop endpoint ownership")
 	ROM_SYSTEM_BIOS(195, "block-xc-edge", "Conditional execution crossing repeat endpoints is excluded")
 	ROM_SYSTEM_BIOS(196, "imm-forward", "Immediate RAM store forwarding and producer replay")
+	ROM_SYSTEM_BIOS(197, "repeat-isr", "Software-saved callback repeat and interrupted CCD resumption")
 ROM_END
 
 ROM_START(tms54rom4)

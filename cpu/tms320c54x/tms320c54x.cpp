@@ -3903,7 +3903,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = m_pipeline_operand[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
-			if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
+			if ((m_st1 & ST1_BRAF) &&
 				(address < m_pipeline_block_start || address > m_pipeline_block_end_address))
 			{
 				u32 const restored_start = (m_pipeline_fetch_address & 0x7f0000) | m_rsa;
@@ -3918,6 +3918,8 @@ void tms320c54x_device::pipeline_step()
 					m_pipeline_block_start = restored_start;
 					m_pipeline_block_end_address = restored_end;
 					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+					m_pipeline_block_active = true;
+					m_pipeline_block_fetch_enabled = true;
 					if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = m_pipeline_block_start;
 				}
 			}
@@ -4489,7 +4491,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[2] = data_read(0x10 + ((m_pipeline_word[2] >> 4) & 15));
 	if (m_pipeline_valid[2] && staged_block_repeat(m_pipeline_word[2]))
 	{
-		if (m_pipeline_block_active) { logerror("%s: nested staged block repeat is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+		// There is one architectural loop controller, not a hidden loop stack.
+		// An outside-body callback may replace it after software saves its
+		// registers; returning to restored bounds rebuilds the fetch prediction.
+		if (m_pipeline_block_active && m_pipeline_block_body[2]) { logerror("%s: nested staged block repeat inside active body is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 		// The two RPTBD delay words execute once, outside the repeated block.
 		m_rsa = u16(m_pipeline_address[2] + (BIT(m_pipeline_word[2], 9) ? 4 : 2));
 		m_rea = m_pipeline_immediate[2];
