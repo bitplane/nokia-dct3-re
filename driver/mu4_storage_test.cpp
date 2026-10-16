@@ -86,6 +86,19 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 && opcode == 0x62e6 &&
+						(address == 0x2433a || address == 0x24340 || address == 0x24346))
+					{
+						unsigned const site = (address - 0x2433a) / 6;
+						if (m_playback_bit_multiply_samples[site]++ < 8)
+						{
+							u16 source = 0, operand = 0, immediate = 0;
+							bool const valid = m_cpu->observe_execute_memory_multiply(address, opcode, source, operand, immediate);
+							logerror("mu4_playback_bit_multiply: address=%06x ordinal=%u retained=%u source=%04x operand=%04x immediate=%04x st1=%04x t=%.9f identity=Execute_entry observer_writes=0 retirement=unclaimed\n",
+								unsigned(address), m_playback_bit_multiply_samples[site], unsigned(valid), source, operand, immediate,
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), machine().time().as_double());
+						}
+					}
 					if (m_playback_execute_entries[1] == 1 && !m_playback_optional_started && address == 0x2532e && opcode == 0xe801)
 					{
 						m_playback_optional_started = m_playback_optional_active = true;
@@ -439,6 +452,7 @@ private:
 	std::array<u32, 2> m_playback_bit_samples{};
 	std::array<u16, 4> m_playback_bit_source_samples{};
 	u16 m_playback_bit_unusual_samples = 0;
+	std::array<u16, 3> m_playback_bit_multiply_samples{};
 	bool m_playback_optional_started = false, m_playback_optional_active = false;
 	u8 m_playback_bit_group = 0;
 	bool m_playback_bit_selected = false;
@@ -2175,6 +2189,7 @@ private:
 			save_item(NAME(m_playback_bit_samples));
 			save_item(NAME(m_playback_bit_source_samples));
 			save_item(NAME(m_playback_bit_unusual_samples));
+			save_item(NAME(m_playback_bit_multiply_samples));
 			save_item(NAME(m_playback_optional_started)); save_item(NAME(m_playback_optional_active)); save_item(NAME(m_playback_bit_group));
 			save_item(NAME(m_playback_bit_selected)); save_item(NAME(m_playback_bit_caller));
 			save_item(NAME(m_playback_activation_pc)); save_item(NAME(m_playback_activation_word)); save_item(NAME(m_playback_activation_time));
@@ -2397,6 +2412,7 @@ private:
 		m_playback_bit_samples = {};
 		m_playback_bit_source_samples = {};
 		m_playback_bit_unusual_samples = 0;
+		m_playback_bit_multiply_samples = {};
 		m_playback_optional_started = m_playback_optional_active = false; m_playback_bit_group = 0;
 		m_playback_bit_selected = false; m_playback_bit_caller = 0;
 		m_playback_activation_pc = {}; m_playback_activation_word = {}; m_playback_activation_time = 0;

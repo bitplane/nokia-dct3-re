@@ -4849,8 +4849,20 @@ it explains the arithmetic but does not establish retained argument ownership
 or a CPU defect. Source immediately before that call is
 `024340: 62e6 0003 0005; 024343: f982 510c`.
 
-The next question is how that caller forms its argument, with retained
-operand and stack provenance, before replaying the complete bit reader.
+The multiply's retained Execute-entry operands establish the immediate
+predecessor: `024340` reads source `a88b`, value `000a`, literal `0005`,
+with ST1=`610f` (FRCT clear), at 0.993192000 seconds. Its signed product
+is 50, matching the next bit-reader entry's A. The preceding multiply at
+`02433a` reads `a88a=0003` with the same literal. These are captured
+pipeline operands, not late memory snapshots; the diagnostic accessor
+rejects mismatched instructions and performs no bus access. Existing
+MPY/MAC conformance verifies the accessor alongside operand mutation,
+exact access counts and save-state replay (98,304 MPY, 262,144 MAC and
+1,664 exclusion cases). This does not make the complete parser valid.
+
+The next question is which parser operation writes `a88b=000a` and whether
+that path is valid for this supplied external media, before treating the
+out-of-domain request as a CPU defect or replaying the complete bit reader.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
 acceptance constraints. A separate broader AAC-LC control (MPEG-2

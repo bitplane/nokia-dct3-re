@@ -1106,6 +1106,17 @@ std::unique_ptr<util::disasm_interface> tms320c54x_device::create_disassembler()
 	return std::make_unique<tms320c54x_disassembler>(m_extended_program);
 }
 
+bool tms320c54x_device::observe_execute_memory_multiply(offs_t address, u16 opcode, u16 &source, u16 &operand, u16 &immediate) const
+{
+	if (!m_pipeline_valid[5] || m_pipeline_annulled[5] ||
+		m_pipeline_address[5] != address || m_pipeline_word[5] != opcode || !staged_memory_immediate_multiply(opcode))
+		return false;
+	source = m_pipeline_operand_address[5];
+	operand = m_pipeline_operand[5];
+	immediate = m_pipeline_immediate[5];
+	return true;
+}
+
 void tms320c54x_device::device_start()
 {
 	m_imr = m_power_on_imr;

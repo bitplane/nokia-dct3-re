@@ -40,6 +40,8 @@ public:
 	// Offset is the logical instruction address; data is the captured opcode.
 	// Observers must not modify guest state; other registers are live, not a snapshot.
 	auto instruction_observer_cb() { return m_instruction_observer_cb.bind(); }
+	// Valid only for the matching staged Execute entry; no bus reads or retirement claim.
+	bool observe_execute_memory_multiply(offs_t address, u16 opcode, u16 &source, u16 &operand, u16 &immediate) const;
 
 	enum : unsigned
 	{
