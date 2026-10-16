@@ -9,8 +9,17 @@ the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, regi
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
-CPU correctness work currently takes precedence over further opcode expansion:
-short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). The
+The independent MU4 music-DSP bench completes original recording control,
+storage and metadata transactions, but native playback remains silent.
+The current software frontier is the [recording/playback transform initializer](#recording-transform-and-initializer-inputs):
+a native recording block matches an independent scalar model and saved bytes,
+while seven-word initializer reads differ in their last word after six-word
+clears. Recover that producer/caller/lifetime contract without forcing keys,
+lengths or file offsets. These bench results do not establish whole-handset
+boot, decoded music, analog audio or native speech.
+
+CPU admission remains fail-closed. In particular, short Smem MOD=3
+preincrement is write-only (SPRU131G table 5-4). The
 corrections below cover selected read families, not the entire ISA. Remaining
 read-source classifiers and older fixture input domains still require an audit;
 passing mechanically decoded cases is not hardware-legality evidence.
@@ -4979,8 +4988,8 @@ maps its first zero pair to `c641,474f`, exactly matching the bit reader's
 packed words `41c6,4f47`. This supports local processing arithmetic, not
 the association with a unique file offset: the file has multiple zero
 regions and no retained file-cursor ownership was captured here.
-The next boundary is the native record's leading-region/finalization and
-playback-start contract, including the recording-side transform input/state.
+The file-start/header contract remains unresolved; the more discriminating
+initializer-input boundary is mapped below.
 Do not remove the zero region, change a seek or synthesize header bytes to
 claim playback. The recorder contains an exact copy of the 23-word nibble
 helper at AA88 `03f0e6`, a software-accessible anchor for that comparison.
@@ -4991,6 +5000,62 @@ run. A separate three-second repeat reproduces all 708 selected first-window
 lines exactly and closes the taps at 2.416666667 seconds. That is observer
 equivalence over the stated window, not a shorter substitute for the complete
 20-second playback observation or decoded-audio acceptance.
+
+#### Recording Transform and Initializer Inputs
+
+The read-only `mu4_recorder_transform_observe.lua` samples the first
+observed data-path forward-transform call, excluding reviewed key-expansion
+return addresses. AA88 `03f0fd..03f466` is pinned as 874 words; its
+82-word state is at `fc6c..fcbd`. The observed caller return is `03ee95`;
+`03edae` was not observed in its bounded window, not proved absent.
+At 1.125195309 seconds the sampled input is `f9ff,8050`, representing
+ADTS bytes `fff95080` in little-endian halfwords. The independent forward
+model yields `2ee7,dcc0`, matching actual writes to `6e9c/6e9d` and the
+independently extracted file's bytes `e72ec0dc` at offset 622. Applying
+the inverse model under that recording state recovers `f9ff,8050`.
+This validates the sampled block boundary, not complete AAC encoding or
+a unique file-offset association. The observed full recording repeats the
+unobserved NAND byte-for-byte, with the same converted-input counts.
+
+The recording state differs from the initial playback state. Different
+header/content stages could legitimately use different state; the difference
+alone is not a defect. `mu4_transform_key_observe.lua` narrows it to these
+initializer-frame and actual bus-read observations:
+
+| Overlay | Buffer | Length In Caller Frame | Actual Seven-Word Read Sequence |
+| --- | --- | ---: | --- |
+| AA88 recording | `ff84` | 7 | `0000,0000,0000,0000,0000,0000,0000` |
+| AA99 playback | `e3d0` | 7 | `0000,0000,0000,0000,0000,0000,ffff` |
+
+The initializers are AA88 `03f7cf` and AA99 `02cd14`; their source uses
+the buffer/length in its key-mixing loop. The first seven data-bus reads
+cycle through all seven addresses; this is not an inference solely from
+late RAM contents. Snapshots remain frame context rather than a retained
+CPU argument API. Before initialization, only the first six buffer words
+receive zero writes near `03e446` (recording) or `02d028` (playback).
+Playback's clearing loop writes BRC=`0005`, consistent with six iterations,
+not evidence of a lost seventh iteration. Its last word `e3d6` still holds
+`ffff` from a prior observed write near `03c862` at 0.309186156 seconds;
+no write to recording's seventh word was seen in the installed-tap epoch.
+Neither fact licenses a claim about physical power-on RAM contents.
+
+The current question is why a six-word clear precedes seven-word
+initialization, and which producer/lifetime contract owns the seventh word.
+Decode that caller contract before classifying this as a key error,
+changing reset RAM policy or replacing either word. No key, pointer,
+length, seek or file byte is forced. The key observer detaches after
+1.8 seconds; its two-second probes are local initialization evidence, not
+complete recording/playback runs. Retain these bounded diagnostics until
+the producer/initializer contract is normalized, then remove redundant taps.
+
+The metadata rewrite is not a new primary suspect. Fresh pre-request
+`REL_001.REL` is 143,470 bytes, SHA-256
+`f2d1e98be033aaf66d473dff58e2e4df0b3828bfe4fd42753265b98028965add`.
+It already contains the same zero region and no `POCP`. Compared with
+post-request `TEST`, only 33 common bytes change (all before offset 56),
+and 210 `ff` bytes are appended. This reproduces the earlier narrow
+metadata-boundary result; it does not resolve the EOF extension or certify
+record completion.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
 acceptance constraints. A separate broader AAC-LC control (MPEG-2
@@ -5001,7 +5066,7 @@ The inventory handles MPEG-2/4 header IDs, CRC-dependent header size,
 declared length, raw block count and file truncation. Tests include embedded
 sync candidates that must not replace the declared-length chain, divergent
 but parseable headers, missing boundaries and read-only CLI operation.
-The complete tool suite passes (2,984 tests, one skipped), including eight
+The complete tool suite passes (2,985 tests, one skipped), including eight
 generated-media tests covering authoring boundaries and failure paths.
 
 In the pre-bypass constant-file control, all 1,125,032 actual channel-3

@@ -27,9 +27,24 @@ from tools.mu4_context_contract import reference_bit_window
 from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, decode_bit_window
 from tools.mu4_context_contract import NIBBLE_BASE, NIBBLE_WITNESS, decode_nibble_selector, reference_nibble
 from tools.mu4_context_contract import decode_prefix_transform, reference_transform_block
+from tools.mu4_context_contract import decode_recording_prefix_transform
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_recorded_native_block_matches_model_and_independent_saved_bytes(self):
+        state = [int(word, 16) for word in (
+            '038f d4c4 63fd 5f08 8d2f d427 9d03 7986 4d6e d591 d525 ad1f 8a59 265a af39 057c 1432 1e68 '
+            '2eaf 682b b991 49ec 3c0d f25a 8020 2f59 7b34 8060 7e4b f765 e6b7 2712 8eef 8954 '
+            'ec34 a6ef 2878 049a 7f78 e8ab 8e37 5a27 2487 c372 fc24 66f0 0e17 7884 a6d5 6543 '
+            '2b3b cdb3 e234 8ebc 5219 8626 0dda f6d0 997f d1be 21a3 2608 a562 a5ed 24f2 d374 '
+            'b9cb 0611 36f0 c51c f3de a969 90e6 7bd4 490a ebc3 ace7 72d0 350c 346f f925 584f').split()]
+        encoded = reference_transform_block(0xf9ff, 0x8050, state, reverse=False)
+        self.assertEqual(encoded, (0x2ee7, 0xdcc0))
+        self.assertEqual(b''.join(word.to_bytes(2, 'little') for word in encoded), bytes.fromhex('e72ec0dc'))
+        self.assertEqual(reference_transform_block(*encoded, state), (0xf9ff, 0x8050))
+        with self.assertRaises(ValueError):
+            decode_recording_prefix_transform({})
+
     def test_prefix_transform_matches_independently_captured_native_block(self):
         state = [int(word, 16) for word in (
             '19ab 3f55 0747 8eaa b29e f452 7c29 2860 b697 6f5a b372 e61e 1aef 91df dc01 02ec 7967 3b13 '

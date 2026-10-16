@@ -68,6 +68,24 @@ def reference_transform_block(left, right, state, *, reverse=True):
     return right ^ keys[17], left ^ keys[16]
 
 
+def decode_recording_prefix_transform(words):
+    for offset, word in enumerate(NIBBLE_WITNESS):
+        if words.get(0x3f0e6 + offset) != word:
+            raise ValueError('AA88 recording nibble selector changed or absent')
+    try:
+        digest = hashlib.sha256(b''.join(words[address].to_bytes(2, 'big')
+                                        for address in range(0x3f0fd, 0x3f467))).hexdigest()
+    except KeyError as error:
+        raise ValueError('incomplete AA88 recording transform source') from error
+    if digest != 'b257221beee04b41a239bb4627de4ef051788fcf753ac510785d4a59e707b5e4':
+        raise ValueError('AA88 recording transform source changed')
+    return {'entry': '03f0fd', 'last_word': '03f466', 'pinned_words': 874,
+            'sha256_be_words': digest, 'nibble_entry': '03f0e6',
+            'state_base': 'fc6c', 'state_words': 82,
+            'observed_data_caller_return': '03ee95',
+            'scope': 'Mapped forward block under captured state; not header generation, state initialization or valid full encoding'}
+
+
 BIT_WINDOW_WITNESS = (
     0xED00, 0xF6B6, 0xF6B7, 0xF7B8, 0xF6B9, 0x4A08, 0x7712, 0xA854,
     0x1182, 0xF310, 0x0010, 0xFA4E, 0x512E, 0x7713, 0xA858, 0x7714,
@@ -945,6 +963,7 @@ def contract(source):
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
+    result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
     result['recorder_memory_mac'] = decode_recorder_memory_mac(recorder_words)
     result['dma_pause'] = decode_dma_pause(words, rel_words)
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
