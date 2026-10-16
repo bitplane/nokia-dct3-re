@@ -3291,8 +3291,8 @@ the first staged iteration. Each subsequent clock reads the current divisor,
 updates the selected pointer once, applies the shared conditional-subtract
 helper and consumes one repeat count. The opcode is fetched once; DP/CPL
 context is retained, and interrupts remain pending until count+1 executions
-complete. The 46,080 replay cases cover DP, CPL, stationary AR1,
-postincrement, preincrement and postdecrement; short/long RPT; counts
+complete. The 38,400 legal replay cases cover DP, CPL, stationary AR1,
+postincrement and postdecrement; short/long RPT; counts
 `0,1,15,32,255`; both accumulators; four dividend/divisor pairs; SXM/OVM;
 two program pages and none/IRQ/NMI inputs. Decode/first/middle/final
 snapshots check arithmetic at every iteration, one divisor read per iteration,
@@ -3302,6 +3302,10 @@ return address and only interrupt-owned stack writes. TI's independent
 circular/bit-reversed and mapped/peripheral repeated sources remain rejected.
 These checks establish the declared repeat model, not silicon timing or the
 unresolved SUBC overflow-edge behavior.
+Short MOD=3 preincrement is write-only, not a valid SUBC source. A separate
+512-case replay bank covers its rejection in both frontends, standalone and
+under short RPT, without data, pointer or arithmetic-result effects. The
+adjacent repeated immediate-store bank retains its 38,400 legal cases.
 
 Variable-shift memory ADD/SUB (`6fxx` with operation-extension masks
 `0c00/0c20`, SPRU172C extended Smem arithmetic) retains ordered address

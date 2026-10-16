@@ -262,7 +262,7 @@ constexpr bool staged_banz(u16 word)
 
 constexpr unsigned staged_repeat_body_words(u16 word)
 {
-	return word == 0xf495 || staged_repeat_accumulator_load(word) || ((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0) || (staged_read_a(word) && u8(word) != 0xf8) ? 1 : 2;
+	return word == 0xf495 || staged_repeat_accumulator_load(word) || ((word & 0xfe00) == 0x1e00 && u8(word) < 0x98) || (staged_read_a(word) && u8(word) != 0xf8) ? 1 : 2;
 }
 
 constexpr bool staged_short_repeat(u16 word)
@@ -298,7 +298,7 @@ constexpr bool staged_ts_arithmetic(u16 word)
 
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && !((word & 0xfe00) == 0x1e00 && (word & 0xf8) == 0x98) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -3107,7 +3107,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && m_pipeline_repeat_active && word != 0xf070 && !staged_memory_repeat(word) && !short_repeat && !m_pipeline_repeat_body_latched)
 		{
-			if (!program_move && !read_a && !staged_pipelined_repeat(word) && !staged_repeat_accumulator_load(word) && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0xa0)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
+			if (!program_move && !read_a && !staged_pipelined_repeat(word) && !staged_repeat_accumulator_load(word) && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0x98)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
 			if (staged_pipelined_repeat(word))
 			{
 				if (!m_pipeline_valid[3] || (!staged_short_repeat(m_pipeline_word[3]) && m_pipeline_word[3] != 0xf070))
@@ -5560,6 +5560,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1e00: // SUBC Smem, A
 	case 0x1f00: // SUBC Smem, B
 	{
+		// Short preincrement is write-only (SPRU131G table 5-4).
+		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
 		u64 &source = accumulator(BIT(op, 8));
 		source = conditional_subtract(source, alu_smem(), BIT(op, 8));
 		return;

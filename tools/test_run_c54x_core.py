@@ -14,6 +14,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_subc_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['subc-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='subc-mod3-edge')
+        for old, new in (('restore=512', 'restore=0'), ('repeat=none,short', 'repeat=none'),
+                         ('frontends=2', 'frontends=1'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('pointer_changes=0', 'pointer_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='subc-mod3-edge')
+
+    def test_repeated_subc_store_scope(self):
+        markers, ending = EXTRA_PROFILES['rpt-subc-st']
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='rpt-subc-st')
+        for marker in markers:
+            with self.assertRaises(ValueError):
+                check_result(output.replace(marker, ''), 3, profile='rpt-subc-st')
+        with self.assertRaises(ValueError):
+            check_result(output.replace('forms=5', 'forms=6'), 3, profile='rpt-subc-st')
+
     def test_memory_multiply_mod3_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['mpy-mod3-edge']
         output = marker + '\n' + ending + '\n'
