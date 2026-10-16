@@ -4,10 +4,24 @@ from tools.noki5510_bootstrap_check import (
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
     verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input, verify_playback_parent, verify_playback_range,
     verify_playback_switch_history,
+    verify_playback_callback_reads,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_callback_bus_reads_require_original_initializer_and_scoped_ordinals(self):
+        text = ('mu4_playback_callback_descriptor_read: address=d7b1 value=0419 ordinal=1 '
+                't=1.000000000 context_pc=020490 reader_identity=unvalidated observer_writes=0')
+        words = {0x2707c: 0x419}
+        self.assertEqual(verify_playback_callback_reads(text, words, [0.8, 2.2]), {'d7b1': 1})
+        for old, new in (('value=0419', 'value=041a'), ('ordinal=1', 'ordinal=2'),
+                         ('address=d7b1', 'address=d7b6'), ('t=1.000000000', 't=1.800000000'),
+                         ('reader_identity=unvalidated', 'reader_identity=proven')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_callback_reads(text.replace(old, new), words, [0.8, 2.2])
+        with self.assertRaises(ValueError):
+            verify_playback_callback_reads(text + '\n' + text, words, [0.8, 2.2])
+
     def test_switch_history_requires_original_words_and_session_scoping(self):
         text = ('mu4_playback_switch_history: ordinal=1 address=020478 opcode=10e4 ar4=804a '
                 'p0=020370/1234 p1=020371/5678 p2=020374/9abc p3=020375/f074 '
@@ -36,6 +50,10 @@ class BootstrapCheckTest(unittest.TestCase):
             verify_playback_switch_history(activation.replace('paired_ar2=8044', 'paired_ar2=8045'), words, [0.8, 2.2], kind='activation')
         with self.assertRaises(ValueError):
             verify_playback_switch_history(text, words, [0.8, 2.2], kind='unknown')
+        callback = text.replace('switch_history', 'callback_history').replace('ar4=804a', 'ar4=d7b0')
+        self.assertEqual(len(verify_playback_switch_history(callback, words, [0.8, 2.2], kind='callback')), 1)
+        with self.assertRaises(ValueError):
+            verify_playback_switch_history(callback.replace('ar4=d7b0', 'ar4=d7b1'), words, [0.8, 2.2], kind='callback')
 
     def test_range_census_requires_complete_original_word_coverage_and_scoped_totals(self):
         words = {address: 0 for address in range(0x200a0, 0x20cd2)}

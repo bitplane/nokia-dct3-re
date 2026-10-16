@@ -40,6 +40,17 @@ handles[#handles + 1] = data:install_write_tap(0xaa56, 0xaa56, 'mu4_playback_pro
     end
 end)
 _G.mu4_playback_control_taps = handles
+local callback_reads = {}
+handles[#handles + 1] = data:install_read_tap(0xd7b0, 0xd7b5, 'mu4_playback_callback_descriptor', function(address, value)
+    local time = machine.time:as_double()
+    if sampling or time < 0.8182 or time > 1.7 then return end
+    callback_reads[address] = (callback_reads[address] or 0) + 1
+    if callback_reads[address] <= 8 then
+        machine:logerror(string.format(
+            'mu4_playback_callback_descriptor_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+            address, value, callback_reads[address], time, cpu.state.GENPC.value))
+    end
+end)
 local times, next_sample = {0.9, 1.1, 1.4}, 1
 local function words(pointer)
     if pointer < 0x80 or pointer > 0xffe0 then return 'unobserved' end

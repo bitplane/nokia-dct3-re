@@ -4659,6 +4659,22 @@ checked independently; retained observer state is reset/saved. The fresh
 paired runs preserve the previous source-checked range counts. The next
 boundary is which descriptor invokes this trampoline and what condition
 produces its later activation, not the wrapper's enqueue semantics.
+Runtime bus reads confirm the `d7b0` descriptor connection. In constant
+playback the first selected trampoline entry is 1.022780485 seconds;
+its executed predecessors end at `0201de/f074`, and the bus reads
+`d7b4=0001`, then `d7b0..d7b3=0002,0419,0000,8044`. Subsequent bounded
+entries also include the distinct `02018b/f074` caller. All eight sampled
+reads of each of these five fields match the original initialization.
+Varying playback has no selected `d7b0` entries in its first session and
+no reads of these fields in the common 0.8182--1.7-second interval.
+The strict checker validates field values, bounded per-address ordinals,
+session/time selection and read-only scope without claiming bus-owner
+instruction identity. Both fresh runs preserve the established range
+counts. Thus `0201de` is relevant when qualified by this descriptor,
+despite its aggregate counts being insufficient to establish causality.
+The next question is which input/context reaches `0201b3` and selects
+`d7b0` for that first post-startup callback, with the `02018b` path kept
+separate rather than conflating their shared target.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

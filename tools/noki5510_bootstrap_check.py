@@ -436,6 +436,7 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
         'switch': ('address=020478 opcode=10e4 ar4=804a', 'live_ar4_context'),
         'enqueue': ('address=0202d7 opcode=487e ar2=8044', 'live_ar2_context'),
         'activation': ('address=020419 opcode=f6be paired_ar2=8044', 'paired_enqueue_ar2_context'),
+        'callback': ('address=020478 opcode=10e4 ar4=d7b0', 'live_ar4_context'),
     }
     if kind not in formats:
         raise ValueError('unknown playback transfer history kind')
@@ -459,6 +460,25 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
         result.append({'time': time, 'history': [f'{a:06x}/{op:04x}' for a, op in history]})
         previous = time
     return result
+
+
+def verify_playback_callback_reads(text, words, session):
+    rows = list(re.finditer(
+        r'mu4_playback_callback_descriptor_read: address=(d7b[0-5]) value=([0-9a-f]{4}) '
+        r'ordinal=(\d+) t=(\d+\.\d{9}) context_pc=[0-9a-f]{6} '
+        r'reader_identity=unvalidated observer_writes=0$', text, re.MULTILINE))
+    if len(rows) != text.count('mu4_playback_callback_descriptor_read:'):
+        raise ValueError('malformed callback descriptor bus observation')
+    counts, previous = {}, session[0]
+    for row in rows:
+        address, value, ordinal, time = int(row[1], 16), int(row[2], 16), int(row[3]), float(row[4])
+        counts[address] = counts.get(address, 0) + 1
+        if ordinal != counts[address] or ordinal > 8 or not max(previous, 0.8182) <= time <= min(1.7, session[1]):
+            raise ValueError('callback descriptor bus ordinal/session mismatch')
+        if words.get(0x2707B + address - 0xD7B0) != value:
+            raise ValueError('callback descriptor bus value differs from original initialization')
+        previous = time
+    return {f'{address:04x}': count for address, count in sorted(counts.items())}
 
 
 def verify_playback_range(text, words):
@@ -493,6 +513,8 @@ def verify_playback_range(text, words):
             'switch_context_history': verify_playback_switch_history(text, words, parent['first_session']),
             'enqueue_context_history': enqueue_history,
             'activation_context_history': activation_history,
+            'callback_context_history': verify_playback_switch_history(text, words, parent['first_session'], kind='callback'),
+            'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
             'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
             'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '
