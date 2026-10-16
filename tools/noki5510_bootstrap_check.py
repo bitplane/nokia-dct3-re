@@ -316,6 +316,59 @@ def verify_playback_dma(text):
             'tx_pairing': 'unvalidated', 'music_decode': False}
 
 
+def verify_playback_banks(text):
+    """Data-space observation coverage only; contexts are not writer ownership."""
+    scope = ('mu4_playback_banks_scope: first=1000 last=107f upstream_first=7000 '
+             'upstream_last=73ff start=1.000000000 finish=2.000000000 boundary=data_write '
+             'context_pc=not_owner observer_writes=0 audio_acceptance=0')
+    if text.count(scope) != 1 or text.count('mu4_playback_banks_scope:') != 1:
+        raise ValueError('missing or changed playback bank observation scope')
+    reports = {}
+    for kind in ('banks', 'upstream'):
+        prefix = 'mu4_playback_' + kind
+        head = r'pc=([0-9a-f]{6}) illegal=0 ' if kind == 'banks' else ''
+        tail = r' t=(\d+\.\d{9})' if kind == 'banks' else ''
+        matches = list(re.finditer(prefix + r'_terminal: ' + head +
+            r'writes=(\d+) nonzero_driven=(\d+) partial=0 contexts=(\d+) overflow=0' + tail +
+            r' observer_writes=0 audio_acceptance=0$', text, re.MULTILINE))
+        if len(matches) != 1 or text.count(prefix + '_terminal:') != 1:
+            raise ValueError('missing, malformed or duplicated playback bank terminal')
+        report = matches[0]
+        offset = 1 if kind == 'banks' else 0
+        writes, nonzero, count = map(int, report.groups()[offset:offset + 3])
+        if nonzero > writes or count > 512 or bool(writes) != bool(count) or (kind == 'banks' and writes < 4):
+            raise ValueError('inconsistent playback bank counts')
+        if kind == 'banks' and float(report[5]) < 2:
+            raise ValueError('playback bank observation stopped before its window ended')
+        label = 'bank' if kind == 'banks' else 'upstream'
+        contexts = list(re.finditer(r'mu4_playback_' + label + r'_context: '
+            r'context_pc=([0-9a-f]{6}) writes=(\d+) nonzero_driven=(\d+) identity=unvalidated$',
+            text, re.MULTILINE))
+        if (len(contexts) != count or text.count('mu4_playback_' + label + '_context:') != count or
+                len({item[1] for item in contexts}) != count or
+                sum(int(item[2]) for item in contexts) != writes or
+                sum(int(item[3]) for item in contexts) != nonzero or
+                any(not 0 <= int(item[3]) <= int(item[2]) or item.end() >= report.start() or
+                    item.start() <= text.index(scope) for item in contexts)):
+            raise ValueError('incomplete or inconsistent playback bank context census')
+        reports[kind] = {'writes': writes, 'nonzero_driven': nonzero, 'contexts': count}
+    copies = list(re.finditer(r'mu4_playback_copy_context: ordinal=(\d+) destination=([0-9a-f]{4}) '
+        r'ar3=([0-9a-f]{4}) current=([0-9a-f]{4}) previous=([0-9a-f]{4}) ar4=([0-9a-f]{4}) '
+        r'fields=([0-9a-f]{4}(?:,[0-9a-f]{4}){13}) context_pc=02a367 '
+        r'source_identity=unvalidated observer_writes=0$', text, re.MULTILINE))
+    if len(copies) != 4 or text.count('mu4_playback_copy_context:') != 4:
+        raise ValueError('incomplete bounded playback copy contexts')
+    for index, copy in enumerate(copies, 1):
+        fields = [int(value, 16) for value in copy[7].split(',')]
+        if (copy.start() <= text.index(scope) or copy.end() >= text.index('mu4_playback_banks_terminal:') or
+                int(copy[1]) != index or not 0x1000 <= int(copy[2], 16) <= 0x107f or
+                not 0x7000 <= int(copy[3], 16) <= 0x73ff or not 0x60 <= int(copy[6], 16) <= 0xfff2 or
+                fields[6:8] != [0x7000, 0x400] or fields[10] != 0x1000):
+            raise ValueError('playback copy context is outside its observed buffer selection')
+    return {**reports, 'copy_contexts': len(copies), 'audio_acceptance': False,
+            'writer_ownership': 'unvalidated'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -328,6 +381,8 @@ def main():
                         help='validate a passive short-run lifecycle/control observation, not audio')
     parser.add_argument('--playback-dma', action='store_true',
                         help='validate actual channel-3 data reads, not TX pairing or decoded media')
+    parser.add_argument('--playback-banks', action='store_true',
+                        help='validate scoped data-write contexts, not writer ownership or decoded media')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -337,7 +392,7 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
-    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma)
+    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma, args.playback_banks)
     if any(bench_modes) and (
             sum(bench_modes) > 1 or any((
                 args.runtime, args.serial_readiness, args.input_lifecycle,
@@ -345,6 +400,11 @@ def main():
         parser.error('MU4 observation modes cannot be combined with other bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.playback_banks:
+            result = verify_playback_banks(text)
+            print(f'MU4 playback bank observation complete: {result}; '
+                  'writer ownership, all-alias coverage and media validity remain unvalidated')
+            return
         if args.playback_dma:
             result = verify_playback_dma(text)
             print(f'MU4 playback DMA observation complete: {result}; '

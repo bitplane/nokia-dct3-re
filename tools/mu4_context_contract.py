@@ -15,6 +15,33 @@ else:
 
 
 BASE = 0x23D73
+COPY_ADAPTER_WITNESSES = (
+    (0x2A31F, (0x4A11, 0xEEFF, 0x8814, 0xF495, 0xF7B8, 0x56E4,
+               0x0004, 0x54E4, 0x0002, 0xF844, 0xA369)),
+    (0x2A347, (0x11E4, 0x0008, 0xF640, 0x00E4, 0x0006, 0x8813)),
+    (0x2A351, (0x11E4, 0x000C, 0xF640, 0x00E4, 0x000A, 0x8812)),
+    (0x2A35B, (0x10F8, 0x0011, 0xF847, 0xA36D, 0x4811, 0xF010,
+               0x0001, 0x881A, 0xF495, 0xF072, 0xA366, 0xE598, 0xF073, 0xA36D)),
+)
+
+
+def decode_copy_adapter(words):
+    for base, witness in COPY_ADAPTER_WITNESSES:
+        for offset, expected in enumerate(witness):
+            if words.get(base + offset) != expected:
+                raise ValueError(f'copy adapter witness changed or absent at {base + offset:06x}')
+    return {
+        'segment': 'aa99', 'pinned_words': sum(len(w) for _, w in COPY_ADAPTER_WITNESSES),
+        'entry': '02a31f', 'object_register': 'AR4',
+        'double_fields_compared': [4, 2], 'unequal_branch': '02a369',
+        'equal_path': {'source': 'object[6] + object[8]', 'source_register': 'AR3',
+                       'destination': 'object[10] + object[12]', 'destination_register': 'AR2',
+                       'positive_count_required': True, 'body': '02a366',
+                       'operation': 'MVDD *AR3+,*AR2+'},
+        'scope': 'Pinned field comparison, address formation and copy body only; no rate semantics, full callee ownership, all-alias writer closure or decoded audio',
+    }
+
+
 DMA_PAUSE_WITNESSES = (
     ('aa22', 0x290B7, (0x7711, 0x0054, 0x6881, 0xFFF7, 0xE800, 0xF982,
                        0x97BE, 0x7711, 0x0054, 0x6981, 0x0008)),
@@ -696,6 +723,7 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['dma_pause'] = decode_dma_pause(words, rel_words)
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
     result['rel_ar_store'] = decode_rel_ar_store(rel_words)

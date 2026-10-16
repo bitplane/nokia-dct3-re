@@ -4484,6 +4484,17 @@ The extracted file's SHA-256 is
 This verifies independent filesystem/extent readback of these bytes, not
 their audio correctness. `ffprobe` rejects the file as generic audio;
 that is not proof that the original Nokia consumer rejects its REL format.
+Forcing `ffprobe -f aac -count_frames` recognizes AAC-LC-like headers and
+two channels but reports sample rate zero, no decoded-frame count and
+repeated decode errors. Its zero process exit status is not a successful
+decode. This result does not distinguish a malformed recording from REL
+packaging/transforms; the extracted file hash remains unchanged.
+
+A separate [R060/R061 patch author's report](https://retrohack.eu/gsm/nokia-5510-dsp-repair-tool/)
+identifies an existing MP3 decoder and an LSE payload offset of 896 bytes.
+This is a lead for checking the original LSE consumer and constructing an
+independent external media fixture, not a REL specification or a reason to
+patch firmware to manufacture playback acceptance.
 
 ### Saved-Track Playback Boundary
 
@@ -4930,6 +4941,50 @@ python3 tools/noki5510_bootstrap_check.py --playback-observation RUN_DIR/error.l
 python3 tools/noki5510_bootstrap_check.py --playback-dma RUN_DIR/error.log
 ```
 
+### Output-copy observation
+
+`mu4_playback_banks_observe.lua` selects data-space writes during
+`1.0 <= t < 2.0` of the first processing session, not startup, cleanup or
+the later loader's stack use. It covers first DMA buffer `1000..107f`
+and candidate upstream window `7000..73ff`. The three-second run records
+276,352 full-word output writes, all zero, with four complete PC-context
+groups and no overflow: `028fda` (384), `029fee` (39,424), `02a2ea`
+(197,120) and `02a367` (39,424). These are data-write contexts, not retained
+writer-instruction identities or an all-alias writer census.
+
+The upstream window has 416,986 writes, including 966 nonzero values,
+distributed over 94 contexts with no partial masks or overflow. Nonzero
+working values therefore exist upstream; they do not establish that valid
+decoded PCM reaches the copy boundary. A broad `1000..137f` write watch
+would also include control/workspace addresses, and other lifecycle phases
+reuse these addresses. Neither address extrema nor nonzero writes alone
+identify an audio producer.
+
+The bounded copy contexts show AR4=`13e0`, paired 32-bit fields at offsets
+2 and 4 both `0000ac44` (44,100), source base/extent `7000/0400`, and
+destination base/extent `1000/0040`. Live AR3 snapshots are `7043..7046`;
+both inspected adjacent words are zero. These are live RAM snapshots, not
+the MVDD's retained source address. The observer deliberately leaves
+`source_identity=unvalidated`.
+
+The independent AA99 contract pins 37 words around `02:a31f`: it compares
+the two double fields, branches to a different helper when unequal, and
+on the equal-field path forms AR3 from object offsets 6+8 and AR2 from
+10+12. With positive count, `02:a366` copies using `MVDD *AR3+,*AR2+`.
+Rate/converter semantics, the complete unequal-field helper, and the
+ownership of every observed store are not established by this contract.
+
+Use the same copied NAND, BIOS and isolated working directory as the
+playback lifecycle fixture, substituting the banks script and retaining
+`-seconds_to_run 3`. The checker requires the completed observation window,
+unique contexts, exact aggregate conservation, no partial masks/overflow
+and all four pointer snapshots; it does not accept audio:
+
+```sh
+python3 tools/noki5510_bootstrap_check.py --playback-banks RUN_DIR/error.log
+python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
+```
+
 ### Resident reload contract
 
 The common AA55 API at `00:2080` branches to disk loader `00:3538`.
@@ -4973,8 +5028,9 @@ python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
 python3 tools/noki5510_bootstrap_check.py --playback-lifecycle RUN_DIR/error.log
 ```
 
-Next: trace the writers and validity lifecycle of the silent decoder output
-banks, then pair valid McBSP words and codec frames before comparing PCM
+Next: follow REL frame/format ingress and the last producer feeding `7000`,
+with an independently valid media control where the original container
+contract permits it. Then pair valid McBSP words and codec frames before comparing PCM
 against the stored media. Do not remove the programmed reload merely to keep
 resident-entry counts at one.
 

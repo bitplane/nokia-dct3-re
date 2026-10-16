@@ -195,6 +195,10 @@ or was expensive to discover. Current examples include:
   under overlay mappings; the same instruction need not have the same number;
 - instruction observers omitting accelerated repeat or resumed-transfer paths;
   test execution coverage and save/replay, not only the main dispatch loop;
+- memory ranges serving as samples, control tables or stack in different
+  lifecycle phases; scope observations to the consumer's actual footprint
+  and active interval, and report partial masks, truncation and alias limits
+  before making a producer/absence claim;
 - treating a reused scratch buffer as persistent state; observe its value at
   the evidenced construction or consumption boundary, not an arbitrary endpoint;
 - a staged CPU's unsupported Decode frontier not proving that preceding

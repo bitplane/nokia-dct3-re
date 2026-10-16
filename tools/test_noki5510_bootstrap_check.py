@@ -2,11 +2,49 @@ import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
-    verify_playback_lifecycle, verify_playback_dma,
+    verify_playback_lifecycle, verify_playback_dma, verify_playback_banks,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    BANKS = '\n'.join((
+        'mu4_playback_banks_scope: first=1000 last=107f upstream_first=7000 upstream_last=73ff start=1.000000000 finish=2.000000000 boundary=data_write context_pc=not_owner observer_writes=0 audio_acceptance=0',
+        *(f'mu4_playback_copy_context: ordinal={index} destination={0x1000 + index - 1:04x} '
+          f'ar3={0x7042 + index:04x} current=0000 previous=0000 ar4=13e0 '
+          'fields=c6f0,0000,0000,ac44,0000,ac44,7000,0400,0080,0000,1000,0040,0040,0001 '
+          'context_pc=02a367 source_identity=unvalidated observer_writes=0' for index in range(1, 5)),
+        'mu4_playback_bank_context: context_pc=02a367 writes=100 nonzero_driven=0 identity=unvalidated',
+        'mu4_playback_banks_terminal: pc=025beb illegal=0 writes=100 nonzero_driven=0 partial=0 contexts=1 overflow=0 t=3.000000000 observer_writes=0 audio_acceptance=0',
+        'mu4_playback_upstream_context: context_pc=025dcf writes=200 nonzero_driven=3 identity=unvalidated',
+        'mu4_playback_upstream_terminal: writes=200 nonzero_driven=3 partial=0 contexts=1 overflow=0 observer_writes=0 audio_acceptance=0',
+    ))
+
+    def test_playback_bank_contexts_are_not_audio_or_writer_acceptance(self):
+        result = verify_playback_banks(self.BANKS)
+        self.assertEqual(result['banks']['writes'], 100)
+        self.assertEqual(result['upstream']['nonzero_driven'], 3)
+        self.assertEqual(result['writer_ownership'], 'unvalidated')
+        self.assertFalse(result['audio_acceptance'])
+        empty = '\n'.join(line for line in self.BANKS.splitlines() if not line.startswith('mu4_playback_upstream_context:'))
+        empty = empty.replace('writes=200 nonzero_driven=3 partial=0 contexts=1', 'writes=0 nonzero_driven=0 partial=0 contexts=0')
+        self.assertEqual(verify_playback_banks(empty)['upstream']['writes'], 0)
+
+    def test_playback_bank_checker_rejects_incomplete_or_overclaimed_census(self):
+        for old, new in (('context_pc=not_owner', 'context_pc=owner'), ('identity=unvalidated', 'identity=Execute'),
+                         ('observer_writes=0', 'observer_writes=1'), ('audio_acceptance=0', 'audio_acceptance=1'),
+                         ('illegal=0', 'illegal=1'), ('partial=0', 'partial=1'), ('overflow=0', 'overflow=1'),
+                         ('t=3.000000000', 't=1.900000000'), ('contexts=1', 'contexts=2'),
+                         ('context_pc=02a367 writes=100', 'context_pc=02a367 writes=99'),
+                         ('context_pc=025dcf writes=200 nonzero_driven=3', 'context_pc=025dcf writes=200 nonzero_driven=4'),
+                         ('ar3=7043', 'ar3=6043'), ('7000,0400', '7000,0800'),
+                         ('ordinal=4 destination=1003', 'ordinal=3 destination=1003')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_banks(self.BANKS.replace(old, new))
+        for line in self.BANKS.splitlines():
+            for bad in (self.BANKS.replace(line, ''), self.BANKS + '\n' + line):
+                with self.subTest(line=line), self.assertRaises(ValueError):
+                    verify_playback_banks(bad)
+
     LIFECYCLE = '\n'.join((
         'mu4_playback_lifecycle_scope: boundary=data_write context_pc=not_owner observer_writes=0 audio_acceptance=0',
         'mu4_playback_lifecycle_write: address=373e value=0004 mask=ffff ordinal=1 t=1.000000000 context_pc=020b11 observer_writes=0',

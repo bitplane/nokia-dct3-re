@@ -19,9 +19,26 @@ from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPEND
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
+from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_copy_adapter_pins_pointer_roles_and_every_word(self):
+        words = {address: value for base, witness in COPY_ADAPTER_WITNESSES
+                 for address, value in enumerate(witness, base)}
+        result = decode_copy_adapter(words)
+        self.assertEqual(result['pinned_words'], 37)
+        self.assertEqual(result['equal_path']['source_register'], 'AR3')
+        self.assertEqual(result['equal_path']['destination_register'], 'AR2')
+        self.assertEqual(result['double_fields_compared'], [4, 2])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_copy_adapter(changed)
+        with self.assertRaises(ValueError):
+            decode_copy_adapter({address + 0x10000: value for address, value in words.items()})
+
     def test_dma_pause_sequences_require_separate_overlay_namespaces(self):
         sources = {segment: dict(enumerate(witness, base)) for segment, base, witness in DMA_PAUSE_WITNESSES}
         result = decode_dma_pause(sources['aa22'], sources['aa99'])
