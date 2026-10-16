@@ -575,7 +575,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated STLM BK complete",
     ),
     "store-bypass": (
-        "TMS320C54x staged store bypass: PASS cases=288 restore=288 producers=STL_A,STL_B,STH_A,STH_B,T,TRN destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated",
+        (
+            "TMS320C54x staged store bypass: PASS cases=288 restore=288 producers=STL_A,STL_B,STH_A,STH_B,T,TRN destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated",
+            "TMS320C54x original nibble helper: PASS cases=128 restore=128 words=23 selectors=4 values=8 sxm=2 pages=2 count_reads=1 input_reads=1 count_writes=2 silicon_phase_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated store bypass complete",
     ),
     "ldu-periph": (

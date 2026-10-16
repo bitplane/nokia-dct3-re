@@ -25,9 +25,50 @@ from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITE
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
 from tools.mu4_context_contract import reference_bit_window
 from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, decode_bit_window
+from tools.mu4_context_contract import NIBBLE_BASE, NIBBLE_WITNESS, decode_nibble_selector, reference_nibble
+from tools.mu4_context_contract import decode_prefix_transform, reference_transform_block
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_prefix_transform_matches_independently_captured_native_block(self):
+        state = [int(word, 16) for word in (
+            '19ab 3f55 0747 8eaa b29e f452 7c29 2860 b697 6f5a b372 e61e 1aef 91df dc01 02ec 7967 3b13 '
+            '44ce da5d 71b6 a02e 39ab eaec fe91 6f35 6485 b819 e850 4dee 195f 70f1 1d95 d9d5 '
+            'e3e8 54d7 79dd 0394 f65f 693c b5b1 955b e75d 67e3 9672 ab64 2434 dc78 9bb8 178b '
+            'a09d 5c8e 4965 f7de 5546 96b9 66e6 d459 f92e 31ed 4f90 1272 c41f ab19 e607 190c '
+            '8bae a8cc a98a 4ee0 9987 ef84 8767 2609 7bc7 b5fc b37d 3193 cd0f 1a4a ca87 bf1b').split()]
+        self.assertEqual(reference_transform_block(0xf9ff, 0x8050, state), (0x8bca, 0x3641))
+        self.assertEqual(reference_transform_block(0x8bca, 0x3641, state, reverse=False), (0xf9ff, 0x8050))
+
+    def test_prefix_transform_domain_and_roundtrip_controls(self):
+        self.assertEqual(reference_transform_block(0x1234, 0xabcd, [0] * 82), (0xabcd, 0x1234))
+        state = [(index * 1999 + 1357) & 0xffff for index in range(82)]
+        for left, right in ((0, 0), (0xffff, 0x8000), (0x1234, 0x5678)):
+            transformed = reference_transform_block(left, right, state)
+            self.assertEqual(reference_transform_block(*transformed, state, reverse=False), (left, right))
+        for bad in ([], [0] * 81, [0] * 83, [-1] + [0] * 81, [65536] + [0] * 81):
+            with self.assertRaises(ValueError):
+                reference_transform_block(0, 0, bad)
+        with self.assertRaises(ValueError):
+            decode_prefix_transform({})
+
+    def test_original_nibble_selector_source_rejects_each_mutation(self):
+        words = dict(enumerate(NIBBLE_WITNESS, NIBBLE_BASE))
+        self.assertEqual(decode_nibble_selector(words)['pinned_words'], 23)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_nibble_selector(changed)
+
+    def test_nibble_reference_matches_each_hex_digit(self):
+        for value in range(65536):
+            for selector, digit in enumerate(f'{value:04x}'):
+                self.assertEqual(reference_nibble(value, selector), int(digit, 16))
+        for value, selector in ((-1, 0), (65536, 0), (0, -1), (0, 4)):
+            with self.assertRaises(ValueError):
+                reference_nibble(value, selector)
+
     def test_original_bit_reader_source_is_pinned_without_cross_overlay_aliases(self):
         words = dict(enumerate(BIT_WINDOW_WITNESS, BIT_WINDOW_BASE))
         self.assertEqual(decode_bit_window(words)['pinned_words'], 55)

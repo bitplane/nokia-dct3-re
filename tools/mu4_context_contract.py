@@ -16,6 +16,58 @@ else:
 
 BASE = 0x23D73
 BIT_WINDOW_BASE = 0x2510C
+NIBBLE_BASE = 0x2C62B
+NIBBLE_WITNESS = (
+    0x4A11, 0xEEFF, 0xF495, 0x8000, 0xE803, 0xF6B8, 0x0804, 0x8004,
+    0x7100, 0x0011, 0x6F04, 0x0C82, 0x1004, 0xF484, 0x880E, 0xEE01,
+    0x1481, 0x8A11, 0xF030, 0x000F, 0xF495, 0xF495, 0xF4E4,
+)
+
+
+def decode_nibble_selector(words):
+    if any(words.get(NIBBLE_BASE + offset) != word for offset, word in enumerate(NIBBLE_WITNESS)):
+        raise ValueError('AA99 nibble-selector source witness changed or absent')
+    return {'entry': '02c62b', 'last_word': '02c641', 'pinned_words': 23,
+            'selector_domain': [0, 3], 'shift': '4 * (3 - selector)',
+            'dependency': '6f04 0c82 shifted store followed immediately by 1004 load',
+            'scope': 'Scalar contract for complete original helper; not cipher or native playback acceptance'}
+
+
+def reference_nibble(value, selector):
+    if not 0 <= value <= 0xffff or not 0 <= selector <= 3:
+        raise ValueError('nibble selector outside recovered scalar domain')
+    return (value >> (4 * (3 - selector))) & 15
+
+
+def decode_prefix_transform(words):
+    try:
+        digest = hashlib.sha256(b''.join(words[address].to_bytes(2, 'big')
+                                        for address in range(0x2c9ac, 0x2cd14))).hexdigest()
+    except KeyError as error:
+        raise ValueError('incomplete AA99 prefix-transform source') from error
+    if digest != '472e17feff646a45de1ff5ab4c3d46cc0183297d5dff813032fc4741f6acb192':
+        raise ValueError('AA99 prefix-transform source changed')
+    return {'entry': '02c9ac', 'last_word': '02cd13', 'pinned_words': 872,
+            'sha256_be_words': digest, 'state_base': 'b9de', 'state_words': 82,
+            'rounds': 16, 'half_bits': 16, 'table_entries': [16, 16, 16, 16],
+            'scope': 'Scalar transform model; not key initialization, packaging, cipher identification or playback acceptance'}
+
+
+def reference_transform_block(left, right, state, *, reverse=True):
+    """Independent 16-bit-half model for the mapped lookup/XOR/add sequence."""
+    if len(state) != 82 or any(not 0 <= word <= 0xffff for word in (left, right, *state)):
+        raise ValueError('transform block outside recovered word/state domain')
+    keys = state[:18][::-1] if reverse else state[:18]
+    tables = [state[18 + index * 16:34 + index * 16] for index in range(4)]
+    for key in keys[:16]:
+        left ^= key
+        digits = [reference_nibble(left, selector) for selector in range(4)]
+        mixed = (((tables[0][digits[0]] + tables[1][digits[1]]) ^
+                  tables[2][digits[2]]) + tables[3][digits[3]]) & 0xffff
+        left, right = right ^ mixed, left
+    return right ^ keys[17], left ^ keys[16]
+
+
 BIT_WINDOW_WITNESS = (
     0xED00, 0xF6B6, 0xF6B7, 0xF7B8, 0xF6B9, 0x4A08, 0x7712, 0xA854,
     0x1182, 0xF310, 0x0010, 0xFA4E, 0x512E, 0x7713, 0xA858, 0x7714,
@@ -888,6 +940,8 @@ def contract(source):
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
+    result['nibble_selector'] = decode_nibble_selector(rel_words)
+    result['prefix_transform'] = decode_prefix_transform(rel_words)
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

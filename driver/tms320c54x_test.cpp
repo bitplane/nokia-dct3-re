@@ -10248,6 +10248,39 @@ private:
 		}
 		return u16(value >> (selector & 2 ? 16 : 0));
 	}
+	static u16 nibble_input(unsigned variant)
+	{
+		return std::array<u16, 8>{0, 0xffff, 0xc410, 0x1234, 0x8001, 0xabcd, 0x00f0, 0xf00f}[(variant / 4) % 8];
+	}
+	void start_original_nibble(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_cpu->set_pipeline_frontend(false);
+		m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 64 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		// Original AA99 02:c62b..c641, relocated without changing its words.
+		std::array<u16, 23> const source{0x4a11,0xeeff,0xf495,0x8000,0xe803,0xf6b8,0x0804,0x8004,0x7100,0x0011,0x6f04,0x0c82,0x1004,0xf484,0x880e,0xee01,0x1481,0x8a11,0xf030,0x000f,0xf495,0xf495,0xf4e4};
+		for (unsigned i = 0; i < source.size(); ++i) program.write_word(base + 0x700 + i, source[i]);
+		program.write_word(base + 0x600, 0xf020); program.write_word(base + 0x601, 0x2000);
+		program.write_word(base + 0x602, 0xf980 | (base >> 16)); program.write_word(base + 0x603, 0x700); program.write_word(base + 0x604, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | (variant & 32 ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1357);
+		data.write_word(0x1400, variant % 4); data.write_word(0x2000, nibble_input(variant));
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x1400, 0x1400, "nibble_count_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_fetch_tap = data.install_read_tap(0x2000, 0x2000, "nibble_input_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0x1400, 0x1400, "nibble_count_write", [this, variant](offs_t, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const ordinal = m_pipeline_store_writes++;
+			expect(ordinal < 2 && value == (3 - variant % 4) * (ordinal ? 4 : 1), "Original nibble helper preserves both real count stores");
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 399900;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_store_bypass(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -43831,11 +43864,42 @@ private:
 					throw emu_fatalerror(0, "TMS320C54x isolated Xmem store bypass complete");
 				}
 				osd_printf_info("TMS320C54x staged store bypass: PASS cases=288 restore=288 producers=STL_A,STL_B,STH_A,STH_B,T,TRN destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated store bypass complete");
+				start_original_nibble(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254450) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254440; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 399900)
+		{
+			unsigned const tick = ++m_idle_fixture_tick, variant = m_pipeline_peripheral_case;
+			if (tick == 14 && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original nibble helper before shifted-store dependency");
+			}
+			if (tick == 64)
+			{
+				u16 const expected = (nibble_input(variant) >> (4 * (3 - variant % 4))) & 15;
+				expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == expected && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1400 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1357, "Complete original nibble helper returns the independently selected nibble and restores its frame");
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 && m_pipeline_store_writes == 2,
+					"Shifted-store bypass avoids stale backing reads without suppressing real writes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = 14; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original nibble dependency without duplicate accesses");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 399910; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 127) { start_original_nibble(variant + 1); return; }
+				osd_printf_info("TMS320C54x original nibble helper: PASS cases=128 restore=128 words=23 selectors=4 values=8 sxm=2 pages=2 count_reads=1 input_reads=1 count_writes=2 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated store bypass complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 399910) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 399900; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254400)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 128 ? 5 : 3;

@@ -43,6 +43,42 @@ local parser_writes = {}
 local prefix_writes = {}
 local merge_reads = 0
 local merge_writes = {}
+local transform_state_captured = false
+local transform_reads = 0
+local nibble_reads = 0
+handles[#handles + 1] = data:install_read_tap(0xd700, 0xd77f, 'mu4_playback_transform_nibbles', function(address, value)
+    local time = machine.time:as_double()
+    local pc = cpu.state.GENPC.value
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 or pc < 0x2c62b or pc > 0x2c642 then return end
+    nibble_reads = nibble_reads + 1
+    if nibble_reads <= 64 then
+        machine:logerror(string.format(
+            'mu4_playback_nibble_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+            address, value, nibble_reads, time, pc))
+    end
+end)
+handles[#handles + 1] = data:install_read_tap(0xb9de, 0xba2f, 'mu4_playback_transform_state', function(address, value)
+    local time = machine.time:as_double()
+    local pc = cpu.state.GENPC.value
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 or pc < 0x2c9ac or pc > 0x2cd13 then return end
+    transform_reads = transform_reads + 1
+    if transform_reads <= 96 then
+        machine:logerror(string.format(
+            'mu4_playback_transform_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+            address, value, transform_reads, time, pc))
+    end
+    if transform_state_captured then return end
+    transform_state_captured, sampling = true, true
+    local state, input, stack = {}, {}, {}
+    local sp = cpu.state.SP.value
+    for address = 0xb9de, 0xba2f do state[#state + 1] = string.format('%04x', data:read_u16(address)) end
+    for address = 0xaa24, 0xaa43 do input[#input + 1] = string.format('%04x', data:read_u16(address)) end
+    for offset = 0, 23 do stack[#stack + 1] = string.format('%04x', data:read_u16((sp + offset) & 0xffff)) end
+    sampling = false
+    machine:logerror(string.format(
+        'mu4_playback_transform_snapshot: state_base=b9de state=%s input_base=aa24 input=%s sp=%04x stack=%s t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+        table.concat(state, ','), table.concat(input, ','), sp, table.concat(stack, ','), time, pc))
+end)
 handles[#handles + 1] = data:install_write_tap(0xaa24, 0xaa27, 'mu4_playback_merge_input', function(address, value, mask)
     local time = machine.time:as_double()
     if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end

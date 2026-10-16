@@ -876,12 +876,15 @@ class CoreResultTests(unittest.TestCase):
                 check_result(bad, 3, profile='stlm-bk')
 
     def test_store_bypass_scope(self):
-        marker, ending = EXTRA_PROFILES['store-bypass']
-        output = marker + '\n' + ending + '\n'
+        markers, ending = EXTRA_PROFILES['store-bypass']
+        output = '\n'.join((*markers, ending)) + '\n'
         check_result(output, 3, profile='store-bypass')
         for bad in (output.replace('restore=288', 'restore=0'),
                     output.replace('alias_reads=0', 'alias_reads=1'),
-                    marker + '\n' + output, output + 'late output\n'):
+                    output.replace('restore=128', 'restore=0'),
+                    output.replace('count_reads=1', 'count_reads=2'),
+                    output.replace(markers[1] + '\n', ''),
+                    markers[0] + '\n' + output, output + 'late output\n'):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='store-bypass')
 

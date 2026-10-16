@@ -4831,15 +4831,16 @@ host decoding yields 178,176 stereo frames. The fixture changes 131 NAND
 data pages. Reproduce with the generator's source-NAND and new-output-directory
 arguments, adding `--mcopy PATH` when mtools is not installed globally.
 
-Native `bootplaystage` on this input stops at instruction `025137`
+Native `bootplaystage` on this input still stops at instruction `025137`
 (`f48f`, NORM), reported at PC `02513b`, with raw T=`0029` at cycle
-111,871,463. This lies inside the pinned bit reader. T's low six bits encode
+111,871,465 after the shifted-store bypass correction below. This lies
+inside the pinned bit reader. T's low six bits encode
 -23, outside TI's documented -16..31 range. Plain MAME exit status zero
 does not accept this run: the strict playback checker still rejects its
 illegal instruction and incomplete session. No native decoded PCM is
 established. Do not extend the CPU's shift range to accommodate this state.
 
-An entry capture beyond the ordinary sample cap observes raw A=`0032`,
+The operand-localization capture before that correction observes raw A=`0032`,
 remaining=`0009`, reservoir=`28254497`, index=`0017`, base=`162e`, next
 word=`9271`, SP=`d70c`, ST1=`610f`, with call-site history `024343` at
 0.993192041 seconds. Interpreting raw A as width 50 would give
@@ -4877,7 +4878,7 @@ Independent write taps on `162e..1631` observe:
 | --- | --- | --- |
 | 0.983259227 | `f9ff 8050 9f26 defc` | `003356` |
 | 0.988100171 | `fff9 5080 269f fcde` | `0032f5` |
-| 0.988777742 | `ef76 bdc5 269f fcde` | `029e7a` |
+| 0.988777742 | `ca8b 4136 269f fcde` | `029e7a` |
 
 The middle row matches the generated ADTS header exactly; the last row
 matches the bit reader's observed initial words. Thus a later native
@@ -4890,20 +4891,57 @@ is established; do not call this proof of corruption, decryption, or a CPU
 arithmetic defect.
 
 The loop near `029e74` is a byte-packing stage, not the first observed
-change: its data reads from `aa24..aa2b` are already
-`00ef,0076,00bd,00c5,0026,009f,00fc,00de`. The surrounding load/AND/OR/store
+change: its data reads from `aa24..aa2b` are already byte-expanded output
+from the processing helper. The surrounding load/AND/OR/store
 sequence is consistent with packing adjacent low bytes into output words.
 Earlier write taps on `aa24..aa27` distinguish unpacked input
-`00ff,00f9,0050,0080` near `029e5c/029e5f` from replacement bytes
-`00ef,0076,00bd,00c5` near `02b5ac/02b5b8/02b5c0/02b5cc`.
+`00ff,00f9,0050,0080` near `029e5c/029e5f` from replacement bytes near
+`02b5ac/02b5b8/02b5c0/02b5cc`.
 Source `02b5a1: fb82 c9ac` calls a processing helper before those stores;
 `02c9ac` accesses state near `b9ef` and calls `02c62b`. This identifies
-the upstream processing boundary, not its algorithm or key semantics.
-In particular, do not repair the later packer or pre-adjust external media
-to cancel these observed bytes. The next question is that helper's
-input/state and format-selection contract, including whether the fixture's
-REL naming selects processing inappropriate for plain AAC.
+the upstream processing boundary, not its format/key initialization semantics.
+Do not repair the later packer or pre-adjust external media to cancel bytes.
 Host-valid AAC alone is not proof of valid native REL packaging.
+
+#### Shifted-store dependency and prefix block model
+
+The complete AA99 helper `02c62b..02c641` selects one nibble from a 16-bit
+word: `(value >> (4 * (3 - selector))) & 15`, for selectors 0..3.
+It uses `6f04 0c82` (shifted store) immediately followed by `1004` (load
+of the same stack location). The core omitted that store form from its
+existing same-address pending-write bypass. For input `c410`, observed
+indices were `2,4,8,0` instead of `c,4,1,0`: the load saw the unshifted
+count rather than the pending shifted value.
+
+[TI SPRU131G section 7.3.2](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6114.spru131g.pdf)
+documents bypassing same-location on-chip reads through an internal bus
+before the pending real write. The correction extends that existing path
+to explicit-shift stores and shares its value calculation with the real
+Execute write. No firmware address, key, file byte or shift-range guard
+is special-cased. The original complete helper fails the access-count
+check before the correction and passes after it: 128 cases/replays,
+four selectors, eight inputs, two SXM settings and two pages, one count
+read, one input read and two real count writes. Original store, Xmem,
+ASM, shifted-register bank, delayed and repeated-block regressions pass.
+
+`mu4_context_contract.py` pins all 23 selector words and all 872 words
+of processing routine `02c9ac..02cd13`. Its independent scalar block model
+uses 18 state words plus four 16-entry lookup tables, 16 rounds and two
+16-bit halves. A read-only native snapshot captures those 82 words and
+the helper's stack inputs `f9ff,8050`. After the bypass correction, the
+model yields `8bca,3641`, matching native replacement bytes
+`ca,8b,41,36` and the packed words above. Tests retain that captured vector,
+an independent nibble/digit oracle, domain rejection and mathematical
+forward/reverse controls. This establishes one block under captured state,
+not initialization, all blocks, a named cipher or valid native packaging.
+The earlier `ef76,bdc5` prefix belongs to the pre-correction core, not the
+current fixture oracle.
+
+The generated control still fails native playback; original recorded media
+also predates this correction. Next, regenerate an organic recording on
+the corrected core and compare its saved framing/playback before attributing
+the remaining failure to packaging or another CPU operation. Keep the
+processing initializer and format selection explicitly unresolved.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
 acceptance constraints. A separate broader AAC-LC control (MPEG-2
@@ -4914,7 +4952,7 @@ The inventory handles MPEG-2/4 header IDs, CRC-dependent header size,
 declared length, raw block count and file truncation. Tests include embedded
 sync candidates that must not replace the declared-length chain, divergent
 but parseable headers, missing boundaries and read-only CLI operation.
-The complete tool suite passes (2,980 tests, one skipped), including eight
+The complete tool suite passes (2,984 tests, one skipped), including eight
 generated-media tests covering authoring boundaries and failure paths.
 
 All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
