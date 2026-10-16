@@ -35,7 +35,7 @@ public:
 		m_cpu->set_reset_clkmd(0);
 		// Only the fail-closed original-firmware diagnostic opts into bus waits.
 		// Program/data bank ownership and physical READY wiring remain unvalidated.
-		if (!strcmp(config.options().bios(), "bootrecstage")) m_cpu->set_c5416_bus_profile(true);
+		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -1053,8 +1053,13 @@ private:
 		static constexpr u8 recorder_poll[] = {0x1e, 2, 0xaa, 1, 0x49, 2, 0xfc, 0x55};
 		static constexpr u8 recorder_polled_control[] = {0x1e, 3, 0xaa, 1, 0x36, 4, 3, 0x87, 0x55};
 		static constexpr u8 recorder_resident_poll[] = {0x1e, 2, 0xaa, 1, 0x49, 4, 0xfa, 0x55};
-		// Original parameter-7 grammar: three length-prefixed strings, title TEST.
-		static constexpr u8 recorder_metadata[] = {0x1e, 10, 0xaa, 1, 0x36, 7, 4, 'T', 'E', 'S', 'T', 0, 0, 5, 0x99, 0x55};
+		// Preserve the empty-field rejection control. The positive request
+		// supplies filename, TPE1 and TIT2 strings; the ID3 builder requires
+		// both metadata lengths to be positive (02:853d..8543).
+		static constexpr u8 recorder_metadata_empty[] = {0x1e, 10, 0xaa, 1, 0x36, 7, 4, 'T', 'E', 'S', 'T', 0, 0, 5, 0x99, 0x55};
+		static constexpr u8 recorder_metadata_full[] = {0x1e, 18, 0xaa, 1, 0x36, 7, 4, 'T', 'E', 'S', 'T', 4, 'T', 'E', 'S', 'T', 4, 'M', 'A', 'M', 'E', 5, 0x93, 0x55};
+		u8 const *const recorder_metadata = full_metadata_profile() ? recorder_metadata_full : recorder_metadata_empty;
+		unsigned const metadata_size = full_metadata_profile() ? std::size(recorder_metadata_full) : std::size(recorder_metadata_empty);
 		constexpr auto valid_packet = [](auto const &bytes)
 		{
 			u8 checksum = 0;
@@ -1064,12 +1069,13 @@ private:
 		};
 		static_assert(valid_packet(status) && valid_packet(measurement) && valid_packet(recorder) && valid_packet(recorder_control) &&
 			valid_packet(recorder_poll) && valid_packet(recorder_polled_control) &&
-			valid_packet(recorder_resident_poll) && valid_packet(recorder_metadata));
+			valid_packet(recorder_resident_poll) && valid_packet(recorder_metadata_empty) && valid_packet(recorder_metadata_full));
+		if (metadata_size != recorder_metadata_size()) fatalerror("MU4 metadata fixture length differs from acceptance contract");
 		u8 const *packet = recorder_profile() ? recorder : measurement_profile() ? measurement : status;
 		unsigned const first_size = recorder_profile() ? std::size(recorder) : std::size(status);
 		unsigned const packet_size = first_size + (recorder_control_profile() ? std::size(recorder_control) : 0) +
 			(recorder_poll_profile() ? std::size(recorder_poll) : 0) +
-			(recorder_save_profile() ? std::size(recorder_resident_poll) + std::size(recorder_metadata) : 0);
+			(recorder_save_profile() ? std::size(recorder_resident_poll) + metadata_size : 0);
 		unsigned packet_start = 0;
 		bool const ack = m_native_command_cursor >= first_size && m_command_ack_pending && m_command_ack_cursor != 3;
 		if (recorder_control_profile() && m_native_command_cursor >= first_size && !ack)
@@ -1155,7 +1161,7 @@ private:
 		// ADD_H is held enabled by this fixture; U202's lower 14 address bits alias.
 		if ((m_direction & 7) != 7) fatalerror("MU4 storage: strobe before GPIO outputs enabled");
 		m_writes.push_back((u16(m_gpio & 7) << 8) | (value & 0xff));
-		if (system_bios() == 26 && m_writes.size() <= 16)
+		if (staged_original_profile() && m_writes.size() <= 16)
 			logerror("mu4_staged_nand_strobe: offset=%04x byte=%02x hd012=%x direction=%x ready=%u observation_only=1\n",
 				unsigned(offset), value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		if (BIT(m_gpio, 2)) return;
@@ -1182,17 +1188,20 @@ private:
 		++m_data_reads;
 		u16 const value = m_nand->data_r();
 		// Capture one bounded page from the existing read, never a second read.
-		if (system_bios() == 26 && m_data_reads <= 512)
+		if (staged_original_profile() && m_data_reads <= 512)
 			logerror("mu4_staged_nand_read: index=%u byte=%02x hd012=%x direction=%x ready=%u observation_only=1\n",
 				m_data_reads, value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		return value;
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 26; }
+	bool staged_original_profile() const { return system_bios() == 26 || system_bios() == 27; }
+	bool full_metadata_profile() const { return system_bios() == 27; }
+	unsigned recorder_metadata_size() const { return full_metadata_profile() ? 24 : 16; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 27; }
 	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
 	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile(); }
 	bool recorder_control_profile() const { return system_bios() == 23 || recorder_poll_profile(); }
 	bool recorder_poll_profile() const { return system_bios() == 24 || recorder_save_profile(); }
-	bool recorder_save_profile() const { return system_bios() == 25 || system_bios() == 26; }
+	bool recorder_save_profile() const { return system_bios() == 25 || staged_original_profile(); }
 	u16 shared_daram_r(offs_t offset)
 	{
 		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
@@ -1426,7 +1435,7 @@ private:
 				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
 			}
 			if (measurement_profile()) install_measurement_observers();
-			if (system_bios() == 26)
+			if (staged_original_profile())
 			{
 				m_cpu->space(AS_IO).install_write_handler(0x80, 0x80,
 					write16smo_delegate(*this, FUNC(mu4_storage_test_state::staged_unmodeled_port_w)));
@@ -1519,7 +1528,7 @@ private:
 				[this](offs_t address, u16 &, u16) {
 					if (machine().side_effects_disabled() || (m_cpu->pc() & 0xffff) != address + 1) return;
 					++m_native_bootstrap_resident_entries;
-					if ((system_bios() == 25 || system_bios() == 26) && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
+					if (recorder_save_profile() && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
 				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
 				[this](offs_t address, u16 &, u16)
@@ -1571,7 +1580,7 @@ private:
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
-			if (system_bios() == 25 || system_bios() == 26)
+			if (recorder_save_profile())
 			{
 				m_cpu->space(AS_DATA).install_write_tap(0x36c5, 0x36c5, "mu4_file_boundary_cursor",
 					[this](offs_t, u16 &value, u16) {
@@ -2166,7 +2175,7 @@ private:
 			if (cursor + 2 != end || records != 7 || uploaded != 10760)
 				fatalerror("MU4 original bootstrap upload coverage changed records=%u words=%u", records, uploaded);
 			logerror("mu4_original_bootstrap_upload: records=%u words=%u program_only=1 data_alias=unvalidated\n", records, uploaded);
-			if (system_bios() == 26)
+			if (staged_original_profile())
 			{
 				// Fail-closed coverage diagnostic from the original serial entry.
 				// No atomic fallback and no firmware-PC-conditioned switch.
@@ -2192,11 +2201,13 @@ private:
 		{
 			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 			{
-				if (system_bios() == 26)
+				if (staged_original_profile())
 					logerror("mu4_staged_stop: pc=%06x nand_reads=%u nand_strobes=%zu ar0=%04x ar1=%04x ar2=%04x ready=%u acceptance=0\n",
 						unsigned(m_cpu->state_int(STATE_GENPC)), m_data_reads, m_writes.size(),
 						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
 						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), m_ready);
+				// CPU coverage failures must retain the media produced before the stop.
+				if (recorder_profile()) capture_recorder_media();
 				fatalerror("MU4 original bootstrap entry did not execute cleanly");
 			}
 			auto const disable = machine().disable_side_effects();
@@ -2223,11 +2234,14 @@ private:
 				logerror("mu4_native_recorder_observe: dispatches=%u loader_calls=%u responses=%u rx_words=%u tx_words=%u ack_pending=%u music_recording=0\n",
 					m_recorder_dispatches, m_recorder_loader_calls, m_recorder_responses, m_command_rx_irqs,
 					unsigned(m_command_tx_words.size()), m_command_ack_pending && m_command_ack_cursor != 3);
+				// Preserve postmortem media/context even when a later assertion fails.
+				// Serialization issues no NAND command and does not save source NVRAM.
+				capture_recorder_media();
 				if ((!recorder_control_profile() && m_native_command_cursor != 9) || m_recorder_dispatches != 1 || m_recorder_loader_calls != 1)
 					fatalerror("MU4 original recorder command did not reach the native overlay loader");
 				if (!m_recorder_overlay_checked) fatalerror("MU4 recorder overlay destinations were not verified");
 				if (shared_daram_profile() && m_recorder_startup_entries != 1)
-					fatalerror("MU4 shared RAM probe did not execute the original recorder startup");
+					fatalerror("MU4 shared RAM startup observation differs count=%u expected=1 ownership=legacy_program_read", m_recorder_startup_entries);
 				if (shared_daram_profile() && !recorder_control_profile() && (m_recorder_responses != 2 || m_command_rx_irqs != 15 ||
 					m_command_tx_words.size() != 30 || (m_command_ack_pending && m_command_ack_cursor != 3)))
 					fatalerror("MU4 recorder startup did not complete both observed native reply handshakes");
@@ -2253,12 +2267,14 @@ private:
 							unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
 							unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
 							unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)));
-						if (m_native_command_cursor != 50 || m_command_rx_ready || m_command_rx_busy ||
+						// Initial start, recorder poll/control and resident poll total 34 bytes.
+						if (m_native_command_cursor != 34 + recorder_metadata_size() || m_command_rx_ready || m_command_rx_busy ||
 							m_recorder_control_acks != 4 || !m_recorder_metadata_result)
 							fatalerror("MU4 recorder metadata transaction did not complete natively");
+						if (full_metadata_profile() && m_recorder_metadata_result != 1)
+							fatalerror("MU4 nonempty metadata request did not receive native success");
 						logerror("mu4_native_recorder_metadata: PASS native_reply=1 success=%u playback=0 firmware_state_forcing=0\n",
 							m_recorder_metadata_result == 1);
-						capture_recorder_media();
 					}
 					else if (recorder_poll_profile())
 					{
@@ -2269,7 +2285,6 @@ private:
 							data.read_word(0x373e) != 2 || data.read_word(0x3750) != 0 || data.read_word(0x3762) != 10)
 							fatalerror("MU4 recorder polled control did not reach the original handler");
 						logerror("mu4_native_recorder_polled_control: PASS status_poll=1 control_handler=1 recording_complete=0 firmware_state_forcing=0\n");
-						capture_recorder_media();
 					}
 					else if (m_native_command_cursor != 18 || m_command_rx_ready || m_command_rx_busy ||
 						m_command_rx_irqs != 24 || m_recorder_responses != 2 || m_command_tx_words.size() != 33 ||
@@ -3896,6 +3911,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(23, "bootrecpoll", "Original recorder status-poll/control sequence (provisional RAM)")
 	ROM_SYSTEM_BIOS(24, "bootrecsave", "Original recorder metadata transaction (provisional RAM)")
 	ROM_SYSTEM_BIOS(25, "bootrecstage", "Staged original recorder coverage diagnostic (fail-closed)")
+	ROM_SYSTEM_BIOS(26, "bootrecmeta", "Staged recorder with nonempty ID3 title and artist input")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

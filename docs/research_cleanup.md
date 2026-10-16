@@ -177,11 +177,16 @@ or was expensive to discover. Current examples include:
 - fetch-based PC taps missing sequential instructions between block-entry
   fetches; establish the hook's coverage rather than assuming it observes
   the same events as an Execute instruction hook;
+- a program-bus read matching the live PC not establishing an execution:
+  data reads and speculative fetches can match too; count retained Execute
+  identities before assigning invocation or completion semantics;
 - a staged CPU's unsupported Decode frontier not proving that preceding
   instructions reached Execute; validate retirement with a positive-controlled
   stage observation rather than the reported PC alone;
 - Access/Read-owned register writes not inheriting the PC or loop membership
-  of the different instruction currently occupying Execute;
+  of the different instruction currently occupying Execute; an Execute-entry
+  breakpoint's SP can already include younger prologue stack effects, so it
+  is not an atomic function-entry register snapshot;
 - Lua tap subscriptions needing a live owner for the entire observation
   window; retain them in a callback/upvalue and validate positive-control
   detail records, not just counters, before interpreting absent events;

@@ -60,7 +60,7 @@ the following multiply consumes it. The five-second observation is free of
 instruction exclusions. The subsequent ASM load at `03:a165` and its
 adjacent `LD B,ASM,A` also execute after branch-delay admission.
 
-The twenty-second control/save fixture now executes without an instruction
+The twenty-second empty-field control/save fixture executes without an instruction
 exclusion and ends at `02:98ea`, ILLEGAL=`0`, IDLE=`1`. It processes the
 ten-second control and fifteen-second poll/metadata traffic: input cursor
 `50`, receive ring empty, seven responses and no pending acknowledgement.
@@ -71,10 +71,20 @@ This remains a failed integration run, not a recording acceptance. The
 metadata response has status=`00`, parameter=`07`, reason=`03`, success=`0`;
 the bench ends on its exact-one startup-observation assertion. Its program
 read tap at `73f8` records two live-PC-qualified matches, with PMST=`2028`
-and `202c`, rather than one. That tap does not retain instruction identity,
-so the count is not proof that startup executed twice. The next work is to
-establish actual startup execution ownership and decode the metadata reply's
-failure path, without relaxing the assertion or synthesizing success.
+and `202c`, rather than one. A separate Execute breakpoint observes exactly
+one startup entry, so the program-read counter overcounts; the assertion is
+retained rather than silently relaxed. The metadata operation finds
+`REL_001 .REL` and fails because the test request supplies empty ID3 fields,
+not because the file is absent. The request contract is detailed below.
+
+The separate `bootrecmeta` positive input supplies filename `TEST`, artist
+`TEST` and title `MAME`. Updater `02:8385` and outer operation `03:8dc3`
+return zero, and firmware sends parameter-7 status=`01`, reason=`0c`,
+success=`1`. Execution then reaches a new CPU coverage boundary in the
+post-save refresh: absolute ADD `00f8 0018` at `03:a1cf` reads mapped SP.
+That source remains deliberately excluded from staged ADD pending independent
+operand-timing and producer tests. The successful reply is not proof of a
+complete recorded file, playback or handset boot.
 
 The fixture observes 2,108 NAND program setups, 2,107 confirms and
 1,098,240 data writes, but track count is zero and the recorded file is not
@@ -3981,8 +3991,12 @@ protection mechanism or playable track. No payload transformation or
 protection bypass is performed. The inventory's five synthetic tests
 cover page boundaries, separate spare changes, disjoint runs and size errors.
 
+### Recorder metadata request contract
+
 The resident AA22 selector-`36` parameter-`7` branch at `03:b1f8`
-consumes three length-prefixed byte strings following the parameter. It
+consumes three length-prefixed byte strings following the parameter:
+new base filename, TPE1 artist and TIT2 title. The order is verified from
+the resulting NAND header, not inferred from argument-register names. It
 copies each to a local zero-terminated buffer and calls `03:8dc3` with
 the firmware-owned context at data `bf1c`, operation argument zero and
 the three pointer/length pairs. Return zero selects the class-1
@@ -4005,23 +4019,60 @@ ASCII digits and ranks their numeric value. The NAND name `REL_001 `
 therefore is not excluded merely because the context contains padding.
 The comparison extraction `02:e300..e420` has SHA-256
 `0c867e27045d0684472c883a12bab4dbf10ffac27caab0244d3c0fbeeca2f7c3`.
-No filename digits need to be injected. The next fixture can send the
-mapped length-prefixed metadata through serial pins and inspect the
-original reply and NAND delta. A scan of 48,261 AA22 extended words finds only
+No filename digits need to be injected. The `bootrecmeta` fixture sends the
+mapped length-prefixed metadata through serial pins; the native reply and
+endpoint NAND delta are separate observations. A scan of 48,261 AA22 extended words finds only
 the two direct `bf1c` operands in these callers; indirect writes and
 initialization/data references remain outside that literal census.
 An exhaustive runtime write watch shows that the recorder overlay reuses
 this data range for codec work and resident initialization restores the
 prefix at 13.908 seconds. The broad watch is retired after harvesting that
-ownership observation; the small endpoint capture remains.
+ownership observation; the small endpoint capture remains. The endpoint
+media/context export now precedes acceptance assertions, so failed runs
+retain postmortem storage without issuing NAND commands or saving the source
+NVRAM. An exported image is an observation, not a passing test.
 
-The separate `bootrecsave` diagnostic schedules a resident status poll
-after the native return, then parameter `7` with title `TEST` and two empty
-secondary strings. Its checksummed candidate packets are
+The staged empty-field control reaches both file scans in `03:8dc3` and
+selects `REL_001 .REL`. Its call at `03:8ec7` to updater `02:8385`
+returns `3`; the outer routine takes `03:8eef` and returns `1`. This is
+not the outer routine's no-match return `2`. The updater recognizes the
+existing ID3 header and calls builder `02:8519` at `02:844c`. The builder
+requires both metadata pointers to be nonzero and both lengths positive
+(`02:8535..8543`); it returns `1` for the fixture's zero lengths. Updater
+`02:8452` translates that into `3`, then the protocol reply reports failure.
+Accepted title/artist lengths are capped to twelve bytes. The filename is
+handled separately by the later directory-name copy at `03:8ed8`.
+
+`bootrecstage` retains the empty-field input. `bootrecmeta` uses the same
+original staged execution, input media and pin protocol, but supplies
+filename `TEST`, artist `TEST`, title `MAME`. Its request has 18 payload
+bytes, 24 total bytes and XOR checksum `93`; its positive acceptance requires
+the native success response, not merely any parameter-7 reply. It introduces
+no firmware-state writes. Both profiles retain the exact-one legacy startup
+observation assertion pending an instruction-owned replacement.
+
+A fresh non-debugger run (`tmp/mu4-metadata-final/error.log`) reproduces
+native success and then the mapped-SP exclusion at `03:a1cf`; exit 3 remains
+the expected failed integration result. Its exported 69,206,016-byte NAND
+has SHA-256 `d44b5d50e58e56b44b4fc6fd0b365e342cd02f767a32c77992458cda7c7b85f8`;
+the unchanged input hash is
+`75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
+Changed data pages are 34, 161, 288 and 352--631; no spare bytes change.
+Page 288 begins `TEST` followed by a zero terminator and retains extension
+`REL`; the following padding is not normalized. Page 352 begins an ID3v2.3
+header with size `00000064`, then `TIT2` containing encoding byte zero plus
+`MAME`, and `TPE1` containing encoding byte zero plus `TEST` (five-byte
+payloads each). This corrects the static title/artist order inference and
+proves these particular stored fields, not filesystem consistency, audio
+completeness or playback. Resident-memory comparison still passes exactly.
+
+The retained atomic `bootrecsave` diagnostic schedules a resident status poll
+after the native return, then parameter `7` with filename `TEST` and empty
+artist/title strings. Its checksummed candidate packets are
 `1e 02 aa 01 49 04 fa 55` and
 `1e 0a aa 01 36 07 04 54 45 53 54 00 00 05 99 55`.
-The gate fails before the metadata packet is sent: the resident poll remains
-incomplete at the 20-second endpoint. The current replay below reaches cursor
+That observation failed before the metadata packet was sent: the resident poll remained
+incomplete at the 20-second endpoint. The retained replay below reaches cursor
 28 with RX-ready set, three replies and two subsequent ACKs. Do not interpret
 this as a failed metadata command.
 
