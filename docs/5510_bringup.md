@@ -4581,6 +4581,17 @@ At 1.741077 seconds, after that AA99 session ends at 1.726312648,
 the same RAM addresses instead yield `0002,8f56,12a2,1280` near a
 different context-switch location. Therefore these addresses must remain
 qualified by overlay/session: they are not permanent playback objects.
+The matching constant-input bus run first re-reads the unchanged descriptor
+at 1.022782 seconds, then again at 1.043100 seconds; its fourth observed
+latch write is `aa56=0001` at 1.043100872. This distinguishes missing
+reactivation from a permanently unsuitable method-15 return value.
+The source census finds five immediate-call encoding candidates targeting
+`020478`: `02018b,0201de,0201ec,02023d,020375`. Their respective first-session
+Execute-entry counts are `7,1571,2,1131,4271` for constant playback and
+`2,1,2,601,1669` for varying playback. These are not receiver-qualified call
+counts or indirect-call closure. The sharpest next static boundary is
+the caller at `0201de` and its reactivation predicate; synthesizing a wakeup
+or assigning descriptor semantics from its shape would bypass that question.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

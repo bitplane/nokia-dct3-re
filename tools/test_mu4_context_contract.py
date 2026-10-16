@@ -22,7 +22,7 @@ from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
-from tools.mu4_context_contract import playback_control_literal_census
+from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
 
 
 class ContextContractTest(unittest.TestCase):
@@ -38,6 +38,8 @@ class ContextContractTest(unittest.TestCase):
         words.update({0x2049a: 0xaa59, 0x27a2e: 0xaa59,
                       0x204b4: 0xaa56, 0x204d0: 0xaa56,
                       0x204d3: 0xaa56, 0x205af: 0xaa56})
+        for site in PLAYBACK_SWITCH_CALLS:
+            words.update({site: 0xf074, site + 1: 0x478})
         result = playback_control_literal_census(words)
         self.assertEqual(result['literal_hits']['0495'], ['02716a'])
         self.assertEqual(result['mapped_words_scanned'], len(words))
@@ -51,6 +53,8 @@ class ContextContractTest(unittest.TestCase):
         for value in (0x495, 0xaa56, 0xaa59):
             with self.assertRaises(ValueError):
                 playback_control_literal_census({**words, 0x20000: value})
+        with self.assertRaisesRegex(ValueError, 'immediate call census'):
+            playback_control_literal_census({**words, 0x20000: 0xf074, 0x20001: 0x478})
 
     def test_filter_parent_relationships_and_literal_coverage(self):
         words = {address: value for base, witness in FILTER_PARENT_WITNESSES

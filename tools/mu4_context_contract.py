@@ -43,6 +43,7 @@ FILTER_PARENT_WITNESSES = (
     (0xC70E, (0x0002, 0xA315)),
 )
 FILTER_CALL_SITES = (0x2A23C, 0x2A246, 0x2A250, 0x2A25A, 0x2A264)
+PLAYBACK_SWITCH_CALLS = (0x2018B, 0x201DE, 0x201EC, 0x2023D, 0x20375)
 
 
 def playback_control_literal_census(words):
@@ -68,6 +69,11 @@ def playback_control_literal_census(words):
             for literal in expected}
     if hits != expected:
         raise ValueError('AA99 playback control literal census changed')
+    switch_calls = sorted(address for address, opcode in words.items()
+                          if opcode in (0xF074, 0xF274, 0xF982, 0xFB82)
+                          and words.get(address + 1) == 0x0478)
+    if switch_calls != list(PLAYBACK_SWITCH_CALLS):
+        raise ValueError('AA99 context-switch immediate call census changed')
     return {'segment': 'aa99', 'mapped_words_scanned': len(words),
             'literal_hits': {f'{value:04x}': [f'{a:06x}' for a in addresses]
                              for value, addresses in hits.items()},
@@ -75,6 +81,7 @@ def playback_control_literal_census(words):
             'initialized_values': ['0002', '0495', 'd7b8', 'd796', '0001', '054f'],
             'initial_control_area': '00d796',
             'context_switch_candidate': ['020478', '020494'],
+            'immediate_switch_call_candidates': [f'{a:06x}' for a in switch_calls],
             'scope': 'Exact literals and pinned initialization only; not instruction classification, '
                      'computed aliases, record interpreter, resume contract or decoded audio'}
 
