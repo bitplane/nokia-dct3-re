@@ -431,6 +431,28 @@ def verify_playback_parent(text):
                 first_session=(start, finish), selector_samples=samples, decoded_audio=False, subsystem_identity='unvalidated')
 
 
+def verify_playback_switch_history(text, words, session):
+    rows = list(re.finditer(
+        r'mu4_playback_switch_history: ordinal=(\d+) address=020478 opcode=10e4 ar4=804a '
+        r'p0=([0-9a-f]{6})/([0-9a-f]{4}) p1=([0-9a-f]{6})/([0-9a-f]{4}) '
+        r'p2=([0-9a-f]{6})/([0-9a-f]{4}) p3=([0-9a-f]{6})/([0-9a-f]{4}) '
+        r't=(\d+\.\d{9}) identity=Execute_entry selection=live_ar4_context '
+        r'receiver_ownership=unvalidated observer_writes=0$', text, re.MULTILINE))
+    if len(rows) != text.count('mu4_playback_switch_history:') or len(rows) > 8:
+        raise ValueError('malformed or excessive playback switch history')
+    result, previous = [], session[0]
+    for ordinal, row in enumerate(rows, 1):
+        time = float(row[10])
+        if int(row[1]) != ordinal or not previous <= time < session[1]:
+            raise ValueError('playback switch history ordinal/session mismatch')
+        history = [(int(row[i], 16), int(row[i + 1], 16)) for i in (2, 4, 6, 8)]
+        if any(words.get(address) != opcode for address, opcode in history):
+            raise ValueError('playback switch history disagrees with original AA99 source')
+        result.append({'time': time, 'history': [f'{a:06x}/{op:04x}' for a, op in history]})
+        previous = time
+    return result
+
+
 def verify_playback_range(text, words):
     parent = verify_playback_parent(text)
     first, last = 0x200a0, 0x20cd1
@@ -455,6 +477,7 @@ def verify_playback_range(text, words):
     if not visits or sum(row['entries'] for row in visits.values()) != int(summary[0][2]):
         raise ValueError('range entry totals disagree with the complete census')
     return {'parent': parent, 'source_range_words': last - first + 1,
+            'switch_context_history': verify_playback_switch_history(text, words, parent['first_session']),
             'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
             'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
             'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '

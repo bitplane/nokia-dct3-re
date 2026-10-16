@@ -4597,10 +4597,19 @@ respective `0201b3`/`0201de` counts. This is consistent with a downstream
 processing consequence, not an independently missing wakeup. Both runs
 also visit `0201d2` and `0201dd` equally within this path and never enter
 `0201d6` or `0202a4`; that status branch does not distinguish them.
-The next dynamic question is which trampoline caller selects descriptor
-`804a` for the second service entry, with executed call history rather than
-unqualified live PC as evidence. Synthesizing a wakeup or assigning
-descriptor semantics from its shape would bypass that question.
+Executed history now locates that caller. At trampoline Execute entry
+`020478/10e4`, a bounded selector observes live `AR4=804a` and retains the
+preceding four Execute entries. All eight sampled constant-input visits
+have `02036f/f030,020371/f050,020373/f945,020375/f074`; the sole varying-input
+visit has the identical sequence. First entry is 0.834083498 seconds in
+both; constant playback's second is 1.022782161. These words match the
+original AA99 source and identify the immediate caller at `020375` in
+the loop beginning `020341`. The AR4 selector remains context, not a new
+instruction-operand ownership API. The observation counter is reset/saved,
+and the strict range checker rejects malformed histories, out-of-session
+timestamps and source-word mismatches. Both fresh runs reproduce the
+previous range counts exactly. The next boundary is that loop's descriptor
+selection/requeue contract, rather than `0201de` or an injected wakeup.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

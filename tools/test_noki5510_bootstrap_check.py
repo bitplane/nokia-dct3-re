@@ -3,10 +3,26 @@ from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
     verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input, verify_playback_parent, verify_playback_range,
+    verify_playback_switch_history,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_switch_history_requires_original_words_and_session_scoping(self):
+        text = ('mu4_playback_switch_history: ordinal=1 address=020478 opcode=10e4 ar4=804a '
+                'p0=020370/1234 p1=020371/5678 p2=020374/9abc p3=020375/f074 '
+                't=1.000000000 identity=Execute_entry selection=live_ar4_context '
+                'receiver_ownership=unvalidated observer_writes=0')
+        words = {0x20370: 0x1234, 0x20371: 0x5678, 0x20374: 0x9abc, 0x20375: 0xf074}
+        self.assertEqual(len(verify_playback_switch_history(text, words, [0.8, 2.2])), 1)
+        for old, new in (('ordinal=1', 'ordinal=2'), ('t=1.000000000', 't=2.200000000'),
+                         ('p3=020375/f074', 'p3=020375/f075'), ('ar4=804a', 'ar4=804b'),
+                         ('receiver_ownership=unvalidated', 'receiver_ownership=proven')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_switch_history(text.replace(old, new), words, [0.8, 2.2])
+        with self.assertRaises(ValueError):
+            verify_playback_switch_history(text + '\n' + text, words, [0.8, 2.2])
+
     def test_range_census_requires_complete_original_word_coverage_and_scoped_totals(self):
         words = {address: 0 for address in range(0x200a0, 0x20cd2)}
         words[0x200a0], words[0x200a1] = 0x1234, 0xabcd
