@@ -41,15 +41,16 @@ continuation `03:a1a9`; the former transfer into page `42` and eventual
 the subsequent interval count, so its DST zero-fill no longer wraps into the
 register window. The current stop is the nested staged block-repeat exclusion
 while decoding `RPTB` at `03:faa3` (`f072 faa5`), with live terminal PC
-`03:faa2`, `illegal=1`. Establish the active loop and software context-save
-contract before admitting that composition. NAND writes alone
+`03:faa2`, `illegal=1`. The firmware has saved the outer repeat registers;
+the next implementation boundary is replacement/restoration of a software-saved
+repeat context across the post-interrupt callback. NAND writes alone
 do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
-`03:db51..03:db56`; it is not an observed inactive-BRAF case. Trace its
-call/interrupt and software-save ownership before replacing the old context
-with the setup at `03:faa3`.
+`03:db51..03:db56`; it is not an observed inactive-BRAF case. The saved-context
+witness and required return paths are recorded below. Do not merely delete the
+nested-repeat guard or invent an automatic hardware loop stack.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -58,6 +59,45 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+### Software-saved repeat context
+
+The outer `RPTBD` at `03:db4d` repeats `03:db51..03:db56`, with a delayed
+conditional call at `03:db53` to `03:dada`. Its return address is `db57`,
+one word beyond REA. The observed interrupt enters logical `03:206c`, whose
+common-window vector saves XPC and branches to `03:9528`; RTN is `dadc`
+and BRC is `0037`. Thus the interrupted instruction is in the called leaf,
+not directly in the loop body.
+
+The ISR saves BRC/RSA/REA at `03:954d..03:954f` and restores them at
+`03:9568..03:956a`. The subsequent common-window gateway also saves the
+repeat context before dispatching application callbacks: `1ef7..1efa` selects
+MMRs `0019..001d` and repeats `PSHD *AR7+` five times. Passive Write taps
+observe BRC=`0037` at `5cd6`, RSA=`db51` at `5cd5`, REA=`db56` at `5cd4`
+and PMST=`202c` at `5cd3`; these words remain intact at the exclusion.
+`1eff..1f06` provides the reverse `POPD` sequence, and ST1 is popped at
+`1f16` before FRETE at `1f18`. This restores BRC before BRAF, as required
+by [TI SPRU131G section 6.10.6](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+Section 6.8 establishes that there is only one physical set of repeat
+registers; software must save outer contexts for nesting.
+
+The callback reaches `03:fa5e` with the outer BRAF still set and later
+publishes its own BRC=`003f` before `RPTB 03:faa5`. The model currently
+rejects that setup. An executable replacement/restoration fixture must cover
+an interrupt during the outside-body CCD callee, an ISR/callback-owned inner
+repeat, restoration from firmware stack words, FRETE to the leaf, and its
+near return to REA+1. Retain endpoint accounting, flags and save/replay;
+do not substitute an easier direct-to-loop return for this composition.
+No nested-repeat execution or successful outer-loop resumption is yet claimed.
+
+`tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
+`mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute
+`-autoboot_script` path, `-autoboot_delay 0`, `-log` and `-nonvram_save` to
+the retained-NAND command below. The tool exits after five emulated seconds.
+Require the positive outer/vector/copy-entry records and saved-word records;
+MMR event PCs describe live context, not necessarily the owning pipeline slot.
+This is a manual frontier instrument, not a passing nested-repeat gate. Retire
+it when an isolated composition fixture and original resumption proof replace it.
 
 ### Immediate-store forwarding
 
