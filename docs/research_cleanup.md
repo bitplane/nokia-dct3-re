@@ -190,7 +190,9 @@ or was expensive to discover. Current examples include:
   the same events as an Execute instruction hook;
 - a program-bus read matching the live PC not establishing an execution:
   data reads and speculative fetches can match too; count retained Execute
-  identities before assigning invocation or completion semantics;
+  identities before assigning invocation or completion semantics. Match
+  logical Execute addresses against translated physical bus addresses explicitly
+  under overlay mappings; the same instruction need not have the same number;
 - instruction observers omitting accelerated repeat or resumed-transfer paths;
   test execution coverage and save/replay, not only the main dispatch loop;
 - treating a reused scratch buffer as persistent state; observe its value at

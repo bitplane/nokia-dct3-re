@@ -1,11 +1,54 @@
 import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
-    verify_input_timer, verify_dsp_service_route, verify_resident_memory,
+    verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    PLAYBACK = '\n'.join((
+        'mu4_playback_audio_window: start=decoder_execute_entry t=1.234000000 '
+        'sample_source=converted_sample_bench music_decode=0',
+        'mu4_native_playback_execution: bootstrap_fetch=3 bootstrap_execute=1 '
+        'resident_fetch=24 resident_execute=8 filter_calls=10 filter_iterations=640 '
+        'filter_returns=10 instruction_entries=20000 observer=Execute_entry retirement_claim=0',
+        'mu4_native_playback_audio: tx_words=100 din_words=99 tx_nonzero=12 din_nonzero=11 '
+        'tx_hash=12345678 din_hash=87654321 clocks=5000 frames=50 power=0000 format=0053 '
+        'rate=0023 active=0001 window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0',
+        'mu4_native_playback_observe: requests=1 inspections=1 decoder_loads=1 replies=14 '
+        'input_cursor=12 title_verified=1 overlay_verified=1 pc=02a2d5 illegal=0 audio_acceptance=0',
+    ))
+
+    def test_playback_observation_is_not_audio_acceptance(self):
+        result = verify_playback_observation(self.PLAYBACK)
+        self.assertEqual(result['bootstrap_execute'], 1)
+        self.assertEqual(result['filter_iterations'], 640)
+        self.assertNotEqual(result['tx_words'], result['din_words'])
+        self.assertNotIn('audio_acceptance', result)
+
+    def test_playback_observation_rejects_scope_changes(self):
+        for old, new in (('observer=Execute_entry', 'observer=fetch'),
+                         ('retirement_claim=0', 'retirement_claim=1'),
+                         ('stream_alignment=unvalidated', 'stream_alignment=validated'),
+                         ('music_decode=0', 'music_decode=1'), ('audio_acceptance=0', 'audio_acceptance=1'),
+                         ('illegal=0', 'illegal=1'), ('overlay_verified=1', 'overlay_verified=0'),
+                         ('bootstrap_execute=1', 'bootstrap_execute=0'),
+                         ('resident_execute=8', 'resident_execute=0'),
+                         ('instruction_entries=20000', 'instruction_entries=0'),
+                         ('filter_iterations=640', 'filter_iterations=641'),
+                         ('tx_nonzero=12', 'tx_nonzero=101'), ('din_nonzero=11', 'din_nonzero=100')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_observation(self.PLAYBACK.replace(old, new))
+
+    def test_playback_observation_requires_each_report_once_in_order(self):
+        lines = self.PLAYBACK.splitlines()
+        for line in lines:
+            for bad in (self.PLAYBACK.replace(line, ''), self.PLAYBACK + '\n' + line):
+                with self.subTest(line=line), self.assertRaises(ValueError):
+                    verify_playback_observation(bad)
+        with self.assertRaises(ValueError):
+            verify_playback_observation('\n'.join(reversed(lines)))
+
     RESIDENT = '\n'.join((
         'mu4_original_resident_program: PASS checked_words=48261 mismatch_words=0 '
         'excluded_data_words=3660 source_words=51921 before_resident_execution=1 '

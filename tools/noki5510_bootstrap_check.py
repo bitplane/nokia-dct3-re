@@ -135,12 +135,57 @@ def verify_resident_memory(text):
         cursor = match.end()
 
 
+def verify_playback_observation(text):
+    """Validate observation scope, not decoding, aligned PCM or handset boot."""
+    def report(pattern, label):
+        matches = list(re.finditer(pattern + '$', text, re.MULTILINE))
+        if len(matches) != 1:
+            raise ValueError('missing or duplicated playback ' + label)
+        return matches[0]
+
+    window = report(r'mu4_playback_audio_window: start=decoder_execute_entry t=([0-9.]+) '
+                    r'sample_source=converted_sample_bench music_decode=0', 'window')
+    execution = report(
+        r'mu4_native_playback_execution: bootstrap_fetch=(\d+) bootstrap_execute=(\d+) '
+        r'resident_fetch=(\d+) resident_execute=(\d+) filter_calls=(\d+) '
+        r'filter_iterations=(\d+) filter_returns=(\d+) instruction_entries=(\d+) '
+        r'observer=Execute_entry retirement_claim=0', 'execution')
+    audio = report(
+        r'mu4_native_playback_audio: tx_words=(\d+) din_words=(\d+) tx_nonzero=(\d+) '
+        r'din_nonzero=(\d+) tx_hash=([0-9a-f]{8}) din_hash=([0-9a-f]{8}) '
+        r'clocks=(\d+) frames=(\d+) power=([0-9a-f]{4}) format=([0-9a-f]{4}) '
+        r'rate=([0-9a-f]{4}) active=([0-9a-f]{4}) window=decoder_entry '
+        r'stream_alignment=unvalidated music_decode=0 analog_audio=0', 'audio')
+    playback = report(
+        r'mu4_native_playback_observe: requests=1 inspections=1 decoder_loads=1 '
+        r'replies=(\d+) input_cursor=12 title_verified=1 overlay_verified=1 '
+        r'pc=([0-9a-f]{6}) illegal=0 audio_acceptance=0', 'result')
+    if not window.start() < execution.start() < audio.start() < playback.start():
+        raise ValueError('playback observation ordering mismatch')
+    values = tuple(map(int, execution.groups()))
+    calls, iterations, returns = values[4:7]
+    if not values[1] or not values[3] or not values[7]:
+        raise ValueError('playback lacks actual Execute-entry evidence')
+    if returns > calls or not 64 * returns <= iterations <= 64 * calls:
+        raise ValueError('AA99 filter loop observations contradict its 64-iteration contract')
+    tx, din, tx_nonzero, din_nonzero = map(int, audio.groups()[:4])
+    if tx_nonzero > tx or din_nonzero > din:
+        raise ValueError('playback nonzero count exceeds complete words')
+    return {'bootstrap_fetch': values[0], 'bootstrap_execute': values[1],
+            'resident_fetch': values[2], 'resident_execute': values[3],
+            'filter_calls': calls, 'filter_iterations': iterations, 'filter_returns': returns,
+            'tx_words': tx, 'din_words': din, 'tx_nonzero': tx_nonzero,
+            'din_nonzero': din_nonzero, 'pc': playback[2]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--runtime', action='store_true', help='check explicitly hybrid service frontier')
     parser.add_argument('--resident-memory', action='store_true',
                         help='check MU4 original AA22 program/data RAM only, not handset bootstrap or boot')
+    parser.add_argument('--playback-observation', action='store_true',
+                        help='validate Execute/audio observation scope only, not playback acceptance')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -150,11 +195,18 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
-    if args.resident_memory and any((args.runtime, args.serial_readiness, args.input_lifecycle,
-                                    args.input_timer, args.dsp_service_route)):
-        parser.error('--resident-memory cannot be combined with handset bootstrap checks')
+    if (args.resident_memory or args.playback_observation) and (
+            (args.resident_memory and args.playback_observation) or any((
+                args.runtime, args.serial_readiness, args.input_lifecycle,
+                args.input_timer, args.dsp_service_route))):
+        parser.error('MU4 observation modes cannot be combined with other bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.playback_observation:
+            result = verify_playback_observation(text)
+            print(f'MU4 playback observation complete: {result}; '
+                  'stream alignment and decoded audio remain unvalidated')
+            return
         if args.resident_memory:
             verify_resident_memory(text)
             print('MU4 resident memory PASS: 48261 program + 3656 data words; '

@@ -47,6 +47,24 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (playback_profile())
+			{
+				// Execute reports logical XPC; the existing bus tap sees OVLY's physical 006d62.
+				if (address == 0x0e41 || address == 0x26d62)
+				{
+					unsigned const which = address == 0x26d62;
+					if (m_playback_execute_entries[which]++ < 4)
+						logerror("mu4_playback_execute_entry: address=%06x opcode=%04x t=%.9f sp=%04x pmst=%04x\n", unsigned(address), opcode, machine().time().as_double(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+				}
+				if (m_playback_overlay_checked)
+				{
+					++m_playback_execute_steps;
+					// AA99 identity matters: AA22 has different code at these addresses.
+					if (address == 0x2a2c6 && opcode == 0x771a) ++m_playback_filter[0];
+					if (address == 0x2a2cc && opcode == 0xe900) ++m_playback_filter[1];
+					if (address == 0x2a2ea && opcode == 0xf4e4) ++m_playback_filter[2];
+				}
+			}
 			if (cold_catalog_profile() && !m_playback_decoder_loads)
 			{
 				if (address == 0x3941d) ++m_cold_catalog_scans;
@@ -60,7 +78,10 @@ public:
 				}
 			}
 			if (playback_profile() && m_playback_decoder_loads && !m_playback_overlay_checked && (address & 0xffff) == 0x2000)
+			{
 				verify_media_overlay(true);
+				logerror("mu4_playback_audio_window: start=decoder_execute_entry t=%.9f sample_source=converted_sample_bench music_decode=0\n", machine().time().as_double());
+			}
 			if (address != 0x73f8 || !m_recorder_loader_calls) return;
 			++m_recorder_startup_entries;
 			logerror("mu4_native_recorder_startup: pc=%06x opcode=%04x pmst=%04x identity=execute_entry\n",
@@ -112,10 +133,12 @@ public:
 		m_mcbsp0->rx_irq_cb().set([this](int state) { if (state) ++m_rx_irqs; m_cpu->set_input_line(4, state); });
 		TLV320AIC23(config, "codec", 11'995'200);
 		subdevice<tlv320aic23_device>("codec")->bclk_cb().set([this](int state) {
+			if (playback_profile() && m_playback_overlay_checked && state) ++m_playback_audio_clocks;
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
 			m_mcbsp0->tx_clock_w(state); m_mcbsp0->rx_clock_w(state);
 		});
 		subdevice<tlv320aic23_device>("codec")->frame_cb().set([this](int state) {
+			if (playback_profile() && m_playback_overlay_checked && state) ++m_playback_audio_frames;
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
 			m_mcbsp0->tx_frame_w(state); m_mcbsp0->rx_frame_w(state);
 		});
@@ -123,6 +146,7 @@ public:
 		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set([](offs_t channel) -> u16 { return channel ? 0x5678 : 0x1234; });
 		subdevice<tlv320aic23_device>("codec")->dout_cb().set([this](int state) { m_mcbsp0->rx_data_w(state); });
 		subdevice<tlv320aic23_device>("codec")->din_word_cb().set([this](offs_t channel, u16 value) {
+			if (playback_profile() && m_playback_overlay_checked) observe_playback_audio(value, true);
 			if (m_phase == 30 && system_bios() == 20 && m_stream_words)
 			{
 				if (!m_continuous_tx_count) fatalerror("MU4 codec DIN word has no observed transmitter word");
@@ -230,6 +254,11 @@ private:
 	bool m_cold_title_verified = false;
 	unsigned m_playback_requests = 0, m_playback_inspections = 0, m_playback_decoder_loads = 0;
 	bool m_playback_overlay_checked = false;
+	std::array<u32, 2> m_playback_execute_entries{}, m_playback_audio_words{}, m_playback_audio_nonzero{};
+	std::array<u32, 2> m_playback_audio_hash{2166136261U, 2166136261U};
+	std::array<u32, 3> m_playback_filter{};
+	u64 m_playback_execute_steps = 0;
+	u32 m_playback_audio_clocks = 0, m_playback_audio_frames = 0;
 	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
 	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
@@ -633,9 +662,19 @@ private:
 		if (receive_status() & 6) fatalerror("MU4 McBSP receiver reset did not clear RFULL/RRDY");
 		logerror("mu4_mcbsp_overrun: PASS three_word_threshold=1 drr_retained=1 rbr_retained=1 rsr_loss=1 peek=1 read_clear=1 frame_recovery=1 reset=1\n");
 	}
+	void observe_playback_audio(u16 value, bool din)
+	{
+		unsigned const which = din ? 1 : 0;
+		if (m_playback_audio_words[which]++ < 4)
+			logerror("mu4_playback_audio_word: boundary=%s word=%04x t=%.9f pc=%06x\n", din ? "codec_din" : "mcbsp_tx", value, machine().time().as_double(), unsigned(m_cpu->state_int(STATE_GENPC)));
+		if (value) ++m_playback_audio_nonzero[which];
+		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value >> 8)) * 16777619U;
+		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value & 0xff)) * 16777619U;
+	}
 	void stream_tx(u16 value)
 	{
 		++m_stream_words;
+		if (playback_profile() && m_playback_overlay_checked) observe_playback_audio(value, false);
 		// TX reports the last launched bit before DIN samples it on the next rising edge.
 		// Idle-line DIN words before this observable transmission are not stream evidence.
 		if (m_phase == 30 && m_native_tx_words.size() < native_stream_target()) m_native_tx_words.push_back(value);
@@ -1755,6 +1794,9 @@ private:
 			save_item(NAME(m_cold_title_publications)); save_item(NAME(m_cold_title_verified));
 			save_item(NAME(m_playback_requests)); save_item(NAME(m_playback_inspections)); save_item(NAME(m_playback_decoder_loads));
 			save_item(NAME(m_playback_overlay_checked));
+			save_item(NAME(m_playback_execute_entries)); save_item(NAME(m_playback_execute_steps)); save_item(NAME(m_playback_filter));
+			save_item(NAME(m_playback_audio_words)); save_item(NAME(m_playback_audio_nonzero)); save_item(NAME(m_playback_audio_hash));
+			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
 			if (media_command_profile())
 			{
@@ -1949,6 +1991,9 @@ private:
 		m_cold_title_publications = 0; m_cold_title_verified = false;
 		m_playback_requests = m_playback_inspections = m_playback_decoder_loads = 0;
 		m_playback_overlay_checked = false;
+		m_playback_execute_entries = {}; m_playback_execute_steps = 0; m_playback_filter = {};
+		m_playback_audio_words = {}; m_playback_audio_nonzero = {}; m_playback_audio_hash = {2166136261U, 2166136261U};
+		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
@@ -2280,9 +2325,14 @@ private:
 		if (original_bootstrap_profile())
 		{
 			if (playback_profile())
+			{
+				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps));
+				auto const &codec = *subdevice<tlv320aic23_device>("codec");
+				logerror("mu4_native_playback_audio: tx_words=%u din_words=%u tx_nonzero=%u din_nonzero=%u tx_hash=%08x din_hash=%08x clocks=%u frames=%u power=%04x format=%04x rate=%04x active=%04x window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0\n", m_playback_audio_words[0], m_playback_audio_words[1], m_playback_audio_nonzero[0], m_playback_audio_nonzero[1], m_playback_audio_hash[0], m_playback_audio_hash[1], m_playback_audio_clocks, m_playback_audio_frames, codec.reg(6), codec.reg(7), codec.reg(8), codec.reg(9));
 				logerror("mu4_native_playback_observe: requests=%u inspections=%u decoder_loads=%u replies=%u input_cursor=%u title_verified=%u overlay_verified=%u pc=%06x illegal=%u audio_acceptance=0\n",
 					m_playback_requests, m_playback_inspections, m_playback_decoder_loads, m_recorder_responses, m_native_command_cursor,
 					unsigned(m_cold_title_verified), unsigned(m_playback_overlay_checked), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			}
 			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 			{
 				if (staged_original_profile())

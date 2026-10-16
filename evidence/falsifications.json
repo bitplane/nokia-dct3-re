@@ -950,6 +950,12 @@
       "hypothesis": "Short MOD=3 can feed logical operations or source-side transfers because the transfer eventually writes a different memory space",
       "conclusion": "SPRU172C defines AND/OR/XOR, MVDK, MVMD, PORTW and WRITA's encoded operands as reads. SPRU131G table 5-4 restricts short MOD=3 to write accesses. Their atomic entry points now reject before operand effects, matching their staged exclusions. The logic-short gate retains 576 positive cases and requires 2560 rejection/replay cases across ten opcode classes, ARs, CMPT settings, initial TC states, pages, frontends and snapshots. Independent data, program and I/O taps require no operand/output transactions, pointer or arithmetic effects. Thirteen neighboring profiles and three external-I/O controls pass. Destination-side MVKD/MVDM, PORTR and MVPD must not inherit the source restriction. This does not settle implicit-copy/RMW instructions, MMR long-form handling, circular fixture domains or physical timing; it is not a fresh full staged-suite run. POPD's encoded operand remains a destination.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
+      "id": "mu4_playback_fetch_hits_establish_bootstrap_restarts", "status": "disproven",
+      "hypothesis": "Three hits on the bootstrap entry bus tap and 24 resident hits prove three boot executions and 24 resident executions during original REL playback",
+      "conclusion": "A retained Execute-entry observer records one logical 00:0e41 entry against three physical fetch hits, and 12 logical 02:6d62 entries against 24 physical 00:6d62 hits. OVLY requires translating physical tap addresses before comparing logical Execute identities. Actual resident recurrence remains, but three full boots do not follow from the fetch counter. Opcode-qualified AA99 loop observations separately prove 87613 completed 64-iteration calls, with one call in progress at the sampled 02:a2d5 PC; that PC is not evidence of a hung kernel. The old terminal playback, CPU/NAND/stream and lifecycle summaries are byte-identical after these observation-only additions. No retirement, decoded-music or analog-audio claim follows.",
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     }
   ]
 }

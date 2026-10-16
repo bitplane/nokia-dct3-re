@@ -277,12 +277,13 @@ count, arithmetic, interrupt and replay coverage. Original playback now
 passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
 `02:9fae`, the long-offset PSHD at `02:a13d`, and long-offset
 `POPD` (`8be1 0004`) at `02:a270`. At the 20-second observation, the
-unaltered original playback run has PC `02:a2d5`, `illegal=0`, three
-bootstrap-entry observations, 24 resident entries and 6,767,711 NAND reads.
-The current boundary is active execution, not an unsupported opcode;
-the repeated entry counts and PCM/peripheral progress need characterization.
-The acceptance gate remains failed: it expects a single bootstrap/resident
-entry, and decoded audio has not been established. The generic 16-bit
+unaltered original playback run has PC `02:a2d5`, `illegal=0`, one actual
+bootstrap Execute entry and 12 resident Execute entries. Its paired arithmetic
+loop completes repeatedly, and nonzero words reach codec DIN. The current
+boundary is the resident-entry lifecycle and aligned PCM provenance, not an
+unsupported opcode. [Playback observations](#playback-execution-and-codec-observations)
+separate fetch hits, Execute entries and audio counts. The coverage diagnostic
+still intentionally fails without audio acceptance. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4839,14 +4840,55 @@ AA99 contains `8a10 8be1 0004 f4e4` at `02:a26f..a272`; the admitted
 long-offset POPD is followed by FRET, not a missing source image. On the
 unchanged protected NAND, original playback now runs the 20-second window
 without an illegal instruction: PC `02:a2d5`, one request/inspection/decoder
-load, 14 replies, cursor 12, and verified title/overlay. It reports three
-bootstrap-entry observations, 24 resident entries, 6,767,711 NAND reads and
-1,568,462 stream words. PC `a2d5` is inside AA99's paired arithmetic loop
-beginning at `a2c6`; this sample alone does not prove correct loop progress
-or audio output. The existing exact-one entry gate still fails; it was not
-weakened or re-banked as playback success. The next boundary is to distinguish
-normal repeated processing from unintended lifecycle re-entry and observe
-the native PCM/peripheral path.
+load, 14 replies, cursor 12, and verified title/overlay. It reports 6,767,711
+NAND reads and 1,568,462 stream words. PC `a2d5` is inside AA99's paired
+arithmetic loop beginning at `a2c6`. Execution and codec observations below
+characterize this window without promoting it to playback acceptance.
+
+### Playback execution and codec observations
+
+Program-bus hits are not invocation counts. The 20-second run has three
+physical bootstrap fetch hits but one Execute entry at logical `00:0e41`.
+Physical resident address `00:6d62` has 24 fetch hits; the observer records
+12 actual Execute entries at logical `02:6d62` under OVLY. The first resident
+entry is at 0.227594058 seconds; subsequent observed entries include
+2.366798542, 4.001016229 and 5.635233916 seconds. Bootstrap re-execution is
+not established by its three fetch hits. The recurring resident entry is real,
+but its caller and lifecycle meaning remain unresolved. These are Execute-entry
+observations, not retirement or atomic register snapshots.
+
+AA99's `a2c6` loop loads BRC=`003f`, repeats through `a2e9` and returns at
+`a2ea`. Opcode-qualified Execute observations record 87,614 starts,
+5,607,269 body entries and 87,613 return entries. The bounds
+`64 * returns <= iterations <= 64 * starts` hold with one call in progress;
+the sampled PC is not evidence of a stuck loop. The source calls this loop
+`filter` descriptively, not as a recovered Nokia function name. AA22 has
+different instructions at these addresses and must not inherit the attribution.
+
+The audio observation window starts at the verified decoder Execute entry,
+0.818862751 seconds, not at codec initialization. It counts 1,524,143 McBSP
+TX words and 1,691,776 codec DIN words; each boundary sees 1,277 nonzero words.
+Their whole-stream FNV hashes differ (`44a1430b` versus `47cd35d3`). Codec
+power/format/rate/active registers are `0007/0053/0023/0001`, with 230,081,577
+clock rises and 845,888 frame rises. Counts and hashes are independent:
+neither zero-frame alignment nor a one-to-one PCM relation is established.
+The fixture's converted-sample ADC input remains an explicit bench source;
+nonzero DIN alone is not decoded music or analog audio acceptance.
+
+The pre-existing terminal playback, CPU/NAND/stream and media-context summaries
+are byte-identical with and without these read-only observers. Native 5110
+save-state and 2,932 tool tests (one skipped) pass. The fixture deliberately
+terminates with `audio completion is not validated`, so the Make target remains
+failed before its later exact-one fetch-count checks. Those legacy fetch checks
+are not evidence of three actual boots and were not relaxed into success.
+The manual checker validates observation completeness and loop bounds only:
+
+```sh
+python3 tools/noki5510_bootstrap_check.py --playback-observation RUN_DIR/error.log
+```
+
+Next: identify the executed transfer into recurring resident entry, and align
+valid McBSP words with codec frames before comparing PCM against media content.
 
 The current broad CPU regression and remaining operand-domain audit are
 summarized under [Short-preincrement fixture audit](#short-preincrement-fixture-audit).
