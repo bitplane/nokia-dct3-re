@@ -49,9 +49,21 @@ transaction, AR change, accumulator, T or ST0 change. This is not an exhaustive
 opcode census: read-only ALU/test sources and MMR addressing remain open,
 as do instruction-specific read/modify/write and implicit-copy classifications.
 The scalar arithmetic entry points now omit `memory_arithmetic_case` form 5.
-Confirmed remaining positive-source defects include `memory_multiply_case`
-RAM kind 5, inherited by multiply and T-load families.
-Their current positive PASS counts are not legal-domain acceptance.
+The multiply/T-load fixtures also omit `memory_multiply_case` RAM kind 5,
+preserving raw case IDs. Their four banks each retain 52,224 cases/restores:
+27,648 RAM cases over nine address forms and 24,576 mapped-source cases.
+These are MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T, totaling 208,896.
+This corrects the forbidden source encoding, not every circular input domain.
+
+`mul-mod3-edge` passes 4,352 rejection/replay cases over 34 opcode classes,
+all ARs, CMPT settings, pages, both frontends and two snapshots. It covers
+the multiply/MAC/square families, T/ASM loads, BITT, POLY, immediate MAC,
+DP loads and RPT. Rejection preserves data, pointers, accumulators, T,
+status (including ASM) and RC. The atomic RPT guard and legacy immediate-MAC
+fixture obey the same read restriction. This adds no positive staged support
+for otherwise unsupported operations and makes no silicon-trap claim.
+Fifteen neighboring profiles pass, covering MAC, ASM consumers, repeats,
+T-load composition, prior rejection banks and short-preincrement stores.
 
 Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
 MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
@@ -102,14 +114,14 @@ both CMPT settings, both pages, atomic and staged frontends, and snapshots
 before/after rejection. No data access, AR update, accumulator, T or ST0 change
 is permitted. The atomic guard precedes `immediate_smem_read`; the staged
 classifier excludes short MOD=3. This does not close the other read families.
-The broad baseline at `bc2d939f` passes the full 288-check default CPU suite,
-the separate 208,896-case TS-load profile, 9,728 load rejection/replay cases,
-native 5110 save-state restoration and 2,919 tool tests (one skipped) pass.
-The broad suite includes the corrected LDU, shift-16, variable-LD, DLD and
-SUBC banks. The subsequent CMPM/BITF and scalar-arithmetic corrections use
-the focused profiles above; the broad suite has not been rerun for those corrections. It remains
-a prototype regression net, not proof that the
-remaining operand domains or all circular inputs are legal.
+The full 288-check default CPU suite passes with the corrected load,
+SUBC, CMPM/BITF, scalar-arithmetic and multiply/T-load domains, including the
+legacy atomic immediate-MAC rejection control. The isolated multiply/load
+rejection bank, four positive multiply/T-load banks, fifteen neighboring
+profiles and absolute DP-load control also pass. Native 5110 save-state
+restoration and 2,926 tool tests (one skipped) pass. This remains a prototype
+regression net, not proof that remaining operand domains or all circular
+inputs are legal.
 
 Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
 grammars, and Smem destination writes are eligible for short preincrement.
@@ -1307,8 +1319,8 @@ load. `asm-consumer` passes 9,216 cases/restores with immediately following
 LD/ADD/SUB ASM operations, all 32 signed shift encodings, positive/negative
 accumulators, SXM/OVM combinations, gaps 0/1, two pages and three snapshots.
 Upper bits of the source word do not overwrite other ST1 flags. The isolated
-`t-load-control` reuses 55,296 existing RAM/mapped T-load and 768 multiply-pair
-cases, with 56,064 restores, to protect Read-owned T publication without a
+`t-load-control` reuses 52,224 existing RAM/mapped T-load and 768 multiply-pair
+cases, with 52,992 restores, to protect Read-owned T publication without a
 retirement rewrite. The 73,728-case MAC/MAS and delayed-comparison controls
 also pass after the shared-path rename. General ASM-load interrupt/control-delay
 composition, mapped sources and measured physical phase timing remain unvalidated.

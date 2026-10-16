@@ -14,6 +14,29 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_multiply_load_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['mul-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mul-mod3-edge')
+        for old, new in (('restore=4352', 'restore=0'), ('opcode_classes=34', 'opcode_classes=2'),
+                         ('frontends=2', 'frontends=1'), ('data_reads=0', 'data_reads=1'),
+                         ('asm_changes=0', 'asm_changes=1'), ('rc_changes=0', 'rc_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mul-mod3-edge')
+
+    def test_multiply_t_source_scope(self):
+        markers, ending = EXTRA_PROFILES['mul-t-sources']
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='mul-t-sources')
+        for marker in markers:
+            for bad in (output.replace(marker, ''), marker + '\n' + output):
+                with self.subTest(marker=marker), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile='mul-t-sources')
+        for old, new in (('restore=52224', 'restore=0'), ('ram_cases=27648', 'ram_cases=30720'),
+                         ('mapped_cases=24576', 'mapped_cases=0')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mul-t-sources')
+
     def test_arithmetic_mod3_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['arith-mod3-edge']
         output = marker + '\n' + ending + '\n'
@@ -1811,7 +1834,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['t-load-control']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='t-load-control')
-        for old, new in (('restore=56064', 'restore=0'),
+        for old, new in (('restore=52992', 'restore=0'),
                          ('t_publish=Read', 't_publish=Execute'),
                          ('no_retirement_rewrite=1', 'no_retirement_rewrite=0')):
             with self.subTest(old=old), self.assertRaises(ValueError):

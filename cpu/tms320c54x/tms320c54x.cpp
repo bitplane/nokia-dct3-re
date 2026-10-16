@@ -308,7 +308,7 @@ constexpr bool staged_extended_smem_arithmetic(u16 word)
 
 constexpr bool staged_smem_special(u16 word)
 {
-	return ((word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8;
+	return ((word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_smem_special(u16 word)
@@ -4841,9 +4841,9 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
-	// Scalar arithmetic, loads, CMPM and BITF read their encoded memory operand.
+	// These scalar arithmetic, multiply, load, repeat and test families read Smem.
 	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
-	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xfc00) == 0x3c00 || (op & 0xfc00) == 0x4000 || (op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600 || (op & 0xfe00) == 0x6000))
+	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf800) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfe00) == 0x5600 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400))
 	{
 		m_illegal = true;
 		return;

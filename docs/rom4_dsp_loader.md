@@ -3415,7 +3415,7 @@ instruction but never rewrites T. Signed MPY/MPYR (`20xx..23xx`) retain
 Smem and T in Read before older Execute; Execute multiplies signed 16-bit inputs, applies FRCT,
 rounds MPYR by adding `8000` and clearing the low word, then applies the
 existing destination OVM/overflow handling. SXM does not reinterpret their
-signed operands. Each family has 55,296 RAM/mapped-source replay cases;
+signed operands. Each family has 52,224 RAM/mapped-source replay cases;
 LD T preserves both accumulators and all arithmetic flags. Changed T after
 Read distinguishes retained multiply operands from live Execute inputs.
 The additional 768 adjacent `30e1 0004; 20e1/21e1 0003` fixtures cover
@@ -3430,8 +3430,8 @@ Smem sample and its unsigned T input at Read, before older Execute work.
 Execute multiplies the retained 16-bit unsigned operands, applies FRCT,
 then the existing OVM/result-overflow behavior; it does not publish T.
 The partial Read ownership is not measured silicon interlock timing.
-Its 55,296 replay cases cover both accumulators, T=`8000/ffff`, eight
-memory/source patterns, 16 flag combinations, ten RAM address forms and
+Its 52,224 replay cases cover both accumulators, T=`8000/ffff`, eight
+memory/source patterns, 16 flag combinations, nine RAM address forms and
 all sixteen mapped register sources `0008..0017`. Decode/Access/Read
 snapshots, changed T after Read, poisoned literals and changed RAM/pointers
 check no resampling or duplicate pointer update. PMST.SMUL does not
@@ -3451,8 +3451,8 @@ A and carry remain unchanged; result overflow affects sticky OVB.
 TI SPRU172C specifies memory-to-T publication in Read for these forms.
 The staged path publishes retained memory to T after older Execute in
 that clock and does not write T again at retirement. B and its flags
-publish in Execute. The 55296 replay cases cover 30720 RAM cases over
-ten address forms and 24576 mapped-register cases over AL/AH/AG, BL/BH/BG,
+publish in Execute. The 52,224 replay cases cover 27,648 RAM cases over
+nine read-capable address forms and 24,576 mapped-register cases over AL/AH/AG, BL/BH/BG,
 T/TRN and AR0--AR7. They cover all four operations, eight independent
 input patterns and FRCT/OVM/SMUL/SXM combinations. Saves in Decode,
 Access or Read require one source sample, no data writes and no literal
