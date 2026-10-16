@@ -21,6 +21,8 @@ public:
 	void write(offs_t offset, u16 value);
 	// Side-effect-free inspection; does not alter the register index or bus state.
 	bool source_matches(unsigned channel, int space, u32 address) const;
+	// Unlike source_matches, true only inside this channel's actual source read.
+	bool source_read_matches(unsigned channel, int space, u32 address) const;
 
 protected:
 	virtual void device_start() override;
@@ -47,6 +49,9 @@ private:
 	u16 m_regs[0x3e] = {};
 	u16 m_frame_elements[6] = {};
 	u16 m_sync_levels = 0;
+	// Synchronous bus-observer context, never hardware or save-state contents.
+	int m_source_read_channel = -1, m_source_read_space = -1;
+	u32 m_source_read_address = 0;
 	emu_timer *m_timers[6] = {};
 };
 

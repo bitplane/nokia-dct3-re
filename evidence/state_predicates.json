@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_full_upload_measurement_revalidation",
+      "owner": "mu4_native_dsp",
+      "status": "unresolved",
+      "predicate": "The current core completes the full-upload measurement response and independently verified tone-to-codec transport acceptance",
+      "current": "The bootmeasure retained-medium run reaches six independently checked energy blocks and mode zero, but fails the acknowledged measurement-response predicate before final tone/transport acceptance. Repeating with the original enabled-source observer produces a byte-identical complete log to the stricter actual-source-read observer; the attribution change does not explain the failure. Actual DMA source-read ownership separately passes executable positive, ordinary-read, wrong-channel/space/address, cancellation and pending-save/restore controls. Prior full-upload tone counts are not renewed acceptance on the current core. Diagnose the response predicate without weakening it or claiming decoded music.",
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_original_rel_playback_audio",
       "owner": "mu4_native_dsp",
       "status": "unresolved",

@@ -6849,7 +6849,16 @@ not music decoding or physical board reset.
 unchanged measurement request through McBSP2 pins after complete original
 startup, using the same retained-medium source. The measurement and tone
 observers/verifier are shared with the routine-level `measure` profile,
-not a second, weaker acceptance path. Six stereo sample-energy blocks
+not a second, weaker acceptance path. **Current revalidation boundary:**
+the complete-upload run reaches six independently checked energy blocks
+and mode zero, but fails the acknowledged measurement-response predicate
+before the final tone/transport acceptance checks. The enabled-source and
+actual-source-read observer variants produce byte-identical complete logs
+on the same retained medium; narrowing source attribution does not account
+for this failure. The response predicate must be diagnosed before claiming
+renewed full-upload tone acceptance on the current core. The following
+counts describe the previously validated contract, not a fresh passing run.
+Six stereo sample-energy blocks
 match independent arithmetic applied to live firmware input reads; the
 12-byte response is acknowledged, all 11 received bytes drain, and the
 firmware returns to mode zero with empty queues. The fixed 20-second run
@@ -6875,9 +6884,15 @@ samples to that transport. It does not model the DAC/analog output.
 Original worker `02:955b..9588` writes DMA source-reload index `32`, selects
 `ba79` or `baf9`, calls the generator and flips `bb86`. Each bank contains
 64 left samples followed by 64 right samples. A passive data-read observer
-uses side-effect-free DMA channel-3 source inspection to distinguish DMA
-reads from CPU operands and other channels, without changing the DMA
-register index. Every uncancelled generated word matches the independent
+uses side-effect-free DMA channel-3 **active source-read** inspection to
+distinguish DMA reads from CPU operands and other channels, without changing
+the DMA register index. The older `source_matches` inspector identifies an
+enabled programmed source only; an address match alone cannot attribute a
+bus read to that channel. `source_read_matches` is scoped to the actual
+synchronous source read and is false during the destination write and
+outside the transfer. Device conformance checks cover ordinary reads while
+enabled, wrong channel/space/address, cancellation and a pending-transfer
+save/restore. Every uncancelled generated word matches the independent
 tone calculation in alternating left/right source order. Bounded queues
 then require every observed DMA source word to match McBSP TX, followed by
 the existing independent codec-DIN comparison.

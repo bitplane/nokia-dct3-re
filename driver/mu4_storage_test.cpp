@@ -745,6 +745,7 @@ private:
 	std::vector<u16> m_verified_files;
 	unsigned m_read_words = 0;
 	std::stringstream m_saved_dma;
+	unsigned m_dma_observed_reads = 0;
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
@@ -1556,6 +1557,17 @@ private:
 	}
 	virtual void machine_start() override
 	{
+		m_cpu->space(AS_DATA).install_read_tap(0x6000, 0x6001, "mu4_dma_read_ownership",
+			[this](offs_t address, u16 &, u16) {
+				if (m_phase < 25 || m_phase > 29 || machine().side_effects_disabled()) return;
+				if (!m_dma->source_read_matches(0, AS_DATA, address)) return;
+				if (m_dma->source_read_matches(1, AS_DATA, address) ||
+					m_dma->source_read_matches(6, AS_DATA, address) ||
+					m_dma->source_read_matches(0, AS_PROGRAM, address) ||
+					m_dma->source_read_matches(0, AS_DATA, address ^ 1))
+					fatalerror("MU4 actual DMA source read matched another channel/space/address");
+				++m_dma_observed_reads;
+			});
 		logerror("mu4_clock_reset_profile: pins=111 clkmd=0000 divider=2 family=C5416_compatible exact_da150_identity=0\n");
 		if (original_bootstrap_profile())
 		{
@@ -1874,9 +1886,9 @@ private:
 			m_cpu->space(AS_DATA).install_read_tap(0x80, 0xffff, "mu4_native_dma_source",
 				[this](offs_t address, u16 &value, u16)
 				{
-					// Timer-driven DMA reads, not CPU operands or supervisor inspection.
-					if (m_phase != 30 || machine().side_effects_disabled() || machine().scheduler().currently_executing() ||
-						!m_dma->source_matches(3, AS_DATA, address)) return;
+					// Actual channel-3 source reads, not merely an enabled matching source.
+					if (m_phase != 30 || machine().side_effects_disabled() ||
+						!m_dma->source_read_matches(3, AS_DATA, address)) return;
 					bool const tone = address >= 0xba79 && address <= 0xbb78;
 					if (m_source_count == m_source_words.size()) fatalerror("MU4 DMA source comparison queue overflow");
 					m_source_words[(m_source_head + m_source_count) % m_source_words.size()] = value;
@@ -2129,6 +2141,7 @@ private:
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
+			m_dma_observed_reads = 0;
 			program.write_word(0x1809, 0xf4e1);
 			auto &data = m_cpu->space(AS_DATA);
 			data.write_word(0x6000, 0x1234); data.write_word(0x6001, 0xabcd);
@@ -2150,6 +2163,8 @@ private:
 				m_dma->source_matches(0, AS_PROGRAM, 0x6000) || m_dma->source_matches(6, AS_DATA, 0x6000) ||
 				data.read_word(0x55) != 0x1f)
 				fatalerror("MU4 DMA source inspection changed index or matched wrong channel/address/space");
+			if (m_dma->source_read_matches(0, AS_DATA, 0x6000) || data.read_word(0x6000) != 0x1234 || m_dma_observed_reads)
+				fatalerror("MU4 enabled DMA source falsely attributed an ordinary read");
 			if (!(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff || program.read_word(0x2ffff) != 0xffff)
 				fatalerror("MU4 DMA completed synchronously");
 			if (m_phase == 27) data.write_word(0x54, 0);
@@ -3080,6 +3095,9 @@ private:
 			}
 			if (data.read_word(0x54) & 1) fatalerror("MU4 DMA completion bit remains set");
 			if (m_dma->source_matches(0, AS_DATA, 0x6000)) fatalerror("MU4 completed DMA source inspection remained active");
+			if (m_dma->source_read_matches(0, AS_DATA, 0x6000) ||
+				m_dma_observed_reads != (m_phase == 25 || m_phase == 29 ? 2U : m_phase == 27 ? 0U : 1U))
+				fatalerror("MU4 actual DMA read ownership count mismatch phase=%u reads=%u", m_phase, m_dma_observed_reads);
 			if (m_phase == 25 && (program.read_word(0x2ffff) != 0x1234 || program.read_word(0x20000) != 0xabcd))
 				fatalerror("MU4 DMA program page wrap mismatch");
 			if (m_phase == 26 && data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA zero-count single-word mismatch");
@@ -3114,6 +3132,7 @@ private:
 				m_saved_dma.str(std::string());
 				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1 reload_banks=6 frame_mask=1 reserved=1\n");
 				logerror("mu4_dma_source_inspection: PASS disabled=1 active=1 space=1 address=1 channel=1 index_preserved=1\n");
+				logerror("mu4_dma_read_ownership: PASS source_reads=1 ordinary_read_excluded=1 channel=1 space=1 address=1 canceled=1 restored=1\n");
 				m_phase = 0;
 			}
 			else ++m_phase;

@@ -94,6 +94,12 @@ bool tms320c54x_dma_device::source_matches(unsigned channel, int space, u32 addr
 		address == (m_regs[base] | (source_space == 0 ? u32(m_regs[0x1e]) << 16 : 0));
 }
 
+bool tms320c54x_dma_device::source_read_matches(unsigned channel, int space, u32 address) const
+{
+	return channel < 6 && m_source_read_channel == int(channel) &&
+		m_source_read_space == space && m_source_read_address == address;
+}
+
 void tms320c54x_dma_device::enable(unsigned channel)
 {
 	validate(channel);
@@ -200,7 +206,11 @@ TIMER_CALLBACK_MEMBER(tms320c54x_dma_device::transfer)
 	int const spaces[] = {AS_PROGRAM, AS_DATA, AS_IO};
 	u32 const source = m_regs[base] | (source_space == 0 ? u32(m_regs[0x1e]) << 16 : 0);
 	u32 const destination = m_regs[base + 1] | (destination_space == 0 ? u32(m_regs[0x1f]) << 16 : 0);
+	m_source_read_channel = param;
+	m_source_read_space = spaces[source_space];
+	m_source_read_address = source;
 	u16 const value = m_cpu->space(spaces[source_space]).read_word(source);
+	m_source_read_channel = -1;
 	m_cpu->space(spaces[destination_space]).write_word(destination, value);
 	unsigned const source_index = (mode >> 8) & 7, destination_index = (mode >> 2) & 7;
 	bool const frame_end = !m_regs[base + 2];
