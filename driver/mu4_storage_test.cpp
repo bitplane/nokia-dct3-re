@@ -438,6 +438,7 @@ private:
 	u32 m_playback_restore_samples = 0;
 	std::array<u32, 2> m_playback_bit_samples{};
 	std::array<u16, 4> m_playback_bit_source_samples{};
+	u16 m_playback_bit_unusual_samples = 0;
 	bool m_playback_optional_started = false, m_playback_optional_active = false;
 	u8 m_playback_bit_group = 0;
 	bool m_playback_bit_selected = false;
@@ -913,6 +914,20 @@ private:
 			m_playback_bit_group = source;
 			m_playback_bit_selected = m_playback_bit_source_samples[source] < (source == 3 ? 128 : 8);
 			if (m_playback_bit_selected) ++m_playback_bit_source_samples[source];
+			// Retain bounded anomalous entry contexts even after ordinary samples fill.
+			// These are live-register observations, not retained operand ownership.
+			auto const disable = machine().disable_side_effects();
+			u16 const raw_a = m_cpu->state_int(tms320c54x_device::STATE_A);
+			u16 const remaining = m_cpu->space(AS_DATA).read_word(0xa854);
+			if ((raw_a > 16 || remaining > 32) && m_playback_bit_unusual_samples < 8)
+			{
+				++m_playback_bit_unusual_samples;
+				m_playback_bit_selected = true;
+				logerror("mu4_playback_bit_unusual: ordinal=%u raw_a=%04x remaining=%04x sp=%04x st1=%04x caller=%06x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+					m_playback_bit_unusual_samples, raw_a, remaining,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), m_playback_bit_caller, machine().time().as_double());
+			}
 		}
 		if (!m_playback_bit_selected) return;
 		++m_playback_bit_samples[boundary];
@@ -2159,6 +2174,7 @@ private:
 			save_item(NAME(m_playback_restore_samples));
 			save_item(NAME(m_playback_bit_samples));
 			save_item(NAME(m_playback_bit_source_samples));
+			save_item(NAME(m_playback_bit_unusual_samples));
 			save_item(NAME(m_playback_optional_started)); save_item(NAME(m_playback_optional_active)); save_item(NAME(m_playback_bit_group));
 			save_item(NAME(m_playback_bit_selected)); save_item(NAME(m_playback_bit_caller));
 			save_item(NAME(m_playback_activation_pc)); save_item(NAME(m_playback_activation_word)); save_item(NAME(m_playback_activation_time));
@@ -2380,6 +2396,7 @@ private:
 		m_playback_restore_samples = 0;
 		m_playback_bit_samples = {};
 		m_playback_bit_source_samples = {};
+		m_playback_bit_unusual_samples = 0;
 		m_playback_optional_started = m_playback_optional_active = false; m_playback_bit_group = 0;
 		m_playback_bit_selected = false; m_playback_bit_caller = 0;
 		m_playback_activation_pc = {}; m_playback_activation_word = {}; m_playback_activation_time = 0;

@@ -4839,11 +4839,21 @@ does not accept this run: the strict playback checker still rejects its
 illegal instruction and incomplete session. No native decoded PCM is
 established. Do not extend the CPU's shift range to accommodate this state.
 
-The next question is which bit-reader request/context produces this
-invalid shift, and whether replay of the complete routine reproduces it
-against the scalar model. Preserve original recorded media and acceptance
-constraints; capture entry/return provenance rather than assigning operand
-ownership from live registers. A separate broader AAC-LC control (MPEG-2
+An entry capture beyond the ordinary sample cap observes raw A=`0032`,
+remaining=`0009`, reservoir=`28254497`, index=`0017`, base=`162e`, next
+word=`9271`, SP=`d70c`, ST1=`610f`, with call-site history `024343` at
+0.993192041 seconds. Interpreting raw A as width 50 would give
+`9 + 16 - 50 = -25` remaining after refill, hence shift `16 - (-25) = 41`,
+matching T=`0029`. This is outside the reference model's width domain;
+it explains the arithmetic but does not establish retained argument ownership
+or a CPU defect. Source immediately before that call is
+`024340: 62e6 0003 0005; 024343: f982 510c`.
+
+The next question is how that caller forms its argument, with retained
+operand and stack provenance, before replaying the complete bit reader.
+The observer retains at most eight unusual entry contexts, is reset/saved,
+and never changes firmware state. Preserve original recorded media and
+acceptance constraints. A separate broader AAC-LC control (MPEG-2
 header flag without the MPEG-2 encoder profile) stops at `02568a`, T=`ffee`;
 it is not interchangeable with the constrained control above.
 
