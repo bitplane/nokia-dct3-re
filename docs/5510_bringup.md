@@ -92,10 +92,10 @@ The active `bootplaystage` diagnostic sends an original playback request
 through serial pins and loads the matching `RELSI16` image. Its 49,839
 compared program/data words match original marker `aa99` before startup;
 four low-window words remain excluded. Native execution passes mapped-SP
-MVKD and the delayed far call inside block `02:6116..6120`. It now stops
-at `02:5fdd`, `6ff8 0015 0c81`: `STL A,1,*($0015)`, targeting C54x
-AR5. The shifted-store mapped-destination guard remains in place pending
-independent DAGEN-publication/consumer-latency tests. The generic 16-bit
+MVKD, the delayed far call inside block `02:6116..6120` and the shifted
+store to AR5 at `02:5fdd`. It now stops at `02:6050`, `710a 0008`:
+`MVDK AG,AL`. The mapped-accumulator move remains guarded pending its
+own source/destination publication and adjacent-producer tests. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4349,15 +4349,15 @@ and both delay words; initial overlay comparison covers the pinned callee.
 This excludes missing loop words or an unclassified callee-owned repeat
 setup, not the provisional physical DA150 map or all call/loop hazards.
 
-The unchanged external playback input now advances past this composition
-and reaches `02:5fdd`, `6ff8 0015 0c81`, `STL A,1,*($0015)`.
-The exact guarded destination is C54x AR5 (`0015`), not an unidentified
-external peripheral. The live PC is already `02:5fe3`; instruction ownership
-comes from the retained Read slot, not that advanced PC. The run observes
-929,701 NAND data reads and 26,211 strobes, but these are progress witnesses,
-not decoder/output acceptance. Shifted mapped stores need their own
-Execute-owned DAGEN publication, consumer latency, bank-conflict,
-retained-address/source and replay tests before this next guard is relaxed.
+The unchanged external playback input also executes `02:5fdd`,
+`6ff8 0015 0c81`, `STL A,1,*($0015)`. Its destination is C54x AR5
+(`0015`), not an unidentified external peripheral. Shifted stores now
+admit AR0..AR7 using their ordinary Execute-time write; other low mapped
+destinations remain guarded. The next stop is `02:6050`, `710a 0008`,
+`MVDK AG,AL`, with the live PC already at `02:6053`. Instruction identity
+comes from the retained pipeline slot, not the advanced PC. The run observes
+929,701 NAND data reads and 26,211 strobes; unchanged counts do not negate
+instruction progress, and neither count is decoder/output acceptance.
 
 `mu4_context_contract.py` also pins the 13 original words at
 `02:5fdc..5fe8` and decodes the shifted-store opcode/operation-extension
@@ -4371,10 +4371,34 @@ SPRU131G table 7-5 places shifted STL/STH in the store-type group;
 table 7-7 gives an AR write two latency cycles before a category-I
 consumer such as long-offset indirect DLD, or one before category II.
 This is a local static spacing contract, not executed publication evidence.
-The current early-DAGEN conflict checks recognize ordinary stores, STLM
-and RMW but omit the `6fxx` shifted-store family. Admission must test the
-shared-bank collision with younger STM/MVDK/POPM as well as ordinary AR
-consumers; enabling only destination `0015` would hide that coverage gap.
+The early-DAGEN conflict checks include the `6fxx` shifted-store family
+alongside ordinary stores, STLM and RMW.
+
+Executable shifted-AR acceptance is split into four isolated profiles:
+
+- `st-shift-ar`: 122,880 replay cases, four extended address forms, all
+  eight AR destinations, STL/STH from A/B, four accumulator patterns,
+  SST/SXM combinations, shifts -16/-1/0/1/15, self/other pointer aliases,
+  two program pages and three save points. Address and operation
+  extensions are changed after fetch; address registers and the source
+  accumulator are changed between Read and Execute. The test requires
+  the retained address but Execute-live source, one write and no data read.
+- `st-shift-ar-use`: 30,720 replays of absolute stores followed by legal-gap
+  indirect consumers, with gaps 2/3 and the same shift/arithmetic matrix.
+  This does not define forbidden-gap behavior or measured silicon phases.
+- `st-shift-ar-bank`: 768 replays of short direct stores followed by STM,
+  MVDK, POPM or constant ST to the same or a different AR. RAM controls
+  publish at clock 7; shared-bank collisions defer the younger write to
+  clock 8 without repeating its source read or stack increment.
+- `st-shift-ar-edge`: 48 replays retaining twelve control/peripheral
+  destination exclusions before and after rejection, with no data access
+  or register mutation. These are prototype exclusions, not silicon traps.
+
+Nine existing store/DAGEN/move profiles, the native 5110 save-state gate
+and 2,897 tool tests (one skipped) guard this admission. The full 288-check
+default CPU suite was last run at the delayed-call milestone; it is not
+implied by these focused profiles. The original REL diagnostic still fails
+closed with `audio_acceptance=0`; mapped-accumulator move timing is next.
 
 ```sh
 python3 tools/run_c54x_core.py --profile mvkd-sp \

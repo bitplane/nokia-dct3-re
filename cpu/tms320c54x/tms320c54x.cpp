@@ -3148,7 +3148,7 @@ void tms320c54x_device::pipeline_step()
 			}
 			m_pipeline_operand_address[3] = destination;
 			bool const conflict = m_pipeline_valid[5] &&
-				(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+				(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[3] = conflict;
 			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
@@ -3169,7 +3169,7 @@ void tms320c54x_device::pipeline_step()
 		// BRC likewise has zero latency before RPTB (table 7-24), without
 		// inheriting DAGEN-bank arbitration. In-loop BRC writes stay excluded.
 		bool const older_store = m_pipeline_word[3] != 0x770e && m_pipeline_word[3] != 0x771a && m_pipeline_valid[5] &&
-			(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+			(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 		m_pipeline_early_write_deferred[3] = older_store;
 		if (u8(m_pipeline_word[3]) == 0x18) m_pipeline_direct_sp[3] = m_sp;
@@ -3407,7 +3407,7 @@ void tms320c54x_device::pipeline_step()
 		if (destination >= 0x10 && destination <= 0x19)
 		{
 			bool const conflict = m_pipeline_valid[5] &&
-				(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+				(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[3] = conflict;
 			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
@@ -3749,7 +3749,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Table 7-4 gives POPM/POPD DAGEN an early Read write; an older
 			// store using that register bank defers publication one clock.
-			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[4] = conflict;
 			if (!conflict && !late_popm_read)
@@ -3811,7 +3811,9 @@ void tms320c54x_device::pipeline_step()
 		if (preincrement) indirect_modify(mode, false, 4);
 		u16 const literal = m_pipeline_operand_address[4];
 		m_pipeline_operand_address[4] = extended ? (mode == 0xf8 ? literal : long_offset_address(mode, indirect_ar(mode, 4), s16(literal), 4)) : basic_address(4, mode);
-		if (m_pipeline_operand_address[4] < 0x60)
+		// SPRU131G tables 7-5/7-7: shifted stores publish ARx in Execute;
+		// early DAGEN writers must arbitrate with the same register bank.
+		if (m_pipeline_operand_address[4] < 0x60 && (m_pipeline_operand_address[4] < 0x10 || m_pipeline_operand_address[4] > 0x17))
 		{
 			logerror("%s: staged shifted store register/peripheral destination is unsupported instruction=%06x word=%04x operation=%04x destination=%04x\n",
 				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_immediate[4], m_pipeline_operand_address[4]);

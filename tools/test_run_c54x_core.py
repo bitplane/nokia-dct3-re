@@ -12,6 +12,38 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_shifted_ar_store_scope(self):
+        for profile in ('st-shift-ar', 'st-shift-ar-use', 'st-shift-ar-bank'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for bad in (output.replace('publish_clock=8', 'publish_clock=7'),
+                        output.replace('retained_extensions=1', 'retained_extensions=0'),
+                        output.replace('writes=1', 'writes=2'),
+                        output.replace('restore=', 'missing_restore='),
+                        output.replace('silicon_phase_claim=0', 'silicon_phase_claim=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                if bad == output:
+                    continue
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
+    def test_shifted_ar_bank_and_exclusion_scope(self):
+        for profile, replacements in (
+                ('st-shift-ar-bank', (('early_write=7,8', 'early_write=7,7'),
+                                      ('source_reads=once', 'source_reads=twice'),
+                                      ('restore=768', 'restore=0'))),
+                ('st-shift-ar-edge', (('source_reads=0', 'source_reads=1'),
+                                      ('destination_writes=0', 'destination_writes=1'),
+                                      ('register_changes=0', 'register_changes=1'),
+                                      ('restore=48', 'restore=0')))):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in replacements:
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+
     def test_repeat_page_comparator_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-page']
         output = marker + '\n' + ending + '\n'

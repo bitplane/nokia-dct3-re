@@ -6411,18 +6411,74 @@ private:
 	struct extended_ar_store_fixture
 	{
 		unsigned form, reg, selected, kind, flags, gap;
+		int shift;
+		bool shifted;
 		u16 literal, initial_ar, next_ar, result;
 		u64 value;
 		u32 base;
 	};
-	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer)
+	void start_shifted_ar_conflict(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const reg = variant % 8, kind = (variant / 8) % 4;
+		bool const same = (variant / 32) % 2, conflict = (variant / 64) % 2;
+		u16 const destination = 0x10 + (same ? reg : reg ^ 1), older = conflict ? 0x10 + reg : 0x63;
+		u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x6f00 | older); program.write_word(base + 0x601, 0x0c81);
+		program.write_word(base + 0x602, kind == 0 ? 0x7700 | destination : kind == 1 ? 0x7162 : kind == 2 ? 0x8a00 | destination : 0x7600 | destination);
+		if (kind != 2) program.write_word(base + 0x603, kind == 1 ? destination : 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xabcdef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x4000 + i);
+		// 0060/0061 belong to the fixture's side-effecting test port, not RAM.
+		data.write_word(0x62, 0xbeef); data.write_word(0x1000, 0xbeef);
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "shift_ar_conflict_read", [this, kind](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if ((kind != 1 && kind != 2) || m_pipeline_operand_reads || at != (kind == 1 ? 0x62 : 0x1000) || word != 0xbeef || m_cpu->pipeline_cycles() != 7)
+				osd_printf_info("shift_ar_conflict_read: case=%u kind=%u address=%04x word=%04x cycle=%llu\n", m_pipeline_peripheral_case, kind, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles());
+			expect((kind == 1 || kind == 2) && !m_pipeline_operand_reads++ && at == (kind == 1 ? 0x62 : 0x1000) && word == 0xbeef && m_cpu->pipeline_cycles() == 7,
+				"Early writer retains its one source read despite the shifted-store bank conflict"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "shift_ar_conflict_write", [this, destination, older, conflict](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == older && word == 0x2468) { expect(!m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == 7, "Shifted store publishes its own Execute word once"); return; }
+			expect(at == destination && word == 0xbeef && !m_pipeline_register_writes++ && m_cpu->pipeline_cycles() == (conflict ? 8 : 7),
+				"Shared DAGEN bank defers early publication once for same and different AR destinations"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 310100;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_shifted_ar_edge(unsigned variant = 0)
+	{
+		start_shifted_ar_conflict(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		u32 const base = (variant / 12) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0x6ff8);
+		program.write_word(base + 0x601, std::array<u16, 12>{0, 1, 6, 7, 8, 0xe, 0x18, 0x19, 0x1a, 0x1d, 0x20, 0x5f}[variant % 12]);
+		program.write_word(base + 0x602, 0x0c81);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shift_ar_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shift_ar_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_phase = 310120; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
+	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer, bool shifted = false)
 	{
 		extended_ar_store_fixture f{};
-		unsigned v = variant;
+		f.shifted = shifted;
+		unsigned const span = consumer ? 6144 : 24576;
+		f.shift = shifted ? std::array<int, 5>{-16, -1, 0, 1, 15}[variant / span] : 0;
+		unsigned v = variant % span;
 		if (!consumer) { f.form = v % 4; v /= 4; }
 		f.reg = v % 8; v /= 8;
 		f.kind = v % 4; v /= 4;
 		f.value = std::array<u64, 4>{0x123456789aULL, 0x0180001200ULL, 0xff7fff1200ULL, 0xfffffff495ULL}[v % 4]; v /= 4;
+		if (shifted && consumer && f.value < 0x8000000000ULL) f.value |= 0x7f00000000ULL;
 		f.flags = v % 4; v /= 4; // SST and SXM, not arithmetic OVM.
 		bool const alias = !consumer && v % 2;
 		if (consumer) f.gap = 2 + v % 2;
@@ -6433,15 +6489,18 @@ private:
 		f.literal = f.form == 0 ? target : f.form == 1 ? u16(target - 0x40) : 1;
 		f.initial_ar = f.form == 0 ? 0x4000 + f.selected : f.form == 1 ? 0x40 : f.form == 2 ? target - 1 : 0x10 + (f.reg + 7) % 8;
 		f.next_ar = f.form < 2 ? f.initial_ar : target;
-		u32 stored = u32(f.value);
+		u64 bits = f.value;
+		for (int i = 0; i < f.shift; ++i) bits = (bits * 2) & 0xffffffffffULL;
+		for (int i = 0; i < -f.shift; ++i) bits = (bits >> 1) | ((f.flags & 2) && (bits & 0x8000000000ULL) ? 0x8000000000ULL : 0);
+		u32 stored = u32(bits);
 		if (f.flags & 1)
 		{
 			if (f.flags & 2)
 			{
-				s64 const signed_value = s64(f.value << 24) >> 24;
+				s64 const signed_value = s64(bits << 24) >> 24;
 				stored = signed_value < -0x80000000LL ? 0x80000000U : signed_value > 0x7fffffffLL ? 0x7fffffffU : u32(signed_value);
 			}
-			else if (f.value > 0xffffffffULL) stored = 0xffffffffU;
+			else if (bits > 0xffffffffULL) stored = 0xffffffffU;
 		}
 		f.result = (f.kind & 2) ? stored >> 16 : stored;
 		return f;
@@ -6449,14 +6508,16 @@ private:
 	void start_extended_ar_store(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer");
-		auto const f = extended_ar_store_case(variant, consumer);
+		bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+		bool const shifted = !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+		auto const f = extended_ar_store_case(variant, consumer, shifted);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		u16 const mode = f.form == 0 ? 0xf8 : f.form == 1 ? 0xe0 | f.selected : f.form == 2 ? 0xe8 | f.selected : 0xf0 | f.selected;
-		program.write_word(f.base + 0x600, 0x8000 | (f.kind << 8) | mode);
+		program.write_word(f.base + 0x600, shifted ? 0x6f00 | mode : 0x8000 | (f.kind << 8) | mode);
 		program.write_word(f.base + 0x601, f.literal);
-		if (consumer) program.write_word(f.base + 0x602 + f.gap, 0x1280 | (((f.kind & 1) ^ 1) << 8) | f.reg);
+		if (shifted) program.write_word(f.base + 0x602, (f.kind & 2 ? 0x0c60 : 0x0c80) | ((f.kind & 1) << 8) | (f.shift & 31));
+		if (consumer) program.write_word(f.base + 0x602 + shifted + f.gap, 0x1280 | (((f.kind & 1) ^ 1) << 8) | f.reg);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 1);
@@ -6474,11 +6535,11 @@ private:
 		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "extended_ar_store_reads", [this, f, consumer](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
-			expect(consumer && !m_pipeline_operand_reads && at == f.result && word == (f.result ? 0xbbbb : 0) && m_cpu->pipeline_cycles() == 7 + f.gap,
+			expect(consumer && !m_pipeline_operand_reads && at == f.result && word == (f.result ? 0xbbbb : 0) && m_cpu->pipeline_cycles() == 7 + f.shifted + f.gap,
 				"Accumulator store has no destination read; legal-gap LDU consumes the published AR once"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "extended_ar_store_publication", [this, f](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
-			expect(!m_pipeline_store_writes && at == 0x10 + f.reg && word == f.result && m_cpu->pipeline_cycles() == 7,
+			expect(!m_pipeline_store_writes && at == 0x10 + f.reg && word == f.result && m_cpu->pipeline_cycles() == 7 + f.shifted,
 				"Extended STL/STH publishes the Execute-live saturated accumulator word to retained AR destination once"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "extended_ar_store_literal", [this, f](offs_t, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
@@ -14603,7 +14664,9 @@ private:
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-smem")) { start_pipeline_bitfield(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-branch")) { start_pipeline_bitfield_ar7(); return; }
-		if (!strcmp(machine().options().bios(), "st-extended-ar") || !strcmp(machine().options().bios(), "st-ar-consumer")) { start_extended_ar_store(); return; }
+		if (!strcmp(machine().options().bios(), "st-extended-ar") || !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use")) { start_extended_ar_store(); return; }
+		if (!strcmp(machine().options().bios(), "st-shift-ar-bank")) { start_shifted_ar_conflict(); return; }
+		if (!strcmp(machine().options().bios(), "st-shift-ar-edge")) { start_shifted_ar_edge(); return; }
 		if (!strcmp(machine().options().bios(), "ld-ts") || !strcmp(machine().options().bios(), "ld-ts-producer")) { start_ts_load(); return; }
 		if (!strcmp(machine().options().bios(), "ifr-pair")) { start_ifr_pair(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-ar")) { start_mvmd_ar(); return; }
@@ -38130,18 +38193,69 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254580;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 310100)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = (variant / 8) % 4;
+			unsigned const checkpoint = 6 + variant / 256;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Shifted store and early DAGEN writer remain independently owned");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save shifted-store shared-bank publication boundary");
+			}
+			if (tick == 20)
+			{
+				unsigned const reg = variant % 8; bool const same = (variant / 32) % 2, conflict = (variant / 64) % 2;
+				unsigned const target = same ? reg : reg ^ 1;
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == target ? 0xbeef : conflict && i == reg ? 0x2468 : 0x4000 + i), "Only the two owned register publications affect the AR bank");
+				expect(m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_pipeline_operand_reads == unsigned(kind == 1 || kind == 2) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(kind == 2), "Shifted-store conflict preserves every source, write and stack increment across replay");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore pending or committed shifted-store bank collision"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310110; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_shifted_ar_conflict(variant + 1); return; }
+				osd_printf_info("TMS320C54x shifted AR store bank conflicts: PASS cases=768 restore=768 destinations=8 writers=STM,MVDK,POPM,ST targets=same,different controls=RAM pages=2 snapshots=3 store_write=7 early_write=7,8 source_reads=once writes=once silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated shifted AR bank conflicts complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310110) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310100; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310120)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 6 + variant / 24;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= 7) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Shifted-store control and peripheral destinations reject before any data transaction");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or after shifted-store destination rejection"); }
+			if (tick == 10)
+			{
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x4000 + i, "Rejected shifted store preserves the AR bank");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Destination rejection does not publish status, stack or accumulator changes");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore shifted-store destination rejection without data work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310130; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 47) { start_shifted_ar_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x shifted AR store exclusions: PASS cases=48 restore=48 excluded_destinations=12 pages=2 snapshots=2 source_reads=0 destination_writes=0 register_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated shifted AR exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310130) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310120; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254560)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer");
-			auto const f = extended_ar_store_case(variant, consumer);
-			unsigned const checkpoint = consumer ? std::array<unsigned, 3>{4, 7, 7 + f.gap}[variant / 2048] : std::array<unsigned, 3>{4, 6, 7}[variant / 8192];
+			bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+			bool const shifted = !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+			auto const f = extended_ar_store_case(variant, consumer, shifted);
+			unsigned const local = variant % (consumer ? 6144 : 24576);
+			unsigned const checkpoint = consumer ? std::array<unsigned, 3>{4, 7 + unsigned(shifted), 7 + unsigned(shifted) + f.gap}[local / 2048] : std::array<unsigned, 3>{4, 6 + unsigned(shifted), 7 + unsigned(shifted)}[local / 8192];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Extended accumulator store owns its mapped AR destination");
 			if (tick == 4)
 			{
 				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
 			}
-			if (tick == 6 && !consumer)
+			if (shifted && tick == 5)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xdead);
+			}
+			if (tick == 6 + unsigned(shifted) && !consumer)
 			{
 				for (unsigned ar = 0; ar < 8; ++ar)
 				{
@@ -38151,7 +38265,7 @@ private:
 				}
 				m_cpu->set_state_int((f.kind & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
 			}
-			if (consumer && tick == 7 + f.gap && f.result >= 0x60)
+			if (consumer && tick == 7 + unsigned(shifted) + f.gap && f.result >= 0x60)
 			{
 				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.result, 0xcccc);
 			}
@@ -38181,7 +38295,13 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254570; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (consumer ? 6143 : 24575)) { start_extended_ar_store(variant + 1); return; }
+				if (variant + 1 < (consumer ? 6144U : 24576U) * (shifted ? 5 : 1)) { start_extended_ar_store(variant + 1); return; }
+				if (shifted)
+				{
+					if (consumer) osd_printf_info("TMS320C54x shifted AR store consumers: PASS cases=30720 restore=30720 destinations=8 selectors=4 patterns=4 sst_sxm=4 shifts=-16,-1,0,1,15 legal_gaps=2,3 pages=2 snapshots=3 publish_clock=8 consumer_reads=1 writes=1 retained_extensions=1 silicon_phase_claim=0\n");
+					else osd_printf_info("TMS320C54x shifted AR stores: PASS cases=122880 restore=122880 forms=absolute,offset,preincrement,circular destinations=8 selectors=4 patterns=4 sst_sxm=4 shifts=-16,-1,0,1,15 aliases=self,other pages=2 snapshots=3 publish_clock=8 destination_reads=0 writes=1 retained_extensions=1 execute_live_source=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated shifted AR stores complete");
+				}
 				if (consumer)
 				{
 					osd_printf_info("TMS320C54x extended AR store consumer: PASS cases=6144 restore=6144 destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 legal_gaps=2,3 pages=2 snapshots=3 publish_clock=7 consumer_reads=1 ar_writes=1 literal_fetches=1 forbidden_gap_claim=0 silicon_phase_claim=0\n");
@@ -44866,6 +44986,10 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(217, "mvkd-sp", "Retained MVKD and MVDM from mapped SP with stack-update contexts")
 	ROM_SYSTEM_BIOS(218, "rptb-page", "Low-PC repeat endpoint and foreign-page hazard")
 	ROM_SYSTEM_BIOS(219, "rptb-fcalld", "Delayed far calls and complete delay spans inside block repeats")
+	ROM_SYSTEM_BIOS(220, "st-shift-ar", "Shifted accumulator stores to retained AR destinations")
+	ROM_SYSTEM_BIOS(221, "st-shift-ar-use", "Shifted AR stores with legal-gap indirect consumers")
+	ROM_SYSTEM_BIOS(222, "st-shift-ar-bank", "Shifted stores and shared-bank early DAGEN write arbitration")
+	ROM_SYSTEM_BIOS(223, "st-shift-ar-edge", "Shifted-store control and peripheral destination exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
