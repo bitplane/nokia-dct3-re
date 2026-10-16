@@ -3128,6 +3128,32 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_intm_follow = intm_bit;
 		}
 	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7600 &&
+		(m_pipeline_word[3] == 0x76f8 || (u8(m_pipeline_word[3]) < 0x80 && !BIT(m_pipeline_direct_status[3], 14))))
+	{
+		// SPRU131G table 7-4 includes constant ST with the early DAGEN
+		// writers. Retained direct/absolute forms know their destination here;
+		// indirect aliases still require separate address/publication coverage.
+		u16 const destination = m_pipeline_word[3] == 0x76f8 ? m_pipeline_operand_address[3] : u16((m_pipeline_direct_status[3] & 0x1ff) << 7) | u8(m_pipeline_word[3]);
+		if (destination >= 0x10 && destination <= 0x19)
+		{
+			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[3] == m_pipeline_repeat_address)
+			{
+				logerror("%s: repeated immediate store register/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			m_pipeline_operand_address[3] = destination;
+			bool const conflict = m_pipeline_valid[5] &&
+				(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5])) &&
+				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
+			m_pipeline_early_write_deferred[3] = conflict;
+			if (destination == 0x18) m_pipeline_direct_sp[3] = m_sp;
+			if (!conflict)
+			{
+				data_write(destination, m_pipeline_immediate[3], 3);
+				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[3]);
+			}
+		}
+	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700 && m_pipeline_word[3] != 0x771d && m_pipeline_word[3] != 0x7700 && !staged_bus_control(m_pipeline_word[3]) && !staged_timer_control(m_pipeline_word[3]))
 	{
 		// SPRU131G 7.5.2: STM writes DAGEN in the opcode word's Read,
@@ -3151,7 +3177,8 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && m_pipeline_early_write_deferred[4])
 	{
 		bool const move = staged_move(m_pipeline_word[4]);
-		u16 const destination = move ? m_pipeline_immediate[4] : u8(m_pipeline_word[4]);
+		bool const constant_store = (m_pipeline_word[4] & 0xff00) == 0x7600;
+		u16 const destination = constant_store ? m_pipeline_operand_address[4] : move ? m_pipeline_immediate[4] : u8(m_pipeline_word[4]);
 		data_write(destination, move ? m_pipeline_operand[4] : m_pipeline_immediate[4], 4);
 		if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		m_pipeline_early_write_deferred[4] = false;
@@ -3851,7 +3878,7 @@ void tms320c54x_device::pipeline_step()
 			}
 			if (BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		}
-		if (m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x19)
+		if (m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x19 && mode != 0xf8 && (mode >= 0x80 || BIT(m_pipeline_direct_status[4], 14)))
 		{
 			logerror("%s: staged immediate ST to DAGEN requires early-write ownership\n", machine().describe_context());
 			m_illegal = true;
@@ -4124,7 +4151,8 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xff00) == 0x7600)
 		{
 			m_pc += u8(m_op) == 0xf8 || staged_extended_immediate_store(m_op) ? 2 : 1;
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
+			if (m_pipeline_operand_address[5] < 0x10 || m_pipeline_operand_address[5] > 0x19)
+				data_write(m_pipeline_operand_address[5], pipeline_store_word());
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
 		}
 		else if (staged_port_write(m_op))

@@ -353,6 +353,19 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=name)
 
+    def test_constant_dagen_store_scope(self):
+        marker, ending = EXTRA_PROFILES['st-dagen']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='st-dagen')
+        for bad in (output.replace('restore=3920', 'restore=0'),
+                    output.replace('writes_each=1', 'writes_each=2'),
+                    output.replace('repeated_publication=0', 'repeated_publication=1'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='st-dagen')
+        with self.assertRaises(ValueError):
+            check_result(output, 3)
+
     def test_delay_dld_scope(self):
         for name in ('dld-delay', 'dld-delay-edge'):
             marker, ending = EXTRA_PROFILES[name]

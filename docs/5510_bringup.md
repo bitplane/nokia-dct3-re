@@ -52,21 +52,23 @@ Signed MAC `29f8` at `03:b305` now reads mapped BK (`0019`), and
 two-word MAC `28f8 0015` at `03:cc06` reads mapped AR5 in the FCALLD
 delay owned by `fb83 cb1e` at `03:cc04`. DLD `56e3 0010` at `02:a4d3`
 also passes in both delay words of BD `f273 a4dc` at `02:a4d1`, inside
-the `a4cb..a4dd` block repeat. The current exclusion is absolute immediate
-ST `76f8 0014 fdae` at `03:c72c`, targeting AR4. Its Read guard requires
-early DAGEN-write ownership; do not simply publish it at retirement when
-the following MPY already needs AR4 for address calculation.
-Live terminal PC is `03:c732`, not the owning instruction address;
-SP=`5ebd`, BRC=`0000`, CPU ILLEGAL=`1`. The passive observer records
-that flag explicitly: searching only for the words "unsupported" or
-"illegal" misses this guard's diagnostic. NAND writes alone do not prove
-complete recording.
+the `a4cb..a4dd` block repeat. Absolute immediate ST `76f8 0014 fdae`
+at `03:c72c` now initializes AR4 through the early DAGEN-write path before
+the following multiply consumes it. The unchanged recorder reaches the
+five-second observation bound with CPU ILLEGAL=`0`, PC=`03:d784`,
+SP=`5c90`, BRC=`0006`, RSA=`d776`, REA=`d787`. This is a live instruction
+snapshot, not an unsupported-instruction stop or a completed transaction.
+The next question is sustained recorder/application progress and attributable
+sample/storage output, not another inferred opcode exclusion.
+The bench sends its follow-up control no earlier than ten seconds and the
+resident poll/metadata sequence no earlier than fifteen. A five-second
+snapshot therefore cannot assess those transactions; use the original
+twenty-second fixture boundary before interpreting their absence as a stall.
 
-The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
-RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
-`03:db51..03:db56`; it is not an observed inactive-BRAF case. The saved-context
-witness and required return paths are recorded below. Do not merely delete the
-nested-repeat guard or invent an automatic hardware loop stack.
+The passive observer records ILLEGAL explicitly: searching only for the
+words "unsupported" or "illegal" misses some guard diagnostics. NAND
+writes alone do not prove complete recording, and five seconds without
+an instruction exclusion does not validate audio or handset boot.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -79,6 +81,34 @@ recording, validated audio or handset boot.
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#core-regression-checkpoint).
+
+### Constant DAGEN initialization
+
+`--profile st-dagen` passes 3,840 cases plus 80 excluded repeat cases,
+all with save/replay. Direct-DP and absolute ST target AR0..AR7, SP or BK;
+four values, no older store/an older DAGEN store/an older RAM store,
+two extra consumer gaps, two pages and four checkpoints are covered.
+Indirect LD, PSHM and circular LD consume the initialized register.
+
+SPRU131G table 7-4 classifies constant ST as an early DAGEN writer, with
+the shared-bank deferral described in section 7.5.2. The retained operation
+publishes once at its Access clock (5 for direct, 6 for absolute without a
+prefix), representing the original opcode's Read with owned extension words.
+The direct form behind an older DAGEN store defers one clock; the older RAM
+store does not cause that deferral. The existing saved deferral flag owns it,
+and Execute does not duplicate the write. These are frontend placements,
+not measured silicon phases.
+
+Tests poison both extensions after Fetch and check exact publication clocks,
+consumer reads, pointer/stack changes and unrelated register/status preservation.
+BK consumers have at least one gap word, increased to two for the bank-deferred
+case so consumer Decode follows publication. The closer deferred-BK case
+samples the old value in this frontend; its silicon behavior is unvalidated,
+not an admitted new latency rule. The BK=1 fixture starts at `5002`, not
+`5003`, so its starting index is inside the one-word circular buffer.
+Repeated mapped stores reject before any
+register publication. Indirect/compiler-relative aliases, CPL=1 stack behavior,
+interrupts and control-delay compositions need separate acceptance.
 
 ### Signed MAC/MAS with a BK operand
 
@@ -140,6 +170,11 @@ are not established by these isolated fixtures.
 
 ### Software-saved repeat context
 
+The retained diagnostic context has ST1=`e104` (BRAF set), BRC=`003f`,
+RSA=`db51`, REA=`db56`, SP=`5cc2`. Its range is `03:db51..03:db56`;
+it is not an observed inactive-BRAF case. The saved-context witness below
+establishes software restoration, not an automatic hardware loop stack.
+
 The outer `RPTBD` at `03:db4d` repeats `03:db51..03:db56`, with a delayed
 conditional call at `03:db53` to `03:dada`. Its return address is `db57`,
 one word beyond REA. The observed interrupt enters logical `03:206c`, whose
@@ -175,11 +210,10 @@ frames, retained stack operands and final register state are checked. The
 original firmware passes this setup; this is not a complete recording
 or a claim that every original outer-loop iteration has settled.
 
-Regression coverage for this boundary includes all 288 default core markers,
-the `repeat-context`, `repeat-pmst`, `repeat-popd`, `repeat-rearm`, `rptb-ccd`,
-`rptbd-irq` and `rptb-fcall-edge` profiles, the native 5110 save-state round
-trip and 2,863 tooling tests (one skip). The original resident-memory gate
-still compares 48,261 program and 3,656 data words exactly.
+Companion isolated controls are `repeat-context`, `repeat-pmst`,
+`repeat-popd`, `repeat-rearm`, `rptb-ccd`, `rptbd-irq` and `rptb-fcall-edge`.
+Their renewal is not implied by a default run; aggregate scope is maintained
+in [Core regression checkpoint](#core-regression-checkpoint).
 
 ### Accumulator SQUR
 
@@ -1403,42 +1437,28 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-Aggregate acceptance includes these separately scoped checkpoints:
+The constant-DAGEN checkpoint renews the full default run: all 288 required
+markers exactly once, expected completion exit and terminal completion check.
+The separate `st-dagen` profile covers 3,840 positive cases, 80 exclusions
+and 3,920 save/replays. Controls `imm-forward`, `st-extended-ar`,
+`st-ar-consumer`, `st-t` and `stm-brc` also pass. Tooling acceptance is
+2,875 tests (one skip); exact MU4 resident-memory comparison remains
+48,261 program and 3,656 data words. Native 5110 restoration is separately
+checked; none of these scopes establishes complete recording or speech.
 
-- Control-delay DLD acceptance: `dld-delay` passes 147,456 cases and
-  save/replays; `dld-delay-edge` passes sixteen. The shared fixture's
-  `load-delay` and controls `ld-delay-edge`, `add-delay`, `mac-delay-edge`,
-  `st-delay-edge` and `rptb-back` also pass. Native 5110 save-state,
-  exact MU4 resident-memory comparison and 2,874 tooling tests (one skip)
-  pass. The full default population was not rerun for this delay admission.
-- Control-delay MAC/MAS acceptance: `mac-delay` passes 147,456 cases
-  and save/replays; `mac-delay-edge` passes sixteen. The shared fixture's
-  `mpy-delay` and the controls `mpy-delay-edge`, `st-delay-edge`,
-  `add-delay` and `fcala-delay` also pass. Native 5110 save-state,
-  exact MU4 resident-memory comparison and 2,873 tooling tests (one skip)
-  pass. The full default population was not rerun for this delay admission.
-- BK MAC/MAS acceptance: `mac-bk` passes 98,304 cases and save/replays;
-  the shared fixture's original `mac-smem` passes 73,728. The controls
-  `arith-bk`, `arith-ar`, `add-bk`, `add-delay`, `fcala-delay`,
-  `mpy-mapped` and `mac-t-imm` also pass, as do native 5110 save-state,
-  exact MU4 resident-memory comparison and 2,872 tooling tests (one skip).
-  The full default population was not rerun for this guard extension;
-  its last renewal is the FCALAD checkpoint below.
-- FCALAD acceptance: renewed full default run, all 288 required markers
-  exactly once with the expected terminal completion; the separate 648-case
-  `fcala-delay` profile; the eight existing accumulator-call/branch profiles
-  and their producer controls; `far-call-delay`, `far-atomic`,
-  `stack-irq-return` and `repeat-isr`. Native 5110 save-state, exact MU4
-  resident-memory comparison and 2,871 tooling tests (one skip) also pass.
-  This does not renew every isolated profile or establish complete recording.
+Earlier isolated renewals remain revision-bound, not implicitly rerun by
+the renewed default population:
 
-- Immediate-store forwarding correction: renewed full default run, all 288
-  required markers exactly once, expected completion exit and terminal
-  completion check, including the expanded 72-case far-return fixture.
-  The separate 6,912-case `imm-forward` matrix and 768-case `rmw-forward`
-  control also pass; the former is not part of the default population.
-  Other isolated matrices remain separately scoped above; default acceptance
-  does not imply a renewed run of those matrices.
+- `fd9e402c`: `dld-delay` (147,456), `dld-delay-edge` (sixteen),
+  `load-delay`, `ld-delay-edge`, `add-delay`, `mac-delay-edge`,
+  `st-delay-edge` and `rptb-back`.
+- `40996160`: `mac-delay` (147,456), `mac-delay-edge` (sixteen),
+  `mpy-delay`, `mpy-delay-edge`, `st-delay-edge`, `add-delay` and `fcala-delay`.
+- `d1ea11b3`: `mac-bk` (98,304), `mac-smem` (73,728), `arith-bk`,
+  `arith-ar`, `add-bk`, `add-delay`, `fcala-delay`, `mpy-mapped` and `mac-t-imm`.
+- `5ad89352`: `fcala-delay` (648), the eight accumulator-call/branch
+  profiles and producer controls, `far-call-delay`, `far-atomic`,
+  `stack-irq-return` and `repeat-isr`.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.
@@ -1452,7 +1472,7 @@ A renewed default run does not imply a renewed run of every isolated profile
 or of the seven additional scopes.
 Each fixture retains its own opcode, composition, physical timing and bus
 ownership limits. Latest tool counts, native 5110 restoration and original
-resident-memory checks are recorded above; the recorder stop is in
+resident-memory checks are recorded above; the recorder execution bound is in
 [Current boundary](#current-boundary). SIP lifecycle unit tests require local
 loopback socket permission. No aggregate scope establishes native speech.
 
