@@ -4552,8 +4552,24 @@ and the sampled words include return-like addresses.
 
 A literal census of all 49,843 mapped AA99 words finds one `0495` at
 `02716a`, in the data sequence `804a,0002,0495,d7b8,d796,0001,054f,0002`.
-This is a candidate data-driven invocation record, not proof of its
-interpreter or complete indirect-call ownership. The only five `aa56`
+The preceding word `0006` at `027167` makes this a count/destination/data
+initialization record: six words `0002,0495,d7b8,d796,0001,054f` are copied
+to data `804a..804f`. The existing C-initialization parser confirms this
+when walking from `027000` to exclusive end `027692` (228 records); that
+walk alone does not establish the table's true beginning or runtime
+initialization ownership. Thus the entry pointer is initialized RAM data,
+not a standalone invocation packet. Its runtime interpreter, descriptor
+field meanings and complete indirect-call ownership remain open.
+Separate three-second constant/varying-input runs sample data `804a`
+at 0.9, 1.116666667 and 1.4 seconds. All six descriptor words retain
+their initialized values in both runs. This excludes a changed descriptor
+at those sample times, not transient corruption, consumer identity or a
+complete resume-state contract. Nearby RAM words do change and are not
+silently included in that equality claim. The read-only
+`mu4_playback_control_observe.lua` captures both this descriptor and the
+separate control-area snapshots; it neither changes their state nor
+attributes them to an instruction.
+The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`
 at `027a0d`. Computed aliases remain outside this literal census.

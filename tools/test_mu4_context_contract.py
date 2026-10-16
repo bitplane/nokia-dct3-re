@@ -27,7 +27,7 @@ from tools.mu4_context_contract import playback_control_literal_census
 
 class ContextContractTest(unittest.TestCase):
     def test_playback_control_census_rejects_missing_extra_and_changed_records(self):
-        words = dict(enumerate((0x804a, 2, 0x495, 0xd7b8, 0xd796, 1, 0x54f, 2), 0x27168))
+        words = dict(enumerate((6, 0x804a, 2, 0x495, 0xd7b8, 0xd796, 1, 0x54f, 2), 0x27167))
         words.update(dict(enumerate((0x76f8, 0xaa56, 0), 0x27a04)))
         words.update(dict(enumerate((0x76f8, 0xaa59, 0xd796), 0x27a0d)))
         words.update({0x2049a: 0xaa59, 0x27a2e: 0xaa59,
@@ -36,6 +36,8 @@ class ContextContractTest(unittest.TestCase):
         result = playback_control_literal_census(words)
         self.assertEqual(result['literal_hits']['0495'], ['02716a'])
         self.assertEqual(result['mapped_words_scanned'], len(words))
+        self.assertEqual(result['destination'], '00804a')
+        self.assertEqual(result['initialized_values'][:2], ['0002', '0495'])
         for address in words:
             changed = dict(words)
             changed[address] ^= 1

@@ -52,7 +52,7 @@ def playback_control_literal_census(words):
         0xAA56: [0x204B4, 0x204D0, 0x204D3, 0x205AF, 0x27A05],
     }
     witnesses = (
-        (0x27168, (0x804A, 0x0002, 0x0495, 0xD7B8, 0xD796, 0x0001, 0x054F, 0x0002)),
+        (0x27167, (0x0006, 0x804A, 0x0002, 0x0495, 0xD7B8, 0xD796, 0x0001, 0x054F, 0x0002)),
         (0x27A04, (0x76F8, 0xAA56, 0x0000)),
         (0x27A0D, (0x76F8, 0xAA59, 0xD796)),
     )
@@ -66,7 +66,9 @@ def playback_control_literal_census(words):
     return {'segment': 'aa99', 'mapped_words_scanned': len(words),
             'literal_hits': {f'{value:04x}': [f'{a:06x}' for a in addresses]
                              for value, addresses in hits.items()},
-            'candidate_record': '027168', 'initial_control_area': '00d796',
+            'initialization_record': '027167', 'destination': '00804a',
+            'initialized_values': ['0002', '0495', 'd7b8', 'd796', '0001', '054f'],
+            'initial_control_area': '00d796',
             'scope': 'Exact literals and pinned initialization only; not instruction classification, '
                      'computed aliases, record interpreter, resume contract or decoded audio'}
 

@@ -14,6 +14,9 @@ emu.register_frame_done(function()
     if next_sample > #times or time < times[next_sample] then return end
     local receiver = data:read_u16(0xaa59)
     machine:logerror(string.format(
+        'mu4_playback_descriptor_snapshot: ordinal=%u address=804a words=%s t=%.9f context_only=1 observer_writes=0 audio_acceptance=0\n',
+        next_sample, words(0x804a), time))
+    machine:logerror(string.format(
         'mu4_playback_control_snapshot: ordinal=%u receiver=%04x words=%s aa54=%04x aa55=%04x aa56=%04x aa5a=%04x aa5b=%04x aa5c=%04x aa5d=%04x t=%.9f context_only=1 observer_writes=0 audio_acceptance=0\n',
         next_sample, receiver, words(receiver), data:read_u16(0xaa54), data:read_u16(0xaa55),
         data:read_u16(0xaa56), data:read_u16(0xaa5a), data:read_u16(0xaa5b),
