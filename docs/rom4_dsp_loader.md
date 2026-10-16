@@ -3953,7 +3953,8 @@ three arrivals and one-/two-word followers, distinguishing incomplete Decode
 from special INTM protection. Other CMPT categories, ARP-writer latency and
 arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
-FCALAD remains excluded.
+Delayed FCALAD has separate staged frame, delay and IRQ/NMI coverage;
+see the [delayed accumulator-call contract](5510_bringup.md#delayed-far-accumulator-call).
 Serial output does not prove audio or full board boot.
 Resident program/data memory still matches exactly. Shared regression and
 native 5110 restoration coverage are indexed in the

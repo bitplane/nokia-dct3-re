@@ -47,8 +47,9 @@ The internal BD (`f273`) at `03:da7e` and extended BANZ (`6ce0`) at
 occupies the two-word delay span of FCALLD `03:dc44` at `02:9e9b`;
 its source is mapped BL, not RAM. Memory SUB `08f8` at `03:d309` now
 reads mapped BK (`0019`). Immediate store `76b2` at `03:df3e` now uses
-`*AR2+0` addressing. The current unsupported form is FCALAD B (`f7e7`)
-at `03:b3a2`. Live terminal PC is `03:b3a4`; it is not the owning
+`*AR2+0` addressing. FCALAD B (`f7e7`) at `03:b3a2` also executes.
+The current exclusion is multiply-form `29f8` at `03:b305`, reading mapped
+BK (`0019`). Live terminal PC is `03:b309`; it is not the owning
 instruction address. NAND writes alone do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
@@ -64,6 +65,10 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+Fixture counts below describe focused acceptance. Shared broad-run scope,
+tooling totals and native handset restoration are centralized in the
+[core regression checkpoint](#core-regression-checkpoint).
 
 ### Software-saved repeat context
 
@@ -121,10 +126,8 @@ The implementation reuses the existing multiply-result contract. Other
 producer compositions and physical pipeline phases are not established by
 this fixture. Original recorder execution now passes SQUR and reaches the
 internal BD at `03:da7e`.
-The shared MAX/MIN fixture, memory-MAC and saved-repeat profiles, native
-5110 save-state gate and 2,864 tooling tests (one skip) pass with this
-admission. The full 288-marker default CPU run belongs to the preceding
-repeat-restoration checkpoint; it was not rerun for this opcode-only change.
+The shared MAX/MIN fixture, memory-MAC and saved-repeat profiles pass as
+controls.
 
 ### Unconditional delayed branch in a block
 
@@ -146,9 +149,7 @@ The original recorder passes this branch and stops at extended BANZ
 `02:a4cb`. Interrupt composition and measured physical phases remain outside
 this fixture's claim.
 The conditional, nondelayed and backward block-branch profiles, exclusion
-profile, saved-repeat and SQUR profiles, native 5110 save-state gate and
-2,865 tooling tests (one skip) pass at this boundary. The default broad CPU
-run was not repeated for this admission-only change.
+profile, saved-repeat and SQUR profiles pass as controls.
 
 ### Long BANZ in a block
 
@@ -170,9 +171,6 @@ for this composition. The standalone long BANZD, internal BD/BCD, branch
 exclusion, forward/backward branch and saved-repeat profiles pass as controls.
 Original execution advances to the separately mapped FCALLD/absolute-ADD
 delay sequence above; this is not full recorder acceptance.
-The native 5110 save-state gate, resident-memory comparison and 2,866
-tooling tests (one skip) pass. The full default core run was not repeated
-for this bounded block-composition change.
 
 ### Absolute ADD in a control delay
 
@@ -196,9 +194,7 @@ adjacent producer ordering and measured physical phases are not established
 by this fixture. Original execution passes the sequence and reaches the
 separate mapped-BK SUB exclusion at `03:d309`.
 Absolute ADD/BK controls, both shared delay-load profiles and their exclusion
-profiles, internal BD/BANZ, native 5110 save-state and 2,867 tooling tests
-(one skip) pass. The original resident-memory comparison remains exact.
-The full default CPU run was not repeated for this delay-admission change.
+profiles, and internal BD/BANZ pass as controls.
 
 ### BK as an ordinary arithmetic operand
 
@@ -218,9 +214,6 @@ auxiliary-register control through the same fixture. Absolute-ADD/BK,
 delay-ADD, BK move/store and internal BANZ controls also pass. The original
 recorder passes its SUB and reaches the immediate-store exclusion above;
 native recording and physical pipeline phases remain unproved.
-The native 5110 save-state gate, exact resident-memory comparison and
-2,869 tooling tests (one skip) pass. The full default core run was not
-repeated for this mapped-source admission.
 
 ### AR0-indexed immediate stores
 
@@ -243,10 +236,39 @@ ARP and no pointer update on exclusion. Producer compositions and physical
 pipeline phases are not established. Original firmware passes this store and
 reaches the separate FCALAD B exclusion above.
 Indexed accumulator-store/load and MAR, immediate forwarding, store-delay,
-mapped-BK and saved-repeat profiles pass as controls, along with native
-5110 save-state and 2,870 tooling tests (one skip). The resident-memory
-comparison remains exact; the full default CPU run was not repeated for
-this indexed-mode admission.
+mapped-BK and saved-repeat profiles pass as controls.
+
+### Delayed far accumulator call
+
+SPRU172C page 4-55 specifies one-word FCALAD A/B: save PC+3 then
+caller XPC, transfer through source bits 22-0, and execute two following
+words. Its Class 30B delayed cadence is four cycles, versus six for
+nondelayed FCALA. Neither form may be repeated or placed inside RPTB.
+
+The staged model samples the 23-bit target in Read, redirects Prefetch and
+discards the already fetched continuation after the delay span. PC+3 publishes
+in Read and caller XPC in Execute, without the nondelayed held clock. Two
+single-word or one two-word delay instructions retire before IRQ/NMI can
+enter. Existing target and per-slot frame fields supply save-state ownership;
+no additional CPU saved state or automatic context stack is introduced.
+
+`--profile fcala-delay` passes 648 cases and save/replays: both accumulators,
+three caller and three target pages, both delay layouts, no interrupt/IRQ/NMI
+and six checkpoints. After target sampling the source accumulator is changed;
+delay instructions and callee observe the changed data, but control still
+uses the captured target. Checks cover PC+3/XPC publication, a balanced
+FRET, a separate interrupt frame, delay effects once, target execution once,
+and preserved flags/non-source accumulator. The nominal model has target
+Fetch at clock 6 and callee Execute at 10, with frame writes at 5 and 6;
+these are declared placements, not measured silicon bus phases. Adjacent
+instruction-producer composition and waited memory remain separate contracts.
+Original execution passes FCALAD and reaches the mapped-BK multiply exclusion.
+Its captured sequence targets `03:b2ae`, with NOP and `LDM AR1,A` in the
+caller's delay words. The callee starts with `PSHM AR1` and `FRAME #-7`.
+Observed caller SP `6562` therefore becomes `6558` after the two call words,
+one saved register and seven local words, matching the new stop. This is
+coherent entry evidence, not completion of that callee or the recorder.
+SP-modifying delay words are not covered by the isolated fixture.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute
@@ -1313,7 +1335,15 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-Versioned aggregate acceptance has two distinct scopes:
+Aggregate acceptance includes these separately scoped checkpoints:
+
+- FCALAD acceptance: renewed full default run, all 288 required markers
+  exactly once with the expected terminal completion; the separate 648-case
+  `fcala-delay` profile; the eight existing accumulator-call/branch profiles
+  and their producer controls; `far-call-delay`, `far-atomic`,
+  `stack-irq-return` and `repeat-isr`. Native 5110 save-state, exact MU4
+  resident-memory comparison and 2,871 tooling tests (one skip) also pass.
+  This does not renew every isolated profile or establish complete recording.
 
 - Immediate-store forwarding correction: renewed full default run, all 288
   required markers exactly once, expected completion exit and terminal
@@ -4345,9 +4375,9 @@ caller-page/return-frame ownership, producer timing, interrupts and
 save/replay require executable acceptance. Serial word output
 alone does not prove board boot, recorder readiness or audio.
 
-FCALA/FCALAD are already implemented by the atomic extended-transfer
+FCALA/FCALAD are implemented by the atomic extended-transfer
 decoder `(op & 0xfcfe) == 0xf4e6`; the disassembler recognizes that
-family too. This is a staged-frontend gap, not an absent atomic opcode.
+family too. Its acceptance is independent of the staged fixtures.
 The isolated `far-atomic` gate passes all 16 existing branch/call/return
 encodings, including A/B accumulator calls and delayed forms, from caller
 page 1 to target page 2. It verifies return frames, caller continuation,
@@ -4384,8 +4414,10 @@ its pair at clock 5; later RAM changes cannot change its publication,
 and post-FCALA-sample accumulator changes cannot change the call target.
 Zero-gap FCALA samples after older DLD Execute publication in the same
 clock. This validates that producer family, not every accumulator
-producer or a combined DLD-plus-interrupt cross-product. FCALAD is
-not admitted. The atomic, FCALLD and IFR reference gates still pass.
+producer or a combined DLD-plus-interrupt cross-product. The separate
+[FCALAD contract](#delayed-far-accumulator-call) covers delayed calls but
+does not inherit the nondelayed DLD-producer acceptance. The atomic,
+FCALLD and IFR reference gates still pass.
 SPRU172C page 4-55's
 detailed operation pushes return PC then XPC; SPRU131G section 6.4.3's
 short prose reverses their mention order and must not override the

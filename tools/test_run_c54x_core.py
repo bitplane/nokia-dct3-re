@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_delayed_accumulator_far_call_scope(self):
+        marker, ending = EXTRA_PROFILES['fcala-delay']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='fcala-delay')
+        for bad in (output.replace('restore=648', 'restore=0'),
+                    output.replace('frames=balanced', 'frames=unvalidated'),
+                    output.replace('delay_effects=once', 'delay_effects=twice'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='fcala-delay')
+
     def test_indexed_immediate_store_scope(self):
         marker, ending = EXTRA_PROFILES['imm-index']
         output = marker + '\n' + ending + '\n'
