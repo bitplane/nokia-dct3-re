@@ -17,6 +17,26 @@ else:
 BASE = 0x23D73
 BIT_WINDOW_BASE = 0x2510C
 NIBBLE_BASE = 0x2C62B
+BYTE_COUNT_BASE = 0x2AB09
+BYTE_COUNT_WITNESS = (0x10e1,5,0xf010,1,0x7102,0x0011,0x4808,0xf47d,0xf000,1,0x4808,0x4ee1,6)
+
+
+def decode_byte_count_prefix(words):
+    if any(words.get(BYTE_COUNT_BASE + offset) != word for offset, word in enumerate(BYTE_COUNT_WITNESS)):
+        raise ValueError('AA99 byte-count prefix changed or absent')
+    return {'entry': '02ab09', 'last_word': '02ab15', 'pinned_words': 13,
+            'formula_domain': 'positive 16-bit bit count', 'formula': 'ceil(bits / 8)',
+            'dependency': 'f000 0001 ADD followed by 4808 LDM AL,A',
+            'destination': 'double word at AR1+6; low count at AR1+7',
+            'scope': 'Original scalar prefix, not all constructor branches or initializer argument ownership'}
+
+
+def reference_byte_count(bits):
+    if not 1 <= bits <= 0xffff:
+        raise ValueError('byte-count prefix outside recovered positive domain')
+    return (bits + 7) // 8
+
+
 NIBBLE_WITNESS = (
     0x4A11, 0xEEFF, 0xF495, 0x8000, 0xE803, 0xF6B8, 0x0804, 0x8004,
     0x7100, 0x0011, 0x6F04, 0x0C82, 0x1004, 0xF484, 0x880E, 0xEE01,
@@ -976,6 +996,7 @@ def contract(source):
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)
+    result['byte_count_prefix'] = decode_byte_count_prefix(rel_words)
     result['playback_transform_copy'] = decode_transform_copy(rel_words, 'aa99')
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)

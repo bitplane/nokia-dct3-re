@@ -12,9 +12,10 @@ streams, not a matching handset PMM or an internal DSP mask image.
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
 The current software frontier is the [recording/playback transform initializer](#recording-transform-and-initializer-inputs):
-a native recording block matches an independent scalar model and saved bytes,
-while seven-word initializer reads differ in their last word after six-word
-copies. Recover that producer/caller/lifetime contract without forcing keys,
+a native recording block matches an independent scalar model and saved bytes.
+The six-versus-seven-word copy discrepancy exposed a mapped-accumulator
+latency defect: the corrected core computes and copies seven words, and actual
+initializer reads consume seven zero words. Revalidate fresh recording/playback without forcing keys,
 lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -5049,14 +5050,34 @@ The last destination word `e3d6` still holds
 no write to recording's seventh word was seen in the installed-tap epoch.
 Neither fact licenses a claim about physical power-on RAM contents.
 
-The current question is how the six-word source copy relates to seven-word
-initialization, and which producer/lifetime contract owns the seventh word.
+The table and six-copy observations above are pre-immediate-ALU correction.
+The original AA99 prefix `02ab09..02ab15` computes
+`((bit_length - 1) >> 3) + 1`, then stores the byte count at object offset 7.
+For the observed 56-bit source it must produce 7. Its two-word `ADD #1,A`
+is immediately followed by `LDM AL,A`. SPRU131G table 7-28 specifies zero
+mapped-accumulator latency for this producer; the previous core sampled AL
+before the older ADD executed, returning 6. The exact 13-word prefix
+reproduces that wrong read in an isolated CPU test. Deferring that retained
+mapped read until after the two-word immediate producer corrects it without
+changing guest inputs or the one-word producer restriction.
+
+The prefix passes 16 cases/restores over eight positive lengths and two pages;
+960 immediate ADD/SUB/AND/OR/XOR mapped-consumer cases/restores and the
+existing 3072 immediate-multiply cases also pass. This is bounded instruction
+dependency acceptance, not complete Table 7-28 or silicon-phase validation.
+An unchanged native NAND in a two-second playback probe now publishes
+`e405=7`, passes copy count 7 with BRC=6, and initializes from pointer `e3ce`
+with a seven-zero-word snapshot. Allocation moved from `e3d0`; a repeated
+probe with bounded heap-neighborhood taps observes the first seven actual
+initializer reads at `e3ce..e3d4`, all zero. Historical fixed-address taps
+could not establish this after relocation. Next revalidate fresh native media;
+the old silent playback capture is not evidence of current corrected output.
+
 The reviewed initializer wrapper at `02b25c` has an immediate call at
 `02b268` to `02cd14`, after copying its caller's length slot to the outgoing
 frame. Follow that argument and the source object feeding `02ab43` before
 changing a loop count or assuming a terminator convention.
-Decode that caller contract before classifying this as a key error,
-changing reset RAM policy or replacing either word. No key, pointer,
+Do not compensate by changing reset RAM policy or replacing either word. No key, pointer,
 length, seek or file byte is forced. The key observer detaches after
 1.8 seconds; its two-second probes are local initialization evidence, not
 complete recording/playback runs. Retain these bounded diagnostics until

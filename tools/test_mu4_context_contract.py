@@ -29,9 +29,26 @@ from tools.mu4_context_contract import NIBBLE_BASE, NIBBLE_WITNESS, decode_nibbl
 from tools.mu4_context_contract import decode_prefix_transform, reference_transform_block
 from tools.mu4_context_contract import decode_recording_prefix_transform
 from tools.mu4_context_contract import decode_transform_copy
+from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, decode_byte_count_prefix, reference_byte_count
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_original_byte_count_prefix_source_is_pinned(self):
+        words = dict(enumerate(BYTE_COUNT_WITNESS, BYTE_COUNT_BASE))
+        self.assertEqual(decode_byte_count_prefix(words)['pinned_words'], 13)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_byte_count_prefix(changed)
+
+    def test_byte_count_reference_counts_groups_independently(self):
+        for bits in range(1, 65536):
+            self.assertEqual(reference_byte_count(bits), len(range(0, bits, 8)))
+        for bits in (-1, 0, 65536):
+            with self.assertRaises(ValueError):
+                reference_byte_count(bits)
+
     def test_transform_copy_source_is_not_mistaken_for_zero_fill(self):
         for segment, base in (('aa88', 0x3e438), ('aa99', 0x2d01a)):
             source = (0x1303,0x7102,0x0012,0xfa4d,(base+14)&65535,0xf495,

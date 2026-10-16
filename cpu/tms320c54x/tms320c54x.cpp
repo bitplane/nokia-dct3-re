@@ -3742,13 +3742,14 @@ void tms320c54x_device::pipeline_step()
 	}
 	bool const read_memory_operand = m_pipeline_valid[4] && (staged_memory_immediate_multiply(m_pipeline_word[4]) || staged_port_write(m_pipeline_word[4]) || staged_absolute_add(m_pipeline_word[4]) || staged_memory_load(m_pipeline_word[4]) || staged_memory_logic(m_pipeline_word[4]) ||
 		staged_rmw(m_pipeline_word[4]) || staged_bitfield(m_pipeline_word[4]) || staged_smem_arithmetic(m_pipeline_word[4]) || staged_smem_special(m_pipeline_word[4]) || (staged_shifted_smem(m_pipeline_word[4]) && !staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4])) || staged_xmem_bit(m_pipeline_word[4]) || staged_xmem_load(m_pipeline_word[4]) || staged_xmem_arithmetic(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xfe80) == 0x4800);
-	// SPRU131G table 7-28: a two-word MPY has zero mapped-accumulator
+	// SPRU131G table 7-28: two-word immediate ALU/MPY instructions have zero mapped-accumulator
 	// consumer latency. Finish this retained Read after its older Execute;
 	// do not change the one-word producer restriction or other bus reads.
-	bool const late_mapped_multiply_read = read_memory_operand && m_pipeline_valid[5] && staged_immediate_multiply(m_pipeline_word[5]) &&
+	bool const late_mapped_accumulator_read = read_memory_operand && m_pipeline_valid[5] &&
+		(staged_immediate_multiply(m_pipeline_word[5]) || staged_immediate_alu(m_pipeline_word[5])) &&
 		m_pipeline_operand_address[4] >= 0x08 && m_pipeline_operand_address[4] <= 0x0d &&
 		(m_pipeline_operand_address[4] >= 0x0b) == bool(BIT(m_pipeline_word[5], 8));
-	if (read_memory_operand && !late_mapped_multiply_read)
+	if (read_memory_operand && !late_mapped_accumulator_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
@@ -4461,7 +4462,7 @@ void tms320c54x_device::pipeline_step()
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		}
 	}
-	if (late_mapped_multiply_read)
+	if (late_mapped_accumulator_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];

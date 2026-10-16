@@ -5,6 +5,21 @@ local cpu = assert(machine.devices[':cpu'])
 local data = assert(cpu.spaces.data)
 local handles, sampling = {}, false
 local writers = {}
+local caller_reads = {}
+local function observe_caller_read(address, value)
+    local pc = cpu.state.GENPC.value
+    local time = machine.time:as_double()
+    local site = pc >= 0x2ab07 and pc <= 0x2ab45 and 'copy_caller' or
+                 pc >= 0x2b25c and pc <= 0x2b26a and 'initializer_wrapper' or nil
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 or not site or (caller_reads[site] or 0) >= 32 then return end
+    caller_reads[site] = (caller_reads[site] or 0) + 1
+    machine:logerror(string.format(
+        'mu4_transform_caller_read: site=%s address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+        site, address, value, caller_reads[site], time, pc))
+end
+handles[#handles + 1] = data:install_read_tap(0xd700, 0xd7ff, 'mu4_transform_caller_stack', observe_caller_read)
+handles[#handles + 1] = data:install_read_tap(0xe3b0, 0xe41f, 'mu4_transform_caller_object', observe_caller_read)
+handles[#handles + 1] = data:install_read_tap(0xa500, 0xa53f, 'mu4_transform_caller_source', observe_caller_read)
 local copy_reads = 0
 handles[#handles + 1] = data:install_read_tap(0xd700, 0xd7ff, 'mu4_copy_argument_reads', function(address, value)
     local pc = cpu.state.GENPC.value
@@ -14,7 +29,9 @@ handles[#handles + 1] = data:install_read_tap(0xd700, 0xd7ff, 'mu4_copy_argument
         'mu4_transform_copy_argument_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
         address, value, copy_reads, machine.time:as_double(), pc))
 end)
-for _, range in ipairs({{0xff84, 0xff8a}, {0xe3d0, 0xe3d6}}) do
+-- Allocations move when CPU arithmetic changes; observe the bounded heap
+-- neighborhood, then qualify addresses against the captured caller pointer.
+for _, range in ipairs({{0xff60, 0xffbf}, {0xe3b0, 0xe3ff}}) do
     local reads = 0
     handles[#handles + 1] = data:install_read_tap(range[1], range[2], 'mu4_key_buffer_reads_' .. range[1],
         function(address, value)
@@ -23,15 +40,19 @@ for _, range in ipairs({{0xff84, 0xff8a}, {0xe3d0, 0xe3d6}}) do
                not ((pc >= 0x3f7cf and pc <= 0x3f80d) or (pc >= 0x2cd14 and pc <= 0x2cd52)) then return end
             reads = reads + 1
             machine:logerror(string.format(
-                'mu4_transform_key_read: address=%04x value=%04x index=%u ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
-                address, value, address - range[1], reads, machine.time:as_double(), pc))
+                'mu4_transform_key_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+                address, value, reads, machine.time:as_double(), pc))
         end)
+end
+for _, range in ipairs({{0xff60, 0xffbf}, {0xe3b0, 0xe3ff},
+                       {0xd760, 0xd760}, {0xe405, 0xe405}, {0xa513, 0xa513}, {0xe3db, 0xe3db}}) do
     handles[#handles + 1] = data:install_write_tap(range[1], range[2], 'mu4_key_buffer_' .. range[1],
         function(address, value, mask)
             if sampling or machine:side_effects_disabled() then return end
             local previous = writers[address]
             writers[address] = {value = value, mask = mask, pc = cpu.state.GENPC.value,
-                                time = machine.time:as_double(), count = previous and previous.count + 1 or 1}
+                                time = machine.time:as_double(), count = previous and previous.count + 1 or 1,
+                                prior_value = previous and previous.value, prior_pc = previous and previous.pc}
         end)
 end
 local specs = {
@@ -52,6 +73,20 @@ handles[#handles + 1] = data:install_write_tap(0x1a, 0x1a, 'mu4_key_copy_repeat'
     machine:logerror(string.format(
         'mu4_transform_copy_repeat: value=%04x mask=%04x ordinal=%u sp=%04x frame_return=%06x frame_source=%04x frame_count=%04x ar3=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
         value, mask, repeat_samples, sp, caller, source, count, cpu.state.AR3.value, machine.time:as_double(), pc))
+    if source == 0xe3e2 and (count == 6 or count == 7) then
+        for address = source, source + count - 1 do
+            local writer = writers[address]
+            if writer then
+                machine:logerror(string.format(
+                    'mu4_transform_copy_source_writer: address=%04x value=%04x count=%u prior_value=%s prior_pc=%s t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+                    address, writer.value, writer.count,
+                    writer.prior_value and string.format('%04x', writer.prior_value) or 'unobserved',
+                    writer.prior_pc and string.format('%06x', writer.prior_pc) or 'unobserved', writer.time, writer.pc))
+            else
+                machine:logerror(string.format('mu4_transform_copy_source_unobserved: address=%04x scope=installed_tap_epoch observer_writes=0\n', address))
+            end
+        end
+    end
 end)
 for _, spec in ipairs(specs) do
     handles[#handles + 1] = data:install_write_tap(spec.base, spec.base, 'mu4_key_context_' .. spec.name,
@@ -73,6 +108,19 @@ for _, spec in ipairs(specs) do
                 'mu4_transform_key_context: segment=%s pointer=%04x length=%04x captured=%u words=%s state_base=%04x first_write=%04x mask=%04x sp=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
                 spec.name, pointer, length, count, count > 0 and table.concat(words, ',') or 'unobserved',
                 spec.base, value, mask, sp, machine.time:as_double(), pc))
+            if spec.name == 'aa99' then
+                for _, field in ipairs({{0xd760, 'caller_slot'}, {0xe405, 'copy_count_field'},
+                                        {0xa513, 'source_word3'}, {0xe3db, 'copied_word3'}}) do
+                    local writer = writers[field[1]]
+                    if writer then
+                        machine:logerror(string.format(
+                            'mu4_transform_length_writer: role=%s address=%04x value=%04x count=%u t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+                            field[2], field[1], writer.value, writer.count, writer.time, writer.pc))
+                    else
+                        machine:logerror(string.format('mu4_transform_length_unobserved: role=%s address=%04x scope=installed_tap_epoch observer_writes=0\n', field[2], field[1]))
+                    end
+                end
+            end
             for offset = 0, count - 1 do
                 local address = pointer + offset
                 local writer = writers[address]
