@@ -4589,9 +4589,18 @@ The source census finds five immediate-call encoding candidates targeting
 `020478`: `02018b,0201de,0201ec,02023d,020375`. Their respective first-session
 Execute-entry counts are `7,1571,2,1131,4271` for constant playback and
 `2,1,2,601,1669` for varying playback. These are not receiver-qualified call
-counts or indirect-call closure. The sharpest next static boundary is
-the caller at `0201de` and its reactivation predicate; synthesizing a wakeup
-or assigning descriptor semantics from its shape would bypass that question.
+counts or indirect-call closure. In particular, `0201de` is not yet a
+causal reactivation frontier: the service helpers `020454` and `02046b`
+call `0201b3` at `02045d`/`020472`. Their entry counts are 787/784 for
+constant playback and 1/0 for varying playback, summing exactly to the
+respective `0201b3`/`0201de` counts. This is consistent with a downstream
+processing consequence, not an independently missing wakeup. Both runs
+also visit `0201d2` and `0201dd` equally within this path and never enter
+`0201d6` or `0202a4`; that status branch does not distinguish them.
+The next dynamic question is which trampoline caller selects descriptor
+`804a` for the second service entry, with executed call history rather than
+unqualified live PC as evidence. Synthesizing a wakeup or assigning
+descriptor semantics from its shape would bypass that question.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

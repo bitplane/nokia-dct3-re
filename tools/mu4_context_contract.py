@@ -61,6 +61,10 @@ def playback_control_literal_census(words):
                     0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495, 0x4A0B,
                     0xF495, 0x4594, 0x1B94, 0x4B94, 0x1094, 0xF5E7,
                     0xF6BE, 0xEE01, 0x8A18, 0xF495, 0xFC00)),
+        (0x20454, (0xF6BE, 0x8812, 0xF495, 0xF495, 0xF495, 0xF495,
+                    0x6DEA, 0x0013, 0x4492, 0xF074, 0x01B3, 0xF7BE, 0xF4E4)),
+        (0x2046B, (0xF6BE, 0x8812, 0xF495, 0xF495, 0xF495, 0xF495,
+                    0x4482, 0xF274, 0x01B3, 0x6DEA, 0x0004, 0xF7BE, 0xF4E4)),
     )
     for base, values in witnesses:
         if any(words.get(base + i) != value for i, value in enumerate(values)):
@@ -82,6 +86,7 @@ def playback_control_literal_census(words):
             'initial_control_area': '00d796',
             'context_switch_candidate': ['020478', '020494'],
             'immediate_switch_call_candidates': [f'{a:06x}' for a in switch_calls],
+            'service_helpers_calling_0201b3': ['020454', '02046b'],
             'scope': 'Exact literals and pinned initialization only; not instruction classification, '
                      'computed aliases, record interpreter, resume contract or decoded audio'}
 
