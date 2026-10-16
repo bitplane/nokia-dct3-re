@@ -2111,7 +2111,9 @@ total sectors. Its textual label is `FAT16`, but those BPB fields yield only
 3,894 data clusters (a FAT12-sized count). Do not promote the label or this
 unmodified template into a claim about the real medium's format: the copy's
 consumer and any subsequent field changes still need decoding. No disk image
-is synthesized from it.
+is synthesized from it. The independently read-back InitDisk fixture volume
+below is confirmed as FAT12; that does not establish a factory handset dump's
+format or physical bad-block mapping.
 
 The template is not installed unconditionally. At `0943` startup mounts
 through `2082`; zero result branches directly to `095e`. A nonzero result
@@ -4199,6 +4201,39 @@ The same cold profile with the original no-track seed is a negative control:
 it completes the same 23/78-byte transport but fails the catalogue predicate
 with one scanner entry, zero ID3-reader entries and zero tracks. The fixture
 does not manufacture a title or accept an ordinary status reply as file proof.
+
+### Independent Recorded-File Readback
+
+`mu4_recorder_media_inventory.py --export-fixture-volume <new-image>` exports
+the data area of the single partition created by original InitDisk. It is
+specific to this fixture: physical page 1 holds the MBR; its partition LBA
+31 becomes physical page 32 through original lower reader `3035`'s row+1
+mapping. The BPB's hidden-sector field is 32, not 31, and is not used as a
+replacement partition address. Extents, signatures and 512-byte sectors are
+validated; 16 spare bytes per NAND page are omitted. Existing outputs are
+refused. No filesystem is synthesized or modified by the exporter.
+Thirteen inventory/export unit tests cover extents, spare omission, invalid
+formats, unchanged inputs and refusal to overwrite an existing output.
+
+```sh
+python3 tools/mu4_recorder_media_inventory.py source.nand endpoint.nand \
+  --export-fixture-volume recorded-volume.img
+7z l -slt recorded-volume.img
+7z x -orecorded-file-readback recorded-volume.img TEST
+```
+
+On the saved endpoint, 7-Zip 26.00 independently identifies FAT12 with
+16,384-byte clusters, despite the BPB's `FAT16` text. It extracts one file
+named `TEST`, size 143,168 bytes, occupying 147,456 allocated bytes; the
+native directory separately retains extension `REL` and non-normalized
+short-name padding. Exported volume size is 63,946,752 bytes (124,896
+sectors), SHA-256
+`c89c8e4695fa7939f9b5789a98079024a09166250e5e98be66beeaaf5242eebb`.
+The extracted file's SHA-256 is
+`832058a7d5042cfa1c559a42a062d7dfb38bbaeabe9e60436fb6f46b8af87021`.
+This verifies independent filesystem/extent readback of these bytes, not
+their audio correctness. `ffprobe` rejects the file as generic audio;
+that is not proof that the original Nokia consumer rejects its REL format.
 
 ### Atomic Metadata Negative Control
 
