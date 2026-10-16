@@ -353,6 +353,20 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=name)
 
+    def test_delay_asm_scope(self):
+        for name in ('asm-delay', 'asm-delay-edge'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('t_preserved=1', 't_preserved=0') if name == 'asm-delay'
+                        else output.replace('data_reads=0', 'data_reads=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+            with self.assertRaises(ValueError):
+                check_result(output, 3)
+
     def test_constant_dagen_store_scope(self):
         marker, ending = EXTRA_PROFILES['st-dagen']
         output = marker + '\n' + ending + '\n'

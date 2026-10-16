@@ -15,8 +15,10 @@ words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. It also compares the
 recorder overlay's 73,762 RAM destination words before execution (four
 register words excluded) and enters original recorder startup at `0073f9`.
-The repeated MVDD (`e598`) at `03:8eda` now completes its first 128 ordered
-source reads from `0000..007f` into RAM beginning at `0e35`. Firmware then
+The paired copy witness records repeated MVDD (`e598`) at `03:8eda`
+completing 128 ordered source reads from `0000..007f` into RAM beginning
+at `0e35`. The current legacy observer does not renew that instruction-owned
+read claim. Firmware then
 publishes buffer pointers `1800` and `1880`. The zero source is shared with
 the atomic control, not a demonstrated staged-only pointer defect; see
 [Recorder low-page copy](#recorder-low-page-copy).
@@ -54,16 +56,18 @@ delay owned by `fb83 cb1e` at `03:cc04`. DLD `56e3 0010` at `02:a4d3`
 also passes in both delay words of BD `f273 a4dc` at `02:a4d1`, inside
 the `a4cb..a4dd` block repeat. Absolute immediate ST `76f8 0014 fdae`
 at `03:c72c` now initializes AR4 through the early DAGEN-write path before
-the following multiply consumes it. The unchanged recorder reaches the
-five-second observation bound with CPU ILLEGAL=`0`, PC=`03:d784`,
-SP=`5c90`, BRC=`0006`, RSA=`d776`, REA=`d787`. This is a live instruction
-snapshot, not an unsupported-instruction stop or a completed transaction.
-The next question is sustained recorder/application progress and attributable
-sample/storage output, not another inferred opcode exclusion.
-The bench sends its follow-up control no earlier than ten seconds and the
-resident poll/metadata sequence no earlier than fifteen. A five-second
-snapshot therefore cannot assess those transactions; use the original
-twenty-second fixture boundary before interpreting their absence as a stall.
+the following multiply consumes it. The five-second observation is free of
+instruction exclusions. The subsequent ASM load at `03:a165` and its
+adjacent `LD B,ASM,A` also execute after branch-delay admission.
+
+The twenty-second control/save fixture now stops at NORM `f48f`, owned
+by `03:dad2` in Read, with sampled T=`4421`, code=`21` (-31), and
+CPU ILLEGAL=`1`. Live PC=`03:dace` is not the owning instruction address.
+The next question is the legitimate T producer and its publication order;
+do not widen NORM's documented -16..31 range to accommodate the sample.
+This stop precedes handling of the ten-second follow-up control and
+fifteen-second poll/metadata sequence, so their absence is not evidence of
+a missing command peer. No complete recorder transaction is established.
 
 The passive observer records ILLEGAL explicitly: searching only for the
 words "unsupported" or "illegal" misses some guard diagnostics. NAND
@@ -81,6 +85,30 @@ recording, validated audio or handset boot.
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#core-regression-checkpoint).
+
+### ASM loads in branch delay words
+
+`--profile asm-delay` passes 30,720 cases and save/replays: BD,
+taken/untaken BCD and BD with an older source store; DP, SP, postincrement,
+offset and absolute sources; all 32 ASM codes, positive/negative B,
+SXM/OVM, two pages and three checkpoints. A one-word ASM load shares the
+delay span with `LD B,ASM,A`; a two-word load fills the span and the
+selected target performs that consumer before reporting the result.
+
+The unchanged ASM execution path samples one source word in Read and
+publishes only ST1's low five bits in Execute. The fixture mutates the
+pointer after Access, the source after Read and the extension after Fetch;
+it checks the following consumer's signed/logical shift, unchanged B/T,
+unrelated status, pointer ownership and one selected target write. No CPU
+state is added. Calls, interrupts, repeat composition and physical phase
+placement remain outside this fixture's acceptance.
+
+The original `3200` at `03:a165` follows BD at `03:a163` and precedes
+`f682` at `03:a166`. Its stopped context has ST1=`6116` (CPL set) and
+SP=`63d6`, so `$00` selects stack RAM, not peripheral zero or DP=`0f80`.
+The preceding `STL A,$00` supplies that frame word. A literal opcode-zero
+interpretation without the captured addressing status would misidentify
+the missing contract.
 
 ### Constant DAGEN initialization
 
@@ -1437,14 +1465,19 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The constant-DAGEN checkpoint renews the full default run: all 288 required
+The ASM-delay checkpoint covers 30,720 cases and save/replays plus sixteen
+partial-slot exclusions. Controls `asm-load`, `asm-mapped`, `asm-consumer`,
+`asm-edge`, `dld-delay-edge`, `mac-delay-edge` and `st-delay-edge` also pass.
+Tooling acceptance is 2,876 tests (one skip), with native 5110 restoration
+and exact MU4 resident-memory comparison (48,261 program and 3,656 data
+words). The default population was not rerun for this guard admission.
+
+The constant-DAGEN checkpoint at `026b6670` renewed the full default run: all 288 required
 markers exactly once, expected completion exit and terminal completion check.
 The separate `st-dagen` profile covers 3,840 positive cases, 80 exclusions
 and 3,920 save/replays. Controls `imm-forward`, `st-extended-ar`,
-`st-ar-consumer`, `st-t` and `stm-brc` also pass. Tooling acceptance is
-2,875 tests (one skip); exact MU4 resident-memory comparison remains
-48,261 program and 3,656 data words. Native 5110 restoration is separately
-checked; none of these scopes establishes complete recording or speech.
+`st-ar-consumer`, `st-t` and `stm-brc` also passed. None of these scopes
+establishes complete recording or speech.
 
 Earlier isolated renewals remain revision-bound, not implicitly rerun by
 the renewed default population:
@@ -1506,16 +1539,20 @@ sequence. With a one-second stop bound:
   through the existing firmware buffer path (write context `02:1c96`);
 - both observe selector `05b8` as zero on the first callback.
 
-`tools/mu4_recorder_source_observe.lua` reproduces these guest-access
-observations without debugger support, memory reads of its own or DUT writes.
+`tools/mu4_recorder_source_observe.lua` observes field, selector and low-page
+activity without debugger support, memory reads of its own or DUT writes.
 Attach it with `-autoboot_script /absolute/path/to/tools/mu4_recorder_source_observe.lua
 -autoboot_delay 0` to the existing recorder commands, retaining
 `-nonvram_save`. Compare the two NVRAM inputs byte-for-byte before the run;
 the BIOS-specific NAND tags are `mu4nand_25` and `mu4nand_24`, respectively.
-The source-copy summary requires `first_copy_reads=128`, `order_errors=0` and
-`first_copy_before_nonzero=1`. The observer arms from the actual field and
-selector reads rather than a frontend-dependent live PC. Later field-access totals
-are observation-window counts, not cadence or acceptance constants.
+The paired one-second witness recorded `first_copy_reads=128`, `order_errors=0`
+and `first_copy_before_nonzero=1`. The legacy observer's arm also qualifies
+the selector read with a live-PC range, however, and its subsequent low-page
+tap does not identify an instruction owner. Broader staged runs can mix other
+MMR reads into that summary; it is not a copy-acceptance gate. Revalidation
+needs retained MVDD Read identity, not a tighter guessed live-PC range.
+Field-access totals likewise describe the observation window, not cadence
+or acceptance constants.
 
 This falsifies a staged-only source-pointer explanation. It does not prove
 that a physical DA150 deliberately reads this page before its first buffer

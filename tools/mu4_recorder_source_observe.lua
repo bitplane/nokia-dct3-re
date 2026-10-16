@@ -10,6 +10,7 @@ local first_copy_before_nonzero = false
 local selector_reads = 0
 local source_field
 local copy_armed = false
+machine:logerror('mu4_recorder_source_scope: identity=legacy_live_pc_range staged_copy_acceptance=0 observer_writes=0\n')
 
 local function context()
     return cpu.state['GENPC'].value
@@ -40,7 +41,7 @@ handles[3] = data:install_read_tap(0x05b8, 0x05b8, 'mu4_recorder_source_selector
     selector_reads = selector_reads + 1
 end)
 handles[4] = data:install_read_tap(0, 0x7f, 'mu4_recorder_first_low_page_copy', function(address, value)
-    -- Arm on the firmware's selector access, not an ahead live PC at Read.
+    -- The arm uses GENPC; these raw accesses do not identify staged MVDD reads.
     if not copy_armed or first_copy_reads >= 128 then return end
     if first_copy_reads == 0 then first_copy_before_nonzero = nonzero_writes == 0 end
     if address ~= first_copy_reads then order_errors = order_errors + 1 end
