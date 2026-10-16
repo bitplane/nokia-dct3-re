@@ -15,7 +15,9 @@ The current software frontier is the [recording/playback transform initializer](
 a native recording block matches an independent scalar model and saved bytes.
 The six-versus-seven-word copy discrepancy exposed a mapped-accumulator
 latency defect: the corrected core computes and copies seven words, and actual
-initializer reads consume seven zero words. Revalidate fresh recording/playback without forcing keys,
+initializer reads consume seven zero words. Fresh recording is byte-identical;
+corrected playback publishes one longer-body parser result but remains silent.
+Follow its downstream consumer and source-region contract without forcing keys,
 lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -5070,8 +5072,35 @@ An unchanged native NAND in a two-second playback probe now publishes
 with a seven-zero-word snapshot. Allocation moved from `e3d0`; a repeated
 probe with bounded heap-neighborhood taps observes the first seven actual
 initializer reads at `e3ce..e3d4`, all zero. Historical fixed-address taps
-could not establish this after relocation. Next revalidate fresh native media;
-the old silent playback capture is not evidence of current corrected output.
+could not establish this after relocation. The older silent playback capture
+alone is not evidence of corrected output; the complete repeat below is.
+
+A complete `bootrecac` repeat on the immediate-ALU-corrected core closes
+through native metadata success and reproduces the canonical NAND above
+byte-for-byte (`e845f9ae...413e7`). The seed remains unchanged. Resident
+comparison again checks 48,261 program and 3,656 data words; the converted
+input again has 871,742 generated frames and DMA symbol counts
+`201120,201155,201141,201134`. The correction therefore changes the observed
+playback initialization without changing this recorded media. This is a
+controlled media-generation result, not codec validity or audio acceptance.
+
+Cold playback of that exact media completes the 20-second observation with
+`illegal=0`, verified title/overlay and 22 replies. Attributed channel-3 reads
+total 1,125,032, TX words 1,402,542 and DIN words 1,691,842; all are zero.
+The strict DMA and source-range observation checks pass, while deliberate
+audio-completion rejection remains. The first captured zero processing block
+under the corrected 82-word state gives scalar `1bce,8003`, matching native
+packed output `ce1b,0380`. This is captured-state arithmetic, not file-offset
+ownership or valid stream alignment.
+
+The first-session method `023e64` now has 378 calls: 377 early returns and
+one longer-body/result publication through `0293ed`. Previously the varying
+control had no such publication. The observed longer body writes `ac44`
+at `15f5`, `0002` at `15f6` and `0ba0` at `15f7`; entering and publishing
+this result does not validate AAC syntax, sample meaning or decoded output.
+The next question is what the downstream consumer does with that publication,
+and whether its source region/lifecycle is correct. Do not reopen the resolved
+six-word-copy premise or compensate with file trimming, key edits or seeks.
 
 The reviewed initializer wrapper at `02b25c` has an immediate call at
 `02b268` to `02cd14`, after copying its caller's length slot to the outgoing
