@@ -31,9 +31,43 @@ from tools.mu4_context_contract import decode_recording_prefix_transform
 from tools.mu4_context_contract import decode_transform_copy
 from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, decode_byte_count_prefix, reference_byte_count
 from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
+from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
+from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_flag_context_helper_source_is_pinned(self):
+        words = dict(enumerate(FLAG_CONTEXT_WITNESS, FLAG_CONTEXT_BASE))
+        self.assertEqual(decode_flag_context(words)['pinned_words'], 45)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_flag_context(changed)
+
+    def test_flag_context_selector_has_one_zero_route(self):
+        self.assertEqual([reference_flag_context(value) for value in range(4)], [1, 1, 0, 1])
+        for value in (-1, 4, 65535):
+            with self.assertRaises(ValueError):
+                reference_flag_context(value)
+
+    def test_post_flag_branch_source_is_pinned(self):
+        words = dict(enumerate(POST_FLAG_WITNESS, POST_FLAG_BASE))
+        self.assertEqual(decode_post_flag_branch(words)['pinned_words'], 21)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_post_flag_branch(changed)
+
+    def test_post_flag_route_exhausts_local_condition_domain(self):
+        for word in range(65536):
+            self.assertEqual(post_flag_route(0, word), 'skip')
+            self.assertEqual(post_flag_route(1, word), 'restore' if word == 0 else 'conditional_parser')
+        for flag, word in ((-1, 0), (2, 0), (1, -1), (1, 65536)):
+            with self.assertRaises(ValueError):
+                post_flag_route(flag, word)
+
     def test_service_gate_and_receiver_direction_are_source_pinned(self):
         words = dict(enumerate(SERVICE_GATE_WITNESS, SERVICE_GATE_BASE))
         words.update(dict(enumerate((0x7211,0xaa59,0x7217,0xaa60), 0x20499)))

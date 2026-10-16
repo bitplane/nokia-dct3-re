@@ -23,6 +23,52 @@ SERVICE_GATE_BASE = 0x204C1
 SERVICE_GATE_WITNESS = (0x10e1,6,0xf845,0x04d2,0x44f8,0x15d9,0x3ce1,0x16,
                         0x82f8,0x12,0xf495,0xf495,0x6c82,0x04d2,
                         0x76f8,0xaa56,1,0x10f8,0xaa56,0xf845,0x05ae)
+POST_FLAG_BASE = 0x2532E
+POST_FLAG_WITNESS = (0xe801,0xf982,0x510c,0x80f8,0xba66,0x10f8,8,0xf845,0x5343,
+                     0x1081,0xf844,0x533f,0xe800,0xf982,0x4538,0xf073,0x5343,
+                     0xf020,0xba66,0xf982,0x5232)
+FLAG_CONTEXT_BASE = 0x25F94
+FLAG_CONTEXT_WITNESS = (
+    0x4a11,0xeeff,0xf495,0x7104,0x13,0x7105,0x12,0x8811,0x6ce3,0xfffe,0x5fae,
+    0x7681,0,0x76e1,4,8,0x10e2,4,0x80e1,6,0x10e2,5,0x80e1,7,0xf073,0x5fbe,
+    0x7681,1,0x76e1,4,1,0x10e2,2,0x80e1,6,0x10e2,3,0x80e1,7,0x76e1,9,1,
+    0xee01,0x8a11,0xf4e4)
+
+
+def decode_flag_context(words):
+    if any(words.get(FLAG_CONTEXT_BASE + offset) != word for offset, word in enumerate(FLAG_CONTEXT_WITNESS)):
+        raise ValueError('AA99 flag-context helper changed or absent')
+    return {'entry': '025f94', 'last_word': '025fc0', 'pinned_words': 45,
+            'selector': 'MVDK *SP(4),AR3; BANZ *(AR3-2),025fae',
+            'selector_2': 'store 0 through AR1 and 8 at receiver+4',
+            'other_selector': 'store 1 through AR1 and 1 at receiver+4',
+            'scope': 'Complete local helper; field/codec names and input parsing remain unproved'}
+
+
+def reference_flag_context(selector):
+    if selector not in range(4):
+        raise ValueError('flag-context selector outside recovered two-bit domain')
+    return int(selector != 2)
+
+
+def decode_post_flag_branch(words):
+    if any(words.get(POST_FLAG_BASE + offset) != word for offset, word in enumerate(POST_FLAG_WITNESS)):
+        raise ValueError('AA99 post-flag branch changed or absent')
+    return {'entry': '02532e', 'last_word': '025342', 'pinned_words': 21,
+            'request': 'LD #1,A; FCALL 02510c; STL A,ba66',
+            'zero_flag': 'BC AEQ skips to 025343',
+            'nonzero_flag': 'LD *AR1,A; BC ANEQ selects 02533f',
+            'zero_indirect_word': 'LD #0,A; FCALL 024538 at 02533b',
+            'nonzero_indirect_word': 'LD #ba66,A; FCALL 025232',
+            'scope': 'Local branch only; AR1 field semantics, stream alignment and codec validity unproved'}
+
+
+def post_flag_route(flag, indirect_word):
+    if flag not in (0, 1) or not 0 <= indirect_word <= 0xffff:
+        raise ValueError('post-flag route outside one-bit/16-bit domain')
+    if not flag:
+        return 'skip'
+    return 'conditional_parser' if indirect_word else 'restore'
 
 
 def decode_service_gate(words):
@@ -1016,6 +1062,8 @@ def contract(source):
     result['prefix_transform'] = decode_prefix_transform(rel_words)
     result['byte_count_prefix'] = decode_byte_count_prefix(rel_words)
     result['processing_latch_gate'] = decode_service_gate(rel_words)
+    result['post_publication_flag_branch'] = decode_post_flag_branch(rel_words)
+    result['post_flag_context'] = decode_flag_context(rel_words)
     result['playback_transform_copy'] = decode_transform_copy(rel_words, 'aa99')
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)

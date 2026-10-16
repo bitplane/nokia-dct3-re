@@ -40,6 +40,50 @@ _G.mu4_playback_gate_stop = gate_stop
 local queue_counts = {}
 local result_counts = {}
 local service_counts = {}
+local published, post_flag_captured = false, false
+local context_writes = {}
+handles[#handles + 1] = data:install_write_tap(0xac36, 0xac38, 'mu4_playback_flag_context', function(address, value, mask)
+    local time = machine.time:as_double()
+    if sampling or machine:side_effects_disabled() or time < 0.8181 or time > 1.7 then return end
+    local count = (context_writes[address] or 0) + 1
+    context_writes[address] = count
+    if count <= 16 then
+        machine:logerror(string.format(
+            'mu4_playback_flag_context_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+            address, value, mask, count, time, cpu.state.GENPC.value))
+    end
+end)
+handles[#handles + 1] = data:install_write_tap(0x15d9, 0x15d9, 'mu4_playback_publication_selection', function(_, value)
+    local pc, time = cpu.state.GENPC.value, machine.time:as_double()
+    if not sampling and not machine:side_effects_disabled() and time >= 0.8182 and time <= 1.7 and
+       value == 0 and pc >= 0x293e1 and pc <= 0x293e5 then published = true end
+end)
+handles[#handles + 1] = data:install_write_tap(0xba66, 0xba66, 'mu4_playback_post_publication_flag', function(_, value)
+    local pc, time = cpu.state.GENPC.value, machine.time:as_double()
+    if sampling or machine:side_effects_disabled() or not published or post_flag_captured or
+       time > 1.7 or pc < 0x25331 or pc > 0x25335 then return end
+    post_flag_captured, sampling = true, true
+    local pointer = cpu.state.AR1.value
+    local remaining, high, low = data:read_u16(0xa854), data:read_u16(0xa858), data:read_u16(0xa859)
+    local index, base = data:read_u16(0xb331), data:read_u16(0xb332)
+    local window = {}
+    for offset = -2, 1 do window[#window + 1] = string.format('%04x', data:read_u16((base + index + offset) & 0xffff)) end
+    sampling = false
+    machine:logerror(string.format(
+        'mu4_playback_post_flag: value=%04x remaining=%04x reservoir=%04x%04x index=%04x base=%04x window=%s ar1=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+        value, remaining, high, low, index, base, table.concat(window, ','), pointer, time, pc))
+    -- The live pointer selects a candidate address, not retained operand ownership.
+    -- Log actual accesses separately; never promote the snapshot to a bus read.
+    local reads = 0
+    handles[#handles + 1] = data:install_read_tap(pointer, pointer, 'mu4_playback_post_flag_pointer', function(address, word)
+        local context = cpu.state.GENPC.value
+        if sampling or machine:side_effects_disabled() or context < 0x25331 or context > 0x2533f or reads >= 4 then return end
+        reads = reads + 1
+        machine:logerror(string.format(
+            'mu4_playback_post_flag_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+            address, word, reads, machine.time:as_double(), context))
+    end)
+end)
 for _, range in ipairs({{0xaa54, 0xaa62}, {0x15d9, 0x15d9}, {0x15ef, 0x15f8}, {0xd796, 0xd7af}, {0x13c0, 0x147f}}) do
     handles[#handles + 1] = data:install_read_tap(range[1], range[2], 'mu4_playback_service_reads_' .. range[1],
         function(address, value)

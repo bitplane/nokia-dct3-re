@@ -11,10 +11,11 @@ streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
-The current software frontier is the [processing-latch consumer](#processing-latch-consumer):
-corrected playback publishes one longer-body parser result but its consumer
-still bypasses processing with latch `aa56=0`. The local gate and observed
-receiver fields are mapped; their producer/lifecycle contract remains open.
+The current software frontier is the [post-publication input branch](#post-publication-input-branch):
+after one longer-body result publication, the next transaction consumes a
+saved-data bit and restores context through `02533b`. Its local predicate
+and selector writer are mapped. An independent host decoder also rejects
+the nearby two candidate frames, without establishing the REL framing contract.
 The earlier seven-word initializer discrepancy is corrected and fresh
 recording remains byte-identical. Continue without forcing counters, keys,
 lengths or file offsets. These bench results do not establish whole-handset
@@ -5005,10 +5006,57 @@ lines exactly and closes the taps at 2.416666667 seconds. That is observer
 equivalence over the stated window, not a shorter substitute for the complete
 20-second playback observation or decoded-audio acceptance.
 
+#### Post-Publication Input Branch
+
+**Open question:** how does the original recorder produce the fields of the
+sampled saved-data region, and is that region being interpreted under the
+correct framing contract? Do not clear the rejected bit, force a successful
+result or synthesize another activation to bypass the consumer gate.
+
+After the first `0293ed` publication, a new transaction sets `15d9=1`
+and reaches the restore wrapper through `02533b` at 1.017096345 seconds.
+The complete 21-word local branch `02532e..025342` requests one bit,
+stores it at `ba66`, skips the conditional branch if zero, and otherwise
+loads `*AR1`. A zero indirect word calls `024538`; a nonzero word calls
+`025232`. Read-only taps observe `ba66=1`, candidate AR1=`ac36`, and an
+actual read of `ac36=0` in the matching branch context. This establishes
+the local predicate, not a retained-register API or global stream validity.
+
+The 45-word helper `025f94..025fc0` sets the receiver's first word to
+zero when its selector is 2 and to one otherwise. The preceding parser
+requests two bits at `025dee` and stores them at receiver+1. Actual writes
+observe `ac37=2` at 1.016848687, followed by `ac36=0` near `025fa1` at
+1.016849329. Earlier and later attempts instead show selectors 1/3/0
+with first word one. The helper and branch are source-pinned with every-word
+mutation tests; local route tests cover all four selectors and both flag
+values across every 16-bit indirect word. These are scalar/source contracts,
+not complete executable CPU or codec acceptance.
+
+At the rejected flag write, remaining bits are 31, reservoir is `ce393785`,
+word index is `001c`, and base is `162e`. The nearby captured words are
+`ce39,3785,99c7,26f0`. Their eight bytes occur exactly once in independently
+extracted canonical `TEST` (`c9da011f...231`), at offset 1050. The selected
+leading bit of `ce39` is one, consistent with the captured one-bit result
+and post-read reservoir. This ties the particular input window to saved
+bytes, not all cursor ownership or preceding parsing alignment.
+
+A host-only diagnostic sends unchanged bytes `[995,1739)` to FFmpeg
+8.0.1-3ubuntu2's AAC
+demuxer: these are the two 372-byte candidate frames at 995 and 1367,
+not an authored replacement or a MAME input. It reads 2 packets/744 bytes,
+decodes 0 frames/0 samples and reports band counts 19>14 and 53>49.
+The native branch and independent decoder therefore both reject aspects of
+this interpretation of the saved bytes. This does not prove valid frame
+boundaries, an invalid complete REL container or an encoder defect: an
+unrecovered transformation/framing layer remains possible. No trimmed media
+is fed back to the guest and no native-audio claim follows.
+
 #### Processing-Latch Consumer
 
-**Open question:** what owns receiver word 22 and its interaction with
-`15d9`, and which legitimate transaction enables the processing latch?
+**Boundary:** the receiver word-22 and `15d9` interaction explains why the
+first publication does not immediately enable the processing latch. Its
+full producer/lifetime contract is not closed; the subsequent transaction
+does execute, and its input branch above is the current discriminating lead.
 Do not name either field as a missing readiness report from its numeric
 shape, or force the latch/counter to enter the processing body.
 
