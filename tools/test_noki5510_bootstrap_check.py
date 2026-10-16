@@ -6,10 +6,32 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_switch_history,
     verify_playback_callback_reads,
     verify_playback_notify_context,
+    verify_playback_path,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_bounded_path_requires_source_order_and_first_callback_pairing(self):
+        words = {0x201d0: 0xf050, 0x201d2: 0xf844, 0x201dd: 0xe734, 0x201de: 0xf074}
+        history = [f'{a:06x}/{op:04x}' for a, op in words.items()]
+        callbacks = [{'time': 1.0, 'history': history}]
+        rows = '\n'.join(f'mu4_playback_path_entry: index={i} address={a:06x} opcode={op:04x} identity=Execute_entry observer_writes=0'
+                         for i, (a, op) in enumerate(words.items()))
+        terminal = ('mu4_playback_path_terminal: entries=4 t=1.000000000 selection=before_first_d7b0_callback '
+                    'identity=Execute_entry observer_writes=0 audio_acceptance=0')
+        text = rows + '\n' + terminal
+        self.assertEqual(verify_playback_path(text, words, callbacks), history)
+        for old, new in (('index=0', 'index=1'), ('opcode=f050', 'opcode=f051'),
+                         ('entries=4', 'entries=5'), ('t=1.000000000', 't=1.000000001'),
+                         ('audio_acceptance=0', 'audio_acceptance=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_path(text.replace(old, new), words, callbacks)
+        for bad in (rows, terminal, terminal + '\n' + rows, text + '\n' + terminal):
+            with self.assertRaises(ValueError):
+                verify_playback_path(bad, words, callbacks)
+        with self.assertRaises(ValueError):
+            verify_playback_path(text, words, [{'time': 1.0, 'history': history[::-1]}])
+
     def test_notify_register_context_is_not_an_unpaired_operand_claim(self):
         text = ('mu4_playback_notify_context: ordinal=1 ar1=d796 ar2=d7ac '
                 'a=0000000001 b=0000000002 t=1.000000000 context_only=1 observer_writes=0')

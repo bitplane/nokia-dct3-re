@@ -463,6 +463,33 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
     return result
 
 
+def verify_playback_path(text, words, callbacks):
+    terminals = list(re.finditer(
+        r'mu4_playback_path_terminal: entries=(\d+) t=(\d+\.\d{9}) '
+        r'selection=before_first_d7b0_callback identity=Execute_entry observer_writes=0 audio_acceptance=0$',
+        text, re.MULTILINE))
+    rows = list(re.finditer(
+        r'mu4_playback_path_entry: index=(\d+) address=([0-9a-f]{6}) opcode=([0-9a-f]{4}) '
+        r'identity=Execute_entry observer_writes=0$', text, re.MULTILINE))
+    if not terminals and not rows and 'mu4_playback_path_' not in text:
+        return []
+    if len(terminals) != 1 or text.count('mu4_playback_path_terminal:') != 1 or not callbacks:
+        raise ValueError('missing or duplicated callback path terminal')
+    if len(rows) != text.count('mu4_playback_path_entry:') or not 4 <= len(rows) <= 128 or int(terminals[0][1]) != len(rows):
+        raise ValueError('incomplete or excessive bounded callback path')
+    if float(terminals[0][2]) != callbacks[0]['time']:
+        raise ValueError('callback path terminal is not paired with first callback')
+    result = []
+    for index, row in enumerate(rows):
+        address, opcode = int(row[2], 16), int(row[3], 16)
+        if int(row[1]) != index or row.end() >= terminals[0].start() or words.get(address) != opcode:
+            raise ValueError('callback path index, ordering or original source mismatch')
+        result.append(f'{address:06x}/{opcode:04x}')
+    if result[-4:] != callbacks[0]['history']:
+        raise ValueError('callback path tail differs from immediate executed history')
+    return result
+
+
 def verify_playback_notify_context(text, history):
     rows = list(re.finditer(
         r'mu4_playback_notify_context: ordinal=(\d+) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) '
@@ -523,6 +550,7 @@ def verify_playback_range(text, words):
     enqueue_history = verify_playback_switch_history(text, words, parent['first_session'], kind='enqueue')
     activation_history = verify_playback_switch_history(text, words, parent['first_session'], kind='activation')
     notify_history = verify_playback_switch_history(text, words, parent['first_session'], kind='notify')
+    callback_history = verify_playback_switch_history(text, words, parent['first_session'], kind='callback')
     if activation_history and (len(activation_history) != len(enqueue_history) or any(
             a['time'] >= e['time'] for a, e in zip(activation_history, enqueue_history))):
         raise ValueError('activation history does not precede its paired enqueue entries')
@@ -530,7 +558,8 @@ def verify_playback_range(text, words):
             'switch_context_history': verify_playback_switch_history(text, words, parent['first_session']),
             'enqueue_context_history': enqueue_history,
             'activation_context_history': activation_history,
-            'callback_context_history': verify_playback_switch_history(text, words, parent['first_session'], kind='callback'),
+            'callback_context_history': callback_history,
+            'callback_producer_path': verify_playback_path(text, words, callback_history),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'notify_context_history': notify_history,
             'notify_raw_register_context': verify_playback_notify_context(text, notify_history),

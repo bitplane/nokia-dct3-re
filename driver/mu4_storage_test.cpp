@@ -109,6 +109,15 @@ public:
 							m_playback_history_pc[(p + 1) & 3], m_playback_history_word[(p + 1) & 3],
 							m_playback_history_pc[(p + 2) & 3], m_playback_history_word[(p + 2) & 3],
 							m_playback_history_pc[(p + 3) & 3], m_playback_history_word[(p + 3) & 3], machine().time().as_double());
+						if (m_playback_callback_samples == 1)
+						{
+							unsigned const first = (m_playback_path_next + 128 - m_playback_path_count) & 127;
+							for (unsigned i = 0; i < m_playback_path_count; ++i)
+								logerror("mu4_playback_path_entry: index=%u address=%06x opcode=%04x identity=Execute_entry observer_writes=0\n",
+									i, m_playback_path_pc[(first + i) & 127], m_playback_path_word[(first + i) & 127]);
+							logerror("mu4_playback_path_terminal: entries=%u t=%.9f selection=before_first_d7b0_callback identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+								m_playback_path_count, machine().time().as_double());
+						}
 					}
 					if (m_playback_execute_entries[1] == 1 && address == 0x20419 && opcode == 0xf6be)
 					{
@@ -157,6 +166,13 @@ public:
 					}
 					if (m_playback_execute_entries[1] == 1 && ((address >= 0x205ac && address <= 0x205d0) || (address >= 0x2a10c && address <= 0x2a2c6)))
 						observe_playback_parent(address, opcode);
+					if (m_playback_execute_entries[1] == 1)
+					{
+						m_playback_path_pc[m_playback_path_next] = address;
+						m_playback_path_word[m_playback_path_next] = opcode;
+						m_playback_path_next = (m_playback_path_next + 1) & 127;
+						if (m_playback_path_count < 128) ++m_playback_path_count;
+					}
 				}
 				// Retain executed bytes: current overlay memory may already differ.
 				m_playback_history_pc[m_playback_history_next] = address;
@@ -379,6 +395,10 @@ private:
 	u32 m_playback_enqueue_samples = 0;
 	u32 m_playback_callback_samples = 0;
 	u32 m_playback_notify_samples = 0;
+	std::array<u32, 128> m_playback_path_pc{};
+	std::array<u16, 128> m_playback_path_word{};
+	u8 m_playback_path_next = 0;
+	u16 m_playback_path_count = 0;
 	std::array<u32, 4> m_playback_activation_pc{};
 	std::array<u16, 4> m_playback_activation_word{};
 	double m_playback_activation_time = 0;
@@ -2055,6 +2075,8 @@ private:
 			save_item(NAME(m_playback_enqueue_samples));
 			save_item(NAME(m_playback_callback_samples));
 			save_item(NAME(m_playback_notify_samples));
+			save_item(NAME(m_playback_path_pc)); save_item(NAME(m_playback_path_word));
+			save_item(NAME(m_playback_path_next)); save_item(NAME(m_playback_path_count));
 			save_item(NAME(m_playback_activation_pc)); save_item(NAME(m_playback_activation_word)); save_item(NAME(m_playback_activation_time));
 			save_item(NAME(m_playback_range_counts)); save_item(NAME(m_playback_range_opcodes)); save_item(NAME(m_playback_range_changes));
 			save_item(NAME(m_playback_dma_min)); save_item(NAME(m_playback_dma_max)); save_item(NAME(m_playback_dma_last_nonzero));
@@ -2269,6 +2291,7 @@ private:
 		m_playback_enqueue_samples = 0;
 		m_playback_callback_samples = 0;
 		m_playback_notify_samples = 0;
+		m_playback_path_pc = {}; m_playback_path_word = {}; m_playback_path_next = 0; m_playback_path_count = 0;
 		m_playback_activation_pc = {}; m_playback_activation_word = {}; m_playback_activation_time = 0;
 		m_playback_range_counts = {}; m_playback_range_opcodes = {}; m_playback_range_changes = 0;
 		m_playback_dma_min = 0xffff; m_playback_dma_max = 0; m_playback_dma_last_nonzero = 0;

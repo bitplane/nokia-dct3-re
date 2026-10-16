@@ -4532,9 +4532,10 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** which producer reaches helper `020454` with the context
-that leads to the `d7b0` callback, and why does varying-input playback not
-reach that context? Do not force a wakeup, node, callback or input value.
+**Open question:** how does method 9 reached through receiver reference
+`15eb` return its result, and why does varying-input playback not take
+the `0293da..0293ed` publication path? Do not force a wakeup, node,
+callback, method result or input value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
 2.368206564 (constant) / 1.726312648 (varying). Source-checked observation
@@ -4607,6 +4608,24 @@ initial raw context is AR1=`d7b8`, AR2=`d7cb` at 0.820211608.
 Constant playback's later entry at 1.022780152 has AR1=`0000`,
 AR2=`d7a9`, A=`0008000000`, B=`0000023e64`. These are raw contexts,
 not retained operands or proof of the referenced structure's identity.
+
+A 128-entry bounded Execute history before the first `d7b0` callback
+reaches beyond these helpers: it traverses `029c6f..029c7e`, returns
+through `029bfc` to `023eea`, returns at `023ef7` to `0293da`, and reaches
+`0293ed -> 020454 -> 02045d -> 0201b3 -> 0201de`. Every retained word
+matches original AA99 source; its final four entries also match the
+independently retained immediate callback history. The enclosing source
+calls method-9 wrapper `029873` through receiver reference `15eb`, then
+accesses result word `15f0` before the publication branch. Initialization
+sets `15eb=aaac`; the C-initialization table sets `aaac=c686`, whose
+method-9 pointer at `c698` is `0002,3e64`. This names a source-supported
+method candidate consistent with the executed return, not a claim of
+codec/decoder ownership or complete indirect-call closure. Varying playback
+has no selected callback and therefore emits no trigger-qualified path.
+The path checker rejects missing/duplicate terminals, wrong counts/indices,
+source mismatches, reordered entries and disagreement with the immediate
+history; the observer ring is bounded, reset/saved and never changes CPU
+execution. Fresh paired runs reproduce the established counts.
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,
