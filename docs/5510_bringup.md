@@ -4569,6 +4569,18 @@ silently included in that equality claim. The read-only
 `mu4_playback_control_observe.lua` captures both this descriptor and the
 separate control-area snapshots; it neither changes their state nor
 attributes them to an instruction.
+With snapshot-generated reads excluded from bus taps, varying-input
+playback reads `804e=0001`, then `804a..804d=0002,0495,d7b8,d796`
+at 0.834083490--0.834083631 seconds. The reported live PCs lie in
+`020478..020494`; that source sequence is now pinned as the candidate
+context-switch consumer, not asserted as each access's instruction owner.
+The latch receives zero at 0.823371263 (initialization context) and
+0.834084523 (bypass context). The same run preserves the source-checked
+954 visited addresses and 336,192 first-session Execute entries.
+At 1.741077 seconds, after that AA99 session ends at 1.726312648,
+the same RAM addresses instead yield `0002,8f56,12a2,1280` near a
+different context-switch location. Therefore these addresses must remain
+qualified by overlay/session: they are not permanent playback objects.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

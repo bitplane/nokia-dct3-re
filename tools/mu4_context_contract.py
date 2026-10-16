@@ -55,6 +55,11 @@ def playback_control_literal_census(words):
         (0x27167, (0x0006, 0x804A, 0x0002, 0x0495, 0xD7B8, 0xD796, 0x0001, 0x054F, 0x0002)),
         (0x27A04, (0x76F8, 0xAA56, 0x0000)),
         (0x27A0D, (0x76F8, 0xAA59, 0xD796)),
+        (0x20478, (0x10E4, 0x0004, 0xF844, 0x0483, 0x6D94, 0x1394,
+                    0x1094, 0x7194, 0x0012, 0xF5E3, 0xFC00, 0x4918,
+                    0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495, 0x4A0B,
+                    0xF495, 0x4594, 0x1B94, 0x4B94, 0x1094, 0xF5E7,
+                    0xF6BE, 0xEE01, 0x8A18, 0xF495, 0xFC00)),
     )
     for base, values in witnesses:
         if any(words.get(base + i) != value for i, value in enumerate(values)):
@@ -69,6 +74,7 @@ def playback_control_literal_census(words):
             'initialization_record': '027167', 'destination': '00804a',
             'initialized_values': ['0002', '0495', 'd7b8', 'd796', '0001', '054f'],
             'initial_control_area': '00d796',
+            'context_switch_candidate': ['020478', '020494'],
             'scope': 'Exact literals and pinned initialization only; not instruction classification, '
                      'computed aliases, record interpreter, resume contract or decoded audio'}
 
