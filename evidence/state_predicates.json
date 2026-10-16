@@ -5,10 +5,10 @@
     {
       "id": "mu4_full_upload_measurement_revalidation",
       "owner": "mu4_native_dsp",
-      "status": "unresolved",
+      "status": "satisfied",
       "predicate": "The current core completes the full-upload measurement response and independently verified tone-to-codec transport acceptance",
-      "current": "The bootmeasure retained-medium run reaches six independently checked energy blocks and mode zero, but fails the acknowledged measurement-response predicate before final tone/transport acceptance. Repeating with the original enabled-source observer produces a byte-identical complete log to the stricter actual-source-read observer; the attribution change does not explain the failure. Actual DMA source-read ownership separately passes executable positive, ordinary-read, wrong-channel/space/address, cancellation and pending-save/restore controls. Prior full-upload tone counts are not renewed acceptance on the current core. Diagnose the response predicate without weakening it or claiming decoded music.",
-      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "Makefile"]
+      "current": "The complete 20-second bootmeasure gate passes six independently checked energy blocks, executed response comparisons and exact numerical result 01, acknowledged response drainage, 42 independently checked tone blocks (5376 samples, 12 phase wraps), 1744936 exact TX-to-DIN word matches and actual channel-3 source-read attribution. Of the generated samples, 5179 are consumed and 197 cancelled by original cleanup; the complete DMA stream has one final pending source word. The 27-word AA22 response contract compares each energy sum against 10000000, defaults to 01 and lets low right energy override low left energy. Both checked sums exceed threshold; the former fixed result 20 assertion was stale, not a DMA observer or response-drain defect. Tests cover threshold edges, equality, right precedence and every pinned-word mutation. This is converted-sample bench tone and digital transport acceptance, not decoded music, analog audio or native speech.",
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "Makefile"]
     },
     {
       "id": "mu4_original_rel_playback_audio",

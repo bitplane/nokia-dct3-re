@@ -3783,24 +3783,34 @@ observes live CPU operand reads rather than an entry-time buffer snapshot:
 DMA can update samples while the routine executes. This check is bounded
 to nonsaturating sums below `7fffffff`, not all arithmetic edge cases.
 
-The original response is `1e 03 aa 01 68 20 80 7e 55`, preceded by
-`7f 01 55`. The peer acknowledges token `80`; all eleven receive bytes and
-twelve transmitted bytes drain without retry or queued residue. Status `20`
-is the firmware's numerical result for these converted samples, not an
-assumed success code. Mode `bb80` returns to zero, completion `b64e` is one,
+The response carries a numerical classification, not a success code.
+AA22 `03:b01d..b037` initializes result `01`, clears C16 and compares each
+32-bit energy aggregate with 10,000,000 using `DSUB` and `ALEQ`. A left sum
+strictly below the threshold selects `1f`; a right sum strictly below it
+overrides that with `20`. Equality does not select either low-energy result.
+`mu4_context_contract.py` pins all 27 words; tests cover threshold edges,
+right precedence, invalid domains and mutation of every pinned word.
+The current full-upload bench sums are `029abd24` and `3ad39fc4`, both
+above threshold, so the correct response is `1e 03 aa 01 68 01 80 5f 55`,
+preceded by `7f 01 55`. The old fixed `20` assertion was not portable across
+CPU correctness changes. Execute-entry checks now require both comparison
+accumulators and the selected stack result to match independently checked
+sample energies, and require the transmitted result to match too. The peer
+acknowledges token `80`; all eleven receive bytes and twelve transmitted
+bytes drain without retry or queued residue. Mode `bb80` returns to zero, completion `b64e` is one,
 and the block count is six. No illegal instruction occurs. Cleanup clears
 the RX buffers, so this profile does not reuse the idle profile's final
 constant-buffer assertions; the independently checked startup prefix and
 the untouched status/replay controls retain their own acceptance checks.
 This alone does not validate tone generation or music decoding.
 
-The same original command calls generator `02:876a` 90 times. Its two
+The same original command repeatedly calls generator `02:876a`. Its two
 64-word channels use phase words `bb79/bb7a`, increments `bb7b/bb7c`,
 ROM lookup base `17fd` and amplitudes `bb7d/bb7e`. A separate integer model
 folds the signed phase into the table index and applies the fractional
 amplitude product with high-word truncation. Both ping-pong buffers and
-final phase words match on every call: 11,520 sample words, including 26
-signed phase wraps. The model explicitly rejects product saturation outside
+final phase words match on every call, including signed phase wraps.
+The model explicitly rejects product saturation outside
 this fixture's supported range. These are verified generated buffer values;
 the separate `bootmeasure` profile below also validates continuous digital
 transport and the generator-buffer-to-DMA contract. Analog sound, music and
@@ -6849,20 +6859,11 @@ not music decoding or physical board reset.
 unchanged measurement request through McBSP2 pins after complete original
 startup, using the same retained-medium source. The measurement and tone
 observers/verifier are shared with the routine-level `measure` profile,
-not a second, weaker acceptance path. **Current revalidation boundary:**
-the complete-upload run reaches six independently checked energy blocks
-and mode zero, but fails the acknowledged measurement-response predicate
-before the final tone/transport acceptance checks. The enabled-source and
-actual-source-read observer variants produce byte-identical complete logs
-on the same retained medium; narrowing source attribution does not account
-for this failure. The response predicate must be diagnosed before claiming
-renewed full-upload tone acceptance on the current core. The following
-counts describe the previously validated contract, not a fresh passing run.
-Six stereo sample-energy blocks
+not a second, weaker acceptance path. Six stereo sample-energy blocks
 match independent arithmetic applied to live firmware input reads; the
 12-byte response is acknowledged, all 11 received bytes drain, and the
 firmware returns to mode zero with empty queues. The fixed 20-second run
-also checks 90 stereo tone blocks (11,520 buffer samples) and 26 signed
+also checks 42 stereo tone blocks (5,376 buffer samples) and 12 signed
 phase wraps against independent table/phase/scaling calculations. Block
 counts are observations of this fixture, not a physical timing contract.
 The codec input remains a declared converted-sample fixture. These checks
@@ -6873,8 +6874,8 @@ The same profile continuously compares every McBSP0 transmitter word with
 the independently pin-decoded AIC23 DIN word. A four-word bounded comparison
 queue rejects overflow, unpaired codec words, channel-order errors and
 sample mismatches; it is registered for save states and cleared on reset.
-The complete 20-second observation matches 1,633,006 words, including
-11,381 nonzero words, with no pending word at its endpoint. Acceptance
+The complete 20-second observation matches 1,744,936 words, including
+5,218 nonzero words, with no pending word at its endpoint. Acceptance
 requires coverage beyond the old 1,024-word prefix, nonzero output and at
 most one final launched-but-not-yet-sampled word; exact volume is not a
 physical clock-rate oracle. This verifies sustained digital transport
@@ -6901,9 +6902,9 @@ The command's original cleanup matters: `03:b056/b058` zero both tone
 banks while the last DMA block is in flight, before `03:b05e` writes mode
 zero. The observer recognizes only those exact CPU store boundaries and
 zero values, updates its expected source image and accounts for samples
-cancelled before DMA read. This fixture generates 11,520 words: 11,362 are
-independently verified through DMA and 158 are cancelled by original
-cleanup. The complete source stream has 1,633,007 reads, 1,633,006 completed
+cancelled before DMA read. This fixture generates 5,376 words: 5,179 are
+independently verified through DMA and 197 are cancelled by original
+cleanup. The complete source stream has 1,744,937 reads, 1,744,936 completed
 transmitter words and one pending source word. Acceptance requires exact
 generated = consumed + cancelled accounting, no premature bank overwrite,
 stereo source order and source-to-TX-to-DIN agreement. These quantities

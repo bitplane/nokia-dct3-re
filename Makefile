@@ -1128,7 +1128,7 @@ check-mu4-storage-original: build
 			reset) grep -q 'mu4_native_reset_storage: PASS' error.log; \
 				grep -q 'mu4_native_worker_activation: PASS' error.log; grep -q 'mu4_native_reset_request:' error.log; \
 				grep -q 'mu4_native_reset_controller:' error.log; grep -q 'mu4_native_reset_frontier: control_restart=0' error.log;; \
-			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
+			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_measurement_result: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
 
 .PHONY: check-mu4-retained-original
 check-mu4-retained-original:
@@ -1203,6 +1203,7 @@ check-mu4-bootstrap-original: build
 		grep -q 'mu4_original_bootstrap_loader: name=004d,0043,0055,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0001,e1e8 ' error.log; \
 		if test "$$bios" = bootmeasure; then \
 			grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; \
+			grep -q 'mu4_native_measurement_result: PASS' error.log; \
 			grep -q 'mu4_native_codec_continuous: PASS' error.log; \
 			grep -q 'mu4_native_tone_dma: PASS' error.log; \
 		elif test "$$bios" = bootrecord || test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol || test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta; then \

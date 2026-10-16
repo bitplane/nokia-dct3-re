@@ -47,6 +47,28 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (measurement_profile() && (address == 0x3b021 || address == 0x3b02a || address == 0x3b034 || address == 0x3b038))
+			{
+				auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+				unsigned const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+				unsigned const step = address == 0x3b021 ? 0 : address == 0x3b02a ? 1 : address == 0x3b034 ? 2 : 3;
+				if (m_measurement_blocks != 6 || m_measurement_branch_mask != (1U << step) - 1 ||
+					opcode != (step == 0 ? 0x760b : step == 3 ? 0x4818 : 0xf847))
+					fatalerror("MU4 measurement response branch order or instruction identity changed");
+				if (step == 1 || step == 2)
+				{
+					u64 const expected = (u64(10'000'000) - m_measurement_expected[step - 1]) & 0xffffffffffULL;
+					if ((m_cpu->state_int(tms320c54x_device::STATE_A) & 0xffffffffffULL) != expected)
+						fatalerror("MU4 measurement response comparison disagrees with checked sample energies");
+				}
+				if (step == 3 && data.read_word((sp + 11) & 0xffff) != expected_measurement_result())
+					fatalerror("MU4 measurement response selection disagrees with decoded threshold contract");
+				m_measurement_branch_mask |= 1U << step;
+				logerror("mu4_measurement_result_branch: address=%06x opcode=%04x a=%010llx left=%04x,%04x right=%04x,%04x result=%04x blocks=%u t=%.9f identity=Execute_entry\n",
+					unsigned(address), opcode, static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+					data.read_word(0xb64a), data.read_word(0xb64b), data.read_word(0xb64c), data.read_word(0xb64d),
+					data.read_word((sp + 11) & 0xffff), m_measurement_blocks, machine().time().as_double());
+			}
 			if (playback_profile())
 			{
 				// Execute reports logical XPC; the existing bus tap sees OVLY's physical 006d62.
@@ -242,6 +264,7 @@ private:
 	unsigned m_native_consumer_mode_writes = 0;
 	unsigned m_native_command_paths[6] = {};
 	unsigned m_measurement_blocks = 0;
+	u8 m_measurement_branch_mask = 0;
 	std::array<u32, 2> m_measurement_expected{};
 	std::array<unsigned, 2> m_measurement_samples{};
 	unsigned m_measurement_factor = 1;
@@ -1486,6 +1509,11 @@ private:
 			logerror("mu4_native_receive_pins: PASS bytes=%u rx_irqs=%u frame=1 data=1 clock=1 drr_drained=1\n", rx_words, m_command_rx_irqs);
 		}
 	}
+	u16 expected_measurement_result() const
+	{
+		// AA22 03:b021..b037: right-channel low energy overrides the left result.
+		return m_measurement_expected[1] < 10'000'000 ? 0x20 : m_measurement_expected[0] < 10'000'000 ? 0x1f : 1;
+	}
 	void verify_native_measurement()
 	{
 		auto const disable = machine().disable_side_effects();
@@ -1493,13 +1521,18 @@ private:
 		logerror("mu4_native_measurement_observe: mode=%04x complete=%04x blocks=%04x,%04x left=%04x,%04x right=%04x,%04x tx_words=%u full_boot=0\n",
 			data.read_word(0xbb80), data.read_word(0xb64e), data.read_word(0xb650), data.read_word(0xb651),
 			data.read_word(0xb652), data.read_word(0xb653), data.read_word(0xb65e), data.read_word(0xb65f), unsigned(m_command_tx_words.size()));
-		if (m_measurement_blocks != 6 || m_command_ack_cursor != 3 || m_command_tx_words.size() != 12 ||
-			m_command_tx_words[8] != 0x20 || m_command_wire_bit_count || m_command_rx_irqs != 11 ||
+		logerror("mu4_native_measurement_response: result=%04x ack=%u rx_irqs=%u wire_bits=%u busy=%u ready=%u rx_head=%04x rx_tail=%04x tx_head=%04x tx_tail=%04x pending=%04x queued=%04x\n",
+			m_command_tx_words.size() > 8 ? m_command_tx_words[8] : 0xffff, m_command_ack_cursor, m_command_rx_irqs,
+			m_command_wire_bit_count, unsigned(m_command_rx_busy), unsigned(m_command_rx_ready),
+			data.read_word(0x1657), data.read_word(0x1658), data.read_word(0x1659), data.read_word(0x165a), data.read_word(0x165d), data.read_word(0x165e));
+		if (m_measurement_blocks != 6 || m_measurement_branch_mask != 15 || m_command_ack_cursor != 3 || m_command_tx_words.size() != 12 ||
+			m_command_tx_words[8] != expected_measurement_result() || m_command_wire_bit_count || m_command_rx_irqs != 11 ||
 			m_command_rx_busy || m_command_rx_ready || data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 ||
 			data.read_word(0x1659) != 12 || data.read_word(0x165a) != 12 ||
 			data.read_word(0xbb80) || data.read_word(0x165d) || data.read_word(0x165e))
 			fatalerror("MU4 original measurement command did not complete six blocks and settle its acknowledged response");
 		logerror("mu4_native_measurement: PASS blocks=6 stereo=1 independent_arithmetic=1 pin_request=1 ack=1 tx_words=12 mode=0 music_decode=0 full_boot=0\n");
+		logerror("mu4_native_measurement_result: PASS result=%02x threshold=10000000 executed_comparisons=2 independent_energy=1 right_precedence=1\n", expected_measurement_result());
 		if (m_tone_blocks < 6 || !m_tone_phase_wraps)
 			fatalerror("MU4 native tone observation did not cover repeated blocks and signed phase wraparound");
 		logerror("mu4_native_tone: PASS blocks=%u samples=%u stereo=1 independent_table_scale=1 phase_wraps=%u music_decode=0 analog_audio=0\n",
@@ -1999,6 +2032,7 @@ private:
 		std::fill(std::begin(m_native_command_paths), std::end(m_native_command_paths), 0);
 		m_native_command_cursor = m_native_command_waits = 0;
 		m_measurement_blocks = 0;
+		m_measurement_branch_mask = 0;
 		m_measurement_expected.fill(0);
 		m_measurement_samples.fill(0);
 		m_measurement_factor = 1;

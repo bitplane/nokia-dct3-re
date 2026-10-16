@@ -15,6 +15,37 @@ else:
 
 
 BASE = 0x23D73
+MEASUREMENT_RESPONSE_BASE = 0x3B01D
+MEASUREMENT_RESPONSE_WITNESS = (
+    0x7608, 0x0002, 0x760A, 0x0068, 0x760B, 0x0001,
+    0xF062, 0x0098, 0xF7B8, 0xF040, 0x9680, 0x54F8, 0xB64A,
+    0xF847, 0xB02E, 0x760B, 0x001F, 0xF062, 0x0098, 0xF040,
+    0x9680, 0x54F8, 0xB64C, 0xF847, 0xB038, 0x760B, 0x0020,
+)
+
+
+def measurement_result(left, right):
+    """AA22's nonsaturating energy classification, not a success-code enum."""
+    if any(type(value) is not int or not 0 <= value <= 0x7FFFFFFF for value in (left, right)):
+        raise ValueError('measurement energies must be nonsaturating nonnegative 32-bit sums')
+    return 0x20 if right < 10_000_000 else 0x1F if left < 10_000_000 else 1
+
+
+def decode_measurement_response(words):
+    for offset, expected in enumerate(MEASUREMENT_RESPONSE_WITNESS):
+        if words.get(MEASUREMENT_RESPONSE_BASE + offset) != expected:
+            raise ValueError(f'measurement response witness changed or absent at {MEASUREMENT_RESPONSE_BASE + offset:06x}')
+    return {
+        'segment': 'aa22', 'pinned_words': len(MEASUREMENT_RESPONSE_WITNESS),
+        'selector': '68', 'default_result': 1, 'threshold': 10_000_000,
+        'left': {'aggregate': 'b64a/b64b', 'below_threshold_result': 0x1F},
+        'right': {'aggregate': 'b64c/b64d', 'below_threshold_result': 0x20,
+                  'overrides_left': True},
+        'comparison': 'RSBX C16; DSUB aggregate,A; ALEQ skips result store at equality or above',
+        'scope': 'Pinned AA22 response for independently checked nonsaturating energy sums; no decoded music or analog audio claim',
+    }
+
+
 REL_CLEANUP_BASE = 0x2956F
 REL_CLEANUP_WITNESS = (
     0x60F8, 0x373E, 0x0004, 0xF820, 0x959D, 0xF7B8, 0x7212, 0x3742,
@@ -628,6 +659,7 @@ def contract(source):
         raise ValueError('expected original R060 InitData source')
     words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22')
     result = decode_words(words)
+    result['measurement_response'] = decode_measurement_response(words)
     result['worker_entry'] = decode_worker_entry(words)
     result['worker_return'] = decode_worker_return(words)
     result['worker_copy'] = decode_worker_copy(words)

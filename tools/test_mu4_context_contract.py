@@ -17,9 +17,39 @@ from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, 
 from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
+from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_measurement_result_thresholds_and_right_precedence(self):
+        threshold = 10_000_000
+        for left in (0, threshold - 1, threshold, threshold + 1, 0x7FFFFFFF):
+            for right in (0, threshold - 1, threshold, threshold + 1, 0x7FFFFFFF):
+                expected = 1
+                if left < threshold:
+                    expected = 0x1F
+                if right < threshold:
+                    expected = 0x20
+                self.assertEqual(measurement_result(left, right), expected)
+        self.assertEqual(measurement_result(0x029ABD24, 0x3AD39FC4), 1)
+        for invalid in (-1, 0x80000000, None, '1', True):
+            for pair in ((invalid, 0), (0, invalid)):
+                with self.assertRaises(ValueError):
+                    measurement_result(*pair)
+
+    def test_measurement_response_pins_every_word_and_namespace(self):
+        words = dict(enumerate(MEASUREMENT_RESPONSE_WITNESS, MEASUREMENT_RESPONSE_BASE))
+        result = decode_measurement_response(words)
+        self.assertEqual(result['threshold'], 10_000_000)
+        self.assertTrue(result['right']['overrides_left'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_measurement_response(changed)
+        with self.assertRaises(ValueError):
+            decode_measurement_response({a - 0x10000: v for a, v in words.items()})
+
     def test_rel_cleanup_control_partition(self):
         words = dict(enumerate(REL_CLEANUP_WITNESS, REL_CLEANUP_BASE))
         api = dict(enumerate(REL_RELOAD_API, 0x2080))
