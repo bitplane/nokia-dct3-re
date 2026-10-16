@@ -46,6 +46,12 @@ public:
 				subdevice<tlv320aic23_device>("codec")->clock(), machine().time().as_double());
 		});
 		m_cpu->set_extended_program(true);
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (address != 0x73f8 || !m_recorder_loader_calls) return;
+			++m_recorder_startup_entries;
+			logerror("mu4_native_recorder_startup: pc=%06x opcode=%04x pmst=%04x identity=execute_entry\n",
+				unsigned(address), opcode, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+		});
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_storage_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_storage_test_state::data_map);
 		m_cpu->set_addrmap(AS_IO, &mu4_storage_test_state::io_map);
@@ -1491,16 +1497,6 @@ private:
 							}
 						});
 				}
-				m_cpu->space(AS_PROGRAM).install_read_tap(0x73f8, 0x73f8, "mu4_recorder_startup",
-					[this](offs_t address, u16 &, u16)
-					{
-						if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1 && m_recorder_loader_calls)
-						{
-							++m_recorder_startup_entries;
-							logerror("mu4_native_recorder_startup: pc=%06x pmst=%04x\n",
-								unsigned(m_cpu->pc()), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
-						}
-					});
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x2000, "mu4_recorder_overlay_entry",
 					[this](offs_t address, u16 &, u16)
 					{
@@ -2241,7 +2237,7 @@ private:
 					fatalerror("MU4 original recorder command did not reach the native overlay loader");
 				if (!m_recorder_overlay_checked) fatalerror("MU4 recorder overlay destinations were not verified");
 				if (shared_daram_profile() && m_recorder_startup_entries != 1)
-					fatalerror("MU4 shared RAM startup observation differs count=%u expected=1 ownership=legacy_program_read", m_recorder_startup_entries);
+					fatalerror("MU4 shared RAM startup observation differs count=%u expected=1 ownership=execute_entry", m_recorder_startup_entries);
 				if (shared_daram_profile() && !recorder_control_profile() && (m_recorder_responses != 2 || m_command_rx_irqs != 15 ||
 					m_command_tx_words.size() != 30 || (m_command_ack_pending && m_command_ack_cursor != 3)))
 					fatalerror("MU4 recorder startup did not complete both observed native reply handshakes");

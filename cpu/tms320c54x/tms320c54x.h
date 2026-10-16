@@ -36,6 +36,10 @@ public:
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
 	auto pll_clock_stop_cb() { return m_pll_clock_stop_cb.bind(); }
 	auto system_clock_cb() { return m_system_clock_cb.bind(); }
+	// Diagnostic Execute-entry observation, not a pin or retirement signal.
+	// Offset is the logical instruction address; data is the captured opcode.
+	// Observers must not modify guest state; other registers are live, not a snapshot.
+	auto instruction_observer_cb() { return m_instruction_observer_cb.bind(); }
 
 	enum : unsigned
 	{
@@ -260,6 +264,7 @@ private:
 	u32 m_pending_clock = 0;
 	emu_timer *m_clock_timer = nullptr;
 	devcb_write32 m_system_clock_cb;
+	devcb_write16 m_instruction_observer_cb;
 	bool m_pll_locked = false;
 	emu_timer *m_pll_timer = nullptr;
 	u16 m_tim = 0xffff;

@@ -180,6 +180,8 @@ or was expensive to discover. Current examples include:
 - a program-bus read matching the live PC not establishing an execution:
   data reads and speculative fetches can match too; count retained Execute
   identities before assigning invocation or completion semantics;
+- instruction observers omitting accelerated repeat or resumed-transfer paths;
+  test execution coverage and save/replay, not only the main dispatch loop;
 - a staged CPU's unsupported Decode frontier not proving that preceding
   instructions reached Execute; validate retirement with a positive-controlled
   stage observation rather than the reported PC alone;

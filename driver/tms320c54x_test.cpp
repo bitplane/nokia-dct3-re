@@ -6071,6 +6071,31 @@ private:
 		m_phase = 252430; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_instruction_observer(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const staged = BIT(variant, 0), overlay = BIT(variant, 2);
+		u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = overlay ? 0 : base;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 48; ++i) program.write_word(physical + 0x600 + i, 0xf495);
+		std::array<u16, 10> const code{0xec02, 0xf495, 0xf073, 0x0608, 0xe966, 0xf495, 0xf495, 0xf495, 0xe977, 0xf4e1};
+		for (unsigned i = 0; i < code.size(); ++i) program.write_word(physical + 0x600 + i, code[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, overlay ? 0x20 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_observed_instructions.clear(); m_saved_observed_instructions.clear();
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(staged);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 292000;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_add_sp_context(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -14329,6 +14354,7 @@ private:
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
 		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute") || !strcmp(machine().options().bios(), "add-sp")) { start_pipeline_absolute_add(); return; }
+		if (!strcmp(machine().options().bios(), "instr-observer")) { start_instruction_observer(); return; }
 		if (!strcmp(machine().options().bios(), "arith-bk") || !strcmp(machine().options().bios(), "arith-ar")) { start_pipeline_register_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bk")) { start_stlm_bk(); return; }
 		if (!strcmp(machine().options().bios(), "store-bypass") || !strcmp(machine().options().bios(), "xmem-store-bp") || !strcmp(machine().options().bios(), "asm-store-bp")) { start_store_bypass(); return; }
@@ -37338,6 +37364,56 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252410;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 292000)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = BIT(variant, 2) ? 0 : base;
+			unsigned const checkpoint = std::array<unsigned, 4>{1, 3, 6, 9}[variant / 8];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Observer fixture executes only accepted instructions");
+			// Debugger-style inspection and plain program-bus reads are not execution.
+			unsigned const before = m_observed_instructions.size();
+			m_cpu->space(AS_PROGRAM).read_word(physical + 0x600);
+			{ auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).read_word(physical + 0x601); }
+			expect(m_observed_instructions.size() == before, "Program/data inspection cannot issue instruction observations");
+			if (tick == 5)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_PROGRAM).write_word(physical + 0x600, 0x0000);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_observed_instructions = m_observed_instructions;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or after observer entry without saving callback wiring");
+			}
+			if (tick == 40)
+			{
+				std::vector<std::pair<offs_t, u16>> const expected{
+					{base + 0x600, 0xec02}, {base + 0x601, 0xf495}, {base + 0x601, 0xf495},
+					{base + 0x601, 0xf495}, {base + 0x602, 0xf073}, {base + 0x608, 0xe977}, {base + 0x609, 0xf4e1}};
+				if (m_observed_instructions != expected)
+				{
+					osd_printf_info("Instruction observer mismatch: case=%u replay=%u entries=%zu pc=%06x\n", variant, unsigned(m_pipeline_replay), m_observed_instructions.size(), unsigned(m_cpu->state_int(STATE_GENPC)));
+					for (auto const &[address, opcode] : m_observed_instructions) osd_printf_info("  entry=%06x opcode=%04x\n", unsigned(address), opcode);
+				}
+				expect(m_observed_instructions == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"Execute entries retain opcode and logical page, include real repeats and exclude extension/annulled fetches");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
+					m_observed_instructions = m_saved_observed_instructions;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore instruction identity without extra observer emissions");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 292010; m_check_timer->enable(true); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 31) { start_instruction_observer(variant + 1); return; }
+				osd_printf_info("TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated instruction observer complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 292010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 292000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 291000)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, producer = variant % 4;
@@ -43655,6 +43731,7 @@ private:
 	u64 m_entry_fetch_cycle = 0, m_entry_stack_cycle = 0;
 	std::stringstream m_saved_vector;
 	std::stringstream m_saved_pipeline;
+	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
 	u64 m_pipeline_expected_cycle = 0;
 	bool m_pipeline_empty_nmi = false;
 	bool m_pipeline_memory_case = false;
@@ -43753,6 +43830,8 @@ private:
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
+	if (!strcmp(config.options().bios(), "instr-observer"))
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose") || !strcmp(config.options().bios(), "bus-stm")) m_cpu->set_c5416_bus_profile(true);
 	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
@@ -44552,6 +44631,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(213, "asm-delay-edge", "Rejected ASM load straddling a control delay")
 	ROM_SYSTEM_BIOS(214, "repeat-body-isr", "Software-saved ISR repeat returning directly into an outer body")
 	ROM_SYSTEM_BIOS(215, "add-sp", "Retained absolute ADD from SP and stack-update contexts")
+	ROM_SYSTEM_BIOS(216, "instr-observer", "Execute-owned instruction observation without program-read aliases")
 ROM_END
 
 ROM_START(tms54rom4)

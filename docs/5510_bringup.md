@@ -14,7 +14,7 @@ profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
 `007f,0001,0055`, and enters the recorder routine. It also compares the
 recorder overlay's 73,762 RAM destination words before execution (four
-register words excluded) and enters original recorder startup at `0073f9`.
+register words excluded) and enters original recorder startup at `0073f8`.
 The paired copy witness records repeated MVDD (`e598`) at `03:8eda`
 completing 128 ordered source reads from `0000..007f` into RAM beginning
 at `0e35`. The current legacy observer does not renew that instruction-owned
@@ -67,15 +67,14 @@ ten-second control and fifteen-second poll/metadata traffic: input cursor
 The former NORM stop was downstream of incomplete merge-loop restoration;
 the correction and its independent regression are documented below.
 
-This remains a failed integration run, not a recording acceptance. The
-metadata response has status=`00`, parameter=`07`, reason=`03`, success=`0`;
-the bench ends on its exact-one startup-observation assertion. Its program
-read tap at `73f8` records two live-PC-qualified matches, with PMST=`2028`
-and `202c`, rather than one. A separate Execute breakpoint observes exactly
-one startup entry, so the program-read counter overcounts; the assertion is
-retained rather than silently relaxed. The metadata operation finds
-`REL_001 .REL` and fails because the test request supplies empty ID3 fields,
-not because the file is absent. The request contract is detailed below.
+The empty-field metadata response has status=`00`, parameter=`07`,
+reason=`03`, success=`0`. The operation finds `REL_001 .REL` and rejects
+empty ID3 fields, not a missing file. Startup acceptance now uses a generic
+instruction observer and still requires exactly one Execute entry at
+`0073f8`, with captured opcode `fd00`. The retired program-read counter
+reported two live-PC-qualified reads; a separate Execute breakpoint and the
+new observer each report one actual entry. Ordinary reads, prefetch and
+advanced live PCs are not instruction identity.
 
 The separate `bootrecmeta` positive input supplies filename `TEST`, artist
 `TEST` and title `MAME`. Updater `02:8385` and outer operation `03:8dc3`
@@ -84,10 +83,9 @@ success=`1`. Absolute ADD `00f8 0018` at `03:a1cf` now reads mapped SP
 under its independent arithmetic/producer contract. Post-save refresh
 completes within the twenty-second window: PC=`02:98ea`, ILLEGAL=`0`,
 IDLE=`1`, input cursor `58`, seven responses, no pending acknowledgement
-and one reported track. The run still exits 3 on the legacy startup counter
-(`2`, expected `1`), not a CPU coverage stop. Replacing that program-read
-counter with an instruction-owned acceptance observation is the immediate
-tooling boundary; its assertion has not been weakened.
+and one reported track. Its internal startup, native metadata and dispatch
+assertions pass without weakening the exact-one condition. File/audio
+completeness, cold reopening of the saved track and playback remain open.
 
 The empty-field fixture observes 2,108 NAND program setups, 2,107 confirms and
 1,098,240 data writes, but track count is zero and the recorded file is not
@@ -1537,6 +1535,24 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
+The instruction-observation checkpoint passes `instr-observer`: 32 cases
+and save/replays covering atomic/staged frontends, two logical pages,
+OVLY clear/set and four snapshots. Each observes the same seven ordered
+instruction entries, including three real repeat iterations; ordinary
+program reads, extension words and annulled fetches produce no extra events.
+Overwriting program bytes after fetch does not change the captured opcode.
+The staged accelerated-repeat execution path is observed separately from
+the normal Execute slot. This optional diagnostic callback is configuration,
+not architectural state or a physical pin; it does not assert retirement
+or an atomic snapshot of other registers. Tooling acceptance is 2,879 tests
+(one skip). Fresh `check-mu4-bootstrap-original` runs pass for both
+`bootrecmeta` (native success) and `bootrecstage` (expected empty-field
+rejection), with exactly one startup Execute entry each and unchanged source
+NAND. Their endpoint hashes reproduce the pre-observer captures exactly.
+The older atomic `bootrecordram` gate and native 5110 save-state round trip
+also pass with this observation wiring.
+Full default CPU population coverage remains revision-bound below.
+
 The mapped-SP ADD checkpoint passes `add-sp` (4,096 arithmetic cases/restores,
 576 stack-update contexts/restores and twenty control/peripheral exclusions),
 plus the unchanged `add-absolute` and `add-bk` controls. The native 5110
@@ -1656,8 +1672,9 @@ ordinary low-page RAM. Focused MVDD acceptance and aggregate regression
 scopes are recorded separately. Unknown physical register identities,
 especially data `002a`, remain separate from transaction conformance.
 
-For execution tracing, `pc=0073f9` is an executed startup address in the
-observed run. Debugger disassembly of common-window PCs on nonzero pages
+For execution tracing, startup's instruction address is `0073f8`; the legacy
+`pc=0073f9` was an advanced live PC, not the executed address. Debugger
+disassembly of common-window PCs on nonzero pages
 is not reliable: use the explicit loader projection of program records
 (for example `02:1f83` to physical `001f83`), not a merged data/program
 dictionary or a missing-word-as-zero fallback.
@@ -4089,16 +4106,13 @@ original staged execution, input media and pin protocol, but supplies
 filename `TEST`, artist `TEST`, title `MAME`. Its request has 18 payload
 bytes, 24 total bytes and XOR checksum `93`; its positive acceptance requires
 the native success response, not merely any parameter-7 reply. It introduces
-no firmware-state writes. Both profiles retain the exact-one legacy startup
-observation assertion pending an instruction-owned replacement.
+no firmware-state writes. Both profiles require exactly one instruction-owned
+startup entry; no duplicate suppression or relaxed expected count is used.
 
-The pre-SP-admission non-debugger run (`tmp/mu4-metadata-final/error.log`) reproduces
-native success and then the mapped-SP exclusion at `03:a1cf`; exit 3 remains
-the expected failed integration result. Its exported 69,206,016-byte NAND
-has SHA-256 `d44b5d50e58e56b44b4fc6fd0b365e342cd02f767a32c77992458cda7c7b85f8`;
-the unchanged input hash is
+The exported 69,206,016-byte NAND retains the independently created input,
+whose unchanged SHA-256 is
 `75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
-Changed data pages are 34, 161, 288 and 352--631; no spare bytes change.
+Changed data pages are 34, 161, 288, 352--631 and 127008; no spare bytes change.
 Page 288 begins `TEST` followed by a zero terminator and retains extension
 `REL`; the following padding is not normalized. Page 352 begins an ID3v2.3
 header with size `00000064`, then `TIT2` containing encoding byte zero plus
@@ -4107,13 +4121,27 @@ payloads each). This corrects the static title/artist order inference and
 proves these particular stored fields, not filesystem consistency, audio
 completeness or playback. Resident-memory comparison still passes exactly.
 
-After mapped-SP admission, `tmp/mu4-add-sp-positive/error.log` reaches idle
-without an instruction exclusion and reports one track. The endpoint hash
+Post-save refresh reaches idle without an instruction exclusion and reports
+one track. The endpoint hash
 is `93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`;
-relative to the same unchanged input it additionally changes page 127008,
-with no spare-byte delta. Directory and ID3 bytes match the fields above.
-That additional page is not yet decoded as a filesystem commit. The legacy
-startup-read assertion still fails, so this is not a passing recorder gate.
+directory and ID3 bytes match the fields above. Page 127008 changes after
+refresh but is not yet decoded as a filesystem commit. The internal native
+metadata check passes; this is not a recorded-audio or playback acceptance.
+
+Reproduce from a completed retained run:
+
+```sh
+make check-mu4-bootstrap-original \
+  MU4_BOOTSTRAP_BIOS=bootrecmeta \
+  MU4_BOOTSTRAP_SOURCE_RUN=/path/to/completed-retained-run
+```
+
+Use `bootrecstage` for the empty-field rejection control. Each run copies
+that bench's own NAND and checks the copy remains unchanged. The staged
+runner requires exact resident/overlay comparison, one Execute-owned startup
+entry, original request acknowledgement, native dispatch and the expected
+success/failure reply. It does not use the atomic profile's live-PC-qualified
+loader-name read tap as a staged loader identity oracle.
 
 The retained atomic `bootrecsave` diagnostic schedules a resident status poll
 after the native return, then parameter `7` with filename `TEST` and empty

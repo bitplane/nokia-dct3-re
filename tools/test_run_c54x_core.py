@@ -12,6 +12,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_instruction_observer_scope(self):
+        marker, ending = EXTRA_PROFILES['instr-observer']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='instr-observer')
+        for bad in (output.replace('restore=32', 'restore=0'),
+                    output.replace('ordinary_reads=0', 'ordinary_reads=1'),
+                    output.replace('captured_opcode=1', 'captured_opcode=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='instr-observer')
+
     def test_add_sp_requires_arithmetic_contexts_and_exclusions(self):
         markers, ending = EXTRA_PROFILES['add-sp']
         output = '\n'.join((*markers, ending)) + '\n'

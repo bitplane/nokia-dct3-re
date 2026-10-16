@@ -1060,7 +1060,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_pll_clock_stop_cb(*this),
 	m_clkout_divisor_cb(*this),
 	m_iack_enable_cb(*this),
-	m_system_clock_cb(*this)
+	m_system_clock_cb(*this),
+	m_instruction_observer_cb(*this)
 {
 }
 
@@ -2510,6 +2511,8 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_repeat_store_pending = true;
 			return;
 		}
+		// Accelerated iterations execute outside the ordinary pipeline slot.
+		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(m_pipeline_repeat_address, m_pipeline_repeat_word);
 		++m_rpt_iteration;
 		if (immediate_store)
 		{
@@ -3910,6 +3913,7 @@ void tms320c54x_device::pipeline_step()
 		m_xpc = (address >> 16) & 0x7f;
 		m_op = m_pipeline_word[5];
 		debugger_instruction_hook(address);
+		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
 		++m_pc;
 		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
 		++m_opcode_count[m_op];
@@ -6883,6 +6887,7 @@ void tms320c54x_device::execute_run()
 		const u16 previous_sp = m_sp;
 		const bool repeat_was_armed = m_rpt_armed;
 		m_op = fetch();
+		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(instruction_address, m_op);
 		m_capture_extensions = (m_op & 0xff00) == 0x6f00 && machine().options().verbose();
 		if (m_capture_extensions)
 		{
