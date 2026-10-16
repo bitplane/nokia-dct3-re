@@ -353,6 +353,20 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=name)
 
+    def test_delay_dld_scope(self):
+        for name in ('dld-delay', 'dld-delay-edge'):
+            marker, ending = EXTRA_PROFILES[name]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=name)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('ordered_reads=2', 'ordered_reads=1') if name == 'dld-delay'
+                        else output.replace('data_reads=0', 'data_reads=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(name=name, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=name)
+            with self.assertRaises(ValueError):
+                check_result(output, 3)
+
     def test_delay_mac_scope(self):
         for name in ('mac-delay', 'mac-delay-edge'):
             marker, ending = EXTRA_PROFILES[name]

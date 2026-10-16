@@ -9030,7 +9030,7 @@ private:
 		unsigned const fixture = (variant % 4) * 20 + ((variant / 4) % 2) * 480;
 		start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, (!strcmp(machine().options().bios(), "mac-delay-edge") ? 0x2800 : !strcmp(machine().options().bios(), "mpy-delay-edge") ? 0x2000 : 0x8000) | f.mode); program.write_word(f.base + 0x604, f.literal);
+		program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, (!strcmp(machine().options().bios(), "dld-delay-edge") ? 0x5600 : !strcmp(machine().options().bios(), "mac-delay-edge") ? 0x2800 : !strcmp(machine().options().bios(), "mpy-delay-edge") ? 0x2000 : 0x8000) | f.mode); program.write_word(f.base + 0x604, f.literal);
 		m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -11276,6 +11276,7 @@ private:
 		u32 caller, target;
 		u64 a, b, result;
 		std::array<u16, 8> initial, final;
+		u16 memory_low = 0;
 		unsigned delay() const { return kind == 5 ? 1 : 2; }
 		unsigned literal_clock() const { return kind == 5 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
 	};
@@ -11314,6 +11315,19 @@ private:
 		f.read = delay_multiply_fixture::operand_read(f.kind, 1); f.checkpoint = std::array<unsigned, 3>{f.literal_clock(), f.read - 1, f.read}[v / 49152];
 		return f;
 	}
+	static delay_load_fixture delay_dld_case(unsigned v)
+	{
+		auto f = delay_load_case(v);
+		bool const odd = (v / 192) % 2 == 0;
+		f.address = odd ? 0x5007 : 0x5004;
+		f.literal = f.form == 3 ? f.address : odd ? 2 : 0xffff;
+		if (f.form == 1 || f.form == 2) f.final[f.selected] = f.address;
+		f.st1 = (f.st1 & ~u16(0x200)) | (f.flags & 2 ? 0x80 : 0);
+		f.memory_low = std::array<u16, 4>{0x1234, 0xffff, 0, 0x8001}[(v / 768) % 4];
+		f.result = (u64(f.memory) << 16) | f.memory_low;
+		if ((f.flags & 1) && (f.memory & 0x8000)) f.result |= 0xff00000000ULL;
+		return f;
+	}
 	static delay_load_fixture delay_add_case(unsigned v)
 	{
 		delay_load_fixture f{};
@@ -11346,22 +11360,24 @@ private:
 	{
 		bool const shifted = !strncmp(machine().options().bios(), "shift-delay", 11);
 		bool const add = !strcmp(machine().options().bios(), "add-delay");
-		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = add ? delay_add_case(variant) : delay_load_case(variant, shifted);
+		bool const dld = !strcmp(machine().options().bios(), "dld-delay");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = dld ? delay_dld_case(variant) : add ? delay_add_case(variant) : delay_load_case(variant, shifted);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.caller + 0x600 + i, 0xf495);
 		program.write_word(f.caller + 0x600, f.kind == 4 ? 0xfb80 | (f.target >> 16) : std::array<u16, 6>{0xf273, 0xfa45, 0xfa45, 0xf274, 0, 0xfe00}[f.kind]);
 		if (f.kind != 5) program.write_word(f.caller + 0x601, 0x700);
 		u16 const mode = f.form == 3 ? 0xf8 : (0xe0 + f.form * 8) | f.ar;
-		program.write_word(f.caller + 0x600 + f.delay(), add ? 0x00f8 | (f.destination << 8) : shifted ? 0x6f00 | (f.form == 0 ? 2 : f.form == 1 ? 0x83 : 0x93) : 0x1000 | (f.destination << 8) | mode); program.write_word(f.caller + 0x601 + f.delay(), f.literal);
+		program.write_word(f.caller + 0x600 + f.delay(), add ? 0x00f8 | (f.destination << 8) : shifted ? 0x6f00 | (f.form == 0 ? 2 : f.form == 1 ? 0x83 : 0x93) : (dld ? 0x5600 : 0x1000) | (f.destination << 8) | mode); program.write_word(f.caller + 0x601 + f.delay(), f.literal);
 		for (u32 at : {f.caller + 0x604, f.target + 0x700}) { program.write_word(at, 0x880f | (f.destination << 8)); program.write_word(at + 1, 0xf4e1); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2468); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
 		data.write_word(0x3000, 0x700); data.write_word(f.address, f.memory);
+		if (dld) data.write_word(f.address ^ 1, f.memory_low);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_pipeline_extensions_reads = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x3000) { expect(f.kind == 5 && word == 0x700 && !m_fast_stack_reads, "RETD load delay has one independent return-frame read"); ++m_fast_stack_reads; return; } expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Delayed LD retains exactly one RAM word at Read"); ++m_pipeline_operand_reads; });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_load_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff || at == 0x2ffe) { unsigned const i = m_pipeline_register_writes; expect((f.kind == 3 || f.kind == 4) && i < (f.kind == 4 ? 2 : 1) && at == 0x2fff - i && word == (i ? f.caller >> 16 : 0x604), "Delayed load does not change its owning call frame"); ++m_pipeline_register_writes; return; } expect(at == 0x0f && word == u16(f.result) && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() >= f.read + 2, "Target observes the completed delay load once"); ++m_pipeline_store_writes; });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_load_read", [this, f, dld](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x3000) { expect(f.kind == 5 && word == 0x700 && !m_fast_stack_reads, "RETD load delay has one independent return-frame read"); ++m_fast_stack_reads; return; } expect(m_pipeline_operand_reads < (dld ? 2U : 1U) && at == (f.address ^ m_pipeline_operand_reads) && word == (m_pipeline_operand_reads ? f.memory_low : f.memory) && m_cpu->pipeline_cycles() == f.read, "Delayed load retains its ordered RAM operand once at Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_load_write", [this, f, dld](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff || at == 0x2ffe) { unsigned const i = m_pipeline_register_writes; expect((f.kind == 3 || f.kind == 4) && i < (f.kind == 4 ? 2 : 1) && at == 0x2fff - i && word == (i ? f.caller >> 16 : 0x604), "Delayed load does not change its owning call frame"); ++m_pipeline_register_writes; return; } expect(at == 0x0f && word == u16(f.result) && !m_pipeline_store_writes && m_pipeline_operand_reads == (dld ? 2U : 1U) && m_cpu->pipeline_cycles() >= f.read + 2, "Target observes the completed delay load once"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.caller + 0x601 + f.delay(), f.caller + 0x601 + f.delay(), "delay_load_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.literal_clock(), "Delayed LD owns one literal without decoding it as an opcode"); ++m_pipeline_extensions_reads; });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255260;
 		m_cpu->set_state_int(STATE_GENPC, f.caller + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -14096,7 +14112,8 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-fcall")) { start_block_far_call(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-fcall-edge")) { start_block_far_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-back")) { start_block_back(); return; }
-		if (!strcmp(machine().options().bios(), "load-delay") || !strcmp(machine().options().bios(), "add-delay")) { start_delay_load(); return; }
+		if (!strcmp(machine().options().bios(), "load-delay") || !strcmp(machine().options().bios(), "add-delay") || !strcmp(machine().options().bios(), "dld-delay")) { start_delay_load(); return; }
+		if (!strcmp(machine().options().bios(), "dld-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "shift-delay")) { start_delay_load(); return; }
 		if (!strcmp(machine().options().bios(), "shift-delay-edge")) { start_shift_delay_edge(); return; }
 		if (!strcmp(machine().options().bios(), "ld-delay-edge")) { start_delay_load_edge(); return; }
@@ -41674,6 +41691,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 15) { start_delay_store_edge(variant + 1); return; }
 				if (!strcmp(machine().options().bios(), "mac-delay-edge")) { osd_printf_info("TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS boundary complete"); }
+				if (!strcmp(machine().options().bios(), "dld-delay-edge")) { osd_printf_info("TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay DLD boundary complete"); }
 				if (!strcmp(machine().options().bios(), "mpy-delay-edge")) { osd_printf_info("TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay MPY boundary complete"); }
 				osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
@@ -41947,19 +41965,21 @@ private:
 		{
 			bool const shifted = !strcmp(machine().options().bios(), "shift-delay");
 			bool const add = !strcmp(machine().options().bios(), "add-delay");
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = add ? delay_add_case(variant) : delay_load_case(variant, shifted);
+			bool const dld = !strcmp(machine().options().bios(), "dld-delay");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = dld ? delay_dld_case(variant) : add ? delay_add_case(variant) : delay_load_case(variant, shifted);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (tick > f.read && !f.destination ? f.result : f.a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (tick > f.read && f.destination ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((add ? tick > f.read : tick >= f.read - 1) ? f.final_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Delay arithmetic/load publishes its retained result and owned flags in Execute");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (add || tick < f.read - 1 ? f.initial[i] : tick == f.read - 1 ? f.final[i] : 0x2200 + i), "Delay addressing preserves or updates the selected pointer once");
 			if (tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.caller + 0x601 + f.delay(), 0xdead); }
 			if (!add && tick == f.read - 1) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
-			if (tick == f.read && (!add || f.address >= 0x60)) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
+			if (tick == f.read && (!add || f.address >= 0x60)) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); if (dld) m_cpu->space(AS_DATA).write_word(f.address ^ 1, 0xbeef); }
 			if (tick == f.checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save delayed LD around literal Access and Read ownership"); }
 			if (tick == 24)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (f.kind == 2 ? f.caller + 0x606 : f.target + 0x702) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == (f.kind == 4 ? 2U : unsigned(f.kind == 3)) && m_fast_stack_reads == unsigned(f.kind == 5) && m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 4 ? 0x2ffe : f.kind == 3 ? 0x2fff : f.kind == 5 ? 0x3001 : 0x3000), "Delayed LD reaches the selected target with correct page frame and observed data");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (f.kind == 2 ? f.caller + 0x606 : f.target + 0x702) && m_pipeline_operand_reads == (dld ? 2U : 1U) && m_pipeline_store_writes == 1 && m_pipeline_register_writes == (f.kind == 4 ? 2U : unsigned(f.kind == 3)) && m_fast_stack_reads == unsigned(f.kind == 5) && m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 4 ? 0x2ffe : f.kind == 3 ? 0x2fff : f.kind == 5 ? 0x3001 : 0x3000), "Delayed LD reaches the selected target with correct page frame and observed data");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed LD without duplicate data literal or frame transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255270; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < (add ? 18431U : shifted ? 110591U : 147455U)) { start_delay_load(variant + 1); return; }
+				if (dld) { osd_printf_info("TMS320C54x delayed DLD: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=offset,preincrement,circular,absolute registers=8 offsets=-1,2 parity=even,odd destinations=2 patterns=4 sxm_c16=4 compatibility_states=2 pages=2 snapshots=3 ordered_reads=2 literal_fetches=1 pointer_updates=once target_observes_result=1 interrupt_repeat_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed DLD complete"); }
 				if (add) { osd_printf_info("TMS320C54x delayed absolute ADD: PASS cases=18432 restore=18432 controls=BD,CALLD,FCALLD,RETD sources=RAM,AR3,AL,AH,BL,BH destinations=2 memory_values=4 initial_values=4 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 literal_fetches=1 call_frames=owned target_observes_result=1 conditional_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed absolute ADD complete"); }
 				if (shifted) { osd_printf_info("TMS320C54x delayed shifted LD: PASS cases=110592 restore=110592 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postincrement destinations=2 shifts=32 memory_values=4 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed shifted LD complete"); }
 				osd_printf_info("TMS320C54x delayed LD: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=offset,preincrement,circular,absolute registers=8 offsets=2 destinations=2 memory_values=4 sxm_ovm=4 compatibility_states=2 pages=2 snapshots=3 source_reads=1 literal_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delayed LD complete");
@@ -44109,6 +44129,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(206, "mac-bk", "Mapped BK signed multiply-accumulate operand ownership")
 	ROM_SYSTEM_BIOS(207, "mac-delay", "Retained signed multiply-accumulate in complete control delays")
 	ROM_SYSTEM_BIOS(208, "mac-delay-edge", "Rejected multiply-accumulate straddling a control delay")
+	ROM_SYSTEM_BIOS(209, "dld-delay", "Retained double-word load in complete control delays")
+	ROM_SYSTEM_BIOS(210, "dld-delay-edge", "Rejected double-word load straddling a control delay")
 ROM_END
 
 ROM_START(tms54rom4)

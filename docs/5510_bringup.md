@@ -50,11 +50,17 @@ reads mapped BK (`0019`). Immediate store `76b2` at `03:df3e` now uses
 `*AR2+0` addressing. FCALAD B (`f7e7`) at `03:b3a2` also executes.
 Signed MAC `29f8` at `03:b305` now reads mapped BK (`0019`), and
 two-word MAC `28f8 0015` at `03:cc06` reads mapped AR5 in the FCALLD
-delay owned by `fb83 cb1e` at `03:cc04`. The current exclusion is
-`56e3 0010` at `02:a4d3`: DLD `*AR3($0010),A` filling both delay words
-of BD `f273 a4dc` at `02:a4d1`, inside the `a4cb..a4dd` block repeat.
-Live terminal PC is `02:a4d5`, not the owning instruction address;
-SP=`5cc4`, BRC=`000b`. NAND writes alone do not prove complete recording.
+delay owned by `fb83 cb1e` at `03:cc04`. DLD `56e3 0010` at `02:a4d3`
+also passes in both delay words of BD `f273 a4dc` at `02:a4d1`, inside
+the `a4cb..a4dd` block repeat. The current exclusion is absolute immediate
+ST `76f8 0014 fdae` at `03:c72c`, targeting AR4. Its Read guard requires
+early DAGEN-write ownership; do not simply publish it at retirement when
+the following MPY already needs AR4 for address calculation.
+Live terminal PC is `03:c732`, not the owning instruction address;
+SP=`5ebd`, BRC=`0000`, CPU ILLEGAL=`1`. The passive observer records
+that flag explicitly: searching only for the words "unsupported" or
+"illegal" misses this guard's diagnostic. NAND writes alone do not prove
+complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -111,6 +117,26 @@ MAC execution path and complete delay-word accounting, with no new CPU state.
 `mac-delay-edge` separately checks that a two-word MAC cannot start in the
 last one-word slot. Interrupt arrival during these MAC delays, waited
 memory and physical phase timing remain unvalidated.
+
+### Double-word loads in control delay words
+
+`--profile dld-delay` passes 147,456 cases and save/replays over BD,
+taken/untaken BCD, CALLD, cross-page FCALLD and RETD. Offset, preincrement,
+circular and absolute forms cover eight AR selectors, offsets -1/+2 with
+even/odd effective addresses, both destinations, four distinct long-word
+patterns, SXM/C16, both compatibility states, two pages and three checkpoints.
+The first addressed word is the high half and its XOR-1 partner is the low
+half; both are sampled once in Read. Sign extension follows SXM, and C16
+does not change this load's final bit pattern (SPRU172C section 4-42).
+
+The fixture poisons the extension after Fetch, all ARs after Access and both
+source words after Read. It checks the full accumulator result and preserved
+other accumulator/status/T, one pointer update, exact call/return frames and
+the selected target's observation of the completed value. The existing DLD
+execution path and saved pipeline operands are reused; no CPU state is added.
+The separate `dld-delay-edge` fixture covers partial-slot rejection.
+Interrupt arrival, waited memory, repeat composition and physical phase timing
+are not established by these isolated fixtures.
 
 ### Software-saved repeat context
 
@@ -1379,6 +1405,12 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Aggregate acceptance includes these separately scoped checkpoints:
 
+- Control-delay DLD acceptance: `dld-delay` passes 147,456 cases and
+  save/replays; `dld-delay-edge` passes sixteen. The shared fixture's
+  `load-delay` and controls `ld-delay-edge`, `add-delay`, `mac-delay-edge`,
+  `st-delay-edge` and `rptb-back` also pass. Native 5110 save-state,
+  exact MU4 resident-memory comparison and 2,874 tooling tests (one skip)
+  pass. The full default population was not rerun for this delay admission.
 - Control-delay MAC/MAS acceptance: `mac-delay` passes 147,456 cases
   and save/replays; `mac-delay-edge` passes sixteen. The shared fixture's
   `mpy-delay` and the controls `mpy-delay-edge`, `st-delay-edge`,
