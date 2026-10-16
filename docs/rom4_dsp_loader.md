@@ -35,12 +35,13 @@ instruction-reference restriction on far calls inside repeat blocks does
 not specify a page-qualified comparator or a hardware trap, and does not
 justify importing the C55x compatibility mode's automatic BRAF clearing.
 
-The `rptb-page` fixture checks 192 cases with replay: both atomic and staged
+The `rptb-page` fixture checks 384 cases with replay: both atomic and staged
 frontends, BRC 0/1/2/7, caller pages 0/2/127, foreign-page REA collisions
-and safe controls, with four save points. In the colliding case, a foreign
+and safe controls, FCALL/FCALLD, and four save points. In the colliding case, a foreign
 callee consumes the remaining loop count and repeats at its own page's
 RSA. Caller iteration counts, foreign prefix/endpoint counts, BRC/BRAF,
-SP, return PC/page and ordered two-word frames are checked independently.
+SP, return PC/page, ordered two-word frames and once-only delay effects
+are checked independently.
 The former staged page qualifier suppresses this result; the atomic
 frontend already follows the 16-bit comparator. This is a manual-derived
 regression, not a silicon timing measurement or permission to admit every
@@ -51,10 +52,11 @@ python3 tools/run_c54x_core.py --profile rptb-page \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 
-The 25 focused repeat/control profiles, native 5110 save-state gate and
-MU4 cold saved-track catalogue gate pass. The delayed far-call guard at
-the [REL playback boundary](5510_bringup.md#saved-track-playback-boundary)
-remains separate. The reference PDF is retained locally at
+The focused repeat/control profiles, native 5110 save-state gate and
+MU4 cold saved-track catalogue gate pass. Delayed far-call/loop composition
+has separate `rptb-fcalld` acceptance; none of these is full
+[REL playback acceptance](5510_bringup.md#saved-track-playback-boundary).
+The reference PDF is retained locally at
 `roms/reference-docs/c54x/ti_tms320c54x_extended_addressing_spra599a.pdf`,
 SHA-256 `fbbe43aa06609af2491e71213b19145f11db3d05169939daae5358efcea52432`.
 

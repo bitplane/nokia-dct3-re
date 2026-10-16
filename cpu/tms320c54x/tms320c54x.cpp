@@ -3030,8 +3030,8 @@ void tms320c54x_device::pipeline_step()
 		bool const internal_delayed_block_branch = (word == 0xf273 || (staged_accumulator_branch(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
-		bool const block_far_call = staged_far_call(word) && !BIT(word, 9) &&
-			m_pipeline_address[2] + 1 < m_pipeline_block_end_address &&
+		bool const block_far_call = staged_far_call(word) &&
+			(BIT(word, 9) ? m_pipeline_address[2] + 3 <= m_pipeline_block_end_address : m_pipeline_address[2] + 1 < m_pipeline_block_end_address) &&
 			(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
 		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
@@ -3813,7 +3813,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[4] = extended ? (mode == 0xf8 ? literal : long_offset_address(mode, indirect_ar(mode, 4), s16(literal), 4)) : basic_address(4, mode);
 		if (m_pipeline_operand_address[4] < 0x60)
 		{
-			logerror("%s: staged shifted store register/peripheral destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged shifted store register/peripheral destination is unsupported instruction=%06x word=%04x operation=%04x destination=%04x\n",
+				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_immediate[4], m_pipeline_operand_address[4]);
 			m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);

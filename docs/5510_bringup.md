@@ -91,14 +91,13 @@ NAND. File/audio completeness and playback remain open.
 The active `bootplaystage` diagnostic sends an original playback request
 through serial pins and loads the matching `RELSI16` image. Its 49,839
 compared program/data words match original marker `aa99` before startup;
-four low-window words remain excluded. Native execution now passes the
-mapped-SP MVKD and stops at `02:6116`, `fb82 510c`: a delayed far call
-inside the active block-repeat body `02:6116..6120`. Delayed far calls
-and block repeats have separate coverage, but this combination remains
-guarded pending its frame/delay/loop-restoration tests and reconciliation
-with TI's far-call/block-repeat restriction. The generic 16-bit repeat
-comparator has independent TI documentation and focused acceptance;
-it must not be made XPC-private to avoid the documented page hazard.
+four low-window words remain excluded. Native execution passes mapped-SP
+MVKD and the delayed far call inside block `02:6116..6120`. It now stops
+at `02:5fdd`, `6ff8 0015 0c81`: `STL A,1,*($0015)`, targeting C54x
+AR5. The shifted-store mapped-destination guard remains in place pending
+independent DAGEN-publication/consumer-latency tests. The generic 16-bit
+repeat comparator retains the documented foreign-page hazard; delayed
+calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
 unavailable-ROM boundary.
 
@@ -1031,11 +1030,14 @@ ordinary backward branches as unsupported. Unconditional near calls remain
 covered by `rptb-fcall-edge`. Outside-block branches, delayed back edges and
 measured physical phase timing remain unvalidated.
 
-Non-delayed FCALL is admitted from inside a block when the complete call
-precedes the endpoint and its target is outside that block. Existing retained
+FCALL is admitted from inside a block when the complete call precedes the
+endpoint; FCALLD additionally requires both delay words inside the block.
+Its target must be outside the caller's logical block. Existing retained
 frames and Access-time redirection preserve the caller's Decode-owned loop
 state and rebuild discarded endpoint predictions; no separate call/loop state
-or save fields are introduced. Callees do not acquire the caller's block tags.
+or save fields are introduced. Code outside the low 16-bit interval does not
+acquire its body tags, but a foreign page's matching low PC can consume the
+loop. See the shared [repeat-endpoint contract](rom4_dsp_loader.md#repeat-endpoint-and-page-hazard).
 
 `rptb-fcall` passes 768 cases/restores across counts 0/1/2/7, early/near-end
 placement, two caller pages, same/cross-page callees, one/two nested far-call
@@ -1043,11 +1045,22 @@ frames, none/IRQ/NMI and four snapshots. Interrupts arrive on the first callee
 RAM read, not at every possible clock. The test checks one ordered copy per
 outer iteration, balanced frame/interrupt transactions, caller-page return,
 prefix/suffix counts, BRC, RSA/REA and final BRAF. The original recorder reaches
-its `FCALL` Execute hook once before the next exclusion. `rptb-fcall-edge`
-adds 16 cases/restores retaining delayed, endpoint, internal-target and near-call
-exclusions before data work or frame allocation; these are prototype limits,
-not silicon traps. Callee loop-control writes, arbitrary control mixtures and
+its `FCALL` Execute hook once before the next exclusion. `rptb-fcalld` adds
+2,304 replay cases with the same counts/pages/depths/interrupts, middle and
+endpoint delay placement, and two single-word, one double-word or original
+LD/NOP delay layouts. It checks once-only delay effects and paired page/PC
+frames returning to call+4. `rptb-fcall-edge` has 20 cases/restores retaining
+delayed/non-delayed internal targets, a non-delayed call ending at the
+endpoint, near calls and delayed spans spilling outside the block. These
+reject before data work or frame allocation and are prototype limits, not
+silicon traps. Callee loop-control writes, arbitrary control mixtures and
 physical phase timing remain unvalidated.
+
+Acceptance for this composition includes all 288 required checks in the
+default isolated CPU suite, 16 focused repeat/control profiles, the native
+5110 save-state round trip and 2,891 tool tests (one skipped). The original
+REL run is a separate failed coverage diagnostic at the mapped shifted-store
+boundary, not an audio acceptance test.
 
 MACSU Xmem,Ymem,A/B retains both RAM words in Read, treating X as unsigned
 and Y as signed independently of SXM. X is also published to T in Read, after
@@ -4303,20 +4316,22 @@ The original REL sequence at `02:a81e`, `7090 0018`
 (`MVKD $0018, *AR0+`) now executes. Neighboring instructions copy AR1,
 AR6 and AR7, and the adjacent restore sequence uses MVDK to restore SP;
 that context-shaped layout does not by itself identify a task or RTOS ABI.
-Native execution subsequently stops at `02:6116`, `fb82 510c`
-(`FCALLD $02:510c`), the first instruction of active block `02:6116..6120`.
+The original `02:6116`, `fb82 510c` (`FCALLD $02:510c`) is the first
+instruction of active block `02:6116..6120`.
 The block count is initialized to six at `02:610f`; the call's delay words
-are `e801 f495`. The staged block-control guard rejects the delayed far
-call before its frame is allocated. This is not automatically a legal
-composition waiting for a test: TI's [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+are `e801 f495`. TI's [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
 FCALL[D] page 4-57 and RPTB[D] page 4-148, explicitly restricts far calls
 inside block repeats. This restriction does not define a hardware trap or
 prove that the supplied program is invalid. TI's separate
 [extended-addressing report](rom4_dsp_loader.md#repeat-endpoint-and-page-hazard)
 establishes that REA compares only the low PC, including on foreign pages.
-The repaired staged comparator passes the paired atomic/staged hazard
-fixture; this does not rescind the instruction-reference restriction or
-by itself validate the delayed call.
+The paired atomic/staged hazard fixture passes 384 replays with FCALL and
+FCALLD. The bounded delayed-call composition now passes its separate
+2,304-case frame/delay/count/replay fixture and the 20 exclusion controls.
+This models the explicit instruction/register effects without rescinding
+the manual restriction or claiming measured silicon phases or unrestricted
+control mixtures. It does not clear BRAF, bypass the loop, synthesize a
+callee return or introduce hidden call-owned repeat registers.
 
 `mu4_context_contract.py` pins all 25 caller words and all 55 callee words.
 The callee has one forward BGT branch at `02:5117`, with a two-word
@@ -4328,18 +4343,26 @@ requires incoming CPL=1. Do not assign the following routine's BRC write
 at `02:5170` to this callee: the separate prologue starts at `02:5143`.
 
 The read-only native snapshot matches all 25 loop words in the common
-program window. At the guard it has PMST=`202c`, ST1=`e104`, SP=`d6f6`,
-BRC=`0006`, RSA=`6116` and REA=`6120`; source image and live code agree
-on the same-page `02:510c` call and both delay words. Initial overlay
-comparison also covers the pinned callee. This excludes a missing loop
-word or unclassified callee-owned repeat setup, not the provisional
-physical DA150 map or all call/loop hazards. The next admission must
-establish call/return frame balance, both delay words, actual repeat
-counts and replay through the callee, without synthesizing its return or
-replacing the bitstream input. The existing guard stays until then.
+program window, with OVLY enabled, CPL/BRAF set and BRC/RSA/REA equal to
+`0006/6116/6120`. Source image and live code agree on the same-page call
+and both delay words; initial overlay comparison covers the pinned callee.
+This excludes missing loop words or an unclassified callee-owned repeat
+setup, not the provisional physical DA150 map or all call/loop hazards.
+
+The unchanged external playback input now advances past this composition
+and reaches `02:5fdd`, `6ff8 0015 0c81`, `STL A,1,*($0015)`.
+The exact guarded destination is C54x AR5 (`0015`), not an unidentified
+external peripheral. The live PC is already `02:5fe3`; instruction ownership
+comes from the retained Read slot, not that advanced PC. The run observes
+929,701 NAND data reads and 26,211 strobes, but these are progress witnesses,
+not decoder/output acceptance. Shifted mapped stores need their own
+Execute-owned DAGEN publication, consumer latency, bank-conflict,
+retained-address/source and replay tests before this next guard is relaxed.
 
 ```sh
 python3 tools/run_c54x_core.py --profile mvkd-sp \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile rptb-fcalld \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 
