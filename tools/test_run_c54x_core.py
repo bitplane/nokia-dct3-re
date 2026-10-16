@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_accumulator_square_scope(self):
+        marker, ending = EXTRA_PROFILES['squr']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='squr')
+        for bad in (output.replace('restore=32768', 'restore=0'),
+                    output.replace('operand_bits=17', 'operand_bits=16'),
+                    output.replace('t_unchanged=1', 't_unchanged=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='squr')
+
     def test_software_saved_interrupt_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['repeat-isr']
         output = marker + '\n' + ending + '\n'

@@ -2952,7 +2952,7 @@ void tms320c54x_device::pipeline_step()
 		bool const long_arithmetic = staged_long_arithmetic(word);
 		// These one-word forms use only live accumulators in Execute; their
 		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48e;
+		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);
@@ -4028,6 +4028,13 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
 			if (m_op == 0x46f8) ++m_pc;
+		}
+		else if ((m_op & 0xfeff) == 0xf48d)
+		{
+			// SPRU172C 4-161: square A(32-16), not the signed 16-bit AH.
+			// The accumulator form does not publish T.
+			s64 const high = accumulator_high17(m_a);
+			accumulator(BIT(m_op, 8)) = multiply_result(high * high * (BIT(m_st1, 6) ? 2 : 1), BIT(m_op, 8));
 		}
 		else if (staged_minmax(m_op))
 		{

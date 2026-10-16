@@ -41,9 +41,10 @@ continuation `03:a1a9`; the former transfer into page `42` and eventual
 the subsequent interval count, so its DST zero-fill no longer wraps into the
 register window. Software-saved repeat replacement/restoration now passes
 the isolated interrupt fixture, and the original recorder advances past
-`RPTB 03:faa5`. The current unsupported staged instruction is `SQUR A,A`
-(`f48d`) at `03:dbe6`, with live terminal PC `03:dbe8`. NAND writes alone
-do not prove complete recording.
+`RPTB 03:faa5`. Accumulator SQUR (`f48d`) at `03:dbe6` also executes.
+The current exclusion is RETD (`f273`) at `03:da7e`, inside repeated
+block `03:da71..03:da93`, with live terminal PC `03:da81`. NAND writes
+alone do not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -93,7 +94,7 @@ an outside-body CCD callee. The ISR saves repeat/status registers, executes
 its own loop and restores the saved words; FRETE returns to the leaf, whose
 near return targets either the body or REA+1. Ordered copies, balanced
 frames, retained stack operands and final register state are checked. The
-original firmware now reaches `03:dbe6`; this is not a complete recording
+original firmware passes this setup; this is not a complete recording
 or a claim that every original outer-loop iteration has settled.
 
 Regression coverage for this boundary includes all 288 default core markers,
@@ -101,6 +102,24 @@ the `repeat-context`, `repeat-pmst`, `repeat-popd`, `repeat-rearm`, `rptb-ccd`,
 `rptbd-irq` and `rptb-fcall-edge` profiles, the native 5110 save-state round
 trip and 2,863 tooling tests (one skip). The original resident-memory gate
 still compares 48,261 program and 3,656 data words exactly.
+
+### Accumulator SQUR
+
+`--profile squr` passes 32,768 cases and save/replays: two destinations,
+16 A operands, 16 untouched-B patterns, eight FRCT/OVM/SXM combinations,
+two pages and four checkpoints. The independent expectation squares signed
+A(32-16), including `10000` (-65536) and `0ffff` (+65535) high-part cases
+that a signed 16-bit AH implementation gets wrong. Tests check Execute
+operand publication, saturation, sticky destination overflow, unchanged T
+and ST1, preserved non-destination accumulator and no data-memory access.
+The implementation reuses the existing multiply-result contract. Other
+producer compositions and physical pipeline phases are not established by
+this fixture. Original recorder execution now passes SQUR and reaches the
+separate in-block RETD exclusion at `03:da7e`.
+The shared MAX/MIN fixture, memory-MAC and saved-repeat profiles, native
+5110 save-state gate and 2,864 tooling tests (one skip) pass with this
+admission. The full 288-marker default CPU run belongs to the preceding
+repeat-restoration checkpoint; it was not rerun for this opcode-only change.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

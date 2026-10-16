@@ -11792,7 +11792,7 @@ private:
 		u64 a, b, result;
 		u16 st0, st1, result_st0;
 	};
-	static minmax_fixture minmax_case(unsigned v)
+	static minmax_fixture minmax_case(unsigned v, bool square = false)
 	{
 		static constexpr std::array<u64, 16> values{0, 1, 0xffffffffffULL, 0x7fffffff, 0x80000000, 0xff80000000ULL, 0xff7fffffffULL, 0x7fffffffffULL, 0x8000000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL, 0xedcba98765ULL, 0x7fffff, 0xffffff, 0xffff000000ULL};
 		minmax_fixture f{};
@@ -11805,14 +11805,27 @@ private:
 		bool const choose_a = f.selector & 2 ? a < b : a > b;
 		f.result = choose_a ? f.a : f.b; f.result_st0 = (f.st0 & ~0x800) | (choose_a ? 0 : 0x800);
 		f.base = (v / 8192) % 2 ? 0x20000 : 0; f.snapshot = v / 16384;
+		if (square)
+		{
+			static constexpr std::array<u32, 16> high_words{0, 1, 0xffff, 0x10000, 0x1ffff, 0x7fff, 0x8000, 0x17fff, 0x18000, 0xfffe, 0x10001, 0x8001, 0x17ffe, 0x5555, 0x15555, 0xaaaa};
+			f.a = (u64(high_words[v % 16]) << 16) | 0x5aa5;
+			f.st1 |= flags & 1 ? 0x40 : 0;
+			u32 const bits = (f.a >> 16) & 0x1ffff;
+			s64 const operand = bits >= 0x10000 ? s64(bits) - 0x20000 : bits;
+			u64 const product = u64(operand * operand) * (flags & 1 ? 2 : 1);
+			bool const overflow = product > 0x7fffffff;
+			f.result = overflow && (flags & 2) ? 0x7fffffff : product;
+			f.result_st0 = f.st0 | (overflow ? (f.selector & 1 ? 0x200 : 0x400) : 0);
+		}
 		return f;
 	}
 	void start_minmax(unsigned variant = 0)
 	{
-		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = minmax_case(variant);
+		bool const square = !strcmp(machine().options().bios(), "squr");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = minmax_case(square ? variant % 512 + (variant / 512) * 1024 : variant, square);
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0xf486 | ((f.selector & 1) << 8) | (f.selector >> 1)); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, square ? 0xf48d | ((f.selector & 1) << 8) : 0xf486 | ((f.selector & 1) << 8) | (f.selector >> 1)); program.write_word(f.base + 0x601, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -13906,7 +13919,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "mar-reverse")) { start_indexed_mar(); return; }
-		if (!strcmp(machine().options().bios(), "minmax")) { start_minmax(); return; }
+		if (!strcmp(machine().options().bios(), "minmax") || !strcmp(machine().options().bios(), "squr")) { start_minmax(); return; }
 		if (!strcmp(machine().options().bios(), "store-index")) { start_indexed_store(); return; }
 		if (!strcmp(machine().options().bios(), "compare-delay")) { start_delay_compare(); return; }
 		if (!strcmp(machine().options().bios(), "cmp-delay-edge")) { start_delay_compare_edge(); return; }
@@ -42053,20 +42066,22 @@ private:
 		if (m_phase == 254970) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254960; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254940)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = minmax_case(variant);
+			bool const square = !strcmp(machine().options().bios(), "squr");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = minmax_case(square ? variant % 512 + (variant / 512) * 1024 : variant, square);
 			u64 const a = tick < 6 ? f.a ^ 0xffffffffffULL : !(f.selector & 1) ? f.result : f.a;
 			u64 const b = tick < 6 ? f.b ^ 0xffffffffffULL : f.selector & 1 ? f.result : f.b;
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? f.result_st0 : f.st0), "MAX MIN compares signed 40-bit Execute operands and changes only destination and carry");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "MAX MIN ignores SXM OVM and preserves T and status");
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? f.result_st0 : f.st0), "Register ALU samples Execute operands and publishes the expected destination and flags");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Register ALU preserves T and ST1");
 			if (tick == 5) { m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); }
 			unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 6, 8}[f.snapshot];
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MAX MIN before or after Execute operand publication"); }
 			if (tick == 12)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1, "MAX MIN completes with one opcode fetch");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1, "Register ALU completes with one opcode fetch");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MAX MIN without resampling or duplicate execution"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254950; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 65535) { start_minmax(variant + 1); return; }
+				if (variant < (square ? 32767 : 65535)) { start_minmax(variant + 1); return; }
+				if (square) { osd_printf_info("TMS320C54x staged accumulator SQUR: PASS cases=32768 restore=32768 destinations=2 a_patterns=16 b_patterns=16 flags=8 pages=2 snapshots=4 operand_bits=17 operand=Execute t_unchanged=1 sticky_overflow=1 data_accesses=0 producer_composition=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated accumulator SQUR complete"); }
 				osd_printf_info("TMS320C54x staged MAX MIN: PASS cases=65536 restore=65536 selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MAX MIN complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -43876,6 +43891,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(195, "block-xc-edge", "Conditional execution crossing repeat endpoints is excluded")
 	ROM_SYSTEM_BIOS(196, "imm-forward", "Immediate RAM store forwarding and producer replay")
 	ROM_SYSTEM_BIOS(197, "repeat-isr", "Software-saved callback repeat and interrupted CCD resumption")
+	ROM_SYSTEM_BIOS(198, "squr", "Accumulator square with signed 17-bit operand")
 ROM_END
 
 ROM_START(tms54rom4)
