@@ -288,6 +288,12 @@ also cover a fresh recording made with corrected DMA and MAC support:
 it reaches `02:b5e1` without an illegal instruction but remains silent.
 Thus the older recording is not the sole explanation for the zero output.
 The two input artifacts and their observations remain distinct.
+The separate varying-input recorder gate also passes, but playing its
+file takes an earlier/different path: zero tracked arithmetic-loop entries,
+twenty resident Execute entries and silent output, without an illegal
+instruction. The next discriminating question is where this input's
+decoder/read path diverges before the loop, not whether the constant
+fixture alone should produce nonzero samples.
 The playback observations
 separate fetch hits, Execute entries and audio counts. The coverage diagnostic
 still intentionally fails without audio acceptance. The generic 16-bit
@@ -4516,10 +4522,33 @@ make check-mu4-bootstrap-original \
   MU4_BOOTSTRAP_SOURCE_RUN=/path/to/completed-retained-run
 ```
 
-Playback of this separate AC-input NAND must retain the ordinary playback
-source and the existing audio-unvalidated diagnostic; nonzero output, if
-observed, still requires waveform/media provenance rather than a weakened
-acceptance predicate.
+Playback of this separate AC-input NAND retains the ordinary constant
+playback source and the existing audio-unvalidated diagnostic. At 20 seconds
+it has `illegal=0`, PC `00:3276`, a verified `MAME` title/overlay and 22
+replies. Execute observations record one bootstrap, twenty resident and
+forty loader-API entries, but no calls/iterations/returns in the tracked
+`02:a2c6` arithmetic loop. This differs from the constant-input file's
+87,390 completed calls and twelve resident entries. It is an input-dependent
+earlier/different route, not evidence of a stuck filter or missing opcode.
+The source of the divergence remains unmapped.
+
+All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
+as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are
+`fc93daf5`/`1e4f2315`; clocks/frames remain 230,090,537/845,921. The strict
+`--playback-dma` observation check passes without any changes, and the
+coverage diagnostic still intentionally fails audio acceptance. Nonzero
+output, if later observed, requires waveform/media provenance rather
+than a weakened predicate. The varying source demonstrably reaches the
+peripheral and changes the saved file, but valid encoding and decoding
+remain unproved. Both sample input and file-format interpretation remain
+separate from analog audio or native speech acceptance.
+
+Public format clues must preserve the recording/import distinction.
+[Nokryptia's author-written manual](https://manpage.me/index.cgi?apropos=0&manpath=FreeBSD+11.1-RELEASE+and+Ports&q=nokryptia&sektion=1)
+describes MP3 packaging without encrypting or decrypting the payload; it
+does not provide a REL recording decoder. It is not a plain-AAC validity
+oracle for these captures. No header workaround or firmware patch from
+external tools is used by the native recorder/playback acceptance path.
 
 ### Cold Saved-Track Catalogue
 
