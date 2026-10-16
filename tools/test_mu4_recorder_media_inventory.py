@@ -2,13 +2,53 @@ import unittest
 import struct
 import contextlib
 import io
+import json
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
-from tools.mu4_recorder_media_inventory import inventory, fixture_volume, main
+from tools.mu4_recorder_media_inventory import inventory, fixture_volume, file_inventory, main
 
 
 class RecorderMediaInventoryTest(unittest.TestCase):
+    def test_file_delta_separates_common_changes_from_added_tail(self):
+        report = file_inventory(b'abcdef', b'abXYeZ\xff\xff')
+        self.assertEqual(report['common_extent_bytes'], 6)
+        self.assertEqual(report['changed_common_bytes'], 3)
+        self.assertEqual(report['changed_common_ranges_end_exclusive'], [[2, 4], [5, 6]])
+        self.assertEqual(report['added_bytes'], 2)
+        self.assertEqual(report['added_byte_counts'], {'ff': 2})
+        self.assertEqual(report['removed_bytes'], 0)
+        self.assertEqual(report['removed_byte_counts'], {})
+
+    def test_file_delta_shortening_and_empty_inputs(self):
+        report = file_inventory(b'ab\x00\x00\xff', b'aB')
+        self.assertEqual(report['changed_common_ranges_end_exclusive'], [[1, 2]])
+        self.assertEqual(report['removed_bytes'], 3)
+        self.assertEqual(report['removed_byte_counts'], {'00': 2, 'ff': 1})
+        for source, endpoint in ((b'', b''), (b'abc', b'abc'), (b'', b'\xff')):
+            report = file_inventory(source, endpoint)
+            self.assertEqual(report['changed_common_bytes'], 0)
+            self.assertEqual(report['changed_common_ranges_end_exclusive'], [])
+            self.assertEqual(report['added_bytes'], len(endpoint) - len(source))
+
+    def test_file_delta_cli_is_read_only_and_excludes_volume_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, endpoint = root / 'source', root / 'endpoint'
+            source.write_bytes(b'abc')
+            endpoint.write_bytes(b'abX\xff')
+            arguments = ['inventory', str(source), str(endpoint), '--extracted-files']
+            output = io.StringIO()
+            with patch('sys.argv', arguments), contextlib.redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            self.assertEqual(json.loads(output.getvalue())['added_byte_counts'], {'ff': 1})
+            with patch('sys.argv', arguments + ['--export-fixture-volume', str(root / 'volume')]), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                main()
+            self.assertEqual(error.exception.code, 2)
+            self.assertEqual(source.read_bytes(), b'abc')
+            self.assertEqual(endpoint.read_bytes(), b'abX\xff')
+            self.assertFalse((root / 'volume').exists())
+
     @staticmethod
     def volume_image():
         image = bytearray(528 * 8)

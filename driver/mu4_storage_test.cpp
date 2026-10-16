@@ -1262,6 +1262,8 @@ private:
 			else
 			{
 				unsigned const index = m_native_command_cursor - packet_start;
+				if (!index && recorder_save_profile() && packet == recorder_metadata)
+					serialize_recorder_media("mu4_recorder_before_metadata.nand");
 				command_receive(packet[index]);
 				++m_native_command_cursor;
 				logerror("mu4_native_command_input: cursor=%u total=%u\n", m_native_command_cursor, packet_size);
@@ -2005,15 +2007,19 @@ private:
 		if (!output) fatalerror("MU4 RAM observation could not be written");
 		logerror("mu4_native_ram_observation: stage=%s leg=%u first=0080 words=65408 encoding=le16 file=%s\n", stage, m_native_reset_leg, name.c_str());
 	}
+	void serialize_recorder_media(char const *name)
+	{
+		// Serialize storage only; do not issue NAND commands or save the source NVRAM.
+		util::core_file::ptr file;
+		if (util::core_file::open(name, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, file) ||
+			!m_nand->nvram_write(*file))
+			fatalerror("MU4 recorder media observation could not be written");
+		logerror("mu4_native_recorder_media_capture: file=%s observation_only=1\n", name);
+	}
 	void capture_recorder_media()
 	{
 		if (!recorder_poll_profile()) return;
-		// Serialize storage only; do not issue NAND commands or save the source NVRAM.
-		util::core_file::ptr file;
-		if (util::core_file::open("mu4_recorder_endpoint.nand", OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, file) ||
-			!m_nand->nvram_write(*file))
-			fatalerror("MU4 recorder media observation could not be written");
-		logerror("mu4_native_recorder_media_capture: file=mu4_recorder_endpoint.nand observation_only=1\n");
+		serialize_recorder_media("mu4_recorder_endpoint.nand");
 		auto const disable = machine().disable_side_effects();
 		auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i)

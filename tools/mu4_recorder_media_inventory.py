@@ -1,10 +1,36 @@
-"""Read-only NAND delta inventory; signatures are not codec or file-validity proof."""
+"""Read-only NAND/file deltas; signatures are not codec or file-validity proof."""
 import argparse
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
 import struct
 import sys
+
+
+def file_inventory(source, endpoint):
+    """Compare externally extracted files, without interpreting their format."""
+    common = min(len(source), len(endpoint))
+    ranges = []
+    changed = 0
+    for offset, (old, new) in enumerate(zip(source, endpoint)):
+        if old == new:
+            continue
+        changed += 1
+        if ranges and ranges[-1][1] == offset:
+            ranges[-1][1] = offset + 1
+        else:
+            ranges.append([offset, offset + 1])
+    added, removed = endpoint[common:], source[common:]
+    return {'source_bytes': len(source), 'endpoint_bytes': len(endpoint),
+            'source_sha256': hashlib.sha256(source).hexdigest(),
+            'endpoint_sha256': hashlib.sha256(endpoint).hexdigest(),
+            'common_extent_bytes': common, 'changed_common_bytes': changed,
+            'changed_common_ranges_end_exclusive': ranges,
+            'added_bytes': len(added), 'removed_bytes': len(removed),
+            'added_byte_counts': {f'{value:02x}': count for value, count in sorted(Counter(added).items())},
+            'removed_byte_counts': {f'{value:02x}': count for value, count in sorted(Counter(removed).items())},
+            'scope': 'byte deltas of independently extracted files only; no filesystem or codec validation'}
 
 
 def fixture_volume(image):
@@ -81,12 +107,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('endpoint', type=Path)
-    parser.add_argument('--export-fixture-volume', type=Path,
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--export-fixture-volume', type=Path,
                         help='write a new data-only volume image from the original InitDisk fixture endpoint')
+    mode.add_argument('--extracted-files', action='store_true',
+                      help='compare independent file readbacks instead of raw NAND captures')
     args = parser.parse_args()
     try:
         source, endpoint = args.source.read_bytes(), args.endpoint.read_bytes()
-        report = inventory(source, endpoint)
+        report = file_inventory(source, endpoint) if args.extracted_files else inventory(source, endpoint)
         if args.export_fixture_volume:
             metadata, volume = fixture_volume(endpoint)
             with args.export_fixture_volume.open('xb') as output:

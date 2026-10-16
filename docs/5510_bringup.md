@@ -4426,6 +4426,38 @@ audio acceptance nor proof that this native container is invalid.
 The independently verified result is protocol/storage reproduction; native
 codec output must be checked separately against this fresh input.
 
+### Metadata boundary comparison
+
+The recorder bench serializes `mu4_recorder_before_metadata.nand` immediately
+before transmitting the first parameter-7 request byte. This calls only the
+NAND's buffer-to-stream serializer, without NAND commands, device-state
+changes or emulated-time advancement. The 20-second endpoint remains
+byte-identical to the fresh recorder hash above, including with this observer.
+The pre-request NAND hash is
+`86bef66c843aff4933045bc0a4799c90e85b139c1153b460ceb108ce95cd6a0a`.
+Only physical pages 288, 352 and 127008 differ afterward; no spare bytes
+change. Page 127008's role is not established by this comparison.
+
+Independent 7-Zip 26.00 FAT extraction reads `REL_001.REL` before the
+request (142,958 bytes, SHA-256
+`520a27329f3c058658aa905668b9e019561c9a1a4b521cfd80f40998593da6f0`)
+and `TEST` afterward (143,168 bytes, hash above). In their common extent,
+exactly 33 bytes differ, all within the first 56 bytes of ID3 metadata;
+all bytes from offset 56 through the earlier EOF are identical. The added
+210 bytes are all `ff`, not verified audio or benign padding. `POCP` is
+absent before the request too. Thus this rewrite does not remove that
+marker or alter the common payload, but its EOF extension remains a
+separate correctness question. Forced AAC probing of the pre-request file
+also reports sample rate zero, no decoded-frame count and decoder errors;
+neither readback independently validates the native container or codec.
+
+The existing NAND inventory reports physical-page changes. Its separate
+`--extracted-files` mode compares independent file readbacks, quantifying
+common changed ranges and added/removed byte counts without interpreting
+FAT or codec syntax. Synthetic tests cover changed ranges, appended bytes,
+shortening, empty inputs, read-only CLI behavior and incompatible export
+options. All 2,950 tool tests pass (one skipped).
+
 ### Cold Saved-Track Catalogue
 
 `bootopenstage` starts a fresh process at the original serial bootstrap,
