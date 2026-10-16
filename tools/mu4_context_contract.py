@@ -83,6 +83,61 @@ REL_AR_STORE_WITNESS = (
     0x8814, 0x6FF8, 0x0015, 0x0C81, 0xF495, 0x11E4, 0xC22E,
     0x8192, 0x57E5, 0xC2AE, 0xFD30, 0xF784, 0x4F93,
 )
+REL_COPY_ENTRY_BASE = 0x24542
+REL_COPY_ENTRY_WITNESS = (0x4A11, 0x4A16, 0x4A17, 0xEEF7, 0xF495,
+                          0x710E, 0x0019, 0x710F, 0x0011)
+REL_COPY_BASE = 0x245A0
+REL_COPY_WITNESS = (
+    0x8008, 0x4819, 0x6F08, 0x0C01, 0x8810, 0x1000, 0xF601,
+    0x8811, 0x480E, 0x0806, 0xF500, 0xF010, 0x0001, 0x881A,
+    0xF495, 0xF072, 0x45B2, 0x5691, 0x4E90,
+)
+
+
+def rel_copy_destination(stack8, bk):
+    """Desk arithmetic for the pinned CPL=1 sequence, not an execution model."""
+    if any(not isinstance(value, int) or not 0 <= value <= 0xFFFF for value in (stack8, bk)):
+        raise ValueError('REL copy inputs must be 16-bit words')
+    return (bk + 2 * stack8) & 0xFFFF
+
+
+def decode_rel_copy_loop(words):
+    for base, witness in ((REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS),
+                          (REL_COPY_BASE, REL_COPY_WITNESS)):
+        for offset, expected in enumerate(witness):
+            address = base + offset
+            if words.get(address) != expected:
+                raise ValueError(f'REL copy witness changed or absent at {address:06x}')
+    return {
+        'segment': 'aa99', 'pinned_words': len(REL_COPY_ENTRY_WITNESS) + len(REL_COPY_WITNESS),
+        'entry_cpl_required': 1,
+        'frame': {'entry': '024542', 'saved_registers': ['AR1', 'AR6', 'AR7'],
+                  'local_words': 9, 'sp_delta_before_arguments': -12},
+        'bk_writer': {'address': '024547', 'operation': 'MVDK *(SP+14),BK',
+                      'source_is_mapped_t': False,
+                      'caller_stack_offset_with_two_word_far_frame': 0},
+        'destination': {
+            'save_argument': 'STL A,*(SP+8) at 0245a0',
+            'base_load': 'LDM BK,A at 0245a1',
+            'arithmetic': 'ADD *(SP+8),1,A at 0245a2',
+            'publish': 'STLM A,AR0 at 0245a4',
+            'formula': '(BK + 2 * stack[SP+8]) & ffff',
+            'short_direct_operand_is_mapped_al': False,
+        },
+        'loop': {'setup_address': '0245af',
+                 'setup': decode_block_repeat_setup(0xF072, 0x45B2, 0x245AF),
+                 'instructions': ['DLD *AR1+,A', 'DST A,*AR0+'],
+                 'words_copied_per_iteration': 2,
+                 'source_increment_per_iteration': 2,
+                 'destination_increment_per_iteration': 2},
+        'examples': [
+            {'stack8': 'ac78', 'bk': f'{bk:04x}',
+             'destination': f'{rel_copy_destination(0xAC78, bk):04x}'}
+            for bk in (0x7000, 0xE800)
+        ],
+        'scope': '28 pinned logical-source words and CPL=1 address arithmetic; '
+                 'not input validity, physical aliasing or repeat execution acceptance',
+    }
 
 
 def decode_shifted_store(words, address):
@@ -525,6 +580,7 @@ def contract(source):
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
     result['rel_ar_store'] = decode_rel_ar_store(rel_words)
+    result['rel_copy_loop'] = decode_rel_copy_loop(rel_words)
     return result
 
 

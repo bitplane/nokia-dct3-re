@@ -93,7 +93,7 @@ through serial pins and loads the matching `RELSI16` image. Its 49,839
 compared program/data words match original marker `aa99` before startup;
 four low-window words remain excluded. Native execution passes mapped-SP
 MVKD, the delayed far call inside block `02:6116..6120`, the shifted
-store to AR5 at `02:5fdd` and `MVDK AG,AL` at `02:6050`.
+store to AR5 at `02:5fdd` and `MVDK Smem,AL` at `02:6050`.
 It now stops at `02:40ef`: `6f8c` has a zero extension where the original
 image has `0c9e`. Read-only watches confirm that the correct words are
 loaded and later zeroed by data writes in the `02:45b1..45b2` doubleword
@@ -4356,8 +4356,11 @@ The unchanged external playback input also executes `02:5fdd`,
 `6ff8 0015 0c81`, `STL A,1,*($0015)`. Its destination is C54x AR5
 (`0015`), not an unidentified external peripheral. Shifted stores now
 admit AR0..AR7 using their ordinary Execute-time write; other low mapped
-destinations remain guarded. `MVDK AG,AL` at `02:6050`, `710a 0008`, also
+destinations remain guarded. `MVDK Smem,AL` at `02:6050`, `710a 0008`, also
 executes through the tested generic accumulator-destination move path.
+The immediate destination is AL, but source mode `0a` denotes AG only
+with CPL clear; with CPL set it denotes `*(SP+10)`. Do not infer a mapped
+source solely from the opcode's low byte.
 The run observes
 929,701 NAND data reads and 26,211 strobes; unchanged counts do not negate
 instruction progress, and neither count is decoder/output acceptance.
@@ -4431,11 +4434,39 @@ REL upload, followed by repeated data-space zero writes with live PC
 `02:45b3`. The original local block is `RPTB 45b2` at `02:45af`,
 `DLD *AR1+,A` at `02:45b1` and `DST A,*AR0+` at `02:45b2`.
 The taps identify the copying block, not an exact Execute PC or a proven
-physical bank fault. Next, establish its entry pointers, source contents,
-count and write extent, and reconcile those with the board's provisional
-shared-DARAM model. Distinguish a wrong pointer/count from wrong bank
-aliasing before changing either. Initial overlay equality does not prove
-that executable words survive subsequent native data writes.
+physical bank fault. Initial overlay equality does not prove that executable
+words survive subsequent native data writes.
+
+The bounded copy observation has 98 setup fetches; the latter 49 use BK
+`e800` and destination `40f0`. Their measured writes total 2,048 zero words,
+with 8--192 words per call and maximum end address `41af`. In all 49 calls,
+the write count in the observed `4000..4fff` range equals `2 * setup_A`
+and its minimum/maximum match that span. Counts and bounds alone do not
+prove per-word uniqueness or ordering. The first call already starts at `40f0` and writes
+eight words through `40f7`; this is not merely an overrun from a safe
+destination. `setup_A` is a pre-Execute observation, not a claimed BRC
+publication phase or general repeat-composition acceptance.
+
+At the overlapping writes SP is `d660`, ST1 is `e105` (CPL=1), and
+`stack[SP+8]` is `ac78`. The pinned sequence at `02:45a0..45a4` saves
+the incoming A into that stack slot, loads BK into A, adds twice the
+stack word and publishes AR0. Its low-word result is
+`(e800 + 2 * ac78) & ffff = 40f0`, matching the observed destination.
+The short direct operand `08` is a stack slot here, not mapped AL.
+
+BK writes of `7000` and `e800` both occur with live PC `02:454b`.
+The corresponding original writer at `02:4547` is `710e 0019`:
+`MVDK *(SP+14),BK` under CPL=1, not a read of mapped T. Its three saved
+registers and nine locals place that slot at the caller's stack argument
+0, accounting for the two-word far-return frame. `mu4_context_contract.py`
+pins all 28 entry/copy words, tests the address arithmetic, and explicitly
+requires CPL=1. These facts explain the computed pointer; they do not
+establish that the argument values are valid.
+
+Next, audit the own-ROM caller at `02:47d3` and the producers of its
+stack arguments and incoming A. Establish why `ac78` is supplied to this
+copy before changing the shared-DARAM map. Input/pointer validity and
+physical aliasing remain competing explanations; neither has been proved.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.

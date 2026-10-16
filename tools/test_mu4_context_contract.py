@@ -14,9 +14,48 @@ from tools.mu4_context_contract import BOOT_BLOCK_REPEAT_BASE, BOOT_BLOCK_REPEAT
 from tools.mu4_context_contract import decode_block_repeat_setup
 from tools.mu4_context_contract import REL_REPEAT_BASE, REL_REPEAT_WITNESS, REL_CALLEE_BASE, REL_CALLEE_WITNESS, decode_rel_repeat_call
 from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, decode_rel_ar_store, decode_shifted_store
+from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_rel_copy_cpl_and_frame_contract(self):
+        words = {**dict(enumerate(REL_COPY_ENTRY_WITNESS, REL_COPY_ENTRY_BASE)),
+                 **dict(enumerate(REL_COPY_WITNESS, REL_COPY_BASE))}
+        result = decode_rel_copy_loop(words)
+        self.assertEqual(result['pinned_words'], 28)
+        self.assertEqual(result['entry_cpl_required'], 1)
+        self.assertEqual(result['frame']['sp_delta_before_arguments'], -12)
+        self.assertEqual(result['bk_writer']['caller_stack_offset_with_two_word_far_frame'], 0)
+        self.assertFalse(result['bk_writer']['source_is_mapped_t'])
+        self.assertFalse(result['destination']['short_direct_operand_is_mapped_al'])
+        self.assertEqual(result['loop']['setup']['rsa'], 0x45B1)
+        self.assertEqual(result['loop']['setup']['rea'], 0x45B2)
+        self.assertEqual(result['loop']['words_copied_per_iteration'], 2)
+        self.assertEqual([row['destination'] for row in result['examples']], ['c8f0', '40f0'])
+        self.assertIn('not input validity', result['scope'])
+
+    def test_rel_copy_destination_word_arithmetic(self):
+        for stack8 in range(0x10000):
+            for bk in (0, 1, 0x7000, 0xE800, 0xFFFF):
+                self.assertEqual(rel_copy_destination(stack8, bk),
+                                 (bk + stack8 + stack8) % 65536)
+        for values in ((-1, 0), (0, -1), (65536, 0), (0, 65536), (None, 0), (0, 'e800')):
+            with self.assertRaises(ValueError):
+                rel_copy_destination(*values)
+
+    def test_rel_copy_every_word_is_required(self):
+        original = {**dict(enumerate(REL_COPY_ENTRY_WITNESS, REL_COPY_ENTRY_BASE)),
+                    **dict(enumerate(REL_COPY_WITNESS, REL_COPY_BASE))}
+        for address in original:
+            with self.subTest(address=f'{address:06x}'):
+                words = original.copy()
+                words[address] ^= 1
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_copy_loop(words)
+                del words[address]
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_copy_loop(words)
+
     def test_shifted_store_fields_and_extension_order(self):
         for shift in range(-16, 16):
             for source in range(2):
