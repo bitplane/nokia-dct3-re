@@ -13433,6 +13433,65 @@ private:
 		});
 		m_phase = 255800; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static saved_repeat_fixture body_repeat_case(unsigned v)
+	{
+		return {std::array<unsigned, 4>{1, 2, 7, 56}[v % 4], std::array<unsigned, 4>{0, 1, 3, 63}[(v / 4) % 4], v / 128,
+			false, bool((v / 64) % 2), bool((v / 16) % 2), (v / 32) % 2 ? 0x20000U : 0U, 0x3000};
+	}
+	u16 body_repeat_word(saved_repeat_fixture const &f, unsigned slot) const
+	{
+		return slot == 1 ? m_saved_repeat_counts.return_pc : slot == 2 ? f.base >> 16 :
+			slot == 3 ? 0xa608 : slot == 4 ? 0x8900 : slot == 5 ? f.count : slot == 6 ? 0x604 : 0x60b;
+	}
+	void start_body_repeat(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = body_repeat_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x900 + i, 0xf495); }
+		program.write_word(f.base + 0x600, 0xf272); program.write_word(f.base + 0x601, 0x60b);
+		program.write_word(f.base + 0x604, 0xe589); program.write_word(f.base + 0x60a, 0x6d96);
+		program.write_word(f.base + 0x60c, 0x6d97); program.write_word(f.base + 0x60d, 0xf4e1);
+		program.write_word(f.base + f.vector(), 0x4a1e);
+		program.write_word(f.base + f.vector() + 1, 0xf880 | (f.base >> 16)); program.write_word(f.base + f.vector() + 2, 0x900);
+		// Software owns the only repeat context: save it, use the controller
+		// for an ISR loop, then restore REA/RSA/BRC before ST1 and FRETE[D].
+		std::array<u16, 25> const handler{0x4a06, 0x4a07, 0x4a1a, 0x4a1b, 0x4a1c, 0xf495,
+			0x771a, u16(f.inner), 0xf072, 0x90b, 0x7694, 0x55aa, 0xf495,
+			0x8a1c, 0x8a1b, 0x8a1a, 0xf495, 0xf495, 0xf495, 0xf495, 0xf495, 0xf495,
+			0x8a07, 0x8a06, u16(f.delayed ? 0xf6e5 : 0xf4e5)};
+		for (unsigned i = 0; i < handler.size(); ++i) program.write_word(f.base + 0x900 + i, handler[i]);
+		for (unsigned i = 0; i < 64; ++i) { data.write_word(0x5000 + i, 0x1357 ^ (i * 0x2345)); data.write_word(0x6000 + i, 0xdead); data.write_word(0x7100 + i, 0xdead); }
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2345);
+		for (unsigned ar = 2; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, std::array<u16, 6>{0x5000, 0x6000, 0x7100, 0x1500, 0x1600, 0x1700}[ar - 2]);
+		m_saved_repeat_counts = {}; m_saved_repeat_checkpoint = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "body_repeat_reads", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts;
+			if (at >= 0x5000 && at < 0x5040) { unsigned const i = c.outer_reads++; expect(i <= f.count && at == 0x5000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Direct IRQ return retains ordered outer sources"); return; }
+			if (at >= f.sp - 7 && at < f.sp) { expect(word == body_repeat_word(f, f.sp - at), "ISR pops the CPU-published return and software-saved repeat frame"); ++c.stack_reads; auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xdead); return; }
+			std::array<u16, 6> const registers{0x1e, 6, 7, 0x1a, 0x1b, 0x1c};
+			expect(c.mapped_reads < registers.size() && at == registers[c.mapped_reads] && word == body_repeat_word(f, c.mapped_reads + 2), "ISR saves XPC status and loop registers in order"); ++c.mapped_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "body_repeat_writes", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			auto &c = m_saved_repeat_counts;
+			if (at >= 0x6000 && at < 0x6040) { unsigned const i = c.outer_writes++; expect(i <= f.count && at == 0x6000 + i && word == u16(0x1357 ^ (i * 0x2345)), "Direct IRQ return preserves every outer destination"); if (!c.assertions) { ++c.assertions; m_cpu->set_input_line(f.nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE); } return; }
+			if (at >= 0x7100 && at < 0x7140) { unsigned const i = c.inner_writes++; expect(i <= f.inner && at == 0x7100 + i && word == 0x55aa, "ISR loop executes its own count"); if (!i) c.inner_cycle = m_cpu->pipeline_cycles(); return; }
+			if (at >= f.sp - 7 && at < f.sp) { if (at == f.sp - 1) { expect(c.vectors == 1 && word >= 0x605 && word <= 0x60b, "IRQ interrupts the loop body without a near-return intermediary"); c.return_pc = word; } expect(word == body_repeat_word(f, f.sp - at), "One hardware entry and six software pushes balance the ISR frame"); ++c.stack_writes; return; }
+			std::array<u16, 6> const registers{0x1a, 0x1c, 0x1b, 0x1a, 7, 6};
+			std::array<u16, 6> const words{u16(f.inner), 0x60b, 0x604, u16(f.count), 0x8900, 0xa608};
+			expect(c.controls < registers.size() && at == registers[c.controls] && word == words[c.controls], "ISR restores the architectural repeat context before direct return"); ++c.controls;
+			if (c.controls == 4) c.restore_cycle = m_cpu->pipeline_cycles();
+			if (c.controls == 5) c.st1_cycle = m_cpu->pipeline_cycles();
+		});
+		m_vector_prefetch_tap = program.install_read_tap(f.base + f.vector(), f.base + f.vector(), "body_repeat_vector", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; auto &c = m_saved_repeat_counts; expect(c.assertions == 1 && !c.vectors && word == 0x4a1e, "One physical IRQ reaches the ISR"); ++c.vectors; c.vector_cycle = m_cpu->pipeline_cycles(); m_cpu->set_input_line(f.nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x605, f.base + 0x60b, "body_repeat_resumed", [this, f](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; auto &c = m_saved_repeat_counts; if (c.controls == 6 && !c.resumed && at == f.base + c.return_pc) { ++c.resumed; c.resume_cycle = m_cpu->pipeline_cycles(); } });
+		m_phase = 255840; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct repeat_context_fixture
 	{
 		bool replace, span;
@@ -14287,6 +14346,7 @@ private:
 		if (!strcmp(machine().options().bios(), "cond-cd-edge")) { start_delayed_conditional_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-ccd")) { start_block_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-isr")) { start_saved_repeat(); return; }
+		if (!strcmp(machine().options().bios(), "repeat-body-isr")) { start_body_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-context")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-pmst")) { start_repeat_context(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-popd")) { start_repeat_context(); return; }
@@ -39932,6 +39992,37 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255830) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255820; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
+		if (m_phase == 255840)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = body_repeat_case(variant); auto const &c = m_saved_repeat_counts;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Direct repeat-body IRQ composition remains admitted");
+			u64 const cycle = m_cpu->pipeline_cycles();
+			bool const checkpoint = f.snapshot == 0 ? tick == 4 : f.snapshot == 1 ? c.vectors && cycle >= c.vector_cycle + 2 :
+				f.snapshot == 2 ? c.inner_writes && cycle >= c.inner_cycle + 2 : f.snapshot == 3 ? c.controls >= 4 && cycle >= c.restore_cycle + 2 :
+				f.snapshot == 4 ? c.controls >= 5 && cycle >= c.st1_cycle + 1 : c.resumed && cycle >= c.resume_cycle + 2;
+			if (checkpoint && !m_pipeline_replay && !m_saved_repeat_checkpoint) { m_saved_repeat_checkpoint = tick; m_saved_repeat_snapshot = c; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save direct IRQ repeat before and after context restoration"); }
+			if (m_cpu->state_int(tms320c54x_device::STATE_IDLE) || tick == 5000)
+			{
+				unsigned const iterations = f.count + 1;
+				if (c.outer_writes != iterations) osd_printf_info("Body-repeat mismatch: case=%u replay=%u pc=%06x brc=%04x st1=%04x outer=%u expected=%u inner=%u\n", variant, unsigned(m_pipeline_replay), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), c.outer_writes, iterations, c.inner_writes);
+				expect(m_saved_repeat_checkpoint && c.outer_reads == iterations && c.outer_writes == iterations && c.inner_writes == f.inner + 1 && c.assertions == 1 && c.vectors == 1 && c.mapped_reads == 6 && c.stack_reads == 7 && c.stack_writes == 7 && c.controls == 6 && c.resumed == 1, "Direct ISR return completes every outer iteration and balances one software-saved frame");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x60e && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x100 && !m_cpu->state_int(tms320c54x_device::STATE_BRC) &&
+					m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x604 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x60b &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2345 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + iterations &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7101 + f.inner && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701,
+					"FRETE and FRETED reactivate restored architectural loop bounds without a hidden context stack");
+				{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < iterations; ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == u16(0x1357 ^ (i * 0x2345)), "Final copied memory matches the independent iteration oracle"); }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = m_saved_repeat_checkpoint; m_saved_repeat_counts = m_saved_repeat_snapshot; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore direct IRQ repeat without replaying input or stack transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255850; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 767) { start_body_repeat(variant + 1); return; }
+				osd_printf_info("TMS320C54x direct IRQ repeat restoration: PASS cases=768 restore=768 outer_counts=1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 returns=FRETE,FRETED snapshots=6 ordered_copies=1 balanced_frames=1 near_return=0 physical_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated direct IRQ repeat restoration complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 255850) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255840; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255800)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = saved_repeat_case(variant); auto const &c = m_saved_repeat_counts;
@@ -44323,6 +44414,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(211, "st-dagen", "Retained constant DAGEN initialization and bank arbitration")
 	ROM_SYSTEM_BIOS(212, "asm-delay", "Retained ASM load and adjacent shift in branch delays")
 	ROM_SYSTEM_BIOS(213, "asm-delay-edge", "Rejected ASM load straddling a control delay")
+	ROM_SYSTEM_BIOS(214, "repeat-body-isr", "Software-saved ISR repeat returning directly into an outer body")
 ROM_END
 
 ROM_START(tms54rom4)

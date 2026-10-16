@@ -3944,26 +3944,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = m_pipeline_operand[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
-			if ((m_st1 & ST1_BRAF) &&
-				(address < m_pipeline_block_start || address > m_pipeline_block_end_address))
-			{
-				u32 const restored_start = (m_pipeline_fetch_address & 0x7f0000) | m_rsa;
-				u32 const restored_end = (m_pipeline_fetch_address & 0x7f0000) | m_rea;
-				u32 const after_end = (m_pipeline_fetch_address & 0x7f0000) | u16(m_rea + 1);
-				if ((m_pipeline_fetch_address >= restored_start && m_pipeline_fetch_address <= restored_end) || m_pipeline_fetch_address == after_end)
-				{
-					// A call retains PC+4 even when its delay span ends at REA.
-					// Outside-body context pops may also have replaced the loop
-					// registers. Rebuild the discarded fetch prediction from those
-					// architectural values, not a previous context's cached bounds.
-					m_pipeline_block_start = restored_start;
-					m_pipeline_block_end_address = restored_end;
-					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
-					m_pipeline_block_active = true;
-					m_pipeline_block_fetch_enabled = true;
-					if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = m_pipeline_block_start;
-				}
-			}
+			pipeline_restore_block_on_return(address);
 			m_pipeline_flush_front = false;
 			if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);
 		}
@@ -3977,7 +3958,11 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
 			m_pc = m_pipeline_operand_address[5];
-			if (!BIT(m_op, 9)) m_pipeline_fetch_address = logical_program_address(m_pc);
+			if (!BIT(m_op, 9))
+			{
+				m_pipeline_fetch_address = logical_program_address(m_pc);
+				pipeline_restore_block_on_return(address);
+			}
 			m_pipeline_flush_front = false;
 			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
@@ -4512,6 +4497,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_operand_address[4] = data_read(m_sp++);
 		m_pipeline_fetch_address = ((m_pipeline_operand[4] & 0x7f) << 16) | m_pipeline_operand_address[4];
+		pipeline_restore_block_on_return(m_pipeline_address[4]);
 		// Both delay words have reached Decode; discard the next sequential word.
 		m_pipeline_decode_flush = 1;
 	}
@@ -4621,6 +4607,23 @@ void tms320c54x_device::pipeline_begin_repeat_stream()
 		m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
 		pipeline_resume_after_repeat();
 	}
+}
+
+void tms320c54x_device::pipeline_restore_block_on_return(u32 address)
+{
+	if (!(m_st1 & ST1_BRAF) || (address >= m_pipeline_block_start && address <= m_pipeline_block_end_address)) return;
+	u32 const restored_start = (m_pipeline_fetch_address & 0x7f0000) | m_rsa;
+	u32 const restored_end = (m_pipeline_fetch_address & 0x7f0000) | m_rea;
+	u32 const after_end = (m_pipeline_fetch_address & 0x7f0000) | u16(m_rea + 1);
+	if ((m_pipeline_fetch_address < restored_start || m_pipeline_fetch_address > restored_end) && m_pipeline_fetch_address != after_end) return;
+	// The ISR/callback may have used the one loop controller itself. Software
+	// restored its architectural registers; rebuild only the fetch prediction,
+	// before the return target is prefetched (Read for delayed far returns).
+	m_pipeline_block_start = restored_start;
+	m_pipeline_block_end_address = restored_end;
+	m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+	m_pipeline_block_active = m_pipeline_block_fetch_enabled = true;
+	if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = restored_start;
 }
 
 void tms320c54x_device::pipeline_resume_after_repeat()

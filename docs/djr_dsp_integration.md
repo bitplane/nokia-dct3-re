@@ -76,9 +76,11 @@ it conditionally shifts by one and decrements T. SPRU172C section 4-122
 instead specifies `dst = src << TS`, with TS the signed six-bit T count
 in the documented -16..31 range. Do not use successful execution in that
 interpreter to justify accepting the MU4 recorder's out-of-domain count.
-The local failing count is loaded from memory at `03:dacf`, not supplied
-by an adjacent EXP; its upstream buffer preparation is the open question
-in [5510 bring-up](5510_bringup.md).
+The former local failing count was loaded from memory at `03:dacf`, not
+supplied by an adjacent EXP. It exposed a direct-ISR-return repeat-restoration
+defect, now independently reproduced and corrected; the original recorder
+continues through twenty seconds without an instruction exclusion. Its
+remaining transaction boundary is in [5510 bring-up](5510_bringup.md).
 
 The reviewed DST handler also forces an even address. SPRU172C section
 4-47 example 2 explicitly starts at odd address `0101`, storing the high

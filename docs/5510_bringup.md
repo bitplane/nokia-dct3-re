@@ -60,49 +60,27 @@ the following multiply consumes it. The five-second observation is free of
 instruction exclusions. The subsequent ASM load at `03:a165` and its
 adjacent `LD B,ASM,A` also execute after branch-delay admission.
 
-The twenty-second control/save fixture now stops at NORM `f48f`, owned
-by `03:dad2` in Read, with sampled T=`4421`, code=`21` (-31), and
-CPU ILLEGAL=`1`. Live PC=`03:dace` is not the owning instruction address.
-The producer is `LD *AR5-,T` at `03:dacf`, with two intervening
-instructions before NORM. At the failing load, the source is data word
-`c423` (postdecrement leaves AR5=`c422`). This is not an EXP latency case;
-do not widen NORM's documented -16..31 range to accommodate the sample.
+The twenty-second control/save fixture now executes without an instruction
+exclusion and ends at `02:98ea`, ILLEGAL=`0`, IDLE=`1`. It processes the
+ten-second control and fifteen-second poll/metadata traffic: input cursor
+`50`, receive ring empty, seven responses and no pending acknowledgement.
+The former NORM stop was downstream of incomplete merge-loop restoration;
+the correction and its independent regression are documented below.
 
-A passive write tap traces `c423` from small shift values to `4421`:
-the low-word write of `DST A,*AR5+` at `03:dad3` publishes `4421` at
-5.259108641 seconds, with A=`0000004421`. The later preparation loop's
-`STL A,*AR4-0` at `03:dabf` stores it again at 7.276284503 seconds,
-before `03:dacf` loads it into T. Direct operands such as `$13`/`$14` in
-this routine are SP-relative with CPL set, not reads of AR3/AR4.
+This remains a failed integration run, not a recording acceptance. The
+metadata response has status=`00`, parameter=`07`, reason=`03`, success=`0`;
+the bench ends on its exact-one startup-observation assertion. Its program
+read tap at `73f8` records two live-PC-qualified matches, with PMST=`2028`
+and `202c`, rather than one. That tap does not retain instruction identity,
+so the count is not proof that startup executed twice. The next work is to
+establish actual startup execution ownership and decode the metadata reply's
+failure path, without relaxing the assertion or synthesizing success.
 
-The preparation defect is an early exit from the first merge repeat
-(`03:da71..03:da93`), not yet a diagnosed memory-mapping defect. In the
-failing call, the `03:da6d` setup has AR5=`c35b`, BRC=`0247`,
-`[SP+13]=0078`, `[SP+14]=02e0`, and `[SP+8]=0020`. The delay span first
-increments AR5; both branch arms then decrement it by two per iteration.
-All 584 iterations would leave AR5=`becb`. Instead `03:da94` executes with
-AR5=`c0f1` and BRC=`0113`: exactly 275 iterations and 550 pointer words
-remain. An earlier abnormal call exits with AR5=`c347`, BRC=`023e`,
-likewise satisfying `AR5 = becb + 2*BRC`. Neighboring complete calls reach
-`03:da94` with AR5=`becb`, BRC zero. The following loop then uses the
-incomplete pointer as its start while its count still spans the full
-vector, exposing prior output to the final NORM pass.
-
-The next question is which control/context transition lets the staged
-repeat fall through with a nonzero remaining count. Trace that transition
-before changing repeat restoration; neither interrupt involvement nor a
-specific return instruction has yet been demonstrated. A ten-second atomic
-control with byte-identical NAND reaches `03:d840`, ILLEGAL zero, but does
-not reach this failing call; it is not a passing counterpart for the loop.
-
-Ten-second debugger, observer-free and source-observer runs reproduce the
-same NORM owner, T sample and cycle (`636150586`). A seven-second cut is
-too short to reach it; the difference is not evidence of debugger or
-observer perturbation. These are provenance observations, not an accepted
-recorder transaction or a diagnosis of the upstream defect.
-This stop precedes handling of the ten-second follow-up control and
-fifteen-second poll/metadata sequence, so their absence is not evidence of
-a missing command peer. No complete recorder transaction is established.
+The fixture observes 2,108 NAND program setups, 2,107 confirms and
+1,098,240 data writes, but track count is zero and the recorded file is not
+verified. Exact resident-memory comparison still passes (48,261 program
+and 3,656 data words). These counts do not establish a complete recorder
+transaction, audio output or handset boot.
 
 The passive observer records ILLEGAL explicitly: searching only for the
 words "unsupported" or "illegal" misses some guard diagnostics. NAND
@@ -120,6 +98,48 @@ recording, validated audio or handset boot.
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#core-regression-checkpoint).
+
+### Direct interrupt return to a restored block repeat
+
+The former NORM stop at `03:dad2` sampled T=`4421` from
+`LD *AR5-,T` at `03:dacf`, reading `c423`. That word was an earlier
+`DST A,*AR5+` output, later reused by an incomplete preparation pass.
+The merge repeat `03:da71..03:da93` decrements AR5 by two per iteration;
+its setup AR5=`c35b`, BRC=`0247` should leave AR5=`becb`. Instead one
+exit left AR5=`c0f1`, BRC=`0113`: exactly 275 iterations and 550 words
+short. The following full-length pass consequently consumed stale output.
+This was not EXP latency or a reason to widen NORM's documented -16..31
+range. The producer uses CPL/SP-relative parameters, not literal AR3/AR4
+reads. Seven seconds was too short to observe the stop; ten-second
+debugger, observer-free and source-observer controls agreed on the failing
+sample. Do not attribute that window difference to observer perturbation.
+
+The recorder's first premature merge-loop exit follows common-window
+`FRETE` at `1f18`, returning into `03:da85`. Firmware has restored BRAF,
+RSA=`da71`, REA=`da93` and nonzero BRC, but the staged fetch controller
+previously retained the ISR's completed loop. It therefore ran the rest of
+one iteration and fell through. Ordinary near returns already reconstructed
+that prediction; direct far returns did not. A debugger history rendered
+these common-window instructions as zero words under logical page 3;
+disassembling their actual page-zero backing identifies the restore and
+`FRETE` instructions. Do not infer execution of zero-filled code from that
+history rendering.
+
+`repeat-body-isr` reproduces the defect independently: the pre-fix first
+case performs one of two copies and exits with BRC=`1`, BRAF set. The
+return paths now rebuild fetch prediction from firmware-restored
+RSA/REA/BRC/ST1 before fetching the continuation: Execute for an ordinary
+far return, Read for a delayed far return. No hidden loop-context stack,
+firmware-address hook or shift-domain relaxation is introduced.
+
+The fixture passes 768 cases and save/replays: outer counts 1/2/7/56,
+ISR counts 0/1/3/63, IRQ/NMI, two pages, FRETE/FRETED and six snapshots.
+It checks ordered source/destination words, exact saved register values,
+seven balanced stack accesses in each direction, retained stack samples
+after backing-memory mutation, and one resumed continuation. The ISR's
+software saves/restores own the context; the test has no intervening near
+return to conceal failed far-return reactivation. Physical silicon stage
+placement remains unvalidated.
 
 ### ASM loads in branch delay words
 
@@ -1500,12 +1520,21 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The ASM-delay checkpoint covers 30,720 cases and save/replays plus sixteen
+The direct-ISR-return checkpoint renews the full default population: all
+288 required markers exactly once, expected completion exit and terminal
+completion check. `repeat-body-isr` passes 768 cases and save/replays.
+Controls `repeat-isr`, `repeat-context`, `repeat-pmst`, `repeat-popd`,
+`rptbd-irq`, `rptb-fcall`, `rptb-bd`, `rptb-bcd` and `rptb-banz` pass.
+Tooling acceptance is 2,877 tests (one skip), and the native 5110
+save-state round trip and exact MU4 resident-memory comparison (48,261
+program and 3,656 data words) pass. These scopes do not establish complete
+recording, physical loop timing or handset speech.
+
+The earlier ASM-delay checkpoint at `930c486b` covers 30,720 cases and save/replays plus sixteen
 partial-slot exclusions. Controls `asm-load`, `asm-mapped`, `asm-consumer`,
 `asm-edge`, `dld-delay-edge`, `mac-delay-edge` and `st-delay-edge` also pass.
-Tooling acceptance is 2,876 tests (one skip), with native 5110 restoration
-and exact MU4 resident-memory comparison (48,261 program and 3,656 data
-words). The default population was not rerun for this guard admission.
+It also renewed exact MU4 resident-memory comparison (48,261 program and
+3,656 data words); those additional isolated profiles are revision-bound.
 
 The constant-DAGEN checkpoint at `026b6670` renewed the full default run: all 288 required
 markers exactly once, expected completion exit and terminal completion check.
