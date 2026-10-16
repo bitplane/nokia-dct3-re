@@ -1,3 +1,5 @@
+from pathlib import Path
+import re
 import unittest
 
 from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
@@ -12,6 +14,46 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_fixture_bios_metadata_fits_mame_encoding(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver' / 'tms320c54x_test.cpp').read_text()
+        blocks = re.findall(r'ROM_START\(([^)]+)\)(.*?)ROM_END', source, re.S)
+        self.assertTrue(blocks)
+        for driver, body in blocks:
+            entries = re.findall(r'ROM_SYSTEM_BIOS\((\d+),\s*"([^"]+)"', body)
+            indices = [int(index) for index, _ in entries]
+            names = [name for _, name in entries]
+            with self.subTest(driver=driver):
+                self.assertEqual(len(indices), len(set(indices)))
+                self.assertEqual(len(names), len(set(names)))
+                # MAME ROM_BIOS encodes (index + 1) in eight bits; 255 wraps to zero.
+                self.assertTrue(all(0 <= index < 255 for index in indices))
+                self.assertTrue(all(0 < len(name) <= 16 for name in names))
+
+    def test_stlm_pmst_scope(self):
+        marker, ending = EXTRA_PROFILES['stlm-pmst']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stlm-pmst')
+        for old, new in (('restore=38912', 'restore=0'), ('writes=1', 'writes=2'),
+                         ('source_sample=Execute', 'source_sample=Decode'),
+                         ('prefetched_mapping=retained', 'prefetched_mapping=remapped'),
+                         ('next_mapping=new', 'next_mapping=old'), ('vector_mapping=Prefetch', 'vector_mapping=Execute'),
+                         ('balanced_frames=1', 'balanced_frames=0'), ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='stlm-pmst')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stlm-pmst')
+
+    def test_stlm_pmst_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['stlm-pmst-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stlm-pmst-edge')
+        for old, new in (('restore=32', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('control_changes=0', 'control_changes=1'),
+                         ('pointer_changes=0', 'pointer_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='stlm-pmst-edge')
+
     def test_repeated_accumulator_load_block_scope(self):
         marker, ending = EXTRA_PROFILES['rpt-ld-block']
         output = marker + '\n' + ending + '\n'

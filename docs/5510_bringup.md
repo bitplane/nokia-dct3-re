@@ -101,9 +101,11 @@ changing the memory map. The two-word shifted store `6f93 0d9f` at
 control owners remain independently guarded. Memory-sourced `RPT Smem`
 and repeated immediate/ASM-shift accumulator loads have independent
 count, arithmetic, interrupt and replay coverage. Original playback now
-passes the repeated `LD A,-1,A` at `02:5cf9` and stops at `02:9fae`,
-`891d` (`STLM B,PMST`). This is an unimplemented accumulator-to-control
-register store, not evidence of missing external hardware. The generic 16-bit
+passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
+`02:9fae`. The current stop is `02:a13d`, `4be1 0004`, a long-offset
+`PSHD` source. Its opcode and address extension match original AA99;
+this remains an instruction-composition boundary, not evidence of
+missing external hardware. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4554,23 +4556,62 @@ counts inside blocks remain outside this bank's claim.
 rejecting before data, arithmetic or flag effects. These remain prototype
 exclusions, not silicon traps.
 
-The full 288-check default CPU suite was last verified at `667be03c`.
-The load extension additionally passes its three profiles, nine related
-count/block/ASM/observer profiles, native 5110 save-state restoration and
-2,909 tool tests (one skipped). None establishes physical bank timing
-or decoded audio.
+### Accumulator-to-PMST stores
 
-### REL PMST-store boundary
+Ordinary direct `STLM A/B,PMST` is admitted. TI SPRU172C 4-175 defines
+the direct MMR destination independently of DP/CPL; SPRU131G table 4-3
+explicitly includes STLM under saturation-on-store. The core therefore
+uses the Execute-live accumulator and the old SST/SXM values before
+publishing PMST. Source accumulators and status flags are unchanged.
+SPRU131G 7.5.9/table 7-26 place program mapping at Prefetch; example
+7-62 explicitly uses STLM to update PMST. Already prefetched words are
+not remapped or flushed by this store.
 
-The unchanged original playback request passes `02:5cf9` and now reaches
-`02:9fae`, opcode `891d` (`STLM B,PMST`), with live PC `02:9fb0`.
+`stlm-pmst` passes 38,912 cases/replays. Its 4,096 ordinary mapping
+cases cross eight 40-bit source patterns, A/B, old SST/SXM, CPL, old
+OVLY, two program pages, low/high entry and four snapshots. The source
+changes after Read to prove Execute-live capture. Distinct old/new-bank
+marker instructions prove retained prefetch and subsequent OVLY mapping.
+The remaining 34,816 high-entry cases cover all 16 IRQ inputs and NMI,
+early/late arrivals, the same source/saturation patterns, pages, old OVLY
+and snapshots. A vector fetched on the publication clock retains the
+earlier IPTR/OVLY sample; a later vector uses the newly published values.
+Every run requires one PMST write, a balanced optional frame and unchanged
+XPC, pointers and unrelated state.
+
+`stlm-pmst-edge` passes 32 cases/replays for delayed-control, single-repeat
+and block-repeat owners, RSA/REA/SP destinations, indirect addressing
+and peripherals. These reject without data, control or pointer effects.
+They are prototype exclusions, not silicon restrictions. This admission
+does not establish external-access interlocks or physical MP/MC/DROM
+memory decoding; the mapping assertions concern the existing OVLY/IPTR
+model, and phase placement remains explicitly partial.
+
 The original AA99 REL image contains `491d f340 0021 f495 f495 891d`
 at `02:9fa9..9fae`: an ordinary PMST read/modify/store sequence.
 AA22 has a different word (`3763`) at the same numeric store address;
-the images must not be merged into one code namespace. The open contract
-is accumulator-to-PMST publication and its mapping/latency effects,
-not a missing peripheral response. The staged core currently excludes
-that destination rather than substituting a control value.
+the images must not be merged into one code namespace. Original playback
+now passes this sequence without substituting a control value.
+
+### REL long-offset push boundary
+
+The unchanged original request now stops at `02:a13d`, `4be1 0004`,
+with live PC `02:a13f`. AA99 contains `6fe1 0001 0d5a 8910 4be1 0004
+f495 4a10` at `02:a139..a140`, matching the stopped opcode/extension.
+`PSHD Smem` is defined by SPRU172C 4-131; long-offset/absolute operands
+add an address word and a clock. The staged decoder currently admits
+only short PSHD addressing. Extension retention, source-address/SP
+ownership, stack publication, producer ordering and replay need independent
+coverage before admitting this composition. The encoded AR1 plus literal
+must be interpreted through the addressing grammar and live context,
+not treated as a fixed source address.
+
+Current acceptance passes the complete 288-check default CPU suite,
+both PMST-store profiles, the separate `pmst-map`, `pmst-pop`,
+`pmst-popd`, `pmst-prefetch`, `pmst-iptr`, `stlm-imr`, `rpt-smem`,
+`rpt-ld` and `rpt-ld-edge` profiles, native 5110 save-state restoration
+and 2,912 tool tests (one skipped). These checks do not establish physical
+bank timing or decoded audio.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
@@ -4589,6 +4630,10 @@ python3 tools/run_c54x_core.py --profile rpt-smem-edge \
 python3 tools/run_c54x_core.py --profile rpt-ld \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile rpt-ld-edge \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile stlm-pmst \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile stlm-pmst-edge \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 

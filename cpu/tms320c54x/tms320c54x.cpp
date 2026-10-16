@@ -456,7 +456,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a);
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d);
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -2873,6 +2873,12 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
+			if (!m_pipeline_decode_remaining && (word & 0xfeff) == 0x881d)
+			{
+				// PMST changes in a delayed span need their own mapping-latency
+				// composition; the ordinary store is covered independently.
+				logerror("%s: staged delay PMST store is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
 			bool const delay_store = staged_extended_accumulator_store(word);
 			bool const delay_load = staged_offset_load(word) && (word & 0xfe00) == 0x1000;
 			bool const delay_dld = staged_extended_dld(word);
@@ -4168,6 +4174,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_accumulator_mmr_store(m_op))
 			// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.
 			// Direct MMR addressing ignores DP/CPL (SPRU172C 4-175).
+			// PMST also publishes here; later Prefetch owns mapping (7.5.9).
 			data_write(u8(m_op), u16(saturated_store(accumulator(BIT(m_op, 8)))));
 		else if (staged_store(m_op))
 		{
