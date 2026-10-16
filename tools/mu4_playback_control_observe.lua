@@ -39,6 +39,38 @@ end)
 _G.mu4_playback_gate_stop = gate_stop
 local queue_counts = {}
 local result_counts = {}
+local service_counts = {}
+for _, range in ipairs({{0xaa54, 0xaa62}, {0x15d9, 0x15d9}, {0x15ef, 0x15f8}, {0xd796, 0xd7af}, {0x13c0, 0x147f}}) do
+    handles[#handles + 1] = data:install_read_tap(range[1], range[2], 'mu4_playback_service_reads_' .. range[1],
+        function(address, value)
+            local pc, time = cpu.state.GENPC.value, machine.time:as_double()
+            if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 or
+               not ((pc >= 0x20495 and pc <= 0x205ff) or (pc >= 0x298b8 and pc <= 0x298cf)) then return end
+            local count = (service_counts[address] or 0) + 1
+            service_counts[address] = count
+            if count <= 16 then
+                machine:logerror(string.format(
+                    'mu4_playback_service_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+                    address, value, count, time, pc))
+            end
+        end)
+end
+for _, address in ipairs({0x15d9, 0xd79c, 0xd7ac}) do
+    local count = 0
+    handles[#handles + 1] = data:install_write_tap(address, address, 'mu4_playback_service_counter_' .. address,
+        function(_, value, mask)
+            local time = machine.time:as_double()
+            -- These addresses are reused before AA99; do not spend this
+            -- session's cap on bootstrap-stack aliases.
+            if sampling or machine:side_effects_disabled() or time < 0.8181 or time > 1.7 then return end
+            count = count + 1
+            if count <= 16 then
+                machine:logerror(string.format(
+                    'mu4_playback_service_counter_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+                    address, value, mask, count, time, cpu.state.GENPC.value))
+            end
+        end)
+end
 local parser_writes = {}
 local prefix_writes = {}
 local merge_reads = 0

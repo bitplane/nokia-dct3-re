@@ -19,6 +19,24 @@ BIT_WINDOW_BASE = 0x2510C
 NIBBLE_BASE = 0x2C62B
 BYTE_COUNT_BASE = 0x2AB09
 BYTE_COUNT_WITNESS = (0x10e1,5,0xf010,1,0x7102,0x0011,0x4808,0xf47d,0xf000,1,0x4808,0x4ee1,6)
+SERVICE_GATE_BASE = 0x204C1
+SERVICE_GATE_WITNESS = (0x10e1,6,0xf845,0x04d2,0x44f8,0x15d9,0x3ce1,0x16,
+                        0x82f8,0x12,0xf495,0xf495,0x6c82,0x04d2,
+                        0x76f8,0xaa56,1,0x10f8,0xaa56,0xf845,0x05ae)
+
+
+def decode_service_gate(words):
+    if any(words.get(SERVICE_GATE_BASE + offset) != word for offset, word in enumerate(SERVICE_GATE_WITNESS)):
+        raise ValueError('AA99 processing-latch gate changed or absent')
+    if tuple(words.get(a) for a in range(0x20499, 0x2049d)) != (0x7211,0xaa59,0x7217,0xaa60):
+        raise ValueError('AA99 service receiver loads changed or absent')
+    return {'entry': '0204c1', 'last_word': '0204d5', 'pinned_words': 25,
+            'receiver': 'MVDM aa59,AR1; MVDM aa60,AR7 (memory to register, not stores)',
+            'first_skip': 'receiver word 6 equals zero',
+            'sum': 'ADD receiver word 22,16 to LD 15d9,16; STH result to AR2',
+            'second_skip': 'BANZ AR2 nonzero skips aa56=1',
+            'tail': 'LD aa56,A; BC AEQ,05ae bypasses processing when zero',
+            'scope': 'Pinned local source; no flag ownership, producer closure or codec/audio acceptance'}
 
 
 def decode_byte_count_prefix(words):
@@ -997,6 +1015,7 @@ def contract(source):
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)
     result['byte_count_prefix'] = decode_byte_count_prefix(rel_words)
+    result['processing_latch_gate'] = decode_service_gate(rel_words)
     result['playback_transform_copy'] = decode_transform_copy(rel_words, 'aa99')
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)

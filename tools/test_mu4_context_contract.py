@@ -30,9 +30,23 @@ from tools.mu4_context_contract import decode_prefix_transform, reference_transf
 from tools.mu4_context_contract import decode_recording_prefix_transform
 from tools.mu4_context_contract import decode_transform_copy
 from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, decode_byte_count_prefix, reference_byte_count
+from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_service_gate_and_receiver_direction_are_source_pinned(self):
+        words = dict(enumerate(SERVICE_GATE_WITNESS, SERVICE_GATE_BASE))
+        words.update(dict(enumerate((0x7211,0xaa59,0x7217,0xaa60), 0x20499)))
+        result = decode_service_gate(words)
+        self.assertEqual(result['pinned_words'], 25)
+        self.assertIn('memory to register', result['receiver'])
+        self.assertIn('AEQ', result['tail'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_service_gate(changed)
+
     def test_original_byte_count_prefix_source_is_pinned(self):
         words = dict(enumerate(BYTE_COUNT_WITNESS, BYTE_COUNT_BASE))
         self.assertEqual(decode_byte_count_prefix(words)['pinned_words'], 13)

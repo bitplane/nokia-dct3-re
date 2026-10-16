@@ -11,13 +11,12 @@ streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
-The current software frontier is the [recording/playback transform initializer](#recording-transform-and-initializer-inputs):
-a native recording block matches an independent scalar model and saved bytes.
-The six-versus-seven-word copy discrepancy exposed a mapped-accumulator
-latency defect: the corrected core computes and copies seven words, and actual
-initializer reads consume seven zero words. Fresh recording is byte-identical;
-corrected playback publishes one longer-body parser result but remains silent.
-Follow its downstream consumer and source-region contract without forcing keys,
+The current software frontier is the [processing-latch consumer](#processing-latch-consumer):
+corrected playback publishes one longer-body parser result but its consumer
+still bypasses processing with latch `aa56=0`. The local gate and observed
+receiver fields are mapped; their producer/lifecycle contract remains open.
+The earlier seven-word initializer discrepancy is corrected and fresh
+recording remains byte-identical. Continue without forcing counters, keys,
 lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -4567,8 +4566,10 @@ absent in varying playback; the getter's word 13 is not an evidenced cause.
 If latch `aa56` remains zero, `0204d4` bypasses processing to `0205ae`.
 Constant playback first writes one at 1.043100872 seconds. Fixed-time
 snapshots miss transient operands and cannot establish writer ownership.
-`7211 aa59` stores AR1; the referenced area contains return-like words
-and must not be named a buffer descriptor from its shape.
+`7211 aa59` is `MVDM aa59,AR1`, a memory-to-register load
+(SPRU172C 4-110), not an AR1 store. The paired `7217 aa60` loads AR7.
+The referenced area contains return-like words and must not be named a
+buffer descriptor from its shape.
 
 **Original initialization and source coverage.** The AA99 literal census
 covers 49,843 mapped words. Its sole `0495` at `02716a` belongs to a
@@ -4997,12 +4998,54 @@ Do not remove the zero region, change a seek or synthesize header bytes to
 claim playback. The recorder contains an exact copy of the 23-word nibble
 helper at AA88 `03f0e6`, a software-accessible anchor for that comparison.
 
-The Lua observer detaches its 16 bus taps after the last 2.4-second
+The Lua observer detaches all bus taps after the last 2.4-second
 observation window instead of retaining hot-stack callbacks for the entire
 run. A separate three-second repeat reproduces all 708 selected first-window
 lines exactly and closes the taps at 2.416666667 seconds. That is observer
 equivalence over the stated window, not a shorter substitute for the complete
 20-second playback observation or decoded-audio acceptance.
+
+#### Processing-Latch Consumer
+
+**Open question:** what owns receiver word 22 and its interaction with
+`15d9`, and which legitimate transaction enables the processing latch?
+Do not name either field as a missing readiness report from its numeric
+shape, or force the latch/counter to enter the processing body.
+
+The newly observed publication activates service `020495` at
+1.0167937 seconds. `7211 aa59` / `7217 aa60` load AR1/AR7 from memory;
+SPRU172C 4-110 specifies this MVDM direction. Read taps observe
+`aa59=d796`, `aa60=d7b8`, `aa54=1`, `aa55=0`, `aa56=0`,
+receiver word 6 (`d79c`)=1 and receiver word 22 (`d7ac`)=1.
+The service reads `15d9=0` and later reads `aa56=0`, then writes the
+zero latch again near the `0205ae` tail. The observations are actual data
+bus events; logged PC values remain context rather than operand ownership.
+
+The pinned 21-word gate `0204c1..0204d5` first skips its update if
+receiver word 6 is zero. Otherwise it loads `15d9` shifted by 16, adds
+receiver word 22 shifted by 16, stores the high half in AR2, and uses
+BANZ to skip `aa56=1` when AR2 is nonzero. The observed 0+1 therefore
+skips the update. `LD aa56,A; BC AEQ,05ae` then bypasses processing.
+This stops before the result-flag and output-configuration calls at `0204f2`;
+one result publication does not imply those consumers ran.
+
+Receiver word 22 is initialized to 2 near `02771b` at 0.818124231 seconds
+and changes to 1 near `020184` at 1.007644005. The adjacent source
+`020182: ADDM #-1,*AR2` provides a decrement candidate, not a closed
+writer/receiver-ownership census. Receiver word 6 changes from 0 to 1 near
+`0201cc` at publication. Importantly, word 22 then reaches zero near
+`020184` at 1.016818475, after the service check; `15d9` changes back to
+one near `0293c6` at 1.016818725. It was one at 1.007644906, then zero
+near `0293e4` immediately before publication. This is not proof of a
+permanently stuck counter or missing hardware event. Follow the subsequent
+transaction and why it supplies no further activation, alongside its input
+region, before assigning meaning or inventing a peer.
+The bounded observer removes all taps after 2.4 seconds. Its three-second
+probe establishes this local path only, not a replacement for full playback.
+With the added taps, all 729 existing bounded Lua observation lines reproduce
+the complete corrected-core playback log exactly (excluding new service
+records and the changed tap-count line). The 25 pinned source words include
+the two receiver loads and the complete gate; every word mutation is tested.
 
 #### Recording Transform and Initializer Inputs
 
@@ -5104,8 +5147,7 @@ six-word-copy premise or compensate with file trimming, key edits or seeks.
 
 The reviewed initializer wrapper at `02b25c` has an immediate call at
 `02b268` to `02cd14`, after copying its caller's length slot to the outgoing
-frame. Follow that argument and the source object feeding `02ab43` before
-changing a loop count or assuming a terminator convention.
+frame. This explains the seven-word argument; it is not a terminator convention.
 Do not compensate by changing reset RAM policy or replacing either word. No key, pointer,
 length, seek or file byte is forced. The key observer detaches after
 1.8 seconds; its two-second probes are local initialization evidence, not
