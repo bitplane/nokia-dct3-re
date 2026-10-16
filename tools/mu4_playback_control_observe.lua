@@ -4,7 +4,22 @@ assert(machine.system.name == 'mu4nand', 'MU4 playback context requires mu4nand'
 local cpu = assert(machine.devices[':cpu'])
 local data = assert(cpu.spaces.data)
 local handles, read_counts, latch_writes, sampling = {}, {}, 0, false
-handles[1] = data:install_read_tap(0x804a, 0x804f, 'mu4_playback_descriptor_reads', function(address, value)
+local queue_counts = {}
+for _, range in ipairs({{0x8044, 0x8049}, {0x80a3, 0x80a5}}) do
+    handles[#handles + 1] = data:install_write_tap(range[1], range[2], 'mu4_playback_queue_' .. range[1],
+        function(address, value, mask)
+            local time = machine.time:as_double()
+            -- Common interval within the independently verified first sessions of both files.
+            if time < 0.8182 or time > 1.7 then return end
+            queue_counts[address] = (queue_counts[address] or 0) + 1
+            if queue_counts[address] <= 32 then
+                machine:logerror(string.format(
+                    'mu4_playback_queue_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+                    address, value, mask, queue_counts[address], time, cpu.state.GENPC.value))
+            end
+        end)
+end
+handles[#handles + 1] = data:install_read_tap(0x804a, 0x804f, 'mu4_playback_descriptor_reads', function(address, value)
     local time = machine.time:as_double()
     if sampling or time < 0.8 or time > 2.4 then return end
     read_counts[address] = (read_counts[address] or 0) + 1
@@ -14,7 +29,7 @@ handles[1] = data:install_read_tap(0x804a, 0x804f, 'mu4_playback_descriptor_read
             address, value, read_counts[address], time, cpu.state.GENPC.value))
     end
 end)
-handles[2] = data:install_write_tap(0xaa56, 0xaa56, 'mu4_playback_processing_latch', function(_, value, mask)
+handles[#handles + 1] = data:install_write_tap(0xaa56, 0xaa56, 'mu4_playback_processing_latch', function(_, value, mask)
     local time = machine.time:as_double()
     if time < 0.8 or time > 2.4 then return end
     latch_writes = latch_writes + 1

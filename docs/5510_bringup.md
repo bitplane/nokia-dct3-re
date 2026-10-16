@@ -4610,6 +4610,23 @@ and the strict range checker rejects malformed histories, out-of-session
 timestamps and source-word mismatches. Both fresh runs reproduce the
 previous range counts exactly. The next boundary is that loop's descriptor
 selection/requeue contract, rather than `0201de` or an injected wakeup.
+The initialization record immediately before the descriptor writes
+`8044..8049=ffff,80a4,0010,0000,0000,0000`. Bounded data-write taps
+over this prefix and candidate links `80a3..80a5` use the common first-session
+interval 0.8182--1.7 seconds. Both runs write `8044=ffff` at 0.834083281
+after the initial selection. Constant playback writes `8044=0000` again
+at 1.022780877, then `ffff` at 1.022781944 before the second descriptor
+entry. It repeats the zero/ffff pattern for later entries. Varying playback
+has only the three initial writes to `8044` (zero, zero, ffff) throughout
+that interval; the per-address cap is 32, so this is not cap exhaustion.
+The observed zero writes have live PC context `0202e1`, near the generic
+enqueue helper at `0202d7`; source `1282,8292,fc45` loads the node's first
+word, stores zero and returns if the loaded word was zero. The nonzero
+path goes on to update links. Conversely, the scheduler writes ffff near
+`02035c..020363`. These observations support an enqueue/dequeue distinction,
+but live PC alone does not identify the exact bus-owning instruction.
+The next boundary is the executed caller/trigger that enqueues this node
+again for constant playback, rather than changing the node or descriptor.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`
