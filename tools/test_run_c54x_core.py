@@ -12,6 +12,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_ram_forwarding_scopes(self):
+        for profile in ('imm-forward', 'rmw-forward'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for bad in (output.replace('restore=', 'missing_restore='),
+                        output.replace('writes_each=1', 'writes_each=2').replace('silicon_phase_claim=0', 'silicon_phase_claim=1'),
+                        marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+            with self.subTest(profile=profile, exit_status=0), self.assertRaises(ValueError):
+                check_result(output, 0, profile=profile)
+
     def test_block_xc_scopes(self):
         for profile in ('block-xc', 'block-xc-edge'):
             marker, ending = EXTRA_PROFILES[profile]

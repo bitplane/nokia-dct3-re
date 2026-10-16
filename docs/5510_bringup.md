@@ -37,10 +37,19 @@ and continuation `03:da94` twice. The alternate `03:da79` signed-XC route
 has zero Execute entries in this run; its static presence is not runtime proof.
 The delayed far return at `03:d95c` now reaches its original caller's
 continuation `03:a1a9`; the former transfer into page `42` and eventual
-`fe76` data execution are eliminated. The current stop is the retained
-long-word register/peripheral-pair exclusion, with terminal PC `03:d9b0`,
-`illegal=1`. Establish the owning instruction and source-pointer provenance
-before relaxing that guard. NAND writes alone do not prove complete recording.
+`fe76` data execution are eliminated. Immediate-store forwarding also corrects
+the subsequent interval count, so its DST zero-fill no longer wraps into the
+register window. The current stop is the nested staged block-repeat exclusion
+while decoding `RPTB` at `03:faa3` (`f072 faa5`), with live terminal PC
+`03:faa2`, `illegal=1`. Establish the active loop and software context-save
+contract before admitting that composition. NAND writes alone
+do not prove complete recording.
+
+The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
+RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
+`03:db51..03:db56`; it is not an observed inactive-BRAF case. Trace its
+call/interrupt and software-save ownership before replacing the old context
+with the setup at `03:faa3`.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -49,6 +58,39 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+### Immediate-store forwarding
+
+[TI SPRU131G section 7.3.2](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+specifies an internal-bus bypass when an on-chip read conflicts with a pending
+write to the same location. The retained RAM-read path now includes immediate
+stores, taking the literal already captured by Decode. Forwarding and the real
+Execute write share the store-word helper. The real Write is not moved and
+register/peripheral addresses remain outside this bypass.
+
+`imm-forward` passes 6,912 cases/restores: direct, postincrement and absolute
+stores; LD A, ADD A and LD B consumers; four literals, SXM/OVM combinations,
+DP/CPL, two pages, adjacent/NOP-separated and same/different addresses.
+Snapshots bracket Read and Write; modifying the already fetched literal
+cannot change either the forwarded value or real write. The test checks one
+pointer update and write, preserved ST1, consumer results/flags and real reads
+only for separated or different-address controls. The expanded fixture fails
+on the preceding core; the separate 768-case RMW-forwarding control passes.
+IRQ/repeat composition, mapped/peripheral forwarding and measured bus timing
+are not established by this matrix.
+
+In original recorder code, `7602 ffff` at `03:d961` stores `ffff` to stack
+word `6576`, immediately followed by `ADD *SP(2),A` at `03:d963`. Previously
+the ADD read stale zero before the real `ffff` write, leaving A=`31` instead
+of `30`. That count caused an extra interval: its delta was `-0400`, then
+`fbff` after subtracting one, producing a huge BRC count. The later
+`DST B,*AR4+` at `03:d9af` eventually wrapped to the register window;
+it was not evidence for relaxing the long-word register-pair guard.
+With forwarding, two observed invocations publish A=`30` and finish their
+zero-fill loops, reaching `03:d9b2`. Passive Write taps observe contiguous
+spans `9e82..a681` and `ae2e..b62d`, each 2,048 zero words under this fixture.
+The register-window exclusion remains unchanged. This advances execution,
+not recorder-output acceptance.
 
 ### Delayed far returns after stack restoration
 
@@ -64,7 +106,7 @@ and 36 preceding-POPM compositions. It checks SP, restored AR1, INTM, ordered
 XPC/PC reads, target Fetch, delay effects and replay around both stack samples.
 The expanded fixture fails on the preceding CPU implementation.
 The native 5110 save-state gate, original resident-memory comparison and
-153 runner unit tests also pass; none establishes complete recorder output.
+154 runner unit tests also pass; none establishes complete recorder output.
 
 In original recorder firmware, the `03:d8bb..03:d95e` function saves three
 registers and allocates 20 local words, then restores them before FRETD at
@@ -1075,12 +1117,13 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Versioned aggregate acceptance has two distinct scopes:
 
-- Delayed far-return/POPM ordering correction: renewed full default run, all
-  288 required markers exactly once, expected completion exit and terminal
-  completion check, including the expanded 72-case far-return fixture. This
-  also renews the default population after the in-block XC ownership fix.
-  Additional isolated matrices remain separately scoped above; default
-  acceptance does not imply those cases are part of its 288-marker population.
+- Immediate-store forwarding correction: renewed full default run, all 288
+  required markers exactly once, expected completion exit and terminal
+  completion check, including the expanded 72-case far-return fixture.
+  The separate 6,912-case `imm-forward` matrix and 768-case `rmw-forward`
+  control also pass; the former is not part of the default population.
+  Other isolated matrices remain separately scoped above; default acceptance
+  does not imply a renewed run of those matrices.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,
   `--atomic-io`, `--compose`, `--bus-stm`, `--mapped-read-a`, `--dp-absolute`.

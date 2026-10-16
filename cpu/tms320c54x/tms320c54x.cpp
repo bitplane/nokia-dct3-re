@@ -4093,7 +4093,7 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xff00) == 0x7600)
 		{
 			m_pc += u8(m_op) == 0xf8 || staged_extended_immediate_store(m_op) ? 2 : 1;
-			data_write(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
 		}
 		else if (staged_port_write(m_op))
@@ -4629,6 +4629,8 @@ u16 tms320c54x_device::pipeline_store_word() const
 	// Younger Read bypass and the real Execute write must publish the same
 	// word, including the store's retained shift rather than live ST1.ASM.
 	u16 const word = m_pipeline_word[5];
+	if ((word & 0xff00) == 0x7600)
+		return m_pipeline_immediate[5];
 	if ((word & 0xfe00) == 0x8c00)
 		return BIT(word, 8) ? m_trn : m_t;
 	u64 value = BIT(word, 8) ? m_b : m_a;
@@ -4646,9 +4648,9 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
-	// This partial model covers retained RMW and ordinary store producers,
+	// This partial model covers retained RMW, ordinary and immediate stores,
 	// not bank contention or stack instructions' separate read ordering.
-	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5])) &&
+	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x7600) &&
 		address == m_pipeline_operand_address[5])
 		return pipeline_store_word();
 	if (address >= 0x60 && m_pipeline_valid[5] && staged_rmw(m_pipeline_word[5]) &&
