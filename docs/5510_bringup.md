@@ -84,8 +84,9 @@ under its independent arithmetic/producer contract. Post-save refresh
 completes within the twenty-second window: PC=`02:98ea`, ILLEGAL=`0`,
 IDLE=`1`, input cursor `58`, seven responses, no pending acknowledgement
 and one reported track. Its internal startup, native metadata and dispatch
-assertions pass without weakening the exact-one condition. File/audio
-completeness, cold reopening of the saved track and playback remain open.
+assertions pass without weakening the exact-one condition. The separate
+staged cold-open fixture below rereads the saved catalogue and title from
+NAND. File/audio completeness and playback remain open.
 
 The empty-field fixture observes 2,108 NAND program setups, 2,107 confirms and
 1,098,240 data writes, but track count is zero and the recorded file is not
@@ -1534,6 +1535,13 @@ display, USB and music functions. These are product differences to recover,
 not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
+
+The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
+`bootopenstage` gate passes with the saved recorder endpoint and rejects the
+original no-track seed after successful transport. The existing atomic
+`bootstatus` control retains its exact 11 RX/14 TX exchange. Tooling acceptance
+is 2,879 tests (one skip); earlier CPU instruction scopes below are not
+implicitly renewed by these MU4 fixture runs.
 
 The instruction-observation checkpoint passes `instr-observer`: 32 cases
 and save/replays covering atomic/staged frontends, two logical pages,
@@ -4142,6 +4150,57 @@ runner requires exact resident/overlay comparison, one Execute-owned startup
 entry, original request acknowledgement, native dispatch and the expected
 success/failure reply. It does not use the atomic profile's live-PC-qualified
 loader-name read tap as a staged loader identity oracle.
+
+### Cold Saved-Track Catalogue
+
+`bootopenstage` starts a fresh process at the original serial bootstrap,
+using the staged CPU and the same explicitly provisional bus/memory model.
+Its input is the untouched `bootrecmeta` endpoint above, not a RAM snapshot
+or donor medium. It sends only the ordinary pin-level status request;
+firmware mounts the NAND and runs scanner `03:941d` and ID3 reader
+`03:9fe9` once each. Exact resident comparison passes (48,261 program and
+3,656 data words). The final lifecycle is 2, mode zero and track count one.
+
+The native reader reconstructs title `MAME` in `b953`, and the scanner
+copies it to `b6c9` and packs it at `c682`. The Execute-owned witness at
+`03:95af`, immediately after the packing loop, checks both the unpacked
+`004d,0041,004d,0045,0000` and packed `4d41,4d45,0000` forms. `c682`
+is later overwritten by storage work (observed around 9 seconds); it is
+scratch storage, not a persistent endpoint invariant. Neither a late RAM
+comparison nor merely entering the reader establishes this title result.
+
+The resident also sends 16-byte class-0/selector-`02` notifications after
+the initial status reply. The external peer validates length, framing,
+checksum and next modulo-eight sequence, then returns the ordinary
+`7f <token> 55` acknowledgement through receive pins. Four notifications
+with tokens 1--4 produce 23 RX and 78 TX bytes in the verified twenty-second
+window; both rings and the typed queue drain, with no response pending or
+retransmission. Counts are checked against the accepted frames, not assumed
+to remain the status-only profile's 11/14 bytes. Payload semantics and
+physical cadence are not established by acknowledging these frames.
+
+```sh
+make check-mu4-bootstrap-original \
+  MU4_BOOTSTRAP_BIOS=bootopenstage \
+  MU4_BOOTSTRAP_SOURCE_RUN=/path/to/completed-retained-run \
+  MU4_BOOTSTRAP_INPUT_NAND=/path/to/bootrecmeta-run/mu4_recorder_endpoint.nand
+```
+
+The source run supplies the same original ROM inputs; the explicit NAND
+input is copied into an isolated cold profile and checked unchanged after
+execution. Its hash remains
+`93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`.
+The gate proves cold catalogue/title recovery and settled pin transport,
+not the recorded audio body, decoder selection, playback, physical MU4 reset
+or a handset boot. Cold-open save/replay is not established: its 78-word TX
+history exceeds the older status peer's 64-word snapshot bound.
+
+The same cold profile with the original no-track seed is a negative control:
+it completes the same 23/78-byte transport but fails the catalogue predicate
+with one scanner entry, zero ID3-reader entries and zero tracks. The fixture
+does not manufacture a title or accept an ordinary status reply as file proof.
+
+### Atomic Metadata Negative Control
 
 The retained atomic `bootrecsave` diagnostic schedules a resident status poll
 after the native return, then parameter `7` with filename `TEST` and empty

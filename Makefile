@@ -1172,20 +1172,23 @@ check-mu4-bootstrap-original: build
 		if test -z "$(MU4_BOOTSTRAP_SOURCE_RUN)" || ! test -f "$$source/nvram/mu4nand_13/nand"; then \
 			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
 		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
+		input="$(if $(MU4_BOOTSTRAP_INPUT_NAND),$(abspath $(MU4_BOOTSTRAP_INPUT_NAND)),$$source/nvram/mu4nand_13/nand)"; \
+		test -f "$$input" && test "$$(wc -c < "$$input")" -eq 69206016 || \
+			{ echo 'MU4 bootstrap input must be one complete 69,206,016-byte NAND image' >&2; exit 1; }; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; bootopenstage) nvtag=mu4nand_27;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
 		tmp="$(if $(MU4_BOOTSTRAP_RUN_DIR),$(abspath $(MU4_BOOTSTRAP_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-bootstrap.XXXXXX"))"; \
 		mkdir -p "$$tmp/nvram/$$nvtag"; \
-		cp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"; \
+		cp "$$input" "$$tmp/nvram/$$nvtag/nand"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios "$$bios" \
 			-rompath "$$source/seed/roms" -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 60 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \
 		grep -q 'mu4_original_bootstrap_upload: records=7 words=10760 program_only=1 ' error.log; \
-		if test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta; then \
+		if test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootopenstage; then \
 			$(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/noki5510_bootstrap_check.py) --resident-memory error.log; \
 		elif test "$$bios" = bootreset; then \
 			grep -q 'mu4_original_bootstrap_frontier: entry_count=2 resident_count=2 ' error.log; \
@@ -1215,7 +1218,7 @@ check-mu4-bootstrap-original: build
 				elif test "$$bios" = bootrecmeta; then grep -q 'mu4_native_recorder_metadata: PASS native_reply=1 success=1 playback=0 firmware_state_forcing=0' error.log; \
 				else grep -q 'mu4_native_recorder_metadata: PASS native_reply=1 success=0 playback=0 firmware_state_forcing=0' error.log; fi; \
 				$(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/mu4_recorder_media_inventory.py) \
-					"$$source/nvram/mu4nand_13/nand" mu4_recorder_endpoint.nand >media_inventory.json; \
+					"$$input" mu4_recorder_endpoint.nand >media_inventory.json; \
 				cat media_inventory.json; fi; \
 			grep -q 'mu4_native_recorder_request_ack: words=007f,0001,0055' error.log; \
 			if test "$$bios" != bootrecstage && test "$$bios" != bootrecmeta; then \
@@ -1223,7 +1226,8 @@ check-mu4-bootstrap-original: build
 		elif test "$$bios" != bootstrap; then \
 			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
 		if test "$$bios" = bootreplay; then grep -q 'mu4_native_replay: PASS' error.log; fi; \
-		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"
+		if test "$$bios" = bootopenstage; then grep -q 'mu4_native_recorder_reopen: PASS tracks=1 title=MAME packed_title=1 original_scanner=1 original_id3_reader=1 pin_status=1 playback=0 firmware_state_forcing=0' error.log; fi; \
+		cmp "$$input" "$$tmp/nvram/$$nvtag/nand"
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

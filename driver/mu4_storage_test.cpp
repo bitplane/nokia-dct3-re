@@ -35,7 +35,7 @@ public:
 		m_cpu->set_reset_clkmd(0);
 		// Only the fail-closed original-firmware diagnostic opts into bus waits.
 		// Program/data bank ownership and physical READY wiring remain unvalidated.
-		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta")) m_cpu->set_c5416_bus_profile(true);
+		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootopenstage")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -47,6 +47,12 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (cold_saved_profile())
+			{
+				if (address == 0x3941d) ++m_cold_catalog_scans;
+				if (address == 0x39fe9) ++m_cold_metadata_reads;
+				if (address == 0x395af) observe_cold_title(opcode);
+			}
 			if (address != 0x73f8 || !m_recorder_loader_calls) return;
 			++m_recorder_startup_entries;
 			logerror("mu4_native_recorder_startup: pc=%06x opcode=%04x pmst=%04x identity=execute_entry\n",
@@ -210,6 +216,10 @@ private:
 	unsigned m_recorder_startup_entries = 0;
 	unsigned m_recorder_control_entries = 0, m_recorder_control_acks = 0;
 	unsigned m_recorder_metadata_result = 0;
+	unsigned m_cold_catalog_scans = 0, m_cold_metadata_reads = 0;
+	unsigned m_cold_notifications = 0, m_cold_response_begin = 14;
+	unsigned m_cold_title_publications = 0;
+	bool m_cold_title_verified = false;
 	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
 	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
@@ -832,6 +842,28 @@ private:
 			m_command->adjust(attotime::from_msec(1));
 			return;
 		}
+		if (cold_saved_profile() && m_command_tx_words.size() > 14)
+		{
+			unsigned const begin = m_cold_response_begin;
+			if (m_command_tx_words.size() < begin + 2) return;
+			unsigned const end = begin + m_command_tx_words[begin + 1] + 6;
+			if (end != begin + 16) fatalerror("MU4 cold notification length differs from observed class-0 selector-02 contract");
+			if (m_command_tx_words.size() < end) return;
+			u8 checksum = 0;
+			for (unsigned i = begin; i < end - 2; ++i) checksum ^= m_command_tx_words[i];
+			if (m_command_tx_words[begin] != 0x1e || m_command_tx_words[begin + 2] != 0xaa ||
+				m_command_tx_words[begin + 3] || m_command_tx_words[begin + 4] != 2 ||
+				m_command_tx_words[end - 2] != checksum || m_command_tx_words[end - 1] != 0x55 ||
+				m_command_tx_words[end - 3] != ((m_cold_notifications + 1) & 7))
+				fatalerror("MU4 cold notification framing, checksum or next sequence differs");
+			if (m_command_ack_pending && m_command_ack_cursor != 3) fatalerror("MU4 cold notification overlaps an unfinished acknowledgement");
+			m_cold_response_begin = end; ++m_cold_notifications;
+			m_command_ack_token = m_command_tx_words[end - 3];
+			m_command_ack_cursor = 0; m_command_ack_pending = true;
+			logerror("mu4_native_cold_notification: class=0 selector=02 words=16 token=%02x pin_decode=1\n", m_command_ack_token);
+			m_command->adjust(attotime::from_msec(1));
+			return;
+		}
 		if (system_bios() < 10 || m_command_tx_words.size() != 14) return;
 		static const std::vector<u16> expected = {0x7f, 1, 0x55, 0x1e, 5, 0xaa, 1, 0x71, 1, 0, 0, 0x80, 0x40, 0x55};
 		if (m_command_tx_words != expected) fatalerror("MU4 original status response differs from decoded contract");
@@ -1199,15 +1231,17 @@ private:
 				m_data_reads, value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		return value;
 	}
-	bool staged_original_profile() const { return system_bios() == 26 || system_bios() == 27; }
+	bool staged_recorder_profile() const { return system_bios() == 26 || system_bios() == 27; }
+	bool cold_saved_profile() const { return system_bios() == 28; }
+	bool staged_original_profile() const { return staged_recorder_profile() || cold_saved_profile(); }
 	bool full_metadata_profile() const { return system_bios() == 27; }
 	unsigned recorder_metadata_size() const { return full_metadata_profile() ? 24 : 16; }
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 27; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 28; }
 	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
 	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile(); }
 	bool recorder_control_profile() const { return system_bios() == 23 || recorder_poll_profile(); }
 	bool recorder_poll_profile() const { return system_bios() == 24 || recorder_save_profile(); }
-	bool recorder_save_profile() const { return system_bios() == 25 || staged_original_profile(); }
+	bool recorder_save_profile() const { return system_bios() == 25 || staged_recorder_profile(); }
 	u16 shared_daram_r(offs_t offset)
 	{
 		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
@@ -1340,20 +1374,40 @@ private:
 			records, total, unsigned(expected.size()), registers);
 	}
 	bool measurement_profile() const { return system_bios() == 13 || system_bios() == 20; }
+	void observe_cold_title(u16 opcode)
+	{
+		// The packing loop ends at 03:95ac. C682 is subsequently reused
+		// by later storage work, so its endpoint value is not an invariant.
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		std::array<u16, 5> const title{'M', 'A', 'M', 'E', 0};
+		std::array<u16, 3> const packed{0x4d41, 0x4d45, 0};
+		bool valid = opcode == 0x7600;
+		for (unsigned i = 0; i < title.size(); ++i) valid &= data.read_word(0xb6c9 + i) == title[i];
+		for (unsigned i = 0; i < packed.size(); ++i) valid &= data.read_word(0xc682 + i) == packed[i];
+		++m_cold_title_publications; m_cold_title_verified = valid;
+		logerror("mu4_native_cold_title: publications=%u verified=%u packed=%04x,%04x,%04x identity=execute_entry\n",
+			m_cold_title_publications, unsigned(valid), data.read_word(0xc682), data.read_word(0xc683), data.read_word(0xc684));
+	}
 	void verify_native_status()
 	{
 		auto const disable = machine().disable_side_effects();
 		auto &data = m_cpu->space(AS_DATA);
-		if (m_command_ack_cursor != 3 || m_command_tx_words.size() != 14 || m_command_wire_bit_count ||
-			data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 || data.read_word(0x1659) != 14 ||
-			data.read_word(0x165a) != 14 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
-			fatalerror("MU4 framed status transaction did not settle after the physical peer acknowledgement");
-		logerror("mu4_native_status_transaction: PASS rx_words=11 tx_words=14 pin_decode=1 ack=1 retries=0 queue_empty=1 mode=0 full_boot=0\n");
+		unsigned const rx_words = 11 + (cold_saved_profile() ? 3 * m_cold_notifications : 0);
+		unsigned const tx_words = 14 + (cold_saved_profile() ? 16 * m_cold_notifications : 0);
+		if (m_command_ack_cursor != 3 || m_command_tx_words.size() != tx_words || m_command_wire_bit_count ||
+			data.read_word(0x1657) != rx_words % 80 || data.read_word(0x1658) != rx_words % 80 || data.read_word(0x1659) != tx_words % 80 ||
+			data.read_word(0x165a) != tx_words % 80 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
+			fatalerror("MU4 framed status transaction did not settle ack=%u tx_words=%zu bits=%u rx=%04x/%04x tx=%04x/%04x queued=%04x pending=%04x mode=%04x",
+				m_command_ack_cursor, m_command_tx_words.size(), m_command_wire_bit_count,
+				data.read_word(0x1657), data.read_word(0x1658), data.read_word(0x1659), data.read_word(0x165a),
+				data.read_word(0x165e), data.read_word(0x165d), data.read_word(0xbb80));
+		logerror("mu4_native_status_transaction: PASS rx_words=%u tx_words=%u pin_decode=1 ack=1 retries=0 queue_empty=1 mode=0 full_boot=0\n", rx_words, tx_words);
 		if (system_bios() >= 11)
 		{
-			if (m_command_rx_irqs != 11 || m_command_rx_busy || m_command_rx_ready)
-				fatalerror("MU4 pin receive did not drain eleven device-owned RRDY interrupts");
-			logerror("mu4_native_receive_pins: PASS bytes=11 rx_irqs=11 frame=1 data=1 clock=1 drr_drained=1\n");
+			if (m_command_rx_irqs != rx_words || m_command_rx_busy || m_command_rx_ready)
+				fatalerror("MU4 pin receive did not drain %u device-owned RRDY interrupts", rx_words);
+			logerror("mu4_native_receive_pins: PASS bytes=%u rx_irqs=%u frame=1 data=1 clock=1 drr_drained=1\n", rx_words, m_command_rx_irqs);
 		}
 	}
 	void verify_native_measurement()
@@ -1524,7 +1578,7 @@ private:
 				[this](offs_t address, u16 &, u16) {
 					if (machine().side_effects_disabled() || (m_cpu->pc() & 0xffff) != address + 1) return;
 					++m_native_bootstrap_resident_entries;
-					if (recorder_save_profile() && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
+					if ((recorder_save_profile() || cold_saved_profile()) && !m_native_bootstrap_memory_checked) observe_bootstrap_resident_memory();
 				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
 				[this](offs_t address, u16 &, u16)
@@ -1679,6 +1733,9 @@ private:
 			save_item(NAME(m_serial_word)); save_item(NAME(m_serial_ready)); save_item(NAME(m_serial_reads));
 			save_item(NAME(m_serial_empty_reads));
 			save_item(NAME(m_native_command_cursor)); save_item(NAME(m_native_command_waits));
+			save_item(NAME(m_cold_catalog_scans)); save_item(NAME(m_cold_metadata_reads));
+			save_item(NAME(m_cold_notifications)); save_item(NAME(m_cold_response_begin));
+			save_item(NAME(m_cold_title_publications)); save_item(NAME(m_cold_title_verified));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
 			if (recorder_profile())
 			{
@@ -1865,6 +1922,9 @@ private:
 		m_recorder_startup_entries = 0;
 		m_recorder_control_entries = m_recorder_control_acks = 0;
 		m_recorder_metadata_result = 0;
+		m_cold_catalog_scans = m_cold_metadata_reads = 0;
+		m_cold_notifications = 0; m_cold_response_begin = 14;
+		m_cold_title_publications = 0; m_cold_title_verified = false;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
@@ -2293,6 +2353,14 @@ private:
 			}
 			else if (measurement_profile()) verify_native_measurement();
 			else if (system_bios() >= 17) verify_native_status();
+			if (cold_saved_profile())
+			{
+				bool valid = m_cold_catalog_scans == 1 && m_cold_metadata_reads == 1 && m_cold_notifications &&
+					m_cold_title_publications == 1 && m_cold_title_verified &&
+					data.read_word(0x3768) == 1 && data.read_word(0x373e) == 2 && !data.read_word(0x3750);
+				if (!valid) fatalerror("MU4 cold saved-track catalogue differs scans=%u metadata_reads=%u tracks=%u", m_cold_catalog_scans, m_cold_metadata_reads, data.read_word(0x3768));
+				logerror("mu4_native_recorder_reopen: PASS tracks=1 title=MAME packed_title=1 original_scanner=1 original_id3_reader=1 pin_status=1 playback=0 firmware_state_forcing=0\n");
+			}
 			if (system_bios() == 20)
 			{
 				logerror("mu4_native_codec_continuous_observe: tx_words=%u din_words=%u pending=%u nonzero=%u\n",
@@ -3908,6 +3976,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(24, "bootrecsave", "Original recorder metadata transaction (provisional RAM)")
 	ROM_SYSTEM_BIOS(25, "bootrecstage", "Staged original recorder coverage diagnostic (fail-closed)")
 	ROM_SYSTEM_BIOS(26, "bootrecmeta", "Staged recorder with nonempty ID3 title and artist input")
+	ROM_SYSTEM_BIOS(27, "bootopenstage", "Staged original cold saved-track catalogue and status")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
