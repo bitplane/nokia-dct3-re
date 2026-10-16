@@ -98,9 +98,12 @@ Pending MVKD writes now forward to same-address consumers, eliminating
 the observed stack-index corruption and subsequent code overwrite without
 changing the memory map. The two-word shifted store `6f93 0d9f` at
 `02:41bc` now executes in the delay span of `RPTBD 41eb`; other delayed
-control owners remain independently guarded. The current stop is
-`02:5cf8`, `4700`, basic memory-sourced `RPT Smem`. Its effective source
-must be derived from live DP/CPL, not the encoded operand byte alone.
+control owners remain independently guarded. Basic memory-sourced
+`RPT Smem` now has independent count/address/replay coverage. The current
+stop is its repeated body at `02:5cf9`, `f45f` (`LD A,-1,A`), which the
+repeat decoder does not yet admit. This original repeat has not completed;
+its effective count source must still be derived from live DP/CPL, not
+the encoded operand byte alone.
 The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
@@ -4463,13 +4466,6 @@ tests CPL=1 pointer arithmetic. Initial overlay equality alone is not
 evidence that code survives later data writes; retain the distinction
 between a bad computed pointer and a physical aliasing defect.
 
-The pending-copy forwarding milestone passed the complete 288-check default CPU suite,
-the separate `mvkd-forward` profile, six related forwarding/move profiles
-(`imm-forward`, `rmw-forward`, `mvkd-sp`, `mvdk-acc`, `mvdk-producer`,
-`store-bypass`), native 5110 save-state restoration and 2,902 tool tests
-(one skipped). The original media diagnostic remains failed closed;
-none of these tests establishes decoded audio or physical bank timing.
-
 ### REL delayed shifted-store contract
 
 The original playback executes instruction `02:41bc`, `6f93 0d9f`,
@@ -4491,19 +4487,50 @@ three-word addressing, BRC destinations and a different control owner,
 with no data or pointer side effects. These exclusions are prototype
 limits, not claimed silicon traps; physical pipeline phases remain unvalidated.
 
-The final build also passes nine related repeat/delay/forwarding profiles,
-native 5110 save-state restoration and 2,904 tool tests (one skipped).
-The complete 288-check default CPU run above belongs to the preceding
-forwarding milestone, not a fresh full-suite run for this extension.
-
 ### REL memory-sourced repeat boundary
 
-The original diagnostic advances to `02:5cf8`, opcode `4700` (`RPT Smem`),
-with live PC `02:5cfa`. Only absolute memory-sourced repeat (`47f8`) is
-currently admitted by the staged core. Basic direct/indirect forms need
-independent addressing, count capture, producer ordering, interrupt and
-replay coverage before admission. Encoded direct operand `00` does not
-by itself establish an IMR or stack-relative source.
+`RPT Smem` now admits basic direct operands and short indirect stationary,
+postdecrement, postincrement and preincrement forms (`4700..479f`), in
+addition to the existing absolute `47f8` form. DP/CPL are retained at
+Decode, the compiler-mode SP base at Access, and the count is sampled
+once in Read. The selected pointer changes once for count acquisition,
+not once per repeated body. The two extra Class 5A/5B clocks remain a
+partial timing placement, not measured silicon phases. See TI SPRU172C
+4-146/147 and the existing SPRU131G address-latency contracts.
+
+`rpt-smem` passes 12,672 cases/replays over 44 address/source cases,
+counts 0/1/7/255, CPL, compatibility mode, program pages, no interrupt/
+IRQ/NMI and three snapshots. Eight additional direct-RAM cases cover
+unsigned counts `8000`/`ffff` on both pages and two snapshots, including
+65,536 body executions for `ffff`. Tests observe one count read, one
+body fetch, exactly RC+1 Execute observations, retained count/body despite
+backing-memory mutation, balanced deferred interrupts and unchanged
+unrelated state. The earliest replay restores the fixture's queued
+external interrupt assertion; later snapshots retain the CPU's accepted
+or pending interrupt without supplying a second edge.
+
+`rpt-smem-edge` passes 36 cases/replays covering unsupported control and
+peripheral sources, a preincrement into the excluded range, long-offset
+addressing, nested repeat, a delayed-control owner and a block-repeat
+body. They reject without data transactions or pointer changes. These
+are prototype exclusions, not silicon traps. Producer spacing, modifying
+self-AR count sources and additional repeated-body families require their
+own composition evidence. Encoded direct operand `00` does not by itself
+establish an IMR or stack-relative source.
+
+Current acceptance passes the complete 288-check default CPU suite,
+both new repeat-count profiles, the separate `rptbd-shift-st`,
+`rptbd-shift-edge`, `rptbd`, `rptbd-irq`, `rptbd-edge` and
+`instr-observer` regressions, native 5110 save-state restoration and
+2,906 tool tests (one skipped). None establishes physical bank timing
+or decoded audio.
+
+The unchanged original playback request now reaches the repeat-body
+guard at `02:5cf9`, `f45f` (`LD A,-1,A`), with live PC `02:5cfb`.
+Decode rejects this body before completing the original memory repeat;
+the isolated fixtures above, not this run, establish count acquisition.
+Repeated accumulator shifts need their own per-iteration arithmetic,
+flags, source/destination composition, interrupt and replay evidence.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
@@ -4514,6 +4541,10 @@ python3 tools/run_c54x_core.py --profile mvkd-sp \
 python3 tools/run_c54x_core.py --profile rptb-fcalld \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile mvkd-forward \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile rpt-smem \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile rpt-smem-edge \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 

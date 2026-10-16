@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rpt-smem": (
+        "TMS320C54x basic memory repeat: PASS cases=12680 restore=12680 forms=44 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated basic memory repeat complete",
+    ),
+    "rpt-smem-edge": (
+        "TMS320C54x basic memory repeat exclusions: PASS cases=36 restore=36 forms=control,peripheral,preincrement,long_offset,nested,delay,block pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated basic memory repeat exclusions complete",
+    ),
     "rptbd-shift-edge": (
         "TMS320C54x RPTBD shifted delay exclusions: PASS cases=16 restore=16 forms=spill,three_words,BRC,branch_owner pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 brc_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated RPTBD shifted exclusions complete",

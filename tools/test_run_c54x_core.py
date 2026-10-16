@@ -12,6 +12,34 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_basic_memory_repeat_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-smem-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-smem-edge')
+        for old, new in (('restore=36', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('pointer_changes=0', 'pointer_changes=1'),
+                         ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-smem-edge')
+
+    def test_basic_memory_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-smem']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-smem')
+        for old, new in (('restore=12680', 'restore=0'),
+                         ('count_reads=1', 'count_reads=2'),
+                         ('body_fetches=1', 'body_fetches=2'),
+                         ('body_count=rc+1', 'body_count=rc'),
+                         ('pointer_effect=once', 'pointer_effect=twice'),
+                         ('retained_count=1', 'retained_count=0'),
+                         ('balanced_frames=1', 'balanced_frames=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-smem')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rpt-smem')
+
     def test_rptbd_shift_store_scope(self):
         marker, ending = EXTRA_PROFILES['rptbd-shift-st']
         output = marker + '\n' + ending + '\n'
