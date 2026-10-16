@@ -86,6 +86,22 @@ def decode_recording_prefix_transform(words):
             'scope': 'Mapped forward block under captured state; not header generation, state initialization or valid full encoding'}
 
 
+def decode_transform_copy(words, segment):
+    base = {'aa88': 0x3e438, 'aa99': 0x2d01a}.get(segment)
+    if base is None:
+        raise ValueError('unsupported transform copy overlay')
+    expected = (0x1303, 0x7102, 0x0012, 0xfa4d, (base + 14) & 0xffff,
+                0xf495, 0x8813, 0xf310, 0x0001, 0x891a, 0xf495,
+                0xf072, (base + 13) & 0xffff, 0xe589, 0xf495, 0xf495, 0xf4e4)
+    if any(words.get(base + offset) != word for offset, word in enumerate(expected)):
+        raise ValueError('original transform-copy source changed or absent')
+    return {'entry': f'{base:06x}', 'pinned_words': len(expected),
+            'operation': 'MVDD Xmem,Ymem copy, not fill',
+            'cpl1_far_call_arguments': {'destination': 'A -> AR3', 'source': '*SP(2) -> AR2', 'count': '*SP(3) -> B'},
+            'loop': 'nonzero count: BRC=count-1, RPTB over e589',
+            'scope': 'Source grammar; not caller intent, retained argument ownership or allocation/key-length validity'}
+
+
 BIT_WINDOW_WITNESS = (
     0xED00, 0xF6B6, 0xF6B7, 0xF7B8, 0xF6B9, 0x4A08, 0x7712, 0xA854,
     0x1182, 0xF310, 0x0010, 0xFA4E, 0x512E, 0x7713, 0xA858, 0x7714,
@@ -960,10 +976,12 @@ def contract(source):
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)
+    result['playback_transform_copy'] = decode_transform_copy(rel_words, 'aa99')
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
+    result['recording_transform_copy'] = decode_transform_copy(recorder_words, 'aa88')
     result['recorder_memory_mac'] = decode_recorder_memory_mac(recorder_words)
     result['dma_pause'] = decode_dma_pause(words, rel_words)
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)

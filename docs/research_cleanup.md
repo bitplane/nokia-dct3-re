@@ -148,6 +148,10 @@ Some recurring mistakes need stronger checks than ordinary source review:
   mode and live page/frame controls before naming a mapped register. On C54x,
   a short direct Smem operand inherits DP/CPL, while a literal dmad/MMR
   address may not; identical numeric fields can name different storage.
+- Zero-valued writes do not establish a clear operation. Decode the source
+  and destination paths: a copy of zero-filled data can produce the same
+  write trace. Keep copy source, copy destination and initializer length
+  separate until their caller contract is established.
 - Similar addressing names need not have the same legal operand domain.
   On C54x, short MOD=3 preincrement is write-only (SPRU131G table 5-4),
   while long-offset MOD=13 preincrement can read. A passing fixture for

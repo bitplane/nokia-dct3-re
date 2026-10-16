@@ -14,7 +14,7 @@ storage and metadata transactions, but native playback remains silent.
 The current software frontier is the [recording/playback transform initializer](#recording-transform-and-initializer-inputs):
 a native recording block matches an independent scalar model and saved bytes,
 while seven-word initializer reads differ in their last word after six-word
-clears. Recover that producer/caller/lifetime contract without forcing keys,
+copies. Recover that producer/caller/lifetime contract without forcing keys,
 lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -5033,14 +5033,28 @@ cycle through all seven addresses; this is not an inference solely from
 late RAM contents. Snapshots remain frame context rather than a retained
 CPU argument API. Before initialization, only the first six buffer words
 receive zero writes near `03e446` (recording) or `02d028` (playback).
-Playback's clearing loop writes BRC=`0005`, consistent with six iterations,
-not evidence of a lost seventh iteration. Its last word `e3d6` still holds
+The preceding helper is a copier, not a clear routine: its `e589` body is
+`MVDD Xmem,Ymem`, with source through AR2 and destination through AR3.
+Both 17-word copies (AA88 `03e438`, AA99 `02d01a`) are pinned by the
+source tool. Under CPL=1/far-call layout, it reads source pointer from
+`*SP(2)`, count from `*SP(3)`, and transfers incoming A to AR3. Playback's
+actual argument bus reads include `d75f=0006` and `d75e=e3e2`; the latter
+is the source, not the destination receiving the zero writes. The paired
+snapshot records AR3=`e3d0` and return context `02ab45`, following call
+`02ab43`. Its loop
+writes BRC=`0005`, consistent with six copies, not evidence of a lost
+seventh iteration. Zero-valued writes alone did not establish clearing.
+The last destination word `e3d6` still holds
 `ffff` from a prior observed write near `03c862` at 0.309186156 seconds;
 no write to recording's seventh word was seen in the installed-tap epoch.
 Neither fact licenses a claim about physical power-on RAM contents.
 
-The current question is why a six-word clear precedes seven-word
+The current question is how the six-word source copy relates to seven-word
 initialization, and which producer/lifetime contract owns the seventh word.
+The reviewed initializer wrapper at `02b25c` has an immediate call at
+`02b268` to `02cd14`, after copying its caller's length slot to the outgoing
+frame. Follow that argument and the source object feeding `02ab43` before
+changing a loop count or assuming a terminator convention.
 Decode that caller contract before classifying this as a key error,
 changing reset RAM policy or replacing either word. No key, pointer,
 length, seek or file byte is forced. The key observer detaches after
@@ -5066,7 +5080,7 @@ The inventory handles MPEG-2/4 header IDs, CRC-dependent header size,
 declared length, raw block count and file truncation. Tests include embedded
 sync candidates that must not replace the declared-length chain, divergent
 but parseable headers, missing boundaries and read-only CLI operation.
-The complete tool suite passes (2,985 tests, one skipped), including eight
+The complete tool suite passes (2,986 tests, one skipped), including eight
 generated-media tests covering authoring boundaries and failure paths.
 
 In the pre-bypass constant-file control, all 1,125,032 actual channel-3

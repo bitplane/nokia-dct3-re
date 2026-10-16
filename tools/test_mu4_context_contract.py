@@ -28,9 +28,27 @@ from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, deco
 from tools.mu4_context_contract import NIBBLE_BASE, NIBBLE_WITNESS, decode_nibble_selector, reference_nibble
 from tools.mu4_context_contract import decode_prefix_transform, reference_transform_block
 from tools.mu4_context_contract import decode_recording_prefix_transform
+from tools.mu4_context_contract import decode_transform_copy
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_transform_copy_source_is_not_mistaken_for_zero_fill(self):
+        for segment, base in (('aa88', 0x3e438), ('aa99', 0x2d01a)):
+            source = (0x1303,0x7102,0x0012,0xfa4d,(base+14)&65535,0xf495,
+                      0x8813,0xf310,1,0x891a,0xf495,0xf072,(base+13)&65535,
+                      0xe589,0xf495,0xf495,0xf4e4)
+            words = dict(enumerate(source, base))
+            report = decode_transform_copy(words, segment)
+            self.assertEqual(report['operation'], 'MVDD Xmem,Ymem copy, not fill')
+            self.assertEqual(report['pinned_words'], 17)
+            for address in words:
+                changed = dict(words)
+                changed[address] ^= 1
+                with self.subTest(segment=segment, address=address), self.assertRaises(ValueError):
+                    decode_transform_copy(changed, segment)
+        with self.assertRaises(ValueError):
+            decode_transform_copy({}, 'aa22')
+
     def test_recorded_native_block_matches_model_and_independent_saved_bytes(self):
         state = [int(word, 16) for word in (
             '038f d4c4 63fd 5f08 8d2f d427 9d03 7986 4d6e d591 d525 ad1f 8a59 265a af39 057c 1432 1e68 '

@@ -5,6 +5,15 @@ local cpu = assert(machine.devices[':cpu'])
 local data = assert(cpu.spaces.data)
 local handles, sampling = {}, false
 local writers = {}
+local copy_reads = 0
+handles[#handles + 1] = data:install_read_tap(0xd700, 0xd7ff, 'mu4_copy_argument_reads', function(address, value)
+    local pc = cpu.state.GENPC.value
+    if sampling or machine:side_effects_disabled() or copy_reads >= 16 or pc < 0x2d01a or pc > 0x2d01f then return end
+    copy_reads = copy_reads + 1
+    machine:logerror(string.format(
+        'mu4_transform_copy_argument_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+        address, value, copy_reads, machine.time:as_double(), pc))
+end)
 for _, range in ipairs({{0xff84, 0xff8a}, {0xe3d0, 0xe3d6}}) do
     local reads = 0
     handles[#handles + 1] = data:install_read_tap(range[1], range[2], 'mu4_key_buffer_reads_' .. range[1],
@@ -30,14 +39,19 @@ local specs = {
     {name = 'aa99', base = 0xb9de, first = 0x2cd14, last = 0x2cd52},
 }
 local repeat_samples = 0
-handles[#handles + 1] = data:install_write_tap(0x1a, 0x1a, 'mu4_key_clear_repeat', function(_, value, mask)
+handles[#handles + 1] = data:install_write_tap(0x1a, 0x1a, 'mu4_key_copy_repeat', function(_, value, mask)
     local pc = cpu.state.GENPC.value
     if sampling or machine:side_effects_disabled() or repeat_samples >= 8 or
        not ((pc >= 0x3e438 and pc <= 0x3e448) or (pc >= 0x2d01a and pc <= 0x2d02a)) then return end
     repeat_samples = repeat_samples + 1
+    sampling = true
+    local sp = cpu.state.SP.value
+    local caller = data:read_u16(sp) * 0x10000 + data:read_u16((sp + 1) & 0xffff)
+    local source, count = data:read_u16((sp + 2) & 0xffff), data:read_u16((sp + 3) & 0xffff)
+    sampling = false
     machine:logerror(string.format(
-        'mu4_transform_clear_repeat: value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
-        value, mask, repeat_samples, machine.time:as_double(), pc))
+        'mu4_transform_copy_repeat: value=%04x mask=%04x ordinal=%u sp=%04x frame_return=%06x frame_source=%04x frame_count=%04x ar3=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+        value, mask, repeat_samples, sp, caller, source, count, cpu.state.AR3.value, machine.time:as_double(), pc))
 end)
 for _, spec in ipairs(specs) do
     handles[#handles + 1] = data:install_write_tap(spec.base, spec.base, 'mu4_key_context_' .. spec.name,
