@@ -41,6 +41,29 @@ local queue_counts = {}
 local result_counts = {}
 local parser_writes = {}
 local prefix_writes = {}
+local merge_reads = 0
+local merge_writes = {}
+handles[#handles + 1] = data:install_write_tap(0xaa24, 0xaa27, 'mu4_playback_merge_input', function(address, value, mask)
+    local time = machine.time:as_double()
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end
+    merge_writes[address] = (merge_writes[address] or 0) + 1
+    if merge_writes[address] <= 32 then
+        machine:logerror(string.format(
+            'mu4_playback_merge_write: address=%04x value=%04x mask=%04x ordinal=%u t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
+            address, value, mask, merge_writes[address], time, cpu.state.GENPC.value))
+    end
+end)
+handles[#handles + 1] = data:install_read_tap(0xaa24, 0xaa63, 'mu4_playback_prefix_merge', function(address, value)
+    local time = machine.time:as_double()
+    local pc = cpu.state.GENPC.value
+    if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 or pc < 0x29e70 or pc > 0x29e7c then return end
+    merge_reads = merge_reads + 1
+    if merge_reads <= 32 then
+        machine:logerror(string.format(
+            'mu4_playback_merge_read: address=%04x value=%04x ordinal=%u t=%.9f context_pc=%06x reader_identity=unvalidated observer_writes=0\n',
+            address, value, merge_reads, time, pc))
+    end
+end)
 handles[#handles + 1] = data:install_write_tap(0x162e, 0x1631, 'mu4_playback_buffer_prefix', function(address, value, mask)
     local time = machine.time:as_double()
     if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end

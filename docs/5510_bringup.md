@@ -4887,8 +4887,22 @@ stored AAC and parser input. Nearby source is
 Bus PCs are context, not a retained writer-identity API. Neither the
 transformation's purpose nor the native external-media packaging contract
 is established; do not call this proof of corruption, decryption, or a CPU
-arithmetic defect. The next question is the input/key contract of this
-transformation and whether plain AAC in a REL-named record selects it.
+arithmetic defect.
+
+The loop near `029e74` is a byte-packing stage, not the first observed
+change: its data reads from `aa24..aa2b` are already
+`00ef,0076,00bd,00c5,0026,009f,00fc,00de`. The surrounding load/AND/OR/store
+sequence is consistent with packing adjacent low bytes into output words.
+Earlier write taps on `aa24..aa27` distinguish unpacked input
+`00ff,00f9,0050,0080` near `029e5c/029e5f` from replacement bytes
+`00ef,0076,00bd,00c5` near `02b5ac/02b5b8/02b5c0/02b5cc`.
+Source `02b5a1: fb82 c9ac` calls a processing helper before those stores;
+`02c9ac` accesses state near `b9ef` and calls `02c62b`. This identifies
+the upstream processing boundary, not its algorithm or key semantics.
+In particular, do not repair the later packer or pre-adjust external media
+to cancel these observed bytes. The next question is that helper's
+input/state and format-selection contract, including whether the fixture's
+REL naming selects processing inappropriate for plain AAC.
 Host-valid AAC alone is not proof of valid native REL packaging.
 The observer retains at most eight unusual entry contexts, is reset/saved,
 and never changes firmware state. Preserve original recorded media and
