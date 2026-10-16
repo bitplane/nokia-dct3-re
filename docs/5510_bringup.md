@@ -4472,11 +4472,54 @@ and the existing strict playback-observation checker does not accept it.
 The native audio diagnostic still intentionally fails. No verifier was
 relaxed to bank this comparison.
 
-The converted-ADC fixture supplies constant `1234`/`5678` channel values.
-A varying-input recorder/playback experiment is still required before
-using nonzero output as an audio expectation. Native filtering behavior,
-input consumption and decoded-sample provenance must be established rather
-than assuming that the constant bench input should survive unchanged.
+The baseline converted-ADC fixture supplies constant `1234`/`5678` channel
+values. Native filtering behavior, encoder consumption and decoded-sample
+provenance must be established rather than assuming that this input should
+survive unchanged. The separate varying-input fixture below exercises a
+different external source without changing the baseline.
+
+### Varying converted-input fixture
+
+`bootrecac` uses the same original staged recorder, pin-level requests,
+nonempty metadata and independent seed NAND as `bootrecmeta`. Only its
+converted-ADC source changes: the left channel alternates +8192/-8192
+over 64 requested frames, the right +4096/-4096 over 32. These are sample
+periods, not measured physical frequencies. Generation counters determine
+phase and are reset/saved with the bench; phase replay is not newly accepted
+by this experiment. No firmware state or waveform is written into DSP RAM.
+
+The complete recorder gate passes with 871,742 generated stereo frames.
+Actual channel-2 source reads at data `0021` observe counts
+`201120,201155,201141,201134` for `2000,e000,1000,f000`, respectively
+(804,550 reads, no other values). Attribution uses the active-source-read
+API, not the enabled channel's address. Another 902,505 reads are outside
+that ownership selection and remain unclassified; neither their identity
+nor complete delivery/drop accounting is inferred. The strict
+`--recorder-input` check independently verifies square-source statistics
+and both received polarities for both amplitudes. This proves varying
+peripheral input, not encoder consumption or decoded audio.
+
+The captured endpoint NAND SHA-256 is
+`5b857e584ac4ebb1806cc54cc5bb6d6bd4825c6605c490f3645cf94a649014d9`.
+Independent FAT extraction reads `TEST`, 143,680 bytes, SHA-256
+`5b9eeb7a4d194d202a332bd4d17bddf8cd072fd7f8658a05e57b793db6b7aee5`.
+Against the constant-input file, 43,567 common bytes differ, starting at
+offset 1005 (decimal), and length increases by 512 bytes. Forced AAC
+probing still produces errors, sample rate zero and no decoded-frame
+count; format/codec validity is not established. Re-running the unchanged
+constant profile on the same build reproduces NAND hash `523e9417...` above
+exactly. All 2,952 tool tests pass (one skipped).
+
+```sh
+make check-mu4-bootstrap-original \
+  MU4_BOOTSTRAP_BIOS=bootrecac \
+  MU4_BOOTSTRAP_SOURCE_RUN=/path/to/completed-retained-run
+```
+
+Playback of this separate AC-input NAND must retain the ordinary playback
+source and the existing audio-unvalidated diagnostic; nonzero output, if
+observed, still requires waveform/media provenance rather than a weakened
+acceptance predicate.
 
 ### Cold Saved-Track Catalogue
 

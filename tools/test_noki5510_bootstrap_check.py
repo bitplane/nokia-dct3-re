@@ -2,11 +2,41 @@ import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
-    verify_playback_lifecycle, verify_playback_dma, verify_playback_banks,
+    verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    AC_INPUT = ('mu4_recorder_ac_input: generated=64,64,64,64 '
+                'received=60,60,60,60 other=0 other_owner_reads=5 '
+                'shape=square periods=64,32 amplitudes=8192,4096 '
+                'ownership=actual_channel2_source_read analog_adc=0 decoded_audio=0')
+
+    def test_recorder_input_requires_actual_dma_and_does_not_accept_encoding(self):
+        result = verify_recorder_input(self.AC_INPUT)
+        self.assertEqual(result['generated_frames'], 128)
+        self.assertEqual(result['dma_symbol_reads'], [60] * 4)
+        self.assertEqual(result['encoder_consumption'], 'unvalidated')
+        self.assertFalse(result['decoded_audio'])
+        partial = self.AC_INPUT.replace('generated=64,64,64,64', 'generated=65,64,65,64')
+        self.assertEqual(verify_recorder_input(partial)['generated_frames'], 129)
+
+    def test_recorder_input_rejects_bad_shape_missing_dma_and_overclaims(self):
+        for old, new in (('generated=64,64,64,64', 'generated=63,65,64,64'),
+                         ('generated=64,64,64,64', 'generated=64,64,65,64'),
+                         ('generated=64,64,64,64', 'generated=1,0,1,0'),
+                         ('received=60,60,60,60', 'received=0,60,60,60'),
+                         ('received=60,60,60,60', 'received=65,65,65,65'),
+                         ('other=0', 'other=1'), ('periods=64,32', 'periods=32,32'),
+                         ('amplitudes=8192,4096', 'amplitudes=1,1'),
+                         ('actual_channel2_source_read', 'enabled_channel'),
+                         ('analog_adc=0', 'analog_adc=1'), ('decoded_audio=0', 'decoded_audio=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_recorder_input(self.AC_INPUT.replace(old, new))
+        for text in ('', self.AC_INPUT + '\n' + self.AC_INPUT):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                verify_recorder_input(text)
+
     BANKS = '\n'.join((
         'mu4_playback_banks_scope: first=1000 last=107f upstream_first=7000 upstream_last=73ff start=1.000000000 finish=2.000000000 boundary=data_write context_pc=not_owner observer_writes=0 audio_acceptance=0',
         *(f'mu4_playback_copy_context: ordinal={index} destination={0x1000 + index - 1:04x} '

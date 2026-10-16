@@ -1178,7 +1178,7 @@ check-mu4-bootstrap-original: build
 		test -f "$$input" && test "$$(wc -c < "$$input")" -eq 69206016 || \
 			{ echo 'MU4 bootstrap input must be one complete 69,206,016-byte NAND image' >&2; exit 1; }; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; bootopenstage) nvtag=mu4nand_27;; bootplaystage) nvtag=mu4nand_28;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; bootrecstage) nvtag=mu4nand_25;; bootrecmeta) nvtag=mu4nand_26;; bootopenstage) nvtag=mu4nand_27;; bootplaystage) nvtag=mu4nand_28;; bootrecac) nvtag=mu4nand_29;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
 		tmp="$(if $(MU4_BOOTSTRAP_RUN_DIR),$(abspath $(MU4_BOOTSTRAP_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-bootstrap.XXXXXX"))"; \
@@ -1190,7 +1190,7 @@ check-mu4-bootstrap-original: build
 			-seconds_to_run 60 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \
 		grep -q 'mu4_original_bootstrap_upload: records=7 words=10760 program_only=1 ' error.log; \
-		if test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootopenstage; then \
+		if test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootopenstage || test "$$bios" = bootrecac; then \
 			$(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/noki5510_bootstrap_check.py) --resident-memory error.log; \
 		elif test "$$bios" = bootreset; then \
 			grep -q 'mu4_original_bootstrap_frontier: entry_count=2 resident_count=2 ' error.log; \
@@ -1207,29 +1207,30 @@ check-mu4-bootstrap-original: build
 			grep -q 'mu4_native_measurement_result: PASS' error.log; \
 			grep -q 'mu4_native_codec_continuous: PASS' error.log; \
 			grep -q 'mu4_native_tone_dma: PASS' error.log; \
-		elif test "$$bios" = bootrecord || test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol || test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta; then \
+		elif test "$$bios" = bootrecord || test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol || test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootrecac; then \
 			grep -q 'mu4_native_recorder_dispatch: PASS' error.log; \
 			grep -q 'mu4_native_recorder_overlay: PASS' error.log; \
-			if test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol || test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta; then \
+			if test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol || test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootrecac; then \
 				grep -Eq '^\[:\] mu4_native_recorder_startup: pc=0073f8 opcode=[0-9a-f]{4} pmst=[0-9a-f]{4} identity=execute_entry$$' error.log; \
 				grep -q 'mu4_native_recorder_response: index=0 selector=5e words=11 token=80 class=1' error.log; \
 				grep -q 'mu4_native_recorder_response: index=1 selector=02 words=16 token=01 class=0' error.log; fi; \
 			if test "$$bios" = bootreccontrol; then \
 				grep -q 'mu4_native_recorder_control_receive: PASS packet_received=1 native_ack=1 recording_complete=0 firmware_state_forcing=0' error.log; fi; \
-			if test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta; then \
+			if test "$$bios" = bootrecpoll || test "$$bios" = bootrecsave || test "$$bios" = bootrecstage || test "$$bios" = bootrecmeta || test "$$bios" = bootrecac; then \
 				if test "$$bios" = bootrecpoll; then grep -q 'mu4_native_recorder_polled_control: PASS' error.log; \
-				elif test "$$bios" = bootrecmeta; then grep -q 'mu4_native_recorder_metadata: PASS native_reply=1 success=1 playback=0 firmware_state_forcing=0' error.log; \
+				elif test "$$bios" = bootrecmeta || test "$$bios" = bootrecac; then grep -q 'mu4_native_recorder_metadata: PASS native_reply=1 success=1 playback=0 firmware_state_forcing=0' error.log; \
 				else grep -q 'mu4_native_recorder_metadata: PASS native_reply=1 success=0 playback=0 firmware_state_forcing=0' error.log; fi; \
 				$(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/mu4_recorder_media_inventory.py) \
 					"$$input" mu4_recorder_endpoint.nand >media_inventory.json; \
 				cat media_inventory.json; fi; \
 			grep -q 'mu4_native_recorder_request_ack: words=007f,0001,0055' error.log; \
-			if test "$$bios" != bootrecstage && test "$$bios" != bootrecmeta; then \
+			if test "$$bios" != bootrecstage && test "$$bios" != bootrecmeta && test "$$bios" != bootrecac; then \
 				grep -Eq 'mu4_original_bootstrap_loader: name=0052,0045,0052,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0002,aca2 .* index=1' error.log; fi; \
 		elif test "$$bios" != bootstrap; then \
 			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
 		if test "$$bios" = bootreplay; then grep -q 'mu4_native_replay: PASS' error.log; fi; \
 		if test "$$bios" = bootopenstage; then grep -q 'mu4_native_recorder_reopen: PASS tracks=1 title=MAME packed_title=1 original_scanner=1 original_id3_reader=1 pin_status=1 playback=0 firmware_state_forcing=0' error.log; fi; \
+		if test "$$bios" = bootrecac; then $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/noki5510_bootstrap_check.py) --recorder-input error.log; fi; \
 		cmp "$$input" "$$tmp/nvram/$$nvtag/nand"
 
 check-mu4-nand: build

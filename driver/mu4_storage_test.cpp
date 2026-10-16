@@ -35,7 +35,7 @@ public:
 		m_cpu->set_reset_clkmd(0);
 		// Only the fail-closed original-firmware diagnostic opts into bus waits.
 		// Program/data bank ownership and physical READY wiring remain unvalidated.
-		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootopenstage") || !strcmp(config.options().bios(), "bootplaystage")) m_cpu->set_c5416_bus_profile(true);
+		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootrecac") || !strcmp(config.options().bios(), "bootopenstage") || !strcmp(config.options().bios(), "bootplaystage")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -174,7 +174,7 @@ public:
 			m_mcbsp0->tx_frame_w(state); m_mcbsp0->rx_frame_w(state);
 		});
 		// Explicit converted-sample bench input, not a modeled analog ADC.
-		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set([](offs_t channel) -> u16 { return channel ? 0x5678 : 0x1234; });
+		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set(FUNC(mu4_storage_test_state::converted_adc));
 		subdevice<tlv320aic23_device>("codec")->dout_cb().set([this](int state) { m_mcbsp0->rx_data_w(state); });
 		subdevice<tlv320aic23_device>("codec")->din_word_cb().set([this](offs_t channel, u16 value) {
 			if (playback_profile() && m_playback_overlay_checked) observe_playback_audio(value, true);
@@ -206,6 +206,18 @@ public:
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
 private:
+	std::array<u32, 4> m_ac_generated{}, m_ac_received{};
+	u32 m_ac_other = 0, m_ac_other_owners = 0;
+	u16 converted_adc(offs_t channel)
+	{
+		if (!recorder_ac_profile()) return channel ? 0x5678 : 0x1234;
+		unsigned const slot = unsigned(channel) * 2, period = channel ? 32 : 64;
+		unsigned const phase = (m_ac_generated[slot] + m_ac_generated[slot + 1]) % period;
+		bool const negative = phase >= period / 2;
+		++m_ac_generated[slot + unsigned(negative)];
+		int const amplitude = channel ? 4096 : 8192;
+		return u16(negative ? -amplitude : amplitude);
+	}
 	required_device<tms320c54x_device> m_cpu;
 	required_device<tms320c54x_dma_device> m_dma;
 	required_device<tms320c54x_mcbsp_device> m_mcbsp;
@@ -1330,14 +1342,15 @@ private:
 				m_data_reads, value & 0xff, m_gpio & 7, m_direction & 7, m_ready);
 		return value;
 	}
-	bool staged_recorder_profile() const { return system_bios() == 26 || system_bios() == 27; }
+	bool recorder_ac_profile() const { return system_bios() == 30; }
+	bool staged_recorder_profile() const { return system_bios() == 26 || system_bios() == 27 || recorder_ac_profile(); }
 	bool cold_saved_profile() const { return system_bios() == 28; }
 	bool playback_profile() const { return system_bios() == 29; }
 	bool cold_catalog_profile() const { return cold_saved_profile() || playback_profile(); }
 	bool staged_original_profile() const { return staged_recorder_profile() || cold_catalog_profile(); }
-	bool full_metadata_profile() const { return system_bios() == 27; }
+	bool full_metadata_profile() const { return system_bios() == 27 || recorder_ac_profile(); }
 	unsigned recorder_metadata_size() const { return full_metadata_profile() ? 24 : 16; }
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 29; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 30; }
 	bool recorder_profile() const { return system_bios() == 21 || system_bios() == 22 || recorder_control_profile(); }
 	bool media_command_profile() const { return recorder_profile() || playback_profile(); }
 	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile() || playback_profile(); }
@@ -1620,6 +1633,16 @@ private:
 				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
 			}
 			if (measurement_profile()) install_measurement_observers();
+			if (recorder_ac_profile())
+				m_cpu->space(AS_DATA).install_read_tap(0x21, 0x21, "mu4_recorder_ac_receive",
+					[this](offs_t address, u16 &value, u16) {
+						if (machine().side_effects_disabled()) return;
+						if (!m_dma->source_read_matches(2, AS_DATA, address)) { ++m_ac_other_owners; return; }
+						std::array<u16, 4> const alphabet{0x2000, 0xe000, 0x1000, 0xf000};
+						auto const found = std::find(alphabet.begin(), alphabet.end(), value);
+						if (found == alphabet.end()) ++m_ac_other;
+						else ++m_ac_received[found - alphabet.begin()];
+					});
 			if (playback_profile())
 				m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mu4_playback_dma_source",
 					[this](offs_t address, u16 &value, u16) {
@@ -1880,6 +1903,8 @@ private:
 			// Save the external peer alongside McBSP2. Growing observation vectors
 			// need bounded backing storage; save_item(vector) fixes its initial size.
 			save_item(NAME(m_direction)); save_item(NAME(m_gpio)); save_item(NAME(m_ready));
+			save_item(NAME(m_ac_generated)); save_item(NAME(m_ac_received));
+			save_item(NAME(m_ac_other)); save_item(NAME(m_ac_other_owners));
 			save_item(NAME(m_serial_index)); save_item(NAME(m_serial_regs));
 			save_item(NAME(m_serial_word)); save_item(NAME(m_serial_ready)); save_item(NAME(m_serial_reads));
 			save_item(NAME(m_serial_empty_reads));
@@ -2042,6 +2067,7 @@ private:
 		m_serial_tx_irqs = 0;
 		m_dma_output.clear(); m_dma_completions = 0;
 		m_rx_dma_completions = m_rx_irqs = 0;
+		m_ac_generated = {}; m_ac_received = {}; m_ac_other = m_ac_other_owners = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_native_din_words = 0;
 		m_continuous_tx.fill(0);
@@ -2439,6 +2465,10 @@ private:
 	{
 		if (original_bootstrap_profile())
 		{
+			if (recorder_ac_profile())
+				logerror("mu4_recorder_ac_input: generated=%u,%u,%u,%u received=%u,%u,%u,%u other=%u other_owner_reads=%u shape=square periods=64,32 amplitudes=8192,4096 ownership=actual_channel2_source_read analog_adc=0 decoded_audio=0\n",
+					m_ac_generated[0], m_ac_generated[1], m_ac_generated[2], m_ac_generated[3],
+					m_ac_received[0], m_ac_received[1], m_ac_received[2], m_ac_received[3], m_ac_other, m_ac_other_owners);
 			if (playback_profile())
 			{
 				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu loader_execute=%u observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps), m_playback_execute_entries[2]);
@@ -4195,6 +4225,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(26, "bootrecmeta", "Staged recorder with nonempty ID3 title and artist input")
 	ROM_SYSTEM_BIOS(27, "bootopenstage", "Staged original cold saved-track catalogue and status")
 	ROM_SYSTEM_BIOS(28, "bootplaystage", "Staged original saved-track playback coverage diagnostic")
+	ROM_SYSTEM_BIOS(29, "bootrecac", "Staged original recorder with explicit varying converted-ADC fixture")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

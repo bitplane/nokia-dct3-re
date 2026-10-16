@@ -369,6 +369,32 @@ def verify_playback_banks(text):
             'writer_ownership': 'unvalidated'}
 
 
+def verify_recorder_input(text):
+    """Check the explicit bench source and actual RX DMA reads, not encoded audio."""
+    matches = list(re.finditer(
+        r'mu4_recorder_ac_input: generated=(\d+),(\d+),(\d+),(\d+) '
+        r'received=(\d+),(\d+),(\d+),(\d+) other=(\d+) other_owner_reads=(\d+) '
+        r'shape=square periods=64,32 amplitudes=8192,4096 '
+        r'ownership=actual_channel2_source_read analog_adc=0 decoded_audio=0$', text, re.MULTILINE))
+    if len(matches) != 1 or text.count('mu4_recorder_ac_input:') != 1:
+        raise ValueError('missing or duplicated recorder converted-input observation')
+    values = [int(value) for value in matches[0].groups()]
+    generated, received = values[:4], values[4:8]
+    frames = generated[0] + generated[1]
+    if frames < 64 or generated[2] + generated[3] != frames:
+        raise ValueError('recorder converted source lacks complete stereo periods')
+    for channel, period in enumerate((64, 32)):
+        cycles, remainder = divmod(frames, period)
+        positive = cycles * (period // 2) + min(remainder, period // 2)
+        if generated[channel * 2:channel * 2 + 2] != [positive, frames - positive]:
+            raise ValueError('recorder converted-source statistics violate the square fixture')
+    if values[8] or not all(received) or sum(received) > sum(generated):
+        raise ValueError('actual RX DMA does not establish both polarities of both converted inputs')
+    return {'generated_frames': frames, 'dma_symbol_reads': received,
+            'other_owner_reads': values[9], 'encoder_consumption': 'unvalidated',
+            'decoded_audio': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -383,6 +409,8 @@ def main():
                         help='validate actual channel-3 data reads, not TX pairing or decoded media')
     parser.add_argument('--playback-banks', action='store_true',
                         help='validate scoped data-write contexts, not writer ownership or decoded media')
+    parser.add_argument('--recorder-input', action='store_true',
+                        help='validate varying converted-input generation and RX DMA, not encoding')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -392,7 +420,7 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
-    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma, args.playback_banks)
+    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma, args.playback_banks, args.recorder_input)
     if any(bench_modes) and (
             sum(bench_modes) > 1 or any((
                 args.runtime, args.serial_readiness, args.input_lifecycle,
@@ -400,6 +428,11 @@ def main():
         parser.error('MU4 observation modes cannot be combined with other bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.recorder_input:
+            result = verify_recorder_input(text)
+            print(f'MU4 recorder converted-input observation complete: {result}; '
+                  'encoder consumption and decoded audio remain unvalidated')
+            return
         if args.playback_banks:
             result = verify_playback_banks(text)
             print(f'MU4 playback bank observation complete: {result}; '
