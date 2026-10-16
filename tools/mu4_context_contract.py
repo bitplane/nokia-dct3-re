@@ -78,6 +78,67 @@ REL_CALLEE_WITNESS = (
     0xF784, 0x890E, 0x5683, 0xF48F, 0xF450, 0x32F8, 0x0010, 0xE901,
     0xF782, 0xF310, 0x0001, 0xF280, 0xF030, 0xFFFF, 0xF4E4,
 )
+REL_AR_STORE_BASE = 0x25FDC
+REL_AR_STORE_WITNESS = (
+    0x8814, 0x6FF8, 0x0015, 0x0C81, 0xF495, 0x11E4, 0xC22E,
+    0x8192, 0x57E5, 0xC2AE, 0xFD30, 0xF784, 0x4F93,
+)
+
+
+def decode_shifted_store(words, address):
+    """SPRU172C STL/STH syntax 4 fields, not register execution/timing."""
+    opcode = words.get(address)
+    if opcode is None or opcode & 0xFF00 != 0x6F00 or opcode & 0xFF > 0xF8:
+        raise ValueError(f'expected shifted Smem store opcode at {address:06x}')
+    mode = opcode & 0xFF
+    extended = mode >= 0xE0
+    operation_address = address + 1 + extended
+    extension = words.get(operation_address)
+    if extension is None or extension & 0xFEE0 not in (0x0C60, 0x0C80):
+        raise ValueError(f'expected STL/STH shift extension at {operation_address:06x}')
+    literal = words.get(address + 1) if extended else None
+    if extended and literal is None:
+        raise ValueError(f'missing address extension at {address + 1:06x}')
+    shift = extension & 31
+    return {
+        'address': f'{address:06x}', 'opcode': f'{opcode:04x}',
+        'operation': 'STH' if extension & 0xFEE0 == 0x0C60 else 'STL',
+        'source': 'B' if extension & 0x100 else 'A',
+        'shift': shift - 32 if shift & 16 else shift,
+        'address_mode': f'{mode:02x}',
+        'address_extension': f'{literal:04x}' if extended else None,
+        'absolute_destination': f'{literal:04x}' if mode == 0xF8 else None,
+        'operation_extension_address': f'{operation_address:06x}',
+        'operation_extension': f'{extension:04x}',
+        'words': 3 if extended else 2,
+        'source_reference': 'SPRU172C STL/STH syntax 4; SPRU131G tables 7-5 and 7-7',
+        'scope': 'instruction fields only; no mapped-register publication, DAGEN conflict, '
+                 'pipeline execution or audio acceptance',
+    }
+
+
+def decode_rel_ar_store(words):
+    for offset, expected in enumerate(REL_AR_STORE_WITNESS):
+        address = REL_AR_STORE_BASE + offset
+        if words.get(address) != expected:
+            raise ValueError(f'REL AR store witness changed or absent at {address:06x}')
+    return {
+        'segment': 'aa99', 'pinned_words': len(REL_AR_STORE_WITNESS),
+        'preceding_store': {'address': '025fdc', 'operation': 'STLM A,AR4'},
+        'store': decode_shifted_store(words, 0x25FDD),
+        'destination_register': 'AR5',
+        'following_instructions': [
+            {'address': '025fe0', 'operation': 'NOP', 'words': 1},
+            {'address': '025fe1', 'operation': 'LD *+AR4(-15826),B', 'words': 2},
+            {'address': '025fe3', 'operation': 'STL B,*AR2+', 'words': 1},
+            {'address': '025fe4', 'operation': 'DLD *+AR5(-15698),B', 'words': 2},
+        ],
+        'words_before_first_ar5_consumer': 4,
+        'ar5_consumer_category': 'I (long-offset indirect DLD)',
+        'required_store_latency_cycles': 2,
+        'scope': '13 pinned logical-source words; static local spacing only, not a '
+                 'whole-function census or executed latency/conflict acceptance',
+    }
 
 
 def decode_rel_repeat_call(words):
@@ -461,7 +522,9 @@ def contract(source):
     result['bootstrap_repeat'] = decode_bootstrap_repeat(bootstrap_words)
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
-    result['rel_repeat_call'] = decode_rel_repeat_call(uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99'))
+    rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
+    result['rel_ar_store'] = decode_rel_ar_store(rel_words)
     return result
 
 

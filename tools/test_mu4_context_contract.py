@@ -13,9 +13,65 @@ from tools.mu4_context_contract import BOOT_MEMORY_SHIFT_BASE, BOOT_MEMORY_SHIFT
 from tools.mu4_context_contract import BOOT_BLOCK_REPEAT_BASE, BOOT_BLOCK_REPEAT_WITNESS, decode_boot_block_repeat
 from tools.mu4_context_contract import decode_block_repeat_setup
 from tools.mu4_context_contract import REL_REPEAT_BASE, REL_REPEAT_WITNESS, REL_CALLEE_BASE, REL_CALLEE_WITNESS, decode_rel_repeat_call
+from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, decode_rel_ar_store, decode_shifted_store
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_shifted_store_fields_and_extension_order(self):
+        for shift in range(-16, 16):
+            for source in range(2):
+                for operation, code in (('STL', 0x0C80), ('STH', 0x0C60)):
+                    for mode in (0x15, 0x85, 0xE5, 0xF8):
+                        extension = code | source << 8 | (shift & 31)
+                        values = [0x6F00 | mode]
+                        if mode >= 0xE0:
+                            values.append(0x0015)
+                        values.append(extension)
+                        result = decode_shifted_store(dict(enumerate(values, 0x600)), 0x600)
+                        self.assertEqual(result['operation'], operation)
+                        self.assertEqual(result['source'], 'B' if source else 'A')
+                        self.assertEqual(result['shift'], shift)
+                        self.assertEqual(result['words'], len(values))
+                        self.assertEqual(result['operation_extension_address'], f'{0x600 + len(values) - 1:06x}')
+                        self.assertEqual(result['absolute_destination'], '0015' if mode == 0xF8 else None)
+                        self.assertIn('no mapped-register publication', result['scope'])
+
+    def test_shifted_store_rejects_other_operations_and_missing_words(self):
+        for values in ([0x6FF8, 0x15, 0x0C41], [0x6FF8, 0x15, 0x0C21],
+                       [0x6FF8, 0x0C81], [0x6FF9, 0x15, 0x0C81],
+                       [0x8815, 0x0C81], [0x6F85]):
+            with self.assertRaises(ValueError):
+                decode_shifted_store(dict(enumerate(values)), 0)
+        with self.assertRaises(ValueError):
+            decode_shifted_store({0: 0x6FF8, 2: 0x0C81}, 0)
+
+    def test_rel_ar5_store_and_consumer_spacing(self):
+        result = decode_rel_ar_store(dict(enumerate(REL_AR_STORE_WITNESS, REL_AR_STORE_BASE)))
+        self.assertEqual(result['pinned_words'], 13)
+        self.assertEqual(result['preceding_store']['operation'], 'STLM A,AR4')
+        self.assertEqual(result['store']['address'], '025fdd')
+        self.assertEqual(result['store']['operation'], 'STL')
+        self.assertEqual(result['store']['source'], 'A')
+        self.assertEqual(result['store']['shift'], 1)
+        self.assertEqual(result['store']['absolute_destination'], '0015')
+        self.assertEqual(result['destination_register'], 'AR5')
+        self.assertEqual(result['words_before_first_ar5_consumer'], 4)
+        self.assertEqual(result['required_store_latency_cycles'], 2)
+        self.assertEqual(result['following_instructions'][-1]['address'], '025fe4')
+        self.assertIn('not a whole-function census', result['scope'])
+
+    def test_rel_ar_store_every_word_is_required_and_pinned(self):
+        original = dict(enumerate(REL_AR_STORE_WITNESS, REL_AR_STORE_BASE))
+        for address in original:
+            with self.subTest(address=f'{address:06x}'):
+                words = original.copy()
+                words[address] ^= 1
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_ar_store(words)
+                del words[address]
+                with self.assertRaisesRegex(ValueError, f'{address:06x}'):
+                    decode_rel_ar_store(words)
+
     @staticmethod
     def rel_words():
         return {**dict(enumerate(REL_REPEAT_WITNESS, REL_REPEAT_BASE)),

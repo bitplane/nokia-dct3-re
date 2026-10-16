@@ -4359,6 +4359,23 @@ not decoder/output acceptance. Shifted mapped stores need their own
 Execute-owned DAGEN publication, consumer latency, bank-conflict,
 retained-address/source and replay tests before this next guard is relaxed.
 
+`mu4_context_contract.py` also pins the 13 original words at
+`02:5fdc..5fe8` and decodes the shifted-store opcode/operation-extension
+order independently of the CPU. The preceding instruction writes AR4
+(`STLM A,AR4`), not AR5. After the three-word AR5 store come a NOP,
+two-word `LD *+AR4(-15826),B` and `STL B,*AR2+`; the first local AR5
+consumer is `DLD *+AR5(-15698),B` at `02:5fe4`. Those four intervening
+words do not indicate an immediate-use latency violation.
+
+SPRU131G table 7-5 places shifted STL/STH in the store-type group;
+table 7-7 gives an AR write two latency cycles before a category-I
+consumer such as long-offset indirect DLD, or one before category II.
+This is a local static spacing contract, not executed publication evidence.
+The current early-DAGEN conflict checks recognize ordinary stores, STLM
+and RMW but omit the `6fxx` shifted-store family. Admission must test the
+shared-bank collision with younger STM/MVDK/POPM as well as ordinary AR
+consumers; enabling only destination `0015` would hide that coverage gap.
+
 ```sh
 python3 tools/run_c54x_core.py --profile mvkd-sp \
   --mame mame/mame --rompath roms --output-root tmp
