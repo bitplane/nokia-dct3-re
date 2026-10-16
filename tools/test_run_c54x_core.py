@@ -101,7 +101,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output, 0, profile=profile)
 
     def test_ram_forwarding_scopes(self):
-        for profile in ('imm-forward', 'rmw-forward'):
+        for profile in ('imm-forward', 'rmw-forward', 'mvkd-forward'):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)
@@ -112,6 +112,15 @@ class CoreResultTests(unittest.TestCase):
                     check_result(bad, 3, profile=profile)
             with self.subTest(profile=profile, exit_status=0), self.assertRaises(ValueError):
                 check_result(output, 0, profile=profile)
+
+    def test_mvkd_forwarding_retains_source_once(self):
+        marker, ending = EXTRA_PROFILES['mvkd-forward']
+        output = marker + '\n' + ending + '\n'
+        for old, new in (('source_reads=1', 'source_reads=2'),
+                         ('retained_source=1', 'retained_source=0'),
+                         ('same_and_different=1', 'same_and_different=0')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mvkd-forward')
 
     def test_block_xc_scopes(self):
         for profile in ('block-xc', 'block-xc-edge'):

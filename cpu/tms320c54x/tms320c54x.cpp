@@ -2950,7 +2950,7 @@ void tms320c54x_device::pipeline_step()
 		u16 const word = m_pipeline_word[2];
 		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40)
 		{
-			logerror("%s: staged control-delay Smem extension is not an admitted shifted load\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}
 		bool const software_intr = staged_software_intr(word);
 		bool const short_repeat = staged_short_repeat(word);
@@ -4740,8 +4740,13 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
-	// This partial model covers retained RMW, ordinary and immediate stores,
+	// This partial model covers retained copies, RMW, ordinary and immediate stores,
 	// not bank contention or stack instructions' separate read ordering.
+	if (address >= 0x60 && m_pipeline_valid[5] && staged_data_copy(m_pipeline_word[5]) &&
+		address == m_pipeline_operand_address[5])
+		// MVKD/MVDM have already captured their source in Read. Forward that
+		// word, not the live source register, while preserving the real write.
+		return m_pipeline_operand[5];
 	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x7600) &&
 		address == m_pipeline_operand_address[5])
 		return pipeline_store_word();

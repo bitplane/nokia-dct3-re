@@ -144,6 +144,10 @@ Some recurring mistakes need stronger checks than ordinary source review:
 - An address hit does not establish dispatcher or subsystem ownership. Confirm
   the containing function boundary and exhaustively decode the relevant
   dispatch extent or caller set before assigning an input to a handler.
+- An encoded operand number is not an effective address. Recover its addressing
+  mode and live page/frame controls before naming a mapped register. On C54x,
+  a short direct Smem operand inherits DP/CPL, while a literal dmad/MMR
+  address may not; identical numeric fields can name different storage.
 - Widening an operation classifier requires auditing all of its consumers,
   not just the primary execution path. Forwarding, bypass, wait arbitration
   and repeat helpers can retain assumptions about the narrower family.

@@ -15,19 +15,24 @@ from tools.mu4_context_contract import decode_block_repeat_setup
 from tools.mu4_context_contract import REL_REPEAT_BASE, REL_REPEAT_WITNESS, REL_CALLEE_BASE, REL_CALLEE_WITNESS, decode_rel_repeat_call
 from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, decode_rel_ar_store, decode_shifted_store
 from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
+from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
     def test_rel_copy_cpl_and_frame_contract(self):
         words = {**dict(enumerate(REL_COPY_ENTRY_WITNESS, REL_COPY_ENTRY_BASE)),
+                 **dict(enumerate(REL_COPY_DEPENDENCY_WITNESS, REL_COPY_DEPENDENCY_BASE)),
                  **dict(enumerate(REL_COPY_WITNESS, REL_COPY_BASE))}
         result = decode_rel_copy_loop(words)
-        self.assertEqual(result['pinned_words'], 28)
+        self.assertEqual(result['pinned_words'], 34)
         self.assertEqual(result['entry_cpl_required'], 1)
         self.assertEqual(result['frame']['sp_delta_before_arguments'], -12)
         self.assertEqual(result['bk_writer']['caller_stack_offset_with_two_word_far_frame'], 0)
         self.assertFalse(result['bk_writer']['source_is_mapped_t'])
         self.assertFalse(result['destination']['short_direct_operand_is_mapped_al'])
+        self.assertTrue(result['dependency']['copy_source_is_absolute_ar1'])
+        self.assertEqual(result['dependency']['copy'], 'MVKD $0011,*(SP+8) at 02459c')
+        self.assertEqual(result['dependency']['consumer'], 'LD *(SP+8),A at 02459e')
         self.assertEqual(result['loop']['setup']['rsa'], 0x45B1)
         self.assertEqual(result['loop']['setup']['rea'], 0x45B2)
         self.assertEqual(result['loop']['words_copied_per_iteration'], 2)
@@ -45,6 +50,7 @@ class ContextContractTest(unittest.TestCase):
 
     def test_rel_copy_every_word_is_required(self):
         original = {**dict(enumerate(REL_COPY_ENTRY_WITNESS, REL_COPY_ENTRY_BASE)),
+                    **dict(enumerate(REL_COPY_DEPENDENCY_WITNESS, REL_COPY_DEPENDENCY_BASE)),
                     **dict(enumerate(REL_COPY_WITNESS, REL_COPY_BASE))}
         for address in original:
             with self.subTest(address=f'{address:06x}'):

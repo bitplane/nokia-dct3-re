@@ -94,11 +94,12 @@ compared program/data words match original marker `aa99` before startup;
 four low-window words remain excluded. Native execution passes mapped-SP
 MVKD, the delayed far call inside block `02:6116..6120`, the shifted
 store to AR5 at `02:5fdd` and `MVDK Smem,AL` at `02:6050`.
-It now stops at `02:40ef`: `6f8c` has a zero extension where the original
-image has `0c9e`. Read-only watches confirm that the correct words are
-loaded and later zeroed by data writes in the `02:45b1..45b2` doubleword
-copy loop. Its pointers/count and the provisional shared-memory mapping
-must be reconciled before admitting more instructions. The generic 16-bit
+Pending MVKD writes now forward to same-address consumers, eliminating
+the observed stack-index corruption and subsequent code overwrite without
+changing the memory map. The current stop is `02:41bc`, `6f93 0d9f`:
+`STL B,-1,*AR3+` in the two-word delay span of `RPTBD 41eb` at
+`02:41ba`. Shifted stores have ordinary execution coverage but remain
+excluded from this delayed-control composition. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4359,7 +4360,7 @@ admit AR0..AR7 using their ordinary Execute-time write; other low mapped
 destinations remain guarded. `MVDK Smem,AL` at `02:6050`, `710a 0008`, also
 executes through the tested generic accumulator-destination move path.
 The immediate destination is AL, but source mode `0a` denotes AG only
-with CPL clear; with CPL set it denotes `*(SP+10)`. Do not infer a mapped
+with CPL clear and DP=0; with CPL set it denotes `*(SP+10)`. Do not infer a mapped
 source solely from the opcode's low byte.
 The run observes
 929,701 NAND data reads and 26,211 strobes; unchanged counts do not negate
@@ -4400,10 +4401,8 @@ Executable shifted-AR acceptance is split into four isolated profiles:
   destination exclusions before and after rejection, with no data access
   or register mutation. These are prototype exclusions, not silicon traps.
 
-Nine existing store/DAGEN/move profiles, the native 5110 save-state gate
-and 2,897 tool tests (one skipped) guard this admission. The full 288-check
-default CPU suite was last run at the delayed-call milestone; it is not
-implied by these focused profiles.
+These isolated shifted-store profiles are separate from the default CPU
+suite; passing that suite does not imply their coverage.
 
 MVDK to AL/AH/AG/BL/BH/BG retains its Access-owned source and writes at
 the following clock, like the existing retained RAM-destination path.
@@ -4416,57 +4415,69 @@ sibling preservation and source/destination aliases. `mvdk-acc-prod` adds
 15,552 replays with mapped STL/POPM and direct LD producers, gaps 0/1 and
 all six source/destination fields. Adjacent short-form direct LD results
 remain a prototype projection, not a guarantee for code violating
-SPRU131G table 7-28. Seven prior move/store profiles, native 5110 save-state
-restoration and 2,898 tool tests (one skipped) pass. MVMD accumulator
+SPRU131G table 7-28. MVMD accumulator
 destinations and unrelated control/peripheral moves are not admitted.
 
-### REL code/data overwrite boundary
+### REL copy dependency
 
-The active failure is at retained instruction `02:40ef`, with last fetched
-physical word `0040f0` and live PC `02:40f2`. Original AA99 words at
-`02:40ef..40f4` are `6f8c 0c9e 5682 5483 f622 6f95`;
-the extension `0c9e` is valid shifted STL syntax. A ten-second read-only
-snapshot instead sees zero at `40f0..40f4` in both program and data spaces.
-This must not be "fixed" by accepting extension zero or restoring code.
+The copy loop at `02:45b1..45b2` (`DLD *AR1+,A; DST A,*AR0+`)
+uses destination `(BK + 2 * stack[SP+8]) & ffff`. Under CPL=1, the
+`08` direct operand is a stack slot, not mapped AL. BK comes from
+`MVDK *(SP+14),BK` at `02:4547`, not mapped T: three saved registers,
+nine locals and the two-word far-return frame place this at caller
+stack argument 0. The `02:47d3` caller supplies bases `7000` and `e800`,
+opaque context `ac36`, and entry A values `e800` and `f000`.
 
-Read-only write taps on those five physical addresses observe the correct
-REL upload, followed by repeated data-space zero writes with live PC
-`02:45b3`. The original local block is `RPTB 45b2` at `02:45af`,
-`DLD *AR1+,A` at `02:45b1` and `DST A,*AR0+` at `02:45b2`.
-The taps identify the copying block, not an exact Execute PC or a proven
-physical bank fault. Initial overlay equality does not prove that executable
-words survive subsequent native data writes.
+The load/use dependency at `02:459c..459f` is:
 
-The bounded copy observation has 98 setup fetches; the latter 49 use BK
-`e800` and destination `40f0`. Their measured writes total 2,048 zero words,
-with 8--192 words per call and maximum end address `41af`. In all 49 calls,
-the write count in the observed `4000..4fff` range equals `2 * setup_A`
-and its minimum/maximum match that span. Counts and bounds alone do not
-prove per-word uniqueness or ordering. The first call already starts at `40f0` and writes
-eight words through `40f7`; this is not merely an overrun from a safe
-destination. `setup_A` is a pre-Execute observation, not a claimed BRC
-publication phase or general repeat-composition acceptance.
+```text
+MVKD $0011,*(SP+8)  ; retained AR1 word -> stack slot
+LD   *(SP+8),A      ; adjacent same-address consumer
+ADD  *(SP+7),A
+```
 
-At the overlapping writes SP is `d660`, ST1 is `e105` (CPL=1), and
-`stack[SP+8]` is `ac78`. The pinned sequence at `02:45a0..45a4` saves
-the incoming A into that stack slot, loads BK into A, adds twice the
-stack word and publishes AR0. Its low-word result is
-`(e800 + 2 * ac78) & ffff = 40f0`, matching the observed destination.
-The short direct operand `08` is a stack slot here, not mapped AL.
+SPRU131G section 7.3.2 requires same-location on-chip reads to consume
+a pending write through the internal bus. The staged read-bypass path
+includes MVKD's retained Read operand; it neither re-reads live AR1 nor
+advances the real destination write. `mvkd-forward` passes 6,912 replays
+over direct/postincrement/absolute destinations, LD A/ADD A/LD B consumers,
+same/different addresses, gaps 0/1, SXM/OVM, CPL, two pages and three save
+points. Changing AR1 after Read and changing fetched literals checks
+retention; source reads and real writes occur once. Bank contention and
+the physical DA150 memory extent are not established by this CPU fixture.
 
-BK writes of `7000` and `e800` both occur with live PC `02:454b`.
-The corresponding original writer at `02:4547` is `710e 0019`:
-`MVDK *(SP+14),BK` under CPL=1, not a read of mapped T. Its three saved
-registers and nine locals place that slot at the caller's stack argument
-0, accounting for the two-word far-return frame. `mu4_context_contract.py`
-pins all 28 entry/copy words, tests the address arithmetic, and explicitly
-requires CPL=1. These facts explain the computed pointer; they do not
-establish that the argument values are valid.
+Without this bypass, the consumer read stale stack word `ac78` despite
+MVKD writing the intended index (0,4,8,...); the following stack store
+saved the stale value again. This generated `40f0` and overwrote code.
+With forwarding, the observed destinations advance through `7000` and
+`e800` buffer ranges; the latter 49 setup samples span `e800..ef40`.
+A read-only clean-build snapshot matches all 13 original AA99 words at
+`40e8..40f4`, including `0c9e 5682 5483 f622 6f95`, in both program and data
+spaces. The argument probes were removed after the CPU correction.
+This resolves the observed overwrite, not all memory-map fidelity.
 
-Next, audit the own-ROM caller at `02:47d3` and the producers of its
-stack arguments and incoming A. Establish why `ac78` is supplied to this
-copy before changing the shared-DARAM map. Input/pointer validity and
-physical aliasing remain competing explanations; neither has been proved.
+`mu4_context_contract.py` pins all 34 entry/dependency/copy words and
+tests CPL=1 pointer arithmetic. Initial overlay equality alone is not
+evidence that code survives later data writes; retain the distinction
+between a bad computed pointer and a physical aliasing defect.
+
+Current acceptance includes the complete 288-check default CPU suite,
+the separate `mvkd-forward` profile, six related forwarding/move profiles
+(`imm-forward`, `rmw-forward`, `mvkd-sp`, `mvdk-acc`, `mvdk-producer`,
+`store-bypass`), native 5110 save-state restoration and 2,902 tool tests
+(one skipped). The original media diagnostic remains failed closed;
+none of these tests establishes decoded audio or physical bank timing.
+
+### REL delayed shifted-store boundary
+
+The current guard owns instruction `02:41bc`, `6f93 0d9f`,
+`STL B,-1,*AR3+`, with the live PC already `02:41bf`.
+These two words occupy the delay span of `RPTBD 41eb` at `02:41ba`;
+the ordinary body begins at `02:41be`. The control-delay decoder admits
+shifted loads, not this store composition. Next acceptance must cover
+once-only pointer/data effects, the complete delay span, repeat counts,
+interrupts and replay before relaxing the guard. This is not evidence
+for an invalid original opcode or missing external hardware.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
@@ -4475,6 +4486,8 @@ original REL diagnostic fails closed with `audio_acceptance=0`.
 python3 tools/run_c54x_core.py --profile mvkd-sp \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile rptb-fcalld \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile mvkd-forward \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 
@@ -5051,8 +5064,8 @@ status after Read cannot change the result. No destination write occurs.
 These clock positions describe the executable partial pipeline model,
 not measured silicon bus phases.
 
-The original emits six native McBSP TX words (`0c10 0818 0a01 0e53 1023
-1201`). FCALA B `f5e7` at `02:40ef` now executes in the original run
+The resident AA22 image emits six native McBSP TX words (`0c10 0818 0a01 0e53 1023
+1201`). Its FCALA B `f5e7` at `02:40ef` executes in the resident run
 after the frame, interrupt and producer gates below. SPRU172C
 page 4-55 identifies this as nondelayed FCALA B: push PC+1 and caller
 XPC, then load PC from B[15:0] and XPC from B[22:16], with no status
@@ -5061,6 +5074,8 @@ repeated or placed in a block repeat. Retained accumulator target,
 caller-page/return-frame ownership, producer timing, interrupts and
 save/replay require executable acceptance. Serial word output
 alone does not prove board boot, recorder readiness or audio.
+This is not the AA99 REL image's `6f8c 0c9e` at the same logical address;
+source-image identity is part of every instruction claim.
 
 FCALA/FCALAD are implemented by the atomic extended-transfer
 decoder `(op & 0xfcfe) == 0xf4e6`; the disassembler recognizes that
