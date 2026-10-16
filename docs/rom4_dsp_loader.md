@@ -119,8 +119,9 @@ pass. The original firmware emits the pin-decoded acknowledgement
 at `02:e5e7` now execute, with 13,824 arithmetic/status/producer replay
 cases and an unchanged NEG control. MPY (`62f8 0008 012c`, mapped AL
 times immediate 300) at `03:95b5` now executes through retained
-memory/immediate operands, with Read-owned T publication and 106,496
-replay cases. The original recorder routine at `02:9e90` is entered and
+memory/immediate operands, with Read-owned T publication and 98,304 legal
+replay cases; 256 additional replay cases reject write-only short MOD=3
+in both execution frontends. The original recorder routine at `02:9e90` is entered and
 output words `0580,0a09` are observed. Forward near B/BC inside
 `02:a0ea..02:a0fd` now executes, with 12,288 IRQ/NMI/replay cases and
 32 exclusion cases. Software INTR 25 (`f7d9`) at `02:9c74` now

@@ -10,9 +10,9 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 CPU correctness work currently takes precedence over further opcode expansion:
-short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). RPT's
-incorrect read admission is corrected, but other existing load/ALU classifiers
-and fixtures still require a domain audit. Passing those mechanically decoded
+short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). Incorrect
+read admission in RPT and memory/immediate MPY is corrected, but other existing
+load/ALU classifiers and fixtures still require a domain audit. Passing those mechanically decoded
 read cases is not hardware-legality evidence. Long-offset MOD=13 preincrement
 is a distinct read-capable form and must not be removed by that audit.
 
@@ -27,13 +27,24 @@ are prototype regressions, not proof of legal read execution:
 | --- | --- | --- |
 | `start_pipeline_indirect_case` | `1099` and `1199`: 2 of 8 cases | Replace those legs with rejection checks before address modification/read, retaining the 6 valid load cases and their restore checks. |
 | `memory_repeat_case` SUBC bank | Form 4 uses `1e99`/`1f99`: 7,680 of 46,080 cases | Remove this form from positive division coverage; test rejection separately, including active repeat state. |
-| `memory_immediate_case` | Form 4 uses `629a`/`639a`: 8,192 of 106,496 cases | Remove this form from positive MPY coverage and test rejection without operand reads or T/AR publication. |
 
 These counts are derived from the current generators, not new execution
 results. They identify confirmed defects, not an exhaustive opcode census.
-The remaining legal positive domains in the latter two banks are 38,400 and
-98,304 cases respectively; preserve their Cartesian dimensions rather than
+The remaining legal positive domain in the SUBC bank is 38,400 cases;
+preserve its Cartesian dimensions rather than
 substituting duplicate valid forms to keep old totals.
+
+Memory/immediate MPY's corresponding defect is corrected: 8,192 invalid
+`629a`/`639a` cases were removed, leaving 98,304 legal positive cases/restores.
+`mpy-mod3-edge` passes 256 cases/restores: all eight ARs, both destinations,
+both CMPT settings, both pages, atomic and staged frontends, and snapshots
+before/after rejection. No data access, AR update, accumulator, T or ST0 change
+is permitted. The atomic guard precedes `immediate_smem_read`; the staged
+classifier excludes short MOD=3. This does not close the other read families.
+The corrected positive and negative profiles, neighboring `mpy-t-imm`
+(86,016 replay cases), native 5110 save-state gate, and 2,915 tool tests
+(one skipped) pass. The full default suite was not rerun for this correction;
+its known invalid load/SUBC domains remain listed above.
 
 Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
 grammars, and Smem destination writes are eligible for short preincrement.
@@ -6064,9 +6075,9 @@ Memory/immediate MPY uses Class 6A/6B (SPRU172C, MPY syntax 3): the
 memory word publishes to T in Read, while the retained memory word and
 signed literal produce the accumulator result at Execute. Absolute and
 long-offset forms retain address/offset before the multiplier literal,
-adding one word and cycle. The `mpy-mem-imm` fixture passes 106,496
-cases/restores: thirteen forms (DP/SP direct, short fixed/postincrement/
-postdecrement/preincrement, long offset/preincrement/circular, absolute
+adding one word and cycle. The `mpy-mem-imm` fixture passes 98,304
+cases/restores: twelve forms (DP/SP direct, short fixed/postincrement/
+postdecrement, long offset/preincrement/circular, absolute
 RAM and mapped AL/AH/T/AR3), eight memory values, eight literals, eight
 FRCT/OVM/SXM configurations, both destinations, two pages and four
 snapshots. DP/SP selection shares the direct-form page cases; CMPT=0

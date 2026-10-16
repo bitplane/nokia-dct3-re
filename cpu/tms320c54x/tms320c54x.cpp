@@ -318,7 +318,7 @@ constexpr bool staged_extended_smem_special(u16 word)
 
 constexpr bool staged_memory_immediate_multiply(u16 word)
 {
-	return (word & 0xfe00) == 0x6200 && (u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
+	return (word & 0xfe00) == 0x6200 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_immediate_multiply(u16 word)
@@ -5582,6 +5582,8 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6200: case 0x6300: // MPY Smem, #lk, A/B
 	{
+		// SPRU131G table 5-4: short MOD=3 is write-only, unlike long MOD=13.
+		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
 		u16 immediate;
 		const u16 memory = immediate_smem_read(low, immediate);
 		m_t = memory;

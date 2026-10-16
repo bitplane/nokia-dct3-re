@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_memory_multiply_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['mpy-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mpy-mod3-edge')
+        for old, new in (('restore=256', 'restore=0'), ('frontends=2', 'frontends=1'),
+                         ('data_reads=0', 'data_reads=1'), ('data_writes=0', 'data_writes=1'),
+                         ('pointer_changes=0', 'pointer_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mpy-mod3-edge')
+
     def test_extended_push_scope(self):
         for profile, restores in (('pshd-long', 99696), ('pshd-long-map', 3696)):
             marker, ending = EXTRA_PROFILES[profile]

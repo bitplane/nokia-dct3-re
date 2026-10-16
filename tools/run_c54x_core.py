@@ -860,8 +860,12 @@ EXTRA_PROFILES = {
         "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block branches complete",
     ),
+    "mpy-mod3-edge": (
+        "TMS320C54x memory MPY MOD3 exclusions: PASS cases=256 restore=256 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated memory MPY MOD3 exclusions complete",
+    ),
     "mpy-mem-imm": (
-        "TMS320C54x memory immediate MPY: PASS cases=106496 restore=106496 forms=13 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x memory immediate MPY: PASS cases=98304 restore=98304 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated memory immediate MPY complete",
     ),
     "mpy-t-imm": (
