@@ -438,6 +438,7 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
         'activation': ('address=020419 opcode=f6be paired_ar2=8044', 'paired_enqueue_ar2_context'),
         'callback': ('address=020478 opcode=10e4 ar4=d7b0', 'live_ar4_context'),
         'notify': ('address=0201b3 opcode=f7b8', 'entry_address_context'),
+        'restore': ('address=024538 opcode=eefe', 'entry_address_context'),
     }
     if kind not in formats:
         raise ValueError('unknown playback transfer history kind')
@@ -536,19 +537,26 @@ def verify_playback_method(text, words, session):
     return dict(zip(('entry', 'early', 'body', 'returned', 'result', 'publish'), totals))
 
 
-def verify_playback_path(text, words, callbacks):
+def verify_playback_path(text, words, callbacks, *, kind='callback'):
+    formats = {
+        'callback': ('mu4_playback_path', 'before_first_d7b0_callback'),
+        'restore': ('mu4_playback_restore_path', 'before_first_restore_wrapper'),
+    }
+    if kind not in formats:
+        raise ValueError('unknown playback path kind')
+    prefix, selection = formats[kind]
     terminals = list(re.finditer(
-        r'mu4_playback_path_terminal: entries=(\d+) t=(\d+\.\d{9}) '
-        r'selection=before_first_d7b0_callback identity=Execute_entry observer_writes=0 audio_acceptance=0$',
+        rf'{prefix}_terminal: entries=(\d+) t=(\d+\.\d{{9}}) '
+        rf'selection={selection} identity=Execute_entry observer_writes=0 audio_acceptance=0$',
         text, re.MULTILINE))
     rows = list(re.finditer(
-        r'mu4_playback_path_entry: index=(\d+) address=([0-9a-f]{6}) opcode=([0-9a-f]{4}) '
+        rf'{prefix}_entry: index=(\d+) address=([0-9a-f]{{6}}) opcode=([0-9a-f]{{4}}) '
         r'identity=Execute_entry observer_writes=0$', text, re.MULTILINE))
-    if not terminals and not rows and 'mu4_playback_path_' not in text:
+    if not terminals and not rows and prefix + '_' not in text:
         return []
-    if len(terminals) != 1 or text.count('mu4_playback_path_terminal:') != 1 or not callbacks:
+    if len(terminals) != 1 or text.count(prefix + '_terminal:') != 1 or not callbacks:
         raise ValueError('missing or duplicated callback path terminal')
-    if len(rows) != text.count('mu4_playback_path_entry:') or not 4 <= len(rows) <= 128 or int(terminals[0][1]) != len(rows):
+    if len(rows) != text.count(prefix + '_entry:') or not 4 <= len(rows) <= 128 or int(terminals[0][1]) != len(rows):
         raise ValueError('incomplete or excessive bounded callback path')
     if float(terminals[0][2]) != callbacks[0]['time']:
         raise ValueError('callback path terminal is not paired with first callback')
@@ -624,6 +632,7 @@ def verify_playback_range(text, words):
     activation_history = verify_playback_switch_history(text, words, parent['first_session'], kind='activation')
     notify_history = verify_playback_switch_history(text, words, parent['first_session'], kind='notify')
     callback_history = verify_playback_switch_history(text, words, parent['first_session'], kind='callback')
+    restore_history = verify_playback_switch_history(text, words, parent['first_session'], kind='restore')
     if activation_history and (len(activation_history) != len(enqueue_history) or any(
             a['time'] >= e['time'] for a, e in zip(activation_history, enqueue_history))):
         raise ValueError('activation history does not precede its paired enqueue entries')
@@ -633,6 +642,8 @@ def verify_playback_range(text, words):
             'activation_context_history': activation_history,
             'callback_context_history': callback_history,
             'callback_producer_path': verify_playback_path(text, words, callback_history),
+            'restore_context_history': restore_history,
+            'restore_producer_path': verify_playback_path(text, words, restore_history, kind='restore'),
             'method_coverage': verify_playback_method(text, words, parent['first_session']),
             'method_gate_accesses': verify_playback_gates(text, parent['first_session']),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),

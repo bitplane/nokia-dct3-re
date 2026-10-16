@@ -4532,9 +4532,9 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** which caller of context-restore wrapper `024538` causes
-setup to resume with `ba51=1`, and why does varying-input playback never
-take method `023e64`'s longer body? Do not force a wakeup, node, callback,
+**Open question:** what input/return predicates drive the observed restore
+calls at `02535c`, `02587e` and `025e35`, and how do their bit-reading
+paths differ between the files? Do not force a wakeup, node, callback,
 saved context, method result or input value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
@@ -4679,6 +4679,24 @@ Gate verification rejects missing identities, bad ordinals/counts, wrong
 time scopes and inconsistent terminal values; exhausted sample caps are
 reported rather than interpreted as stability. Both fresh runs retain the
 same method and range counts.
+
+Execute history at wrapper `024538/eefe` identifies actual callers, not
+just references. Varying playback's first eight selected callers are
+`02535c,02587e,02587e,02587e,02587e,025e35,02587e,02587e`; constant
+playback's first eight are all `02587e`. The first varying entry is
+1.008694684 seconds, following return from `02510c` at `025142` and
+the sequence `025356/f7b8,025357/f468,025358/f478,025359/f845,
+02535b/e800,02535c/f982`. Constant playback first restores at
+1.008497130 through `02587e`, following the `0256df` call and comparison
+at `02587b`. These are bounded samples, not a complete caller-frequency
+census or evidence that the shared caller is always an error.
+Both 128-entry histories match original AA99 words and their immediate
+caller tails. The same bounded-path reporter serves callback and restore
+observations without changing CPU behavior. Fresh runs preserve the
+method counts and full selected-range counts. Input bits, saved-stream
+positions and the return-value predicates now need independent checking;
+neither a numeric restore result nor a generic file probe establishes
+invalid media or a missing peripheral.
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,

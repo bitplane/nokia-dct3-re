@@ -75,6 +75,11 @@ class BootstrapCheckTest(unittest.TestCase):
                 verify_playback_path(bad, words, callbacks)
         with self.assertRaises(ValueError):
             verify_playback_path(text, words, [{'time': 1.0, 'history': history[::-1]}])
+        restore = text.replace('mu4_playback_path_', 'mu4_playback_restore_path_').replace(
+            'before_first_d7b0_callback', 'before_first_restore_wrapper')
+        self.assertEqual(verify_playback_path(restore, words, callbacks, kind='restore'), history)
+        with self.assertRaises(ValueError):
+            verify_playback_path(restore.replace('entries=4', 'entries=5'), words, callbacks, kind='restore')
 
     def test_notify_register_context_is_not_an_unpaired_operand_claim(self):
         text = ('mu4_playback_notify_context: ordinal=1 ar1=d796 ar2=d7ac '
