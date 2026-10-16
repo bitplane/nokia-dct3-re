@@ -96,10 +96,12 @@ MVKD, the delayed far call inside block `02:6116..6120`, the shifted
 store to AR5 at `02:5fdd` and `MVDK Smem,AL` at `02:6050`.
 Pending MVKD writes now forward to same-address consumers, eliminating
 the observed stack-index corruption and subsequent code overwrite without
-changing the memory map. The current stop is `02:41bc`, `6f93 0d9f`:
-`STL B,-1,*AR3+` in the two-word delay span of `RPTBD 41eb` at
-`02:41ba`. Shifted stores have ordinary execution coverage but remain
-excluded from this delayed-control composition. The generic 16-bit
+changing the memory map. The two-word shifted store `6f93 0d9f` at
+`02:41bc` now executes in the delay span of `RPTBD 41eb`; other delayed
+control owners remain independently guarded. The current stop is
+`02:5cf8`, `4700`, basic memory-sourced `RPT Smem`. Its effective source
+must be derived from live DP/CPL, not the encoded operand byte alone.
+The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4461,23 +4463,47 @@ tests CPL=1 pointer arithmetic. Initial overlay equality alone is not
 evidence that code survives later data writes; retain the distinction
 between a bad computed pointer and a physical aliasing defect.
 
-Current acceptance includes the complete 288-check default CPU suite,
+The pending-copy forwarding milestone passed the complete 288-check default CPU suite,
 the separate `mvkd-forward` profile, six related forwarding/move profiles
 (`imm-forward`, `rmw-forward`, `mvkd-sp`, `mvdk-acc`, `mvdk-producer`,
 `store-bypass`), native 5110 save-state restoration and 2,902 tool tests
 (one skipped). The original media diagnostic remains failed closed;
 none of these tests establishes decoded audio or physical bank timing.
 
-### REL delayed shifted-store boundary
+### REL delayed shifted-store contract
 
-The current guard owns instruction `02:41bc`, `6f93 0d9f`,
+The original playback executes instruction `02:41bc`, `6f93 0d9f`,
 `STL B,-1,*AR3+`, with the live PC already `02:41bf`.
 These two words occupy the delay span of `RPTBD 41eb` at `02:41ba`;
-the ordinary body begins at `02:41be`. The control-delay decoder admits
-shifted loads, not this store composition. Next acceptance must cover
-once-only pointer/data effects, the complete delay span, repeat counts,
-interrupts and replay before relaxing the guard. This is not evidence
-for an invalid original opcode or missing external hardware.
+the ordinary body begins at `02:41be`. The decoder admits a complete
+two-word shifted STL/STH only when the retained delayed-control owner is
+RPTBD. Other control owners, three-word operands, a store spilling beyond
+the delay span and unsupported mapped destinations remain guarded.
+
+`rptbd-shift-st` passes 115,200 cases and save/replays across repeat counts
+0/1/2/7, direct and indirect addressing, decrement/postincrement, mapped
+AR destinations, all four accumulator/store selectors, signed shifts,
+SST/SXM, program pages, CPL and IRQ/NMI arrivals. It checks one delay
+write and pointer effect, Execute-live source capture, retained fetched
+words, BRC+1 body iterations and balanced interrupt frames. The separate
+`rptbd-shift-edge` profile passes 16 cases/replays for span spill,
+three-word addressing, BRC destinations and a different control owner,
+with no data or pointer side effects. These exclusions are prototype
+limits, not claimed silicon traps; physical pipeline phases remain unvalidated.
+
+The final build also passes nine related repeat/delay/forwarding profiles,
+native 5110 save-state restoration and 2,904 tool tests (one skipped).
+The complete 288-check default CPU run above belongs to the preceding
+forwarding milestone, not a fresh full-suite run for this extension.
+
+### REL memory-sourced repeat boundary
+
+The original diagnostic advances to `02:5cf8`, opcode `4700` (`RPT Smem`),
+with live PC `02:5cfa`. Only absolute memory-sourced repeat (`47f8`) is
+currently admitted by the staged core. Basic direct/indirect forms need
+independent addressing, count capture, producer ordering, interrupt and
+replay coverage before admission. Encoded direct operand `00` does not
+by itself establish an IMR or stack-relative source.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.

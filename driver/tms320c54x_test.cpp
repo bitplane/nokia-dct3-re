@@ -9003,6 +9003,97 @@ private:
 	static u16 rptbd_source(unsigned v, unsigned i) { return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(rptbd_seed(v) / 16) % 4] ^ u16(i * 0x1357); }
 	static int rptbd_irq_line(unsigned v) { return ((v - 512) / 32) % 2 ? INPUT_LINE_NMI : 2; }
 	static bool rptbd_late_irq(unsigned v) { return ((v - 512) / 64) % 2; }
+	struct rptbd_shift_store_fixture
+	{
+		unsigned count, form, kind, flags, irq, checkpoint;
+		int shift;
+		bool compiler;
+		u32 base;
+		u16 mode, address, initial_ar3, final_ar3, value, st0, st1;
+		u64 source;
+	};
+	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v)
+	{
+		rptbd_shift_store_fixture f{};
+		f.count = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4]; v /= 4;
+		f.form = v % 5; v /= 5; f.kind = v % 4; v /= 4;
+		f.shift = std::array<int, 3>{-16, -1, 15}[v % 3]; v /= 3;
+		f.flags = v % 4; v /= 4;
+		f.source = v % 2 ? 0xff7fff1200ULL : 0x0180001200ULL; v /= 2;
+		f.base = v % 2 ? 0x20000 : 0; v /= 2;
+		f.compiler = v % 2; v /= 2; f.irq = v % 5; v /= 5;
+		f.checkpoint = std::array<unsigned, 3>{4, 8, 12}[v];
+		f.mode = std::array<u16, 5>{3, 0x83, 0x8b, 0x93, 0x13}[f.form];
+		f.st0 = 0xa600 | (f.form == 4 ? 0 : 8);
+		f.st1 = (f.compiler ? 0x4000 : 0) | (f.flags & 2 ? 0x100 : 0) | (f.irq ? 0 : 0x800);
+		f.address = f.form >= 1 && f.form <= 3 ? 0x5000 : f.compiler ? 0x3000 + f.mode : (f.st0 & 0x1ff) * 128 + f.mode;
+		f.initial_ar3 = f.form >= 1 && f.form <= 3 ? 0x5000 : 0x7103;
+		u64 bits = f.source;
+		for (int i = 0; i < f.shift; ++i) bits = (bits * 2) & 0xffffffffffULL;
+		for (int i = 0; i < -f.shift; ++i) bits = (bits >> 1) | ((f.flags & 2) && (bits & 0x8000000000ULL) ? 0x8000000000ULL : 0);
+		u32 stored = u32(bits);
+		if (f.flags & 1)
+		{
+			if (f.flags & 2) stored = u32(std::clamp(s64(bits << 24) >> 24, s64(-2147483648LL), s64(2147483647LL)));
+			else if (bits > 0xffffffffULL) stored = 0xffffffffU;
+		}
+		f.value = stored >> (f.kind & 2 ? 16 : 0);
+		f.final_ar3 = f.address == 0x13 ? f.value : f.initial_ar3 + (f.form == 3 ? 1 : f.form == 2 ? -1 : 0);
+		return f;
+	}
+	void start_rptbd_shift_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = rptbd_shift_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xf272); program.write_word(f.base + 0x601, 0x605);
+		program.write_word(f.base + 0x602, 0x6f00 | f.mode);
+		program.write_word(f.base + 0x603, (f.kind & 2 ? 0x0c60 : 0x0c80) | ((f.kind & 1) << 8) | (f.shift & 31));
+		program.write_word(f.base + 0x604, 0xe800 | ((f.kind & 1) << 8)); program.write_word(f.base + 0x605, 0x6d94);
+		program.write_word(f.base + 0x60f, 0xf4e1);
+		int const line = f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2;
+		u32 const vector = f.base + (line == INPUT_LINE_NMI ? 4 : 0x48);
+		program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
+		if (f.address >= 0x60) data.write_word(f.address, 0xdead);
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 1); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.kind & 1 ? 0x123456789aULL : 0x11112222);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.kind & 1 ? 0x11112222 : 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq && line == 2 ? 4 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == 3 ? f.initial_ar3 : i == 4 ? 0x6000 : 0x7000 + i);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_rptbd_counts = {}; m_rptbd_return = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x603, "rptbd_shift_words", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_rptbd_counts.fetches++;
+			expect(i < 3 && at == f.base + 0x601 + i && word == (i == 0 ? 0x605 : i == 1 ? 0x6f00 | f.mode : (f.kind & 2 ? 0x0c60 : 0x0c80) | ((f.kind & 1) << 8) | (f.shift & 31)), "RPTBD retains its endpoint and complete shifted-store delay exactly once"); });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "rptbd_shift_reads", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_reads++ && m_rptbd_counts.stack_writes == 1 && word == m_rptbd_return, "Shifted store has no destination read; ISR reads one original continuation"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "rptbd_shift_writes", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff) { expect(f.irq && !m_rptbd_counts.stack_writes++ && word >= 0x604 && word <= 0x60f && m_rptbd_counts.delay_writes == 1, "Interrupt stacks one continuation after the complete delay store"); m_rptbd_return = word; return; }
+			expect(at == f.address && word == f.value && !m_rptbd_counts.delay_writes++ && m_cpu->pipeline_cycles() == 9, "Shifted store publishes the Execute-live source to its retained delay address once"); });
+		m_phase = 310400; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_rptbd_shift_store_edge(unsigned variant = 0)
+	{
+		unsigned const fixture = (variant / 4) % 2 ? 1920 : 0;
+		start_rptbd_shift_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = rptbd_shift_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned const kind = variant % 4;
+		if (kind == 0) { program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, 0x6f93); program.write_word(f.base + 0x604, 0x0d9f); }
+		if (kind == 1) { program.write_word(f.base + 0x602, 0x6ff8); program.write_word(f.base + 0x603, 0x5000); program.write_word(f.base + 0x604, 0x0c81); }
+		if (kind == 2) { program.write_word(f.base + 0x602, 0x6f1a); program.write_word(f.base + 0x603, 0x0c81); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); }
+		if (kind == 3) { program.write_word(f.base + 0x600, 0xf273); program.write_word(f.base + 0x601, 0x700); program.write_word(f.base + 0x602, 0x6f93); program.write_word(f.base + 0x603, 0x0c81); }
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "rptbd_shift_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "rptbd_shift_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
+		m_phase = 310420; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	void start_rptbd(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -14607,6 +14698,8 @@ private:
 		if (!strcmp(machine().options().bios(), "ld-delay-edge")) { start_delay_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "ld-ar0-index") || !strcmp(machine().options().bios(), "ld-circular")) { start_indexed_load(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd")) { start_rptbd(); return; }
+		if (!strcmp(machine().options().bios(), "rptbd-shift-st")) { start_rptbd_shift_store(); return; }
+		if (!strcmp(machine().options().bios(), "rptbd-shift-edge")) { start_rptbd_shift_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-mapped") || !strcmp(machine().options().bios(), "mvdk-acc")) { start_mvdk_mapped(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-producer") || !strcmp(machine().options().bios(), "mvdk-acc-prod")) { start_mvdk_producer(); return; }
@@ -40861,6 +40954,62 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310400)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = rptbd_shift_store_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Complete shifted-store delay belongs to RPTBD, not its repeated body");
+			if (tick == 3 || tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + (tick == 3 ? 0x601 : 0x603), 0xdead); }
+			if (tick == 8) m_cpu->set_state_int(f.kind & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.source);
+			if (f.irq && tick == (f.irq <= 2 ? 5U : 10U)) m_cpu->set_input_line(f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_rptbd_saved_counts = m_rptbd_counts; m_rptbd_saved_return = m_rptbd_return; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RPTBD delay decode, Read or body/interrupt continuation");
+			}
+			if (tick == 96)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x610 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.final_ar3 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x6000 + f.count + 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.kind & 1 ? 0x123456789aULL : 0) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.kind & 1 ? 0 : 0xfedcba9876ULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x604 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x605 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_BK) == 13,
+					"RPTBD executes one shifted delay write and pointer effect, then clears its source and executes the body BRC+1 times");
+				expect(m_rptbd_counts.fetches == 3 && m_rptbd_counts.delay_writes == 1 && m_rptbd_counts.acks == unsigned(bool(f.irq)) &&
+					m_rptbd_counts.stack_reads == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)), "RPTBD retains words and balances its one optional interrupt across replay");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts; m_rptbd_return = m_rptbd_saved_return;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore complete shifted delay without duplicate publication or pointer work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310410; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 115199) { start_rptbd_shift_store(variant + 1); return; }
+				osd_printf_info("TMS320C54x RPTBD shifted delay stores: PASS cases=115200 restore=115200 counts=0,1,2,7 forms=direct,plain,decrement,postincrement,mapped_encoding selectors=4 shifts=-16,-1,15 sst_sxm=4 patterns=2 pages=2 cpl=2 sources=none,IRQ,NMI arrivals=delay,body snapshots=3 delay_writes=1 pointer_effect=once body_count=brc+1 execute_live_source=1 retained_words=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated RPTBD shifted stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310410) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 310411; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310411) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310400; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310420)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 8 ? 3 : 9;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded shifted delay has no data-side effects");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save shifted delay before or after rejection"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11112222 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x7103 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x6000,
+					"Spilled, extended, BRC-writing or other-owner shifted delays reject before publication and pointer work");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded shifted delay without new side effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310430; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 15) { start_rptbd_shift_store_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x RPTBD shifted delay exclusions: PASS cases=16 restore=16 forms=spill,three_words,BRC,branch_owner pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 brc_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated RPTBD shifted exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310430) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310420; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255320)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, layout = rptbd_layout(variant), iterations = rptbd_count(variant) + 1;
@@ -44234,6 +44383,11 @@ void tms320c54x_test_state::test(machine_config &config)
 				m_rptbd_counts.delay_reads == unsigned(layout == 2) && m_rptbd_counts.delay_writes == unsigned(layout == 1), "RPTBD acknowledges its pending source only after complete delay work");
 			++m_rptbd_counts.acks; m_cpu->set_input_line(line, CLEAR_LINE);
 		}
+		if (m_phase == 310400)
+		{
+			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);
+			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && m_rptbd_counts.delay_writes == 1 && m_cpu->pipeline_cycles() >= 9, "RPTBD shifted-store interrupt is acknowledged only after its complete delay publication"); m_cpu->set_input_line(line, CLEAR_LINE);
+		}
 		if (m_phase == 255240) { auto const f = block_back_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes, "Backward block acknowledges its pending source once after the first copy"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 255200) { auto const f = block_far_call_case(m_pipeline_peripheral_case, !strcmp(machine().options().bios(), "rptb-fcalld")); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_operand_reads, "In-block far call acknowledges the actual pending source once after callee entry"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
@@ -45031,6 +45185,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(224, "mvdk-acc", "Retained MVDK to accumulator fields and guard-width aliases")
 	ROM_SYSTEM_BIOS(225, "mvdk-acc-prod", "Mapped and direct accumulator producers before MVDK field destinations")
 	ROM_SYSTEM_BIOS(226, "mvkd-forward", "Retained MVKD source forwarded to same-address RAM followers")
+	ROM_SYSTEM_BIOS(227, "rptbd-shift-st", "Shifted stores in complete RPTBD delays with interrupt and replay")
+	ROM_SYSTEM_BIOS(228, "rptbd-shift-edge", "Shifted RPTBD span, destination and control-owner exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

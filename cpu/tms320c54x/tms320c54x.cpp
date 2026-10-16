@@ -2948,7 +2948,14 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
-		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40)
+		// Admit the complete shifted store only for the tested RPTBD owner;
+		// other delayed transfers retain their independent exclusions.
+		bool rptbd_delay_store = false;
+		if (completing_shift_delay && staged_shifted_memory_store(word, m_pipeline_immediate[2]))
+			for (unsigned stage = 3; stage < 6; ++stage)
+				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address && m_pipeline_word[stage] == 0xf272)
+					rptbd_delay_store = true;
+		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !rptbd_delay_store)
 		{
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}

@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rptbd-shift-edge": (
+        "TMS320C54x RPTBD shifted delay exclusions: PASS cases=16 restore=16 forms=spill,three_words,BRC,branch_owner pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 brc_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated RPTBD shifted exclusions complete",
+    ),
+    "rptbd-shift-st": (
+        "TMS320C54x RPTBD shifted delay stores: PASS cases=115200 restore=115200 counts=0,1,2,7 forms=direct,plain,decrement,postincrement,mapped_encoding selectors=4 shifts=-16,-1,15 sst_sxm=4 patterns=2 pages=2 cpl=2 sources=none,IRQ,NMI arrivals=delay,body snapshots=3 delay_writes=1 pointer_effect=once body_count=brc+1 execute_live_source=1 retained_words=1 balanced_frames=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated RPTBD shifted stores complete",
+    ),
     "mvkd-forward": (
         "TMS320C54x staged MVKD forwarding: PASS cases=6912 restore=6912 forms=direct,postincrement,absolute consumers=LD_A,ADD_A,LD_B same_and_different=1 gap_words=0,1 sxm_ovm=4 pages=2 cpl=2 source_reads=1 writes_each=1 retained_source=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVKD forwarding complete",

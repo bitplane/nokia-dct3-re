@@ -12,6 +12,33 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_rptbd_shift_store_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd-shift-st']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd-shift-st')
+        for old, new in (('restore=115200', 'restore=0'),
+                         ('delay_writes=1', 'delay_writes=2'),
+                         ('pointer_effect=once', 'pointer_effect=twice'),
+                         ('body_count=brc+1', 'body_count=brc'),
+                         ('balanced_frames=1', 'balanced_frames=0'),
+                         ('retained_words=1', 'retained_words=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rptbd-shift-st')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptbd-shift-st')
+
+    def test_rptbd_shift_store_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd-shift-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd-shift-edge')
+        for old, new in (('restore=16', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('pointer_changes=0', 'pointer_changes=1'),
+                         ('brc_changes=0', 'brc_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rptbd-shift-edge')
+
     def test_mvdk_accumulator_destination_scope(self):
         for profile in ('mvdk-acc', 'mvdk-acc-prod'):
             marker, ending = EXTRA_PROFILES[profile]
