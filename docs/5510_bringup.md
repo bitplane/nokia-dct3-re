@@ -4532,10 +4532,10 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 earlier/different route, not evidence of a stuck filter or missing opcode.
 #### Playback reactivation contract
 
-**Open question:** what establishes method `023e64`'s control words
-`ba4f` and `ba51`, and why does varying-input playback never take its
-longer body? Do not force a wakeup, node, callback, method result or input
-value.
+**Open question:** which caller of context-restore wrapper `024538` causes
+setup to resume with `ba51=1`, and why does varying-input playback never
+take method `023e64`'s longer body? Do not force a wakeup, node, callback,
+saved context, method result or input value.
 
 The first verified AA99 sessions start at 0.818115786 seconds and end at
 2.368206564 (constant) / 1.726312648 (varying). Source-checked observation
@@ -4656,6 +4656,29 @@ checker verifies original words, bounded per-site samples, totals and
 first-session ordering without requiring a guessed successful outcome.
 Both fresh runs retain prior range counts, and the full tool suite passes
 (2,963 tests, one skipped).
+
+Read-only gate taps narrow this to `ba51`, not an observed `ba4f` change.
+In the common 0.8182--1.7-second interval, varying playback has 996 reads
+and 332 writes of `ba4f`, all sampled values one with no value-change cap
+exhaustion. Constant playback has 576/192 reads/writes with the same value.
+For `ba51`, varying playback has 996 reads / 664 writes, constant 549 / 357;
+both clear it to zero and later write one. Its transition samples reach
+the cap of 32, so the log explicitly does not close all intermediate
+transitions. Terminal totals and last-access values remain available.
+These are scoped bus observations, not a new physical clock/protocol claim.
+
+The setup at `023da0..023dbb` clears `ba51`, calls `02a81a` with `a8ab`,
+and sets `ba51=1` on its nonzero-return path before calling it again.
+`02a81a..02a82a` stores SP and register context; the neighbouring
+`02a82b..02a83f` restores saved context. The sole immediate-call encoding
+candidate for the latter is `02453d` in wrapper `024538`, which supplies
+`a8ab` and stack argument one. Its ten immediate caller candidates are
+`023dd1,0242ba,0242c1,02438c,02533b,02535c,02587e,025e14,025e28,025e35`.
+This is not yet a runtime caller proof or a named format-error contract.
+Gate verification rejects missing identities, bad ordinals/counts, wrong
+time scopes and inconsistent terminal values; exhausted sample caps are
+reported rather than interpreted as stability. Both fresh runs retain the
+same method and range counts.
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,

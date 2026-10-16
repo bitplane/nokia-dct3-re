@@ -8,10 +8,36 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_notify_context,
     verify_playback_path,
     verify_playback_method,
+    verify_playback_gates,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_gate_accesses_require_all_identities_and_observed_terminal_values(self):
+        reports = [f'mu4_playback_gate_terminal: direction={direction} address={address} accesses=0 samples=0 last=unobserved '
+                   'selection=common_first_session_window observer_writes=0 audio_acceptance=0'
+                   for direction in ('read', 'write') for address in ('ba4f', 'ba51')]
+        reports[0] = reports[0].replace('accesses=0 samples=0 last=unobserved', 'accesses=1 samples=1 last=0001')
+        entry = ('mu4_playback_gate_access: direction=read address=ba4f value=0001 ordinal=1 access=1 '
+                 't=1.000000000 context_pc=023e76 ownership=unvalidated observer_writes=0')
+        text = entry + '\n' + '\n'.join(reports)
+        self.assertEqual(verify_playback_gates(text, [0.8, 2.2])['read_ba4f']['last'], '0001')
+        for old, new in (('ordinal=1', 'ordinal=2'), ('access=1', 'access=0'), ('t=1.000000000', 't=1.800000000'),
+                         ('last=0001', 'last=0000'), ('ownership=unvalidated', 'ownership=proven'),
+                         ('accesses=1 samples=1', 'accesses=2 samples=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_gates(text.replace(old, new), [0.8, 2.2])
+        with self.assertRaises(ValueError):
+            verify_playback_gates(text.replace(reports[3], reports[2]), [0.8, 2.2])
+        with self.assertRaises(ValueError):
+            verify_playback_gates(text.replace(reports[3], ''), [0.8, 2.2])
+        capped = '\n'.join(entry.replace('ordinal=1 access=1', f'ordinal={i} access={i}')
+                           for i in range(1, 33)) + '\n' + '\n'.join(reports)
+        capped = capped.replace('accesses=1 samples=1 last=0001', 'accesses=100 samples=32 last=0000')
+        result = verify_playback_gates(capped, [0.8, 2.2])['read_ba4f']
+        self.assertTrue(result['sample_cap_reached'])
+        self.assertEqual(result['last'], '0000')
+
     def test_method_coverage_preserves_absence_and_checks_source_and_totals(self):
         terminal = ('mu4_playback_method_terminal: entry=1 early=0 body=0 returned=0 result=0 publish=0 '
                     'opcode_mismatch=0 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0')

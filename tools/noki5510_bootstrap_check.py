@@ -463,6 +463,50 @@ def verify_playback_switch_history(text, words, session, *, kind='switch'):
     return result
 
 
+def verify_playback_gates(text, session):
+    terminals = list(re.finditer(
+        r'mu4_playback_gate_terminal: direction=(read|write) address=(ba4f|ba51) accesses=(\d+) samples=(\d+) '
+        r'last=([0-9a-f]{4}|unobserved) selection=common_first_session_window observer_writes=0 audio_acceptance=0$',
+        text, re.MULTILINE))
+    rows = list(re.finditer(
+        r'mu4_playback_gate_access: direction=(read|write) address=(ba4f|ba51) value=([0-9a-f]{4}) '
+        r'ordinal=(\d+) access=(\d+) t=(\d+\.\d{9}) context_pc=([0-9a-f]{6}) ownership=unvalidated observer_writes=0$',
+        text, re.MULTILINE))
+    if not terminals and not rows and 'mu4_playback_gate_' not in text:
+        return None
+    expected = {(direction, address) for direction in ('read', 'write') for address in ('ba4f', 'ba51')}
+    if len(terminals) != 4 or len(terminals) != text.count('mu4_playback_gate_terminal:') or len(rows) != text.count('mu4_playback_gate_access:'):
+        raise ValueError('missing or malformed playback gate observations')
+    reports = {(row[1], row[2]): row for row in terminals}
+    if set(reports) != expected:
+        raise ValueError('duplicate or missing playback gate identity')
+    samples = {key: [] for key in expected}
+    previous_time = max(session[0], 0.8182)
+    for row in rows:
+        key, ordinal, access, time = (row[1], row[2]), int(row[4]), int(row[5]), float(row[6])
+        seen = samples[key]
+        if ordinal != len(seen) + 1 or ordinal > 32 or access <= (seen[-1]['access'] if seen else 0):
+            raise ValueError('playback gate ordinal/access mismatch')
+        if not previous_time <= time <= min(session[1], 1.7) or row.end() >= reports[key].start():
+            raise ValueError('playback gate time or terminal ordering mismatch')
+        seen.append({'value': row[3], 'access': access, 'time': time, 'context_pc': row[7]})
+        previous_time = time
+    result = {}
+    for key, report in reports.items():
+        total, count, last = int(report[3]), int(report[4]), report[5]
+        seen = samples[key]
+        if count != len(seen) or not min(total, 8) <= count <= min(total, 32):
+            raise ValueError('playback gate samples disagree with access totals')
+        if total == 0:
+            if last != 'unobserved':
+                raise ValueError('unobserved gate value asserted')
+        elif not seen or seen[-1]['access'] > total or last == 'unobserved' or (count < 32 and seen[-1]['value'] != last):
+            raise ValueError('playback gate terminal value/access mismatch')
+        result['_'.join(key)] = {'accesses': total, 'samples': seen, 'last': last,
+                                'sample_cap_reached': count == 32}
+    return result
+
+
 def verify_playback_method(text, words, session):
     terminals = list(re.finditer(
         r'mu4_playback_method_terminal: entry=(\d+) early=(\d+) body=(\d+) returned=(\d+) result=(\d+) publish=(\d+) '
@@ -590,6 +634,7 @@ def verify_playback_range(text, words):
             'callback_context_history': callback_history,
             'callback_producer_path': verify_playback_path(text, words, callback_history),
             'method_coverage': verify_playback_method(text, words, parent['first_session']),
+            'method_gate_accesses': verify_playback_gates(text, parent['first_session']),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'notify_context_history': notify_history,
             'notify_raw_register_context': verify_playback_notify_context(text, notify_history),

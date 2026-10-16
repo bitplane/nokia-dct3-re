@@ -1,9 +1,42 @@
--- Fixed-time RAM context only: no writer identity, instruction operands or audio claim.
+-- Read-only playback bus/context observations; no instruction ownership or audio claim.
 local machine = manager.machine
 assert(machine.system.name == 'mu4nand', 'MU4 playback context requires mu4nand')
 local cpu = assert(machine.devices[':cpu'])
 local data = assert(cpu.spaces.data)
 local handles, read_counts, latch_writes, sampling = {}, {}, 0, false
+local gates = {}
+for _, direction in ipairs({'read', 'write'}) do
+    for _, address in ipairs({0xba4f, 0xba51}) do
+        local state = {accesses = 0, samples = 0}
+        gates[direction .. address] = state
+        local install = direction == 'read' and data.install_read_tap or data.install_write_tap
+        handles[#handles + 1] = install(data, address, address, 'mu4_playback_gate_' .. direction .. address,
+            function(_, value)
+                local time = machine.time:as_double()
+                if sampling or machine:side_effects_disabled() or time < 0.8182 or time > 1.7 then return end
+                state.accesses = state.accesses + 1
+                if state.samples < 32 and (state.accesses <= 8 or state.last ~= value) then
+                    state.samples = state.samples + 1
+                    machine:logerror(string.format(
+                        'mu4_playback_gate_access: direction=%s address=%04x value=%04x ordinal=%u access=%u t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
+                        direction, address, value, state.samples, state.accesses, time, cpu.state.GENPC.value))
+                end
+                state.last = value
+            end)
+    end
+end
+local gate_stop = emu.add_machine_stop_notifier(function()
+    for _, direction in ipairs({'read', 'write'}) do
+        for _, address in ipairs({0xba4f, 0xba51}) do
+            local state = gates[direction .. address]
+            machine:logerror(string.format(
+                'mu4_playback_gate_terminal: direction=%s address=%04x accesses=%u samples=%u last=%s selection=common_first_session_window observer_writes=0 audio_acceptance=0\n',
+                direction, address, state.accesses, state.samples,
+                state.last and string.format('%04x', state.last) or 'unobserved'))
+        end
+    end
+end)
+_G.mu4_playback_gate_stop = gate_stop
 local queue_counts = {}
 local result_counts = {}
 handles[#handles + 1] = data:install_write_tap(0x15ee, 0x15f8, 'mu4_playback_method_result', function(address, value, mask)
