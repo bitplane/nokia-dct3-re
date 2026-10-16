@@ -890,6 +890,12 @@
       "hypothesis": "Selecting BIOS 584e while restoring a complete v5.21 donor flash image executes v5.84 code with only donor product state",
       "conclusion": "MAME restores persistent flash NVRAM over the selected BIOS, so the original full-donor fixture executed v5.21 code. The 281-byte and alternate-credential censuses performed with that composition do not establish v5.84 semantics. The corrected generator preserves the complete v5.84 MCU/PPM region and imports only the donor's 64 KiB PMM partition. The first corrected gate selected a stale frame, but a subsequently isolated fresh-fixture run independently executed both v5.84 cipher calls and reproduced the physical Wrong code result.",
       "evidence": ["docs/2100_bringup.md", "tools/make_2100_pmm_profile.py", "tools/test_make_2100_pmm_profile.py"]
+    },
+    {
+      "id": "mu4_rel_zero_shift_extension_is_missing_instruction_coverage", "status": "disproven",
+      "hypothesis": "After admitting MVDK AG,AL, original REL playback's 6f8c/0000 stop is another unimplemented original shifted instruction or merely a lost retained extension",
+      "conclusion": "The retained instruction is 02:40ef and its last fetched physical word is 0040f0. The original AA99 image contains 6f8c 0c9e, a supported shifted STL encoding. Read-only snapshots see zero at physical 40f0..40f4 in both program and data spaces. Write taps observe the correct REL upload followed by repeated data-space zero writes with live PC 02:45b3, beside the original RPTB body DLD *AR1+,A at 02:45b1 and DST A,*AR0+ at 02:45b2. This is a real code/data overwrite in the current model, not grounds to accept extension zero or restore instructions. The copying block's pointers/count and provisional shared-DARAM aliasing remain to be reconciled; neither a wrong physical bank map nor a wrong firmware pointer is yet established.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp"]
     }
   ]
 }

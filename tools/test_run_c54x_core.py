@@ -12,6 +12,22 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mvdk_accumulator_destination_scope(self):
+        for profile in ('mvdk-acc', 'mvdk-acc-prod'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in (('guard_width=8', 'guard_width=16'),
+                             ('source_reads=1', 'source_reads=2'),
+                             ('destination_writes=1', 'destination_writes=2'),
+                             ('restore=', 'missing_restore='),
+                             ('physical_phase_claim=0', 'physical_phase_claim=1')):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.subTest(profile=profile), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_shifted_ar_store_scope(self):
         for profile in ('st-shift-ar', 'st-shift-ar-use', 'st-shift-ar-bank'):
             marker, ending = EXTRA_PROFILES[profile]

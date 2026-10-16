@@ -14145,23 +14145,24 @@ private:
 		unsigned form, access, checkpoint;
 		u32 base;
 	};
-	static mvdk_mapped_fixture mvdk_mapped_case(unsigned v)
+	static mvdk_mapped_fixture mvdk_mapped_case(unsigned v, bool accumulator_destination = false)
 	{
 		mvdk_mapped_fixture f{};
-		f.source = 8 + v % 18; f.form = (v / 18) % 3;
-		unsigned const destination = (v / 54) % 11;
-		f.destination = destination < 8 ? 0x10 + destination : destination < 10 ? 0x0e + destination - 8 : 0x6000;
-		f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 594) % 4];
+		unsigned const sources = accumulator_destination ? 19 : 18, destinations = accumulator_destination ? 6 : 11;
+		f.source = v % sources == 18 ? 0x62 : 8 + v % sources; f.form = (v / sources) % 3;
+		unsigned const destination = (v / (sources * 3)) % destinations, patterns = sources * 3 * destinations;
+		f.destination = accumulator_destination ? 8 + destination : destination < 8 ? 0x10 + destination : destination < 10 ? 0x0e + destination - 8 : 0x6000;
+		f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / patterns) % 4];
 		if (f.source == 0x0a || f.source == 0x0d) f.value &= 0xff;
 		if (f.form == 1 && f.source == 0x16) f.value = f.source;
-		f.base = (v / 2376) % 2 ? 0x20000 : 0; f.access = f.form == 2 ? 6 : 5;
-		f.checkpoint = f.access - 1 + v / 4752;
+		f.base = (v / (patterns * 4)) % 2 ? 0x20000 : 0; f.access = f.form == 2 ? 6 : 5;
+		f.checkpoint = f.access - 1 + v / (patterns * 8);
 		return f;
 	}
 	void start_mvdk_mapped(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = mvdk_mapped_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		auto const f = mvdk_mapped_case(variant, !strcmp(machine().options().bios(), "mvdk-acc")); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.form == 0 ? 0x7100 | f.source : f.form == 1 ? 0x7196 : 0x71f8);
 		program.write_word(f.base + 0x601, f.form == 2 ? f.source : f.destination);
@@ -14195,11 +14196,13 @@ private:
 		unsigned form, producer, prefix, access, checkpoint;
 		u32 base;
 	};
-	static mvdk_producer_fixture mvdk_producer_case(unsigned v)
+	static mvdk_producer_fixture mvdk_producer_case(unsigned v, bool accumulator_destination = false)
 	{
+		unsigned const group = accumulator_destination ? v / 5184 : 0; v %= 5184;
 		mvdk_producer_fixture f{};
 		f.source = 8 + v % 6; f.form = (v / 6) % 3; f.producer = (v / 18) % 3;
 		f.prefix = 1 + (v / 54) % 2; f.destination = (v / 108) % 2 ? 0x6000 : 0x13;
+		if (accumulator_destination) f.destination = 8 + 2 * group + (v / 108) % 2;
 		f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 216) % 4];
 		f.base = (v / 864) % 2 ? 0x20000 : 0; f.access = 5 + f.prefix + unsigned(f.form == 2);
 		f.checkpoint = f.access - 1 + v / 1728;
@@ -14214,7 +14217,7 @@ private:
 	void start_mvdk_producer(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = mvdk_producer_case(variant); bool const b = f.source >= 0x0b;
+		auto const f = mvdk_producer_case(variant, !strcmp(machine().options().bios(), "mvdk-acc-prod")); bool const b = f.source >= 0x0b;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 20; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.producer == 0 ? (b ? 0x8000 : 0x8100) | f.source : f.producer == 1 ? 0x8a00 | f.source : (b ? 0xe900 : 0xe800) | u8(f.value));
@@ -14237,8 +14240,8 @@ private:
 				expect(at == f.source && word == f.expected && !m_pipeline_operand_reads && m_pipeline_register_writes == unsigned(f.producer != 2) && m_cpu->pipeline_cycles() == f.access, "MVDK distinguishes direct ALU latency from mapped producer no-conflict ordering"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdk_producer_writes",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				if (at == f.source) { expect(f.producer != 2 && !m_pipeline_register_writes && word == f.value && m_cpu->pipeline_cycles() == 6, "Mapped accumulator producer publishes once at Execute"); ++m_pipeline_register_writes; return; }
-				expect(at == f.destination && word == f.expected && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == f.access + unsigned(f.destination >= 0x60), "MVDK publishes its retained mapped word once without an extra producer delay"); ++m_pipeline_store_writes; });
+				if (f.producer != 2 && !m_pipeline_register_writes && at == f.source) { expect(word == f.value && m_cpu->pipeline_cycles() == 6, "Mapped accumulator producer publishes once at Execute"); ++m_pipeline_register_writes; return; }
+				expect(at == f.destination && word == f.expected && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == f.access + unsigned(f.destination < 0x10 || f.destination >= 0x60), "MVDK publishes its retained mapped word once without an extra producer delay"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + f.prefix + (f.form == 2 ? 0x602 : 0x601), "mvdk_producer_literals",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_extensions_reads++;
 				expect(i < (f.form == 2 ? 2U : 1U) && at == f.base + 0x601 + f.prefix + i && word == (f.form == 2 && !i ? f.source : f.destination), "Producer-composed MVDK retains ordered literals"); });
@@ -14601,8 +14604,8 @@ private:
 		if (!strcmp(machine().options().bios(), "ld-ar0-index") || !strcmp(machine().options().bios(), "ld-circular")) { start_indexed_load(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd")) { start_rptbd(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
-		if (!strcmp(machine().options().bios(), "mvdk-mapped")) { start_mvdk_mapped(); return; }
-		if (!strcmp(machine().options().bios(), "mvdk-producer")) { start_mvdk_producer(); return; }
+		if (!strcmp(machine().options().bios(), "mvdk-mapped") || !strcmp(machine().options().bios(), "mvdk-acc")) { start_mvdk_mapped(); return; }
+		if (!strcmp(machine().options().bios(), "mvdk-producer") || !strcmp(machine().options().bios(), "mvdk-acc-prod")) { start_mvdk_producer(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-map-edge")) { start_mvdk_mapped_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-edge")) { start_rptbd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-periph")) { start_mvdd_peripheral(); return; }
@@ -40766,7 +40769,9 @@ private:
 		if (m_phase == 255410) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255400; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255380)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdk_producer_case(variant);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const accumulator_destination = !strcmp(machine().options().bios(), "mvdk-acc-prod");
+			auto const f = mvdk_producer_case(variant, accumulator_destination);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Producer-composed MVDK stays within supported forms");
 			if (tick == 3 + f.prefix) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix, 0xdead); }
 			if (tick == 4 + f.prefix && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602 + f.prefix, 0xdead); }
@@ -40782,7 +40787,7 @@ private:
 					expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x600 + f.prefix + (f.form == 2 ? 4 : 3) &&
 						m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 + unsigned(f.producer == 1) &&
 						m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.producer != 2) && m_fast_stack_reads == unsigned(f.producer == 1) &&
-						m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == f.expected, "Producer-composed MVDK preserves the captured word and balances all transactions"); }
+						m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == (f.expected & (f.destination == 0xa || f.destination == 0xd ? 0xff : 0xffff)), "Producer-composed MVDK preserves the captured word and balances all transactions"); }
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4];
@@ -40790,7 +40795,11 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255390; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 5183) { start_mvdk_producer(variant + 1); return; }
+				if (variant < (accumulator_destination ? 15551U : 5183U)) { start_mvdk_producer(variant + 1); return; }
+				if (accumulator_destination)
+				{
+					osd_printf_info("TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator producers complete");
+				}
 				osd_printf_info("TMS320C54x mapped MVDK producers: PASS cases=5184 restore=5184 sources=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 destinations=AR3,RAM patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 direct_alu_latency=retained direct_ld_gap0=projection_only mapped_no_conflict=1 physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDK producers complete");
 			}
@@ -40799,7 +40808,9 @@ private:
 		if (m_phase == 255390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255360)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdk_mapped_case(variant);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const accumulator_destination = !strcmp(machine().options().bios(), "mvdk-acc");
+			auto const f = mvdk_mapped_case(variant, accumulator_destination);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped MVDK remains in supported staged forms");
 			if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
 			if (tick == 4 && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xdead); }
@@ -40814,8 +40825,20 @@ private:
 				{ auto const disable = machine().disable_side_effects();
 					expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.form == 2 ? 0x604 : 0x603) &&
 						m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
-						m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == f.value,
+						m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == (f.value & (f.destination == 0xa || f.destination == 0xd ? 0xff : 0xffff)),
 						"Mapped MVDK retains the sampled word, flags and continuation across replay"); }
+				if (accumulator_destination)
+				{
+					u64 a = 0x123456789aULL, b = 0xfedcba9876ULL;
+					auto const field = [&a, &b](unsigned address, u16 word) {
+						if (address < 8 || address > 0xd) return;
+						unsigned const part = (address - 8) % 3, shift = part * 16;
+						u64 const mask = (part == 2 ? 0xffULL : 0xffffULL) << shift;
+						u64 &value = address >= 0xb ? b : a; value = (value & ~mask) | ((u64(word) << shift) & mask);
+					};
+					field(f.source, f.value); if (f.source != f.destination) field(f.source, 0xdead); field(f.destination, f.value);
+					expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b, "Mapped accumulator move preserves every other field and truncates only guard destinations");
+				}
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
@@ -40823,7 +40846,11 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255370; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 14255) { start_mvdk_mapped(variant + 1); return; }
+				if (variant < (accumulator_destination ? 8207U : 14255U)) { start_mvdk_mapped(variant + 1); return; }
+				if (accumulator_destination)
+				{
+					osd_printf_info("TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator destinations complete");
+				}
 				osd_printf_info("TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDK complete");
 			}
@@ -44990,6 +45017,8 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(221, "st-shift-ar-use", "Shifted AR stores with legal-gap indirect consumers")
 	ROM_SYSTEM_BIOS(222, "st-shift-ar-bank", "Shifted stores and shared-bank early DAGEN write arbitration")
 	ROM_SYSTEM_BIOS(223, "st-shift-ar-edge", "Shifted-store control and peripheral destination exclusions")
+	ROM_SYSTEM_BIOS(224, "mvdk-acc", "Retained MVDK to accumulator fields and guard-width aliases")
+	ROM_SYSTEM_BIOS(225, "mvdk-acc-prod", "Mapped and direct accumulator producers before MVDK field destinations")
 ROM_END
 
 ROM_START(tms54rom4)

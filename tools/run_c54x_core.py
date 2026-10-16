@@ -312,6 +312,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "mvdk-acc": (
+        "TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDK accumulator destinations complete",
+    ),
+    "mvdk-acc-prod": (
+        "TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDK accumulator producers complete",
+    ),
     "st-shift-ar-edge": (
         "TMS320C54x shifted AR store exclusions: PASS cases=48 restore=48 excluded_destinations=12 pages=2 snapshots=2 source_reads=0 destination_writes=0 register_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated shifted AR exclusions complete",

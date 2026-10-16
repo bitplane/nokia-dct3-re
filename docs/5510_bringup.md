@@ -92,10 +92,13 @@ The active `bootplaystage` diagnostic sends an original playback request
 through serial pins and loads the matching `RELSI16` image. Its 49,839
 compared program/data words match original marker `aa99` before startup;
 four low-window words remain excluded. Native execution passes mapped-SP
-MVKD, the delayed far call inside block `02:6116..6120` and the shifted
-store to AR5 at `02:5fdd`. It now stops at `02:6050`, `710a 0008`:
-`MVDK AG,AL`. The mapped-accumulator move remains guarded pending its
-own source/destination publication and adjacent-producer tests. The generic 16-bit
+MVKD, the delayed far call inside block `02:6116..6120`, the shifted
+store to AR5 at `02:5fdd` and `MVDK AG,AL` at `02:6050`.
+It now stops at `02:40ef`: `6f8c` has a zero extension where the original
+image has `0c9e`. Read-only watches confirm that the correct words are
+loaded and later zeroed by data writes in the `02:45b1..45b2` doubleword
+copy loop. Its pointers/count and the provisional shared-memory mapping
+must be reconciled before admitting more instructions. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4353,9 +4356,9 @@ The unchanged external playback input also executes `02:5fdd`,
 `6ff8 0015 0c81`, `STL A,1,*($0015)`. Its destination is C54x AR5
 (`0015`), not an unidentified external peripheral. Shifted stores now
 admit AR0..AR7 using their ordinary Execute-time write; other low mapped
-destinations remain guarded. The next stop is `02:6050`, `710a 0008`,
-`MVDK AG,AL`, with the live PC already at `02:6053`. Instruction identity
-comes from the retained pipeline slot, not the advanced PC. The run observes
+destinations remain guarded. `MVDK AG,AL` at `02:6050`, `710a 0008`, also
+executes through the tested generic accumulator-destination move path.
+The run observes
 929,701 NAND data reads and 26,211 strobes; unchanged counts do not negate
 instruction progress, and neither count is decoder/output acceptance.
 
@@ -4397,8 +4400,45 @@ Executable shifted-AR acceptance is split into four isolated profiles:
 Nine existing store/DAGEN/move profiles, the native 5110 save-state gate
 and 2,897 tool tests (one skipped) guard this admission. The full 288-check
 default CPU suite was last run at the delayed-call milestone; it is not
-implied by these focused profiles. The original REL diagnostic still fails
-closed with `audio_acceptance=0`; mapped-accumulator move timing is next.
+implied by these focused profiles.
+
+MVDK to AL/AH/AG/BL/BH/BG retains its Access-owned source and writes at
+the following clock, like the existing retained RAM-destination path.
+Guard writes mask to eight bits and preserve the accumulator's other fields.
+`mvdk-acc` passes 8,208 replays over eighteen mapped sources plus RAM,
+six destinations, direct/indirect/absolute addressing, four word patterns,
+two program pages and three save points. Fetched literals and captured
+sources are changed to check retention; full accumulator comparisons check
+sibling preservation and source/destination aliases. `mvdk-acc-prod` adds
+15,552 replays with mapped STL/POPM and direct LD producers, gaps 0/1 and
+all six source/destination fields. Adjacent short-form direct LD results
+remain a prototype projection, not a guarantee for code violating
+SPRU131G table 7-28. Seven prior move/store profiles, native 5110 save-state
+restoration and 2,898 tool tests (one skipped) pass. MVMD accumulator
+destinations and unrelated control/peripheral moves are not admitted.
+
+### REL code/data overwrite boundary
+
+The active failure is at retained instruction `02:40ef`, with last fetched
+physical word `0040f0` and live PC `02:40f2`. Original AA99 words at
+`02:40ef..40f4` are `6f8c 0c9e 5682 5483 f622 6f95`;
+the extension `0c9e` is valid shifted STL syntax. A ten-second read-only
+snapshot instead sees zero at `40f0..40f4` in both program and data spaces.
+This must not be "fixed" by accepting extension zero or restoring code.
+
+Read-only write taps on those five physical addresses observe the correct
+REL upload, followed by repeated data-space zero writes with live PC
+`02:45b3`. The original local block is `RPTB 45b2` at `02:45af`,
+`DLD *AR1+,A` at `02:45b1` and `DST A,*AR0+` at `02:45b2`.
+The taps identify the copying block, not an exact Execute PC or a proven
+physical bank fault. Next, establish its entry pointers, source contents,
+count and write extent, and reconcile those with the board's provisional
+shared-DARAM model. Distinguish a wrong pointer/count from wrong bank
+aliasing before changing either. Initial overlay equality does not prove
+that executable words survive subsequent native data writes.
+
+The external request, saved file and peer replies remain unchanged. The
+original REL diagnostic fails closed with `audio_acceptance=0`.
 
 ```sh
 python3 tools/run_c54x_core.py --profile mvkd-sp \

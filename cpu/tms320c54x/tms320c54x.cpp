@@ -185,6 +185,11 @@ constexpr bool staged_move(u16 word)
 	return staged_direct_mvmd(word) || ((word & 0xff00) == 0x7100 && u8(word) < 0x98) || staged_extended_move(word);
 }
 
+constexpr bool staged_accumulator_destination_move(u16 word, u16 destination)
+{
+	return (word & 0xff00) == 0x7100 && staged_move(word) && destination >= 8 && destination <= 0x0d;
+}
+
 constexpr bool staged_t_register_move(u16 word, u16 destination)
 {
 	return staged_move(word) && (destination == 0x0e || destination == 0x0f) && word != 0x7308 && word != 0x730b;
@@ -2982,7 +2987,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (m_pipeline_valid[2] && direct_move && !brc_move && !accumulator_status_move && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
+		if (m_pipeline_valid[2] && direct_move && !brc_move && !accumulator_status_move && !staged_accumulator_destination_move(word, m_pipeline_immediate[2]) && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
 			(m_pipeline_immediate[2] < 0x10 || m_pipeline_immediate[2] > 0x19))
 		{
 			logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]);
@@ -3008,7 +3013,7 @@ void tms320c54x_device::pipeline_step()
 		bool const smem_arithmetic = staged_smem_arithmetic(word) || staged_smem_special(word) || staged_shifted_smem(word);
 		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_pipeline_immediate[2]) && !staged_shifted_memory_arithmetic(m_pipeline_immediate[2]))
 		{
-			logerror("%s: unsupported staged Smem extension %04x/%04x\n", machine().describe_context(), word, m_pipeline_immediate[2]);
+			logerror("%s: unsupported staged Smem extension %04x/%04x instruction=%06x last_fetch_physical=%06x\n", machine().describe_context(), word, m_pipeline_immediate[2], unsigned(m_pipeline_address[2]), unsigned(m_pipeline_physical_address[2]));
 			m_illegal = true; return;
 		}
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
@@ -3378,7 +3383,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (extended && !brc && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if (extended && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged long-offset MVDK control/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -4374,7 +4379,9 @@ void tms320c54x_device::pipeline_step()
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}
 	if (m_pipeline_valid[4] && staged_move(m_pipeline_word[4]) &&
-		(m_pipeline_immediate[4] >= 0x60 || staged_t_register_move(m_pipeline_word[4], m_pipeline_immediate[4])))
+		(m_pipeline_immediate[4] >= 0x60 || staged_t_register_move(m_pipeline_word[4], m_pipeline_immediate[4]) || staged_accumulator_destination_move(m_pipeline_word[4], m_pipeline_immediate[4])))
+		// Retained MVDK data writes use the same clock for RAM and accumulator
+		// fields; register_write preserves siblings and masks AG/BG to 8 bits.
 		// Table 7-3: non-accumulator T moves are visible to the next consumer.
 		m_data.write_word(m_pipeline_immediate[4], m_pipeline_operand[4]);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0x7308 || m_pipeline_word[4] == 0x730b) && m_pipeline_immediate[4] == 7)
