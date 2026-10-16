@@ -63,8 +63,43 @@ adjacent `LD B,ASM,A` also execute after branch-delay admission.
 The twenty-second control/save fixture now stops at NORM `f48f`, owned
 by `03:dad2` in Read, with sampled T=`4421`, code=`21` (-31), and
 CPU ILLEGAL=`1`. Live PC=`03:dace` is not the owning instruction address.
-The next question is the legitimate T producer and its publication order;
+The producer is `LD *AR5-,T` at `03:dacf`, with two intervening
+instructions before NORM. At the failing load, the source is data word
+`c423` (postdecrement leaves AR5=`c422`). This is not an EXP latency case;
 do not widen NORM's documented -16..31 range to accommodate the sample.
+
+A passive write tap traces `c423` from small shift values to `4421`:
+the low-word write of `DST A,*AR5+` at `03:dad3` publishes `4421` at
+5.259108641 seconds, with A=`0000004421`. The later preparation loop's
+`STL A,*AR4-0` at `03:dabf` stores it again at 7.276284503 seconds,
+before `03:dacf` loads it into T. Direct operands such as `$13`/`$14` in
+this routine are SP-relative with CPL set, not reads of AR3/AR4.
+
+The preparation defect is an early exit from the first merge repeat
+(`03:da71..03:da93`), not yet a diagnosed memory-mapping defect. In the
+failing call, the `03:da6d` setup has AR5=`c35b`, BRC=`0247`,
+`[SP+13]=0078`, `[SP+14]=02e0`, and `[SP+8]=0020`. The delay span first
+increments AR5; both branch arms then decrement it by two per iteration.
+All 584 iterations would leave AR5=`becb`. Instead `03:da94` executes with
+AR5=`c0f1` and BRC=`0113`: exactly 275 iterations and 550 pointer words
+remain. An earlier abnormal call exits with AR5=`c347`, BRC=`023e`,
+likewise satisfying `AR5 = becb + 2*BRC`. Neighboring complete calls reach
+`03:da94` with AR5=`becb`, BRC zero. The following loop then uses the
+incomplete pointer as its start while its count still spans the full
+vector, exposing prior output to the final NORM pass.
+
+The next question is which control/context transition lets the staged
+repeat fall through with a nonzero remaining count. Trace that transition
+before changing repeat restoration; neither interrupt involvement nor a
+specific return instruction has yet been demonstrated. A ten-second atomic
+control with byte-identical NAND reaches `03:d840`, ILLEGAL zero, but does
+not reach this failing call; it is not a passing counterpart for the loop.
+
+Ten-second debugger, observer-free and source-observer runs reproduce the
+same NORM owner, T sample and cycle (`636150586`). A seven-second cut is
+too short to reach it; the difference is not evidence of debugger or
+observer perturbation. These are provenance observations, not an accepted
+recorder transaction or a diagnosis of the upstream defect.
 This stop precedes handling of the ten-second follow-up control and
 fifteen-second poll/metadata sequence, so their absence is not evidence of
 a missing command peer. No complete recorder transaction is established.
