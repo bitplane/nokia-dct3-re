@@ -928,10 +928,12 @@ class CoreResultTests(unittest.TestCase):
     def test_memory_immediate_multiply_scope(self):
         for name in ('mpy-mem-imm', 'mpy-t-imm', 'mpy-mapped'):
             marker, ending = EXTRA_PROFILES[name]
-            output = marker + '\n' + ending + '\n'
+            markers = marker if isinstance(marker, tuple) else (marker,)
+            output = '\n'.join((*markers, ending)) + '\n'
             check_result(output, 3, profile=name)
             for bad in (output.replace('restore=', 'missing_restore='),
-                        marker + '\n' + output, output + 'late output\n'):
+                        markers[0] + '\n' + output, output + 'late output\n',
+                        *(output.replace(item + '\n', '') for item in markers)):
                 with self.subTest(profile=name, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=name)
 

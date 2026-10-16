@@ -20,9 +20,24 @@ from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, RE
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter
+from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_recorder_mac_original_image_and_syntax_are_pinned(self):
+        words = dict(enumerate(RECORDER_MAC_WITNESS, RECORDER_MAC_BASE))
+        result = decode_recorder_memory_mac(words)
+        self.assertEqual(result['operation'], 'MAC *AR2,#9,A,B')
+        self.assertEqual(result['instruction'], '03ba1a')
+        self.assertEqual(result['t_publication'], 'Read')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_recorder_memory_mac(changed)
+        with self.assertRaises(ValueError):
+            decode_recorder_memory_mac({address - 0x10000: value for address, value in words.items()})
+
     def test_copy_adapter_pins_pointer_roles_and_every_word(self):
         words = {address: value for base, witness in COPY_ADAPTER_WITNESSES
                  for address, value in enumerate(witness, base)}

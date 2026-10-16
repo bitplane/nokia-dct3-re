@@ -15,6 +15,22 @@ else:
 
 
 BASE = 0x23D73
+RECORDER_MAC_BASE = 0x3BA16
+RECORDER_MAC_WITNESS = (0x7109, 0x0012, 0x10E2, 0x0001, 0x6582, 0x0009,
+                        0x4816, 0xF600, 0x8812, 0xF495, 0xF7B8)
+
+
+def decode_recorder_memory_mac(words):
+    for offset, expected in enumerate(RECORDER_MAC_WITNESS):
+        if words.get(RECORDER_MAC_BASE + offset) != expected:
+            raise ValueError(f'recorder MAC witness changed or absent at {RECORDER_MAC_BASE + offset:06x}')
+    return {'segment': 'aa88', 'pinned_words': len(RECORDER_MAC_WITNESS),
+            'instruction': '03ba1a', 'opcode': '6582', 'literal': 9,
+            'operation': 'MAC *AR2,#9,A,B', 't_publication': 'Read',
+            'reference': 'SPRU172C MAC syntax 4, page 4-82',
+            'scope': 'Original instruction provenance and syntax only; this static witness establishes neither staged execution nor recording acceptance'}
+
+
 COPY_ADAPTER_WITNESSES = (
     (0x2A31F, (0x4A11, 0xEEFF, 0x8814, 0xF495, 0xF7B8, 0x56E4,
                0x0004, 0x54E4, 0x0002, 0xF844, 0xA369)),
@@ -724,6 +740,8 @@ def contract(source):
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
     result['copy_adapter'] = decode_copy_adapter(rel_words)
+    recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
+    result['recorder_memory_mac'] = decode_recorder_memory_mac(recorder_words)
     result['dma_pause'] = decode_dma_pause(words, rel_words)
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
     result['rel_ar_store'] = decode_rel_ar_store(rel_words)

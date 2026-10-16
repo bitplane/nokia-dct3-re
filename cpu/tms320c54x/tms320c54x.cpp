@@ -323,7 +323,8 @@ constexpr bool staged_extended_smem_special(u16 word)
 
 constexpr bool staged_memory_immediate_multiply(u16 word)
 {
-	return (word & 0xfe00) == 0x6200 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
+	return ((word & 0xfe00) == 0x6200 || (word & 0xfc00) == 0x6400) &&
+		(u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_immediate_multiply(u16 word)
@@ -3716,7 +3717,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
-		if (source < 0x60 && (source < 8 || source > 0x17))
+		// Mapped-source ownership is validated for MPY, not yet for memory MAC.
+		if (source < 0x60 && ((m_pipeline_word[3] & 0xfc00) == 0x6400 || source < 8 || source > 0x17))
 		{
 			logerror("%s: staged memory/immediate MPY control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
@@ -4335,7 +4337,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
 			if (BIT(m_st1, 6)) product *= 2;
-			if ((m_op & 0xfcff) == 0xf067)
+			if ((m_op & 0xfcff) == 0xf067 || (m_op & 0xfc00) == 0x6400)
 			{
 				product = multiply_product(product);
 				u64 const source = accumulator(BIT(m_op, 9));

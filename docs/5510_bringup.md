@@ -4369,7 +4369,7 @@ the native success response, not merely any parameter-7 reply. It introduces
 no firmware-state writes. Both profiles require exactly one instruction-owned
 startup entry; no duplicate suppression or relaxed expected count is used.
 
-The exported 69,206,016-byte NAND retains the independently created input,
+The protected earlier 69,206,016-byte NAND retains the independently created input,
 whose unchanged SHA-256 is
 `75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
 Changed data pages are 34, 161, 288, 352--631 and 127008; no spare bytes change.
@@ -4381,7 +4381,7 @@ payloads each). This corrects the static title/artist order inference and
 proves these particular stored fields, not filesystem consistency, audio
 completeness or playback. Resident-memory comparison still passes exactly.
 
-Post-save refresh reaches idle without an instruction exclusion and reports
+In that protected artifact, post-save refresh reaches idle without an instruction exclusion and reports
 one track. The endpoint hash
 is `93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`;
 directory and ID3 bytes match the fields above. Page 127008 changes after
@@ -4402,6 +4402,24 @@ runner requires exact resident/overlay comparison, one Execute-owned startup
 entry, original request acknowledgement, native dispatch and the expected
 success/failure reply. It does not use the atomic profile's live-PC-qualified
 loader-name read tap as a staged loader identity oracle.
+
+The fresh `bootrecmeta` gate also passes with the corrected DMA frame-count
+shadow and staged memory/immediate MAC support. It reaches the native
+parameter-7 success reply and the 20-second endpoint at `02:98ea`, with
+one Execute-owned recorder startup and exact resident/overlay comparisons.
+Its NAND SHA-256 is
+`523e9417a37fd2353edbcf3ad4d3f8bdc5231c184e8ac88ec8ae9639da8fc2f8`;
+it is separate from the protected earlier playback input, not a silent
+replacement. Independent 7-Zip 26.00 extraction of the fixture volume reads
+the 143,168-byte `TEST` file, SHA-256
+`b986b3fa41950b04711981460901c21f09b8f62778616f703a7ac2868509adc8`.
+The first difference from the earlier extracted file is byte offset `0564`;
+the stored metadata prefix remains identical. Forced AAC probing still
+reports sample rate zero, no decoded-frame count and decoder errors
+(672 diagnostic lines). As with the earlier file, that is neither decoded
+audio acceptance nor proof that this native container is invalid.
+The independently verified result is protocol/storage reproduction; native
+codec output must be checked separately against this fresh input.
 
 ### Cold Saved-Track Catalogue
 
@@ -6432,6 +6450,30 @@ MVDD also pass (six profiles including the new fixture), along with
 evidence validation and native 5110 restoration. No new
 CPU saved fields are introduced. The shared broad checkpoint also covers
 these profiles without promoting untested compositions.
+
+The same retained operand path supports `MAC Smem,#lk,src,dst`
+(SPRU172C, MAC syntax 4, page 4-82). Smem publishes to T in Read;
+Execute multiplies the retained signed memory word and literal, applies
+FRCT and SMUL product saturation, adds the selected signed 40-bit
+accumulator and applies destination OVM/sticky overflow. No new CPU saved
+fields are needed. The compatibility-named `mpy-mem-imm` gate additionally
+passes 262,144 MAC cases and replays: eight RAM address forms, eight memory
+values, eight literals, sixteen FRCT/OVM/SXM/SMUL configurations, all four
+source/destination selections, two pages and four snapshots. Source
+accumulator patterns include negative, extended and saturation-boundary
+values; source/literal/pointer poisoning checks retained ownership.
+Another 1,664 cases/replays reject all 96 mapped/control/peripheral source
+addresses and all eight write-only short MOD=3 encodings, across all
+selectors and pages and two snapshots, without data accesses or pointer,
+accumulator, T or ST0 changes. These are scoped frontend exclusions, not
+silicon trap semantics. Repeat, interrupt and new producer/consumer
+compositions remain outside this acceptance.
+
+Original R060 AA88 contains `6582 0009` at `03:ba1a`:
+`MAC *AR2,#9,A,B`. `mu4_context_contract.py` pins its eleven-word
+context in the original upload, with mutation and
+wrong-page negatives. This static witness establishes provenance and
+syntax, independently of executable core tests or recorder acceptance.
 
 Near B and nondelayed BC retain block-loop ownership. The two-word branch
 must finish before REA and target the same block; forward and backward
