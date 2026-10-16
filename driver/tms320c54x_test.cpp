@@ -6038,11 +6038,12 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const bk = !strcmp(machine().options().bios(), "add-bk");
+		bool const sp = !strcmp(machine().options().bios(), "add-sp");
 		u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
 		u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
 		bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
 		u32 const base = BIT(variant, 8) ? 0x20000 : 0;
-		u16 const source = ram ? 0x500 : bk ? 0x19 : 0x11;
+		u16 const source = ram ? 0x500 : bk ? 0x19 : sp ? 0x18 : 0x11;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, b ? 0x01f8 : 0x00f8); program.write_word(base + 0x601, source);
@@ -6050,8 +6051,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0));
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (sp && BIT(variant, 11) ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, sp && !ram ? operand : 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, operand);
 		if (bk) m_cpu->set_state_int(tms320c54x_device::STATE_BK, operand);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : initial);
@@ -6068,6 +6069,72 @@ private:
 			[this, source](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == source && !m_pipeline_extensions_reads,
 				"Absolute accumulator ADD does not refetch its source-address literal"); ++m_pipeline_extensions_reads; });
 		m_phase = 252430; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_add_sp_context(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const producer = variant % 4, gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
+		u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
+		bool const compiler = BIT(variant / 24, 0), b = BIT(variant / 96, 0);
+		u32 const base = BIT(variant / 48, 0) ? 0x20000 : 0;
+		u16 const operand = initial_sp + std::array<int, 4>{-4, -1, 1, -8}[producer];
+		unsigned const read_tick = 6 + (producer == 3 ? 2 : 1) + gap;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 48; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, std::array<u16, 4>{0xeefc, 0x4a11, 0x8a11, 0x7718}[producer]);
+		if (producer == 3) program.write_word(base + 0x601, operand);
+		unsigned const add = 0x600 + (producer == 3 ? 2 : 1) + gap;
+		program.write_word(base + add, b ? 0x01f8 : 0x00f8); program.write_word(base + add + 1, 0x18);
+		// A younger FRAME must not change the older ADD's sampled SP.
+		program.write_word(base + add + 2, 0xee02);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, initial_sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0 : 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->space(AS_DATA).write_word(initial_sp, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x18, 0x18, "add_sp_context_operand",
+			[this, operand, read_tick](offs_t, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_tick,
+					"Mapped SP ADD reads the older stack update once before the younger FRAME"); ++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(initial_sp - 1, initial_sp - 1, "add_sp_context_stack",
+			[this](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled()) { expect(word == 0x1357 && !m_pipeline_store_writes, "PSHM retains one ordered stack write"); ++m_pipeline_store_writes; } });
+		m_phase = 291000; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_add_sp_exclusion(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u16 const source = std::array<u16, 10>{0, 1, 6, 7, 0x1a, 0x1b, 0x1c, 0x1d, 0x24, 0x58}[variant % 10];
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, variant >= 10 ? 0x01f8 : 0x00f8); program.write_word(0x601, source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_pipeline_operand_reads = m_idle_fixture_tick = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "add_sp_excluded_source",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
+		m_phase = 291020; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	void start_pipeline_direct_rmw(unsigned variant = 0)
@@ -14261,7 +14328,7 @@ private:
 		if (!strcmp(machine().options().bios(), "move-t")) { start_t_register_move(); return; }
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "store-delay")) { start_delay_store(); return; }
-		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute")) { start_pipeline_absolute_add(); return; }
+		if (!strcmp(machine().options().bios(), "add-bk") || !strcmp(machine().options().bios(), "add-absolute") || !strcmp(machine().options().bios(), "add-sp")) { start_pipeline_absolute_add(); return; }
 		if (!strcmp(machine().options().bios(), "arith-bk") || !strcmp(machine().options().bios(), "arith-ar")) { start_pipeline_register_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bk")) { start_stlm_bk(); return; }
 		if (!strcmp(machine().options().bios(), "store-bypass") || !strcmp(machine().options().bios(), "xmem-store-bp") || !strcmp(machine().options().bios(), "asm-store-bp")) { start_store_bypass(); return; }
@@ -37271,21 +37338,85 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252410;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 291000)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, producer = variant % 4;
+			unsigned const gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
+			u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
+			u16 const operand = initial_sp + std::array<int, 4>{-4, -1, 1, -8}[producer];
+			bool const compiler = BIT(variant / 24, 0), b = BIT(variant / 96, 0);
+			unsigned const read_tick = 6 + (producer == 3 ? 2 : 1) + gap;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{4, read_tick, read_tick + 2}[variant / 192];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute ADD accepts SP after an evidenced stack update");
+			if (tick == read_tick + 2)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == u16(operand + 2), "Younger FRAME updates SP after the ADD samples its older value");
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2468);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SP producer, retained ADD input or younger FRAME state");
+			}
+			if (tick == 24)
+			{
+				u64 const expected = u64(s64(s16(operand))) & 0xffffffffffULL;
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(producer == 1) &&
+					m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2468 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == (producer == 2 ? 0xbeef : 0x1357) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (compiler ? 0x4000 : 0)),
+					"Mapped SP ADD retains the producer value independently of CPL, younger FRAME and later SP replacement");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped-SP operand without duplicate stack effects or reads");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 291010; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 575) { start_pipeline_add_sp_context(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged absolute ADD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
+				start_pipeline_add_sp_exclusion(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 291010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 291000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 291020)
+		{
+			if (++m_idle_fixture_tick == 12)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008,
+					"SP admission does not admit control, repeat, mapping or peripheral sources");
+				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 19) { start_pipeline_add_sp_exclusion(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged absolute ADD SP exclusions: PASS cases=20 sources=10 accumulators=2 operand_reads=0 architectural_results=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated absolute ADD SP complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
 		if (m_phase == 252430)
 		{
 			unsigned const variant = m_pipeline_peripheral_case;
 			bool const bk = !strcmp(machine().options().bios(), "add-bk");
+			bool const sp = !strcmp(machine().options().bios(), "add-sp");
 			u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
 			u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
 			bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
 			u32 const base = BIT(variant, 8) ? 0x20000 : 0;
-			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 6, 7, 8}[variant / 512];
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 6, 7, 8}[(variant / 512) % 4];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute AR/RAM accumulator ADD is a retained arithmetic form");
 			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x510); }
 			if (tick == 6)
 			{
 				if (ram) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x500, 0x1234); }
-				else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR1, 0x1234);
+				else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : sp ? tms320c54x_device::STATE_SP : tms320c54x_device::STATE_AR1, 0x1234);
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
@@ -37305,7 +37436,7 @@ private:
 				u16 const status = 0xa008 | (carry ? 0x800 : 0) | (overflow ? b ? 0x200 : 0x400 : 0);
 				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
 					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (sp && BIT(variant, 11) ? 0x4000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (sp && !ram ? 0x1234 : 0x1000),
 					"Memory ADD retains its sampled operand and reproduces independent 40-bit result, carry, overflow and saturation expectations");
 				if (!m_pipeline_replay)
 				{
@@ -37315,7 +37446,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252440; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 2047) { start_pipeline_absolute_add(variant + 1); return; }
+				if (variant < (sp ? 4095 : 2047)) { start_pipeline_absolute_add(variant + 1); return; }
+				if (sp)
+				{
+					osd_printf_info("TMS320C54x staged absolute ADD SP: PASS cases=4096 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=SP,RAM pages=2 cpl_states=2 restore=4096 duplicate_reads=0 independent_arithmetic=1 source_retained=1\n");
+					start_pipeline_add_sp_context(); return;
+				}
 				if (bk)
 				{
 					osd_printf_info("TMS320C54x staged absolute ADD BK: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=BK,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1 source_retained=1\n");
@@ -44415,6 +44551,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(212, "asm-delay", "Retained ASM load and adjacent shift in branch delays")
 	ROM_SYSTEM_BIOS(213, "asm-delay-edge", "Rejected ASM load straddling a control delay")
 	ROM_SYSTEM_BIOS(214, "repeat-body-isr", "Software-saved ISR repeat returning directly into an outer body")
+	ROM_SYSTEM_BIOS(215, "add-sp", "Retained absolute ADD from SP and stack-update contexts")
 ROM_END
 
 ROM_START(tms54rom4)

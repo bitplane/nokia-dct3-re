@@ -452,6 +452,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVMD BK: PASS cases=432 restore=432 contexts=isolated,STLM_NOP destinations=AR0_to_AR7,BK values=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_retained=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD BK complete",
     ),
+    "add-sp": (
+        (
+            "TMS320C54x staged absolute ADD SP: PASS cases=4096 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=SP,RAM pages=2 cpl_states=2 restore=4096 duplicate_reads=0 independent_arithmetic=1 source_retained=1",
+            "TMS320C54x staged absolute ADD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0",
+            "TMS320C54x staged absolute ADD SP exclusions: PASS cases=20 sources=10 accumulators=2 operand_reads=0 architectural_results=0",
+        ),
+        "Fatal error: TMS320C54x isolated absolute ADD SP complete",
+    ),
     "add-bk": (
         "TMS320C54x staged absolute ADD BK: PASS cases=2048 operands=4 initial_values=4 sxm_states=2 ovm_states=2 accumulators=2 sources=BK,RAM pages=2 restore=2048 duplicate_reads=0 independent_arithmetic=1 source_retained=1",
         "Fatal error: TMS320C54x isolated absolute ADD BK complete",
@@ -1136,6 +1144,8 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
     if "Errors:" in lines:
         raise ValueError("MAME reported driver validity errors")
     required, completion = ([selected[0][0]], selected[0][1]) if selected else (REQUIRED, COMPLETION)
+    if selected and isinstance(required[0], tuple):
+        required = required[0]
     for marker in required:
         if sum(line == marker or (not selected and line.startswith(marker + " ")) for line in lines) != 1:
             raise ValueError(f"missing or duplicated conformance marker: {marker}")

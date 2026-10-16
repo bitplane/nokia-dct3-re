@@ -80,17 +80,24 @@ not because the file is absent. The request contract is detailed below.
 The separate `bootrecmeta` positive input supplies filename `TEST`, artist
 `TEST` and title `MAME`. Updater `02:8385` and outer operation `03:8dc3`
 return zero, and firmware sends parameter-7 status=`01`, reason=`0c`,
-success=`1`. Execution then reaches a new CPU coverage boundary in the
-post-save refresh: absolute ADD `00f8 0018` at `03:a1cf` reads mapped SP.
-That source remains deliberately excluded from staged ADD pending independent
-operand-timing and producer tests. The successful reply is not proof of a
-complete recorded file, playback or handset boot.
+success=`1`. Absolute ADD `00f8 0018` at `03:a1cf` now reads mapped SP
+under its independent arithmetic/producer contract. Post-save refresh
+completes within the twenty-second window: PC=`02:98ea`, ILLEGAL=`0`,
+IDLE=`1`, input cursor `58`, seven responses, no pending acknowledgement
+and one reported track. The run still exits 3 on the legacy startup counter
+(`2`, expected `1`), not a CPU coverage stop. Replacing that program-read
+counter with an instruction-owned acceptance observation is the immediate
+tooling boundary; its assertion has not been weakened.
 
-The fixture observes 2,108 NAND program setups, 2,107 confirms and
+The empty-field fixture observes 2,108 NAND program setups, 2,107 confirms and
 1,098,240 data writes, but track count is zero and the recorded file is not
 verified. Exact resident-memory comparison still passes (48,261 program
 and 3,656 data words). These counts do not establish a complete recorder
-transaction, audio output or handset boot.
+transaction, audio output or handset boot. The positive fixture instead
+observes 2,236 setups, 2,235 confirms and 1,165,824 data writes. Its captured
+directory and ID3 text fields remain correct, and the reported track count
+advances to one. Neither counters nor the successful protocol reply prove
+file/audio completeness, playback or handset boot.
 
 The passive observer records ILLEGAL explicitly: searching only for the
 words "unsupported" or "illegal" misses some guard diagnostics. NAND
@@ -1530,7 +1537,15 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The direct-ISR-return checkpoint renews the full default population: all
+The mapped-SP ADD checkpoint passes `add-sp` (4,096 arithmetic cases/restores,
+576 stack-update contexts/restores and twenty control/peripheral exclusions),
+plus the unchanged `add-absolute` and `add-bk` controls. The native 5110
+save-state round trip and exact original MU4 resident-memory comparison pass.
+Tooling acceptance is 2,878 tests (one skip). These isolated scopes do not renew the full default
+population, whose latest complete result remains the direct-ISR-return
+checkpoint below.
+
+The direct-ISR-return checkpoint at `59f4285f` renews the full default population: all
 288 required markers exactly once, expected completion exit and terminal
 completion check. `repeat-body-isr` passes 768 cases and save/replays.
 Controls `repeat-isr`, `repeat-context`, `repeat-pmst`, `repeat-popd`,
@@ -3249,8 +3264,34 @@ initial values, SXM/OVM, both accumulators, two pages and four snapshots.
 Changing BK and the address literal after their capture cannot change the
 result. One source read and literal fetch are preserved, with independent
 40-bit result/carry/overflow/saturation checks. The `add-absolute` control
-keeps the existing 2,048 AR/RAM cases unchanged. This does not admit SP,
-status/peripheral sources or short-form ADD from BK.
+keeps the existing 2,048 AR/RAM cases unchanged. This does not admit
+status/peripheral sources or short-form ADD from BK. SP has the separate
+contract below.
+
+### Absolute ADD from mapped SP
+
+Absolute ADD `00f8/01f8 0018` now reads mapped SP, independent of CPL.
+This is not SP-relative direct addressing: the extension is the absolute
+register address, and the operand is captured once in Read. SPRU172C's
+ADD single-memory syntax and SPRU131G section 7.1 define the data-operand
+read; section 7.5.5's compiler-base and stack-operation latency categories
+must not be applied to this operand merely because the register is SP.
+The existing Read ordering captures it before a younger FRAME changes SP.
+No phase, forwarding, loop or status implementation is otherwise changed.
+
+`add-sp` covers 4,096 arithmetic/save-replay cases across four source words,
+four accumulator initial values, SXM/OVM, A/B, SP/RAM, two pages, CPL
+clear/set and four snapshots. Both the address literal and source are
+changed after capture; independent arithmetic verifies result, carry,
+overflow and saturation. Another 576 cases/restores place FRAME, PSHM,
+POPM or STM before ADD with zero, one or three NOPs, positive/negative
+SP values, both CPL states, pages and accumulators. An adjacent younger
+FRAME and later SP replacement must not change ADD's captured input.
+Twenty negative cases preserve rejection of IMR/IFR, status, repeat,
+mapping and peripheral sources before operand reads or arithmetic effects.
+The fixture fails against the old SP guard and passes with SP admitted.
+It establishes this bounded staged contract, not physical bank timing,
+all SP-producer hazards, interrupt composition or new delay-slot support.
 
 MVMD also accepts BK as its direct register source, sharing the existing
 retained register-to-AR/BK move path. The `mvmd-bk` profile has 432
@@ -4051,7 +4092,7 @@ the native success response, not merely any parameter-7 reply. It introduces
 no firmware-state writes. Both profiles retain the exact-one legacy startup
 observation assertion pending an instruction-owned replacement.
 
-A fresh non-debugger run (`tmp/mu4-metadata-final/error.log`) reproduces
+The pre-SP-admission non-debugger run (`tmp/mu4-metadata-final/error.log`) reproduces
 native success and then the mapped-SP exclusion at `03:a1cf`; exit 3 remains
 the expected failed integration result. Its exported 69,206,016-byte NAND
 has SHA-256 `d44b5d50e58e56b44b4fc6fd0b365e342cd02f767a32c77992458cda7c7b85f8`;
@@ -4065,6 +4106,14 @@ header with size `00000064`, then `TIT2` containing encoding byte zero plus
 payloads each). This corrects the static title/artist order inference and
 proves these particular stored fields, not filesystem consistency, audio
 completeness or playback. Resident-memory comparison still passes exactly.
+
+After mapped-SP admission, `tmp/mu4-add-sp-positive/error.log` reaches idle
+without an instruction exclusion and reports one track. The endpoint hash
+is `93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`;
+relative to the same unchanged input it additionally changes page 127008,
+with no spare-byte delta. Directory and ID3 bytes match the fields above.
+That additional page is not yet decoded as a filesystem commit. The legacy
+startup-read assertion still fails, so this is not a passing recorder gate.
 
 The retained atomic `bootrecsave` diagnostic schedules a resident status poll
 after the native return, then parameter `7` with filename `TEST` and empty
