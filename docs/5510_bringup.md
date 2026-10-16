@@ -284,6 +284,11 @@ out-of-buffer source walk and its misleading nonzero output. The current
 boundary is why processing reaches its programmed reload tail with silent buffers and whether PCM
 has the expected media provenance, not an
 unsupported opcode. [Playback observations](#playback-execution-and-codec-observations)
+also cover a fresh recording made with corrected DMA and MAC support:
+it reaches `02:b5e1` without an illegal instruction but remains silent.
+Thus the older recording is not the sole explanation for the zero output.
+The two input artifacts and their observations remain distinct.
+The playback observations
 separate fetch hits, Execute entries and audio counts. The coverage diagnostic
 still intentionally fails without audio acceptance. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
@@ -4902,6 +4907,20 @@ an illegal instruction. The current complete-window execution and codec
 observations below remain separate from playback acceptance.
 
 ### Playback execution and codec observations
+
+The detailed baseline below uses the protected NAND
+`93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`.
+An independent 20-second playback of the fresh, current-core recorder
+endpoint documented under [Recorder metadata request contract](#recorder-metadata-request-contract)
+also verifies the title/overlay and 14 replies, with `illegal=0` at
+`02:b5e1`. It observes one bootstrap, twelve resident and 24 loader-API
+Execute entries; 87,390 completed arithmetic-loop calls and 5,592,960
+body entries. The 1,524,209 TX words, 1,691,842 DIN words and 1,363,518
+actual DMA source reads are again all zero, with source range `1000..137f`
+and the same stream hashes as the baseline. This excludes the stale
+recording as the sole cause of silence, not a container, encoder, decoder
+or buffer-ownership defect. The diagnostic intentionally fails with
+`audio completion is not validated`; no audio acceptance is weakened.
 
 Program-bus hits are not invocation counts. The 20-second run has three
 physical bootstrap fetch hits but one Execute entry at logical `00:0e41`.
