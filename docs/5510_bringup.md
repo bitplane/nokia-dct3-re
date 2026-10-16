@@ -4798,20 +4798,61 @@ not proof that changing the converted input alone broke the encoder.
 The ID3 header declares a 100-byte tag body (audio region begins at 110);
 this alone does not identify subsequent framing or explain its leading data.
 
-The next discriminating control is generated, independently decoded AAC
-media in a separately authored copy of this bench's own storage fixture,
-with independent file readback before execution. This is external media,
-not donor provisioning or a firmware-state patch. Preserve original hashes,
-the native command/receive path and failing audio acceptance until actual
-decoded PCM is independently established. Generating media is software-only
-(`ffmpeg`/`ffprobe` are available); filesystem authoring must use a proven
-writer and checked fixture row mapping rather than ad hoc FAT pokes.
+#### Generated AAC external-media control
+
+`mu4_generated_aac_fixture.py` authors a separate copy of this bench's own
+NAND with four seconds of independently generated AAC: MPEG-2 AAC-LC,
+44.1 kHz stereo, left 440 Hz and right 660 Hz. FFmpeg's
+`mpeg2_aac_low` profile excludes MPEG-4 PNS; setting the ADTS MPEG-2 header
+bit alone is not an equivalent encoder constraint. FFprobe checks the
+configuration, host decoding must report no errors, and independent tone
+measurements must retain both requested channels. This establishes input
+media validity, not native DSP output or speech.
+
+The fixture uses mtools to replace the existing short name `TEST.REL`
+(long name `TEST`), then independently extracts `TEST*` through 7z and
+requires byte equality before publishing NAND. The checked legacy FAT12
+volume has BPB media `f8` but reserved FAT bytes `ff ff ff`; only this
+specific geometry/mismatch permits mtools' compatibility override. Spare
+bytes, the boot sector and everything outside the mapped partition remain
+unchanged. The original NAND is never modified. Unknown layouts and
+readback mismatches are errors, not reasons to weaken verification.
+
+With FFmpeg 8.0.1 and mtools 4.0.49, repeated independent generation yields:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Authored NAND | `b344ba14f993299bea895910357261ebd0da0c082f101e9f137b0ac423d4a432` |
+| Extracted 65,449-byte track | `f24f23ba9eaa19ba9187a04fb2376597a04e3e75e7b05e5b38e14ba6b8109f32` |
+| Host-decoded stereo s16 PCM | `fec0191741b174a8fe7fc032bf3449ed4fe06d05edd5fafc9257cd87808e7bdf` |
+
+The encoded stream contains 174 complete declared-length ADTS frames;
+host decoding yields 178,176 stereo frames. The fixture changes 131 NAND
+data pages. Reproduce with the generator's source-NAND and new-output-directory
+arguments, adding `--mcopy PATH` when mtools is not installed globally.
+
+Native `bootplaystage` on this input stops at instruction `025137`
+(`f48f`, NORM), reported at PC `02513b`, with raw T=`0029` at cycle
+111,871,463. This lies inside the pinned bit reader. T's low six bits encode
+-23, outside TI's documented -16..31 range. Plain MAME exit status zero
+does not accept this run: the strict playback checker still rejects its
+illegal instruction and incomplete session. No native decoded PCM is
+established. Do not extend the CPU's shift range to accommodate this state.
+
+The next question is which bit-reader request/context produces this
+invalid shift, and whether replay of the complete routine reproduces it
+against the scalar model. Preserve original recorded media and acceptance
+constraints; capture entry/return provenance rather than assigning operand
+ownership from live registers. A separate broader AAC-LC control (MPEG-2
+header flag without the MPEG-2 encoder profile) stops at `02568a`, T=`ffee`;
+it is not interchangeable with the constrained control above.
 
 The inventory handles MPEG-2/4 header IDs, CRC-dependent header size,
 declared length, raw block count and file truncation. Tests include embedded
 sync candidates that must not replace the declared-length chain, divergent
 but parseable headers, missing boundaries and read-only CLI operation.
-The complete tool suite passes (2,972 tests, one skipped).
+The complete tool suite passes (2,980 tests, one skipped), including eight
+generated-media tests covering authoring boundaries and failure paths.
 
 All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
 as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are
