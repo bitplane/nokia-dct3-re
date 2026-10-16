@@ -15,6 +15,16 @@ else:
 
 
 BASE = 0x23D73
+REL_CLEANUP_BASE = 0x2956F
+REL_CLEANUP_WITNESS = (
+    0x60F8, 0x373E, 0x0004, 0xF820, 0x959D, 0xF7B8, 0x7212, 0x3742,
+    0x10F8, 0x0012, 0xF010, 0x0001, 0xF845, 0x958E, 0x6CE2, 0xFFFE,
+    0x958E, 0x76F8, 0x373E, 0x0002, 0x4818, 0x7600, 0x0001, 0x7601,
+    0x001A, 0xF000, 0x0014, 0xF983, 0x9005, 0xF073, 0x9591, 0x76F8,
+    0x373E, 0x0005, 0xE801, 0xF982, 0x9189, 0x7600, 0x0001, 0xF020,
+    0x3AEA, 0xF980, 0x2082, 0xE800, 0xF980, 0x2080,
+)
+REL_RELOAD_API = (0xF880, 0x3538)
 MASK = 0xC004
 WITNESS = (
     0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
@@ -572,6 +582,47 @@ def decode_words(words):
     }
 
 
+def rel_cleanup_route(lifecycle, control):
+    """Pinned AA99 branch arithmetic; not a codec result or EOF classification."""
+    if not 0 <= lifecycle <= 0xFFFF or not 0 <= control <= 0xFFFF:
+        raise ValueError('lifecycle and control must be 16-bit words')
+    if lifecycle != 4:
+        return {'cleanup': False, 'state': lifecycle, 'extra_call': None, 'loader_index': None}
+    # SPRU172C BANZ example 3 tests effective Sind, not the unchanged AR2.
+    branch_to_state5 = control == 1 or ((control - 2) & 0xFFFF) != 0
+    return {'cleanup': True, 'state': 5 if branch_to_state5 else 2,
+            'extra_call': None if branch_to_state5 else '039005', 'loader_index': 0}
+
+
+def decode_rel_cleanup(words, bootstrap_words):
+    for source, base, witness in ((words, REL_CLEANUP_BASE, REL_CLEANUP_WITNESS),
+                                  (bootstrap_words, 0x2080, REL_RELOAD_API)):
+        for offset, expected in enumerate(witness):
+            if source.get(base + offset) != expected:
+                raise ValueError(f'REL cleanup/API witness changed or absent at {base + offset:06x}')
+    states = Counter(rel_cleanup_route(4, control)['state'] for control in range(0x10000))
+    return {
+        'segment': 'aa99', 'pinned_words': len(REL_CLEANUP_WITNESS), 'aa55_api_words': 2,
+        'state_gate': {'address': '02956f', 'state_address': '373e', 'required': 4,
+                       'skip': 'NTC -> 02959d'},
+        'control': {'address': '029575', 'operation': 'MVDM $3742,AR2',
+                    'direction': 'data_to_mmr', 'is_result_publication': False},
+        'branch': {'address': '02957d', 'operation': 'BANZ 958e,*AR2(-2)',
+                   'predicate': '((AR2 - 2) & 0xffff) != 0', 'ar2_modified': False,
+                   'precheck': 'AR2 == 1 -> 02958e'},
+        'active_control_partition': {'tested': 0x10000, 'state5': states[5],
+                                     'state2': states[2], 'state2_control': 2},
+        'state2_extra_call': {'target': '039005', 'caller_sp0': 1,
+                              'caller_sp1': '001a', 'a': 'caller_SP + 0x14'},
+        'examples': {f'{control:04x}': rel_cleanup_route(4, control)
+                     for control in (0, 1, 2, 3, 0xFFFF)},
+        'reload': {'address': '02959b', 'descriptor': 0, 'api': '002080',
+                   'aa55_target': '003538', 'selected_image': 'MCUSI16'},
+        'scope': 'Pinned branch and API contract; no EOF/error meaning, '
+                 'worker-completion cause, decoded PCM or analog audio acceptance',
+    }
+
+
 def contract(source):
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise ValueError('expected original R060 InitData source')
@@ -592,6 +643,7 @@ def contract(source):
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
     result['rel_ar_store'] = decode_rel_ar_store(rel_words)
     result['rel_copy_loop'] = decode_rel_copy_loop(rel_words)
+    result['rel_cleanup'] = decode_rel_cleanup(rel_words, bootstrap_words)
     return result
 
 

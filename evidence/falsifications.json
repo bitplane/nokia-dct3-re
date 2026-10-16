@@ -956,6 +956,12 @@
       "hypothesis": "Three hits on the bootstrap entry bus tap and 24 resident hits prove three boot executions and 24 resident executions during original REL playback",
       "conclusion": "A retained Execute-entry observer records one logical 00:0e41 entry against three physical fetch hits, and 12 logical 02:6d62 entries against 24 physical 00:6d62 hits. OVLY requires translating physical tap addresses before comparing logical Execute identities. Actual resident recurrence remains, but three full boots do not follow from the fetch counter. Opcode-qualified AA99 loop observations separately prove 87613 completed 64-iteration calls, with one call in progress at the sampled 02:a2d5 PC; that PC is not evidence of a hung kernel. The old terminal playback, CPU/NAND/stream and lifecycle summaries are byte-identical after these observation-only additions. No retirement, decoded-music or analog-audio claim follows.",
       "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
+    },
+    {
+      "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
+      "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
+      "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_playback_lifecycle_observe.lua", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     }
   ]
 }

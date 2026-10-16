@@ -280,7 +280,8 @@ passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
 unaltered original playback run has PC `02:a2d5`, `illegal=0`, one actual
 bootstrap Execute entry and 12 resident Execute entries. Its paired arithmetic
 loop completes repeatedly, and nonzero words reach codec DIN. The current
-boundary is the resident-entry lifecycle and aligned PCM provenance, not an
+boundary is why processing reaches its programmed reload tail and whether PCM
+has the expected media provenance, not an
 unsupported opcode. [Playback observations](#playback-execution-and-codec-observations)
 separate fetch hits, Execute entries and audio counts. The coverage diagnostic
 still intentionally fails without audio acceptance. The generic 16-bit
@@ -4853,8 +4854,8 @@ Physical resident address `00:6d62` has 24 fetch hits; the observer records
 12 actual Execute entries at logical `02:6d62` under OVLY. The first resident
 entry is at 0.227594058 seconds; subsequent observed entries include
 2.366798542, 4.001016229 and 5.635233916 seconds. Bootstrap re-execution is
-not established by its three fetch hits. The recurring resident entry is real,
-but its caller and lifecycle meaning remain unresolved. These are Execute-entry
+not established by its three fetch hits. The recurring resident entry is real
+and follows the named-loader path described below. These are Execute-entry
 observations, not retirement or atomic register snapshots.
 
 AA99's `a2c6` loop loads BRC=`003f`, repeats through `a2e9` and returns at
@@ -4872,23 +4873,72 @@ Their whole-stream FNV hashes differ (`44a1430b` versus `47cd35d3`). Codec
 power/format/rate/active registers are `0007/0053/0023/0001`, with 230,081,577
 clock rises and 845,888 frame rises. Counts and hashes are independent:
 neither zero-frame alignment nor a one-to-one PCM relation is established.
+The first nonzero TX/DIN words appear at 0.824109792/0.824109833 seconds;
+the last appear at 18.917217701/18.917217743 seconds, after a later application
+restart. These are boundary timestamps, not producer-instruction identities.
 The fixture's converted-sample ADC input remains an explicit bench source;
 nonzero DIN alone is not decoded music or analog audio acceptance.
 
 The pre-existing terminal playback, CPU/NAND/stream and media-context summaries
 are byte-identical with and without these read-only observers. Native 5110
-save-state and 2,932 tool tests (one skipped) pass. The fixture deliberately
+save-state and 2,938 tool tests (one skipped) pass. The fixture deliberately
 terminates with `audio completion is not validated`, so the Make target remains
 failed before its later exact-one fetch-count checks. Those legacy fetch checks
 are not evidence of three actual boots and were not relaxed into success.
-The manual checker validates observation completeness and loop bounds only:
+The manual checker validates observation completeness, bounded executed-byte
+trails and loop bounds, not playback acceptance:
 
 ```sh
 python3 tools/noki5510_bootstrap_check.py --playback-observation RUN_DIR/error.log
 ```
 
-Next: identify the executed transfer into recurring resident entry, and align
-valid McBSP words with codec frames before comparing PCM against media content.
+### Resident reload contract
+
+The common AA55 API at `00:2080` branches to disk loader `00:3538`.
+The 20-second run observes 24 actual API entries. Its bounded first 16 trails
+alternate descriptor 0 and descriptor 1. The initial AA55 caller is `00:09b6`;
+subsequently AA99 `02:959b` passes A=0 for
+`MCUSI16`, while AA22 `02:91c7` passes A=1 for `RELSI16`. All 12 resident
+trails show loader `00:3545 -> 00:2000`, followed by the loaded entry's
+`00:2002 -> 02:6d62`. This is not an arbitrary FRET into startup or a reset
+vector re-entry. Retained executed words identify the calling overlay;
+current memory at the same numeric address is not a substitute.
+
+AA99 `02:956f..959c` compares lifecycle `[373e]` with 4 and skips this
+cleanup when unequal. `7212 3742` at `02:9575` is **MVDM $3742,AR2**:
+the shared word is an input control, not a published worker result. The
+AEQ precheck tests control 1; long-offset BANZ then tests
+`(AR2 - 2) & ffff` without modifying AR2 (SPRU172C BANZ example 3).
+With lifecycle 4, exactly control 2 selects state 2 and an additional call
+to `03:9005` with caller `[SP+1]=001a`; all other 65,535 controls
+select state 5. Both paths join the mount and descriptor-0 reload sequence.
+No nonzero error/control value is required for the observed state-5 path.
+
+`mu4_context_contract.py` pins all 46 AA99 words and the two AA55 API words,
+enumerating all 65,536 controls. It makes no EOF/error or PCM-content claim.
+The passive three-second Lua observation independently records lifecycle 4
+at 0.837863702 seconds, a control read of zero at 2.198518905, state 5 at
+2.198519039, and state 4 again at 2.588181162. Its terminal PC is `02:3e1e`,
+`illegal=0`, with 11 lifecycle writes, three control writes and five control
+reads. GENPC selects a bounded read-context range; it does not establish
+Access/Read ownership. The data-write tap is not an all-alias writer census.
+MVDM, long BANZD, TC-branch and absolute-CMPM core controls also pass.
+
+Use the same fresh copied benchmark NAND, seed ROM path and isolated working
+directory as `check-mu4-bootstrap-original`, adding
+`-autoboot_delay 0 -autoboot_script tools/mu4_playback_lifecycle_observe.lua`
+with an absolute script path and `-seconds_to_run 3`. This short observation
+does not run the separate 20-second acceptance diagnostic:
+
+```sh
+python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
+python3 tools/noki5510_bootstrap_check.py --playback-lifecycle RUN_DIR/error.log
+```
+
+Next: identify why REL reaches this cleanup tail and trace DMA sample-source
+ownership through valid McBSP words and codec frames before comparing PCM
+against the stored media. Do not remove the programmed reload merely to keep
+resident-entry counts at one.
 
 The current broad CPU regression and remaining operand-domain audit are
 summarized under [Short-preincrement fixture audit](#short-preincrement-fixture-audit).

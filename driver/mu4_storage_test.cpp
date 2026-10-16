@@ -50,11 +50,16 @@ public:
 			if (playback_profile())
 			{
 				// Execute reports logical XPC; the existing bus tap sees OVLY's physical 006d62.
-				if (address == 0x0e41 || address == 0x26d62)
+				if (address == 0x0e41 || address == 0x26d62 || address == 0x2080)
 				{
-					unsigned const which = address == 0x26d62;
-					if (m_playback_execute_entries[which]++ < 4)
+					unsigned const which = address == 0x26d62 ? 1 : address == 0x2080 ? 2 : 0;
+					if (m_playback_execute_entries[which]++ < 16)
+					{
 						logerror("mu4_playback_execute_entry: address=%06x opcode=%04x t=%.9f sp=%04x pmst=%04x\n", unsigned(address), opcode, machine().time().as_double(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+						auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+						unsigned const p = m_playback_history_next;
+						logerror("mu4_playback_entry_transfer: target=%06x index=%u p0=%06x/%04x p1=%06x/%04x p2=%06x/%04x p3=%06x/%04x a=%010llx lifecycle=%04x mode=%04x continuation=%04x identity=Execute_entry\n", unsigned(address), m_playback_execute_entries[which] - 1, m_playback_history_pc[p], m_playback_history_word[p], m_playback_history_pc[(p + 1) & 3], m_playback_history_word[(p + 1) & 3], m_playback_history_pc[(p + 2) & 3], m_playback_history_word[(p + 2) & 3], m_playback_history_pc[(p + 3) & 3], m_playback_history_word[(p + 3) & 3], static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL, data.read_word(0x373e), data.read_word(0x3750), data.read_word(0x3762));
+					}
 				}
 				if (m_playback_overlay_checked)
 				{
@@ -64,6 +69,10 @@ public:
 					if (address == 0x2a2cc && opcode == 0xe900) ++m_playback_filter[1];
 					if (address == 0x2a2ea && opcode == 0xf4e4) ++m_playback_filter[2];
 				}
+				// Retain executed bytes: current overlay memory may already differ.
+				m_playback_history_pc[m_playback_history_next] = address;
+				m_playback_history_word[m_playback_history_next] = opcode;
+				m_playback_history_next = (m_playback_history_next + 1) & 3;
 			}
 			if (cold_catalog_profile() && !m_playback_decoder_loads)
 			{
@@ -254,11 +263,16 @@ private:
 	bool m_cold_title_verified = false;
 	unsigned m_playback_requests = 0, m_playback_inspections = 0, m_playback_decoder_loads = 0;
 	bool m_playback_overlay_checked = false;
-	std::array<u32, 2> m_playback_execute_entries{}, m_playback_audio_words{}, m_playback_audio_nonzero{};
+	std::array<u32, 3> m_playback_execute_entries{};
+	std::array<u32, 2> m_playback_audio_words{}, m_playback_audio_nonzero{};
 	std::array<u32, 2> m_playback_audio_hash{2166136261U, 2166136261U};
+	std::array<double, 2> m_playback_audio_last_nonzero{};
 	std::array<u32, 3> m_playback_filter{};
 	u64 m_playback_execute_steps = 0;
 	u32 m_playback_audio_clocks = 0, m_playback_audio_frames = 0;
+	std::array<u32, 4> m_playback_history_pc{};
+	std::array<u16, 4> m_playback_history_word{};
+	u8 m_playback_history_next = 0;
 	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
 	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
@@ -667,7 +681,12 @@ private:
 		unsigned const which = din ? 1 : 0;
 		if (m_playback_audio_words[which]++ < 4)
 			logerror("mu4_playback_audio_word: boundary=%s word=%04x t=%.9f pc=%06x\n", din ? "codec_din" : "mcbsp_tx", value, machine().time().as_double(), unsigned(m_cpu->state_int(STATE_GENPC)));
-		if (value) ++m_playback_audio_nonzero[which];
+		if (value)
+		{
+			m_playback_audio_last_nonzero[which] = machine().time().as_double();
+			if (m_playback_audio_nonzero[which]++ < 4)
+				logerror("mu4_playback_audio_nonzero: boundary=%s word=%04x t=%.9f\n", din ? "codec_din" : "mcbsp_tx", value, m_playback_audio_last_nonzero[which]);
+		}
 		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value >> 8)) * 16777619U;
 		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value & 0xff)) * 16777619U;
 	}
@@ -1796,7 +1815,9 @@ private:
 			save_item(NAME(m_playback_overlay_checked));
 			save_item(NAME(m_playback_execute_entries)); save_item(NAME(m_playback_execute_steps)); save_item(NAME(m_playback_filter));
 			save_item(NAME(m_playback_audio_words)); save_item(NAME(m_playback_audio_nonzero)); save_item(NAME(m_playback_audio_hash));
+			save_item(NAME(m_playback_audio_last_nonzero));
 			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
+			save_item(NAME(m_playback_history_pc)); save_item(NAME(m_playback_history_word)); save_item(NAME(m_playback_history_next));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
 			if (media_command_profile())
 			{
@@ -1993,7 +2014,9 @@ private:
 		m_playback_overlay_checked = false;
 		m_playback_execute_entries = {}; m_playback_execute_steps = 0; m_playback_filter = {};
 		m_playback_audio_words = {}; m_playback_audio_nonzero = {}; m_playback_audio_hash = {2166136261U, 2166136261U};
+		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
+		m_playback_history_pc = {}; m_playback_history_word = {}; m_playback_history_next = 0;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
@@ -2326,9 +2349,9 @@ private:
 		{
 			if (playback_profile())
 			{
-				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps));
+				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu loader_execute=%u observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps), m_playback_execute_entries[2]);
 				auto const &codec = *subdevice<tlv320aic23_device>("codec");
-				logerror("mu4_native_playback_audio: tx_words=%u din_words=%u tx_nonzero=%u din_nonzero=%u tx_hash=%08x din_hash=%08x clocks=%u frames=%u power=%04x format=%04x rate=%04x active=%04x window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0\n", m_playback_audio_words[0], m_playback_audio_words[1], m_playback_audio_nonzero[0], m_playback_audio_nonzero[1], m_playback_audio_hash[0], m_playback_audio_hash[1], m_playback_audio_clocks, m_playback_audio_frames, codec.reg(6), codec.reg(7), codec.reg(8), codec.reg(9));
+				logerror("mu4_native_playback_audio: tx_words=%u din_words=%u tx_nonzero=%u din_nonzero=%u tx_hash=%08x din_hash=%08x clocks=%u frames=%u power=%04x format=%04x rate=%04x active=%04x tx_last_nonzero=%.9f din_last_nonzero=%.9f window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0\n", m_playback_audio_words[0], m_playback_audio_words[1], m_playback_audio_nonzero[0], m_playback_audio_nonzero[1], m_playback_audio_hash[0], m_playback_audio_hash[1], m_playback_audio_clocks, m_playback_audio_frames, codec.reg(6), codec.reg(7), codec.reg(8), codec.reg(9), m_playback_audio_last_nonzero[0], m_playback_audio_last_nonzero[1]);
 				logerror("mu4_native_playback_observe: requests=%u inspections=%u decoder_loads=%u replies=%u input_cursor=%u title_verified=%u overlay_verified=%u pc=%06x illegal=%u audio_acceptance=0\n",
 					m_playback_requests, m_playback_inspections, m_playback_decoder_loads, m_recorder_responses, m_native_command_cursor,
 					unsigned(m_cold_title_verified), unsigned(m_playback_overlay_checked), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));

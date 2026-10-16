@@ -16,9 +16,43 @@ from tools.mu4_context_contract import REL_REPEAT_BASE, REL_REPEAT_WITNESS, REL_
 from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, decode_rel_ar_store, decode_shifted_store
 from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
+from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_rel_cleanup_control_partition(self):
+        words = dict(enumerate(REL_CLEANUP_WITNESS, REL_CLEANUP_BASE))
+        api = dict(enumerate(REL_RELOAD_API, 0x2080))
+        result = decode_rel_cleanup(words, api)
+        self.assertEqual(result['active_control_partition'],
+                         {'tested': 65536, 'state5': 65535, 'state2': 1, 'state2_control': 2})
+        self.assertFalse(result['control']['is_result_publication'])
+        self.assertFalse(result['branch']['ar2_modified'])
+        self.assertEqual(result['reload']['descriptor'], 0)
+        for control in range(65536):
+            route = rel_cleanup_route(4, control)
+            self.assertEqual(route['state'], 2 if control == 2 else 5)
+            self.assertEqual(route['loader_index'], 0)
+        for state in range(65536):
+            if state != 4:
+                self.assertFalse(rel_cleanup_route(state, 0)['cleanup'])
+        for state, control in ((-1, 0), (65536, 0), (4, -1), (4, 65536)):
+            with self.assertRaises(ValueError):
+                rel_cleanup_route(state, control)
+
+    def test_rel_cleanup_rejects_changed_code_or_wrong_api_namespace(self):
+        words = dict(enumerate(REL_CLEANUP_WITNESS, REL_CLEANUP_BASE))
+        api = dict(enumerate(REL_RELOAD_API, 0x2080))
+        for source in (words, api):
+            for address in source:
+                changed = dict(source)
+                changed[address] ^= 1
+                with self.subTest(address=address), self.assertRaises(ValueError):
+                    decode_rel_cleanup(changed if source is words else words,
+                                       changed if source is api else api)
+        with self.assertRaises(ValueError):
+            decode_rel_cleanup(words, {address + 0x20000: value for address, value in api.items()})
+
     def test_rel_copy_cpl_and_frame_contract(self):
         words = {**dict(enumerate(REL_COPY_ENTRY_WITNESS, REL_COPY_ENTRY_BASE)),
                  **dict(enumerate(REL_COPY_DEPENDENCY_WITNESS, REL_COPY_DEPENDENCY_BASE)),

@@ -2,19 +2,67 @@ import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
+    verify_playback_lifecycle,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    LIFECYCLE = '\n'.join((
+        'mu4_playback_lifecycle_scope: boundary=data_write context_pc=not_owner observer_writes=0 audio_acceptance=0',
+        'mu4_playback_lifecycle_write: address=373e value=0004 mask=ffff ordinal=1 t=1.000000000 context_pc=020b11 observer_writes=0',
+        'mu4_playback_lifecycle_write: address=3742 value=0000 mask=ffff ordinal=1 t=1.010000000 context_pc=029d7e observer_writes=0',
+        'mu4_playback_lifecycle_write: address=3750 value=0002 mask=ffff ordinal=1 t=1.020000000 context_pc=03b3e5 observer_writes=0',
+        'mu4_playback_lifecycle_write: address=3762 value=0002 mask=ffff ordinal=1 t=1.030000000 context_pc=020b74 observer_writes=0',
+        'mu4_playback_control_read: value=0000 t=1.100000000 context_pc=02957a selection=context_range reader_identity=unvalidated observer_writes=0',
+        'mu4_playback_lifecycle_write: address=373e value=0005 mask=ffff ordinal=2 t=1.110000000 context_pc=029591 observer_writes=0',
+        'mu4_playback_lifecycle_write: address=373e value=0004 mask=ffff ordinal=3 t=2.000000000 context_pc=020b11 observer_writes=0',
+        'mu4_playback_lifecycle_terminal: pc=023e1e illegal=0 lifecycle_writes=3 control_writes=1 control_last=0000 control_reads=1 cleanup_context_reads=1 mode_writes=1 continuation_writes=1 observer_writes=0 audio_acceptance=0',
+    ))
+
+    def test_passive_playback_lifecycle_witness(self):
+        result = verify_playback_lifecycle(self.LIFECYCLE)
+        self.assertEqual(result['control_read_time'], 1.1)
+        self.assertEqual(result['state5_time'], 1.11)
+        self.assertFalse(result['audio_acceptance'])
+
+    def test_passive_playback_lifecycle_rejects_incomplete_or_overclaimed_scope(self):
+        for old, new in (('context_pc=not_owner', 'context_pc=owner'),
+                         ('observer_writes=0', 'observer_writes=1'),
+                         ('reader_identity=unvalidated', 'reader_identity=Execute'),
+                         ('context_pc=02957a', 'context_pc=00957a'),
+                         ('mask=ffff', 'mask=00ff'), ('illegal=0', 'illegal=1'),
+                         ('control_read: value=0000', 'control_read: value=0001'),
+                         ('value=0005 mask=ffff ordinal=2', 'value=0002 mask=ffff ordinal=2'),
+                         ('value=0004 mask=ffff ordinal=3', 'value=0001 mask=ffff ordinal=3'),
+                         ('control_writes=1', 'control_writes=2'),
+                         ('audio_acceptance=0', 'audio_acceptance=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_lifecycle(self.LIFECYCLE.replace(old, new))
+        for line in self.LIFECYCLE.splitlines():
+            for bad in (self.LIFECYCLE.replace(line, ''), self.LIFECYCLE + '\n' + line):
+                with self.subTest(line=line), self.assertRaises(ValueError):
+                    verify_playback_lifecycle(bad)
+        for prefix in ('mu4_playback_lifecycle_scope:', 'mu4_playback_lifecycle_terminal:',
+                       'mu4_playback_control_read:'):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                verify_playback_lifecycle(self.LIFECYCLE + '\n' + prefix + ' partial')
+
+    TRANSFERS = '\n'.join(
+        f'mu4_playback_entry_transfer: target={target} index={index} '
+        'p0=002000/f980 p1=002002/f495 p2=002003/f495 p3=002004/f495 '
+        'a=0000000000 lifecycle=0004 mode=0002 continuation=0002 identity=Execute_entry'
+        for target, count in (('000e41', 1), ('026d62', 8), ('002080', 2)) for index in range(count))
     PLAYBACK = '\n'.join((
+        TRANSFERS,
         'mu4_playback_audio_window: start=decoder_execute_entry t=1.234000000 '
         'sample_source=converted_sample_bench music_decode=0',
         'mu4_native_playback_execution: bootstrap_fetch=3 bootstrap_execute=1 '
         'resident_fetch=24 resident_execute=8 filter_calls=10 filter_iterations=640 '
-        'filter_returns=10 instruction_entries=20000 observer=Execute_entry retirement_claim=0',
+        'filter_returns=10 instruction_entries=20000 loader_execute=2 observer=Execute_entry retirement_claim=0',
         'mu4_native_playback_audio: tx_words=100 din_words=99 tx_nonzero=12 din_nonzero=11 '
         'tx_hash=12345678 din_hash=87654321 clocks=5000 frames=50 power=0000 format=0053 '
-        'rate=0023 active=0001 window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0',
+        'rate=0023 active=0001 tx_last_nonzero=1.235000000 din_last_nonzero=1.235000040 '
+        'window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0',
         'mu4_native_playback_observe: requests=1 inspections=1 decoder_loads=1 replies=14 '
         'input_cursor=12 title_verified=1 overlay_verified=1 pc=02a2d5 illegal=0 audio_acceptance=0',
     ))
@@ -23,6 +71,7 @@ class BootstrapCheckTest(unittest.TestCase):
         result = verify_playback_observation(self.PLAYBACK)
         self.assertEqual(result['bootstrap_execute'], 1)
         self.assertEqual(result['filter_iterations'], 640)
+        self.assertEqual(result['entry_transfer_reports'], 11)
         self.assertNotEqual(result['tx_words'], result['din_words'])
         self.assertNotIn('audio_acceptance', result)
 
@@ -34,11 +83,32 @@ class BootstrapCheckTest(unittest.TestCase):
                          ('illegal=0', 'illegal=1'), ('overlay_verified=1', 'overlay_verified=0'),
                          ('bootstrap_execute=1', 'bootstrap_execute=0'),
                          ('resident_execute=8', 'resident_execute=0'),
+                         ('loader_execute=2', 'loader_execute=0'),
+                         ('target=026d62', 'target=006d62'),
+                         ('target=002080', 'target=022080'),
+                         ('target=000e41 index=0', 'target=000e41 index=1'),
                          ('instruction_entries=20000', 'instruction_entries=0'),
                          ('filter_iterations=640', 'filter_iterations=641'),
                          ('tx_nonzero=12', 'tx_nonzero=101'), ('din_nonzero=11', 'din_nonzero=100')):
             with self.subTest(mutation=old), self.assertRaises(ValueError):
                 verify_playback_observation(self.PLAYBACK.replace(old, new))
+
+    def test_playback_nonzero_times_follow_the_window(self):
+        for old, new in (('tx_last_nonzero=1.235000000', 'tx_last_nonzero=0.000000000'),
+                         ('din_last_nonzero=1.235000040', 'din_last_nonzero=1.000000000'),
+                         ('tx_nonzero=12', 'tx_nonzero=0'),
+                         ('identity=Execute_entry', 'identity=fetch')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_observation(self.PLAYBACK.replace(old, new))
+
+    def test_playback_transfer_provenance_has_a_bounded_cap(self):
+        template = next(line for line in self.TRANSFERS.splitlines()
+                        if 'target=026d62 index=0 ' in line)
+        extra = '\n'.join(template.replace('index=0 ', f'index={index} ')
+                          for index in range(8, 16))
+        output = self.PLAYBACK.replace('resident_execute=8', 'resident_execute=20')
+        output = output.replace('mu4_playback_audio_window:', extra + '\nmu4_playback_audio_window:')
+        self.assertEqual(verify_playback_observation(output)['entry_transfer_reports'], 19)
 
     def test_playback_observation_requires_each_report_once_in_order(self):
         lines = self.PLAYBACK.splitlines()
@@ -48,6 +118,8 @@ class BootstrapCheckTest(unittest.TestCase):
                     verify_playback_observation(bad)
         with self.assertRaises(ValueError):
             verify_playback_observation('\n'.join(reversed(lines)))
+        with self.assertRaises(ValueError):
+            verify_playback_observation(self.PLAYBACK + '\nmu4_native_playback_audio: partial')
 
     RESIDENT = '\n'.join((
         'mu4_original_resident_program: PASS checked_words=48261 mismatch_words=0 '
