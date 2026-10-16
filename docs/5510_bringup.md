@@ -49,9 +49,22 @@ transaction, AR change, accumulator, T or ST0 change. This is not an exhaustive
 opcode census: read-only ALU/test sources and MMR addressing remain open,
 as do instruction-specific read/modify/write and implicit-copy classifications.
 Confirmed remaining fixture inputs include `memory_arithmetic_case` form 5
-(inherited by arithmetic and `bitfield_address_case`) and
+(inherited by arithmetic) and
 `memory_multiply_case` RAM kind 5 (inherited by multiply and T-load families).
 Their current positive PASS counts are not legal-domain acceptance.
+
+CMPM and BITF now exclude short MOD=3 in both frontends, before any operand
+access or TC publication. Each positive Smem bank retains 52,224 cases/restores
+over 17 read-capable encoding forms; 3,072 invalid cases per bank are omitted
+while preserving raw case IDs. `bitf-mod3-edge` passes 512 cases/restores:
+both operations and initial TC states, all ARs, both CMPT settings, pages,
+frontends and snapshots before/after rejection. It requires no data transaction,
+AR update, accumulator/T change or status change, including TC. Eleven
+neighboring profiles pass, covering mapped/peripheral BITF, CMPM's direct,
+absolute and immediate-branch consumers, delayed comparisons and exclusions,
+TC branches, and the existing MPY/SUBC/load rejection banks. These changes do
+not decide read/modify/write or other bit-test source domains.
+Native 5110 save-state restoration and 2,922 tool tests (one skipped) also pass.
 
 SUBC's corresponding defect is corrected: 7,680 invalid short-preincrement
 cases were removed, leaving 38,400 legal positive cases/restores. The
@@ -70,11 +83,13 @@ both CMPT settings, both pages, atomic and staged frontends, and snapshots
 before/after rejection. No data access, AR update, accumulator, T or ST0 change
 is permitted. The atomic guard precedes `immediate_smem_read`; the staged
 classifier excludes short MOD=3. This does not close the other read families.
-Acceptance after these corrections: the full 288-check default CPU suite,
+The broad baseline at `bc2d939f` passes the full 288-check default CPU suite,
 the separate 208,896-case TS-load profile, 9,728 load rejection/replay cases,
 native 5110 save-state restoration and 2,919 tool tests (one skipped) pass.
 The broad suite includes the corrected LDU, shift-16, variable-LD, DLD and
-SUBC banks. It remains a prototype regression net, not proof that the
+SUBC banks. The subsequent CMPM/BITF correction uses the focused profiles
+above; the broad suite has not been rerun for that correction. It remains
+a prototype regression net, not proof that the
 remaining operand domains or all circular inputs are legal.
 
 Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
@@ -5687,8 +5702,8 @@ replacement. Read is at 6, TC publication at 7 and the following branch's
 taken target Fetch at 10 (one intervening NOP). One source read, one literal
 fetch and zero writes are checked. The 96-case absolute-CMPM control passes.
 Smem CMPM also shares BITF's retained indirect address/literal path
-(SPRU172C, CMPM, page 4-33). The `cmpm-smem` fixture passes 55,296 cases
-and restores over 18 addressing forms, eight auxiliary-register selections,
+(SPRU172C, CMPM, page 4-33). The `cmpm-smem` fixture passes 52,224 cases
+and restores over 17 read-capable encoding forms, eight auxiliary-register selections,
 eight equality/inequality pairs, both initial TC states, four SXM/OVM
 settings and both compatibility modes. Snapshots bracket address capture
 and Read. Later pointer, source and literal mutations cannot retarget or

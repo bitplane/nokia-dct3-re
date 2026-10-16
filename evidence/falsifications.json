@@ -914,6 +914,12 @@
       "hypothesis": "Short single-operand MOD=3 preincrement is a valid LD or DLD source because the address helper and positive replay fixtures can implement it",
       "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to write accesses, including paired accesses. LD, LDU, LD TS, LDR, LD shift-16, variable-shift LD and DLD now reject this encoding before data, pointer or arithmetic-result effects in both frontends. The variable-shift guard classifies the operation extension, preserving write-side forms; long MOD=13 remains read-capable. A 9728-case rejection/replay bank spans all ARs, destinations, CMPT settings, pages, frontends and snapshots, with all 32 variable shifts. Positive source fixtures omit the forbidden encoding instead of replacing it with duplicate valid cases. The legacy 569b DLD and 629b immediate-MPY checks are rejection controls, not positive timing evidence. This does not certify other read families, MMR-source legality, circular inputs outside TI's buffer/step constraints, or a silicon trap mechanism.",
       "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
+      "id": "c54x_short_mod3_is_a_valid_compare_or_bitfield_source", "status": "disproven",
+      "hypothesis": "CMPM and BITF can use short MOD=3 preincrement because the shared address helper and positive fixtures implement the encoded source",
+      "conclusion": "SPRU172C pages 4-22 and 4-33 define read-only Smem operands and a TC result; SPRU131G table 5-4 restricts short MOD=3 to writes. Both frontends now reject these CMPM/BITF source encodings before data, pointer or status effects. Each positive Smem bank omits 3072 invalid cases, retaining 52224 read-capable encoding cases/restores with stable raw IDs. A separate 512-case replay bank covers both operations, both initial TC states, all ARs, CMPT settings, pages, frontends and before/after-rejection snapshots. Mapped/peripheral reads, immediate TC consumers and delayed comparisons retain focused acceptance. This does not establish a silicon trap, permit generalizing the restriction to long MOD=13, settle read/modify/write sources, or validate older circular inputs outside TI's buffer/step constraints.",
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     }
   ]
 }

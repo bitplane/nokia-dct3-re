@@ -4329,7 +4329,7 @@ Read samples one RAM/mapped-AR word, Execute changes only TC according to
 repeat, protected/control-delay and broader producer compositions remain
 unvalidated. Stage placement remains partial, not measured silicon timing.
 
-The 55,296 RAM replay cases cover 18 address forms, eight encoded registers,
+The 52,224 RAM replay cases cover 17 read-capable encoding forms, eight encoded registers,
 eight word/mask pairs (zero, bit 15 and opcode-shaped masks included), both
 initial TC states, four SXM/OVM combinations, both compatibility states and
 three checkpoints. Literal, pointer and post-Read RAM poisoning must not
@@ -4340,6 +4340,11 @@ source reads occur at 7, TC publishes at 8 and taken targets fetch at 10.
 They include the exact upload sequence `61f8,0017,0001`; `007f` is an additional
 conformance mask, not the original literal. The register changes after Read
 must not be resampled, and neither leg may duplicate the source/target read.
+Short MOD=3 is write-only and is rejected by CMPM/BITF in both frontends.
+A separate 512-case replay bank checks rejection across both initial TC
+states without data, pointer, accumulator/T or status effects. Long MOD=13
+remains read-capable. These encoding checks do not settle the older circular
+fixtures' input-domain constraints; see the [addressing audit](5510_bringup.md#short-preincrement-fixture-audit).
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

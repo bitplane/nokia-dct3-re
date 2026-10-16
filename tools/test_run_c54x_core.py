@@ -14,6 +14,37 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mapped_bitfield_scope(self):
+        marker, ending = EXTRA_PROFILES['mapped-bitf']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mapped-bitf')
+        for old, new in (('restore=13824', 'restore=0'), ('reads_each=1', 'reads_each=2'),
+                         ('data_writes=0', 'data_writes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mapped-bitf')
+
+    def test_bitfield_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['bitf-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='bitf-mod3-edge')
+        for old, new in (('restore=512', 'restore=0'), ('operations=CMPM,BITF', 'operations=BITF'),
+                         ('initial_tc=2', 'initial_tc=1'), ('frontends=2', 'frontends=1'),
+                         ('data_reads=0', 'data_reads=1'), ('data_writes=0', 'data_writes=1'),
+                         ('pointer_changes=0', 'pointer_changes=1'), ('tc_changes=0', 'tc_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='bitf-mod3-edge')
+
+    def test_smem_test_compare_scope(self):
+        for profile in ('bitf-smem', 'cmpm-smem'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in (('restore=52224', 'restore=0'), ('forms=17', 'forms=18'),
+                             ('duplicate_reads=0', 'duplicate_reads=1') if profile == 'bitf-smem' else
+                             ('source_reads=1', 'source_reads=2')):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+
     def test_load_mod3_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['load-mod3-edge']
         output = marker + '\n' + ending + '\n'
