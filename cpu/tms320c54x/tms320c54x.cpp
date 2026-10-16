@@ -3165,12 +3165,6 @@ void tms320c54x_device::pipeline_step()
 		if (staged_call(m_pipeline_word[3])) m_rtn = m_pipeline_immediate[3];
 		if (staged_far_call(m_pipeline_word[3])) m_pipeline_far_call_stack[3] = --m_sp;
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
-	{
-		// Delayed class-34 prototype: two stack samples without the plain
-		// return's held Read clock. Placement is not measured silicon timing.
-		m_pipeline_operand[3] = data_read(m_sp++);
-	}
 	auto const basic_address = [this](unsigned stage, u8 mode) -> u16 {
 		if (BIT(mode, 7)) return short_smem_address(mode, stage);
 		u16 const status = m_pipeline_direct_status[stage];
@@ -3748,6 +3742,13 @@ void tms320c54x_device::pipeline_step()
 		// Example 7-7 allocates the return's DAB in Access. Account for an
 		// older PSHM/POPM Read update before allocating this younger pop.
 		m_pipeline_operand_address[3] = m_sp++;
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
+	{
+		// As for near returns, an older POPM/POPD must finish its Read-owned
+		// SP update before this younger Access consumes the next stack word.
+		// The delayed class-34 bus placement remains a partial timing model.
+		m_pipeline_operand[3] = data_read(m_sp++);
 	}
 	if (m_pipeline_valid[3] && staged_conditional_return(m_pipeline_word[3]))
 	{

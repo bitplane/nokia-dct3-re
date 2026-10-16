@@ -35,7 +35,7 @@ REQUIRED = [
     "TMS320C54x staged peripheral arbitration exclusion: PASS stopped_cycle=6 bus_accesses=0 atomic_fallback=0",
     "TMS320C54x staged immediate stores: PASS cases=8 forms=DP,postincrement,absolute,peripheral retained_literal=1 duplicate_writes=0 restore=8",
     "TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0",
-    "TMS320C54x staged far return: PASS cases=36 plain=12 delayed=24 multiword_delay=12 restore=36 duplicate_reads=0 silicon_phase_claim=0",
+    "TMS320C54x staged far return: PASS cases=72 plain=24 delayed=48 multiword_delay=24 preceding_popm=36 restore=72 duplicate_reads=0 silicon_phase_claim=0",
     "TMS320C54x staged cross-page far IRQ: PASS cases=8 masked=4 restored_vector_page=1 continuations=0700,0702 restore=8 duplicate_vectors=0 silicon_phase_claim=0",
     "TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0",
     "TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1",

@@ -35,9 +35,12 @@ In-block XC executes through `03:da71..03:da93`: Execute-entry hooks
 observe `03:da85` (`XC 1,BLT`) and `03:da8f` (`XC 2,TC`) 1,168 times each,
 and continuation `03:da94` twice. The alternate `03:da79` signed-XC route
 has zero Execute entries in this run; its static presence is not runtime proof.
-The current stop is unsupported word `fe76` at `02:6609`, with terminal
-PC `02:660b`, `illegal=1`. Its decode/retained-control contract is the next
-unresolved boundary; NAND writes alone do not prove complete recording.
+The delayed far return at `03:d95c` now reaches its original caller's
+continuation `03:a1a9`; the former transfer into page `42` and eventual
+`fe76` data execution are eliminated. The current stop is the retained
+long-word register/peripheral-pair exclusion, with terminal PC `03:d9b0`,
+`illegal=1`. Establish the owning instruction and source-pointer provenance
+before relaxing that guard. NAND writes alone do not prove complete recording.
 
 Validated instruction and composition boundaries are collected below;
 aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
@@ -46,6 +49,35 @@ distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
+
+### Delayed far returns after stack restoration
+
+FRETD/FRETED must consume the stack after an older POPM/POPD's Read-owned
+SP update, just as near returns do. The retained delayed return's first
+sample remains Access-owned, but is ordered after the older stack operation;
+the second sample remains in Read. No new pipeline state or atomic fallback
+is introduced. Exact DA150 bus phases remain unmeasured.
+
+The default native fixture covers 72 cases/restores: FRET/FRETE and their
+delayed forms, two pages, two single-word or one two-word delay instruction,
+and 36 preceding-POPM compositions. It checks SP, restored AR1, INTM, ordered
+XPC/PC reads, target Fetch, delay effects and replay around both stack samples.
+The expanded fixture fails on the preceding CPU implementation.
+The native 5110 save-state gate, original resident-memory comparison and
+153 runner unit tests also pass; none establishes complete recorder output.
+
+In original recorder firmware, the `03:d8bb..03:d95e` function saves three
+registers and allocates 20 local words, then restores them before FRETD at
+`03:d95c`. Its caller is `FCALL 03:d8bb` (`f983 d8bb`) at `03:a1a7`,
+whose continuation is `03:a1a9`. Passive stack taps observe that `0003,a1a9` frame
+at `657a..657b`. Consuming the preceding saved-register slot as XPC instead
+redirected execution to `42:a1a9`; subsequent execution through unmapped
+pages eventually stopped on `fe76` at `02:6609`. That word is not evidence
+that RCD is the next required instruction: the acquired aa88 record marks
+`6604..6613` as data (original word `6609=beef`), outside the aa22/aa88
+program spans. Debugger history records logical Execute PCs, but disassembles
+current raw program memory; apply the established OVLY projection separately
+for common-window instruction bytes.
 
 ### Signed circular memory loads
 
@@ -1043,11 +1075,11 @@ not permission to borrow another handset's keypad or UI completion events.
 
 Versioned aggregate acceptance has two distinct scopes:
 
-- CPU source at `09229001`: renewed full default run, all 288 required markers
-  exactly once, expected completion exit and terminal completion check. This
-  renews the default population after shared ASM store/bypass calculation,
-  zero-latency memory moves into BRC and signed circular-load admission.
-  Their additional isolated matrices remain separately scoped above; default
+- Delayed far-return/POPM ordering correction: renewed full default run, all
+  288 required markers exactly once, expected completion exit and terminal
+  completion check, including the expanded 72-case far-return fixture. This
+  also renews the default population after the in-block XC ownership fix.
+  Additional isolated matrices remain separately scoped above; default
   acceptance does not imply those cases are part of its 288-marker population.
 - `1fe0df59`: full default run, all 93 named isolated profiles registered at
   that revision, and the seven additional scopes `--bus-registers`, `--bus-io`,

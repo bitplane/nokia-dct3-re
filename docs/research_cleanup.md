@@ -158,6 +158,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
   must respect the owning instruction's age/stage, so an older loop iteration
   cannot clear a younger instruction's protection. Include the shortest
   legal loops with pending interrupts and save/replay in composition tests.
+- An unsupported word that decodes as a valid opcode may still be data reached
+  by bad control flow. Establish upload/program provenance, physical mapping
+  and the preceding executed transfer before extending the ISA. Debugger
+  history may disassemble current raw memory rather than the bytes executed
+  through an overlay; retain PCs and recover instruction bytes independently.
 
 ## Protect surprising facts
 
