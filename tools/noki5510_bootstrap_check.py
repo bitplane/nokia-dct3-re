@@ -431,14 +431,17 @@ def verify_playback_parent(text):
                 first_session=(start, finish), selector_samples=samples, decoded_audio=False, subsystem_identity='unvalidated')
 
 
-def verify_playback_switch_history(text, words, session):
+def verify_playback_switch_history(text, words, session, *, enqueue=False):
+    label = 'enqueue' if enqueue else 'switch'
+    entry = 'address=0202d7 opcode=487e ar2=8044' if enqueue else 'address=020478 opcode=10e4 ar4=804a'
+    selector = 'live_ar2_context' if enqueue else 'live_ar4_context'
     rows = list(re.finditer(
-        r'mu4_playback_switch_history: ordinal=(\d+) address=020478 opcode=10e4 ar4=804a '
+        rf'mu4_playback_{label}_history: ordinal=(\d+) {entry} '
         r'p0=([0-9a-f]{6})/([0-9a-f]{4}) p1=([0-9a-f]{6})/([0-9a-f]{4}) '
         r'p2=([0-9a-f]{6})/([0-9a-f]{4}) p3=([0-9a-f]{6})/([0-9a-f]{4}) '
-        r't=(\d+\.\d{9}) identity=Execute_entry selection=live_ar4_context '
+        rf't=(\d+\.\d{{9}}) identity=Execute_entry selection={selector} '
         r'receiver_ownership=unvalidated observer_writes=0$', text, re.MULTILINE))
-    if len(rows) != text.count('mu4_playback_switch_history:') or len(rows) > 8:
+    if len(rows) != text.count(f'mu4_playback_{label}_history:') or len(rows) > 8:
         raise ValueError('malformed or excessive playback switch history')
     result, previous = [], session[0]
     for ordinal, row in enumerate(rows, 1):
@@ -478,6 +481,7 @@ def verify_playback_range(text, words):
         raise ValueError('range entry totals disagree with the complete census')
     return {'parent': parent, 'source_range_words': last - first + 1,
             'switch_context_history': verify_playback_switch_history(text, words, parent['first_session']),
+            'enqueue_context_history': verify_playback_switch_history(text, words, parent['first_session'], enqueue=True),
             'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
             'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
             'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '

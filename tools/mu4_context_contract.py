@@ -56,6 +56,8 @@ def playback_control_literal_census(words):
         (0x27167, (0x0006, 0x804A, 0x0002, 0x0495, 0xD7B8, 0xD796, 0x0001, 0x054F, 0x0002)),
         (0x27A04, (0x76F8, 0xAA56, 0x0000)),
         (0x27A0D, (0x76F8, 0xAA59, 0xD796)),
+        (0x20419, (0xF6BE, 0x4A06, 0x8812, 0x46F8, 0x007F, 0xF495,
+                    0xF074, 0x02D7, 0x8A06, 0xF7BE, 0xF4E4)),
         (0x20478, (0x10E4, 0x0004, 0xF844, 0x0483, 0x6D94, 0x1394,
                     0x1094, 0x7194, 0x0012, 0xF5E3, 0xFC00, 0x4918,
                     0x68F8, 0x0018, 0xFFFE, 0xF7BE, 0xF495, 0x4A0B,
@@ -87,6 +89,7 @@ def playback_control_literal_census(words):
             'context_switch_candidate': ['020478', '020494'],
             'immediate_switch_call_candidates': [f'{a:06x}' for a in switch_calls],
             'service_helpers_calling_0201b3': ['020454', '02046b'],
+            'enqueue_wrapper': '020419', 'enqueue_wrapper_call': '02041f',
             'scope': 'Exact literals and pinned initialization only; not instruction classification, '
                      'computed aliases, record interpreter, resume contract or decoded audio'}
 

@@ -4627,6 +4627,21 @@ path goes on to update links. Conversely, the scheduler writes ffff near
 but live PC alone does not identify the exact bus-owning instruction.
 The next boundary is the executed caller/trigger that enqueues this node
 again for constant playback, rather than changing the node or descriptor.
+Execute history at enqueue entry `0202d7/487e`, selected by live
+`AR2=8044`, identifies `02041f/f074` in all eight bounded constant samples
+and both varying-input samples. The preceding entries are
+`02041b/8812,02041c/46f8,02041e/f495`. The source-pinned wrapper at
+`020419` moves its A input to AR2, calls the enqueue helper and returns;
+it does not create a missing event. Constant playback's third wrapper
+request is at 1.022780785 seconds; varying playback has no third selected
+request in its first session. Source-checked history and previous range
+counts reproduce on the new build. The three immediate far-call encoding
+candidates for `020419` at `020cba,0295c8,038c40` are preceded by literals
+`8052,8060,807c`, respectively, not `8044`. Initialized `02:0419` references
+also occur in the control-area data. These facts prioritize the indirect
+caller of the wrapper; they do not close computed or cross-overlay callers
+or establish that each reference is a completion callback. Full tool tests
+pass (2,959 tests, one skipped); native audio acceptance remains unmet.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`
