@@ -6993,6 +6993,7 @@ private:
 	}
 	void start_pipeline_long_pair(unsigned variant = 0)
 	{
+		if (variant % 9 == 4) ++variant; // Short MOD=3 is write-only; preserve raw IDs for the other forms.
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = !strcmp(machine().options().bios(), "drsub") ? long_reverse_fixture(variant) : long_pair_fixture(variant);
 		bool const source = (f.opcode & 0xfc00) == 0x5000 ? BIT(f.opcode, 9) : BIT(f.opcode, 8);
@@ -9633,9 +9634,9 @@ private:
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 		u32 const base = (variant & 32) ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		bool const stack = variant >= 51200, multiply = variant >= 46848 && !stack, arithmetic = variant >= 11008 && variant < 46848, shifted_arithmetic = arithmetic && variant >= 14080;
+		bool const paired = variant >= 51712, stack = variant >= 51200 && !paired, multiply = variant >= 46848 && variant < 51200, arithmetic = variant >= 11008 && variant < 46848, shifted_arithmetic = arithmetic && variant >= 14080;
 		bool const bitfield = variant >= 10496 && variant < 11008, load = variant >= 768 && variant < 2048, dld = variant >= 10240 && variant < 10496, shifted = variant >= 2048 && variant < 10240, subc = variant >= 256 && variant < 768, repeat = subc && variant >= 512;
-		u16 const family = stack ? ((variant - 51200) / 256 ? 0x4a00 : 0x4800) : multiply ? std::array<u16, 17>{0x2000,0x2200,0x2400,0x2600,0x2800,0x2a00,0x2c00,0x2e00,0x3000,0x3200,0x3400,0x3600,0x3800,0x3a00,0x6400,0x6600,0x4600}[(variant - 46848) / 256] : shifted_arithmetic ? 0x6f00 : arithmetic ? std::array<u16, 12>{0x0000,0x0200,0x0400,0x0600,0x0800,0x0a00,0x0c00,0x0e00,0x3c00,0x3e00,0x4000,0x4200}[(variant - 11008) / 256] : bitfield ? 0x6000 : dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
+		u16 const family = paired ? std::array<u16, 7>{0x5000,0x5200,0x5400,0x5800,0x5a00,0x5c00,0x5e00}[(variant - 51712) / 512] : stack ? ((variant - 51200) / 256 ? 0x4a00 : 0x4800) : multiply ? std::array<u16, 17>{0x2000,0x2200,0x2400,0x2600,0x2800,0x2a00,0x2c00,0x2e00,0x3000,0x3200,0x3400,0x3600,0x3800,0x3a00,0x6400,0x6600,0x4600}[(variant - 46848) / 256] : shifted_arithmetic ? 0x6f00 : arithmetic ? std::array<u16, 12>{0x0000,0x0200,0x0400,0x0600,0x0800,0x0a00,0x0c00,0x0e00,0x3c00,0x3e00,0x4000,0x4200}[(variant - 11008) / 256] : bitfield ? 0x6000 : dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
 		u16 const opcode = family | 0x98 | (variant & 7) | ((variant & 8) ? 0x100 : 0);
 		program.write_word(base + 0x600, repeat ? 0xec03 : opcode);
 		unsigned const operation = shifted_arithmetic ? (variant - 14080) / 8192 : 0;
@@ -9643,7 +9644,7 @@ private:
 		program.write_word(base + 0x601, shifted_arithmetic ? extension : shifted ? 0x0c40 | ((variant & 8) ? 0x100 : 0) | ((variant - 2048) / 256) : repeat ? opcode : subc ? 0xf4e1 : 3); program.write_word(base + 0x602, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant & 16) ? 0x4000 : 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, bitfield && variant >= 10752 ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, multiply ? 0x0815 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, bitfield && variant >= 10752 ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, multiply ? 0x0815 : 0x800 | (paired && (variant & 256) ? 0x80 : 0));
 		if (multiply) m_cpu->set_state_int(tms320c54x_device::STATE_RC, 7);
 		if (stack) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -39160,16 +39161,16 @@ private:
 				if (reverse)
 				{
 					if (variant < 6911) { start_pipeline_long_pair(variant + 1); return; }
-					osd_printf_info("TMS320C54x staged DRSUB: PASS cases=6912 restore=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0\n");
-					throw emu_fatalerror(0, "TMS320C54x isolated DRSUB complete");
+					osd_printf_info("TMS320C54x staged DRSUB: PASS cases=6144 restore=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0\n");
+					start_short_read_mod3_edge(51712); return;
 				}
-				if (variant == 6911) osd_printf_info("TMS320C54x staged DSUB: PASS cases=6912 address_forms=9 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6912 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
+				if (variant == 6911) osd_printf_info("TMS320C54x staged DSUB: PASS cases=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6144 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
 				if (variant < 20735) { start_pipeline_long_pair(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged DADD: PASS cases=13824 address_forms=9 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=13824 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged DADD: PASS cases=12288 address_forms=8 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=12288 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
 				if (!strcmp(machine().options().bios(), "long-pair"))
 				{
-					osd_printf_info("TMS320C54x staged long-pair controls: PASS dsub=6912 dadd=13824 restore=20736 pair_reads=2 memory_writes=0\n");
-					throw emu_fatalerror(0, "TMS320C54x isolated long-pair controls complete");
+					osd_printf_info("TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0\n");
+					start_short_read_mod3_edge(51712); return;
 				}
 				start_pipeline_long_immediate_store(); return;
 			}
@@ -43314,9 +43315,9 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = (variant & 128) ? 10 : 1;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Write-only short MOD=3 source performs no data transaction");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (variant >= 10752 && variant < 11008 ? 0x0804 : 0x1804), "Rejected source preserves accumulators, T and arithmetic flags");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (variant >= 46848 && variant < 51200 ? 0x0815 : 0x800), "Rejected source preserves ASM and the other ST1 fields");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (variant >= 46848 && variant < 51200 ? 0x0815 : 0x800 | (variant >= 51712 && (variant & 256) ? 0x80 : 0)), "Rejected source preserves ASM, C16 and the other ST1 fields");
 			if (variant >= 46848 && variant < 51200) expect(m_cpu->state_int(tms320c54x_device::STATE_RC) == 7, "Rejected source preserves the repeat counter");
-			if (variant >= 51200) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Rejected push preserves the stack pointer");
+			if (variant >= 51200 && variant < 51712) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Rejected push preserves the stack pointer");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Rejected source does not preincrement any AR");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save source before or after rejection"); }
 			if (tick == 20)
@@ -43324,7 +43325,12 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject write-only short source addressing");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rejected source without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310610; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (variant >= 51200 ? 51711U : variant >= 46848 ? 51199U : variant >= 11008 ? 46847U : variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant < (variant >= 51712 ? 55295U : variant >= 51200 ? 51711U : variant >= 46848 ? 51199U : variant >= 11008 ? 46847U : variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant >= 51712)
+				{
+					osd_printf_info("TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, !strcmp(machine().options().bios(), "drsub") ? "TMS320C54x isolated DRSUB complete" : "TMS320C54x isolated long-pair controls complete");
+				}
 				if (variant >= 51200)
 				{
 					osd_printf_info("TMS320C54x MMR push MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n");

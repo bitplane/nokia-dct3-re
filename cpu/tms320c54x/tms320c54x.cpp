@@ -487,7 +487,7 @@ constexpr bool staged_extended_dld(u16 word)
 
 constexpr bool staged_long_arithmetic(u16 word)
 {
-	return ((word & 0xfc00) == 0x5000 || (word & 0xfe00) == 0x5400 || (word & 0xfe00) == 0x5800) && u8(word) <= 0xf8;
+	return ((word & 0xfc00) == 0x5000 || (word & 0xfe00) == 0x5400 || (word & 0xfe00) == 0x5800) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_long_arithmetic(u16 word)
@@ -4843,7 +4843,7 @@ void tms320c54x_device::execute_one(u16 op)
 	const u8 low = op;
 	// These scalar arithmetic, multiply, load, repeat and test families read Smem.
 	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
-	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf800) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfc00) == 0x4800 || (op & 0xfe00) == 0x5600 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400))
+	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf800) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfc00) == 0x4800 || (op & 0xf000) == 0x5000 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400))
 	{
 		m_illegal = true;
 		return;

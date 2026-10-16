@@ -3611,7 +3611,7 @@ same clock, including odd-address ordering (SPRU131G 5.6). Execute calls a
 shared, operand-only long-arithmetic helper; atomic DADD/DSUB/DRSUB and
 T variants use that same calculation without changing their bus paths.
 
-The 6912 replay cases cover nine address forms, A/B destinations, eight
+The 6,144 replay cases cover eight read-capable address forms, A/B destinations, eight
 operand pairs (including TI's C16 example), both C16/SXM/OVM states,
 both parities and Decode/Read/Execute checkpoints. They verify one paired
 read, no memory write, retained values after RAM/literal/AR/SP changes,
@@ -3627,12 +3627,21 @@ DADD (`5000`--`5300` families) shares that retained-pair/address path,
 but bit 9 independently selects its source accumulator and bit 8 its
 destination. Execute reads the selected original source and adds the
 captured memory pair; it does not use an unrelated destination value.
-The new 13824 replay cases cover all four A/B selections, nine address
+The 12,288 replay cases cover all four A/B selections, eight read-capable address
 forms, eight source/memory pairs, C16/SXM/OVM and both parities. Direct
 offsets 4/5 include exact `5304` under compiler-relative addressing.
 Fixtures change AR/SP after Access, literals after Decode and RAM after
 Read, then restore in Decode, Read or Execute; each leg requires one
 ordered pair, no memory writes and unchanged unselected accumulator.
+
+Short MOD=3 is omitted from these read fixtures with raw IDs preserved;
+SPRU131G table 5-4 restricts it to writes. Atomic paired arithmetic and the
+staged DADD/DSUB/DRSUB classifier reject it before operand effects. The
+`long-pair` and `drsub` gates additionally require 3,584 rejection/replay
+cases across all 14 paired-read opcode classes, all ARs, CMPT/C16 settings,
+pages, frontends and two snapshots, with no data or pointer effects.
+This adds no positive staged T-variant support; paired DST writes and long
+MOD=13 reads retain their separate domains.
 
 Ordinary mode extends the memory high word under SXM, computes full
 40-bit addition, low-32 carry, sticky destination overflow and OVM

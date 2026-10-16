@@ -80,6 +80,19 @@ read-source families, implicit copies and read/modify/write remain separate
 audit questions. Long MOD=13 remains a valid ordinary Smem read encoding,
 but is not an MMR addressing form (SPRU131G section 5.6).
 
+Paired arithmetic reads also reject short MOD=3. The atomic guard covers
+DADD, DSUB, DRSUB, DADST, DSUBT and DSADT; the staged DADD/DSUB/DRSUB
+classifier excludes the form without adding positive support for the T
+variants. The corrected positive banks retain raw IDs and omit form 4:
+6,144 DSUB, 12,288 DADD and 6,144 DRSUB cases/restores over eight read-capable
+address forms. Both `long-pair` and `drsub` additionally require a 3,584-case
+rejection bank covering all 14 opcode classes, ARs, CMPT and C16 settings,
+pages, frontends and two snapshots. No data access, pointer or arithmetic
+state change is allowed. The atomic-prefix/MMR gate, DLD, write-side
+preincrement and previous load/multiply rejection controls pass. These are
+focused regressions, not a fresh full staged-suite run or physical-timing
+acceptance. Implicit copies and read/modify/write remain unclassified.
+
 Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
 MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
 extension before rejecting; STL/STH extensions are unchanged. The
@@ -1533,11 +1546,12 @@ The two words are sampled once in parity-defined MSW/LSW order, then the
 shared long-word arithmetic helper publishes at Execute. C16 mode subtracts
 the two lanes independently and does not saturate with OVM; full-width mode
 uses SXM, carry, sticky destination overflow and OVM saturation.
-`drsub` passes 6,912 cases/restores across nine address forms, A/B, eight
+`drsub` passes 6,144 cases/restores across eight read-capable address forms, A/B, eight
 patterns, C16/SXM/OVM combinations and both pair parities. Later extension,
 AR/SP and memory changes cannot alter the retained address or word pair.
-`long-pair` independently runs the existing 6,912 DSUB and 13,824 DADD cases
-as controls. CPU low-page pairs remain excluded; physical phase timing and
+`long-pair` independently runs 6,144 DSUB and 12,288 DADD cases
+as controls. Both profiles also require the 3,584-case short-MOD=3 rejection
+bank described above. CPU low-page pairs remain excluded; physical phase timing and
 general producer/interrupt composition are not established by these fixtures.
 
 NORM (`f48f/f58f/f68f/f78f`) retains T in Read before older Execute publishes

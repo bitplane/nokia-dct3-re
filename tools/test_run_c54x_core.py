@@ -1682,13 +1682,18 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(old, new), 3, profile='xmem-store-bp')
 
     def test_long_pair_profile_scopes(self):
-        for profile, restores in (('drsub', 6912), ('long-pair', 20736)):
-            marker, ending = EXTRA_PROFILES[profile]
-            output = marker + '\n' + ending + '\n'
+        for profile, restores in (('drsub', 6144), ('long-pair', 18432)):
+            markers, ending = EXTRA_PROFILES[profile]
+            output = '\n'.join((*markers, ending)) + '\n'
             check_result(output, 3, profile=profile)
+            for marker in markers:
+                with self.subTest(profile=profile, marker=marker), self.assertRaises(ValueError):
+                    check_result(output.replace(marker, ''), 3, profile=profile)
             for old, new in ((f'restore={restores}', 'restore=0'),
                              ('pair_reads=2', 'pair_reads=1'),
-                             ('memory_writes=0', 'memory_writes=1')):
+                             ('memory_writes=0', 'memory_writes=1'),
+                             ('restore=3584', 'restore=0'), ('c16=2', 'c16=1'),
+                             ('data_reads=0', 'data_reads=1'), ('opcode_classes=14', 'opcode_classes=8')):
                 with self.subTest(profile=profile, old=old), self.assertRaises(ValueError):
                     check_result(output.replace(old, new), 3, profile=profile)
 
