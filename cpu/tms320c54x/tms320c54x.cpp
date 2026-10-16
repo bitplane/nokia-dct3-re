@@ -272,7 +272,13 @@ constexpr bool staged_short_repeat(u16 word)
 
 constexpr bool staged_memory_repeat(u16 word)
 {
-	return (word & 0xff00) == 0x4700 && (u8(word) < 0xa0 || word == 0x47f8);
+	// SPRU131G table 5-4: short MOD=3 preincrement is write-only.
+	return (word & 0xff00) == 0x4700 && (u8(word) < 0x98 || word == 0x47f8);
+}
+
+constexpr bool staged_extended_push(u16 word)
+{
+	return (word & 0xff00) == 0x4b00 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_absolute_add(u16 word)
@@ -2873,6 +2879,10 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
+			if (!m_pipeline_decode_remaining && staged_extended_push(word))
+			{
+				logerror("%s: staged delay extended PSHD is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
 			if (!m_pipeline_decode_remaining && (word & 0xfeff) == 0x881d)
 			{
 				// PMST changes in a delayed span need their own mapping-latency
@@ -2949,7 +2959,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
 		}
-		else if ((staged_write_a(m_pipeline_word[2]) && u8(m_pipeline_word[2]) >= 0xe0) || staged_shifted_smem(m_pipeline_word[2]) || staged_extended_dld(m_pipeline_word[2]) || staged_offset_load(m_pipeline_word[2]) || staged_bitfield(m_pipeline_word[2]) || staged_extended_smem_arithmetic(m_pipeline_word[2]) || staged_extended_smem_special(m_pipeline_word[2]) || staged_port_read(m_pipeline_word[2]) || staged_port_write(m_pipeline_word[2]) || staged_absolute_add(m_pipeline_word[2]) || m_pipeline_word[2] == 0x47f8 || staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || (staged_absolute_load(m_pipeline_word[2]) || staged_extended_logic(m_pipeline_word[2])) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
+		else if (staged_extended_push(m_pipeline_word[2]) || (staged_write_a(m_pipeline_word[2]) && u8(m_pipeline_word[2]) >= 0xe0) || staged_shifted_smem(m_pipeline_word[2]) || staged_extended_dld(m_pipeline_word[2]) || staged_offset_load(m_pipeline_word[2]) || staged_bitfield(m_pipeline_word[2]) || staged_extended_smem_arithmetic(m_pipeline_word[2]) || staged_extended_smem_special(m_pipeline_word[2]) || staged_port_read(m_pipeline_word[2]) || staged_port_write(m_pipeline_word[2]) || staged_absolute_add(m_pipeline_word[2]) || m_pipeline_word[2] == 0x47f8 || staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || (staged_absolute_load(m_pipeline_word[2]) || staged_extended_logic(m_pipeline_word[2])) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 || staged_immediate_multiply(m_pipeline_word[2]) || staged_extended_accumulator_store(m_pipeline_word[2]) || staged_extended_dst(m_pipeline_word[2]) || staged_extended_long_arithmetic(m_pipeline_word[2]) || staged_data_copy(m_pipeline_word[2]) ||
 			m_pipeline_word[2] == 0xf070 || staged_block_repeat(m_pipeline_word[2]) || m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			m_pipeline_word[2] == 0x46f8 || m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x771a || m_pipeline_word[2] == 0x7700 || staged_bus_control(m_pipeline_word[2]) || staged_timer_control(m_pipeline_word[2]) || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
@@ -3047,7 +3057,11 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		bool const direct_push = (word & 0xffe0) == 0x4a00;
-		bool const data_push = (word & 0xff00) == 0x4b00 && u8(word) < 0x98;
+		bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
+		if (m_pipeline_valid[2] && staged_extended_push(word) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged extended PSHD conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const data_pop = (word & 0xff00) == 0x8b00 && u8(word) < 0x98;
 		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
 		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_pipeline_block_body[2])
@@ -3364,15 +3378,21 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x4b00)
 	{
 		u8 const mode = m_pipeline_word[3];
-		m_pipeline_operand[3] = basic_address(3, mode);
+		bool const extended = staged_extended_push(m_pipeline_word[3]);
+		unsigned const ar = indirect_ar(mode, 3); u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		m_pipeline_operand[3] = !extended ? basic_address(3, mode) : mode == 0xf8 ? m_pipeline_immediate[3] : long_offset_address(mode, ar, s16(m_pipeline_immediate[3]), 3);
 		u16 const source = m_pipeline_operand[3];
-		bool const self_ar = BIT(mode, 7) && (mode & 0x78) && source == 0x10 + indirect_ar(mode, 3);
+		bool const modifying = extended ? mode != 0xf8 && (mode & 0x78) != 0x60 : BIT(mode, 7) && (mode & 0x78);
+		bool const self_ar = modifying && source == 0x10 + ar;
 		if (source == 0x18 || self_ar || (source >= 0x20 && source < 0x60))
 		{
+			// A prototype exclusion is not a hardware trap: discard address
+			// preview side effects before returning without stack allocation.
+			if (extended) { m_ar[ar] = previous_ar; m_st0 = previous_st0; }
 			logerror("%s: staged PSHD SP/self-AR/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
+		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x8b00)
 	{
@@ -3859,17 +3879,14 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_memory_repeat(m_pipeline_word[4]))
 	{
 		u8 const mode = m_pipeline_word[4];
-		bool const preincrement = mode != 0xf8 && BIT(mode, 7) && (mode & 0x78) == 0x18;
 		// Class 5A/5B samples RC once in Read, not once per body iteration.
-		u16 const source = mode == 0xf8 ? m_pipeline_immediate[4] :
-			preincrement ? u16(short_smem_address(mode, 4) + 1) : basic_address(4, mode);
+		u16 const source = mode == 0xf8 ? m_pipeline_immediate[4] : basic_address(4, mode);
 		if (source < 0x60 && (source < 0x10 || source > 0x17))
 		{
 			logerror("%s: staged RPT control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_operand[4] = pipeline_read_data(source);
-		if (mode != 0xf8 && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
+		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 4);
 		m_pipeline_memory_repeat_wait = 2; // Class 5A/5B's extra clocks; placement is partial.
 	}
 	if (m_pipeline_valid[4] && staged_write_a(m_pipeline_word[4]))
@@ -4156,7 +4173,10 @@ void tms320c54x_device::pipeline_step()
 			if (staged_extended_dst(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xffe0) == 0x4a00 || (m_op & 0xff00) == 0x4b00)
+		{
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+			if (staged_extended_push(m_op)) ++m_pc;
+		}
 		else if ((m_op & 0xff00) == 0x8a00)
 		{
 			if (u8(m_op) < 0x10 || u8(m_op) > 0x19 || m_pipeline_early_write_deferred[5])

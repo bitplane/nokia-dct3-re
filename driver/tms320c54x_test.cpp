@@ -9003,6 +9003,115 @@ private:
 	static u16 rptbd_source(unsigned v, unsigned i) { return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(rptbd_seed(v) / 16) % 4] ^ u16(i * 0x1357); }
 	static int rptbd_irq_line(unsigned v) { return ((v - 512) / 32) % 2 ? INPUT_LINE_NMI : 2; }
 	static bool rptbd_late_irq(unsigned v) { return ((v - 512) / 64) % 2; }
+	struct extended_push_fixture
+	{
+		unsigned form, selected, pattern, irq, checkpoint;
+		bool mapped, compatibility, compiler;
+		u32 base;
+		u16 mode, literal, address, value, st0, final_st0, st1, bk, t, trn, pmst;
+		u64 a, b;
+		std::array<u16, 8> initial, final;
+	};
+	static extended_push_fixture extended_push_case(unsigned v)
+	{
+		extended_push_fixture f{}; f.mapped = v >= 96000;
+		unsigned offset = 0;
+		if (f.mapped)
+		{
+			v -= 96000; unsigned pair = v % 77; v /= 77; if (pair >= 41) ++pair;
+			f.form = pair / 26;
+			f.address = std::array<u16, 26>{0, 1, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e}[pair % 26];
+			f.pattern = v % 4; v /= 4; f.compatibility = v % 2; v /= 2; f.base = v % 2 ? 0x20000 : 0; v /= 2;
+			f.mode = std::array<u16, 3>{0xe3, 0xeb, 0xf8}[f.form]; f.bk = 9;
+		}
+		else
+		{
+			f.form = v % 25; v /= 25; offset = v % 4; v /= 4; f.pattern = v % 4; v /= 4;
+			f.compatibility = v % 2; v /= 2; f.compiler = v % 2; v /= 2; f.bk = v % 2 ? 9 : 0; v /= 2;
+			f.base = v % 2 ? 0x20000 : 0; v /= 2; f.irq = v % 5; v /= 5;
+			f.mode = f.form == 24 ? 0xf8 : 0xe0 + f.form;
+		}
+		f.checkpoint = std::array<unsigned, 3>{3, 5, 7}[v];
+		f.selected = f.mode == 0xf8 ? 8 : f.compatibility && !(f.mode & 7) ? 5 : f.mode & 7;
+		f.st0 = 0xb608; f.final_st0 = f.compatibility && f.mode != 0xf8 && (f.mode & 7) ? (f.st0 & ~0xe000) | ((f.mode & 7) << 13) : f.st0;
+		f.st1 = (f.compiler ? 0x4000 : 0) | (f.compatibility ? 0x20 : 0) | (f.irq ? 0 : 0x800) | (f.pattern & 1 ? 0x100 : 0) | (f.pattern & 2 ? 0x200 : 0) | 0x13;
+		f.pmst = f.pattern & 1; f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[f.pattern]; f.a = 0x123456789aULL; f.b = 0xfedcba9876ULL; f.t = 0x5aa5; f.trn = 0x1234;
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = i == f.selected ? 0x5007 : 0x7000 + i;
+		if (f.mapped)
+		{
+			if (f.address >= 8 && f.address <= 0xd)
+			{
+				unsigned const part = (f.address - 8) % 3, shift = part * 16; u64 const mask = (part == 2 ? 0xffULL : 0xffffULL) << shift;
+				u64 &accumulator = f.address >= 0xb ? f.b : f.a; accumulator = (accumulator & ~mask) | ((u64(f.value) << shift) & mask);
+				if (part == 2) f.value &= 0xff;
+			}
+			else if (f.address == 0xe) f.t = f.value;
+			else if (f.address == 0xf) f.trn = f.value;
+			else if (f.address >= 0x10 && f.address <= 0x17) f.initial[f.address - 0x10] = f.value;
+			else if (f.address == 0x19) f.bk = f.value;
+			else if (f.address == 0) f.value = 0;
+			else if (f.address == 1) f.value = 0;
+			else if (f.address == 6) f.value = f.final_st0;
+			else if (f.address == 7) f.value = f.st1;
+			else if (f.address == 0x1a) f.value = 13;
+			else if (f.address == 0x1b) f.value = 0x1234;
+			else if (f.address == 0x1c) f.value = 0x5678;
+			else if (f.address == 0x1d) f.value = f.pmst;
+			else if (f.address == 0x1e) f.value = f.base >> 16;
+			f.literal = f.mode == 0xf8 ? f.address : u16(f.address - f.initial[f.selected]);
+		}
+		else if (f.mode == 0xf8) f.address = f.literal = std::array<u16, 4>{0x5000, 0x3000, 0x2fff, 0xffff}[offset];
+		else
+		{
+			f.literal = std::array<u16, 4>{0xffff, 0, 4, 0x7fff}[offset];
+			if (f.mode >= 0xf0 && f.bk && offset == 3) f.literal = 8; // Keep the circular step within BK.
+			int const delta = s16(f.literal);
+			f.address = f.mode >= 0xf0 && f.bk ? 0x5000 + ((7 + delta) % 9 + 9) % 9 : u16(0x5007 + delta);
+		}
+		f.final = f.initial; if (f.mode >= 0xe8 && f.mode < 0xf8) f.final[f.selected] = f.address;
+		return f;
+	}
+	void start_extended_push(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_push_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x4b00 | f.mode); program.write_word(f.base + 0x601, f.literal); program.write_word(f.base + 0x602, 0xe955); program.write_word(f.base + 0x60f, 0xf4e1);
+		u32 const vector = f.base + (f.irq == 2 || f.irq == 4 ? 4 : 0x48); program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 13); m_cpu->set_state_int(tms320c54x_device::STATE_RSA, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_REA, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 || f.irq == 3 ? 4 : 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		if (!f.mapped) data.write_word(f.address, f.value);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_rptbd_counts = {}; m_rptbd_return = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "extended_push_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.literal && !m_rptbd_counts.fetches++ && m_cpu->pipeline_cycles() == 3, "Extended push fetches its address word once"); });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "extended_push_reads", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2ffe) { expect(f.irq && !m_rptbd_counts.stack_reads++ && word == m_rptbd_return, "Extended push interrupt reads its own continuation, not the pushed operand"); return; }
+			if (at != f.address || word != f.value || m_rptbd_counts.reads || m_cpu->pipeline_cycles() != 6) osd_printf_info("Extended push source mismatch case=%u replay=%u at=%04x word=%04x expected=%04x/%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, f.address, f.value, (unsigned long long)m_cpu->pipeline_cycles());
+			expect(at == f.address && word == f.value && !m_rptbd_counts.reads++ && m_cpu->pipeline_cycles() == 6, "Extended push samples its retained source once in Read"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "extended_push_writes", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff) { expect(word == f.value && !m_rptbd_counts.writes++ && m_cpu->pipeline_cycles() == 7, "Extended push writes the captured source to its own retained stack slot once"); return; }
+			expect(f.irq && at == 0x2ffe && !m_rptbd_counts.stack_writes++ && word >= 0x602 && word <= 0x60f && m_rptbd_counts.writes == 1, "Interrupt stack allocation follows the older extended push"); m_rptbd_return = word; });
+		m_phase = 310560; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_extended_push_edge(unsigned variant = 0)
+	{
+		unsigned const seed = ((variant / 8) % 2 ? 3200 : 0) + ((variant / 16) % 2 ? 400 : 0); start_extended_push(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = extended_push_case(seed); auto &program = m_cpu->space(AS_PROGRAM); unsigned const kind = variant % 8;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5007);
+		if (kind < 4) { program.write_word(f.base + 0x600, std::array<u16, 4>{0x4bf8, 0x4beb, 0x4beb, 0x4bf9}[kind]); program.write_word(f.base + 0x601, kind == 0 ? 0x18 : kind == 1 ? u16(0x24 - 0x5007) : kind == 2 ? u16(0x13 - 0x5007) : 0x5000); }
+		if (kind == 4 || kind == 6) { program.write_word(f.base + 0x600, kind == 4 ? 0xf273 : 0xf072); program.write_word(f.base + 0x601, kind == 4 ? 0x700 : 0x605); program.write_word(f.base + 0x602, 0x4be3); program.write_word(f.base + 0x603, 4); }
+		if (kind == 5 || kind == 7) { program.write_word(f.base + 0x600, kind == 5 ? 0xec00 : 0xfd30); program.write_word(f.base + 0x601, 0x4be3); program.write_word(f.base + 0x602, 4); }
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_push_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_push_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
+		m_phase = 310580; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	struct stlm_pmst_fixture
 	{
 		unsigned pattern, irq, checkpoint;
@@ -9213,22 +9322,22 @@ private:
 	};
 	static basic_repeat_fixture basic_repeat_case(unsigned v)
 	{
-		unsigned const edge = v >= 12672 ? v - 12672 : 8;
-		if (edge < 8) v = ((edge / 2) % 2) * 704 + (edge / 4) * 4224;
+		unsigned const edge = v >= 10368 ? v - 10368 : 8;
+		if (edge < 8) v = ((edge / 2) % 2) * 576 + (edge / 4) * 3456;
 		basic_repeat_fixture f{};
-		f.form = v % 44; v /= 44; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
+		f.form = v % 36; v /= 36; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
 		if (edge < 8) f.count = edge % 2 ? 0xffff : 0x8000;
 		f.compiler = v % 2; v /= 2; f.compatibility = v % 2; v /= 2;
 		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.irq = v % 3; v /= 3;
 		f.checkpoint = std::array<unsigned, 3>{3, 6, 12}[v];
-		f.absolute = f.form >= 42;
-		f.mode = f.form < 2 ? (f.form ? 0x7f : 0) : f.form < 34 ? 0x80 + f.form - 2 : f.form < 42 ? 0x10 + f.form - 34 : 0xf8;
+		f.absolute = f.form >= 34;
+		f.mode = f.form < 2 ? (f.form ? 0x7f : 0) : f.form < 26 ? 0x80 + f.form - 2 : f.form < 34 ? 0x10 + f.form - 26 : 0xf8;
 		f.selected = f.mode & 7;
 		if (f.compatibility && !f.selected) f.selected = 5;
-		f.modification = f.form >= 2 && f.form < 34 ? (f.mode & 0x78) >> 3 : 0;
-		f.st0 = 0xa600 | (f.form >= 34 && f.form < 42 ? 0 : 8);
+		f.modification = f.form >= 2 && f.form < 26 ? (f.mode & 0x78) >> 3 : 0;
+		f.st0 = 0xa600 | (f.form >= 26 && f.form < 34 ? 0 : 8);
 		f.st1 = (f.compiler ? 0x4000 : 0) | (f.compatibility ? 0x20 : 0) | (f.irq ? 0 : 0x800);
-		f.address = f.absolute ? (f.form == 43 ? 0x15 : 0x5000) : f.form >= 2 && f.form < 34 ? 0x5000 + (f.modification == 3) :
+		f.address = f.absolute ? (f.form == 35 ? 0x15 : 0x5000) : f.form >= 2 && f.form < 26 ? 0x5000 :
 			f.compiler ? 0x3000 + f.mode : ((f.st0 & 0x1ff) << 7) | f.mode;
 		f.body = f.base + (f.absolute ? 0x602 : 0x601);
 		return f;
@@ -9266,15 +9375,17 @@ private:
 	}
 	void start_basic_repeat_edge(unsigned variant = 0)
 	{
-		start_basic_repeat((variant / 9) % 2 ? 704 : 0); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const write_only = variant >= 36; unsigned const edge = write_only ? variant - 36 : variant;
+		unsigned const seed = write_only ? ((edge / 16) % 2) * 576 + ((edge / 8) % 2) * 288 : ((variant / 9) % 2) * 576;
+		start_basic_repeat(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-		u32 const base = (variant / 9) % 2 ? 0x20000 : 0; unsigned const kind = variant % 9; auto &program = m_cpu->space(AS_PROGRAM);
+		u32 const base = basic_repeat_case(seed).base; unsigned const kind = write_only ? 9 : variant % 9; auto &program = m_cpu->space(AS_PROGRAM);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, kind == 6 ? 0xa608 : 0xa600);
-		program.write_word(base + 0x600, std::array<u16, 9>{0x4700, 0x4718, 0x471a, 0x4720, 0x4799, 0x47e3, 0x4700, 0xf273, 0xf072}[kind]);
+		program.write_word(base + 0x600, write_only ? 0x4798 | (edge % 8) : std::array<u16, 9>{0x4700, 0x4718, 0x471a, 0x4720, 0x4799, 0x47e3, 0x4700, 0xf273, 0xf072}[kind]);
 		if (kind == 4) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1f);
 		if (kind == 5) program.write_word(base + 0x601, 0);
 		if (kind == 6) program.write_word(base + 0x601, 0x4700);
-		if (kind >= 7) { program.write_word(base + 0x601, kind == 7 ? 0x700 : 0x603); program.write_word(base + 0x602, 0x4700); }
+		if (kind == 7 || kind == 8) { program.write_word(base + 0x601, kind == 7 ? 0x700 : 0x603); program.write_word(base + 0x602, 0x4700); }
 		m_rptbd_counts = {}; m_pipeline_replay = false;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "basic_repeat_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "basic_repeat_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
@@ -14983,6 +15094,9 @@ private:
 		if (!strcmp(machine().options().bios(), "rpt-ld-block")) { start_repeat_load(198656); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst")) { start_stlm_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
+		if (!strcmp(machine().options().bios(), "pshd-long")) { start_extended_push(); return; }
+		if (!strcmp(machine().options().bios(), "pshd-long-map")) { start_extended_push(96000); return; }
+		if (!strcmp(machine().options().bios(), "pshd-long-edge")) { start_extended_push_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-ld-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-mapped") || !strcmp(machine().options().bios(), "mvdk-acc")) { start_mvdk_mapped(); return; }
@@ -41238,6 +41352,55 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310560)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_push_case(variant);
+			bool const success = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick < 5 ? f.st0 : f.final_st0) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && (tick > 7 || m_cpu->state_int(tms320c54x_device::STATE_B) == f.b);
+			if (!success) osd_printf_info("Extended push state mismatch case=%u replay=%u tick=%u illegal=%u st0=%04x expected=%04x sp=%04x\n", variant, unsigned(m_pipeline_replay), tick, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), tick < 5 ? f.st0 : f.final_st0, unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			expect(success, "Extended push preserves accumulators/flags and publishes only its owned ARP update");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick < 5 ? f.initial[i] : f.final[i]), "Extended push modifies only its selected pointer once in Access");
+			if (tick <= 5 || !f.irq) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (tick < 5 ? 0x3000 : 0x2fff), "Extended push allocates one stack word in Access");
+			if (f.irq && tick == (f.irq <= 2 ? 2U : 8U)) { int const line = f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+			if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == 6 && !f.mapped) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_rptbd_saved_counts = m_rptbd_counts; m_rptbd_saved_return = m_rptbd_return; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save extended push before address, after allocation or after write");
+			}
+			if (tick == 96)
+			{
+				expect(m_rptbd_counts.fetches == 1 && m_rptbd_counts.reads == 1 && m_rptbd_counts.writes == 1 && m_rptbd_counts.acks == unsigned(bool(f.irq)) && m_rptbd_counts.stack_reads == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)), "Extended push retains its literal/source and balances one optional interrupt frame");
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x2fff) == f.value, "Extended push retains the sampled source despite backing-memory mutation"); }
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x610 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2fff && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == f.t && m_cpu->state_int(tms320c54x_device::STATE_TRN) == f.trn && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x5678, "Extended push reaches its actual two-word continuation with unrelated state preserved");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts; m_rptbd_return = m_rptbd_saved_return;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore extended push without duplicate source, pointer or stack work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310570; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 99695) { start_extended_push(variant + 1); return; }
+				if (!strcmp(machine().options().bios(), "pshd-long-map")) { osd_printf_info("TMS320C54x extended PSHD mapped sources: PASS cases=3696 restore=3696 sources=26 forms=offset,preincrement,absolute self_modify_excluded=1 patterns=4 controls=safe pages=2 cmpt=2 snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD mapped complete"); }
+				osd_printf_info("TMS320C54x extended PSHD: PASS cases=99696 restore=99696 ram_cases=96000 mapped_cases=3696 forms=25 offsets=-1,0,4,32767 circular_offsets=-1,0,4,8 values=4 bk=0,9 cmpt=2 cpl=2 pages=2 sources=none,IRQ,NMI arrivals=early,late snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once source_retained=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310570) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310560; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310580)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 32 ? 3 : 10;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded extended push performs no data transaction");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded extended push before or after rejection"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5007 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb608, "Excluded push preserves stack, pointer and address-status state");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded extended push without new side effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310590; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_extended_push_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x extended PSHD exclusions: PASS cases=64 restore=64 forms=SP,peripheral,self_AR,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310590) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310580; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310520)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = stlm_pmst_case(variant);
@@ -41348,17 +41511,18 @@ private:
 		if (m_phase == 310510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310500; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310460)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 18 ? 3 : 10;
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = (variant < 36 ? variant < 18 : variant < 68) ? 3 : 10;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded memory repeat performs no data transaction");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded count before or after rejection"); }
 			if (tick == 20)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-					m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (variant % 9 == 4 ? 0x1f : 0x5000), "Excluded memory count preserves stack, repeat counters and preincrement pointer");
+					m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (variant < 36 && variant % 9 == 4 ? 0x1f : 0x5000), "Excluded memory count preserves stack, repeat counters and preincrement pointer");
+				if (variant >= 36) for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x5000, "Write-only MOD=3 RPT forms reject before any auxiliary-register update");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded memory count without side effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310470; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 35) { start_basic_repeat_edge(variant + 1); return; }
-				osd_printf_info("TMS320C54x basic memory repeat exclusions: PASS cases=36 restore=36 forms=control,peripheral,preincrement,long_offset,nested,delay,block pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat exclusions complete");
+				if (variant < 99) { start_basic_repeat_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x basic memory repeat exclusions: PASS cases=100 restore=100 forms=control,peripheral,write_only_MOD3,long_offset,nested,delay,block mod3_cases=64 arf=8 cmpt=2 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat exclusions complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -41383,10 +41547,10 @@ private:
 					osd_printf_info("Memory repeat mismatch case=%u replay=%u count=%u iterations=%u reads=%u fetches=%u acks=%u stack=%u/%u pc=%06x rc=%04x\n", variant, unsigned(m_pipeline_replay), f.count, iterations, m_rptbd_counts.reads, m_rptbd_counts.fetches, m_rptbd_counts.acks, m_rptbd_counts.stack_reads, m_rptbd_counts.stack_writes, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)));
 				expect(iterations == f.count + 1 && m_rptbd_counts.reads == 1 && m_rptbd_counts.fetches == 1 &&
 					m_rptbd_counts.acks == unsigned(bool(f.irq)) && m_rptbd_counts.stack_reads == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)), "Memory repeat executes count+1 bodies with one count read and a balanced deferred interrupt");
-				u16 const st0 = f.compatibility && f.form >= 2 && f.form < 34 && (f.mode & 7) ? (f.st0 & ~0xe000) | ((f.mode & 7) << 13) : f.st0;
+				u16 const st0 = f.compatibility && f.form >= 2 && f.form < 26 && (f.mode & 7) ? (f.st0 & ~0xe000) | ((f.mode & 7) << 13) : f.st0;
 				for (unsigned i = 0; i < 8; ++i)
 				{
-					u16 const ar = f.address == 0x10 + i ? f.count : 0x5000 + (f.form >= 2 && f.form < 34 && i == f.selected ? f.modification == 1 ? -1 : f.modification >= 2 ? 1 : 0 : 0);
+					u16 const ar = f.address == 0x10 + i ? f.count : 0x5000 + (f.form >= 2 && f.form < 26 && i == f.selected ? f.modification == 1 ? -1 : f.modification == 2 ? 1 : 0 : 0);
 					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == ar, "Count addressing modifies its selected pointer once, never once per body");
 				}
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x610 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
@@ -41398,8 +41562,8 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore sampled count and pointer without resampling or duplicated effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310450; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 12679) { start_basic_repeat(variant + 1); return; }
-				osd_printf_info("TMS320C54x basic memory repeat: PASS cases=12680 restore=12680 forms=44 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat complete");
+				if (variant < 10375) { start_basic_repeat(variant + 1); return; }
+				osd_printf_info("TMS320C54x basic memory repeat: PASS cases=10376 restore=10376 forms=36 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -44835,6 +44999,11 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 310560)
+		{
+			auto const f = extended_push_case(m_pipeline_peripheral_case);
+			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++, "Extended push acknowledges its original pending interrupt once"); m_cpu->set_input_line(line, CLEAR_LINE);
+		}
 		if (m_phase == 310520)
 		{
 			auto const f = stlm_pmst_case(m_pipeline_peripheral_case);
@@ -45673,6 +45842,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(233, "rpt-ld-block", "Focused repeated accumulator loads inside an outer block repeat")
 	ROM_SYSTEM_BIOS(234, "stlm-pmst", "Execute-owned accumulator PMST stores with mapping and interrupt replay")
 	ROM_SYSTEM_BIOS(235, "stlm-pmst-edge", "PMST store owner, addressing and neighboring-destination exclusions")
+	ROM_SYSTEM_BIOS(236, "pshd-long", "Long-offset and absolute pushes with interrupt and replay coverage")
+	ROM_SYSTEM_BIOS(237, "pshd-long-map", "Focused long-address push mapped-register source coverage")
+	ROM_SYSTEM_BIOS(238, "pshd-long-edge", "Long-address push source, addressing and compound-owner exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -902,6 +902,12 @@
       "hypothesis": "The REL copy starts in safe data storage and reaches executable word 40f0 only because a runaway block repeat overruns the intended destination",
       "conclusion": "The missing-bypass reproducer has 49 overlapping groups whose first copy starts at 40f0 and writes eight zero words through 40f7. Counts and bounds of 2048 writes agree with nominal 2*setup_A spans (8--192 words), without proving per-word ordering or uniqueness. With CPL=1, the computed destination (e800+2*ac78)&ffff already equals 40f0 before the loop, excluding a mere overrun from safe storage. The 02:47d3 caller's bases 7000/e800 are genuine arguments; ac78 is instead stale stack-slot content read by adjacent LD before pending MVKD publication, then saved back by STL. Independently tested retained-copy forwarding gives partial indices 0,4,8,... and advancing buffer destinations, preserving code without changing caller inputs or the map. This closes the observed copy failure, not arbitrary repeat compositions or physical bank fidelity.",
       "evidence": ["docs/5510_bringup.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
+      "id": "c54x_short_mod3_is_a_valid_memory_repeat_read", "status": "disproven",
+      "hypothesis": "Short preincrement Smem MOD=3 is a valid source form for RPT because its address and pointer effects can be implemented and replayed",
+      "conclusion": "TI SPRU131G table 5-4 marks short MOD=3 preincrement as write-only; RPT Smem reads its operand. The earlier 4798..479f positive cases therefore tested an inadmissible domain rather than hardware behavior. These forms now reject before data or pointer effects, with all eight ARF values, compatibility states, pages and two snapshots covered. Long-offset MOD=13 preincrement is a distinct, read-capable form used by extended PSHD and must not inherit the short-mode restriction. The original REL repeat uses direct 4700 and is unaffected. Prototype rejection does not claim a silicon trap mechanism.",
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp"]
     }
   ]
 }

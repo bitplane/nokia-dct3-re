@@ -312,6 +312,18 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "pshd-long": (
+        "TMS320C54x extended PSHD: PASS cases=99696 restore=99696 ram_cases=96000 mapped_cases=3696 forms=25 offsets=-1,0,4,32767 circular_offsets=-1,0,4,8 values=4 bk=0,9 cmpt=2 cpl=2 pages=2 sources=none,IRQ,NMI arrivals=early,late snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once source_retained=1 balanced_frames=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated extended PSHD complete",
+    ),
+    "pshd-long-map": (
+        "TMS320C54x extended PSHD mapped sources: PASS cases=3696 restore=3696 sources=26 forms=offset,preincrement,absolute self_modify_excluded=1 patterns=4 controls=safe pages=2 cmpt=2 snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated extended PSHD mapped complete",
+    ),
+    "pshd-long-edge": (
+        "TMS320C54x extended PSHD exclusions: PASS cases=64 restore=64 forms=SP,peripheral,self_AR,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated extended PSHD exclusions complete",
+    ),
     "stlm-pmst": (
         "TMS320C54x STLM PMST: PASS cases=38912 restore=38912 mapping_cases=4096 interrupt_cases=34816 sources=A,B patterns=8 old_sst_sxm=4 cpl=0,1 pages=2 entry_regions=low,high old_overlay=0,1 interrupt_sources=IRQ0..15,NMI arrivals=early,late snapshots=4 writes=1 source_sample=Execute prefetched_mapping=retained next_mapping=new vector_mapping=Prefetch balanced_frames=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST complete",
@@ -333,11 +345,11 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated repeated accumulator LD exclusions complete",
     ),
     "rpt-smem": (
-        "TMS320C54x basic memory repeat: PASS cases=12680 restore=12680 forms=44 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0",
+        "TMS320C54x basic memory repeat: PASS cases=10376 restore=10376 forms=36 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated basic memory repeat complete",
     ),
     "rpt-smem-edge": (
-        "TMS320C54x basic memory repeat exclusions: PASS cases=36 restore=36 forms=control,peripheral,preincrement,long_offset,nested,delay,block pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "TMS320C54x basic memory repeat exclusions: PASS cases=100 restore=100 forms=control,peripheral,write_only_MOD3,long_offset,nested,delay,block mod3_cases=64 arf=8 cmpt=2 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated basic memory repeat exclusions complete",
     ),
     "rptbd-shift-edge": (

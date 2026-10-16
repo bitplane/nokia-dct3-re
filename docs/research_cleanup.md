@@ -148,6 +148,10 @@ Some recurring mistakes need stronger checks than ordinary source review:
   mode and live page/frame controls before naming a mapped register. On C54x,
   a short direct Smem operand inherits DP/CPL, while a literal dmad/MMR
   address may not; identical numeric fields can name different storage.
+- Similar addressing names need not have the same legal operand domain.
+  On C54x, short MOD=3 preincrement is write-only (SPRU131G table 5-4),
+  while long-offset MOD=13 preincrement can read. A passing fixture for
+  a mechanically decoded form does not establish that the form is legal.
 - Widening an operation classifier requires auditing all of its consumers,
   not just the primary execution path. Forwarding, bypass, wait arbitration
   and repeat helpers can retain assumptions about the narrower family.

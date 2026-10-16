@@ -14,6 +14,31 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_extended_push_scope(self):
+        for profile, restores in (('pshd-long', 99696), ('pshd-long-map', 3696)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in ((f'restore={restores}', 'restore=0'), ('literal_fetches=1', 'literal_fetches=2'),
+                             ('source_reads=1', 'source_reads=2'), ('stack_writes=1', 'stack_writes=2'),
+                             ('pointer_updates=once', 'pointer_updates=twice'),
+                             ('physical_phase_claim=0', 'physical_phase_claim=1')):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
+    def test_extended_push_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['pshd-long-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='pshd-long-edge')
+        for old, new in (('restore=64', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('stack_changes=0', 'stack_changes=1'),
+                         ('pointer_changes=0', 'pointer_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='pshd-long-edge')
+
     def test_fixture_bios_metadata_fits_mame_encoding(self):
         source = (Path(__file__).resolve().parents[1] / 'driver' / 'tms320c54x_test.cpp').read_text()
         blocks = re.findall(r'ROM_START\(([^)]+)\)(.*?)ROM_END', source, re.S)
@@ -94,7 +119,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['rpt-smem-edge']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='rpt-smem-edge')
-        for old, new in (('restore=36', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+        for old, new in (('restore=100', 'restore=0'), ('mod3_cases=64', 'mod3_cases=0'), ('data_reads=0', 'data_reads=1'),
                          ('data_writes=0', 'data_writes=1'), ('pointer_changes=0', 'pointer_changes=1'),
                          ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
             with self.subTest(mutation=old), self.assertRaises(ValueError):
@@ -104,7 +129,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['rpt-smem']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='rpt-smem')
-        for old, new in (('restore=12680', 'restore=0'),
+        for old, new in (('restore=10376', 'restore=0'),
                          ('count_reads=1', 'count_reads=2'),
                          ('body_fetches=1', 'body_fetches=2'),
                          ('body_count=rc+1', 'body_count=rc'),

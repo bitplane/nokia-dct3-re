@@ -9,6 +9,13 @@ the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, regi
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
+CPU correctness work currently takes precedence over further opcode expansion:
+short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). RPT's
+incorrect read admission is corrected, but other existing load/ALU classifiers
+and fixtures still require a domain audit. Passing those mechanically decoded
+read cases is not hardware-legality evidence. Long-offset MOD=13 preincrement
+is a distinct read-capable form and must not be removed by that audit.
+
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement
@@ -102,8 +109,9 @@ control owners remain independently guarded. Memory-sourced `RPT Smem`
 and repeated immediate/ASM-shift accumulator loads have independent
 count, arithmetic, interrupt and replay coverage. Original playback now
 passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
-`02:9fae`. The current stop is `02:a13d`, `4be1 0004`, a long-offset
-`PSHD` source. Its opcode and address extension match original AA99;
+`02:9fae`, and the long-offset PSHD at `02:a13d`. The current stop is
+`02:a270`, `8be1 0004`, the corresponding long-offset `POPD` destination.
+Its opcode and address extension match original AA99;
 this remains an instruction-composition boundary, not evidence of
 missing external hardware. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
@@ -4491,7 +4499,7 @@ limits, not claimed silicon traps; physical pipeline phases remain unvalidated.
 ### REL memory-sourced repeat contract
 
 `RPT Smem` now admits basic direct operands and short indirect stationary,
-postdecrement, postincrement and preincrement forms (`4700..479f`), in
+postdecrement and postincrement forms (`4700..4797`), in
 addition to the existing absolute `47f8` form. DP/CPL are retained at
 Decode, the compiler-mode SP base at Access, and the count is sampled
 once in Read. The selected pointer changes once for count acquisition,
@@ -4499,7 +4507,7 @@ not once per repeated body. The two extra Class 5A/5B clocks remain a
 partial timing placement, not measured silicon phases. See TI SPRU172C
 4-146/147 and the existing SPRU131G address-latency contracts.
 
-`rpt-smem` passes 12,672 cases/replays over 44 address/source cases,
+`rpt-smem` passes 10,368 cases/replays over 36 address/source cases,
 counts 0/1/7/255, CPL, compatibility mode, program pages, no interrupt/
 IRQ/NMI and three snapshots. Eight additional direct-RAM cases cover
 unsigned counts `8000`/`ffff` on both pages and two snapshots, including
@@ -4510,11 +4518,15 @@ unrelated state. The earliest replay restores the fixture's queued
 external interrupt assertion; later snapshots retain the CPU's accepted
 or pending interrupt without supplying a second edge.
 
-`rpt-smem-edge` passes 36 cases/replays covering unsupported control and
-peripheral sources, a preincrement into the excluded range, long-offset
-addressing, nested repeat, a delayed-control owner and a block-repeat
-body. They reject without data transactions or pointer changes. These
-are prototype exclusions, not silicon traps. Producer spacing, modifying
+`rpt-smem-edge` passes 100 cases/replays covering control/peripheral
+sources, write-only short MOD=3, long-offset addressing, nested repeat,
+a delayed-control owner and a block-repeat body. Its 64-case MOD=3 bank
+crosses all eight ARF values, both compatibility states, both pages and
+two snapshots. Every exclusion rejects without data or pointer effects.
+TI SPRU131G table 5-4 marks short MOD=3 as write-only, so its former
+RPT read fixtures were outside the legal domain. The other exclusions
+remain prototype limits; no rejection claims a silicon trap mechanism.
+Producer spacing, modifying
 self-AR count sources and additional repeated-body families require their
 own composition evidence. Encoded direct operand `00` does not by itself
 establish an IMR or stack-relative source.
@@ -4593,25 +4605,58 @@ AA22 has a different word (`3763`) at the same numeric store address;
 the images must not be merged into one code namespace. Original playback
 now passes this sequence without substituting a control value.
 
-### REL long-offset push boundary
+### Long-address PSHD contract
 
-The unchanged original request now stops at `02:a13d`, `4be1 0004`,
-with live PC `02:a13f`. AA99 contains `6fe1 0001 0d5a 8910 4be1 0004
-f495 4a10` at `02:a139..a140`, matching the stopped opcode/extension.
-`PSHD Smem` is defined by SPRU172C 4-131; long-offset/absolute operands
-add an address word and a clock. The staged decoder currently admits
-only short PSHD addressing. Extension retention, source-address/SP
-ownership, stack publication, producer ordering and replay need independent
-coverage before admitting this composition. The encoded AR1 plus literal
-must be interpreted through the addressing grammar and live context,
-not treated as a fixed source address.
+`PSHD Smem` (SPRU172C 4-131, class 16B) admits long offset,
+long preincrement, long circular preincrement and canonical absolute
+forms (`4be0..4bf8`). The complete address word is retained in Decode,
+Access resolves the source and allocates the stack word, Read captures
+the source once and Execute writes the retained value. The source and
+stack address have separate owners. In an isolated entry the declared
+model resolves/allocates at clock 5, reads at 6 and writes at 7; physical
+bank timing and external-memory contention remain unvalidated.
 
-Current acceptance passes the complete 288-check default CPU suite,
-both PMST-store profiles, the separate `pmst-map`, `pmst-pop`,
-`pmst-popd`, `pmst-prefetch`, `pmst-iptr`, `stlm-imr`, `rpt-smem`,
-`rpt-ld` and `rpt-ld-edge` profiles, native 5110 save-state restoration
-and 2,912 tool tests (one skipped). These checks do not establish physical
-bank timing or decoded audio.
+`pshd-long` passes 99,696 cases/replays. Its 96,000 RAM cases cover all
+25 forms, four values, both compatibility/CPL states, BK=0/9, two pages,
+early/late IRQ/NMI and three snapshots. Linear offsets are -1/0/4/32767;
+nonzero-BK circular offsets are -1/0/4/8, with a valid initial index and
+step magnitude at most BK. Absolute cases include the old stack top,
+the push destination itself and the end of the 16-bit data space.
+Poisoning the fetched literal and sampled RAM cannot retarget or change
+the push. Every run requires one source read/write, one pointer update
+where applicable and a balanced optional interrupt frame.
+
+The remaining 3,696 cases resolve 26 mapped-register sources through
+offset, long preincrement or absolute Smem addressing. Control-register
+inputs remain fixed safe state; ordinary register fields use four patterns.
+The modifying self-AR case is excluded, not silently tested against its
+own updated value. `pshd-long-map` runs this bank alone.
+
+`pshd-long-edge` passes 64 cases/replays for SP, peripheral and modifying
+self-AR sources, an unadmitted mode and delayed/repeat/block/XC owners,
+across both compatibility states and pages. They reject before stack,
+data or pointer effects; address-preview AR/ARP updates are discarded
+on an unadmitted source. These are prototype exclusions, not claimed
+silicon exceptions. Older-producer, adjacent-stack and compound-loop
+compositions need their own coverage. Long MOD=13 preincrement is a
+read-capable addressing mode, unlike short write-only MOD=3.
+
+### REL long-offset pop boundary
+
+Original playback passes `4be1 0004` at `02:a13d` and now stops on
+`8be1 0004` at `02:a270`, with live PC `02:a272`. AA99 contains
+`8a10 8be1 0004 f4e4` at `02:a26f..a272`; this is a long-offset POPD
+followed by FRET, not a missing source image. The source-address grammar,
+SP/Read ownership, destination publication and replay need independent
+coverage before admitting that pop. The encoded AR1 plus literal must
+not be mistaken for a fixed destination address.
+
+The full 288-check default suite was last run at `bfcf0c3e`; it is a
+prototype regression net, not a substitute for the pending operand-domain
+audit. This extension passes its three profiles, corrected RPT profiles,
+nine other stack/repeat/PMST profiles, native 5110 save-state restoration
+and 2,914 tool tests (one skipped). These checks do not establish physical
+bank timing, all legal/illegal operand domains or decoded audio.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
@@ -4634,6 +4679,10 @@ python3 tools/run_c54x_core.py --profile rpt-ld-edge \
 python3 tools/run_c54x_core.py --profile stlm-pmst \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile stlm-pmst-edge \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile pshd-long \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile pshd-long-edge \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 
