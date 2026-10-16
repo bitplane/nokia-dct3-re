@@ -65,6 +65,21 @@ for otherwise unsupported operations and makes no silicon-trap claim.
 Fifteen neighboring profiles pass, covering MAC, ASM consumers, repeats,
 T-load composition, prior rejection banks and short-preincrement stores.
 
+LDM (`48xx/49xx`), PSHM (`4axx`) and PSHD (`4bxx`) also reject short
+MOD=3 before operand effects in the atomic frontend; the staged frontend
+already excludes these forms. `stack-mod3-edge` first runs the legacy atomic
+prefix, including the corrected `489a` LDM rejection, then passes 512
+rejection/replay cases over four opcode classes, all ARs, CMPT settings,
+pages, frontends and two snapshots. Data, pointers (including MMR upper
+bits), accumulators, T, status and SP remain unchanged. It claims no silicon
+trap or full staged-suite coverage. Twelve neighboring profiles pass,
+including extended/mapped/repeated PSHD, stack IRQs, RAM POPD, legal short
+preincrement stores and the multiply rejection bank. Native 5110 save-state
+restoration and 2,927 tool tests (one skipped) pass. MMR long forms, other
+read-source families, implicit copies and read/modify/write remain separate
+audit questions. Long MOD=13 remains a valid ordinary Smem read encoding,
+but is not an MMR addressing form (SPRU131G section 5.6).
+
 Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
 MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
 extension before rejecting; STL/STH extensions are unchanged. The
@@ -114,12 +129,14 @@ both CMPT settings, both pages, atomic and staged frontends, and snapshots
 before/after rejection. No data access, AR update, accumulator, T or ST0 change
 is permitted. The atomic guard precedes `immediate_smem_read`; the staged
 classifier excludes short MOD=3. This does not close the other read families.
-The full 288-check default CPU suite passes with the corrected load,
+At `eb451576`, the full 288-check default CPU suite passes with the corrected load,
 SUBC, CMPM/BITF, scalar-arithmetic and multiply/T-load domains, including the
 legacy atomic immediate-MAC rejection control. The isolated multiply/load
 rejection bank, four positive multiply/T-load banks, fifteen neighboring
 profiles and absolute DP-load control also pass. Native 5110 save-state
-restoration and 2,926 tool tests (one skipped) pass. This remains a prototype
+restoration and 2,926 tool tests (one skipped) pass. The subsequent MMR/push
+correction uses the atomic-prefix and focused profiles above, not a fresh
+full staged run. This remains a prototype
 regression net, not proof that remaining operand domains or all circular
 inputs are legal.
 

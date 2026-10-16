@@ -312,6 +312,13 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "stack-mod3-edge": (
+        (
+            "TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0",
+            "TMS320C54x MMR push MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0",
+        ),
+        "Fatal error: TMS320C54x isolated MMR push MOD3 exclusions complete",
+    ),
     "pshd-long": (
         "TMS320C54x extended PSHD: PASS cases=99696 restore=99696 ram_cases=96000 mapped_cases=3696 forms=25 offsets=-1,0,4,32767 circular_offsets=-1,0,4,8 values=4 bk=0,9 cmpt=2 cpl=2 pages=2 sources=none,IRQ,NMI arrivals=early,late snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once source_retained=1 balanced_frames=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated extended PSHD complete",

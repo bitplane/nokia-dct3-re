@@ -961,8 +961,15 @@ Indirect MMR addressing was a separate core defect: `LDM`/`STLM` and the
 other seven-bit MMR operand forms previously read the opcode's low bits as a
 fixed address even when the indirect bit was set. They now select the AR's
 low seven bits, apply pre/post modification, and clear its upper nine bits
-after the access, per SPRU131G section 5.6. Fixture-only `4882`, `8892`, and
-`489a` check read, postincrement write, and preincrement read at one cycle.
+after the access, per SPRU131G section 5.6. Fixture-only `4882` and `8892`
+check read and postincrement write at one cycle. `489a` instead rejects:
+short MOD=3 is write-only, including in the MMR grammar. LDM, PSHM and
+PSHD reject this source encoding before data, AR masking/modification or
+stack effects; `stack-mod3-edge` checks 512 cases/restores and the legacy
+atomic prefix. The ordinary Smem long-offset preincrement form remains
+read-capable, but long forms are separately excluded from MMR addressing
+by section 5.6. Implicit-copy and read/modify/write forms are not decided
+by these tests.
 SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's

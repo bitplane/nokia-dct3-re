@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mmr_push_mod3_scope(self):
+        markers, ending = EXTRA_PROFILES['stack-mod3-edge']
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='stack-mod3-edge')
+        for marker in markers:
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                check_result(output.replace(marker, ''), 3, profile='stack-mod3-edge')
+        for old, new in (('restore=512', 'restore=0'), ('opcode_classes=4', 'opcode_classes=2'),
+                         ('frontends=2', 'frontends=1'), ('stack_changes=0', 'stack_changes=1'),
+                         ('pointer_changes=0', 'pointer_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='stack-mod3-edge')
+
     def test_multiply_load_mod3_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['mul-mod3-edge']
         output = marker + '\n' + ending + '\n'
