@@ -98,13 +98,12 @@ Pending MVKD writes now forward to same-address consumers, eliminating
 the observed stack-index corruption and subsequent code overwrite without
 changing the memory map. The two-word shifted store `6f93 0d9f` at
 `02:41bc` now executes in the delay span of `RPTBD 41eb`; other delayed
-control owners remain independently guarded. Basic memory-sourced
-`RPT Smem` now has independent count/address/replay coverage. The current
-stop is its repeated body at `02:5cf9`, `f45f` (`LD A,-1,A`), which the
-repeat decoder does not yet admit. This original repeat has not completed;
-its effective count source must still be derived from live DP/CPL, not
-the encoded operand byte alone.
-The generic 16-bit
+control owners remain independently guarded. Memory-sourced `RPT Smem`
+and repeated immediate/ASM-shift accumulator loads have independent
+count, arithmetic, interrupt and replay coverage. Original playback now
+passes the repeated `LD A,-1,A` at `02:5cf9` and stops at `02:9fae`,
+`891d` (`STLM B,PMST`). This is an unimplemented accumulator-to-control
+register store, not evidence of missing external hardware. The generic 16-bit
 repeat comparator retains the documented foreign-page hazard; delayed
 calls do not acquire a hidden page-private loop controller.
 This is a failed coverage diagnostic, not a playback acceptance or an
@@ -4487,7 +4486,7 @@ three-word addressing, BRC destinations and a different control owner,
 with no data or pointer side effects. These exclusions are prototype
 limits, not claimed silicon traps; physical pipeline phases remain unvalidated.
 
-### REL memory-sourced repeat boundary
+### REL memory-sourced repeat contract
 
 `RPT Smem` now admits basic direct operands and short indirect stationary,
 postdecrement, postincrement and preincrement forms (`4700..479f`), in
@@ -4518,19 +4517,60 @@ self-AR count sources and additional repeated-body families require their
 own composition evidence. Encoded direct operand `00` does not by itself
 establish an IMR or stack-relative source.
 
-Current acceptance passes the complete 288-check default CPU suite,
-both new repeat-count profiles, the separate `rptbd-shift-st`,
-`rptbd-shift-edge`, `rptbd`, `rptbd-irq`, `rptbd-edge` and
-`instr-observer` regressions, native 5110 save-state restoration and
-2,906 tool tests (one skipped). None establishes physical bank timing
+### Repeated accumulator loads
+
+The repeat engine admits `LD src,SHIFT,dst` and `LD src,ASM,dst`
+(TI SPRU172C 4-66..68). Each iteration consumes the current source
+accumulator and updates only its destination and sticky destination
+overflow. Same-accumulator loads therefore compound; cross-accumulator
+loads do not. SXM governs right-shift extension and OVM governs
+left-shift saturation. The instruction remains one word, with one
+Execute publication per steady-state clock. Other register-operation
+families remain independently guarded.
+
+`rpt-ld` passes 200,704 cases/replays. Its 32,768 arithmetic cases
+cover all four source/destination pairs, all 32 signed shifts, both
+shift sources, SXM/OVM, eight source patterns and four repeat counts,
+with distributed pages/snapshots. Another 165,888 cases cross short/
+long immediate, DP, SP, absolute-RAM and absolute-AR counts with three
+representative shifts, flags, two patterns, both pages, IRQ/NMI and
+three snapshots. The independent oracle compares both accumulators,
+sticky flags and RC at every clock, not just the final result. Tests
+also poison the backing opcode/count after capture, require a fresh
+one-word continuation and balance the deferred interrupt frame.
+
+The remaining 2,048 cases put immediate-shift loads inside short RPT
+inside RPTB, with outer counts 0/2 and inner counts 0/1/7/255. The
+focused `rpt-ld-block` profile runs this bank alone. It checks every
+arithmetic publication, independent counters and one inner continuation
+per outer iteration. RPTB's initial discarded sequential fetch must not
+be mistaken for an executed body: the fixture gives that fetch a distinct
+`e8ff` word, replaces it before the redirected accepted fetch, and proves
+only the actual load executes. This is a declared pipeline-model test,
+not a measured physical fetch phase. Block/IRQ composition and memory
+counts inside blocks remain outside this bank's claim.
+
+`rpt-ld-edge` passes 32 cases/replays for eight other operation families,
+rejecting before data, arithmetic or flag effects. These remain prototype
+exclusions, not silicon traps.
+
+The full 288-check default CPU suite was last verified at `667be03c`.
+The load extension additionally passes its three profiles, nine related
+count/block/ASM/observer profiles, native 5110 save-state restoration and
+2,909 tool tests (one skipped). None establishes physical bank timing
 or decoded audio.
 
-The unchanged original playback request now reaches the repeat-body
-guard at `02:5cf9`, `f45f` (`LD A,-1,A`), with live PC `02:5cfb`.
-Decode rejects this body before completing the original memory repeat;
-the isolated fixtures above, not this run, establish count acquisition.
-Repeated accumulator shifts need their own per-iteration arithmetic,
-flags, source/destination composition, interrupt and replay evidence.
+### REL PMST-store boundary
+
+The unchanged original playback request passes `02:5cf9` and now reaches
+`02:9fae`, opcode `891d` (`STLM B,PMST`), with live PC `02:9fb0`.
+The original AA99 REL image contains `491d f340 0021 f495 f495 891d`
+at `02:9fa9..9fae`: an ordinary PMST read/modify/store sequence.
+AA22 has a different word (`3763`) at the same numeric store address;
+the images must not be merged into one code namespace. The open contract
+is accumulator-to-PMST publication and its mapping/latency effects,
+not a missing peripheral response. The staged core currently excludes
+that destination rather than substituting a control value.
 
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
@@ -4545,6 +4585,10 @@ python3 tools/run_c54x_core.py --profile mvkd-forward \
 python3 tools/run_c54x_core.py --profile rpt-smem \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile rpt-smem-edge \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile rpt-ld \
+  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_core.py --profile rpt-ld-edge \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 

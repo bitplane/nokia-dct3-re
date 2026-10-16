@@ -12,6 +12,42 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_accumulator_load_block_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-ld-block']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-ld-block')
+        for old, new in (('restore=2048', 'restore=0'), ('each_iteration=1', 'each_iteration=0'),
+                         ('inner_continuations=outer+1', 'inner_continuations=outer'),
+                         ('outer_counter_preserved=1', 'outer_counter_preserved=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-ld-block')
+
+    def test_repeated_accumulator_load_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-ld']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-ld')
+        for old, new in (('restore=200704', 'restore=0'), ('block_cases=2048', 'block_cases=0'),
+                         ('each_iteration=1', 'each_iteration=0'),
+                         ('retained_count=1', 'retained_count=0'), ('retained_opcode=1', 'retained_opcode=0'),
+                         ('fresh_continuation=1', 'fresh_continuation=0'), ('balanced_frames=1', 'balanced_frames=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-ld')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rpt-ld')
+
+    def test_repeated_accumulator_load_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-ld-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-ld-edge')
+        for old, new in (('restore=32', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('arithmetic_changes=0', 'arithmetic_changes=1'),
+                         ('flag_changes=0', 'flag_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-ld-edge')
+
     def test_basic_memory_repeat_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['rpt-smem-edge']
         output = marker + '\n' + ending + '\n'

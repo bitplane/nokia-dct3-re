@@ -9003,6 +9003,121 @@ private:
 	static u16 rptbd_source(unsigned v, unsigned i) { return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(rptbd_seed(v) / 16) % 4] ^ u16(i * 0x1357); }
 	static int rptbd_irq_line(unsigned v) { return ((v - 512) / 32) % 2 ? INPUT_LINE_NMI : 2; }
 	static bool rptbd_late_irq(unsigned v) { return ((v - 512) / 64) % 2; }
+	struct repeat_load_fixture
+	{
+		unsigned selector, flags, pattern, count, setup, irq, checkpoint, first, outer;
+		bool asm_form, block;
+		int shift;
+		u32 base, body;
+		u16 word, st0, st1, address;
+	};
+	static repeat_load_fixture repeat_load_case(unsigned v)
+	{
+		repeat_load_fixture f{}; unsigned snapshot = v % 3;
+		if (v >= 198656)
+		{
+			v -= 198656; f.block = true; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
+			f.outer = v % 2 ? 2 : 0; v /= 2; f.selector = v % 4; v /= 4; f.shift = v % 2 ? 15 : -1; v /= 2;
+			f.flags = v % 4; v /= 4; f.pattern = v % 2 ? 4 : 2; v /= 2; f.base = v % 2 ? 0x20000 : 0; v /= 2;
+			snapshot = v % 2; f.asm_form = false;
+		}
+		else if (v < 32768)
+		{
+			f.selector = v % 4; v /= 4; f.shift = int(v % 32) - 16; v /= 32;
+			f.flags = v % 4; v /= 4; f.pattern = v % 8; v /= 8;
+			f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4; f.asm_form = v % 2;
+			f.base = (f.pattern + f.flags) % 2 ? 0x20000 : 0;
+		}
+		else
+		{
+			v -= 32768; f.setup = v % 6; v /= 6; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
+			f.selector = v % 4; v /= 4; f.shift = std::array<int, 3>{-16, -1, 15}[v % 3]; v /= 3;
+			f.flags = v % 4; v /= 4; f.pattern = v % 2 ? 4 : 2; v /= 2;
+			f.base = v % 2 ? 0x20000 : 0; v /= 2; f.irq = v % 3; v /= 3; snapshot = v % 3; v /= 3; f.asm_form = v % 2;
+		}
+		bool const extended = f.setup == 1 || f.setup >= 4;
+		f.body = f.base + (extended ? 0x602 : 0x601); f.first = f.setup == 0 ? 7 : f.setup == 1 ? 8 : f.setup <= 3 ? 9 : 10;
+		if (f.block) { f.body = f.base + 0x603; f.first = 11; }
+		f.checkpoint = snapshot == 0 ? 3 : snapshot == 1 ? f.first + f.count / 2 : f.first + f.count;
+		f.word = (f.asm_form ? 0xf482 : 0xf440 | (f.shift & 31)) | ((f.selector & 2) << 8) | ((f.selector & 1) << 8);
+		f.st0 = 0xb808 | (f.pattern & 1 ? 0x600 : 0);
+		f.st1 = (f.setup == 3 ? 0x4000 : 0) | (f.irq ? 0 : 0x800) | (f.flags & 1 ? 0x100 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.asm_form ? f.shift & 31 : 11);
+		f.address = f.setup == 3 ? 0x3000 : f.setup == 5 ? 0x15 : 0x400;
+		return f;
+	}
+	static std::array<u64, 3> repeat_load_initial(repeat_load_fixture const &f)
+	{
+		u64 const source = std::array<u64, 8>{0, 1, 0x007fffffffULL, 0x0080000000ULL, 0xff80000000ULL, 0xffffffffffULL, 0x7fffffffffULL, 0x8000000000ULL}[f.pattern];
+		return {f.selector & 2 ? 0x123456789aULL : source, f.selector & 2 ? source : 0xfedcba9876ULL, f.st0};
+	}
+	static std::array<u64, 3> repeat_load_step(repeat_load_fixture const &f, std::array<u64, 3> state)
+	{
+		u64 const source = state[(f.selector >> 1) & 1]; u64 value = source;
+		if (f.shift < 0)
+			for (int i = 0; i < -f.shift; ++i) value = (value >> 1) | (f.flags & 1 && value & 0x8000000000ULL ? 0x8000000000ULL : 0);
+		else
+		{
+			s64 const signed_source = source & 0x8000000000ULL ? s64(source) - (s64(1) << 40) : s64(source);
+			s64 const full = signed_source * (s64(1) << f.shift); value = u64(full) & 0xffffffffffULL;
+			if (full < -2147483648LL || full > 2147483647LL)
+			{
+				state[2] |= f.selector & 1 ? 0x200 : 0x400;
+				if (f.flags & 2) value = full < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+			}
+		}
+		state[f.selector & 1] = value; return state;
+	}
+	void start_repeat_load(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = repeat_load_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.setup == 0 ? 0xec00 | f.count : f.setup == 1 ? 0xf070 : f.setup <= 3 ? 0x4700 : 0x47f8);
+		if (f.setup == 1 || f.setup >= 4) program.write_word(f.base + 0x601, f.setup == 1 ? f.count : f.address);
+		program.write_word(f.body, f.word); program.write_word(f.body + 1, 0x6d94); program.write_word(f.base + 0x60f, 0xf4e1);
+		if (f.block) { program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, 0x607); program.write_word(f.base + 0x602, 0xec00 | f.count); program.write_word(f.body, 0xe8ff); program.write_word(f.base + 0x608, 0xf4e1); }
+		u32 const vector = f.base + (f.irq == 2 ? 4 : 0x48); program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
+		m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_RC, 0); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.block ? f.outer : 13); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 17);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 ? 4 : 0);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == 4 ? 0x6000 : 0x7000 + i);
+		m_repeat_load_expected = {repeat_load_initial(f)};
+		for (unsigned i = 0; i < (f.count + 1) * (f.outer + 1); ++i) m_repeat_load_expected.push_back(repeat_load_step(f, m_repeat_load_expected.back()));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, m_repeat_load_expected[0][0]); m_cpu->set_state_int(tms320c54x_device::STATE_B, m_repeat_load_expected[0][1]);
+		if (f.setup >= 2) data.write_word(f.address, f.count);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_observed_instructions.clear(); m_saved_observed_instructions.clear(); m_rptbd_counts = {}; m_rptbd_return = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(f.body, f.body, "repeat_load_body", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			// RPTB discards the sequential pre-redirect fetch. Give it a
+			// distinct word to prove it never becomes an executed inner body.
+			bool const discarded = f.block && !m_rptbd_counts.fetches;
+			u16 const expected = discarded ? 0xe8ff : f.word;
+			if (word != expected || m_rptbd_counts.fetches > f.outer + unsigned(f.block)) osd_printf_info("Repeated load fetch mismatch case=%u replay=%u at=%06x word=%04x expected=%04x fetches=%u outer=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, expected, m_rptbd_counts.fetches, f.outer, (unsigned long long)m_cpu->pipeline_cycles());
+			expect(word == expected && m_rptbd_counts.fetches <= f.outer + unsigned(f.block) && (!discarded || m_cpu->pipeline_cycles() == 5), "Repeated load distinguishes discarded block-setup prefetch from one accepted opcode per outer iteration"); ++m_rptbd_counts.fetches; });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_load_reads", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff) { expect(f.irq && !m_rptbd_counts.stack_reads++ && word == m_rptbd_return, "Repeated load interrupt reads its original continuation once"); return; }
+			expect(f.setup >= 2 && at == f.address && word == f.count && !m_rptbd_counts.reads++ && m_cpu->pipeline_cycles() == (f.setup >= 4 ? 6 : 5), "Repeated accumulator load reads only its one memory count"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_load_writes", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_writes++ && word >= u16(f.body + 1) && word <= 0x60f, "Repeated accumulator load writes only the deferred interrupt frame"); m_rptbd_return = word; });
+		m_phase = 310480; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_repeat_load_edge(unsigned variant = 0)
+	{
+		start_repeat_load(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		u32 const base = (variant / 8) % 2 ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, 0xec01);
+		program.write_word(base + 0x601, std::array<u16, 8>{0xf460, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_load_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_load_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_phase = 310500; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	struct basic_repeat_fixture
 	{
 		unsigned form, count, irq, checkpoint, selected, modification;
@@ -14778,6 +14893,9 @@ private:
 		if (!strcmp(machine().options().bios(), "rptbd-shift-edge")) { start_rptbd_shift_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-smem")) { start_basic_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-smem-edge")) { start_basic_repeat_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-ld")) { start_repeat_load(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-ld-block")) { start_repeat_load(198656); return; }
+		if (!strcmp(machine().options().bios(), "rpt-ld-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-irq")) { start_rptbd(512); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-mapped") || !strcmp(machine().options().bios(), "mvdk-acc")) { start_mvdk_mapped(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-producer") || !strcmp(machine().options().bios(), "mvdk-acc-prod")) { start_mvdk_producer(); return; }
@@ -41032,6 +41150,64 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310480)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_load_case(variant);
+			unsigned completed = tick < f.first ? 0 : std::min(tick - f.first + 1, f.count + 1);
+			if (f.block) { completed = 0; for (auto const &[address, word] : m_observed_instructions) if (address == f.body) ++completed; }
+			unsigned const last = f.first + f.count, total = (f.count + 1) * (f.outer + 1);
+			expect(completed <= total, "Outer and inner repeat counts cannot execute an extra load");
+			auto const expected = m_repeat_load_expected[completed];
+			unsigned const remaining = tick < f.first - 1 ? 0 : tick <= f.first ? f.count : tick <= last ? last - tick : 0;
+			bool const success = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2] && (f.block || m_cpu->state_int(tms320c54x_device::STATE_RC) == remaining);
+			if (!success) osd_printf_info("Repeated load mismatch case=%u tick=%u replay=%u setup=%u shift=%d selector=%u completed=%u expected=%010llx/%010llx/%04x/%04x actual=%010llx/%010llx/%04x/%04x illegal=%u\n", variant, tick, unsigned(m_pipeline_replay), f.setup, f.shift, f.selector, completed, (unsigned long long)expected[0], (unsigned long long)expected[1], unsigned(expected[2]), remaining, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			expect(success, "Repeated load publishes each live-source shift and sticky destination overflow on its own clock");
+			if (f.irq && tick == 2) { int const line = f.irq == 2 ? INPUT_LINE_NMI : 2; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
+			if (f.block && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body, f.word); }
+			if (!f.block && tick == (f.setup == 1 || f.setup >= 4 ? 4U : 3U)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body, 0xe8ff); }
+			if (f.setup >= 2 && tick == (f.setup >= 4 ? 6U : 5U)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
+			if (tick < last) expect(!m_rptbd_counts.acks && !m_rptbd_counts.stack_writes, "Repeated load defers every interrupt until its final arithmetic publication");
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_rptbd_saved_counts = m_rptbd_counts; m_rptbd_saved_return = m_rptbd_return; m_saved_observed_instructions = m_observed_instructions;
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated load at Decode, middle or final arithmetic publication");
+			}
+			if (tick == (f.block ? total + 12 * (f.outer + 1) + 80 : last + 64))
+			{
+				unsigned iterations = 0, continuations = 0;
+				for (auto const &[address, word] : m_observed_instructions) { if (address == f.body) { expect(word == f.word, "Repeated load retains its fetched opcode"); ++iterations; } if (address == f.body + 1) ++continuations; }
+				expect(iterations == total && continuations == f.outer + 1 && m_rptbd_counts.fetches == f.outer + 1 + unsigned(f.block) && m_rptbd_counts.reads == unsigned(f.setup >= 2) && m_rptbd_counts.acks == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)) && m_rptbd_counts.stack_reads == unsigned(bool(f.irq)), "Repeated load owns count+1 operations and one fresh continuation per outer iteration, excluding discarded block prefetch");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.block ? 0x609 : 0x610) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.block ? 0 : 13) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_BK) == 17, "Repeated load preserves status, stack and unrelated control state");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == 4 ? 0x6000 + f.outer + 1 : i == 5 && f.setup == 5 ? 0xdead : 0x7000 + i), "Repeated accumulator load does not modify address registers; each outer continuation runs once");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts; m_rptbd_return = m_rptbd_saved_return; m_observed_instructions = m_saved_observed_instructions;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeat iteration, live accumulators and sticky flags without restarting"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310490; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 200703) { start_repeat_load(variant + 1); return; }
+				if (!strcmp(machine().options().bios(), "rpt-ld-block")) { osd_printf_info("TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD block complete"); }
+				osd_printf_info("TMS320C54x repeated accumulator LD: PASS cases=200704 restore=200704 arithmetic_cases=32768 composition_cases=165888 block_cases=2048 selectors=4 shifts=-16..15 shift_sources=opcode,ASM sxm_ovm=4 counts=0,1,7,255 count_sources=short,long,DP,SP,absolute_RAM,absolute_AR pages=2 sources=none,IRQ,NMI snapshots=3 each_iteration=1 retained_opcode=1 retained_count=1 fresh_continuation=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310480; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310500)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 16 ? 3 : 10;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded register repeat performs no data transaction");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded register repeat before or after rejection"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb808 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unadmitted repeat families reject before arithmetic, flags, pointer or stack effects");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded repeat without new effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310510; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 31) { start_repeat_load_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x repeated accumulator LD exclusions: PASS cases=32 restore=32 other_families=8 pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 flag_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310500; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310460)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 18 ? 3 : 10;
@@ -44414,6 +44590,7 @@ private:
 	std::stringstream m_saved_vector;
 	std::stringstream m_saved_pipeline;
 	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
+	std::vector<std::array<u64, 3>> m_repeat_load_expected;
 	u64 m_pipeline_expected_cycle = 0;
 	bool m_pipeline_empty_nmi = false;
 	bool m_pipeline_memory_case = false;
@@ -44512,7 +44689,7 @@ private:
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem"))
+	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-ld-block"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose") || !strcmp(config.options().bios(), "bus-stm")) m_cpu->set_c5416_bus_profile(true);
@@ -44520,6 +44697,13 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 310480)
+		{
+			auto const f = repeat_load_case(m_pipeline_peripheral_case); unsigned iterations = 0;
+			for (auto const &[address, word] : m_observed_instructions) if (address == f.body) ++iterations;
+			expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && iterations == f.count + 1, "Repeated accumulator load acknowledges its pending source only after every arithmetic iteration");
+			m_cpu->set_input_line(line, CLEAR_LINE);
+		}
 		if (m_phase == 310440)
 		{
 			auto const f = basic_repeat_case(m_pipeline_peripheral_case); unsigned iterations = 0;
@@ -45341,6 +45525,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(228, "rptbd-shift-edge", "Shifted RPTBD span, destination and control-owner exclusions")
 	ROM_SYSTEM_BIOS(229, "rpt-smem", "Basic memory repeat counts with address, interrupt and replay coverage")
 	ROM_SYSTEM_BIOS(230, "rpt-smem-edge", "Memory repeat control, address and lifecycle exclusions")
+	ROM_SYSTEM_BIOS(231, "rpt-ld", "Repeated accumulator loads with per-iteration flags, interrupts and replay")
+	ROM_SYSTEM_BIOS(232, "rpt-ld-edge", "Unadmitted repeated register-family exclusions")
+	ROM_SYSTEM_BIOS(233, "rpt-ld-block", "Focused repeated accumulator loads inside an outer block repeat")
 ROM_END
 
 ROM_START(tms54rom4)

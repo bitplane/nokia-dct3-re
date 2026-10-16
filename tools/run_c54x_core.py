@@ -312,6 +312,18 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rpt-ld-block": (
+        "TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated accumulator LD block complete",
+    ),
+    "rpt-ld": (
+        "TMS320C54x repeated accumulator LD: PASS cases=200704 restore=200704 arithmetic_cases=32768 composition_cases=165888 block_cases=2048 selectors=4 shifts=-16..15 shift_sources=opcode,ASM sxm_ovm=4 counts=0,1,7,255 count_sources=short,long,DP,SP,absolute_RAM,absolute_AR pages=2 sources=none,IRQ,NMI snapshots=3 each_iteration=1 retained_opcode=1 retained_count=1 fresh_continuation=1 balanced_frames=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated accumulator LD complete",
+    ),
+    "rpt-ld-edge": (
+        "TMS320C54x repeated accumulator LD exclusions: PASS cases=32 restore=32 other_families=8 pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 flag_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated repeated accumulator LD exclusions complete",
+    ),
     "rpt-smem": (
         "TMS320C54x basic memory repeat: PASS cases=12680 restore=12680 forms=44 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated basic memory repeat complete",
