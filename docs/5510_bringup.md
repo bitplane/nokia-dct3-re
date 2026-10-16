@@ -42,10 +42,12 @@ the subsequent interval count, so its DST zero-fill no longer wraps into the
 register window. Software-saved repeat replacement/restoration now passes
 the isolated interrupt fixture, and the original recorder advances past
 `RPTB 03:faa5`. Accumulator SQUR (`f48d`) at `03:dbe6` also executes.
-The internal BD (`f273`) at `03:da7e` also executes. The current exclusion
-is extended BANZ (`6ce0`) at `02:a4cb`, inside repeated block
-`02:a4cb..02:a4dd`, with live terminal PC `02:a4cf`. NAND writes alone
-do not prove complete recording.
+The internal BD (`f273`) at `03:da7e` and extended BANZ (`6ce0`) at
+`02:a4cb` also execute. The current exclusion is absolute ADD `00f8 000b`
+at `02:9e9d`, occupying the two-word delay span of FCALLD `03:dc44` at
+`02:9e9b`. The source is mapped BL, not RAM. Live terminal PC is
+`02:9e9f`; it is not the owning instruction address. NAND writes alone do
+not prove complete recording.
 
 The repeat-exclusion snapshot has ST1=`e104` (BRAF set), BRC=`003f`,
 RSA=`db51`, REA=`db56`, SP=`5cc2`. The retained range belongs to
@@ -145,6 +147,30 @@ The conditional, nondelayed and backward block-branch profiles, exclusion
 profile, saved-repeat and SQUR profiles, native 5110 save-state gate and
 2,865 tooling tests (one skip) pass at this boundary. The default broad CPU
 run was not repeated for this admission-only change.
+
+### Long BANZ in a block
+
+The original `6ce0 fffc a4d5` at `02:a4cb` tests the resolved `AR0-4`
+address without a data-memory read and selects a buffer path inside the
+repeated range `02:a4cb..02:a4dd`. Nondelayed BANZ now has the same
+bounded admission as B/BC: the complete instruction must end before REA
+and its target must remain inside the block. A taken BANZ also resets the
+speculative fetch count from Decode-owned BRC after discarding fall-through
+words; AR modification remains owned by the existing address logic.
+
+`--profile rptb-banz` passes 768 cases and save/replays: three long forms
+(offset, preincrement, circular), eight initial/offset pairs, outer counts
+`0,1,2,7`, two pages and four checkpoints. Selected-arm writes and sequential
+source reads occur once per iteration, AR0 updates occur once per branch,
+and taken/untaken transitions follow the computed address rather than the
+loaded data word. CMPT, interrupts and physical phases remain unvalidated
+for this composition. The standalone long BANZD, internal BD/BCD, branch
+exclusion, forward/backward branch and saved-repeat profiles pass as controls.
+Original execution advances to the separately mapped FCALLD/absolute-ADD
+delay sequence above; this is not full recorder acceptance.
+The native 5110 save-state gate, resident-memory comparison and 2,866
+tooling tests (one skip) pass. The full default core run was not repeated
+for this bounded block-composition change.
 
 `tools/mu4_repeat_context_observe.lua` reproduces the read-only witness on
 `mu4nand -bios bootrecstage`: add `-debug -debugger none`, the absolute

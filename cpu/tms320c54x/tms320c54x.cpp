@@ -2739,6 +2739,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_decode_flush = 1;
 			}
 			m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+			if (m_pipeline_block_body[3]) m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 		}
 	}
 	bool retd_delay_decode = false;
@@ -3013,8 +3014,8 @@ void tms320c54x_device::pipeline_step()
 		bool const block_setup = staged_block_repeat(word);
 		bool const block_word = m_pipeline_block_body[2];
 		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
-		bool const internal_block_branch = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
-			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
+		bool const internal_block_branch = (word == 0xf073 || (staged_banz(word) && !BIT(word, 9)) || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
+			m_pipeline_address[2] + (staged_extended_banz(word) ? 2 : 1) < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		bool const internal_delayed_block_branch = (word == 0xf273 || (staged_accumulator_branch(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];

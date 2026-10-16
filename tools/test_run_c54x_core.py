@@ -110,6 +110,17 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='repeat-context')
 
+    def test_long_banz_block_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-banz']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-banz')
+        for bad in (output.replace('restore=768', 'restore=0'),
+                    output.replace('ar_updates_once=1', 'ar_updates_once=0'),
+                    output.replace('actual_iterations=1', 'actual_iterations=0'),
+                    marker + '\n' + output, output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptb-banz')
+
     def test_unconditional_delayed_block_branch_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-bd']
         output = marker + '\n' + ending + '\n'
