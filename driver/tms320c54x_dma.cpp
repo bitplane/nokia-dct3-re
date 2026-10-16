@@ -46,7 +46,7 @@ u16 tms320c54x_dma_device::read(offs_t offset)
 	if (offset == 0) return m_control;
 	if (offset == 1) return m_index;
 	if (offset != 2 && offset != 3) return 0xffff;
-	u16 const value = valid_index(m_index) ? m_regs[m_index] : 0;
+	u16 const value = inspect_register(m_index);
 	if (offset == 2 && !machine().side_effects_disabled()) ++m_index;
 	return value;
 }
@@ -85,6 +85,11 @@ void tms320c54x_dma_device::write(offs_t offset, u16 value)
 	}
 }
 
+u16 tms320c54x_dma_device::inspect_register(unsigned index) const
+{
+	return index < std::size(m_regs) && valid_index(index) ? m_regs[index] : 0;
+}
+
 bool tms320c54x_dma_device::source_matches(unsigned channel, int space, u32 address) const
 {
 	if (channel >= 6 || !BIT(m_control, channel)) return false;
@@ -103,7 +108,9 @@ bool tms320c54x_dma_device::source_read_matches(unsigned channel, int space, u32
 void tms320c54x_dma_device::enable(unsigned channel)
 {
 	validate(channel);
-	m_frame_elements[channel] = m_regs[channel * 5 + 2];
+	// DE pauses/resumes the channel; the original DMCTR shadow is not its
+	// decremented live counter (SPRU302B 3.2.3.2). CPU count writes and block
+	// autoinitialization own shadow updates, not an enable-bit transition.
 	// Synchronized channels remain enabled but transfer nothing without their event.
 	unsigned const event = m_regs[channel * 5 + 3] >> 12;
 	if (!event || BIT(m_sync_levels, event))

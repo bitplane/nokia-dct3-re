@@ -23,6 +23,8 @@ public:
 	bool source_matches(unsigned channel, int space, u32 address) const;
 	// Unlike source_matches, true only inside this channel's actual source read.
 	bool source_read_matches(unsigned channel, int space, u32 address) const;
+	// Indexed register contents without changing the CPU-facing index latch.
+	u16 inspect_register(unsigned index) const;
 
 protected:
 	virtual void device_start() override;

@@ -277,10 +277,11 @@ count, arithmetic, interrupt and replay coverage. Original playback now
 passes the repeated `LD A,-1,A` at `02:5cf9` and the PMST store at
 `02:9fae`, the long-offset PSHD at `02:a13d`, and long-offset
 `POPD` (`8be1 0004`) at `02:a270`. At the 20-second observation, the
-unaltered original playback run has PC `02:a2d5`, `illegal=0`, one actual
+unaltered original playback run has PC `02:4e3c`, `illegal=0`, one actual
 bootstrap Execute entry and 12 resident Execute entries. Its paired arithmetic
-loop completes repeatedly, and nonzero words reach codec DIN. The current
-boundary is why processing reaches its programmed reload tail and whether PCM
+loop completes repeatedly. Correcting the DMA frame shadow removes the
+out-of-buffer source walk and its misleading nonzero output. The current
+boundary is why processing reaches its programmed reload tail with silent buffers and whether PCM
 has the expected media provenance, not an
 unsupported opcode. [Playback observations](#playback-execution-and-codec-observations)
 separate fetch hits, Execute entries and audio counts. The coverage diagnostic
@@ -3061,7 +3062,6 @@ the final element. Initial source addresses therefore alternate
 VC5410A table 3-20 identifies exactly this per-channel bank; the frame reload
 has only eight writable bits, so its stored value is `003f`. DA150 therefore
 uses the extended per-channel reload layout for this path, not shared `24..27`.
-The original-firmware stream has not yet executed through its endpoint.
 McBSP0 now has its own mapped data/control device and XRDY-to-DMA event line;
 forwarding it into McBSP1 would conflate different ports.
 The VC5410A datasheet's IFR diagram puts XINT1 at bit 11; table 3-21's
@@ -3070,6 +3070,25 @@ The DMA device now has an explicit per-channel reload configuration, selected
 by this fixture. Conformance checks all six reload banks, eight-bit frame masks,
 reserved `28/29`, indexed access and extended-bank save/restore. The
 channel-enable extension remains unsupported.
+
+DE disable/re-enable must preserve the original frame-element shadow, not
+replace it with the decremented live counter. SPRU302B sections 3.2.2.1 and
+3.2.3.2 distinguish channel enable from the original DMCTR count retained
+for each frame. R060 performs this pause around a call: AA22
+`02:90b7..90c1` and AA99 `02:7944..794e` clear bit 3 of DMPREC `0054`,
+call `02:97be` or `02:7b92`, then set the bit. The context tool pins the two
+11-word sequences in separate overlays; it does not infer all callee effects.
+The playback MMIO observation places its pause after the first element,
+while live count is zero and original count is one. Replacing the shadow
+there produces one-element frames and repeated `-63` source steps into
+unrelated data. CPU count writes and block autoinitialization update the
+shadow; changing DE alone does not. The focused two-frame sorting fixture
+pauses after its first word, saves while disabled, disturbs DMCTR through
+MMIO, restores and resumes. It requires all four source words, two frame
+interrupts and count one after the first frame; the defective model fails
+that exact count assertion. Indexed inspection is separately checked to
+leave the CPU-facing index unchanged and reject invalid register numbers.
+
 At captured DMPREC `4848`, INTOSEL is 1; VC5410A table 3-16 assigns IFR
 bit 11 to DMA channel 3 rather than XINT1. The fixture routes these sources
 according to INTOSEL. This is a partial mux (the attached transmit sources
@@ -4849,12 +4868,9 @@ native 5110 save-state and 2,929 tool tests (one skipped) pass.
 
 AA99 contains `8a10 8be1 0004 f4e4` at `02:a26f..a272`; the admitted
 long-offset POPD is followed by FRET, not a missing source image. On the
-unchanged protected NAND, original playback now runs the 20-second window
-without an illegal instruction: PC `02:a2d5`, one request/inspection/decoder
-load, 14 replies, cursor 12, and verified title/overlay. It reports 6,767,711
-NAND reads and 1,568,462 stream words. PC `a2d5` is inside AA99's paired
-arithmetic loop beginning at `a2c6`. Execution and codec observations below
-characterize this window without promoting it to playback acceptance.
+unchanged protected NAND, original playback executes this transfer without
+an illegal instruction. The current complete-window execution and codec
+observations below remain separate from playback acceptance.
 
 ### Playback execution and codec observations
 
@@ -4863,47 +4879,46 @@ physical bootstrap fetch hits but one Execute entry at logical `00:0e41`.
 Physical resident address `00:6d62` has 24 fetch hits; the observer records
 12 actual Execute entries at logical `02:6d62` under OVLY. The first resident
 entry is at 0.227594058 seconds; subsequent observed entries include
-2.366798542, 4.001016229 and 5.635233916 seconds. Bootstrap re-execution is
+2.366754525, 4.002378107 and 5.638001690 seconds. Bootstrap re-execution is
 not established by its three fetch hits. The recurring resident entry is real
 and follows the named-loader path described below. These are Execute-entry
 observations, not retirement or atomic register snapshots.
 
 AA99's `a2c6` loop loads BRC=`003f`, repeats through `a2e9` and returns at
-`a2ea`. Opcode-qualified Execute observations record 87,614 starts,
-5,607,269 body entries and 87,613 return entries. The bounds
-`64 * returns <= iterations <= 64 * starts` hold with one call in progress;
+`a2ea`. Opcode-qualified Execute observations record 87,510 starts,
+5,600,640 body entries and 87,510 return entries. The bounds
+`64 * returns <= iterations <= 64 * starts` hold with all observed calls returned;
 the sampled PC is not evidence of a stuck loop. The source calls this loop
 `filter` descriptively, not as a recovered Nokia function name. AA22 has
 different instructions at these addresses and must not inherit the attribution.
 
 The audio observation window starts at the verified decoder Execute entry,
-0.818862751 seconds, not at codec initialization. It counts 1,524,143 McBSP
-TX words and 1,691,776 codec DIN words; each boundary sees 1,277 nonzero words.
-Their whole-stream FNV hashes differ (`44a1430b` versus `47cd35d3`). Codec
-power/format/rate/active registers are `0007/0053/0023/0001`, with 230,081,577
-clock rises and 845,888 frame rises. Counts and hashes are independent:
+0.818115786 seconds, not at codec initialization. It counts 1,524,209 McBSP
+TX words and 1,691,842 codec DIN words; both streams contain only zeros.
+Their whole-stream FNV hashes differ (`7d8d3d4d` versus `1e4f2315`) because
+the stream lengths differ. Codec
+power/format/rate/active registers are `0007/0053/0023/0001`, with 230,090,537
+clock rises and 845,921 frame rises. Counts and hashes are independent:
 neither zero-frame alignment nor a one-to-one PCM relation is established.
-The first nonzero TX/DIN words appear at 0.824109792/0.824109833 seconds;
-the last appear at 18.917217701/18.917217743 seconds, after a later application
-restart. These are boundary timestamps, not producer-instruction identities.
 The fixture's converted-sample ADC input remains an explicit bench source;
 nonzero DIN alone is not decoded music or analog audio acceptance.
 
 Within the same decoder-entry window, actual channel-3 data-space source
-reads total 1,363,452, including 1,277 nonzero words, over addresses
-`00bf..137f`. This attribution uses `source_read_matches`, not merely an
+reads total 1,363,518, all zero, over addresses
+`1000..137f`. This attribution uses `source_read_matches`, not merely an
 enabled source-register match. The bounded prefix is `1000`, `1040`,
-`1001`, `0fc2`; the next nonzero reads include `0f83`, `0f44` and `0f05`.
-Their words `0d7c/7c13/0200/f980` match the first nonzero TX values, but
-matching values/counts are not complete stream pairing. The last nonzero
-source read is at 18.917215192 seconds. The downward 63-word steps require
-an audit of actual DMA configuration/count/reload writes before assigning
-the source contents to decoded media. No writer-instruction ownership is
+`1001`, `1041`, then `1002`, `1042`, `1003`, `1043`. Eight bounded register
+snapshots confirm count `1/0` alternating, frames `203f..203c`, mode `c541`,
+reload count `1`, and element/frame indices `0040/ffc1`. This is the expected
+two-element frame sorting, not the former downward-63 walk caused by
+re-latching the live count on DE re-enable. That defect's 1,277 nonzero
+output words are not usable evidence of decoded media. Complete zero-word
+streams also do not prove correct media decoding or stream pairing.
+No writer-instruction ownership is
 inferred from the data read or the CPU's contemporaneous PC.
 
-The pre-existing terminal playback, CPU/NAND/stream and media-context summaries
-are byte-identical with and without these read-only observers. Native 5110
-save-state and 2,942 tool tests (one skipped) pass. The fixture deliberately
+The focused DMA pause/restore regression passes, and 2,943 tool tests
+(one skipped) pass. The fixture deliberately
 terminates with `audio completion is not validated`, so the Make target remains
 failed before its later exact-one fetch-count checks. Those legacy fetch checks
 are not evidence of three actual boots and were not relaxed into success.
@@ -4940,8 +4955,8 @@ No nonzero error/control value is required for the observed state-5 path.
 `mu4_context_contract.py` pins all 46 AA99 words and the two AA55 API words,
 enumerating all 65,536 controls. It makes no EOF/error or PCM-content claim.
 The passive three-second Lua observation independently records lifecycle 4
-at 0.837863702 seconds, a control read of zero at 2.198518905, state 5 at
-2.198519039, and state 4 again at 2.588181162. Its terminal PC is `02:3e1e`,
+at 0.837819684 seconds, a control read of zero at 2.198474888, state 5 at
+2.198475021, and state 4 again at 2.589543040. Its terminal PC is `02:5beb`,
 `illegal=0`, with 11 lifecycle writes, three control writes and five control
 reads. GENPC selects a bounded read-context range; it does not establish
 Access/Read ownership. The data-write tap is not an all-alias writer census.
@@ -4958,8 +4973,8 @@ python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
 python3 tools/noki5510_bootstrap_check.py --playback-lifecycle RUN_DIR/error.log
 ```
 
-Next: audit the DMA configuration/count/reload sequence behind the observed
-channel-3 source walk, then pair valid McBSP words and codec frames before comparing PCM
+Next: trace the writers and validity lifecycle of the silent decoder output
+banks, then pair valid McBSP words and codec frames before comparing PCM
 against the stored media. Do not remove the programmed reload merely to keep
 resident-entry counts at one.
 
@@ -6888,7 +6903,7 @@ the independently pin-decoded AIC23 DIN word. A four-word bounded comparison
 queue rejects overflow, unpaired codec words, channel-order errors and
 sample mismatches; it is registered for save states and cleared on reset.
 The complete 20-second observation matches 1,744,936 words, including
-5,218 nonzero words, with no pending word at its endpoint. Acceptance
+5,160 nonzero words, with no pending word at its endpoint. Acceptance
 requires coverage beyond the old 1,024-word prefix, nonzero output and at
 most one final launched-but-not-yet-sampled word; exact volume is not a
 physical clock-rate oracle. This verifies sustained digital transport
@@ -6915,8 +6930,8 @@ The command's original cleanup matters: `03:b056/b058` zero both tone
 banks while the last DMA block is in flight, before `03:b05e` writes mode
 zero. The observer recognizes only those exact CPU store boundaries and
 zero values, updates its expected source image and accounts for samples
-cancelled before DMA read. This fixture generates 5,376 words: 5,179 are
-independently verified through DMA and 197 are cancelled by original
+cancelled before DMA read. This fixture generates 5,376 words: 5,180 are
+independently verified through DMA and 196 are cancelled by original
 cleanup. The complete source stream has 1,744,937 reads, 1,744,936 completed
 transmitter words and one pending source word. Acceptance requires exact
 generated = consumed + cancelled accounting, no premature bank overwrite,

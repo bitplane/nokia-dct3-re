@@ -15,6 +15,30 @@ else:
 
 
 BASE = 0x23D73
+DMA_PAUSE_WITNESSES = (
+    ('aa22', 0x290B7, (0x7711, 0x0054, 0x6881, 0xFFF7, 0xE800, 0xF982,
+                       0x97BE, 0x7711, 0x0054, 0x6981, 0x0008)),
+    ('aa99', 0x27944, (0x7712, 0x0054, 0x6882, 0xFFF7, 0xE800, 0xF982,
+                       0x7B92, 0x7712, 0x0054, 0x6982, 0x0008)),
+)
+
+
+def decode_dma_pause(words, rel_words):
+    sources = {'aa22': words, 'aa99': rel_words}
+    for segment, base, witness in DMA_PAUSE_WITNESSES:
+        for offset, expected in enumerate(witness):
+            if sources[segment].get(base + offset) != expected:
+                raise ValueError(f'DMA pause witness changed or absent in {segment} at {base + offset:06x}')
+    return {
+        'pinned_words': 22, 'control_address': '0054', 'channel': 3,
+        'clear_mask': 'fff7', 'set_mask': '0008',
+        'sequences': [{'segment': segment, 'start': f'{base:06x}',
+                       'paused_call': f'02{witness[6]:04x}'}
+                      for segment, base, witness in DMA_PAUSE_WITNESSES],
+        'scope': 'Direct DE3 pause/call/resume sequences only; no complete callee effects or PCM interpretation',
+    }
+
+
 MEASUREMENT_RESPONSE_BASE = 0x3B01D
 MEASUREMENT_RESPONSE_WITNESS = (
     0x7608, 0x0002, 0x760A, 0x0068, 0x760B, 0x0001,
@@ -672,6 +696,7 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['dma_pause'] = decode_dma_pause(words, rel_words)
     result['rel_repeat_call'] = decode_rel_repeat_call(rel_words)
     result['rel_ar_store'] = decode_rel_ar_store(rel_words)
     result['rel_copy_loop'] = decode_rel_copy_loop(rel_words)

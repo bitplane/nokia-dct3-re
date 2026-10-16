@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_dma_enable_relatches_live_element_count",
+      "status": "disproven",
+      "hypothesis": "Re-enabling a C54x DMA channel must replace its per-frame count shadow with the current decremented DMCTR value",
+      "conclusion": "SPRU302B 3.2.3.2 requires each new frame to reload the original DMCTR shadow; DE independently controls channel enable (3.2.2.1). Original AA22 and AA99 both clear DE3 around a call and restore it. Playback MMIO observations show a pause immediately after the first element, with live count 0 and programmed count 1; no intervening zero count write occurs. Re-latching 0 converts subsequent two-element frames into one-element frames and walks downward by frame index -63 into unrelated data. A focused sorting fixture reproduces the defect, fails the explicit post-frame count assertion, and passes when DE no longer overwrites the shadow. Its paused save/restore disturbs DMCTR through MMIO before restoration and then requires four words and two frame interrupts. Full playback remains legal for 20 seconds with source addresses restricted to 1000..137f; its former 1277 nonzero outputs disappear and are not valid decoder-output evidence. CPU count writes and block auto-reload still update the shadow. This does not establish decoded music, physical DA150 timing or complete TX/DIN pairing.",
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "Makefile"]
+    },
+    {
       "id": "c54x_repeat_endpoint_is_xpc_qualified",
       "status": "disproven",
       "hypothesis": "An active C54x repeat block belongs to its setup XPC, so a matching low PC on a foreign program page cannot consume its count or reload RSA",

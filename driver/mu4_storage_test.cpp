@@ -1626,6 +1626,15 @@ private:
 						++m_playback_dma_reads;
 						m_playback_dma_min = std::min(m_playback_dma_min, u16(address));
 						m_playback_dma_max = std::max(m_playback_dma_max, u16(address));
+						if (m_playback_dma_reads <= 8)
+						{
+							u16 const index = m_dma->read(1);
+							logerror("mu4_playback_dma_config: read=%u source=%04x destination=%04x elements=%04x frames=%04x mode=%04x reload_source=%04x reload_destination=%04x reload_elements=%04x reload_frames=%04x indexes=%04x,%04x,%04x,%04x t=%.9f channel=3 boundary=source_read index_preserved=1\n",
+								m_playback_dma_reads, m_dma->inspect_register(0x0f), m_dma->inspect_register(0x10), m_dma->inspect_register(0x11), m_dma->inspect_register(0x12), m_dma->inspect_register(0x13),
+								m_dma->inspect_register(0x32), m_dma->inspect_register(0x33), m_dma->inspect_register(0x34), m_dma->inspect_register(0x35),
+								m_dma->inspect_register(0x20), m_dma->inspect_register(0x21), m_dma->inspect_register(0x22), m_dma->inspect_register(0x23), machine().time().as_double());
+							if (m_dma->read(1) != index) fatalerror("MU4 DMA inspection changed its index latch");
+						}
 						if (m_playback_dma_reads <= 4)
 							logerror("mu4_playback_dma_word: kind=prefix ordinal=%u read=%u address=%04x word=%04x t=%.9f channel=3 space=data ownership=active_source_read\n",
 								m_playback_dma_reads, m_playback_dma_reads, unsigned(address), value, machine().time().as_double());
@@ -2216,6 +2225,10 @@ private:
 			data.write_word(0x55, 0x1f);
 			if (data.read_word(0x57) != 2 || data.read_word(0x55) != 0x1f) fatalerror("MU4 DMA page/nonincrement mismatch");
 			if (m_dma->source_matches(0, AS_DATA, 0x6000)) fatalerror("MU4 disabled DMA source inspection matched");
+			if (m_dma->inspect_register(0) != 0x6000 || m_dma->inspect_register(0x1f) != 2 ||
+				m_dma->inspect_register(0x28) || m_dma->inspect_register(0x3e) || m_dma->inspect_register(0x10000) ||
+				data.read_word(0x55) != 0x1f)
+				fatalerror("MU4 indexed DMA inspection changed index or accepted an out-of-range register");
 			data.write_word(0x54, 1);
 			if (!m_dma->source_matches(0, AS_DATA, 0x6000) || m_dma->source_matches(0, AS_DATA, 0x6001) ||
 				m_dma->source_matches(0, AS_PROGRAM, 0x6000) || m_dma->source_matches(6, AS_DATA, 0x6000) ||
@@ -2814,10 +2827,27 @@ private:
 				fatalerror("MU4 DMA frame interrupt/transfer ordering mismatch step=%u", words);
 			if (bool(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x0800) != (words >= 2))
 				fatalerror("MU4 DMA/McBSP interrupt mux mismatch step=%u", words);
+			if (words == 1)
+			{
+				// Pause mid-frame without rewriting DMCTR; its original shadow must survive.
+				u16 const control = m_dma->read(0);
+				m_dma->write(0, control & ~u16(8));
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 paused-frame DMA save failed");
+				dma_reg_w(0x11, 7); // Disturb both the live count and its shadow before restore.
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 paused-frame DMA restore failed");
+				if (m_dma->inspect_register(0x11) || (m_dma->read(0) & 8))
+					fatalerror("MU4 paused-frame DMA restore lost its decremented counter or disabled state");
+				m_dma->write(0, control);
+			}
+			if (words == 2 && m_dma->inspect_register(0x11) != 1)
+				fatalerror("MU4 DMA re-enable replaced original frame count with its decremented counter");
 			if (words == 4)
 			{
 				if (m_dma->read(0) & 8) fatalerror("MU4 non-reloading DMA remains enabled");
 				logerror("mu4_dma_sync_conformance: PASS event_gate=1 sorting=1 multiframe=1 auto_reload=1 block_interrupt=1 frame_interrupt=1 no_reload=1 pending_restore=1\n");
+				logerror("mu4_dma_frame_pause: PASS mid_frame=1 counter_shadow=1 sorting=1 frame_interrupts=2 paused_restore=1\n");
 				m_phase = 49; machine().schedule_soft_reset(); return;
 			}
 			m_dma->sync_event(2); ++m_phase; m_check->adjust(attotime::from_usec(1)); return;

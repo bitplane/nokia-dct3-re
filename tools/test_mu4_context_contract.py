@@ -18,9 +18,25 @@ from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNE
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
+from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_dma_pause_sequences_require_separate_overlay_namespaces(self):
+        sources = {segment: dict(enumerate(witness, base)) for segment, base, witness in DMA_PAUSE_WITNESSES}
+        result = decode_dma_pause(sources['aa22'], sources['aa99'])
+        self.assertEqual(result['pinned_words'], 22)
+        self.assertEqual(result['channel'], 3)
+        self.assertEqual([item['paused_call'] for item in result['sequences']], ['0297be', '027b92'])
+        for segment, words in sources.items():
+            for address in words:
+                changed = {name: dict(image) for name, image in sources.items()}
+                changed[segment][address] ^= 1
+                with self.subTest(segment=segment, address=address), self.assertRaises(ValueError):
+                    decode_dma_pause(changed['aa22'], changed['aa99'])
+        with self.assertRaises(ValueError):
+            decode_dma_pause(sources['aa99'], sources['aa22'])
+
     def test_measurement_result_thresholds_and_right_precedence(self):
         threshold = 10_000_000
         for left in (0, threshold - 1, threshold, threshold + 1, 0x7FFFFFFF):
