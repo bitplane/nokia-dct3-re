@@ -4530,7 +4530,39 @@ forty loader-API entries, but no calls/iterations/returns in the tracked
 `02:a2c6` arithmetic loop. This differs from the constant-input file's
 87,390 completed calls and twelve resident entries. It is an input-dependent
 earlier/different route, not evidence of a stuck filter or missing opcode.
-The source of the divergence remains unmapped.
+The divergence is now bounded upstream of that loop. In the first verified
+AA99 session, a source-checked census covers all 3,122 contiguous words at
+`0200a0..020cd1`: constant playback visits 1,162 addresses with 957,582
+Execute entries; varying-input playback visits 954 with 336,192 entries.
+Both have zero opcode mismatches against the original upload. These are
+instruction-entry observations, not retirement or complete branch outcomes.
+The parent at `02a10c` is entered 1,478 times for constant playback and zero
+for varying input. Its method-9 dispatch at `0205d0` is likewise absent in
+the latter; the nearer method-15 selector at `0205ac` is absent too. The
+getter's word 13 therefore is not an evidenced cause of this divergence.
+
+The earlier service entry `020495` runs only once for varying input.
+Its `0204b3..0204d5` path reads latch `aa56`; if still zero, the branch at
+`0204d4` bypasses normal processing to `0205ae`. Constant playback reaches
+`0204d6` 743 times; varying playback never does. Fixed-time RAM snapshots
+show `aa56` becoming one only in constant playback, but cannot identify
+its transient operands or writer. In particular, the area referenced by
+`aa59` must not yet be named a buffer descriptor: `7211 aa59` stores AR1,
+and the sampled words include return-like addresses.
+
+A literal census of all 49,843 mapped AA99 words finds one `0495` at
+`02716a`, in the data sequence `804a,0002,0495,d7b8,d796,0001,054f,0002`.
+This is a candidate data-driven invocation record, not proof of its
+interpreter or complete indirect-call ownership. The only five `aa56`
+literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
+an explicit zero initialization. Initialization also sets `aa59=d796`
+at `027a0d`. Computed aliases remain outside this literal census.
+The next boundary is the invocation/resume contract for `020495` and the
+transient predicate that sets `aa56`, not forced filter entry or input tuning.
+`mu4_context_contract.py` now checks these literal locations and initialization
+words against the original upload, rejecting extra references and changed
+witnesses. `--playback-range --source-a00` checks the paired runtime census
+against source bytes; it deliberately makes no audio acceptance claim.
 
 All 1,125,032 actual channel-3 source reads in `1000..137f` remain zero,
 as do 1,402,542 TX and 1,691,842 DIN words. Their hashes are

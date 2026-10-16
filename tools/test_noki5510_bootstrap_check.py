@@ -2,11 +2,94 @@ import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
-    verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input,
+    verify_playback_lifecycle, verify_playback_dma, verify_playback_banks, verify_recorder_input, verify_playback_parent, verify_playback_range,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_range_census_requires_complete_original_word_coverage_and_scoped_totals(self):
+        words = {address: 0 for address in range(0x200a0, 0x20cd2)}
+        words[0x200a0], words[0x200a1] = 0x1234, 0xabcd
+        rows = ('mu4_playback_range_entry: address=0200a0 opcode=1234 entries=2 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0\n'
+                'mu4_playback_range_entry: address=0200a1 opcode=abcd entries=3 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0\n'
+                'mu4_playback_range_terminal: first=0200a0 last=020cd1 unique=2 entries=5 opcode_changes=0 '
+                'selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0')
+        text = self.PARENT + '\n' + rows
+        result = verify_playback_range(text, words)
+        self.assertEqual(result['source_range_words'], 3122)
+        self.assertEqual(result['visited_words'], 2)
+        self.assertEqual(result['execute_entries'], 5)
+        for old, new in (('address=0200a0', 'address=02009f'), ('opcode=1234 entries=2', 'opcode=1235 entries=2'),
+                         ('entries=2 selection', 'entries=0 selection'), ('unique=2', 'unique=3'),
+                         ('entries=5 opcode_changes', 'entries=6 opcode_changes'), ('opcode_changes=0', 'opcode_changes=1'),
+                         ('audio_acceptance=0', 'audio_acceptance=1'), ('observer_writes=0', 'observer_writes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_range(text.replace(old, new), words)
+        for line in rows.splitlines():
+            for bad in (text.replace(line, ''), text + '\n' + line):
+                with self.assertRaises(ValueError):
+                    verify_playback_range(bad, words)
+        missing = dict(words)
+        del missing[0x20cd1]
+        with self.assertRaisesRegex(ValueError, 'complete selected'):
+            verify_playback_range(text, missing)
+
+    PARENT = '\n'.join((
+        'mu4_playback_execute_entry: address=026d62 opcode=1234 t=0.200000000 sp=1000',
+        'mu4_playback_audio_window: start=decoder_execute_entry t=0.800000000 sample_source=converted_sample_bench music_decode=0',
+        'mu4_playback_execute_entry: address=026d62 opcode=1234 t=2.200000000 sp=1000',
+        'mu4_playback_parent_context: site=0 ordinal=1 address=02a10c opcode=4a11 sp=1000 ar1=0040 ar6=1000 ar7=1000 a=0000000000 b=0000000000 '
+        'stack=' + ','.join(['0000'] * 16) + ' frame=unobserved t=1.000000000 identity=Execute_entry context_only=1 observer_writes=0',
+        'mu4_playback_parent_terminal: wrapper=1 internal=0 body=0 optional=0 returned=0 loop=0 dispatch=0 select=0 target=0 fallthrough=0 opcode_mismatch=0 first_session_complete=1 '
+        'overlay_verified=1 illegal=0 t=3.000000000 selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0',
+    ))
+
+    def test_parent_coverage_allows_verified_absence_without_audio_claim(self):
+        result = verify_playback_parent(self.PARENT)
+        self.assertEqual(result['wrapper'], 1)
+        self.assertFalse(result['decoded_audio'])
+        self.assertEqual(result['subsystem_identity'], 'unvalidated')
+        context = next(line for line in self.PARENT.splitlines() if 'parent_context:' in line)
+        body = context.replace('site=0', 'site=2').replace('address=02a10c opcode=4a11', 'address=02a22e opcode=11e1')
+        expanded = self.PARENT.replace('wrapper=1 internal=0 body=0', 'wrapper=1 internal=0 body=1') + '\n' + body
+        self.assertEqual(verify_playback_parent(expanded)['body'], 1)
+        with self.assertRaises(ValueError):
+            verify_playback_parent(expanded.replace('opcode=11e1', 'opcode=6deb'))
+        absent = '\n'.join(line for line in self.PARENT.splitlines() if 'parent_context:' not in line).replace('wrapper=1', 'wrapper=0')
+        self.assertEqual(verify_playback_parent(absent)['wrapper'], 0)
+
+    def test_parent_coverage_rejects_unbounded_mismatched_or_unsafe_observations(self):
+        for old, new in (('opcode_mismatch=0', 'opcode_mismatch=1'), ('first_session_complete=1', 'first_session_complete=0'),
+                         ('overlay_verified=1', 'overlay_verified=0'), ('illegal=0', 'illegal=1'),
+                         ('observer_writes=0', 'observer_writes=1'), ('audio_acceptance=0', 'audio_acceptance=1'),
+                         ('context_only=1', 'context_only=0'), ('address=02a10c', 'address=02a139'),
+                         ('t=1.000000000', 't=0.500000000'), ('t=1.000000000', 't=2.300000000'),
+                         ('sp=1000 ar1=0040', 'sp=0040 ar1=0040'), ('frame=unobserved', 'frame=0000'),
+                         ('wrapper=1', 'wrapper=2')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_parent(self.PARENT.replace(old, new))
+        for line in self.PARENT.splitlines():
+            for bad in (self.PARENT.replace(line, ''), self.PARENT + '\n' + line):
+                with self.subTest(line=line), self.assertRaises(ValueError):
+                    verify_playback_parent(bad)
+
+    def test_parent_selector_contexts_are_scoped_raw_receiver_values(self):
+        context = next(line for line in self.PARENT.splitlines() if 'parent_context:' in line)
+        parent = context.replace('site=0', 'site=7').replace('address=02a10c opcode=4a11', 'address=0205ac opcode=6c81')
+        words = ','.join(['c6f0'] + ['0000'] * 12 + ['0001', '0000', '0000'])
+        selector = ('mu4_playback_selector_context: ordinal=1 receiver=13e0 words=' + words +
+                    ' ar1=0001 a=0000000001 t=1.000000000 identity=Execute_entry context_only=1 observer_writes=0')
+        text = self.PARENT.replace('select=0', 'select=1') + '\n' + parent + '\n' + selector
+        sample = verify_playback_parent(text)['selector_samples'][0]
+        self.assertEqual(sample, {'receiver': 0x13e0, 'header': 0xc6f0, 'field13': 1, 'ar1': 1, 'a': 1})
+        for old, new in (('receiver=13e0', 'receiver=0021'), ('ordinal=1 receiver', 'ordinal=2 receiver'),
+                         ('t=1.000000000 identity', 't=2.500000000 identity'), ('context_only=1', 'context_only=0')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_parent(text.replace(old, new))
+        for bad in (text.replace(selector, ''), text + '\n' + selector):
+            with self.assertRaises(ValueError):
+                verify_playback_parent(bad)
+
     AC_INPUT = ('mu4_recorder_ac_input: generated=64,64,64,64 '
                 'received=60,60,60,60 other=0 other_owner_reads=5 '
                 'shape=square periods=64,32 amplitudes=8192,4096 '

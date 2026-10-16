@@ -1,5 +1,7 @@
 """Check own-upload execution, not graphical boot or fitted mask identity."""
 import argparse
+import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -369,6 +371,96 @@ def verify_playback_banks(text):
             'writer_ownership': 'unvalidated'}
 
 
+def verify_playback_parent(text):
+    summary = list(re.finditer(
+        r'mu4_playback_parent_terminal: wrapper=(\d+) internal=(\d+) body=(\d+) optional=(\d+) '
+        r'returned=(\d+) loop=(\d+) dispatch=(\d+) select=(\d+) target=(\d+) fallthrough=(\d+) opcode_mismatch=0 first_session_complete=1 '
+        r'overlay_verified=1 illegal=0 t=(\d+\.\d+) selection=first_verified_aa99_session '
+        r'identity=Execute_entry observer_writes=0 audio_acceptance=0$', text, re.MULTILINE))
+    if len(summary) != 1 or text.count('mu4_playback_parent_terminal:') != 1:
+        raise ValueError('missing or invalid first-session parent coverage')
+    counts = [int(summary[0][index]) for index in range(1, 11)]
+    stop = float(summary[0][11])
+    starts = re.findall(r'mu4_playback_audio_window: start=decoder_execute_entry t=(\d+\.\d+) ', text)
+    residents = re.findall(r'mu4_playback_execute_entry: address=026d62 opcode=[0-9a-f]{4} t=(\d+\.\d+) ', text)
+    if len(starts) != 1 or len(residents) < 2 or not float(residents[0]) < float(starts[0]) < float(residents[1]) <= stop:
+        raise ValueError('parent coverage lacks a complete verified first overlay interval')
+    resident_times = [float(value) for value in residents]
+    if any(right <= left for left, right in zip(resident_times, resident_times[1:])) or any(time > stop for time in resident_times):
+        raise ValueError('resident Execute entries are duplicated or out of time order')
+    start, finish = float(starts[0]), float(residents[1])
+    rows = list(re.finditer(
+        r'mu4_playback_parent_context: site=([0-9]) ordinal=([12]) address=([0-9a-f]{6}) opcode=([0-9a-f]{4}) '
+        r'sp=([0-9a-f]{4}) ar1=([0-9a-f]{4}) ar6=[0-9a-f]{4} ar7=[0-9a-f]{4} '
+        r'a=[0-9a-f]{10} b=[0-9a-f]{10} stack=([0-9a-f,]+|unobserved) frame=([0-9a-f,]+|unobserved) '
+        r't=(\d+\.\d+) identity=Execute_entry context_only=1 observer_writes=0$', text, re.MULTILINE))
+    if len(rows) != text.count('mu4_playback_parent_context:'):
+        raise ValueError('malformed parent context or unsupported identity claim')
+    sites = (('02a10c', '4a11'), ('02a139', '6fe1'), ('02a22e', '11e1'),
+             ('02a152', '6101'), ('02a138', 'f4e4'), ('02a2c6', '771a'), ('0205d0', '7711'),
+             ('0205ac', '6c81'), ('0205b3', '71e7'), ('0205ae', '76f8'))
+    observed = [0] * 10
+    def check_snapshot(pointer, snapshot):
+        valid = 0x80 <= int(pointer, 16) <= 0xfff0
+        if (valid and not re.fullmatch(r'[0-9a-f]{4}(?:,[0-9a-f]{4}){15}', snapshot)) or (not valid and snapshot != 'unobserved'):
+            raise ValueError('parent context has an incomplete or unsafe RAM snapshot')
+        return [int(word, 16) for word in snapshot.split(',')] if valid else None
+    for row in rows:
+        site = int(row[1])
+        observed[site] += 1
+        if (int(row[2]) != observed[site] or (row[3], row[4]) != sites[site] or
+                not start <= float(row[9]) < finish):
+            raise ValueError('parent context lies outside its instruction/session selection')
+        for pointer, snapshot in ((row[5], row[7]), (row[6], row[8])):
+            check_snapshot(pointer, snapshot)
+    if observed != [min(2, count) for count in counts]:
+        raise ValueError('parent counters lack their bounded entry contexts')
+    selectors = list(re.finditer(
+        r'mu4_playback_selector_context: ordinal=([12]) receiver=([0-9a-f]{4}) words=([0-9a-f,]+|unobserved) '
+        r'ar1=([0-9a-f]{4}) a=([0-9a-f]{10}) t=(\d+\.\d+) identity=Execute_entry context_only=1 observer_writes=0$', text, re.MULTILINE))
+    if len(selectors) != min(2, counts[7]) or len(selectors) != text.count('mu4_playback_selector_context:'):
+        raise ValueError('selector counters lack their bounded receiver contexts')
+    samples = []
+    for index, row in enumerate(selectors, 1):
+        if int(row[1]) != index or not start <= float(row[6]) < finish:
+            raise ValueError('selector context lies outside the selected first session')
+        words = check_snapshot(row[2], row[3])
+        samples.append({'receiver': int(row[2], 16), 'header': words[0] if words else None,
+                        'field13': words[13] if words else None, 'ar1': int(row[4], 16), 'a': int(row[5], 16)})
+    return dict(zip(('wrapper', 'internal', 'body', 'optional', 'returned', 'loop', 'dispatch', 'select', 'target', 'fallthrough'), counts),
+                first_session=(start, finish), selector_samples=samples, decoded_audio=False, subsystem_identity='unvalidated')
+
+
+def verify_playback_range(text, words):
+    parent = verify_playback_parent(text)
+    first, last = 0x200a0, 0x20cd1
+    if any(address not in words for address in range(first, last + 1)):
+        raise ValueError('AA99 source does not cover the complete selected word range')
+    summary = list(re.finditer(
+        r'mu4_playback_range_terminal: first=0200a0 last=020cd1 unique=(\d+) entries=(\d+) opcode_changes=0 '
+        r'selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0$', text, re.MULTILINE))
+    if len(summary) != 1 or text.count('mu4_playback_range_terminal:') != 1:
+        raise ValueError('missing or invalid range coverage summary')
+    rows = list(re.finditer(
+        r'mu4_playback_range_entry: address=([0-9a-f]{6}) opcode=([0-9a-f]{4}) entries=(\d+) '
+        r'selection=first_verified_aa99_session identity=Execute_entry observer_writes=0$', text, re.MULTILINE))
+    if len(rows) != int(summary[0][1]) or len(rows) != text.count('mu4_playback_range_entry:'):
+        raise ValueError('range coverage is missing or duplicating entries')
+    visits = {}
+    for row in rows:
+        address, opcode, count = int(row[1], 16), int(row[2], 16), int(row[3])
+        if not first <= address <= last or address in visits or count <= 0 or words[address] != opcode:
+            raise ValueError('range entry disagrees with its address, identity or original AA99 word')
+        visits[address] = {'opcode': f'{opcode:04x}', 'entries': count}
+    if not visits or sum(row['entries'] for row in visits.values()) != int(summary[0][2]):
+        raise ValueError('range entry totals disagree with the complete census')
+    return {'parent': parent, 'source_range_words': last - first + 1,
+            'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
+            'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
+            'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '
+                     'not instruction retirement, data-read ownership, subsystem semantics or decoded audio'}
+
+
 def verify_recorder_input(text):
     """Check the explicit bench source and actual RX DMA reads, not encoded audio."""
     matches = list(re.finditer(
@@ -411,6 +503,11 @@ def main():
                         help='validate scoped data-write contexts, not writer ownership or decoded media')
     parser.add_argument('--recorder-input', action='store_true',
                         help='validate varying converted-input generation and RX DMA, not encoding')
+    parser.add_argument('--playback-parent', action='store_true',
+                        help='validate first-session Execute contexts, not subsystem semantics or audio')
+    parser.add_argument('--playback-range', action='store_true',
+                        help='validate first-session low-code counts against original AA99 words')
+    parser.add_argument('--source-a00', type=Path, help='original R060 InitData required for --playback-range')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -420,7 +517,9 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
-    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma, args.playback_banks, args.recorder_input)
+    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma, args.playback_banks, args.recorder_input, args.playback_parent, args.playback_range)
+    if args.playback_range != bool(args.source_a00):
+        parser.error('--source-a00 must accompany --playback-range only')
     if any(bench_modes) and (
             sum(bench_modes) > 1 or any((
                 args.runtime, args.serial_readiness, args.input_lifecycle,
@@ -428,6 +527,23 @@ def main():
         parser.error('MU4 observation modes cannot be combined with other bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.playback_range:
+            if __package__:
+                from .noki5510_a00_inventory import uploaded_word_image
+                from .mu4_clock_contract import SOURCE_SHA256
+            else:
+                from noki5510_a00_inventory import uploaded_word_image
+                from mu4_clock_contract import SOURCE_SHA256
+            source = args.source_a00.read_bytes()
+            if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
+                raise ValueError('range coverage requires the original R060 source')
+            words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+            print(json.dumps(verify_playback_range(text, words), indent=2, sort_keys=True))
+            return
+        if args.playback_parent:
+            result = verify_playback_parent(text)
+            print(f'MU4 playback parent observation complete: {result}; subsystem semantics and audio remain unvalidated')
+            return
         if args.recorder_input:
             result = verify_recorder_input(text)
             print(f'MU4 recorder converted-input observation complete: {result}; '

@@ -15,6 +15,89 @@ else:
 
 
 BASE = 0x23D73
+FILTER_PARENT_WITNESSES = (
+    (0x2A10C, (0x4A11, 0x4A16, 0x4A17, 0x4A07, 0x8811, 0x1006,
+               0x8816, 0x1107, 0x8917, 0xF620, 0xF845, 0xA123)),
+    (0x2A12C, (0xF982, 0xA139, 0x481D, 0xF030, 0xFFFE, 0xF495, 0xF495, 0x881D)),
+    (0x2A139, (0x6FE1, 0x0001, 0x0D5A, 0x8910, 0x4BE1, 0x0004, 0xF495,
+               0x4A10, 0x11E1, 0x0003, 0x8913, 0x6101, 0x0001, 0xF820,
+               0xA22E, 0x6101, 0xFFFE, 0xFA30, 0xA152, 0xE800, 0xF495,
+               0xF273, 0xA22E, 0x8001, 0xF495)),
+    (0xC72A, (0x0002, 0xA10C)),
+    (0x2A138, (0xF4E4,)),
+    (0x2A152, (0x6101,)),
+    (0x2A22E, (0x11E1,)),
+    (0x2A2C6, (0x771A,)),
+    (0x205D0, (0x7711, 0xAA4E, 0x7000, 0x0011, 0x10F8, 0xAA5C, 0xF982,
+               0x9891, 0x7000, 0x0011, 0x10F8, 0xAA5D, 0xF982, 0x9891,
+               0x1002, 0x8000, 0x8001, 0x10F8, 0xAA5C, 0xF982, 0x988E,
+               0x1003, 0x8000, 0x8001, 0x10F8, 0xAA5D, 0xF982, 0x988E)),
+    (0x2988E, (0xE909, 0xF882, 0x98B8)),
+    (0x298B8, (0x8812, 0xF845, 0x98C4, 0xF741, 0x0182, 0x8912, 0xF495,
+               0xF495, 0x5782, 0xF84D, 0x98C4, 0xF5E6, 0xF020, 0xFFFF, 0xF4E4)),
+    (0x205A5, (0x10F8, 0xAA5A, 0xF982, 0x98A9, 0x8811, 0xF495, 0xF495,
+               0x6C81, 0x05B3, 0x76F8, 0xAA56, 0x0000, 0xF073, 0x05F8,
+               0x71E7, 0x0012, 0xBA9C, 0x10F8, 0xAA5E)),
+    (0x298A9, (0xE90F, 0xF882, 0x98B8)),
+    (0x2A315, (0x4A11, 0xEEFF, 0x8811, 0xF495, 0xF495, 0x10E1, 0x000D, 0xEE01, 0x8A11, 0xF4E4)),
+    (0xC70E, (0x0002, 0xA315)),
+)
+FILTER_CALL_SITES = (0x2A23C, 0x2A246, 0x2A250, 0x2A25A, 0x2A264)
+
+
+def playback_control_literal_census(words):
+    expected = {
+        0x0495: [0x2716A],
+        0xAA59: [0x2049A, 0x27A0E, 0x27A2E],
+        0xAA56: [0x204B4, 0x204D0, 0x204D3, 0x205AF, 0x27A05],
+    }
+    witnesses = (
+        (0x27168, (0x804A, 0x0002, 0x0495, 0xD7B8, 0xD796, 0x0001, 0x054F, 0x0002)),
+        (0x27A04, (0x76F8, 0xAA56, 0x0000)),
+        (0x27A0D, (0x76F8, 0xAA59, 0xD796)),
+    )
+    for base, values in witnesses:
+        if any(words.get(base + i) != value for i, value in enumerate(values)):
+            raise ValueError('AA99 playback control witness changed or absent')
+    hits = {literal: sorted(a for a, value in words.items() if value == literal)
+            for literal in expected}
+    if hits != expected:
+        raise ValueError('AA99 playback control literal census changed')
+    return {'segment': 'aa99', 'mapped_words_scanned': len(words),
+            'literal_hits': {f'{value:04x}': [f'{a:06x}' for a in addresses]
+                             for value, addresses in hits.items()},
+            'candidate_record': '027168', 'initial_control_area': '00d796',
+            'scope': 'Exact literals and pinned initialization only; not instruction classification, '
+                     'computed aliases, record interpreter, resume contract or decoded audio'}
+
+
+def decode_filter_parent(words):
+    for base, witness in (*FILTER_PARENT_WITNESSES,
+                          *((site, (0xFB82, 0xA2C6)) for site in FILTER_CALL_SITES)):
+        for offset, expected in enumerate(witness):
+            if words.get(base + offset) != expected:
+                raise ValueError(f'AA99 filter-parent witness changed or absent at {base + offset:06x}')
+    hits = sorted(address for address, word in words.items() if word == 0xA2C6)
+    if hits != [site + 1 for site in FILTER_CALL_SITES]:
+        raise ValueError('AA99 filter-target literal census changed')
+    return {'segment': 'aa99', 'mapped_words_scanned': len(words),
+            'pinned_words': sum(len(w) for _, w in FILTER_PARENT_WITNESSES) + 10,
+            'target': '02a2c6', 'literal_hits': len(hits),
+            'delayed_call_sites': [f'{site:06x}' for site in FILTER_CALL_SITES],
+            'call_form': 'FCALLD 02:a2c6, SPRU172C page 4-57',
+            'parent_entry': '02a10c', 'internal_entry': '02a139',
+            'internal_call': '02a12c', 'far_pointer_reference': '00c72a',
+            'branch_destinations': ['02a22e', '02a152'],
+            'dispatch': {'site': '0205d0', 'receiver_references': ['00aa5c', '00aa5d'],
+                         'method9_entry': '02988e', 'resolver': '0298b8'},
+            'upstream_selector': {'site': '0205ac', 'taken_entry': '0205b3', 'fallthrough': '0205ae',
+                                  'receiver_reference': '00aa5a', 'method15_entry': '0298a9',
+                                  'for_header_c6f0': {'getter': '02a315', 'field': 13,
+                                                     'far_pointer_reference': '00c70e'}},
+            'scope': 'Pinned source relationships and complete literal census within supplied AA99 words only; '
+                     'not computed/indirect caller closure, branch decisions, subsystem identity or decoded audio'}
+
+
 RECORDER_MAC_BASE = 0x3BA16
 RECORDER_MAC_WITNESS = (0x7109, 0x0012, 0x10E2, 0x0001, 0x6582, 0x0009,
                         0x4816, 0xF600, 0x8812, 0xF495, 0xF7B8)
@@ -739,6 +822,8 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['filter_parent'] = decode_filter_parent(rel_words)
+    result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recorder_memory_mac'] = decode_recorder_memory_mac(recorder_words)

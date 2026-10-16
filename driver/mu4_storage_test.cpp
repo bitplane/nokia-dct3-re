@@ -90,6 +90,14 @@ public:
 					if (address == 0x2a2c6 && opcode == 0x771a) ++m_playback_filter[0];
 					if (address == 0x2a2cc && opcode == 0xe900) ++m_playback_filter[1];
 					if (address == 0x2a2ea && opcode == 0xf4e4) ++m_playback_filter[2];
+					if (m_playback_execute_entries[1] == 1 && address >= PLAYBACK_RANGE_FIRST && address < PLAYBACK_RANGE_FIRST + PLAYBACK_RANGE_WORDS)
+					{
+						unsigned const index = address - PLAYBACK_RANGE_FIRST;
+						if (!m_playback_range_counts[index]++) m_playback_range_opcodes[index] = opcode;
+						else if (m_playback_range_opcodes[index] != opcode) ++m_playback_range_changes;
+					}
+					if (m_playback_execute_entries[1] == 1 && ((address >= 0x205ac && address <= 0x205d0) || (address >= 0x2a10c && address <= 0x2a2c6)))
+						observe_playback_parent(address, opcode);
 				}
 				// Retain executed bytes: current overlay memory may already differ.
 				m_playback_history_pc[m_playback_history_next] = address;
@@ -306,6 +314,13 @@ private:
 	u64 m_playback_execute_steps = 0;
 	u32 m_playback_audio_clocks = 0, m_playback_audio_frames = 0;
 	u32 m_playback_dma_reads = 0, m_playback_dma_nonzero = 0;
+	std::array<u32, 10> m_playback_parent{};
+	u32 m_playback_parent_mismatch = 0;
+	static constexpr u32 PLAYBACK_RANGE_FIRST = 0x200a0;
+	static constexpr unsigned PLAYBACK_RANGE_WORDS = 0x0cd2 - 0x00a0;
+	std::array<u32, PLAYBACK_RANGE_WORDS> m_playback_range_counts{};
+	std::array<u16, PLAYBACK_RANGE_WORDS> m_playback_range_opcodes{};
+	u32 m_playback_range_changes = 0;
 	u16 m_playback_dma_min = 0xffff, m_playback_dma_max = 0;
 	double m_playback_dma_last_nonzero = 0;
 	std::array<u32, 4> m_playback_history_pc{};
@@ -727,6 +742,55 @@ private:
 		}
 		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value >> 8)) * 16777619U;
 		m_playback_audio_hash[which] = (m_playback_audio_hash[which] ^ (value & 0xff)) * 16777619U;
+	}
+	void observe_playback_parent(offs_t address, u16 opcode)
+	{
+		std::array<u32, 10> const sites{0x2a10c, 0x2a139, 0x2a22e, 0x2a152, 0x2a138, 0x2a2c6, 0x205d0, 0x205ac, 0x205b3, 0x205ae};
+		std::array<u16, 10> const words{0x4a11, 0x6fe1, 0x11e1, 0x6101, 0xf4e4, 0x771a, 0x7711, 0x6c81, 0x71e7, 0x76f8};
+		auto const found = std::find(sites.begin(), sites.end(), address);
+		if (found == sites.end()) return;
+		unsigned const site = found - sites.begin();
+		if (opcode != words[site]) { ++m_playback_parent_mismatch; return; }
+		if (++m_playback_parent[site] > 2) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		auto const ram_words = [&data](u32 pointer) {
+			std::string result;
+			if (pointer < 0x80 || pointer > 0xfff0) return std::string("unobserved");
+			for (unsigned i = 0; i < 16; ++i) result += util::string_format("%s%04x", i ? "," : "", data.read_word(pointer + i));
+			return result;
+		};
+		u32 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP), ar1 = m_cpu->state_int(tms320c54x_device::STATE_AR1);
+		logerror("mu4_playback_parent_context: site=%u ordinal=%u address=%06x opcode=%04x sp=%04x ar1=%04x ar6=%04x ar7=%04x a=%010llx b=%010llx stack=%s frame=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+			site, m_playback_parent[site], unsigned(address), opcode, sp, ar1,
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR7)),
+			static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+			static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
+			ram_words(sp).c_str(), ram_words(ar1).c_str(), machine().time().as_double());
+		if (site == 7)
+		{
+			u16 const receiver = data.read_word(0xaa5a);
+			logerror("mu4_playback_selector_context: ordinal=%u receiver=%04x words=%s ar1=%04x a=%010llx t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+				m_playback_parent[site], receiver, ram_words(receiver).c_str(), ar1,
+				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)), machine().time().as_double());
+		}
+	}
+	void report_playback_parent()
+	{
+		unsigned unique = 0; u64 entries = 0;
+		for (unsigned i = 0; i < PLAYBACK_RANGE_WORDS; ++i)
+			if (m_playback_range_counts[i])
+			{
+				++unique; entries += m_playback_range_counts[i];
+				logerror("mu4_playback_range_entry: address=%06x opcode=%04x entries=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0\n",
+					PLAYBACK_RANGE_FIRST + i, m_playback_range_opcodes[i], m_playback_range_counts[i]);
+			}
+		logerror("mu4_playback_range_terminal: first=0200a0 last=020cd1 unique=%u entries=%llu opcode_changes=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+			unique, static_cast<unsigned long long>(entries), m_playback_range_changes);
+		logerror("mu4_playback_parent_terminal: wrapper=%u internal=%u body=%u optional=%u returned=%u loop=%u dispatch=%u select=%u target=%u fallthrough=%u opcode_mismatch=%u first_session_complete=%u overlay_verified=%u illegal=%u t=%.9f selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+			m_playback_parent[0], m_playback_parent[1], m_playback_parent[2], m_playback_parent[3], m_playback_parent[4], m_playback_parent[5],
+			m_playback_parent[6], m_playback_parent[7], m_playback_parent[8], m_playback_parent[9],
+			m_playback_parent_mismatch, unsigned(m_playback_execute_entries[1] > 1), unsigned(m_playback_overlay_checked),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), machine().time().as_double());
 	}
 	void stream_tx(u16 value)
 	{
@@ -1633,6 +1697,7 @@ private:
 				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
 			}
 			if (measurement_profile()) install_measurement_observers();
+			if (playback_profile()) machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&mu4_storage_test_state::report_playback_parent, this));
 			if (recorder_ac_profile())
 				m_cpu->space(AS_DATA).install_read_tap(0x21, 0x21, "mu4_recorder_ac_receive",
 					[this](offs_t address, u16 &value, u16) {
@@ -1919,6 +1984,8 @@ private:
 			save_item(NAME(m_playback_audio_last_nonzero));
 			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
 			save_item(NAME(m_playback_dma_reads)); save_item(NAME(m_playback_dma_nonzero));
+			save_item(NAME(m_playback_parent)); save_item(NAME(m_playback_parent_mismatch));
+			save_item(NAME(m_playback_range_counts)); save_item(NAME(m_playback_range_opcodes)); save_item(NAME(m_playback_range_changes));
 			save_item(NAME(m_playback_dma_min)); save_item(NAME(m_playback_dma_max)); save_item(NAME(m_playback_dma_last_nonzero));
 			save_item(NAME(m_playback_history_pc)); save_item(NAME(m_playback_history_word)); save_item(NAME(m_playback_history_next));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
@@ -2126,6 +2193,8 @@ private:
 		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
+		m_playback_parent = {}; m_playback_parent_mismatch = 0;
+		m_playback_range_counts = {}; m_playback_range_opcodes = {}; m_playback_range_changes = 0;
 		m_playback_dma_min = 0xffff; m_playback_dma_max = 0; m_playback_dma_last_nonzero = 0;
 		m_playback_history_pc = {}; m_playback_history_word = {}; m_playback_history_next = 0;
 		m_recorder_application_calls = m_recorder_application_messages = 0;

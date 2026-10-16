@@ -21,9 +21,52 @@ from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RE
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
+from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
+from tools.mu4_context_contract import playback_control_literal_census
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_playback_control_census_rejects_missing_extra_and_changed_records(self):
+        words = dict(enumerate((0x804a, 2, 0x495, 0xd7b8, 0xd796, 1, 0x54f, 2), 0x27168))
+        words.update(dict(enumerate((0x76f8, 0xaa56, 0), 0x27a04)))
+        words.update(dict(enumerate((0x76f8, 0xaa59, 0xd796), 0x27a0d)))
+        words.update({0x2049a: 0xaa59, 0x27a2e: 0xaa59,
+                      0x204b4: 0xaa56, 0x204d0: 0xaa56,
+                      0x204d3: 0xaa56, 0x205af: 0xaa56})
+        result = playback_control_literal_census(words)
+        self.assertEqual(result['literal_hits']['0495'], ['02716a'])
+        self.assertEqual(result['mapped_words_scanned'], len(words))
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                playback_control_literal_census(changed)
+        for value in (0x495, 0xaa56, 0xaa59):
+            with self.assertRaises(ValueError):
+                playback_control_literal_census({**words, 0x20000: value})
+
+    def test_filter_parent_relationships_and_literal_coverage(self):
+        words = {address: value for base, witness in FILTER_PARENT_WITNESSES
+                 for address, value in enumerate(witness, base)}
+        for site in FILTER_CALL_SITES:
+            words.update({site: 0xfb82, site + 1: 0xa2c6})
+        result = decode_filter_parent(words)
+        self.assertEqual(result['literal_hits'], 5)
+        self.assertEqual(result['mapped_words_scanned'], len(words))
+        self.assertEqual(result['pinned_words'], 141)
+        self.assertEqual(result['dispatch']['receiver_references'], ['00aa5c', '00aa5d'])
+        self.assertEqual(result['upstream_selector']['for_header_c6f0']['field'], 13)
+        self.assertEqual(result['far_pointer_reference'], '00c72a')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_filter_parent(changed)
+        with self.assertRaisesRegex(ValueError, 'literal census'):
+            decode_filter_parent({**words, 0x20000: 0xa2c6})
+        with self.assertRaises(ValueError):
+            decode_filter_parent({address - 0x10000: value for address, value in words.items()})
+
     def test_recorder_mac_original_image_and_syntax_are_pinned(self):
         words = dict(enumerate(RECORDER_MAC_WITNESS, RECORDER_MAC_BASE))
         result = decode_recorder_memory_mac(words)
