@@ -1218,6 +1218,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_address));
 	save_item(NAME(m_pipeline_physical_address));
 	save_item(NAME(m_pipeline_word));
+	save_item(NAME(m_pipeline_annulled));
 	save_item(NAME(m_pipeline_operand_address));
 	save_item(NAME(m_pipeline_operand));
 	save_item(NAME(m_pipeline_immediate));
@@ -2447,6 +2448,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_idle_resume_address = 0;
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
+	m_pipeline_annulled.fill(false);
 	m_pipeline_physical_address.fill(0);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
@@ -2696,6 +2698,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_address[stage] = m_pipeline_address[stage - 1];
 		m_pipeline_physical_address[stage] = m_pipeline_physical_address[stage - 1];
 		m_pipeline_word[stage] = m_pipeline_word[stage - 1];
+		m_pipeline_annulled[stage] = m_pipeline_annulled[stage - 1];
 		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
@@ -2711,6 +2714,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_far_call_stack[stage] = m_pipeline_far_call_stack[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
+	m_pipeline_annulled[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
 	m_pipeline_peripheral_wait_paid[0] = false;
 	m_pipeline_io_wait_paid[0] = false;
@@ -2874,6 +2878,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[2] && m_pipeline_xc_skip_words)
 	{
 		m_pipeline_word[2] = 0xf495; // Rejected words are NOPs, not decoded operands.
+		m_pipeline_annulled[2] = true;
 		--m_pipeline_xc_skip_words;
 	}
 	bool const completing_shift_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
@@ -3991,7 +3996,8 @@ void tms320c54x_device::pipeline_step()
 		m_xpc = (address >> 16) & 0x7f;
 		m_op = m_pipeline_word[5];
 		debugger_instruction_hook(address);
-		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
+		// XC's replacement NOP consumes a slot, not an original instruction entry.
+		if (!m_pipeline_annulled[5] && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
 		++m_pc;
 		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
 		++m_opcode_count[m_op];

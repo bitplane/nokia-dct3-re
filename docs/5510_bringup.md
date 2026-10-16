@@ -5032,6 +5032,22 @@ observations below remain separate from playback acceptance.
 
 ### Playback execution and codec observations
 
+The Execute-entry observer excludes XC-annulled words. The staged core
+implements rejection with an internal NOP while preserving its word address;
+that slot must not be reported as an original instruction. A per-slot
+annulment marker is shifted, reset and saved with the pipeline and only
+suppresses the observer callback, not execution clocks or guest state.
+Genuine source NOPs, including accepted conditional NOPs, remain observable.
+`instr-observer` passes its original 32 cases/restores plus 64 XC1/XC2
+accept/reject cases/restores across atomic/staged frontends, pages, OVLY
+states and four snapshots. Before the fix, staged case 33 reports an extra
+`f495` at the rejected `e966` address; the corrected event sequence matches
+the atomic control. Neighboring XC control/signed profiles and native 5110
+save-state restoration pass. Older raw instruction-entry totals can include
+these synthetic slots and must not be compared as exact source counts;
+the source-validated range census excludes them. This remains an entry
+observer, not an instruction-retirement assertion.
+
 The detailed baseline below uses the protected NAND
 `93548b594a91df0ba87acc316435b12fb6fa35da97b066f0c7141748c5d94bb8`.
 An independent 20-second playback of the fresh, current-core recorder

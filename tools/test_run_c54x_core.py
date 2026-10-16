@@ -369,13 +369,15 @@ class CoreResultTests(unittest.TestCase):
                 check_result(bad, 3, profile='rptb-page')
 
     def test_instruction_observer_scope(self):
-        marker, ending = EXTRA_PROFILES['instr-observer']
-        output = marker + '\n' + ending + '\n'
+        markers, ending = EXTRA_PROFILES['instr-observer']
+        output = '\n'.join((*markers, ending)) + '\n'
         check_result(output, 3, profile='instr-observer')
         for bad in (output.replace('restore=32', 'restore=0'),
                     output.replace('ordinary_reads=0', 'ordinary_reads=1'),
                     output.replace('captured_opcode=1', 'captured_opcode=0'),
-                    marker + '\n' + output, output + 'late output\n'):
+                    output.replace('rejected_slots=absent', 'rejected_slots=present'),
+                    markers[0] + '\n' + output, output + 'late output\n',
+                    *(output.replace(marker + '\n', '') for marker in markers)):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='instr-observer')
 

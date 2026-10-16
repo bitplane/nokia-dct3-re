@@ -298,6 +298,7 @@ private:
 	std::array<u32, 6> m_pipeline_address = {};
 	std::array<u32, 6> m_pipeline_physical_address = {};
 	std::array<u16, 6> m_pipeline_word = {};
+	std::array<bool, 6> m_pipeline_annulled = {};
 	std::array<u16, 6> m_pipeline_operand_address = {};
 	std::array<u16, 6> m_pipeline_operand = {};
 	std::array<u16, 6> m_pipeline_immediate = {};

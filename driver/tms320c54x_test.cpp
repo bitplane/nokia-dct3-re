@@ -6074,12 +6074,19 @@ private:
 	void start_instruction_observer(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const xc = variant >= 32, two = xc && BIT(variant - 32, 5);
 		bool const staged = BIT(variant, 0), overlay = BIT(variant, 2);
 		u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = overlay ? 0 : base;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 48; ++i) program.write_word(physical + 0x600 + i, 0xf495);
 		std::array<u16, 10> const code{0xec02, 0xf495, 0xf073, 0x0608, 0xe966, 0xf495, 0xf495, 0xf495, 0xe977, 0xf4e1};
 		for (unsigned i = 0; i < code.size(); ++i) program.write_word(physical + 0x600 + i, code[i]);
+		if (xc)
+		{
+			std::array<u16, 7> const conditional{u16(two ? 0xff45 : 0xfd45), 0xe966, u16(two ? 0xe955 : 0xf495),
+				u16(two ? 0xff44 : 0xfd44), 0xe977, u16(two ? 0xf495 : 0xf4e1), 0xf4e1};
+			for (unsigned i = 0; i < conditional.size(); ++i) program.write_word(physical + 0x600 + i, conditional[i]);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, overlay ? 0x20 : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -6087,7 +6094,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, xc ? 1 : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_observed_instructions.clear(); m_saved_observed_instructions.clear();
@@ -38225,8 +38232,9 @@ private:
 		if (m_phase == 292000)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const xc = variant >= 32, two = xc && BIT(variant - 32, 5);
 			u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = BIT(variant, 2) ? 0 : base;
-			unsigned const checkpoint = std::array<unsigned, 4>{1, 3, 6, 9}[variant / 8];
+			unsigned const checkpoint = std::array<unsigned, 4>{1, 3, 6, 9}[(variant % 32) / 8];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Observer fixture executes only accepted instructions");
 			// Debugger-style inspection and plain program-bus reads are not execution.
 			unsigned const before = m_observed_instructions.size();
@@ -38246,15 +38254,24 @@ private:
 			}
 			if (tick == 40)
 			{
-				std::vector<std::pair<offs_t, u16>> const expected{
+				std::vector<std::pair<offs_t, u16>> expected{
 					{base + 0x600, 0xec02}, {base + 0x601, 0xf495}, {base + 0x601, 0xf495},
 					{base + 0x601, 0xf495}, {base + 0x602, 0xf073}, {base + 0x608, 0xe977}, {base + 0x609, 0xf4e1}};
+				if (xc)
+				{
+					expected = {{base + 0x600, u16(two ? 0xff45 : 0xfd45)}};
+					if (!two) expected.emplace_back(base + 0x602, 0xf495);
+					expected.emplace_back(base + 0x603, two ? 0xff44 : 0xfd44);
+					expected.emplace_back(base + 0x604, 0xe977);
+					if (two) expected.emplace_back(base + 0x605, 0xf495);
+					expected.emplace_back(base + (two ? 0x606 : 0x605), 0xf4e1);
+				}
 				if (m_observed_instructions != expected)
 				{
 					osd_printf_info("Instruction observer mismatch: case=%u replay=%u entries=%zu pc=%06x\n", variant, unsigned(m_pipeline_replay), m_observed_instructions.size(), unsigned(m_cpu->state_int(STATE_GENPC)));
 					for (auto const &[address, opcode] : m_observed_instructions) osd_printf_info("  entry=%06x opcode=%04x\n", unsigned(address), opcode);
 				}
-				expect(m_observed_instructions == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				expect(m_observed_instructions == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_A) == (xc ? 1 : 0) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 					"Execute entries retain opcode and logical page, include real repeats and exclude extension/annulled fetches");
 				if (!m_pipeline_replay)
 				{
@@ -38265,8 +38282,9 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 292010; m_check_timer->enable(true); return;
 				}
 				m_cpu->set_pipeline_frontend(false);
-				if (variant < 31) { start_instruction_observer(variant + 1); return; }
-				osd_printf_info("TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0\n");
+				if (variant == 31) osd_printf_info("TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0\n");
+				if (variant < 95) { start_instruction_observer(variant + 1); return; }
+				osd_printf_info("TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated instruction observer complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
