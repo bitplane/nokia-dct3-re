@@ -472,15 +472,15 @@ def compare_playback_bit_context(text, words, session):
     rows = list(re.finditer(
         r'mu4_playback_bit_context: boundary=(entry|return) ordinal=(\d+) address=([0-9a-f]{6}) '
         r'a=([0-9a-f]{10}) remaining=([0-9a-f]{4}) reservoir=([0-9a-f]{8}) index=([0-9a-f]{4}) '
-        r'base=([0-9a-f]{4}) next=([0-9a-f]{4}|unobserved) caller=([0-9a-f]{6}) t=(\d+\.\d{9}) '
+        r'base=([0-9a-f]{4}) next=([0-9a-f]{4}|unobserved) caller=([0-9a-f]{6}) group=([0-3]) t=(\d+\.\d{9}) '
         r'identity=Execute_entry context_only=1 observer_writes=0$', text, re.MULTILINE))
-    if len(rows) != text.count('mu4_playback_bit_context:') or len(rows) % 2 or len(rows) > 48:
+    if len(rows) != text.count('mu4_playback_bit_context:') or len(rows) % 2 or len(rows) > 304:
         raise ValueError('malformed or unpaired bit-reader context')
-    result, previous, source_counts = [], session[0], [0, 0, 0]
+    result, previous, source_counts = [], session[0], [0, 0, 0, 0]
     for index in range(0, len(rows), 2):
         entry, returned = rows[index:index + 2]
         for boundary, row, address, opcode in (('entry', entry, 0x2510c, 0xed00), ('return', returned, 0x25142, 0xf4e4)):
-            time = float(row[11])
+            time = float(row[12])
             if row[1] != boundary or int(row[2]) != index // 2 + 1 or int(row[3], 16) != address or words.get(address) != opcode:
                 raise ValueError('bit-reader boundary, ordinal or original source mismatch')
             if not previous <= time < session[1]:
@@ -490,15 +490,18 @@ def compare_playback_bit_context(text, words, session):
         caller = int(entry[10], 16)
         if entry[10] != returned[10] or caller not in words:
             raise ValueError('bit-reader caller context is unpaired or absent from original source')
-        source = 1 if caller == 0x25354 else 2 if caller == 0x25e2d else 0
+        source = int(entry[11])
+        expected_source = 1 if caller == 0x25354 else 2 if caller == 0x25e2d else 0
+        if entry[11] != returned[11] or (source != 3 and source != expected_source):
+            raise ValueError('bit-reader selection group disagrees with paired caller')
         source_counts[source] += 1
-        if source_counts[source] > 8:
+        if source_counts[source] > (128 if source == 3 else 8):
             raise ValueError('bit-reader caller selection exceeds its bounded samples')
         literal = words.get(caller - 1)
         literal_request = literal & 0xff if words.get(caller) == 0xf982 and words.get(caller + 1) == 0x510c and literal is not None and literal & 0xff00 == 0xe800 else None
-        row = {'raw_request': raw_request, 'caller': entry[10], 'preceding_literal_candidate': literal_request,
+        row = {'raw_request': raw_request, 'caller': entry[10], 'capture_group': source, 'preceding_literal_candidate': literal_request,
                'literal_candidate_agrees': None if literal_request is None else literal_request == raw_request,
-               'entry_time': float(entry[11]), 'return_time': float(returned[11]),
+               'entry_time': float(entry[12]), 'return_time': float(returned[12]),
                'scope': 'raw context comparison, not retained operands or CPU/codec acceptance'}
         if not 0 <= raw_request <= 16 or remaining > 32 or (remaining <= 16 and entry[9] == 'unobserved') or (literal_request is not None and literal_request != raw_request):
             row['comparison'] = 'unvalidated_input_context'
@@ -511,6 +514,32 @@ def compare_playback_bit_context(text, words, session):
                        expected=expected, observed=observed, base_unchanged=entry[8] == returned[8])
         result.append(row)
     return result
+
+
+def verify_playback_optional_window(text, bits, session):
+    starts = list(re.finditer(r'mu4_playback_optional_window: start=02532e t=(\d+\.\d{9}) identity=Execute_entry observer_writes=0$', text, re.MULTILINE))
+    ends = list(re.finditer(r'mu4_playback_optional_terminal: end=(025359|024538) samples=(\d+) capped=([01]) t=(\d+\.\d{9}) '
+                            r'identity=Execute_entry observer_writes=0 audio_acceptance=0$', text, re.MULTILINE))
+    selected = [row for row in bits if row['capture_group'] == 3]
+    if not starts and not ends and not selected and 'mu4_playback_optional_' not in text:
+        return None
+    if len(starts) != 1 or len(ends) != 1 or text.count('mu4_playback_optional_window:') != 1 or text.count('mu4_playback_optional_terminal:') != 1:
+        raise ValueError('missing or duplicated optional-field window')
+    start, end = float(starts[0][1]), float(ends[0][4])
+    if not session[0] <= start < end < session[1] or starts[0].end() >= ends[0].start():
+        raise ValueError('optional-field window outside ordered first session')
+    if int(ends[0][2]) != len(selected) or int(ends[0][3]) != int(len(selected) == 128) or not selected:
+        raise ValueError('optional-field window sample/cap mismatch')
+    if any(not start <= row['entry_time'] <= row['return_time'] <= end for row in selected):
+        raise ValueError('optional-field sample outside its window')
+    if selected[0]['caller'] != '02532f':
+        raise ValueError('optional-field window lacks its initial one-bit call')
+    if ends[0][1] == '025359' and len(selected) < 128 and selected[-1]['caller'] != '025354':
+        raise ValueError('optional-field window lacks its final one-bit call')
+    if ends[0][1] == '025359' and len(selected) < 128 and not any(row['caller'] == '025344' for row in selected):
+        raise ValueError('optional-field window lacks its intermediate one-bit call')
+    return {'start': start, 'end': end, 'end_address': ends[0][1], 'capped': len(selected) == 128,
+            'calls': selected, 'scope': 'one bounded optional-field attempt, not AAC validity or full stream alignment'}
 
 
 def verify_playback_gates(text, session):
@@ -682,6 +711,7 @@ def verify_playback_range(text, words):
     notify_history = verify_playback_switch_history(text, words, parent['first_session'], kind='notify')
     callback_history = verify_playback_switch_history(text, words, parent['first_session'], kind='callback')
     restore_history = verify_playback_switch_history(text, words, parent['first_session'], kind='restore')
+    bit_context = compare_playback_bit_context(text, words, parent['first_session'])
     if activation_history and (len(activation_history) != len(enqueue_history) or any(
             a['time'] >= e['time'] for a, e in zip(activation_history, enqueue_history))):
         raise ValueError('activation history does not precede its paired enqueue entries')
@@ -695,7 +725,8 @@ def verify_playback_range(text, words):
             'restore_producer_path': verify_playback_path(text, words, restore_history, kind='restore'),
             'method_coverage': verify_playback_method(text, words, parent['first_session']),
             'method_gate_accesses': verify_playback_gates(text, parent['first_session']),
-            'bit_context_comparisons': compare_playback_bit_context(text, words, parent['first_session']),
+            'bit_context_comparisons': bit_context,
+            'optional_field_window': verify_playback_optional_window(text, bit_context, parent['first_session']),
             'callback_descriptor_read_samples': verify_playback_callback_reads(text, words, parent['first_session']),
             'notify_context_history': notify_history,
             'notify_raw_register_context': verify_playback_notify_context(text, notify_history),

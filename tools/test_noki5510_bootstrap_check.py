@@ -10,13 +10,31 @@ from tools.noki5510_bootstrap_check import (
     verify_playback_method,
     verify_playback_gates,
     compare_playback_bit_context,
+    verify_playback_optional_window,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_optional_window_preserves_scope_and_requires_boundary_calls(self):
+        text = ('mu4_playback_optional_window: start=02532e t=1.000000000 identity=Execute_entry observer_writes=0\n'
+                'mu4_playback_optional_terminal: end=025359 samples=3 capped=0 t=1.100000000 '
+                'identity=Execute_entry observer_writes=0 audio_acceptance=0')
+        bits = [{'capture_group': 3, 'entry_time': 1.01 + i * .02, 'return_time': 1.02 + i * .02, 'caller': caller}
+                for i, caller in enumerate(('02532f', '025344', '025354'))]
+        self.assertFalse(verify_playback_optional_window(text, bits, [.8, 2.2])['capped'])
+        for old, new in (('samples=3', 'samples=4'), ('capped=0', 'capped=1'), ('t=1.100000000', 't=2.200000000'),
+                         ('audio_acceptance=0', 'audio_acceptance=1')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_playback_optional_window(text.replace(old, new), bits, [.8, 2.2])
+        for index in range(3):
+            changed = [dict(row) for row in bits]
+            changed[index]['caller'] = '025355'
+            with self.assertRaises(ValueError):
+                verify_playback_optional_window(text, changed, [.8, 2.2])
+
     def test_bit_context_comparison_does_not_promote_context_to_operand_acceptance(self):
         entry = ('mu4_playback_bit_context: boundary=entry ordinal=1 address=02510c a=0000000001 '
-                 'remaining=0000 reservoir=00000000 index=0000 base=1000 next=8001 caller=025354 t=1.000000000 '
+                 'remaining=0000 reservoir=00000000 index=0000 base=1000 next=8001 caller=025354 group=1 t=1.000000000 '
                  'identity=Execute_entry context_only=1 observer_writes=0')
         returned = entry.replace('boundary=entry', 'boundary=return').replace('address=02510c', 'address=025142').replace(
             'remaining=0000 reservoir=00000000 index=0000', 'remaining=000f reservoir=00008001 index=0001').replace(

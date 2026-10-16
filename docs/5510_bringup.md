@@ -4712,8 +4712,9 @@ and a wrong-page alias.
 
 Fresh runs retain eight initial calls and up to eight calls separately
 from each of `025354` and `025e2d`, preventing one caller from starving
-the other. Constant playback records 16 pairs; varying records 17.
-All 33 raw entry/return contexts agree with the model's returned value,
+the other. An additional one-attempt optional-field window has its own
+cap of 128 calls. Constant playback records 16 pairs; varying records 19.
+All 35 raw entry/return contexts agree with the model's returned value,
 remaining count, reservoir, index and unchanged base. The observations
 cover widths 0, 1 and 15, not every width or all calls. Source-adjacent
 literal candidates are reported separately from raw requests; neither is
@@ -4735,11 +4736,21 @@ session, so comparing the same file offset is not a matched parsing proof.
 
 The pulse/TNS/gain-control tail in the upstream
 [FAAD2 AAC syntax parser](https://raw.githubusercontent.com/knik0/faad2/master/libfaad/syntax.c)
-provides a candidate interpretation for the consecutive optional-field
-checks around `025354`. This is a syntax clue only: assigning a gain-control
-name requires mapping the preceding fields and stream position in this ROM.
-No external implementation is imported, and neither that analogy nor the
-observed one bit proves invalid media or justifies clearing it.
+provides a candidate interpretation for the consecutive checks around
+`025354`. The ROM's `025232` reads 2/6-bit fields followed by a 5/4-bit loop,
+matching the pulse-data shape. Its parent reads a flag, optionally calls
+that routine, reads another flag, optionally calls `025190`, then checks
+the final bit. The uncapped first varying-input window at
+1.008693067--1.008694626 contains exactly three width-one calls:
+`02532f=0,025344=0,025354=1`, all agreeing with the scalar model.
+The conditional data parsers are skipped in this attempt; the final one
+causes the observed restore. Constant playback selects no such window
+in its first session. Boundary/ordinal/source checks preserve that absence
+without synthesizing a matching attempt. This strengthens the local
+optional-field interpretation, but earlier section/scalefactor parsing and
+the global stream position are not independently validated. No external
+implementation is imported, and this observation does not prove invalid
+media or justify clearing a bit.
 
 **Do not infer ownership from aggregate counts.** Immediate-call encoding
 candidates for the trampoline are `02018b,0201de,0201ec,02023d,020375`,
