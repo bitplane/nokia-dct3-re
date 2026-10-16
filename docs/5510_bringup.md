@@ -4642,6 +4642,23 @@ also occur in the control-area data. These facts prioritize the indirect
 caller of the wrapper; they do not close computed or cross-overlay callers
 or establish that each reference is a completion callback. Full tool tests
 pass (2,959 tests, one skipped); native audio acceptance remains unmet.
+Paired wrapper-entry history now identifies `02048f/f5e7` (`FCALA B`)
+as the indirect transfer into `020419` for all eight bounded constant
+requests and both varying-input requests. The preceding Execute words
+are `02048c/1b94,02048d/4b94,02048e/1094`. The first two entry times match
+at 0.820210499 and 0.834081781 seconds; only constant playback has the
+third at 1.022780685. The original C-initialization record at `027079`
+copies `0002,0419,0000,8044,0001,054f` to `d7b0..d7b5`, supplying a
+concrete candidate callback descriptor rather than an invented event.
+Its actual runtime use remains to be correlated with the transfer.
+The observer retains history at every wrapper entry and reports it only
+when the subsequent enqueue entry selects live AR2=8044; a live-A match
+at wrapper entry did not recover these calls and is not an absence proof.
+Paired entry timestamps, ordinal order and original source words are
+checked independently; retained observer state is reset/saved. The fresh
+paired runs preserve the previous source-checked range counts. The next
+boundary is which descriptor invokes this trampoline and what condition
+produces its later activation, not the wrapper's enqueue semantics.
 The only five `aa56`
 literals are at `0204b4,0204d0,0204d3,0205af,027a05`; the last belongs to
 an explicit zero initialization. Initialization also sets `aa59=d796`

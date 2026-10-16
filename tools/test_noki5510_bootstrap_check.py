@@ -25,9 +25,17 @@ class BootstrapCheckTest(unittest.TestCase):
         enqueue = text.replace('switch_history', 'enqueue_history').replace(
             'address=020478 opcode=10e4 ar4=804a', 'address=0202d7 opcode=487e ar2=8044').replace(
             'live_ar4_context', 'live_ar2_context')
-        self.assertEqual(len(verify_playback_switch_history(enqueue, words, [0.8, 2.2], enqueue=True)), 1)
+        self.assertEqual(len(verify_playback_switch_history(enqueue, words, [0.8, 2.2], kind='enqueue')), 1)
         with self.assertRaises(ValueError):
-            verify_playback_switch_history(enqueue.replace('ar2=8044', 'ar2=8045'), words, [0.8, 2.2], enqueue=True)
+            verify_playback_switch_history(enqueue.replace('ar2=8044', 'ar2=8045'), words, [0.8, 2.2], kind='enqueue')
+        activation = text.replace('switch_history', 'activation_history').replace(
+            'address=020478 opcode=10e4 ar4=804a', 'address=020419 opcode=f6be paired_ar2=8044').replace(
+            'live_ar4_context', 'paired_enqueue_ar2_context')
+        self.assertEqual(len(verify_playback_switch_history(activation, words, [0.8, 2.2], kind='activation')), 1)
+        with self.assertRaises(ValueError):
+            verify_playback_switch_history(activation.replace('paired_ar2=8044', 'paired_ar2=8045'), words, [0.8, 2.2], kind='activation')
+        with self.assertRaises(ValueError):
+            verify_playback_switch_history(text, words, [0.8, 2.2], kind='unknown')
 
     def test_range_census_requires_complete_original_word_coverage_and_scoped_totals(self):
         words = {address: 0 for address in range(0x200a0, 0x20cd2)}

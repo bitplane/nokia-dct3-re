@@ -431,10 +431,15 @@ def verify_playback_parent(text):
                 first_session=(start, finish), selector_samples=samples, decoded_audio=False, subsystem_identity='unvalidated')
 
 
-def verify_playback_switch_history(text, words, session, *, enqueue=False):
-    label = 'enqueue' if enqueue else 'switch'
-    entry = 'address=0202d7 opcode=487e ar2=8044' if enqueue else 'address=020478 opcode=10e4 ar4=804a'
-    selector = 'live_ar2_context' if enqueue else 'live_ar4_context'
+def verify_playback_switch_history(text, words, session, *, kind='switch'):
+    formats = {
+        'switch': ('address=020478 opcode=10e4 ar4=804a', 'live_ar4_context'),
+        'enqueue': ('address=0202d7 opcode=487e ar2=8044', 'live_ar2_context'),
+        'activation': ('address=020419 opcode=f6be paired_ar2=8044', 'paired_enqueue_ar2_context'),
+    }
+    if kind not in formats:
+        raise ValueError('unknown playback transfer history kind')
+    label, (entry, selector) = kind, formats[kind]
     rows = list(re.finditer(
         rf'mu4_playback_{label}_history: ordinal=(\d+) {entry} '
         r'p0=([0-9a-f]{6})/([0-9a-f]{4}) p1=([0-9a-f]{6})/([0-9a-f]{4}) '
@@ -446,7 +451,7 @@ def verify_playback_switch_history(text, words, session, *, enqueue=False):
     result, previous = [], session[0]
     for ordinal, row in enumerate(rows, 1):
         time = float(row[10])
-        if int(row[1]) != ordinal or not previous <= time < session[1]:
+        if int(row[1]) != ordinal or not previous <= time < session[1] or (kind == 'activation' and ordinal > 1 and time == previous):
             raise ValueError('playback switch history ordinal/session mismatch')
         history = [(int(row[i], 16), int(row[i + 1], 16)) for i in (2, 4, 6, 8)]
         if any(words.get(address) != opcode for address, opcode in history):
@@ -479,9 +484,15 @@ def verify_playback_range(text, words):
         visits[address] = {'opcode': f'{opcode:04x}', 'entries': count}
     if not visits or sum(row['entries'] for row in visits.values()) != int(summary[0][2]):
         raise ValueError('range entry totals disagree with the complete census')
+    enqueue_history = verify_playback_switch_history(text, words, parent['first_session'], kind='enqueue')
+    activation_history = verify_playback_switch_history(text, words, parent['first_session'], kind='activation')
+    if activation_history and (len(activation_history) != len(enqueue_history) or any(
+            a['time'] >= e['time'] for a, e in zip(activation_history, enqueue_history))):
+        raise ValueError('activation history does not precede its paired enqueue entries')
     return {'parent': parent, 'source_range_words': last - first + 1,
             'switch_context_history': verify_playback_switch_history(text, words, parent['first_session']),
-            'enqueue_context_history': verify_playback_switch_history(text, words, parent['first_session'], enqueue=True),
+            'enqueue_context_history': enqueue_history,
+            'activation_context_history': activation_history,
             'visited_words': len(visits), 'execute_entries': int(summary[0][2]),
             'visits': {f'{address:06x}': row for address, row in sorted(visits.items())},
             'scope': 'complete Execute-entry counts in selected first-session AA99 word range only; '
