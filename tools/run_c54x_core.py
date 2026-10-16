@@ -21,7 +21,7 @@ REQUIRED = [
     "TMS320C54x staged multiword: PASS cases=4 literal_fetch=3 complete_decode=4 execute=7 vector_fetch=7 return_pc=0602 pending_decode_restore=4",
     "TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2",
     "TMS320C54x staged stores: PASS cases=12 address=Read write=Execute writes_per_leg=1 pending_store_restore=12",
-    "TMS320C54x staged indirect loads: PASS cases=8 ar_update=Access read=Read execute=Execute captured_address_restore=8",
+    "TMS320C54x staged indirect loads: PASS cases=6 ar_update=Access read=Read execute=Execute captured_address_restore=6",
     "TMS320C54x staged RMW: PASS cases=12 forms=DP,postincrement,absolute extension_restore=6 sampled_read_restore=6 duplicate_reads=0",
     "TMS320C54x staged mask RMW: PASS read=7 write=8 accepted_irq=1 subsequent_masked=1 pending_write_restore=1 duplicate_reads=0",
     "TMS320C54x staged fast returns: PASS cases=8 target_fetch=9 return_execute=10 delay_execute=11,12 resumed_execute=13 stack_reads=0 restore=8",
@@ -108,9 +108,9 @@ REQUIRED = [
     "TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged LDU: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged memory LD shift16: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged variable memory LD: PASS cases=110592 address_forms=18 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=110592 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged LDU: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged memory LD shift16: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged variable memory LD: PASS cases=104448 address_forms=17 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=104448 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged MPYU: PASS ram_cases=30720 mapped_cases=24576 accumulators=2 t_values=2 patterns=8 flag_states=16 restore=55296 t_retained=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged MPY and MPYR: PASS cases=55296 accumulators=2 rounding=0,1 t_retained=1 restore=55296 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged memory LD T: PASS cases=55296 ram_and_mapped=1 restore=55296 read_publication=1 retirement_rewrite=0 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
@@ -127,7 +127,7 @@ REQUIRED = [
     "TMS320C54x staged RPTB: PASS cases=6144 irq_nmi_cases=24 restore=6168 counts=0,1,2,7 zero_overhead_body=5 counter=Decode final_braf=Decode silicon_phase_claim=0",
     "TMS320C54x staged RPTB edges: PASS cases=16 restore=16 one_word=2 two_word=2 exclusions=12 atomic_fallback=0 silicon_phase_claim=0",
     "TMS320C54x staged immediate MPY: PASS isolated_cases=12288 stlm_cases=73728 value_pairs=64 selectors=4 flags=16 restore=86016 literal_fetches=1 t_retained=1 data_reads=0 projection_only_stlm_gap=0 silicon_phase_claim=0",
-    "TMS320C54x staged indirect DLD: PASS cases=24576 forms=16 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=24576 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0",
     "TMS320C54x staged immediate arithmetic: PASS sub_cases=26112 add16_cases=1536 producer_cases=144 selectors=4 shifts=0..16 patterns=8 status_states=8 pages=2 restore=27792 duplicate_literals=0 data_accesses=0 silicon_phase_claim=0",
     "TMS320C54x staged register arithmetic: PASS cases=196608 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=196896 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0",
@@ -489,7 +489,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated mapped MVDD repeat complete",
     ),
     "ld-ts": (
-        "TMS320C54x TS loads: PASS cases=221184 restore=221184 forms=18 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0",
+        "TMS320C54x TS loads: PASS cases=208896 restore=208896 forms=17 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated TS loads complete",
     ),
     "ld-ts-producer": (
@@ -859,6 +859,29 @@ EXTRA_PROFILES = {
     "rptb-branch": (
         "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block branches complete",
+    ),
+    "indirect-dld": (
+        "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated indirect double loads complete",
+    ),
+    "load-variable": (
+        "TMS320C54x staged variable memory LD: PASS cases=104448 address_forms=17 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=104448 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated variable memory loads complete",
+    ),
+    "ldu-shift16": (
+        (
+            "TMS320C54x staged LDU: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+            "TMS320C54x staged memory LD shift16: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        ),
+        "Fatal error: TMS320C54x isolated LDU and shift16 loads complete",
+    ),
+    "load-mod3-edge": (
+        "TMS320C54x load MOD3 exclusions: PASS cases=9728 restore=9728 families=7 variable_shifts=32 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated load MOD3 exclusions complete",
+    ),
+    "indirect-load": (
+        "TMS320C54x staged indirect loads: PASS cases=6 ar_update=Access read=Read execute=Execute captured_address_restore=6",
+        "Fatal error: TMS320C54x isolated indirect loads complete",
     ),
     "rpt-subc-st": (
         (

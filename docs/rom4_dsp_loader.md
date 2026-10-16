@@ -3169,14 +3169,14 @@ and silicon phase fidelity remain unvalidated.
 
 Unsigned memory load LDU (`12xx/13xx`) shares the retained LD address/
 Read path, but Execute always publishes the raw 16-bit sample with all
-upper accumulator bits clear, independently of SXM and OVM. The existing
-signed LD short-mode limits remain unchanged. LDU admits direct DP/CPL,
-all twelve short-indirect modifiers and the offset/absolute forms; other
+upper accumulator bits clear, independently of SXM and OVM. Like signed LD,
+it excludes write-only short MOD=3. LDU admits direct DP/CPL,
+the eleven read-capable short-indirect modifiers and the offset/absolute forms; other
 control/peripheral sources fail closed before Read, while mapped AR0--AR7
 are explicitly covered. Extended control-delay placement and repeats
 remain unsupported.
 
-The 55296 RAM replay cases cover eighteen address forms, eight encoded
+The 52,224 RAM replay cases cover seventeen address forms, eight encoded
 registers, both destinations, eight values including `8000,ffff,f495`,
 SXM/OVM, compatibility mode and Decode/Access/Read saves. Another 2304
 cases cover each mapped AR source through direct, absolute and ordinary
@@ -3190,7 +3190,7 @@ forms in this partial frontend model. These checks are not silicon timing
 evidence. Physical memory-bank arbitration, mixed status/producer hazards
 and wider control/interrupt composition remain unvalidated.
 
-Indirect DLD A/B (`56xx/57xx`) admits short MOD 0--11 and long
+Indirect DLD A/B (`56xx/57xx`) admits short MOD 0--11 except write-only MOD=3, and long
 offset/absolute MOD 12--15. Decode retains an extended operand literal;
 Access applies the shared long-word address helper or short pointer step
 once. Linear and circular unit steps are two words; AR0-indexed and
@@ -3200,7 +3200,7 @@ the 32-bit pair and extends its high sign bit into the guard byte when
 SXM is set, independently of C16. It changes only the chosen accumulator
 and any Access-owned compatibility ARP update.
 
-The 24576 replay cases cover sixteen address forms, eight encoded
+The 23,040 replay cases cover fifteen address forms, eight encoded
 registers, both accumulators, four payload patterns, both address parities,
 SXM/C16 and compatibility mode. They change extended literals after
 Decode, AR/BK after Access and both source words after Read. Saves in
@@ -3346,7 +3346,7 @@ Variable-shift memory LD (`6fxx` plus `0c40/0d40` operation extension,
 SPRU172C LD syntax 4) retains the address-extension word, when present,
 before the operation extension. Access owns DAGEN and Read samples memory
 once; Execute applies SXM and the signed five-bit shift through the shared
-shifted-load helper. Its 110,592 replay cases cover 18 RAM address forms,
+shifted-load helper. Its 104,448 replay cases cover 17 read-capable RAM address forms,
 AR1/AR6, both accumulators, four values, all 32 shifts and SXM/OVM states.
 Separate Decode/Access/Read checkpoints, poisoned extension words and
 changed sources/pointers check retention and single publication. The 16-bit
@@ -3361,7 +3361,7 @@ The stage assignment remains a partial frontend model, not measured timing.
 Memory LD shifted by 16 (`44xx/45xx`, SPRU172C LD syntax 3) shares
 the retained memory-load address and Read path. Execute sign-extends
 according to SXM, shifts by 16 and masks to 40 bits, without changing
-OVdst, carry or other status flags. Its 57,600 replay cases cover 18 RAM
+OVdst, carry or other status flags. Its 54,528 replay cases cover 17 RAM
 address forms, all AR selectors, both accumulators, eight memory values,
 SXM/OVM combinations, compatibility addressing and mapped AR sources.
 Snapshots at Decode, Access and Read check one sample, one address update
@@ -6658,9 +6658,11 @@ and the Smem form publishes its memory operand to T. They cost two DARAM
 cycles, plus one for long-offset or absolute Smem. Fixture-only `6283`
 checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
 `MPY #fffe,B` example and preserves T; `62f8` checks address-before-immediate
-extension order and the absolute three-cycle cost. `629b` checks that the
-preincrement updates AR3 before reading Smem. Long-offset word order, other
-addressing modes, and multiplier saturation variants remain unasserted.
+extension order and the absolute three-cycle cost. `629b` is a write-only
+short-preincrement source and is now a rejection control, not a valid MPY
+timing fixture. Long-offset MOD=13 remains read-capable; its retained
+memory/immediate coverage is described above. Other addressing and multiplier
+saturation variants require their own acceptance scope.
 SPRU172C specifies A(32–16) as a signed **17-bit** multiplicand. The existing
 `MPYA/MACA/MASA` Smem path had narrowed it to `s16`, reversing the product's
 sign when bit 31 was set but bit 32 was clear. A shared 17-bit extraction now

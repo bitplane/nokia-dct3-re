@@ -11,24 +11,47 @@ streams, not a matching handset PMM or an internal DSP mask image.
 
 CPU correctness work currently takes precedence over further opcode expansion:
 short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). Incorrect
-read admission in RPT, SUBC and memory/immediate MPY is corrected, but other existing
-load/ALU classifiers and fixtures still require a domain audit. Passing those mechanically decoded
+read admission in RPT, SUBC, memory/immediate MPY and the Smem/Lmem load
+families below is corrected. Other ALU and MMR-source classifiers and fixtures
+still require a domain audit. Passing those mechanically decoded
 read cases is not hardware-legality evidence. Long-offset MOD=13 preincrement
 is a distinct read-capable form and must not be removed by that audit.
 
 ### Short-preincrement fixture audit
 
 SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 (`*+ARx`,
-encoded Smem byte `98..9f`) to write accesses. The following positive
-fixture domains still violate that restriction; their existing PASS markers
-are prototype regressions, not proof of legal read execution:
+encoded Smem byte `98..9f`) to write accesses. The corrected load fixture
+domains exclude short preincrement, without substituting duplicate legal cases:
 
-| Fixture generator | Confirmed invalid positive domain | Required correction |
+| Load fixture | Read-capable encoding cases/restores | Domain correction |
 | --- | --- | --- |
-| `start_pipeline_indirect_case` | `1099` and `1199`: 2 of 8 cases | Replace those legs with rejection checks before address modification/read, retaining the 6 valid load cases and their restore checks. |
+| `indirect-load` | 6 | Stationary/postdecrement/postincrement for both destinations; 2 invalid cases removed. |
+| `ldu-shift16` | 54,528 per family | 17 RAM address forms plus mapped AR sources; 3,072 invalid cases removed per family. |
+| `ld-ts` | 208,896 | 17 address forms; 12,288 invalid cases removed. |
+| `load-variable` | 104,448 | 17 address forms and all 32 shifts; 6,144 invalid cases removed. |
+| `indirect-dld` | 23,040 | 15 indirect/long address forms; 1,536 invalid cases removed. |
 
-These counts are derived from the current generators, not new execution
-results. They identify confirmed defects, not an exhaustive opcode census.
+The LDU/shift-16/variable-load and DLD banks preserve raw case IDs and skip
+only the invalid form; their totals count admitted cases, not raw ID ranges.
+These totals certify removal of the forbidden read encoding, not every input
+domain: older nonzero-BK circular cases still need the documented buffer/step
+constraints audited independently. In particular, the shared arithmetic
+generator includes large signed offsets, and the DLD generator includes
+`f495` as a circular offset; modulo expectations alone are not silicon evidence.
+The TS-load bank reindexes its 17-form Cartesian domain. Long MOD=13 remains
+admitted. Atomic `LD/LDU/LD TS/LDR/LD shift-16/DLD` reject short MOD=3 before
+operand access. Staged load classifiers reject it; `6fxx` LD rejects only after
+the operation extension has identified a read, leaving stores unchanged.
+`load-mod3-edge` covers 9,728 rejection/replay cases across these seven load
+families, all ARs, both destinations, CMPT settings, pages, frontends and two
+snapshots; variable LD additionally covers all 32 shifts. It requires no data
+transaction, AR change, accumulator, T or ST0 change. This is not an exhaustive
+opcode census: read-only ALU/test sources and MMR addressing remain open,
+as do instruction-specific read/modify/write and implicit-copy classifications.
+Confirmed remaining fixture inputs include `memory_arithmetic_case` form 5
+(inherited by arithmetic and `bitfield_address_case`) and
+`memory_multiply_case` RAM kind 5 (inherited by multiply and T-load families).
+Their current positive PASS counts are not legal-domain acceptance.
 
 SUBC's corresponding defect is corrected: 7,680 invalid short-preincrement
 cases were removed, leaving 38,400 legal positive cases/restores. The
@@ -47,10 +70,12 @@ both CMPT settings, both pages, atomic and staged frontends, and snapshots
 before/after rejection. No data access, AR update, accumulator, T or ST0 change
 is permitted. The atomic guard precedes `immediate_smem_read`; the staged
 classifier excludes short MOD=3. This does not close the other read families.
-The SUBC correction passes its two focused profiles, the MPY rejection
-control, native 5110 save-state restoration and 2,917 tool tests (one skipped).
-The full default suite was not rerun; its known invalid load domain remains
-listed above. These focused checks do not substitute for that pending rerun.
+Acceptance after these corrections: the full 288-check default CPU suite,
+the separate 208,896-case TS-load profile, 9,728 load rejection/replay cases,
+native 5110 save-state restoration and 2,919 tool tests (one skipped) pass.
+The broad suite includes the corrected LDU, shift-16, variable-LD, DLD and
+SUBC banks. It remains a prototype regression net, not proof that the
+remaining operand domains or all circular inputs are legal.
 
 Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
 grammars, and Smem destination writes are eligible for short preincrement.
@@ -4691,7 +4716,8 @@ read-capable addressing mode, unlike short write-only MOD=3.
 
 ### REL long-offset pop boundary
 
-Original playback passes `4be1 0004` at `02:a13d` and now stops on
+Original playback, rechecked after the read-domain corrections, passes
+`4be1 0004` at `02:a13d` and stops on
 `8be1 0004` at `02:a270`, with live PC `02:a272`. AA99 contains
 `8a10 8be1 0004 f4e4` at `02:a26f..a272`; this is a long-offset POPD
 followed by FRET, not a missing source image. The source-address grammar,
@@ -4699,11 +4725,10 @@ SP/Read ownership, destination publication and replay need independent
 coverage before admitting that pop. The encoded AR1 plus literal must
 not be mistaken for a fixed destination address.
 
-The full 288-check default suite was last run at `bfcf0c3e`; it is a
-prototype regression net, not a substitute for the pending operand-domain
-audit. This extension passes its three profiles, corrected RPT profiles,
-nine other stack/repeat/PMST profiles, native 5110 save-state restoration
-and 2,914 tool tests (one skipped). These checks do not establish physical
+The current broad CPU regression and remaining operand-domain audit are
+summarized under [Short-preincrement fixture audit](#short-preincrement-fixture-audit).
+The long-PSHD acceptance remains its three scoped profiles, with separate
+RPT, stack/repeat and PMST controls. These checks do not establish physical
 bank timing, all legal/illegal operand domains or decoded audio.
 
 The external request, saved file and peer replies remain unchanged. The
@@ -5730,7 +5755,7 @@ occupies the retained immediate slot; PC accounting still uses the original
 opcode's instruction length. Mapped/peripheral sources below `0060` remain
 excluded from the staged TS path.
 
-The `ld-ts` fixture passes 221,184 cases/restores over 18 addressing forms,
+The `ld-ts` fixture covers 208,896 cases/restores over 17 legal addressing forms,
 all 64 shift encodings, four input words, SXM/OVM combinations, both
 accumulator destinations and compatibility modes. AR selection and program
 page rotate with shift encoding/destination; this is not their full Cartesian

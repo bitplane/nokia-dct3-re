@@ -152,6 +152,9 @@ Some recurring mistakes need stronger checks than ordinary source review:
   On C54x, short MOD=3 preincrement is write-only (SPRU131G table 5-4),
   while long-offset MOD=13 preincrement can read. A passing fixture for
   a mechanically decoded form does not establish that the form is legal.
+  When correcting admission, audit legacy default/atomic checks as well as
+  isolated staged profiles; otherwise an obsolete positive expectation can
+  survive the new rejection bank. Disassembler recognition is a separate claim.
 - Widening an operation classifier requires auditing all of its consumers,
   not just the primary execution path. Forwarding, bypass, wait arbitration
   and repeat helpers can retain assumptions about the narrower family.

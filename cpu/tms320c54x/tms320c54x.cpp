@@ -398,7 +398,7 @@ constexpr bool staged_memory_load(u16 word)
 {
 	return (((word & 0xfc00) == 0x1000 &&
 		(BIT(word, 9) || u8(word) < 0xa0 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || u8(word) >= 0xc0)) ||
-		(word & 0xfe00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8;
+		(word & 0xfe00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_shifted_smem(u16 word)
@@ -477,7 +477,7 @@ constexpr bool staged_dst(u16 word)
 
 constexpr bool staged_dld(u16 word)
 {
-	return (word & 0xfe00) == 0x5600 && u8(word) <= 0xf8;
+	return (word & 0xfe00) == 0x5600 && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_dld(u16 word)
@@ -2993,6 +2993,10 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}
 		bool const software_intr = staged_software_intr(word);
+		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && (m_pipeline_immediate[2] & 0xfee0) == 0x0c40)
+		{
+			logerror("%s: short MOD=3 is write-only, not a shifted LD source\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const short_repeat = staged_short_repeat(word);
 		if (m_pipeline_valid[2] && (short_repeat || (staged_memory_repeat(word) && word != 0x47f8)))
 		{
@@ -4837,6 +4841,13 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	// LD/LDU/LD TS/LDR, LD shift-16 and DLD all read their memory operand.
+	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
+	if ((low & 0xf8) == 0x98 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600))
+	{
+		m_illegal = true;
+		return;
+	}
 	if ((op & 0xffe0) == 0xf4c0) // TRAP K (SPRU172C 4-195): no status changes.
 	{
 		push(m_pc);
@@ -5188,6 +5199,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool extended = low >= 0xe0;
 		const u16 address = low >= 0xf8 ? fetch() : extended ? long_offset_address(low) : 0;
 		const u16 extension = fetch();
+		if ((low & 0xf8) == 0x98 && (extension & 0xfee0) == 0x0c40) { m_illegal = true; return; }
 		const int shift = s8((extension & 0x1f) << 3) >> 3;
 		auto shifted = [this, shift](u64 value)
 		{

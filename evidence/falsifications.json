@@ -908,6 +908,12 @@
       "hypothesis": "Short preincrement Smem MOD=3 is a valid source form for RPT because its address and pointer effects can be implemented and replayed",
       "conclusion": "TI SPRU131G table 5-4 marks short MOD=3 preincrement as write-only; RPT Smem reads its operand. The earlier 4798..479f positive cases therefore tested an inadmissible domain rather than hardware behavior. These forms now reject before data or pointer effects, with all eight ARF values, compatibility states, pages and two snapshots covered. Long-offset MOD=13 preincrement is a distinct, read-capable form used by extended PSHD and must not inherit the short-mode restriction. The original REL repeat uses direct 4700 and is unaffected. Prototype rejection does not claim a silicon trap mechanism.",
       "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp"]
+    },
+    {
+      "id": "c54x_short_mod3_is_a_valid_accumulator_load_source", "status": "disproven",
+      "hypothesis": "Short single-operand MOD=3 preincrement is a valid LD or DLD source because the address helper and positive replay fixtures can implement it",
+      "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to write accesses, including paired accesses. LD, LDU, LD TS, LDR, LD shift-16, variable-shift LD and DLD now reject this encoding before data, pointer or arithmetic-result effects in both frontends. The variable-shift guard classifies the operation extension, preserving write-side forms; long MOD=13 remains read-capable. A 9728-case rejection/replay bank spans all ARs, destinations, CMPT settings, pages, frontends and snapshots, with all 32 variable shifts. Positive source fixtures omit the forbidden encoding instead of replacing it with duplicate valid cases. The legacy 569b DLD and 629b immediate-MPY checks are rejection controls, not positive timing evidence. This does not certify other read families, MMR-source legality, circular inputs outside TI's buffer/step constraints, or a silicon trap mechanism.",
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     }
   ]
 }

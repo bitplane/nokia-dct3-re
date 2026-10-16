@@ -2554,8 +2554,8 @@ private:
 			program.write_word(0x600 + i, 0xf495);
 			program.write_word(0x40 + i, 0xf495);
 		}
-		constexpr u16 modes[] = { 0x81, 0x89, 0x91, 0x99 };
-		program.write_word(0x600, (variant >= 4 ? 0x1100 : 0x1000) | modes[variant % 4]);
+		constexpr u16 modes[] = { 0x81, 0x89, 0x91 };
+		program.write_word(0x600, (variant >= 3 ? 0x1100 : 0x1000) | modes[variant % 3]);
 		program.write_word(0x40, 0xe955);
 		m_cpu->space(AS_DATA).write_word(0x420, 0x1234);
 		m_cpu->space(AS_DATA).write_word(0x4a0, 0x5678);
@@ -2565,7 +2565,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, variant % 4 == 3 ? 0x41f : 0x420);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x420);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
@@ -6353,7 +6353,7 @@ private:
 	{
 		unsigned v = variant, form = 2, code, kind = 0;
 		if (producer) { kind = v % 3; v /= 3; code = std::array<unsigned, 8>{0, 1, 15, 16, 31, 32, 48, 63}[v % 8]; v /= 8; }
-		else { form = v % 18; v /= 18; code = v % 64; v /= 64; }
+		else { form = v % 17; v /= 17; if (form >= 5) ++form; code = v % 64; v /= 64; }
 		unsigned const pattern = v % 4; v /= 4;
 		unsigned const flags = v % 4; v /= 4;
 		unsigned const destination = v % 2; v /= 2;
@@ -8149,6 +8149,9 @@ private:
 	}
 	void start_pipeline_offset_load(unsigned variant = 0)
 	{
+		// Retain stable raw case IDs; omit short write-only MOD=3, not its
+		// long-offset counterpart. PASS totals count only admitted cases.
+		if (variant >= 12672 && staged_load_case(variant).form == 5) ++variant;
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = staged_load_case(variant);
 		u32 const base = f.reg == 6 ? 0x20000 : 0;
@@ -8204,6 +8207,7 @@ private:
 	}
 	void start_pipeline_indirect_dld(unsigned variant = 0)
 	{
+		if (variant % 16 == 3) ++variant; // Short MOD=3 is write-only, including paired accesses.
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = indirect_dld_case(variant);
 		unsigned const v = variant % 8192, form = v % 16, flags = (v / 1024) % 8, read_cycle = form < 12 ? 5 : 6;
@@ -9625,10 +9629,11 @@ private:
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 		u32 const base = (variant & 32) ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		bool const subc = variant >= 256, repeat = variant >= 512;
-		u16 const opcode = (subc ? 0x1e98 : 0x6298) | (variant & 7) | ((variant & 8) ? 0x100 : 0);
+		bool const load = variant >= 768, dld = variant >= 10240, shifted = variant >= 2048 && !dld, subc = variant >= 256 && !load, repeat = subc && variant >= 512;
+		u16 const family = dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
+		u16 const opcode = family | 0x98 | (variant & 7) | ((variant & 8) ? 0x100 : 0);
 		program.write_word(base + 0x600, repeat ? 0xec03 : opcode);
-		program.write_word(base + 0x601, repeat ? opcode : subc ? 0xf4e1 : 3); program.write_word(base + 0x602, 0xf4e1);
+		program.write_word(base + 0x601, shifted ? 0x0c40 | ((variant & 8) ? 0x100 : 0) | ((variant - 2048) / 256) : repeat ? opcode : subc ? 0xf4e1 : 3); program.write_word(base + 0x602, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant & 16) ? 0x4000 : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
@@ -15080,6 +15085,11 @@ private:
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "subc-mod3-edge")) { start_short_read_mod3_edge(256); return; }
+		if (!strcmp(machine().options().bios(), "load-mod3-edge")) { start_short_read_mod3_edge(768); return; }
+		if (!strcmp(machine().options().bios(), "indirect-load")) { start_pipeline_indirect_case(); return; }
+		if (!strcmp(machine().options().bios(), "ldu-shift16")) { start_pipeline_offset_load(12672); return; }
+		if (!strcmp(machine().options().bios(), "indirect-dld")) { start_pipeline_indirect_dld(); return; }
+		if (!strcmp(machine().options().bios(), "load-variable")) { start_pipeline_offset_load(127872); return; }
 		if (!strcmp(machine().options().bios(), "rpt-subc-st")) { start_pipeline_memory_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
@@ -18139,11 +18149,12 @@ private:
 					data.read_word(0x0e01) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
 					"DST long operand post-increments AR by two");
-			program.write_word(0x05e0, 0x569b); // DLD *+AR3, A
+			program.write_word(0x05e0, 0x569b); // Invalid read: short MOD=3 is write-only.
 			data.write_word(0x0e02, 0xabcd);
 			data.write_word(0x0e03, 0xef01);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e00);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcdef01ULL);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			m_phase = 89;
@@ -18152,9 +18163,10 @@ private:
 		}
 		if (m_phase == 89)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
-					"DLD long operand pre-increments AR before the read");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00,
+					"DLD rejects write-only short preincrement without pointer or accumulator effects");
+			m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 			program.write_word(0x05e0, 0x4fd3); // DST B, *AR3+%
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e02);
@@ -31368,7 +31380,7 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"MPY absolute Smem consumes address before immediate and costs three cycles");
-			program.write_word(0x05e2, 0x629b); // MPY *+AR3,#4,A.
+			program.write_word(0x05e2, 0x629b); // Invalid read: short MOD=3 is write-only.
 			program.write_word(0x05e3, 4);
 			program.write_word(0x05e4, 0x75d6);
 			program.write_word(0x05e5, 0x0124);
@@ -31377,6 +31389,7 @@ private:
 			data.write_word(0x0200, 3);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x01ff);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
@@ -31387,12 +31400,12 @@ private:
 		}
 		if (m_phase == 727)
 		{
-			expect_opcode(0x629b,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 12 &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"MPY preincrements AR3 before reading Smem in two cycles");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x01ff && m_port_writes == 1,
+				"MPY rejects write-only short preincrement before operand effects and the following PORTW");
+			m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 			program.write_word(0x05e2, 0xf480); // ADD A,ASM,A.
 			program.write_word(0x05e3, 0x75d6);
 			program.write_word(0x05e4, 0x0124);
@@ -34583,15 +34596,15 @@ private:
 		if (m_phase == 251090)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			unsigned const modifier = m_pipeline_indirect_case % 4;
-			bool const destination_b = m_pipeline_indirect_case >= 4;
+			unsigned const modifier = m_pipeline_indirect_case % 3;
+			bool const destination_b = m_pipeline_indirect_case >= 3;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
 				"Short indirect load advances through owned stages");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 6 && !destination_b ? 0x1234 : 0) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 10 ? 0x55 : cycle >= 6 && destination_b ? 0x1234 : 0),
 				"Indirect load retires the Read value, not a new AR-relative read");
-			constexpr u16 initial[] = {0x420, 0x420, 0x420, 0x41f};
-			constexpr u16 modified[] = {0x420, 0x41f, 0x421, 0x420};
+			constexpr u16 initial[] = {0x420, 0x420, 0x420};
+			constexpr u16 modified[] = {0x420, 0x41f, 0x421};
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
 				(cycle < 4 ? initial[modifier] : cycle == 4 ? modified[modifier] : 0x4a0),
 				"AR modification occurs in Access and is not repeated at Read or Execute");
@@ -34622,8 +34635,9 @@ private:
 				}
 				m_pipeline_operand_tap.remove();
 				m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_indirect_case < 7) { start_pipeline_indirect_case(m_pipeline_indirect_case + 1); return; }
-				osd_printf_info("TMS320C54x staged indirect loads: PASS cases=8 ar_update=Access read=Read execute=Execute captured_address_restore=8\n");
+				if (m_pipeline_indirect_case < 5) { start_pipeline_indirect_case(m_pipeline_indirect_case + 1); return; }
+				osd_printf_info("TMS320C54x staged indirect loads: PASS cases=6 ar_update=Access read=Read execute=Execute captured_address_restore=6\n");
+				if (!strcmp(machine().options().bios(), "indirect-load")) throw emu_fatalerror(0, "TMS320C54x isolated indirect loads complete");
 				start_pipeline_rmw_case();
 				return;
 			}
@@ -38658,7 +38672,7 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const producer = !strcmp(machine().options().bios(), "ld-ts-producer");
 			auto const f = ts_load_case(variant, producer); auto const &o = f.address;
-			unsigned const checkpoint = std::array<unsigned, 3>{3, o.read_cycle - 1, o.read_cycle}[variant / (producer ? 1536 : 73728)];
+			unsigned const checkpoint = std::array<unsigned, 3>{3, o.read_cycle - 1, o.read_cycle}[variant / (producer ? 1536 : 69632)];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.destination && tick > o.read_cycle ? f.result : f.a) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination && tick > o.read_cycle ? f.result : f.b),
@@ -38702,13 +38716,13 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254590; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (producer ? 4607 : 221183)) { start_ts_load(variant + 1); return; }
+				if (variant < (producer ? 4607 : 208895)) { start_ts_load(variant + 1); return; }
 				if (producer)
 				{
 					osd_printf_info("TMS320C54x TS load producers: PASS cases=4608 restore=4608 producers=STM_T,LD_T,STLM_T shift_codes=8 values=4 sxm_ovm=4 destinations=2 pages=2 snapshots=3 read_owned_t=1 forbidden_stlm_gap_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated TS load producers complete");
 				}
-				osd_printf_info("TMS320C54x TS loads: PASS cases=221184 restore=221184 forms=18 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x TS loads: PASS cases=208896 restore=208896 forms=17 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated TS loads complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40270,10 +40284,12 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant == 12671) osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant == 12671 && !strcmp(machine().options().bios(), "load-offset")) throw emu_fatalerror(0, "TMS320C54x isolated offset memory load complete");
-				if (variant == 70271) osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				if (variant == 127871) osd_printf_info("TMS320C54x staged memory LD shift16: PASS ram_cases=55296 mapped_ar_cases=2304 address_forms=18 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=57600 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 70271) osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 127871) osd_printf_info("TMS320C54x staged memory LD shift16: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 127871 && !strcmp(machine().options().bios(), "ldu-shift16")) throw emu_fatalerror(0, "TMS320C54x isolated LDU and shift16 loads complete");
 				if (variant < 238463) { start_pipeline_offset_load(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged variable memory LD: PASS cases=110592 address_forms=18 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=110592 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged variable memory LD: PASS cases=104448 address_forms=17 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=104448 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "load-variable")) throw emu_fatalerror(0, "TMS320C54x isolated variable memory loads complete");
 				start_pipeline_indirect_dld(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40333,7 +40349,8 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 24575) { start_pipeline_indirect_dld(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=24576 forms=16 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=24576 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "indirect-dld")) throw emu_fatalerror(0, "TMS320C54x isolated indirect double loads complete");
 				start_pipeline_extended_banz(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -43279,7 +43296,12 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject write-only short source addressing");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rejected source without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310610; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant < (variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant >= 768)
+				{
+					osd_printf_info("TMS320C54x load MOD3 exclusions: PASS cases=9728 restore=9728 families=7 variable_shifts=32 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated load MOD3 exclusions complete");
+				}
 				if (variant >= 256)
 				{
 					osd_printf_info("TMS320C54x SUBC MOD3 exclusions: PASS cases=512 restore=512 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 repeat=none,short data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
@@ -45900,6 +45922,11 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(239, "mpy-mod3-edge", "Write-only short-preincrement multiply exclusions")
 	ROM_SYSTEM_BIOS(240, "subc-mod3-edge", "Write-only short-preincrement SUBC exclusions")
 	ROM_SYSTEM_BIOS(241, "rpt-subc-st", "Repeated legal SUBC and immediate store replay")
+	ROM_SYSTEM_BIOS(242, "load-mod3-edge", "Write-only short-preincrement load exclusions")
+	ROM_SYSTEM_BIOS(243, "indirect-load", "Legal short-indirect load address and read replay")
+	ROM_SYSTEM_BIOS(244, "ldu-shift16", "Legal unsigned and shift16 load domains")
+	ROM_SYSTEM_BIOS(245, "indirect-dld", "Legal indirect double-word load replay")
+	ROM_SYSTEM_BIOS(246, "load-variable", "Legal variable-shift memory load replay")
 ROM_END
 
 ROM_START(tms54rom4)

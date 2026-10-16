@@ -14,6 +14,25 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_load_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['load-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='load-mod3-edge')
+        for old, new in (('restore=9728', 'restore=0'), ('families=7', 'families=1'),
+                         ('variable_shifts=32', 'variable_shifts=1'),
+                         ('frontends=2', 'frontends=1'), ('data_reads=0', 'data_reads=1'),
+                         ('data_writes=0', 'data_writes=1'), ('pointer_changes=0', 'pointer_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='load-mod3-edge')
+
+    def test_indirect_load_scope(self):
+        marker, ending = EXTRA_PROFILES['indirect-load']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='indirect-load')
+        with self.assertRaises(ValueError):
+            check_result(output.replace('captured_address_restore=6', 'captured_address_restore=0'),
+                         3, profile='indirect-load')
+
     def test_subc_mod3_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['subc-mod3-edge']
         output = marker + '\n' + ending + '\n'
