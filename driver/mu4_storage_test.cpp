@@ -293,6 +293,9 @@ private:
 	std::array<u32, 3> m_playback_filter{};
 	u64 m_playback_execute_steps = 0;
 	u32 m_playback_audio_clocks = 0, m_playback_audio_frames = 0;
+	u32 m_playback_dma_reads = 0, m_playback_dma_nonzero = 0;
+	u16 m_playback_dma_min = 0xffff, m_playback_dma_max = 0;
+	double m_playback_dma_last_nonzero = 0;
 	std::array<u32, 4> m_playback_history_pc{};
 	std::array<u16, 4> m_playback_history_word{};
 	u8 m_playback_history_next = 0;
@@ -1615,6 +1618,23 @@ private:
 				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
 			}
 			if (measurement_profile()) install_measurement_observers();
+			if (playback_profile())
+				m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mu4_playback_dma_source",
+					[this](offs_t address, u16 &value, u16) {
+						if (!m_playback_overlay_checked || machine().side_effects_disabled() ||
+							!m_dma->source_read_matches(3, AS_DATA, address)) return;
+						++m_playback_dma_reads;
+						m_playback_dma_min = std::min(m_playback_dma_min, u16(address));
+						m_playback_dma_max = std::max(m_playback_dma_max, u16(address));
+						if (m_playback_dma_reads <= 4)
+							logerror("mu4_playback_dma_word: kind=prefix ordinal=%u read=%u address=%04x word=%04x t=%.9f channel=3 space=data ownership=active_source_read\n",
+								m_playback_dma_reads, m_playback_dma_reads, unsigned(address), value, machine().time().as_double());
+						if (!value) return;
+						m_playback_dma_last_nonzero = machine().time().as_double();
+						if (++m_playback_dma_nonzero <= 4)
+							logerror("mu4_playback_dma_word: kind=nonzero ordinal=%u read=%u address=%04x word=%04x t=%.9f channel=3 space=data ownership=active_source_read\n",
+								m_playback_dma_nonzero, m_playback_dma_reads, unsigned(address), value, m_playback_dma_last_nonzero);
+					});
 			if (staged_original_profile())
 			{
 				m_cpu->space(AS_IO).install_write_handler(0x80, 0x80,
@@ -1862,6 +1882,8 @@ private:
 			save_item(NAME(m_playback_audio_words)); save_item(NAME(m_playback_audio_nonzero)); save_item(NAME(m_playback_audio_hash));
 			save_item(NAME(m_playback_audio_last_nonzero));
 			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
+			save_item(NAME(m_playback_dma_reads)); save_item(NAME(m_playback_dma_nonzero));
+			save_item(NAME(m_playback_dma_min)); save_item(NAME(m_playback_dma_max)); save_item(NAME(m_playback_dma_last_nonzero));
 			save_item(NAME(m_playback_history_pc)); save_item(NAME(m_playback_history_word)); save_item(NAME(m_playback_history_next));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
 			if (media_command_profile())
@@ -2062,6 +2084,8 @@ private:
 		m_playback_audio_words = {}; m_playback_audio_nonzero = {}; m_playback_audio_hash = {2166136261U, 2166136261U};
 		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
+		m_playback_dma_reads = m_playback_dma_nonzero = 0;
+		m_playback_dma_min = 0xffff; m_playback_dma_max = 0; m_playback_dma_last_nonzero = 0;
 		m_playback_history_pc = {}; m_playback_history_word = {}; m_playback_history_next = 0;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
@@ -2401,6 +2425,8 @@ private:
 				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu loader_execute=%u observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps), m_playback_execute_entries[2]);
 				auto const &codec = *subdevice<tlv320aic23_device>("codec");
 				logerror("mu4_native_playback_audio: tx_words=%u din_words=%u tx_nonzero=%u din_nonzero=%u tx_hash=%08x din_hash=%08x clocks=%u frames=%u power=%04x format=%04x rate=%04x active=%04x tx_last_nonzero=%.9f din_last_nonzero=%.9f window=decoder_entry stream_alignment=unvalidated music_decode=0 analog_audio=0\n", m_playback_audio_words[0], m_playback_audio_words[1], m_playback_audio_nonzero[0], m_playback_audio_nonzero[1], m_playback_audio_hash[0], m_playback_audio_hash[1], m_playback_audio_clocks, m_playback_audio_frames, codec.reg(6), codec.reg(7), codec.reg(8), codec.reg(9), m_playback_audio_last_nonzero[0], m_playback_audio_last_nonzero[1]);
+				logerror("mu4_playback_dma_source: reads=%u nonzero=%u minimum=%04x maximum=%04x last_nonzero=%.9f channel=3 space=data ownership=active_source_read window=decoder_entry tx_pairing=unvalidated music_decode=0\n",
+					m_playback_dma_reads, m_playback_dma_nonzero, m_playback_dma_min, m_playback_dma_max, m_playback_dma_last_nonzero);
 				logerror("mu4_native_playback_observe: requests=%u inspections=%u decoder_loads=%u replies=%u input_cursor=%u title_verified=%u overlay_verified=%u pc=%06x illegal=%u audio_acceptance=0\n",
 					m_playback_requests, m_playback_inspections, m_playback_decoder_loads, m_recorder_responses, m_native_command_cursor,
 					unsigned(m_cold_title_verified), unsigned(m_playback_overlay_checked), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));

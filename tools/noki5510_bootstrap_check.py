@@ -260,6 +260,62 @@ def verify_playback_observation(text):
             'din_last_nonzero': audio['din_last'], 'pc': playback[2]}
 
 
+def verify_playback_dma(text):
+    """Validate actual channel-3 data-read observations, not TX/media pairing."""
+    result = verify_playback_observation(text)
+    summaries = list(re.finditer(
+        r'mu4_playback_dma_source: reads=(\d+) nonzero=(\d+) minimum=([0-9a-f]{4}) '
+        r'maximum=([0-9a-f]{4}) last_nonzero=(\d+\.\d{9}) channel=3 space=data '
+        r'ownership=active_source_read window=decoder_entry tx_pairing=unvalidated music_decode=0$',
+        text, re.MULTILINE))
+    events = list(re.finditer(
+        r'mu4_playback_dma_word: kind=(prefix|nonzero) ordinal=(\d+) read=(\d+) '
+        r'address=([0-9a-f]{4}) word=([0-9a-f]{4}) t=(\d+\.\d{9}) '
+        r'channel=3 space=data ownership=active_source_read$', text, re.MULTILINE))
+    if len(summaries) != 1 or text.count('mu4_playback_dma_source:') != 1 or len(events) != text.count('mu4_playback_dma_word:'):
+        raise ValueError('missing, malformed or duplicated playback DMA observation')
+    summary = summaries[0]
+    reads, nonzero = int(summary[1]), int(summary[2])
+    minimum, maximum, last = int(summary[3], 16), int(summary[4], 16), float(summary[5])
+    window = re.search(r'mu4_playback_audio_window: start=decoder_execute_entry t=(\d+\.\d{9})', text)
+    start = float(window[1])
+    if not reads or nonzero > reads or minimum > maximum or (nonzero and last < start) or (not nonzero and last):
+        raise ValueError('inconsistent playback DMA counts, addresses or time')
+    if not text.index('mu4_native_playback_audio:') < summary.start() < text.index('mu4_native_playback_observe:'):
+        raise ValueError('playback DMA summary is outside its declared terminal order')
+    counts = {'prefix': 0, 'nonzero': 0}
+    previous_read = {'prefix': 0, 'nonzero': 0}
+    samples = {}
+    prefix_nonzero, reported_nonzero = [], []
+    previous_time = start
+    for event in events:
+        kind, ordinal, index = event[1], int(event[2]), int(event[3])
+        address, value, time = int(event[4], 16), int(event[5], 16), float(event[6])
+        counts[kind] += 1
+        if (ordinal != counts[kind] or not previous_read[kind] < index <= reads or
+                not minimum <= address <= maximum or time < previous_time or
+                event.start() < window.end() or event.end() >= summary.start() or
+                (kind == 'prefix' and index != ordinal) or
+                (kind == 'nonzero' and (not value or time > last))):
+            raise ValueError('playback DMA sample ordinal, scope or ordering mismatch')
+        sample = (address, value, time)
+        if index in samples and samples[index] != sample:
+            raise ValueError('playback DMA prefix and nonzero disagree on the same source read')
+        samples[index] = sample
+        if kind == 'nonzero':
+            reported_nonzero.append(index)
+        elif value:
+            prefix_nonzero.append(index)
+        previous_read[kind], previous_time = index, time
+    if counts != {'prefix': min(reads, 4), 'nonzero': min(nonzero, 4)}:
+        raise ValueError('incomplete bounded playback DMA samples')
+    if prefix_nonzero != reported_nonzero[:len(prefix_nonzero)]:
+        raise ValueError('playback DMA nonzero prefix is missing from its nonzero sample stream')
+    return {**result, 'dma_reads': reads, 'dma_nonzero': nonzero,
+            'dma_minimum': summary[3], 'dma_maximum': summary[4],
+            'tx_pairing': 'unvalidated', 'music_decode': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -270,6 +326,8 @@ def main():
                         help='validate Execute/audio observation scope only, not playback acceptance')
     parser.add_argument('--playback-lifecycle', action='store_true',
                         help='validate a passive short-run lifecycle/control observation, not audio')
+    parser.add_argument('--playback-dma', action='store_true',
+                        help='validate actual channel-3 data reads, not TX pairing or decoded media')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
@@ -279,7 +337,7 @@ def main():
     parser.add_argument('--dsp-service-route', action='store_true',
                         help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
-    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle)
+    bench_modes = (args.resident_memory, args.playback_observation, args.playback_lifecycle, args.playback_dma)
     if any(bench_modes) and (
             sum(bench_modes) > 1 or any((
                 args.runtime, args.serial_readiness, args.input_lifecycle,
@@ -287,6 +345,11 @@ def main():
         parser.error('MU4 observation modes cannot be combined with other bootstrap checks')
     try:
         text = args.log.read_text(errors='replace')
+        if args.playback_dma:
+            result = verify_playback_dma(text)
+            print(f'MU4 playback DMA observation complete: {result}; '
+                  'TX pairing and decoded media remain unvalidated')
+            return
         if args.playback_lifecycle:
             result = verify_playback_lifecycle(text)
             print(f'MU4 playback lifecycle observation complete: {result}; '

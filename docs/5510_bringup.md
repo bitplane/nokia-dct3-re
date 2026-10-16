@@ -4889,9 +4889,21 @@ restart. These are boundary timestamps, not producer-instruction identities.
 The fixture's converted-sample ADC input remains an explicit bench source;
 nonzero DIN alone is not decoded music or analog audio acceptance.
 
+Within the same decoder-entry window, actual channel-3 data-space source
+reads total 1,363,452, including 1,277 nonzero words, over addresses
+`00bf..137f`. This attribution uses `source_read_matches`, not merely an
+enabled source-register match. The bounded prefix is `1000`, `1040`,
+`1001`, `0fc2`; the next nonzero reads include `0f83`, `0f44` and `0f05`.
+Their words `0d7c/7c13/0200/f980` match the first nonzero TX values, but
+matching values/counts are not complete stream pairing. The last nonzero
+source read is at 18.917215192 seconds. The downward 63-word steps require
+an audit of actual DMA configuration/count/reload writes before assigning
+the source contents to decoded media. No writer-instruction ownership is
+inferred from the data read or the CPU's contemporaneous PC.
+
 The pre-existing terminal playback, CPU/NAND/stream and media-context summaries
 are byte-identical with and without these read-only observers. Native 5110
-save-state and 2,938 tool tests (one skipped) pass. The fixture deliberately
+save-state and 2,942 tool tests (one skipped) pass. The fixture deliberately
 terminates with `audio completion is not validated`, so the Make target remains
 failed before its later exact-one fetch-count checks. Those legacy fetch checks
 are not evidence of three actual boots and were not relaxed into success.
@@ -4900,6 +4912,7 @@ trails and loop bounds, not playback acceptance:
 
 ```sh
 python3 tools/noki5510_bootstrap_check.py --playback-observation RUN_DIR/error.log
+python3 tools/noki5510_bootstrap_check.py --playback-dma RUN_DIR/error.log
 ```
 
 ### Resident reload contract
@@ -4945,8 +4958,8 @@ python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
 python3 tools/noki5510_bootstrap_check.py --playback-lifecycle RUN_DIR/error.log
 ```
 
-Next: identify why REL reaches this cleanup tail and trace DMA sample-source
-ownership through valid McBSP words and codec frames before comparing PCM
+Next: audit the DMA configuration/count/reload sequence behind the observed
+channel-3 source walk, then pair valid McBSP words and codec frames before comparing PCM
 against the stored media. Do not remove the programmed reload merely to keep
 resident-entry counts at one.
 

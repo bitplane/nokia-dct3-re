@@ -2,7 +2,7 @@ import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
     verify_input_timer, verify_dsp_service_route, verify_resident_memory, verify_playback_observation,
-    verify_playback_lifecycle,
+    verify_playback_lifecycle, verify_playback_dma,
 )
 
 
@@ -74,6 +74,55 @@ class BootstrapCheckTest(unittest.TestCase):
         self.assertEqual(result['entry_transfer_reports'], 11)
         self.assertNotEqual(result['tx_words'], result['din_words'])
         self.assertNotIn('audio_acceptance', result)
+
+    def playback_dma_log(self):
+        events = []
+        for index in range(1, 9):
+            kind, ordinal, value = ('prefix', index, 0) if index <= 4 else ('nonzero', index - 4, index - 4)
+            events.append(f'mu4_playback_dma_word: kind={kind} ordinal={ordinal} read={index} '
+                          f'address={0xba79 + index:04x} word={value:04x} t=1.234{index:03d}000 '
+                          'channel=3 space=data ownership=active_source_read')
+        summary = ('mu4_playback_dma_source: reads=100 nonzero=12 minimum=ba79 maximum=bb78 '
+                   'last_nonzero=1.235000000 channel=3 space=data ownership=active_source_read '
+                   'window=decoder_entry tx_pairing=unvalidated music_decode=0')
+        return self.PLAYBACK.replace('mu4_native_playback_execution:', '\n'.join(events) + '\nmu4_native_playback_execution:').replace(
+            'mu4_native_playback_observe:', summary + '\nmu4_native_playback_observe:')
+
+    def test_actual_playback_dma_observation_does_not_claim_pairing(self):
+        result = verify_playback_dma(self.playback_dma_log())
+        self.assertEqual(result['dma_reads'], 100)
+        self.assertEqual(result['dma_nonzero'], 12)
+        self.assertEqual(result['tx_pairing'], 'unvalidated')
+        self.assertFalse(result['music_decode'])
+        silent = '\n'.join(line for line in self.playback_dma_log().splitlines() if 'kind=nonzero' not in line)
+        silent = silent.replace('reads=100 nonzero=12', 'reads=100 nonzero=0').replace(
+            'last_nonzero=1.235000000 channel=3', 'last_nonzero=0.000000000 channel=3')
+        self.assertEqual(verify_playback_dma(silent)['dma_nonzero'], 0)
+
+    def test_playback_dma_rejects_incomplete_or_overclaimed_evidence(self):
+        output = self.playback_dma_log()
+        for old, new in (('channel=3', 'channel=2'), ('space=data', 'space=program'),
+                         ('ownership=active_source_read', 'ownership=enabled_source'),
+                         ('tx_pairing=unvalidated', 'tx_pairing=validated'),
+                         ('music_decode=0', 'music_decode=1'),
+                         ('reads=100 nonzero=12', 'reads=10 nonzero=12'),
+                         ('minimum=ba79', 'minimum=bb79'),
+                         ('read=5', 'read=3'), ('ordinal=4 read=4', 'ordinal=3 read=4'),
+                         ('word=0001', 'word=0000'), ('t=1.234005000', 't=1.000000000'),
+                         ('last_nonzero=1.235000000', 'last_nonzero=0.000000000')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                verify_playback_dma(output.replace(old, new))
+        for line in output.splitlines():
+            if not line.startswith('mu4_playback_dma_'):
+                continue
+            for bad in (output.replace(line, ''), output + '\n' + line):
+                with self.subTest(line=line), self.assertRaises(ValueError):
+                    verify_playback_dma(bad)
+        for prefix in ('mu4_playback_dma_word:', 'mu4_playback_dma_source:'):
+            with self.assertRaises(ValueError):
+                verify_playback_dma(output + '\n' + prefix + ' partial')
+        with self.assertRaises(ValueError):
+            verify_playback_dma(output.replace('address=ba7a word=0000', 'address=ba7a word=0001'))
 
     def test_playback_observation_rejects_scope_changes(self):
         for old, new in (('observer=Execute_entry', 'observer=fetch'),
