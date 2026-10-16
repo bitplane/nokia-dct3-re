@@ -298,7 +298,7 @@ constexpr bool staged_ts_arithmetic(u16 word)
 
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && !((word & 0xfe00) == 0x1e00 && (word & 0xf8) == 0x98) && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && (word & 0xf8) != 0x98 && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -2993,9 +2993,9 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}
 		bool const software_intr = staged_software_intr(word);
-		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && (m_pipeline_immediate[2] & 0xfee0) == 0x0c40)
+		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && ((m_pipeline_immediate[2] & 0xfee0) == 0x0c40 || staged_shifted_memory_arithmetic(m_pipeline_immediate[2])))
 		{
-			logerror("%s: short MOD=3 is write-only, not a shifted LD source\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: short MOD=3 is write-only, not a shifted memory source\n", machine().describe_context()); m_illegal = true; return;
 		}
 		bool const short_repeat = staged_short_repeat(word);
 		if (m_pipeline_valid[2] && (short_repeat || (staged_memory_repeat(word) && word != 0x47f8)))
@@ -4841,9 +4841,9 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
-	// Scalar loads, CMPM and BITF all read their encoded memory operand.
+	// Scalar arithmetic, loads, CMPM and BITF read their encoded memory operand.
 	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
-	if ((low & 0xf8) == 0x98 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600 || (op & 0xfe00) == 0x6000))
+	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xfc00) == 0x3c00 || (op & 0xfc00) == 0x4000 || (op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600 || (op & 0xfe00) == 0x6000))
 	{
 		m_illegal = true;
 		return;
@@ -5199,7 +5199,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool extended = low >= 0xe0;
 		const u16 address = low >= 0xf8 ? fetch() : extended ? long_offset_address(low) : 0;
 		const u16 extension = fetch();
-		if ((low & 0xf8) == 0x98 && (extension & 0xfee0) == 0x0c40) { m_illegal = true; return; }
+		if ((low & 0xf8) == 0x98 && ((extension & 0xfee0) == 0x0c40 || staged_shifted_memory_arithmetic(extension))) { m_illegal = true; return; }
 		const int shift = s8((extension & 0x1f) << 3) >> 3;
 		auto shifted = [this, shift](u64 value)
 		{

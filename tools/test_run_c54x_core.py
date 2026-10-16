@@ -14,6 +14,27 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_arithmetic_mod3_exclusion_scope(self):
+        marker, ending = EXTRA_PROFILES['arith-mod3-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='arith-mod3-edge')
+        for old, new in (('restore=35840', 'restore=0'), ('scalar_classes=24', 'scalar_classes=2'),
+                         ('variable_selectors=8', 'variable_selectors=2'), ('shifts=32', 'shifts=1'),
+                         ('frontends=2', 'frontends=1'), ('data_reads=0', 'data_reads=1'),
+                         ('pointer_changes=0', 'pointer_changes=1'), ('alu_changes=0', 'alu_changes=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='arith-mod3-edge')
+
+    def test_scalar_arithmetic_encoding_scope(self):
+        for profile, count in (('memory-alu', 104448), ('adds', 52224), ('subs', 52224),
+                               ('memory-shift16', 208896)):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in ((f'restore={count}', 'restore=0'), ('forms=17', 'forms=18')):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+
     def test_mapped_bitfield_scope(self):
         marker, ending = EXTRA_PROFILES['mapped-bitf']
         output = marker + '\n' + ending + '\n'
@@ -1001,7 +1022,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['adds']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='adds')
-        for bad in (output.replace('restore=55296', 'restore=0'),
+        for bad in (output.replace('restore=52224', 'restore=0'),
                     output.replace('source_unsigned=1', 'source_unsigned=0'),
                     output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
                     marker + '\n' + output, output + 'late output\n'):
@@ -1399,7 +1420,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['memory-shift16']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='memory-shift16')
-        for bad in (output.replace('restore=221184', 'restore=0'),
+        for bad in (output.replace('restore=208896', 'restore=0'),
                     output.replace('partial_carry=1', 'partial_carry=0'),
                     output.replace('selectors=8', 'selectors=4'),
                     output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
@@ -1514,7 +1535,7 @@ class CoreResultTests(unittest.TestCase):
         marker, ending = EXTRA_PROFILES['subs']
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='subs')
-        for bad in (output.replace('restore=55296', 'restore=0'),
+        for bad in (output.replace('restore=52224', 'restore=0'),
                     output.replace('source_unsigned=1', 'source_unsigned=0'),
                     output.replace('mapped_acceptance=0', 'mapped_acceptance=1'),
                     marker + '\n' + output, output + 'late output\n'):
@@ -1773,7 +1794,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(marker.replace(old, new) + '\n' + ending + '\n', 3, profile=profile)
 
     def test_ts_arithmetic_profile_scopes(self):
-        for profile, restores in (('ts-alu', 154368), ('ts-alu-producer', 18432), ('ts-alu-edge', 320)):
+        for profile, restores in (('ts-alu', 153984), ('ts-alu-producer', 18432), ('ts-alu-edge', 320)):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)

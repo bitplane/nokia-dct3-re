@@ -158,11 +158,11 @@ and zero/one/two-gap T consumers. T publishes at Execute: an adjacent LDM
 samples old T and a gap samples the new exponent. Source/flag preservation,
 mutation after the consumer Read and four snapshots are checked. NORM and
 interrupt composition remain outside this acceptance.
-ADDS adds 55,296 RAM-source replay cases through the shared memory-arithmetic
+ADDS adds 52,224 read-capable RAM-source replay cases through the shared memory-arithmetic
 fixture. The unsigned operand ignores SXM; carry, sticky destination overflow,
 OVM saturation, retained address/literal/read operands and single-access
 counts are checked over all eighteen covered forms. Its SUBS control also
-passes 55,296 replays. Mapped/peripheral sources remain excluded.
+passes 52,224 replays. Mapped/peripheral sources remain excluded.
 Syntax-5 Xmem LD covers all 512 encodings in 196,608 replay cases, retaining
 the selected AR2..AR5 RAM address and Read word before Execute's shift.
 Distinct source pointers, source mutation, BK=0/nonzero wrap, both
@@ -3955,14 +3955,14 @@ and zero untaken stack accesses. Original `f945 3ff1` executes; the
 conditional returns now cover all twelve signed A/B predicates in 768
 predicate/pop/target replay cases (eight 40-bit patterns, two pages and four
 snapshots). Untaken returns have zero stack
-accesses. SUBS now passes 55,296 unsigned-source/address/arithmetic
+accesses. SUBS passes 52,224 unsigned-source/address/arithmetic
 replays across 18 forms, A/B and SXM/OVM states; mapped sources and C16
 remain excluded. The pre-status checkpoint stopped at MVMD AL `7308 0007` at
 `02:3f62`, live PC `02:3f65`, immediately after POPM AL. AL/BL-to-RAM
 now passes 288 POPM/mapped-STL producer replays, with mapped-write
 no-conflict ordering and retained source publication. The staged ST1 subset
 passes 288 transfer/replay cases and 16 basic CPL consumer/replay cases;
-the original passed `3f83` at `02:3df3` after a separate 221,184-case
+the original passed `3f83` at `02:3df3` after a separate 208,896-case
 memory ADD/SUB shift-16 gate. That new RAM-only subset covers all eight
 operation/source/destination selectors and the syntax-3 partial carry rule;
 its full checkpoint regression passes. The original's LDU
@@ -4262,7 +4262,8 @@ Zero-shift memory ADD/SUB A/B (`00xx/01xx/08xx/09xx`) now retain their
 memory operand through Read and use the established 40-bit arithmetic
 helper at Execute. Direct forms retain Decode CPL/DP and Access SP;
 short indirect modes apply one pointer modification in Access, including
-linear preincrement, AR0 indexing, reverse carry and BK circular addressing.
+postincrement/postdecrement, AR0 indexing, reverse carry and BK circular addressing.
+Short MOD=3 preincrement is write-only and is rejected for these sources.
 Long-offset forms retain one Decode literal and use the shared address helper;
 absolute forms retain the address directly. The existing absolute-ADD path
 is preserved. Sources are bounded to RAM and mapped AR0-AR7 words; control
@@ -4272,7 +4273,7 @@ carry-consuming, repeat and wider producer/control-delay compositions remain
 outside this acceptance. Source/mode placement is a partial stage model,
 not measured silicon timing.
 
-The 110,592 RAM replay cases cover DP/CPL, all twelve short indirect
+The 104,448 RAM replay cases cover DP/CPL, the eleven read-capable short indirect
 modifiers, three long-offset forms and absolute addressing; eight encoded
 registers, four operation/destination selectors, eight guard/sign patterns,
 four SXM/OVM states, both compatibility states and three checkpoints.

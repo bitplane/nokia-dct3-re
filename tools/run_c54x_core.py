@@ -153,7 +153,7 @@ REQUIRED = [
     "TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0",
     "TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0",
     "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0",
-    "TMS320C54x staged memory ADD/SUB: PASS cases=110592 forms=18 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=110592 duplicate_reads=0 data_writes=0",
+    "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
     "TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0",
@@ -597,7 +597,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated T store consumers complete",
     ),
     "ts-alu": (
-        "TMS320C54x TS arithmetic: PASS address_cases=6912 arithmetic_cases=147456 restore=154368 operations=ADD,SUB selectors=4 address_forms=18 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0",
+        "TMS320C54x TS arithmetic: PASS address_cases=6528 arithmetic_cases=147456 restore=153984 operations=ADD,SUB selectors=4 address_forms=17 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated TS arithmetic complete",
     ),
     "ts-alu-producer": (
@@ -860,6 +860,18 @@ EXTRA_PROFILES = {
         "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block branches complete",
     ),
+    "arith-mod3-edge": (
+        "TMS320C54x arithmetic MOD3 exclusions: PASS cases=35840 restore=35840 scalar_classes=24 variable_selectors=8 shifts=32 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 alu_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated arithmetic MOD3 exclusions complete",
+    ),
+    "memory-alu": (
+        "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0",
+        "Fatal error: TMS320C54x isolated memory ADD SUB complete",
+    ),
+    "shifted-alu": (
+        "TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated shifted memory ADD SUB complete",
+    ),
     "bitf-smem": (
         "TMS320C54x staged BITF: PASS cases=52224 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=52224 duplicate_reads=0 data_writes=0",
         "Fatal error: TMS320C54x isolated Smem BITF complete",
@@ -1007,7 +1019,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated Xmem LD complete",
     ),
     "adds": (
-        "TMS320C54x staged ADDS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x staged ADDS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated staged ADDS complete",
     ),
     "exp-t": (
@@ -1155,7 +1167,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated LDU IMR complete",
     ),
     "memory-shift16": (
-        "TMS320C54x staged memory shift16: PASS cases=221184 restore=221184 forms=18 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x staged memory shift16: PASS cases=208896 restore=208896 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated memory shift16 complete",
     ),
     "mvmd-status-irq": (
@@ -1195,7 +1207,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated MVMD accumulator complete",
     ),
     "subs": (
-        "TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x staged SUBS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated staged SUBS complete",
     ),
     "ret-load": (

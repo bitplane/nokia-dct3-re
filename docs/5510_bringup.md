@@ -10,12 +10,12 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 CPU correctness work currently takes precedence over further opcode expansion:
-short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). Incorrect
-read admission in RPT, SUBC, memory/immediate MPY and the Smem/Lmem load
-families below is corrected. Other ALU and MMR-source classifiers and fixtures
-still require a domain audit. Passing those mechanically decoded
-read cases is not hardware-legality evidence. Long-offset MOD=13 preincrement
-is a distinct read-capable form and must not be removed by that audit.
+short Smem MOD=3 preincrement is write-only (SPRU131G table 5-4). The
+corrections below cover selected read families, not the entire ISA. Remaining
+read-source classifiers and older fixture input domains still require an audit;
+passing mechanically decoded cases is not hardware-legality evidence.
+Long-offset MOD=13 preincrement is a distinct read-capable form and must not
+be removed by that audit.
 
 ### Short-preincrement fixture audit
 
@@ -48,10 +48,29 @@ snapshots; variable LD additionally covers all 32 shifts. It requires no data
 transaction, AR change, accumulator, T or ST0 change. This is not an exhaustive
 opcode census: read-only ALU/test sources and MMR addressing remain open,
 as do instruction-specific read/modify/write and implicit-copy classifications.
-Confirmed remaining fixture inputs include `memory_arithmetic_case` form 5
-(inherited by arithmetic) and
-`memory_multiply_case` RAM kind 5 (inherited by multiply and T-load families).
+The scalar arithmetic entry points now omit `memory_arithmetic_case` form 5.
+Confirmed remaining positive-source defects include `memory_multiply_case`
+RAM kind 5, inherited by multiply and T-load families.
 Their current positive PASS counts are not legal-domain acceptance.
+
+Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
+MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
+extension before rejecting; STL/STH extensions are unchanged. The
+`arith-mod3-edge` bank passes 35,840 rejection/replay cases: 24 scalar opcode
+classes, eight variable-shift operation/source/destination selectors, all 32
+shifts, all ARs, both CMPT settings, pages, frontends and two scheduler
+checkpoints. No data access, pointer update, accumulator/T or ST0 change is
+permitted. This does not add staged positive support for ADC/SUBB or certify
+silicon trap behavior.
+
+The corrected positive banks retain raw case IDs: 104,448 scalar ADD/SUB
+cases, 52,224 each for ADDS and SUBS, 208,896 shift-16 cases and 153,984
+TS cases (6,528 address plus 147,456 numeric cases). Their addressing domains
+have 17 read-capable forms, not 18. The 245,760-case variable-shift bank already
+excluded short preincrement and is unchanged. All six positive profiles and
+ten producer/mapped-register/write-side/rejection controls pass; circular-input
+constraints remain a separate audit.
+Native 5110 save-state restoration and 2,924 tool tests (one skipped) also pass.
 
 CMPM and BITF now exclude short MOD=3 in both frontends, before any operand
 access or TC publication. Each positive Smem bank retains 52,224 cases/restores
@@ -87,8 +106,8 @@ The broad baseline at `bc2d939f` passes the full 288-check default CPU suite,
 the separate 208,896-case TS-load profile, 9,728 load rejection/replay cases,
 native 5110 save-state restoration and 2,919 tool tests (one skipped) pass.
 The broad suite includes the corrected LDU, shift-16, variable-LD, DLD and
-SUBC banks. The subsequent CMPM/BITF correction uses the focused profiles
-above; the broad suite has not been rerun for that correction. It remains
+SUBC banks. The subsequent CMPM/BITF and scalar-arithmetic corrections use
+the focused profiles above; the broad suite has not been rerun for those corrections. It remains
 a prototype regression net, not proof that the
 remaining operand domains or all circular inputs are legal.
 
@@ -1236,8 +1255,8 @@ Execute publications, then shifts and adds/subtracts in Execute. Only T bits
 5..0 select the shift. SPRU172C defines the supported domain as -16..31;
 raw codes 32..47 are excluded by the staged prototype, not claimed silicon
 traps. Arithmetic uses SXM, 32-bit carry, sticky destination overflow and OVM
-saturation through the existing shared helper. `ts-alu` passes 154,368
-cases/restores in two factored matrices: 6,912 address cases over all 18
+saturation through the existing shared helper. `ts-alu` passes 153,984
+cases/restores in two factored matrices: 6,528 address cases over 17 read-capable
 address forms, eight AR fields, both CMPT states, all four selectors, two pages
 and three snapshots; and 147,456 arithmetic cases crossing four memory values,
 eight accumulator patterns, 48 supported counts, SXM/OVM, selectors, pages
@@ -5446,8 +5465,8 @@ SUBS `0a39` at `02:3f5a` now executes. SPRU172C page 4-194 specifies
 an unsigned 16-bit memory operand regardless of SXM, with C and sticky
 destination overflow updates and OVM saturation. The staged path reuses
 retained memory/address ownership and the shared arithmetic helper but
-bypasses sign extension for this family. The `subs` gate passes 55,296
-cases/restores: 18 addressing forms, eight address registers, A/B,
+bypasses sign extension for this family. The `subs` gate passes 52,224
+cases/restores: 17 read-capable encoding forms, eight address registers, A/B,
 eight value patterns, SXM/OVM states, both compatibility modes and three
 snapshots. Post-capture source/literal/pointer changes cannot alter the
 result, and no data write occurs. Mapped-register sources, C16 arithmetic
@@ -5485,11 +5504,10 @@ cases/restores with immediately adjacent RPTB, counts 0/1/2/7, two pages
 and three snapshots. It checks the BRAF update survives status publication,
 then checks every byte-swapped body word and count-plus-one completion.
 
-The status checkpoint advanced to `3f83` (`ADD *AR3,16,B,B`) at
-`02:3df3`, live PC `02:3df5`. The memory shift-16 subset now executes
+Original `3f83` at `02:3df3` is `ADD *AR3,16,B,B`. The memory shift-16 subset executes
 the Class 3 ADD/SUB family using retained addresses, extensions and source
-words. Its separate `memory-shift16` fixture passes 221,184 cases/restores:
-18 addressing forms, eight AR selectors, all eight operation/source/destination
+words. Its separate `memory-shift16` fixture passes 208,896 cases/restores:
+17 read-capable encoding forms, eight AR selectors, all eight operation/source/destination
 selectors, eight arithmetic patterns, four SXM/OVM settings, both CMPT
 states and three snapshots. The reference independently derives signed
 40-bit results, sticky destination overflow and OVM saturation. ADD sets
@@ -5867,17 +5885,16 @@ fixture. Its focused LDU, push and conditional-return controls pass.
 ADDS at `02:3fad` is a real one-word opcode, not
 an unconsumed extension of the preceding SFTL.
 
-ADDS now shares the retained memory ADD/SUB pipeline and unsigned-source
+ADDS shares the retained memory ADD/SUB pipeline and unsigned-source
 handling with SUBS. SPRU172C 4-10 requires zero extension regardless of SXM,
 with C and destination overflow updates and OVM saturation. The `adds`
-fixture passes 55,296 cases/restores over eighteen RAM address forms,
+fixture passes 52,224 cases/restores over seventeen read-capable RAM address forms,
 eight address registers, both accumulators, eight arithmetic patterns,
 SXM/OVM states, standard/compatibility addressing and three snapshots.
 Captured addresses/literals and Read operands survive later mutation;
 one source read and no data writes are observed. Mapped/peripheral sources
-remain excluded. The shared fixture's SUBS control still passes 55,296
-cases/restores; EXP, push and LDU controls and native
-5110 restoration also pass. `9421` at the following load is
+remain excluded. The SUBS control covers the same 52,224-case domain.
+`9421` at the following load is
 `LD Xmem,SHFT,A` (syntax 5), not another unsigned ADD or a stray extension word.
 
 Syntax-5 LD now shares Xmem BIT's captured AR2..AR5 address and one-time

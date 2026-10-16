@@ -7758,6 +7758,7 @@ private:
 	}
 	void start_pipeline_memory_arithmetic(unsigned variant = 0)
 	{
+		if (variant % 18 == 5) ++variant; // Short MOD=3 is write-only; retain raw snapshot IDs.
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const shift16 = !strcmp(machine().options().bios(), "memory-shift16");
 		bool const adds = !strcmp(machine().options().bios(), "adds");
@@ -9630,14 +9631,17 @@ private:
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 		u32 const base = (variant & 32) ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		bool const bitfield = variant >= 10496, load = variant >= 768, dld = variant >= 10240 && !bitfield, shifted = variant >= 2048 && !dld && !bitfield, subc = variant >= 256 && !load, repeat = subc && variant >= 512;
-		u16 const family = bitfield ? 0x6000 : dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
+		bool const arithmetic = variant >= 11008, shifted_arithmetic = variant >= 14080;
+		bool const bitfield = variant >= 10496 && !arithmetic, load = variant >= 768, dld = variant >= 10240 && !bitfield && !arithmetic, shifted = variant >= 2048 && !dld && !bitfield && !arithmetic, subc = variant >= 256 && !load, repeat = subc && variant >= 512;
+		u16 const family = shifted_arithmetic ? 0x6f00 : arithmetic ? std::array<u16, 12>{0x0000,0x0200,0x0400,0x0600,0x0800,0x0a00,0x0c00,0x0e00,0x3c00,0x3e00,0x4000,0x4200}[(variant - 11008) / 256] : bitfield ? 0x6000 : dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
 		u16 const opcode = family | 0x98 | (variant & 7) | ((variant & 8) ? 0x100 : 0);
 		program.write_word(base + 0x600, repeat ? 0xec03 : opcode);
-		program.write_word(base + 0x601, shifted ? 0x0c40 | ((variant & 8) ? 0x100 : 0) | ((variant - 2048) / 256) : repeat ? opcode : subc ? 0xf4e1 : 3); program.write_word(base + 0x602, 0xf4e1);
+		unsigned const operation = shifted_arithmetic ? (variant - 14080) / 8192 : 0;
+		u16 const extension = 0x0c00 | ((operation & 1) << 9) | ((operation & 2) << 4) | ((variant & 8) ? 0x100 : 0) | (shifted_arithmetic ? ((variant - 14080) / 256) % 32 : 0);
+		program.write_word(base + 0x601, shifted_arithmetic ? extension : shifted ? 0x0c40 | ((variant & 8) ? 0x100 : 0) | ((variant - 2048) / 256) : repeat ? opcode : subc ? 0xf4e1 : 3); program.write_word(base + 0x602, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant & 16) ? 0x4000 : 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, variant >= 10752 ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, bitfield && variant >= 10752 ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400 + i);
@@ -12086,6 +12090,7 @@ private:
 	}
 	void start_ts_arithmetic(unsigned variant = 0)
 	{
+		if (strcmp(machine().options().bios(), "ts-alu-producer") && variant < 6912 && variant % 18 == 5) ++variant;
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const producer = !strcmp(machine().options().bios(), "ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
@@ -15088,6 +15093,9 @@ private:
 		if (!strcmp(machine().options().bios(), "subc-mod3-edge")) { start_short_read_mod3_edge(256); return; }
 		if (!strcmp(machine().options().bios(), "load-mod3-edge")) { start_short_read_mod3_edge(768); return; }
 		if (!strcmp(machine().options().bios(), "bitf-mod3-edge")) { start_short_read_mod3_edge(10496); return; }
+		if (!strcmp(machine().options().bios(), "arith-mod3-edge")) { start_short_read_mod3_edge(11008); return; }
+		if (!strcmp(machine().options().bios(), "memory-alu")) { start_pipeline_memory_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "shifted-alu")) { start_pipeline_shifted_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "indirect-load")) { start_pipeline_indirect_case(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-shift16")) { start_pipeline_offset_load(12672); return; }
 		if (!strcmp(machine().options().bios(), "indirect-dld")) { start_pipeline_indirect_dld(); return; }
@@ -39891,20 +39899,21 @@ private:
 				if (variant < (shift16 ? 221183 : adds || subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return; }
 				if (shift16)
 				{
-					osd_printf_info("TMS320C54x staged memory shift16: PASS cases=221184 restore=221184 forms=18 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n");
+					osd_printf_info("TMS320C54x staged memory shift16: PASS cases=208896 restore=208896 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated memory shift16 complete");
 				}
 				if (adds)
 				{
-					osd_printf_info("TMS320C54x staged ADDS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+					osd_printf_info("TMS320C54x staged ADDS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated staged ADDS complete");
 				}
 				if (subs)
 				{
-					osd_printf_info("TMS320C54x staged SUBS: PASS cases=55296 restore=55296 forms=18 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+					osd_printf_info("TMS320C54x staged SUBS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated staged SUBS complete");
 				}
-				osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=110592 forms=18 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=110592 duplicate_reads=0 data_writes=0\n");
+				osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0\n");
+				if (!strcmp(machine().options().bios(), "memory-alu")) throw emu_fatalerror(0, "TMS320C54x isolated memory ADD SUB complete");
 				start_pipeline_register_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40676,6 +40685,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant == 245759) osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				if (variant == 245759 && !strcmp(machine().options().bios(), "shifted-alu")) throw emu_fatalerror(0, "TMS320C54x isolated shifted memory ADD SUB complete");
 				if (variant < 276479) { start_pipeline_shifted_arithmetic(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=18432 mapped_ar_cases=12288 value_pairs=64 sxm_ovm=4 accumulators=2 restore=30720 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				start_pipeline_memory_repeat(); return;
@@ -43291,7 +43301,7 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = (variant & 128) ? 10 : 1;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Write-only short MOD=3 source performs no data transaction");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (variant >= 10752 ? 0x0804 : 0x1804), "Rejected source preserves accumulators, T and arithmetic flags");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (variant >= 10752 && variant < 11008 ? 0x0804 : 0x1804), "Rejected source preserves accumulators, T and arithmetic flags");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Rejected source does not preincrement any AR");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save source before or after rejection"); }
 			if (tick == 20)
@@ -43299,7 +43309,12 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject write-only short source addressing");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rejected source without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310610; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant < (variant >= 11008 ? 46847U : variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant >= 11008)
+				{
+					osd_printf_info("TMS320C54x arithmetic MOD3 exclusions: PASS cases=35840 restore=35840 scalar_classes=24 variable_selectors=8 shifts=32 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 alu_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated arithmetic MOD3 exclusions complete");
+				}
 				if (variant >= 10496)
 				{
 					osd_printf_info("TMS320C54x bitfield MOD3 exclusions: PASS cases=512 restore=512 operations=CMPM,BITF initial_tc=2 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 tc_changes=0 silicon_trap_claim=0\n");
@@ -43908,7 +43923,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant + 1 < (producer ? 18432U : 154368U)) { start_ts_arithmetic(variant + 1); return; }
 				if (producer) { osd_printf_info("TMS320C54x TS arithmetic producers: PASS cases=18432 restore=18432 producers=STM_T,LD_T,STLM_T gaps=0,1 shift_codes=8 memory_values=4 sxm_ovm=4 selectors=4 pages=2 snapshots=3 t_sample=Read projection_only_stlm_gap=0 duplicate_transactions=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic producers complete"); }
-				osd_printf_info("TMS320C54x TS arithmetic: PASS address_cases=6912 arithmetic_cases=147456 restore=154368 operations=ADD,SUB selectors=4 address_forms=18 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic complete");
+				osd_printf_info("TMS320C54x TS arithmetic: PASS address_cases=6528 arithmetic_cases=147456 restore=153984 operations=ADD,SUB selectors=4 address_forms=17 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
@@ -45937,6 +45952,9 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(246, "load-variable", "Legal variable-shift memory load replay")
 	ROM_SYSTEM_BIOS(247, "bitf-mod3-edge", "Write-only short-preincrement compare and bitfield exclusions")
 	ROM_SYSTEM_BIOS(248, "bitf-smem", "Read-capable Smem bitfield and immediate replay")
+	ROM_SYSTEM_BIOS(249, "arith-mod3-edge", "Write-only short-preincrement arithmetic source exclusions")
+	ROM_SYSTEM_BIOS(250, "memory-alu", "Read-capable scalar memory ADD and SUB replay")
+	ROM_SYSTEM_BIOS(251, "shifted-alu", "Read-capable variable-shift memory arithmetic replay")
 ROM_END
 
 ROM_START(tms54rom4)
