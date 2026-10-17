@@ -1,5 +1,33 @@
 import unittest
 from tools.mu4_context_contract import RAW_PRODUCT_BASE, RAW_PRODUCT_WITNESS, decode_raw_product, reference_raw_product
+from tools.mu4_context_contract import RAW_UPSTREAM_WITNESSES, decode_raw_upstream, reference_raw_scale, reference_raw_complex_prefix
+
+
+class RawUpstreamTests(unittest.TestCase):
+    def test_every_source_word_is_pinned(self):
+        words={base+i:w for base,witness in RAW_UPSTREAM_WITNESSES.items() for i,w in enumerate(witness)}
+        self.assertEqual(decode_raw_upstream(words)['pinned_words'],62)
+        for address in words:
+            changed=dict(words)
+            changed[address]^=1
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                decode_raw_upstream(changed)
+
+    def test_shift_width_signed_arguments_and_repetition(self):
+        self.assertEqual(reference_raw_scale(0xfff069e0c0,10,14),(-4,0xff069e0c00))
+        self.assertEqual(reference_raw_scale(0x000aa80658,12,14),(-2,0x002aa01960))
+        self.assertEqual(reference_raw_scale(0xffffffffff,1,0),(1,0xffffffffff))
+        self.assertEqual(reference_raw_scale(0xffffffffff,0xffff,0),(-1,0xfffffffffe))
+        self.assertEqual(reference_raw_scale(0x8000000000,0,0),(0,0x8000000000))
+        with self.assertRaises(ValueError):
+            reference_raw_scale(1<<40,0,0)
+
+    def test_selected_complex_differences(self):
+        for x,y,expected in ((0xe9e619d2,0x00025cf2,0xf069e0c0),
+                             (0x0f2eb181,0x0010b0a5,0x0aa80658)):
+            states,word=reference_raw_complex_prefix(x,y,0x168ed1ea,0x16b25ced)
+            self.assertEqual(word,expected)
+            self.assertEqual((states[0x23f97]['a']<<3)&0xffffffff,word)
 
 
 class RawProductTests(unittest.TestCase):

@@ -6044,13 +6044,13 @@ proof of the complete permutation or every output sample.
 The values already appear at `787e/787f` at 1.019126398/407 s and
 `e87e/e87f` at 1.021159587/595 s, both at live context `025bf7`, following
 the helper `025bb3`'s `025bf6` DST. Its selected first-output arithmetic
-is checked separately below; the next inputs are `7880/7881` and `e880/e881`.
+is checked separately below, along with the selected preceding product and scale.
 Live GENPC remains context rather than retained instruction ownership.
 
 Reproduce with `tools/mu4_raw_output_observe.lua` as the two-second run's
 autoboot script, then run `python3 tools/mu4_raw_output_check.py RUN_DIR/error.log`.
-The probe observes eight word pairs during call 2 and removes its taps
-afterwards. The fresh run has 597 records, no partial masks or truncation;
+The probe observes ten word pairs during call 2 and removes its taps
+afterwards. The fresh run has 805 records, no partial masks or truncation;
 the checker validates all seven transfers and rejects missing material,
 incorrect channel lifetimes, partial buses and incomplete captures. It does
 not establish upstream arithmetic correctness or native audio acceptance.
@@ -6108,9 +6108,35 @@ python3 tools/mu4_raw_product_check.py RUN_DIR/error.log \
 The observer's time windows select measured iterations, not hardware timing
 parameters. The checker requires retained instruction identities, opcode
 witnesses, the status regime, unchanged actual operand reads, intermediate
-values and matching subsequent copy material. The next target is the
-producer/value chain of `7880/7881` and `e880/e881`, including coefficient
-provenance where needed; do not alter MACSU semantics to fit the waveform.
+values and matching subsequent copy material; do not alter MACSU semantics
+to fit the waveform.
+
+The same checker follows the selected preceding complex-product difference
+at `023f8a..023f99` and scale helper `025ce2..025d0e`. A further 62-word
+witness pins these paths; 130 additional actual operand reads support the
+selected intermediate arithmetic and scale arguments. Both complex
+prefixes use coefficients `168ed1ea` and `16b25ced`:
+
+| Channel | Complex input pair | Stored difference | Scale arguments | Left shifts | Product input |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `e9e619d2`, `00025cf2` | `f069e0c0` | 10, 14 | 4 | `069e0c00` |
+| 1 | `0f2eb181`, `0010b0a5` | `0aa80658` | 12, 14 | 2 | `2aa01960` |
+
+The complex difference uses the same split-word products but subtracts the
+second from the first and stores with shift 3. The scale helper subtracts
+its two signed stack arguments; these negative differences select the
+left-shift branch with four or two actual one-bit repeat executions. Every
+selected intermediate and final value agrees. Channel 0's full scaled
+accumulator is `ff069e0c00`: the subsequent unsaturated double-word store
+keeps low 32 bits `069e0c00`. This sign change is source-consistent, not
+evidence to change global accumulator signedness or add saturation.
+
+These are bounded arithmetic exclusions, not full-transform validation.
+The next target is the earlier producer/value chain of both complex input
+pairs: `7880/7881` plus `7882/7883` before 1.019018655 s, and
+`e880/e881` plus `e882/e883` before 1.021053978 s. Numeric addresses are
+reused later: scope observations before the `023f8a` iteration rather than
+at the partial-product helper or final output copy.
 
 ### Resident reload contract
 

@@ -19,6 +19,51 @@ BASE = 0x23D73
 RAW_PRODUCT_BASE = 0x25bd2
 RAW_PRODUCT_WITNESS = (0xe800,0xa669,0xa652,0xf450,0xb01a,0xf443,0xe900,
                        0xa778,0xa743,0xf750,0xb30b,0xf743,0xf520,0x4ff8,0xaadc)
+RAW_UPSTREAM_WITNESSES = {
+    0x23f8a: (0xe800,0xa668,0xa642,0xf450,0xb0a8,0x6d92,0xe900,0xa778,0xa743,
+              0xf750,0xb3b4,0x6d8a,0xf620,0x6f91,0x0c63,0x6f89,0x0c83),
+    0x25ce2: (0x4a11,0x4a16,0x4a17,0xed00,0xf6b6,0xf6b7,0xf7b8,0xf6b9,
+              0x1105,0x0906,0xf84d,0x5d0b,0xf84b,0x5cfd,0xf310,1,0x8916,
+              0xf495,0xf495,0x4a16,0xf495,0xf495,0x4700,0xf45f,0x8a16,
+              0xf073,0x5d0b,0xf784,0xf310,1,0x8916,0xf495,0xf495,0x4a16,
+              0xf495,0xf495,0x4700,0xf441,0x8a16,0xf073,0x5d0b,0x8a17,
+              0x8a16,0x8a11,0xf4e4),
+}
+
+
+def decode_raw_upstream(words):
+    for base,witness in RAW_UPSTREAM_WITNESSES.items():
+        if any(words.get(base+i)!=word for i,word in enumerate(witness)):
+            raise ValueError('raw upstream product/scale source changed or absent')
+    return {'pinned_words':62,'complex_prefix':'023f8a..023f9a',
+            'complex_output':'first partial product minus second, stored with shift 3 to AR1 scratch',
+            'scale':'025ce2..025d0e: signed SP(5)-SP(6); positive right shifts, negative left shifts; one-bit RPT body',
+            'scope':'Selected complex difference prefixes and two negative scale counts only; not the full transform or correct inputs'}
+
+
+def reference_raw_scale(value, first, second):
+    if not 0 <= value < (1<<40) or any(not 0 <= x <= 0xffff for x in (first,second)):
+        raise ValueError('raw scale requires a 40-bit accumulator and two 16-bit arguments')
+    def signed16(x):
+        return x-0x10000 if x & 0x8000 else x
+    delta=signed16(first)-signed16(second)
+    signed=value-(1<<40) if value & (1<<39) else value
+    result=(signed>>delta) if delta>=0 else (signed<<-delta)
+    return delta,result & ((1<<40)-1)
+
+
+def reference_raw_complex_prefix(x,y,c,d):
+    old=reference_raw_product(x,y,c,d)
+    result={}
+    for start_old,start_new,acc in ((0x25bd3,0x23f8b,'a'),(0x25bd9,0x23f91,'b')):
+        for i in range(5):
+            result[start_new+i]={acc:old[start_old+i][acc]}
+    mask=(1<<40)-1
+    a,b=old[0x25bd7]['a'],old[0x25bdd]['b']
+    result[0x23f96]={'a':a,'b':b}
+    result[0x23f97]={'a':(a-b)&mask,'b':b}
+    result[0x23f99]=result[0x23f97].copy()
+    return result,((a-b)<<3)&0xffffffff
 
 
 def decode_raw_product(words):
@@ -1406,6 +1451,7 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['raw_upstream'] = decode_raw_upstream(rel_words)
     result['raw_product'] = decode_raw_product(rel_words)
     result['raw_output_copies'] = decode_raw_output_copies(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)

@@ -88,7 +88,9 @@ public:
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 &&
 						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1 ||
-						 (address >= 0x25bd2 && address <= 0x25bf7)))
+						 (address >= 0x25bd2 && address <= 0x25bf7) ||
+						 (address >= 0x23f8a && address <= 0x23fad) ||
+						 (address >= 0x25ce2 && address <= 0x25d0e)))
 						observe_playback_processing(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && opcode == 0x62e6 &&
 						(address == 0x2433a || address == 0x24340 || address == 0x24346))
@@ -974,6 +976,22 @@ private:
 	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
+		if (m_playback_processing_pending && m_playback_processing[0] == 2 &&
+			((address >= 0x23f8a && address <= 0x23fad) || (address >= 0x25ce2 && address <= 0x25d0e)))
+		{
+			double const time = machine().time().as_double();
+			bool const selected = (time >= 1.0190183 && time <= 1.01901896) || (time >= 1.0210536 && time <= 1.02105428) ||
+				(time >= 1.0190675 && time <= 1.01906804) || (time >= 1.02110175 && time <= 1.02110228);
+			if (selected)
+				logerror("mu4_upstream_execute: address=%06x opcode=%04x a=%010llx b=%010llx sp=%04x ar2=%04x ar3=%04x ar4=%04x ar5=%04x st0=%04x st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+					unsigned(address), opcode,
+					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), time);
+		}
 		if (address >= 0x25bd2 && address <= 0x25bf7 && m_playback_processing_pending && m_playback_processing[0] == 2)
 		{
 			double const time = machine().time().as_double();
