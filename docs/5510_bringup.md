@@ -8584,6 +8584,35 @@ prefixes. The next question is the original cleanup/lifecycle decision
 how to force an inactive decoder to run. Neither these observations nor
 the pinned cleanup route establish EOF or why only 375 blocks are decoded.
 
+`playback_lifecycle_literals` in the context-contract report enumerates all
+mapped literal occurrences of these two fields, retaining unknown patterns.
+AA55 covers 10,760 words and one occurrence (the control-zero store pattern
+at `0008f2`). AA99 covers 49,843 words and 43 occurrences: 25 immediate-store
+patterns, 12 immediate-compare patterns, three A-load patterns and three
+unclassified literals. Exactly one AA99 immediate-store pattern writes
+state 4 (`020b0e`); the other stores select different states or control
+values. This selects a source candidate for runtime observation, not an
+all-writer closure: boundaries, indirect stores, aliases and dynamically
+constructed addresses are not classified by this raw-word census.
+
+A fresh ten-second run with `mu4_playback_lifecycle_observe.lua` records
+state 4 at 0.837819684 seconds (bus-context PC `020b11`), with no subsequent
+write to that field until state 5 at 9.700791097. The cleanup-context read
+of control zero occurs at 9.700790964, immediately after the last caller
+event at 9.700780776 and before loader entry at 9.701774207. The terminal
+accounts for all ten lifecycle writes and three control writes, with
+`illegal=0`; the bounded gate check also passes unchanged. All 918 snapshots,
+six transport streams and decoded returns match the prior ten-second run
+byte-for-byte. These are raw bus timings/context PCs, not retained
+instruction ownership. State 4 becoming newly set is not the late trigger:
+the remaining question is why execution leaves the processing loop and
+reaches the already-enabled cleanup at this point.
+
+The older `--playback-lifecycle` checker requires a later state-4 re-entry
+as well as cleanup. This ten-second recording ends before that re-entry,
+so it does not pass that separate contract; do not weaken the checker or
+claim the complete repeating lifecycle from this shorter observation.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a

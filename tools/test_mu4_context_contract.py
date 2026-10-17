@@ -16,6 +16,7 @@ from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, 
 from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
+from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
@@ -46,6 +47,23 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_lifecycle_census_keeps_unknowns_and_distinguishes_store_from_compare(self):
+        words = dict(enumerate((0x76f8, 0x373e, 4, 0x60f8, 0x373e, 4,
+                                0x10f8, 0x3742, 0xffff, 0x3742), 0x20000))
+        report = playback_lifecycle_literal_census(words)
+        self.assertEqual(report['mapped_words'], 10)
+        self.assertEqual(report['literal_references'], 4)
+        self.assertEqual([row['classification'] for row in report['references']], [
+            'absolute_immediate_store_pattern', 'absolute_immediate_compare_pattern',
+            'absolute_load_a_pattern', 'unclassified_literal'])
+        self.assertEqual(report['references'][0]['instruction_address'], '020000')
+        self.assertEqual(report['references'][0]['immediate'], '0004')
+
+    def test_lifecycle_census_does_not_bridge_missing_words(self):
+        report = playback_lifecycle_literal_census({0x100: 0x76f8, 0x101: 0x373e,
+                                                   0x103: 4, 0x200: 0x3742})
+        self.assertEqual(report['classes'], {'unclassified_literal': 2})
+
     def test_recording_window_prefix_pins_parameter_roles(self):
         words = dict(enumerate(RECORD_WINDOW_WITNESS, RECORD_WINDOW_BASE))
         self.assertEqual(decode_recording_window_arguments(words)['pinned_words'], 16)

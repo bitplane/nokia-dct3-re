@@ -1346,6 +1346,34 @@ def rel_cleanup_route(lifecycle, control):
             'extra_call': None if branch_to_state5 else '039005', 'loader_index': 0}
 
 
+def playback_lifecycle_literal_census(words):
+    """Enumerate raw references; instruction-shaped words are not code ownership."""
+    references = []
+    for address, value in sorted(words.items()):
+        if value not in (0x373e, 0x3742):
+            continue
+        opcode = words.get(address - 1)
+        row = {'operand_address': f'{address:06x}', 'field': f'{value:04x}',
+               'preceding_word': None if opcode is None else f'{opcode:04x}',
+               'classification': 'unclassified_literal'}
+        if opcode == 0x76f8 and address + 1 in words:
+            row.update(classification='absolute_immediate_store_pattern',
+                       instruction_address=f'{address-1:06x}',
+                       immediate=f'{words[address+1]:04x}')
+        elif opcode == 0x60f8 and address + 1 in words:
+            row.update(classification='absolute_immediate_compare_pattern',
+                       immediate=f'{words[address+1]:04x}')
+        elif opcode == 0x10f8:
+            row['classification'] = 'absolute_load_a_pattern'
+        references.append(row)
+    return {'mapped_words': len(words), 'literal_references': len(references),
+            'classes': dict(Counter(row['classification'] for row in references)),
+            'references': references,
+            'scope': 'All mapped literal occurrences of 373e/3742; raw patterns only, '
+                     'not instruction-boundary validation, runtime writers, indirect stores '
+                     'or an all-alias ownership/absence proof'}
+
+
 def decode_rel_cleanup(words, bootstrap_words):
     for source, base, witness in ((words, REL_CLEANUP_BASE, REL_CLEANUP_WITNESS),
                                   (bootstrap_words, 0x2080, REL_RELOAD_API)):
@@ -1393,6 +1421,10 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['playback_lifecycle_literals'] = {
+        'aa55': playback_lifecycle_literal_census(bootstrap_words),
+        'aa99': playback_lifecycle_literal_census(rel_words),
+    }
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
