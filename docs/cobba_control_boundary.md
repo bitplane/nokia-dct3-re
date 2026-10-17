@@ -1429,6 +1429,16 @@ checked DTMF path; it does not prove every codec mode has the same clock.
 Resolve the control/divider contract independently rather than copying RAM
 gates, direct vector injection or the beep identity assumption into a device.
 
+The external-frame checker also reconstructs register-8 values from the full
+helper-entry trace: all 48 calls are retained and reconciled with the final
+uncapped count and sequential hit ids. Register 8 is `0626` throughout each
+checked interval: pre-key silence (7.5--7.9 s), active DTMF (8.13--8.19 s),
+and post-key silence (8.6--9.0 s). Thus this value alone does not indicate
+nonzero tone output. This is helper-path coverage, not an exhaustive proof
+that no other transport writes the register, nor a disproof of a persistent
+converter/clock-enable interpretation. The checker reports observed values
+without assigning bit meanings and rejects truncated or unordered captures.
+
 The control-write helper at `45c2` has 27 raw direct CALL/CALLD candidates
 in the resident image. Reproduce their operand windows with
 `c54x_rom4_port_census.py IMAGE --call-target 0x45c2 --context 10`.

@@ -7,6 +7,30 @@ WORDS = re.compile(r'native_pcm_fixture_word: value=([0-9a-f]{4}) t=([0-9.]+)')
 SUMMARY = re.compile(r'rom4_tone_summary: tx_words=(\d+) rx_reads=(\d+) tone_reads=(\d+) tone_copies=(\d+) t=([0-9.]+)')
 
 
+def control_timeline(text):
+    """Recover complete helper-entry observations, not physical bit meanings."""
+    calls = re.findall(r'rom4_codec_control_call: hit=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) sp=[0-9a-f]{4} return=[0-9a-f]{4} t=([0-9.]+)', text)
+    totals = re.findall(r'rom4_codec_control_summary: calls=(\d+) t=([0-9.]+)', text)
+    if len(totals) != 1 or len(calls) != int(totals[0][0]) or not calls:
+        raise ValueError('missing or truncated codec helper timeline')
+    if [int(hit) for hit, *_ in calls] != list(range(1, len(calls) + 1)):
+        raise ValueError('duplicate or unordered codec helper observations')
+    times = [float(call[3]) for call in calls]
+    if times != sorted(times) or float(totals[0][1]) < max(9.0, times[-1]):
+        raise ValueError('codec helper timeline does not cover waveform intervals')
+    register8 = [(float(time), int(value, 16) & 0xfff)
+                 for _, value, address, time in calls if int(address, 16) == 8]
+    result = {}
+    for name, begin, end in (('before', 7.5, 7.9), ('active', 8.13, 8.19), ('after', 8.6, 9.0)):
+        preceding = [value for time, value in register8 if time <= begin]
+        if not preceding:
+            raise ValueError('codec register 8 lacks an observed initial value')
+        values = {preceding[-1], *(value for time, value in register8 if begin < time < end)}
+        result[name] = sorted(values)
+    return dict(helper_calls=len(calls), register8_values=result,
+                physical_clock_enable_claim=False)
+
+
 def tone_fraction(samples, frequency=900, rate=8000):
     energy = sum(value * value for value in samples)
     if not energy:
@@ -65,6 +89,7 @@ def check(text, *, clock):
         raise ValueError('native output does not reproduce both key-2 DTMF frequencies')
     return dict(clock=True, tx_words=tx, rx_reads=rx, captured_words=len(words),
                 active_samples=len(active), frequencies=[697, 1336], sinusoidal_energy_fractions=fractions,
+                control_timeline=control_timeline(text),
                 handset_clock_claim=False, native_call_speech_claim=False)
 
 

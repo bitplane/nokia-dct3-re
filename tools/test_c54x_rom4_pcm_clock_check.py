@@ -2,18 +2,21 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, check_restore, tone_fraction, WORDS
+from tools.c54x_rom4_pcm_clock_check import check, check_restore, control_timeline, tone_fraction, WORDS
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'
 CONTROL = ('rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.100000\n'
            'rom4_tone_access: owner=mcu direction=write address=0100ac value=14e0 mask=ffff pc=272034 t=8.100100\n'
            'rom4_tone_access: owner=mcu_frequency direction=write address=0100b0 value=ae40000 mask=ffff0000 pc=272034 t=8.100200\n')
+HELPERS = ('rom4_codec_control_call: hit=1 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=7.000000000\n'
+           'rom4_codec_control_call: hit=2 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=8.100000000\n'
+           'rom4_codec_control_summary: calls=2 t=12.000000000\n')
 
 
 @functools.lru_cache(maxsize=2)
 def clock_log(frequency=697):
-    lines = [KEYS, CONTROL, 'rom4_tone_summary: tx_words=60000 rx_reads=60000 tone_reads=20 tone_copies=8 t=12.0']
+    lines = [KEYS, CONTROL, HELPERS, 'rom4_tone_summary: tx_words=60000 rx_reads=60000 tone_reads=20 tone_copies=8 t=12.0']
     for n in range(52001):
         time = 2.5000625 + n / 8000
         value = round(1800 * (math.sin(2 * math.pi * frequency * time) + math.sin(2 * math.pi * 1336 * time))) if 8.11 <= time < 8.22 else 0
@@ -39,6 +42,19 @@ def restore_log():
 
 
 class NativeClockTests(unittest.TestCase):
+    def test_complete_control_timeline_without_bit_semantics(self):
+        result = control_timeline(HELPERS)
+        self.assertEqual(result['register8_values'], dict(before=[0x626], active=[0x626], after=[0x626]))
+        self.assertFalse(result['physical_clock_enable_claim'])
+        for bad in (HELPERS.replace('calls=2', 'calls=3'),
+                    HELPERS.replace('hit=2', 'hit=1'),
+                    HELPERS.replace('t=12.000000000', 't=8.000000000'),
+                    HELPERS.replace('b=0000000008', 'b=0000000009')):
+            with self.assertRaises(ValueError):
+                control_timeline(bad)
+        changed = HELPERS.replace('hit=2 a=0000000626', 'hit=2 a=0000000026')
+        self.assertEqual(control_timeline(changed)['register8_values']['active'], [0x26])
+
     def test_exact_active_restore_and_snapshot_required(self):
         text = restore_log()
         result = check_restore(text)
