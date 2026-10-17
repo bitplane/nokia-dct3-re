@@ -74,7 +74,7 @@ fail-closed emulator contracts, not claims about silicon traps.
 | `bitf-mod3-edge` | 512 | CMPM/BITF with both initial TC values. |
 | `subc-mod3-edge` | 512 | Both destinations; standalone and short-repeat SUBC. |
 | `long-pair` / `drsub` | 3,584 each | 14 paired-arithmetic classes including C16; rejection adds no positive staged T-variant support. |
-| `logic-short` | 2,560 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW and WRITA; includes 576 positive logic cases. |
+| `logic-short` | 2,816 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW, WRITA and MVDP; 576 positive logic cases run separately. |
 | `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
 
 Corrected positive load domains are:
@@ -114,7 +114,22 @@ source rejection. Xmem/Ymem have separate grammars. For `6fxx`, classify the
 operation extension before deciding source versus destination; shifted
 STL/STH remain unchanged. Rejection support does not imply positive staged
 support for ADC/SUBB, paired T variants or otherwise unsupported operations.
-Implicit-copy, read/modify/write and unenumerated read families remain open.
+MVDP's Smem is a data-memory **source** (SPRU172C p. 4-111), unlike
+MVPD and READA destinations. The atomic MVDP handler formerly admitted
+short `98..9f`, read data, advanced the AR and could write program memory.
+Its early admission guard now rejects that encoding before any operand
+effect. The unchanged-core regression fails on a data transaction;
+`logic-short` adds 256 cases/restores across all ARs, initial TC, CMPT,
+program pages, frontends and two checkpoints. The full bank requires zero
+data/program/I/O writes, zero source reads and unchanged pointers/status.
+This is fail-closed admission, not a silicon exception specification.
+Ordinary long MOD=13 and the destination-side preincrement forms are not
+removed. Full core conformance retains all 292 required markers, including
+legal postincrement, absolute and long-offset MVDP controls. Native clocked
+boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
+3210 baseline/frontier regressions pass without rebanking their oracles.
+Other implicit-copy, read/modify/write and unenumerated read families
+remain open; the RMW operand role must not be guessed from this source rule.
 
 ### MMR long-form boundary
 

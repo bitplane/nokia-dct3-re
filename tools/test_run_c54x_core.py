@@ -1118,7 +1118,7 @@ class CoreResultTests(unittest.TestCase):
     def test_logic_transfer_mod3_exclusions(self):
         markers, ending = EXTRA_PROFILES['logic-short']
         output = '\n'.join((*markers, ending)) + '\n'
-        for old, new in (('restore=2560', 'restore=0'), ('opcode_classes=10', 'opcode_classes=6'),
+        for old, new in (('restore=2816', 'restore=0'), ('opcode_classes=11', 'opcode_classes=10'),
                          ('frontends=2', 'frontends=1'), ('initial_tc=2', 'initial_tc=1'),
                          ('program_writes=0', 'program_writes=1'), ('io_writes=0', 'io_writes=1')):
             with self.subTest(mutation=old), self.assertRaises(ValueError):
