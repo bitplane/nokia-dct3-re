@@ -517,13 +517,14 @@ evidence of archive corruption. The independent
 opens it and enumerates 132 names:
 
 ```sh
-python /tmp/nse1-pyidbutil/idbtool.py --names /tmp/nse1-rom4-annotations/dsp_full.idb
+python PATH_TO_PINNED_PYIDBUTIL/idbtool.py --names PATH_TO_EXTRACTED_ARCHIVE/dsp_full.idb
 ```
 
 Relevant original annotations and their current validation scope:
 
 | DSP address | Original label | Evidence use |
 | --- | --- | --- |
+| Data `0x29` | `BSCR` | Annotation, not proof of the custom MAD2 peripheral decode or of an HPI interrupt register |
 | Data `0x32` | `SPC1` | Candidate second serial-control register; not proof of MAD2 board attachment |
 | Data `0x1390` | `FR_prm` | Candidate full-rate parameter buffer |
 | Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Native FR parameter round trip validated; see packing contract below |
@@ -536,8 +537,23 @@ comment slots (`S,0` and `S,1`) at every address in that range and at
 `0x34`, `0x35`, `0x36`, `0x3b92`, `0x7e9c` returns no comments.
 Thus the annotated database does not resolve the NSE-6 port-36 completion
 contract. Codec labels are useful leads, not grounds to rename unknown
-peripherals or claim native speech. The external reader remains in `/tmp`;
-no reader implementation is imported into the driver.
+peripherals or claim native speech. Extract the archive and pinned reader
+under ignored, disk-backed `tmp/`, not `/tmp` tmpfs. No reader implementation
+is imported into the driver.
+
+The request/HPINT range `3598..37be` likewise has no named request-source
+register and no ordinary comments in slots `S,0` or `S,1` (1,102 address/slot
+queries). The adjacent `37ce` label resolves as `DSP_to_MCU_send_message`,
+providing a positive reader control. This bounds only these annotation
+classes, not every possible IDA metadata record. The archive's `Task info.txt`
+describes MCU task structures at `100xxx`, not a DSP-port request map.
+
+TI SPRU131G sections 8.6 and 10.3 locate generic HPIC at data `002c` and
+BSCR at `0029`; BSCR bit 3 is reserved in that documented layout. NSE-1's
+parameter consumer writes data `0029` with masks `0008`/`fff7`. Do not turn
+that strobe or the historical BSCR label into a proven HINT mapping: the
+MAD2 custom peripheral layout still needs independent evidence. Generic TI
+instruction/BSP contracts do not establish every Nokia external-port map.
 
 #### Native carry/XOR helper acceptance
 
