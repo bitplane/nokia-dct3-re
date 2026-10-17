@@ -13,6 +13,8 @@ class ScoreTests(unittest.TestCase):
         text += '\nrom4_rf_window_summary: writes=5 transitions=2 reads_on=800000 reads_off=100000 physical_gate_claim=0'
         text += '\nrom4_rf_window_mode: mode=0000 reads_on=0 reads_off=100000'
         text += '\nrom4_rf_window_mode: mode=0001 reads_on=800000 reads_off=0'
+        text += '\nrom4_rf_window_state: mode=0000 control=0000 reads=100000 aged=90000 minimum_us=2 maximum_us=5000'
+        text += '\nrom4_rf_window_state: mode=0001 control=0005 reads=800000 aged=0 minimum_us=0 maximum_us=0'
         self.assertEqual(check_window(text)['modes'][1], dict(on=800000, off=0))
         self.assertFalse(check_window(text)['physical_gate_claim'])
         with self.assertRaises(ValueError):
@@ -21,6 +23,10 @@ class ScoreTests(unittest.TestCase):
                     text.replace('writes=5', 'writes=1'), text.replace('transitions=2', 'transitions=6'),
                     text.replace('reads=900000', 'reads=900001'), text.replace('mode=0001', 'mode=0000'),
                     text.replace('mode=0001 reads_on=800000', 'mode=0001 reads_on=799999'),
+                    text.replace('reads=100000 aged=90000', 'reads=99999 aged=90000'),
+                    text.replace('aged=90000', 'aged=100001'), text.replace('minimum_us=2', 'minimum_us=5001'),
+                    text.replace('aged=0 minimum_us=0', 'aged=1 minimum_us=0'),
+                    text.replace('maximum_us=0', 'maximum_us=1'),
                     text.replace('physical_gate_claim=0', 'physical_gate_claim=1')):
             with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
                 check_window(bad)

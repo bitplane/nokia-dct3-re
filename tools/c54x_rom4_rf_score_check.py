@@ -9,6 +9,7 @@ import sys
 SUMMARY = re.compile(r"rom4_rf_score_summary: mode=(zero|dc|tone) reads=(\d+) results=(\d+) nonzero=(\d+) maximum=([0-9a-f]{10}) second=(\d+) accepted=(\d+) acquisition_claim=0")
 WINDOW = re.compile(r"rom4_rf_window_summary: writes=(\d+) transitions=(\d+) reads_on=(\d+) reads_off=(\d+) physical_gate_claim=0")
 WINDOW_MODE = re.compile(r"rom4_rf_window_mode: mode=([0-9a-f]{4}) reads_on=(\d+) reads_off=(\d+)")
+WINDOW_STATE = re.compile(r"rom4_rf_window_state: mode=([0-9a-f]{4}) control=([0-9a-f]{4}) reads=(\d+) aged=(\d+) minimum_us=(\d+) maximum_us=(\d+)")
 
 
 def observe(text):
@@ -53,8 +54,21 @@ def check_window(text):
         raise ValueError('inconsistent RF window totals')
     if sum(case['on'] for case in modes.values()) != reads_on or sum(case['off'] for case in modes.values()) != reads_off:
         raise ValueError('RF window mode accounting differs from totals')
+    states, accounted = {}, {mode: dict(on=0, off=0) for mode in modes}
+    for mode, control, count, aged, minimum, maximum in WINDOW_STATE.findall(text):
+        mode, control = int(mode, 16), int(control, 16)
+        count, aged, minimum, maximum = map(int, (count, aged, minimum, maximum))
+        key = (mode, control)
+        if key in states or mode not in modes or not count or aged > count or minimum > maximum:
+            raise ValueError('invalid RF window control/age observation')
+        if (control & 1 and aged) or (not aged and (minimum or maximum)):
+            raise ValueError('RF window age requires a clear-bit read after an observed falling edge')
+        states[key] = dict(reads=count, aged=aged, minimum_us=minimum, maximum_us=maximum)
+        accounted[mode]['on' if control & 1 else 'off'] += count
+    if accounted != modes:
+        raise ValueError('RF window control accounting differs from mode totals')
     return dict(writes=writes, transitions=transitions, reads_on=reads_on,
-                reads_off=reads_off, modes=modes, physical_gate_claim=False)
+                reads_off=reads_off, modes=modes, states={f'{mode:04x}:{control:04x}': value for (mode, control), value in states.items()}, physical_gate_claim=False)
 
 
 def main():

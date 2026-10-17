@@ -525,6 +525,25 @@ bit-0 transitions, 857,440 reads with bit 0 set and 133,920 with it clear.
 | `0009` | 320 | 0 |
 | `000c` | 317,440 | 0 |
 
+Full-control and falling-edge-age accounting separates startup from later
+clear-bit reads. Both controls reproduce these ranges (rounded to microseconds):
+
+| DSP mode | Port 3 | Clear-bit reads | Age since the most recent observed bit-0 clear |
+| --- | --- | ---: | --- |
+| `0000` | `0000/0100` | 9,760 | No preceding falling edge observed |
+| `0001` | `0000` | 31,968 | 4,673--4,610,830 us |
+| `0001` | `0100` | 32 | 4,615,442--4,615,446 us |
+| `0002` | `0104` | 160 | 4,610--23,076 us |
+| `0004` | `0104` | 92,000 | 1,240--155,883 us |
+
+The observer preserves full port values, counts aged versus unaged reads, and
+checks each control bucket against its mode/bit totals. These are emulated
+control-to-read intervals, not measured electrical latency. In the current
+model they are not all a single short post-clear tail. The native backend
+presently drives INT0 from the CTSI frame timer; the physical relationship
+between that frame source and an RF block-ready source remains unresolved.
+Do not clear the CPU's already-latched IFR merely because a control bit falls.
+
 The runner retains validated window totals and per-mode accounting separately
 from score acceptance; `c54x_rom4_rf_score_check.py --window-only <error.log>`
 checks those observations without promoting acquisition. The rotating score

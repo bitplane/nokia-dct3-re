@@ -19,11 +19,15 @@ local taps = {}
 local port3 = cpu.spaces["io"]:read_u16(3)
 local port3_writes, port3_transitions, reads_on, reads_off = 0, 0, 0, 0
 local window_modes = {}
+local window_states, last_clear = {}, nil
 taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(3, 3, "rf_window_control", function(_, value, mask)
     local next_value = (port3 & ~mask) | (value & mask)
     port3_writes = port3_writes + 1
-    if (port3 & 1) ~= (next_value & 1) then port3_transitions = port3_transitions + 1 end
-    if port3_writes <= 32 then
+    if (port3 & 1) ~= (next_value & 1) then
+        port3_transitions = port3_transitions + 1
+        if (next_value & 1) == 0 then last_clear = machine.time:as_double() end
+    end
+    if port3_writes <= 8 or ((port3 & 1) ~= (next_value & 1) and port3_transitions <= 32) then
         machine:logerror(string.format("rom4_rf_window_write: t=%.9f pc=%04x old=%04x value=%04x mask=%04x\n",
             machine.time:as_double(), cpu.state["PC"].value, port3, next_value, mask))
     end
@@ -274,6 +278,16 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         window_modes[state] = window
         if (port3 & 1) ~= 0 then reads_on = reads_on + 1; window.on = window.on + 1
         else reads_off = reads_off + 1; window.off = window.off + 1 end
+        local key = (state << 16) | port3
+        local group = window_states[key] or {mode = state, control = port3, reads = 0, aged = 0, minimum = nil, maximum = 0}
+        window_states[key] = group
+        group.reads = group.reads + 1
+        if (port3 & 1) == 0 and last_clear then
+            local age = math.floor((machine.time:as_double() - last_clear) * 1000000 + 0.5)
+            group.aged = group.aged + 1
+            group.minimum = math.min(group.minimum or age, age)
+            group.maximum = math.max(group.maximum, age)
+        end
         if reads <= 64 then
             machine:logerror(string.format(
                 "rom4_rf_sample_consumption: index=%d t=%.12f pc=%04x counter=%04x\n",
@@ -441,6 +455,10 @@ local stop = emu.add_machine_stop_notifier(function()
         port3_writes, port3_transitions, reads_on, reads_off))
     for state, window in pairs(window_modes) do
         machine:logerror(string.format("rom4_rf_window_mode: mode=%04x reads_on=%d reads_off=%d\n", state, window.on, window.off))
+    end
+    for _, group in pairs(window_states) do
+        machine:logerror(string.format("rom4_rf_window_state: mode=%04x control=%04x reads=%d aged=%d minimum_us=%d maximum_us=%d\n",
+            group.mode, group.control, group.reads, group.aged, group.minimum or 0, group.maximum))
     end
     for _, target in ipairs({0x0b6a, 0x0a5c, 0x0ac2}) do
     for _, space_name in ipairs({"program", "data"}) do
