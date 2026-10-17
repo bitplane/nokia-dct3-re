@@ -2129,13 +2129,16 @@ class CoreResultTests(unittest.TestCase):
             check_result(output, 3)
 
     def test_mac_profile_is_separate(self):
-        (marker, poly), ending = EXTRA_PROFILES['mac-smem']
-        output = '\n'.join((marker, poly, ending)) + '\n'
+        (marker, square, poly), ending = EXTRA_PROFILES['mac-smem']
+        output = '\n'.join((marker, square, poly, ending)) + '\n'
         check_result(output, 3, profile='mac-smem')
         for bad in (output.replace('restore=73728', 'restore=0'),
                     output.replace('flags=16', 'flags=8'),
                     output.replace('t_retained=1', 't_retained=0'),
                     output.replace(poly + '\n', ''),
+                    output.replace(square + '\n', ''),
+                    output.replace('restore=36864', 'restore=0'),
+                    output.replace('t_republish=0', 't_republish=1'),
                     output.replace('restore=4608', 'restore=0'),
                     output.replace('irq_acceptance=0', 'irq_acceptance=1'),
                     marker + '\n' + output, output + 'late output\n'):

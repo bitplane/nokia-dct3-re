@@ -12,8 +12,8 @@ streams, not a matching handset PMM or an internal DSP mask image.
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
 The current software frontier is native decoder instruction support:
-`3882` at `0260d8` stops the fail-closed staged core after the original
-three-step polynomial routine. Corrected pending-double-store forwarding
+`f48c` at `025b14` stops the fail-closed staged core after polynomial and
+square-accumulate execution. Corrected pending-double-store forwarding
 removes the observed overwide encoder fields. Fresh transform observations
 account for 3,072 saved bytes; their first eight packets host-decode as
 eight frames with zero errors. This is captured native encoder output,
@@ -7642,9 +7642,29 @@ does not write T.
 `c22a..c22e={1282,be62,76db,3842,0000}`, then actual stores
 `1174=68a9,1175=0000`. The source-contract tool independently computes
 all three steps and matches `68a90000`. Live PC is context only, not
-retained operand ownership or retirement proof. The 20-second playback
-observation now stops at unsupported `3882` at `0260d8`, still with illegal=1
-and zero nonzero DMA/TX/DIN samples; strict playback acceptance remains failing.
+retained operand ownership or retirement proof.
+
+SQURA/SQURS (TI SPRU172C 4-163/4-164) square the signed memory word,
+add/subtract it from A or B with FRCT and final OVM saturation, and load
+T from memory. The staged path retains the operand, publishes T in Read
+and must not republish it in Execute. Do not substitute the MAC product
+clamp: these square operations retain the full product before accumulation.
+The atomic and staged paths share one arithmetic helper. The `mac-smem`
+profile requires 36,864 square cases/restores over both operations and
+destinations, indirect/absolute RAM and mapped AR1 sources, 64 input pairs,
+16 FRCT/OVM/SMUL/SXM settings and three snapshots. Tests change RAM/T after
+Read and require one captured source read, no data writes, sticky overflow,
+the unaffected accumulator/status and preservation of the later T value.
+This does not validate all mapped-producer latencies, other extended
+address forms, RPT/interrupt composition or measured physical bus phases.
+
+Fourteen original AA99 words at `0260cd..0260da` pin the block-repeat
+setup and `0260d8: SQURA *AR2,A`; source mutation tests guard the extent.
+Native playback advances past that boundary, then stops at unsupported
+`f48c` at `025b14` (also present in the original AA99 upload). The complete
+20-second observation retains illegal=1 and zero nonzero DMA/TX/DIN samples;
+strict playback acceptance remains failing. Verify the new instruction's
+source and contract before extending support.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

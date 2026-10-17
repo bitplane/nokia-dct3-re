@@ -33,6 +33,7 @@ from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, deco
 from tools.mu4_context_contract import ESCAPE_STORE_BASE, ESCAPE_STORE_WITNESS, decode_escape_store_prefix
 from tools.mu4_context_contract import POLY_CALLER_BASE, POLY_CALLER_WITNESS, decode_poly_caller
 from tools.mu4_context_contract import reference_poly_step, playback_poly_observation
+from tools.mu4_context_contract import SQUARE_LOOP_BASE, SQUARE_LOOP_WITNESS, decode_square_loop
 from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
 from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
 from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
@@ -210,6 +211,15 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_poly_caller(changed)
+
+    def test_original_square_loop_source_is_pinned(self):
+        words = dict(enumerate(SQUARE_LOOP_WITNESS,SQUARE_LOOP_BASE))
+        self.assertEqual(decode_square_loop(words)['pinned_words'],14)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_square_loop(changed)
 
     def test_poly_manual_example_and_signed_high17(self):
         self.assertEqual(reference_poly_step(0x12340000,0x10000,0x5678,0x2000,0), (0x06270000,0x20000000,False))

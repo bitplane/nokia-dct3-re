@@ -62,6 +62,11 @@ constexpr bool staged_poly(u16 word)
 	return (word & 0xff00) == 0x3600 && u8(word) < 0x98;
 }
 
+constexpr bool square_accumulate(u16 word)
+{
+	return (word & 0xfc00) == 0x3800;
+}
+
 constexpr bool staged_pipelined_repeat(u16 word)
 {
 	return staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
@@ -318,7 +323,7 @@ constexpr bool staged_extended_smem_arithmetic(u16 word)
 
 constexpr bool staged_smem_special(u16 word)
 {
-	return (staged_poly(word) || (word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
+	return (square_accumulate(word) || staged_poly(word) || (word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_smem_special(u16 word)
@@ -807,6 +812,13 @@ public:
 			bool const extended = mode >= 0xe0;
 			char const *name = family == 0x3100 ? "MPYA" : family == 0x3300 ? "MASA" : family == 0x3500 ? "MACA" : "MACAR";
 			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
+		if (square_accumulate(op))
+		{
+			bool const extended = mode >= 0xe0;
+			stream << (BIT(op,9) ? "SQURS   " : "SQURA   "); smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %c", BIT(op,8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
 		}
 		if (family == 0x3600)
@@ -2047,6 +2059,15 @@ void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
 		m_st0 = (m_st0 & ~u16(0x0800)) | (carry ? 0x0800 : 0);
 		destination = (u64(u32(result_high) & 0xffffff) << 16) | result_low;
 	}
+}
+
+void tms320c54x_device::square_accumulate_result(u16 word, u16 memory)
+{
+	// SPRU172C 4-163/4-164: signed square, no rounding or SMUL product clamp.
+	s64 const product = s64(s16(memory)) * s16(memory) * (BIT(m_st1,6) ? 2 : 1);
+	u64 &destination = accumulator(BIT(word,8));
+	s64 const current = s64(destination << 24) >> 24;
+	destination = multiply_result(BIT(word,9) ? current - product : current + product, BIT(word,8));
 }
 
 void tms320c54x_device::polynomial_step(u16 memory, u16 t)
@@ -4356,6 +4377,7 @@ void tms320c54x_device::pipeline_step()
 				destination = memory_t_multiply(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], destination);
 			}
 			else if (staged_poly(m_op)) polynomial_step(m_pipeline_operand[5], m_pipeline_immediate[5]);
+			else if (square_accumulate(m_op)) square_accumulate_result(m_op, m_pipeline_operand[5]);
 			else accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
 			if (staged_extended_smem_special(m_op)) ++m_pc;
 		}
@@ -5529,14 +5551,8 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		if (family >= 8 && family <= 0x0b)
 		{
-			s64 product = s64(s16(memory)) * s64(s16(memory));
-			if (BIT(m_st1, 6))
-				product *= 2;
 			m_t = memory;
-			u64 &destination = accumulator(BIT(family, 0));
-			const s64 current = s64(destination << 24) >> 24;
-			destination = multiply_result(BIT(family, 1) ? current - product : current + product,
-					BIT(family, 0));
+			square_accumulate_result(op, memory);
 			return;
 		}
 		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) * 0x10000;

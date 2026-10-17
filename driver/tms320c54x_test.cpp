@@ -13801,23 +13801,23 @@ private:
 		unsigned read;
 		u32 base = 0;
 	};
-	static mac_smem_fixture mac_smem_case(unsigned variant, bool bk = false)
+	static mac_smem_fixture mac_smem_case(unsigned variant, bool bk = false, bool square = false)
 	{
-		unsigned const forms = bk ? 2 : 3, v = variant % (forms * 8192), form = v % forms, selector = (v / forms) % 8, pair = (v / (forms * 8)) % 64, flags = v / (forms * 512);
+		unsigned const forms = bk ? 2 : 3, selectors = square ? 4 : 8, v = variant % (forms * selectors * 1024), form = v % forms, selector = (v / forms) % selectors, pair = (v / (forms * selectors)) % 64, flags = v / (forms * selectors * 64);
 		unsigned const operation = selector / 2, tp = pair / 8, mp = pair % 8;
 		u16 const t = std::array<u16, 8>{0, 1, 0xffff, 0x7fff, 0x8000, 0x8001, 0x1234, 0xabcd}[tp];
 		u16 const memory = std::array<u16, 8>{0, 1, 0xffff, 0x7fff, 0x8000, 0x8001, 0x5678, 0xfedc}[mp];
 		u64 const source = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x1234567833ULL, 0x80aa001234ULL}[tp];
 		u16 const st0 = (0xa604 | (tp & 1 ? 0x600 : 0) | (mp & 1 ? 0x800 : 0)) & (bk ? 0xfe00 : 0xffff);
 		u16 const st1 = 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0) | (flags & 8 ? 0x100 : 0);
-		s64 product = s64(s16(t)) * s16(memory) * (flags & 1 ? 2 : 1);
-		if ((flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
+		s64 product = s64(square ? s16(memory) : s16(t)) * s16(memory) * (flags & 1 ? 2 : 1);
+		if (!square && (flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
 		s64 const signed_source = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-		s64 result = operation >= 2 ? signed_source - product : signed_source + product;
-		if (operation & 1) result = (result + 32768) & ~s64(65535);
+		s64 result = operation >= (square ? 1U : 2U) ? signed_source - product : signed_source + product;
+		if (!square && (operation & 1)) result = (result + 32768) & ~s64(65535);
 		bool const overflow = result < -2147483648LL || result > 2147483647LL;
 		u64 const stored = u64(overflow && (flags & 2) ? result < 0 ? -2147483648LL : 2147483647LL : result) & 0xffffffffffULL;
-		mac_smem_fixture f{u16((0x2800 + operation * 0x200) | ((selector & 1) << 8) | (form ? 0xf8 : bk ? 0x19 : 0x81)), memory, t, st0, st1, u16(flags & 4 ? 2 : 0), u16(bk ? 0x19 : form == 2 ? 0x11 : 0x500), u16(st0 | (overflow ? selector & 1 ? 0x200 : 0x400 : 0)), selector & 1 ? 0x246813579aULL : source, selector & 1 ? source : 0x246813579aULL, stored, 5 + unsigned(form != 0)};
+		mac_smem_fixture f{u16(((square ? 0x3800 : 0x2800) + operation * 0x200) | ((selector & 1) << 8) | (form ? 0xf8 : bk ? 0x19 : 0x81)), memory, t, st0, st1, u16(flags & 4 ? 2 : 0), u16(bk ? 0x19 : form == 2 ? 0x11 : 0x500), u16(st0 | (overflow ? selector & 1 ? 0x200 : 0x400 : 0)), selector & 1 ? 0x246813579aULL : source, selector & 1 ? source : 0x246813579aULL, stored, 5 + unsigned(form != 0)};
 		f.base = bk && (variant / 16384) % 2 ? 0x20000 : 0;
 		return f;
 	}
@@ -13891,7 +13891,8 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const bk = !strcmp(machine().options().bios(), "mac-bk");
-		auto const f = mac_smem_case(variant, bk); bool const absolute = u8(f.opcode) == 0xf8;
+		bool const square = !bk && variant >= 73728;
+		auto const f = mac_smem_case(square ? variant - 73728 : variant, bk, square); bool const absolute = u8(f.opcode) == 0xf8;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.opcode); if (absolute) program.write_word(f.base + 0x601, f.address);
@@ -43416,12 +43417,14 @@ private:
 		if (m_phase == 253690)
 		{
 			bool const bk = !strcmp(machine().options().bios(), "mac-bk");
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mac_smem_case(variant, bk);
-			unsigned const checkpoint = f.read - 1 + variant / (bk ? 32768 : 24576);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const square = !bk && variant >= 73728; unsigned const index = square ? variant - 73728 : variant;
+			auto const f = mac_smem_case(index, bk, square);
+			unsigned const checkpoint = f.read - 1 + index / (bk ? 32768 : square ? 12288 : 24576);
 			bool const absolute = u8(f.opcode) == 0xf8, destination_b = BIT(f.opcode, 8);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MAC/MAS execute without an atomic fallback");
 			if (tick == 4 && absolute) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-			if (tick == f.read) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "MAC/MAS must not republish their memory operand into T in Read"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
+			if (tick == f.read) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (square ? f.memory : f.t), "Smem arithmetic publishes T only for square instructions in Read"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
@@ -43438,9 +43441,14 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay MAC/MAS retained operands and result publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253700; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (bk ? 98303 : 73727)) { start_mac_smem(variant + 1); return; }
+				if (index < (bk ? 98303 : square ? 36863 : 73727)) { start_mac_smem(variant + 1); return; }
 				if (bk) { osd_printf_info("TMS320C54x staged BK MAC/MAS: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=direct,absolute pairs=64 flags=16 pages=2 snapshots=3 source_reads=1 data_writes=0 bk_retained=1 t_retained=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated BK MAC/MAS complete"); }
-				osd_printf_info("TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0\n");
+				if (!square)
+				{
+					osd_printf_info("TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0\n");
+					start_mac_smem(73728); return;
+				}
+				osd_printf_info("TMS320C54x staged SQURA/SQURS: PASS cases=36864 restore=36864 operations=add,subtract destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 snapshots=3 source_reads=1 data_writes=0 t_publish=Read t_republish=0 repeat_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
 				start_poly(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
