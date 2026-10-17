@@ -192,6 +192,12 @@ the same boundary.
 
 ## Upstream series
 
+The generic ARM7 patch `mame-arm7-pc-export.patch` refreshes the named
+`ARM7_PC` debugger entry through the same export path as `STATE_GENPC`.
+Without it, Lua can observe stale cached PC data after load despite restored
+architectural registers. `check-c54x-rom4-pcm-restore` checks PC/GENPC agreement
+and active native audio replay; this correction contains no Nokia logic.
+
 The current overlay contains an ordered MAME patch stack plus local CPU, utility and Nokia
 sources. `make check-mame-patches` replays the patches in Makefile order against
 the pinned MAME commit in a temporary Git index. It does not inspect the dirty

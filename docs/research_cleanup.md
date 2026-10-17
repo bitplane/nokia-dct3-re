@@ -229,6 +229,11 @@ or was expensive to discover. Current examples include:
 - Lua tap subscriptions needing a live owner for the entire observation
   window; retain them in a callback/upvalue and validate positive-control
   detail records, not just counters, before interpreting absent events;
+- Lua waits waking early on state load: external physical-input fixtures must
+  recheck absolute emulated deadlines, not mistake an early key release for
+  failed device restoration;
+- debugger register exports exposing cached values: compare named PC with
+  architectural GENPC before attributing a mismatch to CPU save-state loss;
 - constructors that acknowledge an incoming command rather than initiate it;
 - report code 7 belonging to shutdown/power lifecycle rather than ordinary
   boot readiness; and

@@ -1354,6 +1354,19 @@ Keep those product attachments explicit before promoting operational audio.
 
 ### Externally clocked native DTMF
 
+`make check-c54x-rom4-pcm-restore` additionally saves active synthesis at
+8.150 s and reloads before the physical key release at 8.220 s. The fixture
+owns the key through absolute emulated deadlines: Lua waits can wake early on
+load, and host input is not automatically replayed with device state.
+The checkpoint compares MCU R0..R15/CPSR/PC, DSP PC/SP/ST0/ST1/A/B/T/AR0..7/
+IFR/IMR and data words 0021..0023/00f0..00fe; it never reads destructive BDRR.
+All 400 subsequent output words and their absolute timestamps replay exactly
+at the captured 1 ns text resolution. This checks future frame deadlines and
+native oscillator restoration, not physical clock phase or all memory cells.
+Raw capture counts include the replay; the ordinary waveform check removes
+only that duplicated interval. The ARM7 debugger's named PC export must agree
+with GENPC, rather than exposing a stale cached value after load.
+
 `make check-c54x-rom4-pcm-clock` runs the same own-NSE-1 provisioning and
 physical key-2 press/release on the normal `noki5110` machine and the separate
 `nse1pcm` laboratory machine. The latter adds only an external 8 kHz

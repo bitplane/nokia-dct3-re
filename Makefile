@@ -10,6 +10,7 @@ PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
+	patches/mame-arm7-pc-export.patch \
 	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch \
 	patches/mame-sed1565.patch \
 	patches/mame-nandflash-mu4.patch \
@@ -367,6 +368,7 @@ help:
 	@echo "make check-c54x-rom4-codec-tone verify native boot serial and physical tone-control boundaries; retains isolated evidence under RUN_DIR"
 	@echo "make check-c54x-rom4-tone-levels verify physical Off/three-level native tone controls (no audio claim)"
 	@echo "make check-c54x-rom4-pcm-clock verify native key-tone words under explicit external frames (not product clock wiring)"
+	@echo "make check-c54x-rom4-pcm-restore verify exact active native DTMF word/time replay with external frames"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
@@ -1409,6 +1411,10 @@ check-c54x-rom4-tone-levels: build
 .PHONY: check-c54x-rom4-pcm-clock
 check-c54x-rom4-pcm-clock: build
 	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp
+
+.PHONY: check-c54x-rom4-pcm-restore
+check-c54x-rom4-pcm-restore: build
+	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp --restore
 
 check-c54x-rom4-codec-tone: build
 	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \

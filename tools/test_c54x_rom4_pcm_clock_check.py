@@ -2,7 +2,7 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, tone_fraction
+from tools.c54x_rom4_pcm_clock_check import check, check_restore, tone_fraction, WORDS
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'
@@ -21,7 +21,52 @@ def clock_log(frequency=697):
     return '\n'.join(lines)
 
 
+def restore_log():
+    fields = ['t=8.150000000', 'mcu_PC=0025432c', 'mcu_CPSR=0000003f']
+    for name in ('PC', 'SP', 'ST0', 'ST1', 'A', 'B', 'T', *(f'AR{i}' for i in range(8)), 'IFR', 'IMR'):
+        fields.append(f'dsp_{name}=0000000000')
+    fields.extend(f'mcu_R{i}=00000000' for i in range(16))
+    fields.extend(f'data_{address:04x}=0000' for address in (0x21, 0x22, 0x23, *range(0xf0, 0xff)))
+    snapshot = ' '.join(fields)
+    lines = clock_log().splitlines()
+    begin = next(i for i, line in enumerate(lines) if WORDS.fullmatch(line) and float(WORDS.fullmatch(line)[2]) >= 8.15)
+    end = next(i for i, line in enumerate(lines) if WORDS.fullmatch(line) and float(WORDS.fullmatch(line)[2]) >= 8.2)
+    suffix = lines[begin:end]
+    return '\n'.join([*lines[:begin], 'native_pcm_restore: phase=saved ' + snapshot,
+                      *suffix, 'native_pcm_restore: phase=restored ' + snapshot,
+                      *suffix, 'native_pcm_restore: phase=complete t=8.200000000 physical_release_replayed=0',
+                      *lines[end:]])
+
+
 class NativeClockTests(unittest.TestCase):
+    def test_exact_active_restore_and_snapshot_required(self):
+        text = restore_log()
+        result = check_restore(text)
+        self.assertEqual(result['replayed_words'], 400)
+        self.assertTrue(result['snapshot_equal'])
+        self.assertTrue(result['absolute_frame_times_equal'])
+        self.assertEqual(result['captured_words'], result['canonical_captured_words'] + 400)
+        for bad in (text.replace('mcu_R0=00000000 ', ''),
+                    text.replace('phase=restored t=8.150000000', 'phase=restored t=8.150000001'),
+                    text.replace('phase=complete t=8.200000000', 'phase=complete t=8.230000000'),
+                    text.replace('physical_release_replayed=0', 'physical_release_replayed=1'),
+                    text.replace('input-release: t=8.220000', 'input-release: t=8.150000'),
+                    text.replace('mcu_CPSR=0000003f', 'mcu_CPSR=bad'),
+                    text.replace('phase=restored', 'phase=saved')):
+            with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
+                check_restore(bad)
+
+    def test_replayed_words_and_absolute_times_cannot_drift(self):
+        text = restore_log()
+        position = text.index('native_pcm_restore: phase=restored')
+        head, tail = text[:position], text[position:]
+        record = next(WORDS.finditer(tail))
+        for replacement in (f'native_pcm_fixture_word: value=1234 t={record[2]}',
+                            f'native_pcm_fixture_word: value={record[1]} t=8.150062600', ''):
+            changed = head + tail[:record.start()] + replacement + tail[record.end():]
+            with self.assertRaisesRegex(ValueError, 'words or absolute'):
+                check_restore(changed)
+
     def test_native_waveform_and_unclocked_control(self):
         result = check(clock_log(), clock=True)
         self.assertEqual(result['active_samples'], 480)

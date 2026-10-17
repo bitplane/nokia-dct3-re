@@ -1,0 +1,11 @@
+diff --git a/src/devices/cpu/arm7/arm7.cpp b/src/devices/cpu/arm7/arm7.cpp
+--- a/src/devices/cpu/arm7/arm7.cpp
++++ b/src/devices/cpu/arm7/arm7.cpp
+@@ -1098,6 +1098,7 @@ void arm7_cpu_device::state_export(const device_state_entry &entry)
+ {
+ 	switch (entry.index())
+ 	{
++		case ARM7_PC:
+ 		case STATE_GENPC:
+ 		case STATE_GENPCBASE:
+ 			m_pc = GET_PC;

@@ -66,3 +66,49 @@ def check(text, *, clock):
     return dict(clock=True, tx_words=tx, rx_reads=rx, captured_words=len(words),
                 active_samples=len(active), frequencies=[697, 1336], sinusoidal_energy_fractions=fractions,
                 handset_clock_claim=False, native_call_speech_claim=False)
+
+
+def check_restore(text):
+    marker = re.compile(r'native_pcm_restore: phase=(saved|restored|complete) ([^\n]+)')
+    markers = list(marker.finditer(text))
+    if [match[1] for match in markers] != ['saved', 'restored', 'complete']:
+        raise ValueError('missing, duplicate or unordered native PCM restore boundaries')
+    saved, restored, complete = markers
+    expected = {'t': r'\d+\.\d{9}', 'mcu_PC': r'[0-9a-f]{8}', 'mcu_CPSR': r'[0-9a-f]{8}'}
+    for name in ('PC', 'SP', 'ST0', 'ST1', 'A', 'B', 'T',
+                 *(f'AR{i}' for i in range(8)), 'IFR', 'IMR'):
+        expected['dsp_' + name] = r'[0-9a-f]{10}'
+    expected.update({f'mcu_R{i}': r'[0-9a-f]{8}' for i in range(16)})
+    expected.update({f'data_{address:04x}': r'[0-9a-f]{4}' for address in (0x21, 0x22, 0x23, *range(0xf0, 0xff))})
+    for match in (saved, restored):
+        parts = match[2].split()
+        fields = dict(part.split('=', 1) for part in parts if '=' in part)
+        if len(parts) != len(expected) or set(fields) != set(expected) or any(not re.fullmatch(pattern, fields[key]) for key, pattern in expected.items()):
+            raise ValueError('incomplete or malformed native PCM checkpoint snapshot')
+    if saved[2] != restored[2]:
+        raise ValueError('native PCM checkpoint snapshot differs after restoration')
+    saved_time = float(fields['t'])
+    ending = re.fullmatch(r't=([0-9]+\.[0-9]{9}) physical_release_replayed=0', complete[2])
+    if not ending:
+        raise ValueError('malformed native PCM completion boundary')
+    end_time = float(ending[1])
+    if not 8.14 <= saved_time <= 8.17 or not 8.19 <= end_time < 8.22 or 'physical_release_replayed=0' not in complete[2]:
+        raise ValueError('native PCM replay must finish while the physical key remains held')
+    reference = WORDS.findall(text[saved.end():restored.start()])
+    replay = WORDS.findall(text[restored.end():complete.start()])
+    if reference != replay or len(reference) < 240 or not any(int(value, 16) for value, _ in reference):
+        raise ValueError('native transmitted words or absolute frame times differ after load')
+    if any(not saved_time <= float(time) < end_time for _, time in reference):
+        raise ValueError('native PCM suffix escapes its checkpoint interval')
+    keys = re.findall(r'input-(press|release): t=([0-9.]+) name=2\b', text)
+    if [(kind, float(time)) for kind, time in keys] != [('press', 8.0), ('release', 8.22)]:
+        raise ValueError('physical key is not held unchanged across both native PCM legs')
+    # Remove only the replay leg when checking the ordinary complete run;
+    # that checker must still reject duplicate/missing samples on one timeline.
+    canonical = text[:restored.start()] + text[complete.end():]
+    result = check(canonical, clock=True)
+    result['canonical_captured_words'] = result['captured_words']
+    result['captured_words'] = len(WORDS.findall(text))
+    result.update(replayed_words=len(reference), snapshot_equal=True,
+                  absolute_frame_times_equal=True, physical_release_replayed=False)
+    return result
