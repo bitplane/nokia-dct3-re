@@ -38,7 +38,7 @@ the first nonzero block's maximum sample error falls from 43,740 to 7
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
 post-transform rotation/permutation match for all 30 vectors too. Next audit
-scaling, overlap carry and final buffer movement and establish the cause and independent acceptance
+overlap carry, dispatch and final buffer movement and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6108,7 +6108,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is scaling, overlap carry and final buffer movement,
+Remaining work is overlap carry, dispatch and final buffer movement,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6200,7 +6200,7 @@ setup in addition to the complete transform-chain witnesses. It checks
 input/coefficient/output geometry, hashes, chronological call identity and
 the full mirrored-product/permutation model. The helper's input is observed
 after scaling and branch-specific operations; it is not claimed identical
-to the post-transform output. Scale/dispatch behavior, overlap carry and
+to the post-transform output. Dispatch behavior, overlap carry and
 final buffer movement remain separate contracts to establish.
 
 All 30 captured helper operations match: eighteen 128-component windows and
@@ -6221,6 +6221,33 @@ mixed FFT/window geometry, full-product bounds, metadata corruption and
 consistently rehashed wrong arithmetic. This helper acceptance does not
 establish correct selection of its inputs, complete overlap-add behavior,
 decoded waveform conformance, analog output or native speech.
+
+#### Transform Scaling
+
+Caller `024a46` sends the full post-transform vector through `025c1a`,
+which applies `025ce2` to each signed 32-bit component. The scalar subtracts
+two signed 16-bit arguments: a positive difference repeats arithmetic
+right shifts; a negative difference repeats left shifts. The final store
+keeps 32 bits. This is distinct from the rounded/clamped PCM converter.
+
+All 30 captured inputs are byte-identical to the checked post-transform
+outputs. Independent shift/store arithmetic matches all 16,384 resulting
+components. Observed argument pairs are `(10,14)` fourteen times, `(12,14)`
+eight times, `(7,14)` six times and `(27,14)` twice, covering both shift
+directions. The four native word/slot streams and all 582 earlier snapshots
+remain unchanged. Packet binding and the first 4,096 PCM conversions pass.
+
+```sh
+python3 tools/mu4_window_check.py RUN_DIR --scale \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+This combined mode pins 1,042 source words, checks each argument's identity
+and invocation, exact post-transform input continuity, and complete scale
+outputs before window processing. Tests cover zero/positive/negative shifts,
+signed arguments, 32-bit wrap, malformed metadata and consistently rehashed
+wrong outputs. Dispatch, overlap carry, final buffer movement, other media,
+decoded waveform conformance, analog output and speech remain unvalidated.
 
 ### Resident reload contract
 
