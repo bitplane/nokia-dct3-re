@@ -16,6 +16,28 @@ else:
 
 
 BASE = 0x23D73
+RAW_OUTPUT_COPY_WITNESSES = {
+    0x24885: (0x7110,0x0011,0x7212,0xaae9,0x771a,0x03ff,0xf072,0x488e,0x5692,0x4e91),
+    0x24ac4: (0x1004,0x8811,0x1009,0x8812,0x771a,0x007f,0xf072,0x4acd,0x5691,0x4e92),
+    0x24ae7: (0x1004,0xf000,0x0380,0x8811,0x1009,0x8812,0x771a,0x007f,0xf072,0x4af2,0x5692,0x4e91),
+}
+
+
+def decode_raw_output_copies(words):
+    for base, witness in RAW_OUTPUT_COPY_WITNESSES.items():
+        if any(words.get(base + i) != word for i, word in enumerate(witness)):
+            raise ValueError('raw output copy source changed or absent')
+    return {'pinned_words': 32,
+            'copies': [{'load': '02488d', 'store': '02488e', 'pairs': 1024,
+                        'source': 'AR2 from data[aae9]', 'destination': 'AR1 from direct operand $10 under current CPL'},
+                       {'load': '024acc', 'store': '024acd', 'pairs': 128,
+                        'source': 'AR1 from direct operand $04 under current CPL',
+                        'destination': 'AR2 from direct operand $09 under current CPL'},
+                       {'load': '024af1', 'store': '024af2', 'pairs': 128,
+                        'source': 'AR2 from data[SP:09]', 'destination': 'AR1 from data[SP:04] + 0x380'}],
+            'scope': 'Double-word copy grammar only; live GENPC is not retained instruction ownership, and upstream sample arithmetic is unvalidated'}
+
+
 BIT_WINDOW_BASE = 0x2510C
 NIBBLE_BASE = 0x2C62B
 BYTE_COUNT_BASE = 0x2AB09
@@ -1341,6 +1363,7 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['raw_output_copies'] = decode_raw_output_copies(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)

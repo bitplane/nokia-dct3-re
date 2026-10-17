@@ -6025,6 +6025,27 @@ match the prior baseline byte-for-byte. Its 6,852 early observation records
 also match the two-second proof run. This establishes non-interference,
 not decoded-audio acceptance.
 
+The raw-word writer trace further excludes two final copy endpoints. During
+processing call 2, the `024af1/024af2` DLD/DST loop copies `f300/f301 =
+ffbd/0b70` to `eb80/eb81` at 1.022890 s. Later `02488d/02488e` copies
+`7b80/7b81 = fff5/9b08` to `f380/f381` at 1.022905 s. Both source reads
+and destination writes are observed; the source contract pins all 22 words
+of the two loop setups/bodies. Live GENPC is context, not instruction
+ownership: the store taps show the following `024af3` and `02488f`.
+
+The channel-0 value had already reached `7b80/7b81` at 1.020880 s from
+`f300/f301`; the latter buffer is reused for channel 1 at 1.022823 s.
+The earlier stores into `f300/f301` have context `024ace`, immediately
+following the source-pinned `024acc/024acd` DLD/DST loop. Its observed AR1
+values advance past `7800/7801` and `e800/e801` respectively. These are the
+next candidate source pairs to observe, not yet an owned arithmetic
+producer or a diagnosis of the transform. Do not confuse the reused
+`f300/f301` buffer across the two channel lifetimes.
+Reproduce this bounded chronology with `tools/mu4_raw_output_observe.lua`
+as the two-second run's autoboot script. It observes only the four selected
+word pairs during call 2, removes its taps afterwards and reports truncation;
+it does not establish upstream arithmetic correctness.
+
 Use the same passive two-second run and independently regenerated reference:
 
 ```sh

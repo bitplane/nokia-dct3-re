@@ -1,4 +1,19 @@
 import unittest
+from tools.mu4_context_contract import RAW_OUTPUT_COPY_WITNESSES, decode_raw_output_copies
+
+
+class RawOutputCopyTests(unittest.TestCase):
+    def test_copy_source_and_each_word_mutation(self):
+        words = {base + i: word for base, witness in RAW_OUTPUT_COPY_WITNESSES.items()
+                 for i, word in enumerate(witness)}
+        report = decode_raw_output_copies(words)
+        self.assertEqual(report['pinned_words'], len(words))
+        self.assertEqual([row['pairs'] for row in report['copies']], [1024, 128, 128])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_raw_output_copies(changed)
 
 from tools.mu4_context_contract import BASE, MASK, WITNESS, contract, decode_words, route_for_status
 from tools.mu4_context_contract import WORKER_BASE, WORKER_WITNESS, decode_worker_entry, worker_route
