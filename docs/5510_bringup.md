@@ -7600,6 +7600,14 @@ is now `0007` at width three. Changed downstream field ordering means later
 ordinal numbers are not identities. Full saved-media and native audio
 validation remain separate requirements.
 
+The corrected-core full `bootrecac` recording completes successfully and
+passes resident-memory comparison (48,261 program and 3,656 data words)
+and converted-input checks. Its independently serialized NAND SHA256 is
+`6801c3b7ca072cae90c99aa0ec131d0ab9bd6a344dd77294049cc339396e413b`;
+independent volume extraction yields 143,680-byte `TEST`, SHA256
+`4ba59580f8bf50b8d45d7a62d8ddf42ea94dfb7d884ff05b5092e7c13141470d`.
+These identify the post-DST-fix recording, not a decoded-audio oracle.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a
