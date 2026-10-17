@@ -8,9 +8,19 @@ from tools.run_c54x_rom4_crc import ENCODER_PASS, ENCODER_COMPLETE, ENCODER_COMP
 from tools.run_c54x_rom4_crc import PCM_MUTE_PASS
 from tools.run_c54x_rom4_crc import DECODER_REPLAY, ENCODER_REPLAY
 from tools.run_c54x_rom4_crc import file_identity
+from tools.run_c54x_rom4_crc import EFR_CRC_PASS, EFR_CRC_COMPLETE
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_crc_completion(self):
+        text = EFR_CRC_PASS + "\n" + EFR_CRC_COMPLETE
+        check_result(text, 3, efr_crc=True)
+        for invalid in (text.replace("cases=554", "cases=0"),
+                        text.replace(EFR_CRC_PASS, EFR_CRC_PASS + "\n" + EFR_CRC_PASS),
+                        text.replace(EFR_CRC_PASS, FR_PASS)):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_crc=True)
+
     def test_file_identity_tracks_actual_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "input.bin"

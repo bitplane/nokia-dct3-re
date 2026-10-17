@@ -15891,6 +15891,12 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "efr-crc"))
+		{
+			start_rom4_efr_crc(0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "fr-encoder"))
 		{
 			start_rom4_fr_encoder(0, 0);
@@ -16386,6 +16392,68 @@ private:
 			}
 		}
 		return serial;
+	}
+
+	static u8 rom4_efr_parameters(unsigned vector, u16 (&parameters)[57])
+	{
+		// GSM 06.60 parameter order, independent of the acquired descriptor tables.
+		static constexpr unsigned widths[] = {7,8,9,8,6,
+			9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5,
+			9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5};
+		static constexpr unsigned protected_bits[] = {
+			39,40,41,42,43,44,48,87,45,2,3,8,10,18,19,24,46,47,142,143,
+			144,145,146,147,92,93,195,196,98,137,148,94,197,149,150,95,198,
+			4,5,11,12,16,9,6,7,13,17,20,96,199,1,14,15,21,25,26,28,
+			151,201,190,240,88,138,191,241};
+		std::array<u8, 244> serial{};
+		u32 random = 0x9e3779b9U ^ vector;
+		unsigned position = 0;
+		for (unsigned p = 0; p < 57; ++p)
+		{
+			parameters[p] = 0;
+			for (unsigned bit = 0; bit < widths[p]; ++bit, ++position)
+			{
+				random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+				serial[position] = vector < 244 ? position == vector : vector == 244 ? 0 : random & 1;
+				parameters[p] = (parameters[p] << 1) | serial[position];
+			}
+		}
+		// TS 45.003 3.1.1.1: systematic division by x^8+x^4+x^3+x^2+1.
+		unsigned remainder = 0;
+		for (unsigned i = 0; i < 73; ++i)
+		{
+			remainder = (remainder << 1) | (i < 65 ? serial[protected_bits[i] - 1] : 0);
+			if (remainder & 0x100) remainder ^= 0x11d;
+		}
+		u8 result = 0;
+		for (unsigned bit = 0; bit < 8; ++bit) result = (result << 1) | BIT(remainder, bit);
+		return result;
+	}
+
+	void start_rom4_efr_crc(unsigned index)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const base = index & 1 ? 0x1600 : 0x1400;
+		u16 const output = base + 0x100;
+		u16 parameters[57];
+		rom4_efr_parameters(index / 2, parameters);
+		for (unsigned i = 0; i < 57; ++i) data.write_word(base + i, parameters[i]);
+		data.write_word(base - 1, 0x1357); data.write_word(base + 57, 0x2468);
+		data.write_word(output - 1, 0x89ab); data.write_word(output, 0xdead); data.write_word(output + 1, 0xcdef);
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0xc2f2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, output);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 300000 + index;
+		m_check_timer->adjust(attotime::from_msec(1));
 	}
 
 	void start_rom4_fr_packing(unsigned vector, unsigned stage)
@@ -45650,6 +45718,31 @@ private:
 			osd_printf_info("TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR encoder complete");
 		}
+		if (m_phase >= 300000 && m_phase < 300554)
+		{
+			unsigned const index = m_phase - 300000;
+			u16 const base = index & 1 ? 0x1600 : 0x1400;
+			u16 const output = base + 0x100;
+			u16 parameters[57];
+			u8 const expected = rom4_efr_parameters(index / 2, parameters);
+			if (data.read_word(output) != expected)
+				osd_printf_info("ROM4 EFR CRC mismatch: index=%u actual=%04x expected=%02x pc=%04x\n",
+					index, data.read_word(output), expected, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native EFR CRC returns to sentinel with balanced stack");
+			expect(data.read_word(output) == expected, "native EFR CRC matches independent polynomial division");
+			for (unsigned p = 0; p < 57; ++p)
+				expect(data.read_word(base + p) == parameters[p], "EFR CRC preserves speech parameters");
+			expect(data.read_word(base - 1) == 0x1357 && data.read_word(base + 57) == 0x2468 &&
+				data.read_word(output - 1) == 0x89ab && data.read_word(output + 1) == 0xcdef,
+				"EFR CRC preserves adjacent guards");
+			if (index < 553) { start_rom4_efr_crc(index + 1); return; }
+			osd_printf_info("TMS320C54x ROM4 EFR CRC: PASS cases=554 basis_bits=244 protected_bits=65 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR CRC complete");
+		}
 		if (m_phase >= 71000 && m_phase < 71879)
 		{
 			unsigned const vector = (m_phase - 71000) / 3;
@@ -47347,6 +47440,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(4, "fr-packing", "Isolated acquired ROM FR parameter round trip")
 	ROM_SYSTEM_BIOS(5, "fr-decoder", "Isolated acquired ROM FR decoder")
 	ROM_SYSTEM_BIOS(6, "fr-encoder", "Isolated acquired ROM FR encoder")
+	ROM_SYSTEM_BIOS(7, "efr-crc", "Isolated acquired ROM EFR CRC")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -47369,6 +47463,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(6))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(7))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -47391,6 +47488,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(6))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(7))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

@@ -1258,6 +1258,10 @@ check-c54x-rom4-crc-packed: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --packed
 
 .PHONY: check-c54x-rom4-fr-packing
+.PHONY: check-c54x-rom4-efr-crc
+check-c54x-rom4-efr-crc: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-crc
+
 check-c54x-rom4-fr-packing: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-packing
 

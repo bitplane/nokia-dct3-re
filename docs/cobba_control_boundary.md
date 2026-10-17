@@ -1649,7 +1649,8 @@ diagnoses parallel/serial-bus failure, but the reviewed public pages do not
 yet establish equivalent exposed data/strobe pads. Do not transfer NSE-1 test
 point numbers to NSE-8. Schematics or board continuity work are still needed
 before proposing a 3210 probe layout.
-# Bounded EFR table contract
+
+## Bounded EFR table and CRC contracts
 
 `tools/c54x_rom4_efr_tables.py` checks the acquired NSE-1 ROM4 data image
 independently against GSM parameter widths and CRC input positions:
@@ -1674,8 +1675,20 @@ native EFR encode/decode, a running handset codec, or an attached audio clock.
 
 Normative references: [GSM 06.60, table 6](https://www.etsi.org/deliver/etsi_en/301200_301299/301245/04.01.01_60/en_301245v040101p.pdf)
 for the 57 parameter widths, and [TS 45.003, section 3.1.1 and table 6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145003/08.02.00_60/ts_145003v080200p.pdf)
-for preliminary EFR coding and channel ordering. The next executable boundary
-is the acquired `c28f` packer / `c2b7` unpacker / `c2f2` CRC routine, using an
-independent normative bit-order and polynomial oracle rather than the ROM
-table as its own expected result.
+for preliminary EFR coding and channel ordering.
+
+`make check-c54x-rom4-efr-crc` executes the acquired `c2f2` CRC routine without
+replacing its instructions or its resident `2527` return hook. All 244 speech
+basis vectors, zero and 32 mixed vectors pass at two RAM locations (554 cases).
+The independent oracle performs systematic polynomial division using `0x11d`
+over the standard's 65 protected bits, then reverses the eight-bit remainder
+to match the native output representation. Every case checks balanced return,
+unchanged speech parameters and four adjacent guards. The runner records binary,
+source and input hashes in its isolated evidence directory.
+
+Acceptance also reruns FR packing, encoder and decoder with their complete
+frame-history replay checks. This proves the EFR CRC component, not EFR speech
+encoding/decoding, bad-frame policy, handset routing or audio. The next boundary
+is the acquired `c28f` packer / `c2b7` unpacker against an independent normative
+channel-order mapping; multiset descriptor coverage alone is insufficient.
 

@@ -23,6 +23,8 @@ ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR encoder complete"
 ENCODER_COMPARISON = "ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=0"
 ENCODER_REPLAY = "TMS320C54x ROM4 FR encoder replay: PASS frames=32 ram_words=65440 checkpoints=before_preprocessing reference_advance=once handset_audio_claim=0"
 PCM_MUTE_PASS = "TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0"
+EFR_CRC_PASS = "TMS320C54x ROM4 EFR CRC: PASS cases=554 basis_bits=244 protected_bits=65 handset_audio_claim=0"
+EFR_CRC_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR CRC complete"
 
 
 def file_identity(path):
@@ -32,9 +34,11 @@ def file_identity(path):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest}
 
 
-def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False):
+def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False):
     lines = text.splitlines()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
+    if efr_crc:
+        marker, complete = EFR_CRC_PASS, EFR_CRC_COMPLETE
     if fr_packing:
         marker, complete = FR_PASS, FR_COMPLETE
     if fr_decoder:
@@ -72,10 +76,13 @@ def main():
     mode.add_argument("--fr-packing", action="store_true", help="validate FR parameter packing, CRC and unpacking")
     mode.add_argument("--fr-decoder", action="store_true", help="compare native FR decoding against independent PCM")
     mode.add_argument("--fr-encoder", action="store_true", help="compare native FR encoding against independent parameters")
+    mode.add_argument("--efr-crc", action="store_true", help="compare native EFR CRC against normative polynomial division")
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
+    if args.efr_crc:
+        bios = "efr-crc"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
@@ -95,7 +102,7 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder)
+        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1
