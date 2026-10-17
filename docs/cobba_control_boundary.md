@@ -1379,6 +1379,14 @@ changes or new CPU source bits. The source-bit check allows asynchronous
 input delivery before inspecting IFR. It does not claim IFR clears on reset
 assertion rather than release.
 The mandatory marker is `C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0`.
+The same fixture requires a separate observation result: two receive-capable
+cases perform eight side-effect-disabled BDRR reads with ready-only and
+overrun states. These reads return the retained word without acknowledging
+either flag. Two saved overrun states survive CPU dispatch and restoration;
+four ordinary BDRR reads return that same word and clear ready/overrun.
+The runner requires the unique `C54x native backend BSP observation: PASS`
+marker with those exact counts, independently of the original vector/reset
+result. Debugger inspection must not consume a firmware-owned sample.
 This establishes completed-frame wiring, reset suppression and backend
 state restoration, not a production frame-clock caller, handset ISR,
 COBBA control interpretation or native audio. No physical clock is supplied

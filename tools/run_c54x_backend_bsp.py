@@ -6,6 +6,7 @@ import sys
 import tempfile
 
 MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0'
+OBSERVATION = 'C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 
 
@@ -13,6 +14,8 @@ def check_result(text, returncode):
     lines = text.splitlines()
     if returncode != 3 or lines.count(MARKER) != 1:
         raise ValueError('missing unique successful backend BSP completion')
+    if lines.count(OBSERVATION) != 1:
+        raise ValueError('missing unique nondestructive BDRR/overrun result')
     if not lines or lines[-1] != COMPLETION:
         raise ValueError('missing terminal backend BSP completion')
     if any(line.startswith('Fatal error:') and line != COMPLETION for line in lines):

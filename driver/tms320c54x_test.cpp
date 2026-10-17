@@ -46432,6 +46432,22 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
 				(m_case == 0 ? 0x10 : m_case == 1 ? 0x20 : 0x30), "backend ready edges reach IFR");
+			if (m_case != 1)
+			{
+				auto &data = m_cpu->space(AS_DATA);
+				for (unsigned overrun = 0; overrun < 2; ++overrun)
+				{
+					if (overrun) expect(!m_backend->codec_receive_frame(0x9abc), "unread BDRR rejects the overflowing sample");
+					u16 const control = data.read_word(0x0022);
+					expect((control & 0x2400) == (overrun ? 0x2400 : 0x0400), "receive-ready and overrun before observation");
+					{
+						auto const disable = machine().disable_side_effects();
+						expect(data.read_word(0x0020) == 0x5678 && data.read_word(0x0020) == 0x5678,
+							"debugger sees the retained receive word");
+					}
+					expect(data.read_word(0x0022) == control, "debugger BDRR reads preserve receive-ready and overrun");
+				}
+			}
 			m_saved.str(std::string());
 			m_saved.clear();
 			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save backend and pending CPU");
@@ -46443,7 +46459,12 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_case == 2 ? 0x20 : 0),
 				"backend vector and simultaneous receive priority");
 			if (m_case != 1)
-				expect(m_cpu->space(AS_DATA).read_word(0x0020) == 0x5678, "backend retained RX payload");
+			{
+				auto &data = m_cpu->space(AS_DATA);
+				expect((data.read_word(0x0022) & 0x2400) == 0x2400, "backend overrun and receive word survive dispatch and save/load");
+				expect(data.read_word(0x0020) == 0x5678, "backend retained RX payload");
+				expect(!(data.read_word(0x0022) & 0x2400), "ordinary BDRR read acknowledges receive-ready and overrun");
+			}
 			if (m_stage == 4)
 			{
 				m_saved.clear();
@@ -46477,6 +46498,7 @@ private:
 			if (++m_case == 3)
 			{
 				osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
+				osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
 				throw emu_fatalerror(0, "C54x backend BSP tests complete");
 			}
 			m_stage = 0;

@@ -251,7 +251,7 @@ u16 nokia_dsp_c54x_device::data_r(offs_t offset)
 {
 	const u16 address = offset;
 	if (address == 0x0020)
-		return m_bsp.receive_r();
+		return machine().side_effects_disabled() ? m_bsp.receive : m_bsp.receive_r();
 	if (address == 0x0021)
 		return m_bsp.transmit;
 	if (address == 0x0022)
