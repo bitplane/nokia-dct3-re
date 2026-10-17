@@ -10,19 +10,24 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
-storage and metadata transactions, but native playback remains silent.
-The current software frontier is native decoder instruction support:
-`f48c` at `025b14` stops the fail-closed staged core after polynomial and
-square-accumulate execution. Corrected pending-double-store forwarding
-removes the observed overwide encoder fields. Fresh transform observations
-account for 3,072 saved bytes; their first eight packets host-decode as
-eight frames with zero errors. This is captured native encoder output,
-not native decoder PCM. `POLY *AR2+` now executes three times and stores
-`68a90000`, independently reproduced from actual coefficient/T reads.
+storage and metadata transactions. Native playback now runs the full
+20-second observation with illegal=0, 375 first-session processing/publication
+calls and completed parent dispatch. It produces 1,597,627 nonzero words at
+both McBSP TX and codec DIN; actual DMA source reads remain in `1000..137f`.
+DMA/source-range checks pass, but numerical waveform agreement and exact
+DMA/TX/DIN pairing are unvalidated. The strict audio-completion gate remains
+rejecting. The frontier is candidate digital PCM validation, not a missing
+instruction observed within this run.
+
+Corrected pending-double-store forwarding removes the observed overwide
+encoder fields. Fresh transform observations account for 3,072 saved bytes;
+their first eight packets host-decode as eight frames with zero errors.
+This is captured native encoder output, not validation of native decoder PCM.
 See [recorded payload contracts](#recording-header-and-selected-windows).
-Continue without forcing counters, keys, lengths or file offsets. These
-bench results do not establish whole-handset boot, decoded music, analog
-audio or native speech.
+Next audit the remaining T-input multiplier categories and capture complete
+digital output for independent comparison. Continue without forcing counters,
+keys, lengths or file offsets. These bench results do not establish whole-handset
+boot, decoded music, analog audio or native speech.
 
 CPU admission remains fail-closed. In particular, short Smem MOD=3
 preincrement is write-only (SPRU131G table 5-4). The
@@ -7660,11 +7665,54 @@ address forms, RPT/interrupt composition or measured physical bus phases.
 
 Fourteen original AA99 words at `0260cd..0260da` pin the block-repeat
 setup and `0260d8: SQURA *AR2,A`; source mutation tests guard the extent.
-Native playback advances past that boundary, then stops at unsupported
-`f48c` at `025b14` (also present in the original AA99 upload). The complete
-20-second observation retains illegal=1 and zero nonzero DMA/TX/DIN samples;
-strict playback acceptance remains failing. Verify the new instruction's
-source and contract before extending support.
+Native playback advances past that boundary. The global playback frontier
+belongs in Current boundary above; source and dependency acceptance here
+must not be mistaken for complete decoder-output validation.
+
+The register forms `MPYA A/B` and `MACA[R]/MASA[R] T,src,dst` use signed
+A(32..16) and signed T, with FRCT, final OVM saturation and sticky target
+overflow. MACA/MASA additionally use the source accumulator, SMUL product
+saturation and optional rounding; MPYA does not apply that intermediate
+product clamp. Atomic and staged execution share one arithmetic helper.
+No data-memory transaction or T publication belongs to the product itself.
+
+SPRU131G 7.5.6/table 7-13 gives these multipliers zero T-producer latency:
+they are not the Category-I shift/bit-test consumers. Table 7-3's generic
+recommendation must not be turned into an old-T multiplier oracle. The
+partial staged model retains T after older Execute and before younger Read
+publication, then samples A and the source accumulator in Execute. Reading
+live T in Execute would instead risk consuming a following STM-to-T.
+The `mac-smem` profile requires 69,120 register-product cases/restores:
+18 opcodes, eight numeric patterns, 16 control settings, no producer,
+adjacent/separated STLM-to-T, an A producer and a younger STM-to-T,
+two pages and three snapshots. Checks cover initially clear/sticky overflow,
+one opcode fetch, no data reads, only the expected producer write and
+preservation of later T. Repeat/interrupt composition and physical phases
+are unvalidated. Nine AA99 words at `025b0d..025b15` pin the original
+T-producing caller and `025b14: MPYA A`, with per-word mutation tests.
+
+This closes the checked register bank, not every T consumer. The existing
+Smem MPY/MPYR/MPYU/MAC/MACR/MAS/MASR and POLY paths still need a
+consumer-category producer/successor audit. Immediate-T products also need
+that composition check; extension clocks alone are not a blanket proof.
+Keep the intentional short TS/NORM/bit-test restrictions separate rather
+than moving all T sampling to one common point. The unresolved predicate
+`c54x_remaining_t_multiplier_category_audit` names that bounded follow-up.
+
+With these register forms admitted, the preserved recording produces a
+complete 20-second legal run, not an unsupported-opcode stop. Observation
+checks report 1,631,772 actual channel-3 source reads (1,582,728 nonzero)
+within `1000..137f`, 1,661,065 TX words and 1,691,842 DIN words, with
+1,597,627 nonzero at each serial boundary. First-session method coverage
+has 375 body/publication/return paths and no early returns; parent coverage
+completes 11,956 wrapper/body/return paths and 5,978 dispatches. The selected
+AA99 range matches original source at 1,170 visited addresses and
+6,631,884 Execute entries, with no opcode changes. DMA and source-range
+checkers pass; the diagnostic still deliberately exits rejecting audio
+completion. These counters and four bounded nonzero words are not a
+waveform-quality or complete transport-pairing oracle. Capture a longer
+owned digital stream and compare independently decoded source before
+claiming native music; analog conversion and speech remain unproved.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

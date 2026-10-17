@@ -180,6 +180,7 @@ private:
 	void accumulator_memory_multiply(u16 op, u16 memory);
 	void polynomial_step(u16 memory, u16 t);
 	void square_accumulate_result(u16 word, u16 memory);
+	void register_product_result(u16 word, u16 t);
 	u64 memory_t_multiply(u16 op, u16 memory, u16 t, u64 source);
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "c54x_blanket_stlm_t_gap_for_register_products",
+      "status": "disproven",
+      "hypothesis": "The generic STLM-to-T recommendation makes an adjacent register MPYA/MACA/MASA consumer use old T, so every such multiplier needs a separating word",
+      "conclusion": "SPRU131G 7.5.6 and table 7-13 restrict the T hazard to the listed shift/bit-test and related Category-I consumers; other consumers have zero latency. Register MPYA and MACA/MASA are not Category I. An oracle derived only from table 7-3's conservative summary falsely accepted old T. The corrected adjacent-STLM fixture fails that implementation; retaining T after older Execute and before younger Read publication passes the 69120-case dependency bank. A following STM-to-T case prevents replacing this with a live Execute read. These are functional ordering checks, not measured silicon phases. Smem multiplier/POLY and other immediate T-input composition need their own category audit rather than inheriting either rule blindly.",
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "mu4_clear_adts_chain_is_plaintext_recording_oracle",
       "status": "disproven",
       "hypothesis": "The saved REL recording can be treated as plaintext AAC from its first clear ADTS sync, so the changed header at 1739 proves malformed native header packing",

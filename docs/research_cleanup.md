@@ -164,6 +164,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
   and repeat helpers can retain assumptions about the narrower family.
   Production and forwarded values should share one calculation where their
   contract is identical, with an executable producer/consumer test.
+- An executable oracle can preserve a mistaken latency premise. Derive
+  expectations from the instruction's consumer category, not only a conservative
+  summary: SPRU131G table 7-13 distinguishes T used for shifting/bit tests from
+  T used for multiplication. Include both an older producer and a younger writer
+  so a live-register shortcut cannot pass the dependency test.
 - Check fixture inputs against the documented domain before interpreting a
   mismatch. Circular addressing, for example, constrains the initial index
   and nonzero-buffer step size; an out-of-domain modulo oracle does not prove

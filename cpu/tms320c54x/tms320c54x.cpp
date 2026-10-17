@@ -67,6 +67,11 @@ constexpr bool square_accumulate(u16 word)
 	return (word & 0xfc00) == 0x3800;
 }
 
+constexpr bool register_product_form(u16 word)
+{
+	return (word & 0xfeff) == 0xf48c || (word & 0xfcfc) == 0xf488;
+}
+
 constexpr bool staged_pipelined_repeat(u16 word)
 {
 	return staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
@@ -2061,6 +2066,21 @@ void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
 	}
 }
 
+void tms320c54x_device::register_product_result(u16 word, u16 t)
+{
+	s64 product = s64(accumulator_high17(m_a)) * s16(t);
+	if (BIT(m_st1,6)) product *= 2;
+	s64 result = product;
+	if ((word & 0xfeff) != 0xf48c)
+	{
+		product = multiply_product(product);
+		u64 const source = accumulator(BIT(word,9));
+		result = (s64(source << 24) >> 24) + (BIT(word,1) ? -product : product);
+		if (BIT(word,0)) result = (result + 0x8000) & ~s64(0xffff);
+	}
+	accumulator(BIT(word,8)) = multiply_result(result, BIT(word,8));
+}
+
 void tms320c54x_device::square_accumulate_result(u16 word, u16 memory)
 {
 	// SPRU172C 4-163/4-164: signed square, no rounding or SMUL product clamp.
@@ -3075,9 +3095,9 @@ void tms320c54x_device::pipeline_step()
 		bool const direct_long_load = staged_dld(word);
 		bool const direct_long_store = staged_dst(word);
 		bool const long_arithmetic = staged_long_arithmetic(word);
-		// These one-word forms use only live accumulators in Execute; their
-		// existing arithmetic helpers fetch no operands and redirect no control flow.
-		bool const register_alu = staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
+		// Register forms fetch no data operands and redirect no control flow.
+		// Accumulators are Execute-owned; T/TS sampling has dedicated Read handlers.
+		bool const register_alu = register_product_form(word) || staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);
@@ -3819,8 +3839,8 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1400 || staged_ts_arithmetic(m_pipeline_word[4])))
 	{
-		// Like the multiplier's T input, TS belongs to Read before an
-		// older accumulator-to-T store can publish in Execute (table 7-3).
+		// TS belongs to Read. Table 7-13's Category-I restriction applies
+		// to short forms; extension clocks already separate long consumers.
 		m_pipeline_immediate[4] = m_t;
 		unsigned const code = m_t & 63;
 		if (staged_ts_arithmetic(m_pipeline_word[4]) && code >= 32 && code < 48)
@@ -3829,8 +3849,8 @@ void tms320c54x_device::pipeline_step()
 		}
 	}
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) && ((m_pipeline_word[4] & 0xf000) == 0x2000 || staged_poly(m_pipeline_word[4])))
-		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
-		// Read owns this input before the older store publishes in Execute.
+		// Legacy pre-Execute projection for Smem multiplier/POLY T inputs:
+		// table 7-13 category coverage is pending, unlike the register bank below.
 		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfeff) == 0xf066 || (m_pipeline_word[4] & 0xfcff) == 0xf067))
 		m_pipeline_operand[4] = m_t;
@@ -4214,6 +4234,8 @@ void tms320c54x_device::pipeline_step()
 			m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
 			if (m_op == 0x46f8) ++m_pc;
 		}
+		else if (register_product_form(m_op))
+			register_product_result(m_op, m_pipeline_operand[5]);
 		else if ((m_op & 0xfeff) == 0xf48d)
 		{
 			// SPRU172C 4-161: square A(32-16), not the signed 16-bit AH.
@@ -4624,6 +4646,11 @@ void tms320c54x_device::pipeline_step()
 			if (stage == 3) m_pipeline_operand_address[stage] = basic_address(stage, u8(word));
 		}
 	}
+	if (m_pipeline_valid[4] && register_product_form(m_pipeline_word[4]))
+		// SPRU131G 7.5.6/table 7-13: multiply is not a Category-I TS consumer.
+		// Retain T after older Execute but before younger Read publications;
+		// sampling live T in Execute could instead consume a following STM.
+		m_pipeline_operand[4] = m_t;
 	if (m_pipeline_valid[4] && staged_dual_multiply(m_pipeline_word[4]))
 		// MPY/MAC/MACSU load T in Read (SPRU172C 4-101/4-82/4-91). An older
 		// Execute write must not overwrite this younger publication.
@@ -4631,7 +4658,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
 	{
 		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
-		// T-based MPY/MAC/MAS retain their input before that older Execute.
+		// T-based Smem MPY/MAC/MAS input latency still needs a category audit.
 		if ((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]))
 			m_t = m_pipeline_operand[4];
 	}
@@ -5225,25 +5252,9 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
 		return;
 	}
-	if ((op & 0xfcfc) == 0xf488) // MACA[R]/MASA[R] T, source, destination
+	if (register_product_form(op)) // MPYA and MACA[R]/MASA[R] T, source, destination
 	{
-		s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
-		if (BIT(m_st1, 6))
-			product *= 2;
-		product = multiply_product(product);
-		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
-		s64 result = (s64(source << 24) >> 24) + (BIT(op, 1) ? -product : product);
-		if (BIT(op, 0))
-			result = (result + 0x8000) & ~s64(0xffff);
-		accumulator(BIT(op, 8)) = multiply_result(result, BIT(op, 8));
-		return;
-	}
-	if ((op & 0xfeff) == 0xf48c) // MPYA T, A/B
-	{
-		s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
-		if (BIT(m_st1, 6))
-			product *= 2;
-		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		register_product_result(op, m_t);
 		return;
 	}
 	if ((op & 0xfeff) == 0xf48e) // EXP A/B

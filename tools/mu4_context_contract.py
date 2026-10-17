@@ -22,6 +22,8 @@ BYTE_COUNT_BASE = 0x2AB09
 ESCAPE_STORE_BASE = 0x3BDB6
 POLY_CALLER_BASE = 0x260B3
 SQUARE_LOOP_BASE = 0x260CD
+REGISTER_PRODUCT_BASE = 0x25B0D
+REGISTER_PRODUCT_WITNESS = (0x1024,0xf010,0x0003,0x880e,0xf062,0x0010,0xf461,0xf48c,0x801d)
 SQUARE_LOOP_WITNESS = (0x771a,0x0002,0xf272,0x60ee,0x7715,0x1179,0x7714,0x1176,0xe800,0xa610,0xf451,0x3882,0x8294,0x8084)
 POLY_CALLER_WITNESS = (0x30f8,0x1170,0x7712,0xc22a,0x4492,0x4592,0xec02,0x3692,0x4ef8,0x1174)
 ESCAPE_STORE_WITNESS = (0x1106,0x08f8,0x000b,0xf843,0xbdd2,0xf640,0x10f8,0x0008,0x4e0a,0x560a,0x7002,0x0011,0x4e00)
@@ -215,6 +217,14 @@ def decode_square_loop(words):
     return {'entry':'0260cd', 'last_word':'0260da', 'pinned_words':14,
             'operation':'0260d8: SQURA *AR2,A',
             'scope':'Original RPTB setup and local square source; not full loop or execution acceptance'}
+
+
+def decode_register_product_caller(words):
+    if any(words.get(REGISTER_PRODUCT_BASE + offset) != word for offset, word in enumerate(REGISTER_PRODUCT_WITNESS)):
+        raise ValueError('AA99 accumulator/T product caller changed or absent')
+    return {'entry':'025b0d', 'last_word':'025b15', 'pinned_words':9,
+            'operation':'025b14: MPYA A',
+            'scope':'Original local source and T producer; not dynamic operand ownership or complete decoder acceptance'}
 
 
 def reference_poly_step(a, b, t, coefficient, st1):
@@ -1246,6 +1256,7 @@ def contract(source):
     result['byte_count_prefix'] = decode_byte_count_prefix(rel_words)
     result['playback_polynomial_caller'] = decode_poly_caller(rel_words)
     result['playback_square_loop'] = decode_square_loop(rel_words)
+    result['playback_register_product_caller'] = decode_register_product_caller(rel_words)
     result['processing_latch_gate'] = decode_service_gate(rel_words)
     result['post_publication_flag_branch'] = decode_post_flag_branch(rel_words)
     result['post_flag_context'] = decode_flag_context(rel_words)
