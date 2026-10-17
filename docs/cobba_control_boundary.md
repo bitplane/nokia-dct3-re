@@ -1707,7 +1707,26 @@ representation, balanced return and adjacent memory guards.
 
 The fixture explicitly selects ordinary speech (`09ba` bit 0 set). SID/DTX
 transformation, repetition-error combining policy, native EFR speech encoding
-and synthesis remain outside this result. The next EFR boundary is independent
-speech-codec reference acquisition and parameter/PCM comparison, not attaching
-a handset clock on the strength of packing acceptance.
+and synthesis remain outside this result. The next EFR boundary is native
+parameter/PCM comparison, not attaching a handset clock on the strength of
+packing acceptance.
+
+### Independent EFR speech reference
+
+The separately acquired ETSI source archive and its provenance live in
+`roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete
+archive hash before extracting to an isolated ignored run directory. The source
+is unmodified; GCC uses `-std=gnu89 -O2 -fwrapv -DWMOPS=0` to build its original
+makefile. All three installation outputs match their supplied byte streams:
+163 encoded frames (80,196 bytes), interface-converted frames (80,522 bytes),
+and 26,080 decoded samples (52,160 bytes). The input has 96 trailing samples
+which the original reference does not consume as a complete frame.
+
+Evidence records archive identity, commands, executable hashes and output
+hashes. The installation checks establish a usable external software oracle,
+not full GSM 06.54 conformance, native execution or handset sound. Do not copy
+the reference implementation into the MAME device/CPU sources or substitute an
+AMR codec on the assumption that its 12.2-kbit/s mode is identical. The next
+comparison must align native initialization, parameter order, postfilter and
+DTX/homing policy before interpreting a PCM mismatch as a CPU defect.
 

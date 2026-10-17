@@ -111,6 +111,26 @@ classify the actual local regions before using them as evidence. A future real
 DSP dump must be identified by product and hash and must not silently replace
 these placeholders in a test baseline.
 
+### External EFR reference input
+
+The ETSI EFR ANSI-C reference and installation vectors are separate research
+inputs, not MAME runtime code or handset ROMs. The locally acquired mirrored
+archive is retained at
+`roms/research/etsi-efr/original/ts_146053v080000p0.zip`, SHA-256
+`54f4bcba0fbcc3fe1e42e0fb8de2c7f8bb3ac811cf08f1db9b6e40d38c91894d`.
+Download provenance is [FreeCalypso's codec archive](https://www.freecalypso.org/pub/GSM/codecs/ts_146053v080000p0.zip);
+[ETSI TS 46.053](https://www.etsi.org/deliver/etsi_ts/146000_146099/146053/09.00.00_60/ts_146053v090000p.pdf)
+describes the reference distribution and installation checks. Direct ETSI
+archive retrieval was unavailable; the mirror hash is a local content pin,
+not a claimed publisher signature. Retain all original notices and keep source
+and speech vectors out of Git and the MAME overlay.
+
+`python3 tools/verify_etsi_efr_reference.py roms/research/etsi-efr/original/ts_146053v080000p0.zip`
+builds an isolated, unmodified extraction and compares encoder, interface and
+decoder output with the supplied installation vectors. It does not run the
+DSP or establish native EFR speech. See `docs/cobba_control_boundary.md` for
+the independent-reference acceptance boundary.
+
 ### Nokia 5110 DSP ROM4 research input
 
 A complete 5110 ROM4 DSP mask image was historically published by AlexD in

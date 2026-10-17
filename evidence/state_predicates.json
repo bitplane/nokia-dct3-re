@@ -590,6 +590,12 @@
       "evidence": ["docs/cobba_control_boundary.md", "driver/nokia_dsp_c54x.cpp", "tools/c54x_rom4_codec_contract.py", "tools/c54x_rom4_tone_observe.lua", "tools/run_c54x_rom4_tone_levels.py"]
     },
     {
+      "id": "external_etsi_efr_reference", "owner": "native_dsp_codec_validation", "status": "satisfied",
+      "predicate": "The independently acquired ETSI EFR ANSI-C reference reproduces its supplied installation vectors before serving as a native DSP comparison oracle",
+      "current": "The pinned ts_146053v080000p0.zip mirror archive builds without source edits using its original GCC makefile with gnu89, O2, fwrapv and WMOPS=0. All three generated outputs match the supplied expected bytes and independently pinned hashes: 80196 encoded bytes, 80522 interface bytes and 52160 decoded PCM bytes over 163 frames. The original input has 96 trailing samples unused by its full-frame loop. The isolated verifier retains commands, archive and executable identities, output hashes and terminal status. This is installation verification, not full GSM 06.54 conformance, native DSP execution, handset audio or a reference implementation imported into MAME.",
+      "evidence": ["roms/README.md", "docs/cobba_control_boundary.md", "tools/verify_etsi_efr_reference.py", "tools/test_verify_etsi_efr_reference.py"]
+    },
+    {
       "id": "native_rom4_efr_packing", "owner": "native_dsp_codec", "status": "satisfied",
       "predicate": "The acquired NSE-1 ROM4 ordinary-speech EFR packer and unpacker match independent normative ordering and reject protected-bit corruption",
       "current": "All 272 descriptors match GSM preliminary coding and the complete TS 45.003 channel-importance ordering through a separately expressed native storage permutation. Native c28f packs all 244 speech basis inputs, zero and 32 mixed vectors into seventeen independently expected words. Native c2b7 reconstructs separately generated clean normative frames with result zero; flipping packed d30/s24 changes its parameter bit and returns CRC failure one in all 277 vectors. All 831 stages preserve adjacent guards and balance their return stack. Ordinary speech is explicit through 09ba bit 0. SID/DTX, repetition-error combining, EFR speech encode/synthesis and handset audio remain unproved. Existing EFR CRC and FR packing/codec/full-RAM replay gates pass.",
