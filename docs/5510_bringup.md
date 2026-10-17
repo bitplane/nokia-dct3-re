@@ -26,10 +26,13 @@ This is captured native encoder output, not validation of native decoder PCM.
 See [recorded payload contracts](#recording-header-and-selected-windows).
 Complete observed word captures preserve the digital baseline. Checked
 T-input dependency banks now cover each admitted multiplier family within
-the domains below, without changing those native captures. Next preserve
-the codec DIN callback's existing channel metadata across clock/reset epochs
-before comparing framed output with independently decoded source; raw word
-index parity alone is not framing evidence. Continue without forcing counters,
+the domains below, without changing those native captures. Codec callback
+metadata establishes uninterrupted slot pairs and cadence across CPU clock
+changes. A first-signal comparison with eight independently decoded AAC
+packets does not match, but packet-to-PCM-frame ownership is not established.
+Next bind the decoder's output blocks to those source packets before
+diagnosing arithmetic; do not choose a lag or channel swap to improve a fit.
+Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -7758,6 +7761,13 @@ phase or analog audio. Output is fresh-run only: file handles are not
 save-state artifacts, and restored capture integrity is unsupported.
 `tools/mu4_playback_capture_check.py RUN_DIR` verifies byte/word counts,
 observed word hashes, nonzero counts and the existing strict DMA observation.
+New captures also write `mu4_playback_din.slots`: one packed nine-byte record
+per DIN word, little-endian unsigned 64-bit emulated nanoseconds followed by
+the callback's actual slot byte (0 or 1). This observes the existing callback,
+not extra guest reads or a changed serial clock. `--require-framing` requires
+its terminal record, count and raw-byte FNV hash; legacy word-only captures
+remain explicitly identified as lacking slot evidence. File save/restore is
+unsupported for both outputs.
 
 The capture-enabled run reproduces all six previous execution/audio/DMA/
 method/parent summaries byte-for-byte. Its complete stream identities are:
@@ -7771,12 +7781,48 @@ method/parent summaries byte-for-byte. Its complete stream identities are:
 Chronological first-nonzero anchors, checked over 64 words, give initial
 DMA-to-TX offset 92 and TX-to-DIN offset 367. The first 783,116 and 783,208
 overlapping words respectively match exactly, including zero words.
-Thereafter a single-offset comparison diverges; reset/framing/direct-write
-epochs must be evidenced before interpreting that divergence as a transport
+Thereafter a single-offset comparison diverges. The codec sidecar now rules
+out a DIN slot discontinuity during this window; source/TX reset and direct
+write epochs still need alignment before calling the divergence a transport
 defect. The checker reports the complete mismatch extent, not a best-fit
 realignment, and never promotes integrity or overlap to decoded-audio
-acceptance. Use these owned streams for numerical comparison and the pending
-T-input audit; nonzero output alone does not establish native music.
+acceptance.
+
+The sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
+`311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa`.
+It begins at slot 0, yields 845,921 complete pairs, and has zero orphan
+words or slot discontinuities. Pair spacing is 1,333/1,334 ns and frame
+spacing 22,675/22,676 ns, consistent with the modeled 44.1 kHz clock.
+CPU clock changes do not interrupt that cadence. All three word files and
+the six existing terminal summaries remain byte-identical to the baseline.
+
+#### Independent Reference Comparison
+
+The first 2,977 captured plaintext bytes form eight host-valid AAC packets,
+SHA256 `3f0a2b7eafb22ede5b3e3f1bb54c83f2f959386bedd897ebebf218e6fb816ff4`.
+FFmpeg decodes eight AAC frames at 44.1 kHz without errors, producing
+8,192 signed stereo sample frames, SHA256
+`440e479020b5e558b9aa792adc14af8bb4974f30898cba57f3189ac1434f8993`.
+The regenerated host output matches the earlier reference byte-for-byte.
+It is analysis output, never media supplied back to the emulation.
+
+```sh
+ffmpeg -v error -i captured-eight-packets.aac -map 0:a:0 \
+  -c:a pcm_s16le -f s16le host-eight-frames.s16le
+python3 tools/mu4_playback_capture_check.py RUN_DIR --require-framing \
+  --reference-pcm host-eight-frames.s16le --reference-rate 44100
+```
+
+The fixed diagnostic anchor is the first nonzero complete frame on each
+side: reference frame 1,472 and native frame 10,725 (word 21,450).
+All 6,720 remaining reference frames compare without a cadence break.
+Direct slot/channel correlations are 0.032 and 0.017; error RMS is about
+8,052 and 6,146 respectively. Cross-channel correlations are also reported,
+not selected as a mapping (maximum 0.226). There is no fitted lag, scaling,
+permutation or acceptance threshold. This is not a native decode match,
+but the anchor does not establish AAC-packet/output-frame identity either.
+The next question is which decoder output block belongs to the captured
+source packets, not another guessed serial phase or unsupported opcode.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

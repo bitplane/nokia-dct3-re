@@ -307,7 +307,11 @@ public:
 		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set(FUNC(mu4_storage_test_state::converted_adc));
 		subdevice<tlv320aic23_device>("codec")->dout_cb().set([this](int state) { m_mcbsp0->rx_data_w(state); });
 		subdevice<tlv320aic23_device>("codec")->din_word_cb().set([this](offs_t channel, u16 value) {
-			if (playback_profile() && m_playback_overlay_checked) observe_playback_audio(value, true);
+			if (playback_profile() && m_playback_overlay_checked)
+			{
+				capture_playback_slot(channel);
+				observe_playback_audio(value, true);
+			}
 			if (m_phase == 30 && system_bios() == 20 && m_stream_words)
 			{
 				if (!m_continuous_tx_count) fatalerror("MU4 codec DIN word has no observed transmitter word");
@@ -433,6 +437,8 @@ private:
 	std::array<u32, 2> m_playback_audio_hash{2166136261U, 2166136261U};
 	// Observation-only streams are deliberately not save-state outputs.
 	std::array<std::ofstream, 3> m_playback_word_capture;
+	std::ofstream m_playback_slot_capture;
+	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
 	std::array<u32, 3> m_playback_filter{};
@@ -883,6 +889,17 @@ private:
 		char const bytes[2]{char(value & 0xff), char(value >> 8)};
 		m_playback_word_capture[boundary].write(bytes, sizeof(bytes));
 	}
+	void capture_playback_slot(unsigned slot)
+	{
+		if (slot > 1) fatalerror("MU4 playback observation received an invalid codec slot");
+		// Keep actual callback framing/time; stream-index parity is not a slot oracle.
+		u64 const ns = machine().time().as_ticks(1'000'000'000);
+		char bytes[9];
+		for (unsigned i=0;i<8;++i) bytes[i] = char(ns >> (8*i));
+		bytes[8] = char(slot);
+		m_playback_slot_capture.write(bytes,sizeof(bytes));
+		for (char byte : bytes) m_playback_slot_hash = (m_playback_slot_hash ^ u8(byte)) * 16777619U;
+	}
 	void finish_playback_capture()
 	{
 		std::array<u32,3> const counts{m_playback_audio_words[0],m_playback_audio_words[1],m_playback_dma_reads};
@@ -894,6 +911,10 @@ private:
 			logerror("mu4_playback_word_capture: boundary=%s words=%u bytes=%u hash=%08x encoding=le16 file=%s save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 				std::array<char const *,3>{"mcbsp_tx","codec_din","dma_source"}[i],counts[i],counts[i]*2,hashes[i],PLAYBACK_CAPTURE_FILES[i]);
 		}
+		m_playback_slot_capture.flush(); auto const slot_bytes=m_playback_slot_capture.tellp(); m_playback_slot_capture.close();
+		if (!m_playback_slot_capture || slot_bytes != std::streamoff(counts[1])*9) fatalerror("MU4 playback slot observation is incomplete");
+		logerror("mu4_playback_slot_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u8slot file=mu4_playback_din.slots save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+			counts[1],counts[1]*9,m_playback_slot_hash);
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -2203,6 +2224,7 @@ private:
 			save_item(NAME(m_playback_audio_last_nonzero));
 			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
 			save_item(NAME(m_playback_dma_reads)); save_item(NAME(m_playback_dma_nonzero)); save_item(NAME(m_playback_dma_hash));
+			save_item(NAME(m_playback_slot_hash));
 			save_item(NAME(m_playback_parent)); save_item(NAME(m_playback_parent_mismatch));
 			save_item(NAME(m_playback_switch_samples));
 			save_item(NAME(m_playback_enqueue_samples));
@@ -2428,6 +2450,7 @@ private:
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
 		m_playback_dma_hash = 2166136261U;
+		m_playback_slot_hash = 2166136261U;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
@@ -2436,6 +2459,13 @@ private:
 			if (!playback_profile()) continue;
 			stream.open(PLAYBACK_CAPTURE_FILES[i],std::ios::binary|std::ios::trunc);
 			if (!stream) fatalerror("MU4 playback observation capture could not be opened");
+		}
+		if (m_playback_slot_capture.is_open()) m_playback_slot_capture.close();
+		m_playback_slot_capture.clear();
+		if (playback_profile())
+		{
+			m_playback_slot_capture.open("mu4_playback_din.slots",std::ios::binary|std::ios::trunc);
+			if (!m_playback_slot_capture) fatalerror("MU4 playback slot observation could not be opened");
 		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;

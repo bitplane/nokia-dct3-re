@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_codec_slot_capture_integrity",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "The fresh native DIN capture preserves each modeled codec callback's slot identity and emulated timestamp without changing execution or word streams",
+      "current": "The sidecar has 1691842 records of LE64 nanoseconds plus one slot byte (15226578 bytes), raw-byte FNV1a b434d997 and SHA256 311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa. It starts at slot zero and contains 845921 adjacent zero/one pairs, no orphan words and no slot discontinuities. Pair intervals are 1333/1334 ns and frame intervals 22675/22676 ns, including through the CPU clock changes. All three complete DMA/TX/DIN files and six prior terminal summaries are byte-identical to the baseline. The strict checker validates encoding, counts, hashes, slot domain and monotonic time; tests include truncation, corruption, duplicate rows, repeated slots, orphan handling and cadence breaks. Legacy captures remain explicitly unframed; --require-framing rejects absent metadata. The observation reads no guest memory or codec registers and changes no serial input. This validates modeled callback metadata, not packet identity, decoded waveform, analog output, native speech or save/restored captures.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "driver/tlv320aic23.cpp", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py"]
+    },
+    {
+      "id": "mu4_native_decoded_frame_binding",
+      "owner": "mu4_native_dsp",
+      "status": "unresolved",
+      "predicate": "Native decoder output blocks are bound to independently decoded source AAC packets before waveform acceptance",
+      "current": "The first 2977 captured plaintext bytes, SHA256 3f0a2b7eafb22ede5b3e3f1bb54c83f2f959386bedd897ebebf218e6fb816ff4, host-decode without errors as eight AAC frames at 44100 Hz stereo. The regenerated 8192-frame signed LE16 reference has SHA256 440e479020b5e558b9aa792adc14af8bb4974f30898cba57f3189ac1434f8993. Actual codec slot metadata establishes complete native pairs. A fixed first-nonzero-frame anchor compares reference frame 1472 with native frame 10725 across 6720 frames without a cadence break; direct slot/channel correlations are 0.032/0.017 and error RMS about 8052/6146. Cross-channel correlations peak at 0.226 but are not selected as a permutation. There is no lag search, scaling, fitted mapping or audio acceptance. These results do not establish which source packet/native output block the anchor represents; map the actual decoder input/output ownership before attributing the mismatch to arithmetic or serial transport. Host reference bytes are analysis outputs, never emulated inputs.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py", "tools/mu4_recorder_transform_check.py", "driver/mu4_storage_test.cpp"]
+    },
+    {
       "id": "c54x_poly_immediate_extended_t_dependencies",
       "owner": "c54x_cpu",
       "status": "satisfied",
@@ -23,7 +39,7 @@
       "owner": "mu4_native_dsp",
       "status": "satisfied",
       "predicate": "Fresh-run DMA-source, McBSP TX and codec DIN word captures preserve complete observed boundary streams without changing playback behavior",
-      "current": "The capture-enabled twenty-second run preserves all six pre-capture execution/audio/DMA/result/method/parent summary lines exactly. Byte counts, word counts, observed hashes and nonzero counts validate for all three raw LE16 streams. DMA: 1631772 words, SHA256 8f5e1d8747255bb57e292a3ef94b8ed76f78edf78a3848cb0d8877c15c888f2d. TX: 1661065 words, SHA256 94a5e4051568b835c517bb0afc18ea0a73d9fded2445f6cdf5913f8aafd69856. DIN: 1691842 words, SHA256 4920330a91055729cd37bcaa31abea23f8d1d78844c13aad874e19fe878b89df. Capture reads no extra guest memory and writes no input back; DMA ownership comes from the existing active-source-read API. Chronological first-nonzero anchors agree for 64 words: initial offsets are 92 DMA-to-TX and 367 TX-to-DIN, with exact prefixes of 783116 and 783208 words. A whole-run single-offset comparison later diverges; framing/reset/direct-write epochs remain unresolved, not proved defective. Files are observation outputs, not save-state artifacts or established stereo PCM. Integrity and initial overlap do not prove waveform quality, whole-run transport pairing, analog audio or native speech.",
+      "current": "The capture-enabled twenty-second run preserves all six pre-capture execution/audio/DMA/result/method/parent summary lines exactly. Byte counts, word counts, observed hashes and nonzero counts validate for all three raw LE16 streams. DMA: 1631772 words, SHA256 8f5e1d8747255bb57e292a3ef94b8ed76f78edf78a3848cb0d8877c15c888f2d. TX: 1661065 words, SHA256 94a5e4051568b835c517bb0afc18ea0a73d9fded2445f6cdf5913f8aafd69856. DIN: 1691842 words, SHA256 4920330a91055729cd37bcaa31abea23f8d1d78844c13aad874e19fe878b89df. Capture reads no extra guest memory and writes no input back; DMA ownership comes from the existing active-source-read API. Chronological first-nonzero anchors agree for 64 words: initial offsets are 92 DMA-to-TX and 367 TX-to-DIN, with exact prefixes of 783116 and 783208 words. A whole-run single-offset comparison later diverges. The independently checked codec sidecar now rules out DIN slot/cadence discontinuity in this window; source/TX reset and direct-write epochs remain unaligned, not proved defective. Files are observation outputs, not save-state artifacts or established decoded PCM. Integrity and initial overlap do not prove waveform quality, whole-run transport pairing, analog audio or native speech.",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py", "tools/noki5510_bootstrap_check.py"]
     },
     {

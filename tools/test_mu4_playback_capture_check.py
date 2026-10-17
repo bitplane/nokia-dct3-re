@@ -6,11 +6,24 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.mu4_playback_capture_check import (
-    FILES, compare_streams, parse_rows, validate_stream, verify,
+    FILES, SLOT_FILE, compare_reference, compare_streams, framed_words,
+    parse_rows, parse_slot_row, validate_slots, validate_stream, verify,
 )
 
 
 class PlaybackCaptureTests(unittest.TestCase):
+    @staticmethod
+    def slots(records):
+        payload = b''.join(struct.pack('<QB',*record) for record in records)
+        fingerprint = 2166136261
+        for byte in payload:
+            fingerprint = ((fingerprint ^ byte)*16777619) & 0xffffffff
+        row = {'records':len(records),'bytes':len(payload),'hash':f'{fingerprint:08x}'}
+        text = (f'mu4_playback_slot_capture: records={len(records)} bytes={len(payload)} '
+                f'fnv1a={fingerprint:08x} encoding=le64ns_u8slot file={SLOT_FILE} '
+                'save_restore=unsupported observer_writes=0 audio_acceptance=0')
+        return payload,row,text
+
     @staticmethod
     def stream(words):
         payload = struct.pack('<'+'H'*len(words),*words)
@@ -60,6 +73,80 @@ class PlaybackCaptureTests(unittest.TestCase):
             with self.subTest(bad=bad),self.assertRaises(ValueError):
                 parse_rows(bad)
 
+    def test_slot_rows_are_strict_but_legacy_absence_is_explicit(self):
+        _,row,text = self.slots([(10,0),(20,1)])
+        self.assertEqual(parse_slot_row('[:] '+text,True),row)
+        self.assertIsNone(parse_slot_row('legacy capture'))
+        for bad in ('',text+'\n'+text,text+' extra',
+                    text.replace(SLOT_FILE,'other.slots'),
+                    text.replace('le64ns_u8slot','native_endian'),
+                    text.replace('observer_writes=0','observer_writes=1'),
+                    text.replace('audio_acceptance=0','audio_acceptance=1')):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                parse_slot_row(bad,True)
+
+    def test_slot_metadata_validates_time_domain_hash_and_counts(self):
+        data,row,_ = self.slots([(100,0),(110,1),(200,0),(210,1)])
+        result = validate_slots(row,data,4)
+        self.assertEqual(result['observed_frame_pairs'],2)
+        self.assertEqual(result['orphan_words'],0)
+        self.assertEqual(result['pair_interval_ns'],{10:2})
+        self.assertEqual(result['frame_interval_ns'],{100:1})
+        for bad in (data[:-1],data+b'\0',data[:-1]+b'\0'):
+            with self.assertRaises(ValueError):
+                validate_slots(row,bad,4)
+        with self.assertRaises(ValueError):
+            validate_slots(row,data,3)
+        for records in ([(10,0),(10,1)],[(10,0),(9,1)],[(10,0),(20,2)]):
+            bad,changed,_ = self.slots(records)
+            with self.assertRaises(ValueError):
+                validate_slots(changed,bad,2)
+
+    def test_slot_discontinuities_and_orphans_are_not_hidden_by_parity(self):
+        data,row,_ = self.slots([(10,1),(20,0),(30,0),(40,1),(50,0)])
+        result = validate_slots(row,data,5)
+        self.assertEqual(result['observed_frame_pairs'],1)
+        self.assertEqual(result['orphan_words'],3)
+        self.assertEqual(result['slot_discontinuities'],1)
+        self.assertEqual(list(framed_words([1,2,3,4,5],data)),[(2,30,(3,4))])
+        with self.assertRaises(ValueError):
+            list(framed_words([1,2],data))
+
+    def test_reference_comparison_uses_slots_and_does_not_select_a_channel_swap(self):
+        pairs = [(0,0),(10,-20),(30,-40),(50,-60)]
+        records = [(500_000,1)]
+        words = [0]
+        for i,pair in enumerate(pairs):
+            records.extend([(1_000_000+i*1_000_000,0),(1_000_100+i*1_000_000,1)])
+            words.extend(value & 0xffff for value in pair)
+        data,_,_ = self.slots(records)
+        reference = struct.pack('<8h',*(value for pair in pairs for value in pair))
+        result = compare_reference(words,data,reference,1000)
+        self.assertEqual(result['compared_frames'],3)
+        self.assertEqual(result['native_first_nonzero_frame']['word_index'],3)
+        self.assertEqual(result['reference_first_nonzero_frame'],1)
+        for channel in (0,1):
+            self.assertEqual(result['metrics'][f'slot_{channel}_reference_{channel}']['mismatched_samples'],0)
+        self.assertEqual(result['metrics']['slot_0_reference_1']['mismatched_samples'],3)
+        self.assertFalse(result['packet_frame_alignment_validated'])
+        self.assertFalse(result['native_audio_validated'])
+        swapped = struct.pack('<8h',*(value for pair in pairs for value in pair[::-1]))
+        result = compare_reference(words,data,swapped,1000)
+        self.assertEqual(result['metrics']['slot_0_reference_1']['mismatched_samples'],0)
+        self.assertEqual(result['metrics']['slot_0_reference_0']['mismatched_samples'],3)
+        self.assertFalse(result['native_audio_validated'])
+
+    def test_reference_comparison_stops_at_cadence_break_without_searching(self):
+        records = [(100,0),(110,1),(1_000_100,0),(1_000_110,1),
+                   (3_000_100,0),(3_000_110,1)]
+        data,_,_ = self.slots(records)
+        result = compare_reference([1,2,3,4,5,6],data,struct.pack('<6h',1,2,3,4,5,6),1000)
+        self.assertEqual(result['compared_frames'],2)
+        self.assertEqual(result['window_stop'],'native_cadence_discontinuity')
+        for rate,reference in ((0,b'\0'*8),(1000,b'\0'*8),(1000,b'\0'*7)):
+            with self.assertRaises(ValueError):
+                compare_reference([1,2,3,4,5,6],data,reference,rate)
+
     def test_first_nonzero_alignment_checks_all_overlap_and_extras(self):
         source = array('H',[0,0,1,2,3,4,5,6])
         sink = array('H',[0,0,0,0,1,2,3,4,5,6,0])
@@ -106,6 +193,19 @@ class PlaybackCaptureTests(unittest.TestCase):
                 checked.assert_called_once_with(text)
                 self.assertTrue(report['capture_integrity_validated'])
                 self.assertFalse(report['native_audio_validated'])
+                self.assertFalse(report['codec_slots']['capture_integrity_validated'])
+                with self.assertRaises(ValueError):
+                    verify(text,root,require_framing=True)
+                slots,_,slot_text = self.slots([(10,0),(20,1),(30,0),(40,1)])
+                (root/SLOT_FILE).write_bytes(slots)
+                report = verify(text+'\n'+slot_text,root,require_framing=True)
+                self.assertTrue(report['codec_slots']['capture_integrity_validated'])
+                report = verify(text+'\n'+slot_text,root,reference=payload,reference_rate=50_000_000)
+                self.assertEqual(report['reference_comparison']['compared_frames'],2)
+                self.assertFalse(report['native_audio_validated'])
+                (root/SLOT_FILE).write_bytes(slots[:-1])
+                with self.assertRaises(ValueError):
+                    verify(text+'\n'+slot_text,root,require_framing=True)
             with patch('tools.mu4_playback_capture_check.verify_playback_dma',side_effect=ValueError('illegal')):
                 with self.assertRaises(ValueError):
                     verify(text,root)
