@@ -1000,6 +1000,51 @@ from a peripheral sampling clock before adding either buffering or a
 GSM waveform adapter. Codec serial PCM timing is a separate bus contract
 and must not be reused for RF samples.
 
+The current 30-second zero-input gate attributes all 648,032 reads to
+sixteen instruction sites in four resident families. The static census
+requires the complete port-27 reader set and each `PORTR` destination;
+runtime attribution additionally requires XPC zero and the corresponding
+advanced PCs (instruction address plus two). This covers the acquired
+resident image and this execution, not unseen uploaded/computed readers.
+
+| Family | Instruction starts | Reads | Reads with port-3 bit 0 clear |
+| --- | --- | ---: | ---: |
+| Initial filter | `3249,324f,3255,325b` | 372,160 | 81,920 |
+| Unfiltered circular history | `32cd,32d0,32d3,32d6` | 242,144 | 0 |
+| Scan filter | `330a,3310,3316,331c` | 32,768 | 32,064 |
+| Capture filter | `33c9,33cf,33d5,33db` | 960 | 160 |
+
+The passive observer latches port-3 writes, observes ordinary mode RAM
+and counts every input read. It does not read I/O to obtain a control
+value or feed mode RAM back into the emulator. Its 64 buckets preserve
+raw mode/control values and first/last timestamps. All four instructions
+within each family must have identical mode/control/count partitions;
+histogram totals must equal the independent backend read count. The
+checker rejects unclassified pages/sites, missing or duplicated buckets,
+partial runs and changed family/control-clear totals. Its JSON report
+retains the mode/control partitions without assigning application names.
+
+In particular, 114,144 reads occur with bit 0 clear. Capture-filter reads
+under control `0104` continue in the observed 1.682--1.700 s interval;
+scan-filter reads under control zero continue from about 1.820 to 6.436 s.
+Suppressing all INT0 delivery or sample reads with that bit alone would
+remove these observed paths under the current frame-clock model. This is
+not independent proof that physical hardware produces fresh post-clear
+samples: the frame model, FIFO draining and stale/empty reads remain open.
+Do not promote a universal gate from this emulator-only observation.
+The external emulator's faster receive-block schedule remains a hypothesis
+for a distinct hardware source, not a license to read firmware mode RAM
+to choose an interrupt period. A FIFO/ADC-ready producer and its clock
+must be established separately from the already modeled frame-wrap source.
+
+`make check-c54x-rom4-processing KEEP_NATIVE_EVIDENCE=1` retains the
+fresh own-profile run and `rf_consumers.json`; omit the retention option
+for normal disposable acceptance runs. The consumer checker also accepts
+`--program`, `--log` and `--output` for independently retained captures.
+No physical sample rate, I/Q lane, scaling or acquisition follows from
+this census. The bounded cadence observations below are earlier controls,
+not replacements for this full-run ownership accounting.
+
 The cold zero and tone controls independently capture the first 64
 port-`27` reads at advanced PCs `324b,3251,3257,325d`. Each initial
 32-word group spans approximately 4.788 microseconds, with group starts
