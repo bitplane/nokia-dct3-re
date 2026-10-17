@@ -7,13 +7,83 @@ import struct
 import sys
 
 if __package__:
+    from .mu4_context_contract import reference_refill_completion
     from .mu4_playback_frame_check import rows
     from .mu4_recorder_media_inventory import adts_inventory
 else:
+    from mu4_context_contract import reference_refill_completion
     from mu4_playback_frame_check import rows
     from mu4_recorder_media_inventory import adts_inventory
 
 FIRST, WORDS = 0x80, 0xff80
+
+
+def check_completions(text):
+    scopes = rows(text, 'mu4_refill_completion_scope')
+    events = rows(text, 'mu4_refill_completion')
+    ends = rows(text, 'mu4_refill_completion_terminal')
+    stops = rows(text, 'mu4_refill_completion_stop')
+    parents = rows(text, 'mu4_playback_parent_terminal')
+    if (len(scopes) != 1 or scopes[0] != {'identity': 'debugger_Execute_hook',
+            'operands': 'context_only', 'observer_writes': '0', 'audio_acceptance': '0'}
+            or any(len(items) != 1 for items in (ends, stops, parents))):
+        raise ValueError('incomplete completion scope/terminal')
+    end, stop, parent = ends[0], stops[0], parents[0]
+    if (not 0 < len(events) == int(end['events']) < int(end['cap'])
+            or end['audio_acceptance'] != '0' or stop['audio_acceptance'] != '0'
+            or stop['illegal'] != '0' or float(stop['t']) < 9.86
+            or any(parent.get(key) != value for key, value in {'illegal': '0',
+                'first_session_complete': '1', 'overlay_verified': '1', 'opcode_mismatch': '0'}.items())):
+        raise ValueError('capped or unfinished completion session')
+    overlay = 'mu4_native_playback_overlay: PASS marker=aa99 records=3127 words=49843 checked_ram_words=49839 excluded_register_words=4 before_execution=1'
+    residents = [line for line in text.splitlines() if 'mu4_playback_execute_entry: address=026d62' in line]
+    if (text.count(overlay) != 1 or len(residents) < 2
+            or not text.index(residents[0]) < text.index('mu4_refill_completion:')
+            or text.index(overlay) > text.index('mu4_refill_completion:')
+            or text.rindex('mu4_refill_completion:') > text.index(residents[1])):
+        raise ValueError('completion outside verified first AA99 session')
+    pending, previous, handled, inactive = None, -1, 0, 0
+    controls, counts = [], []
+    addresses = {'entry': '020862', 'updated': '020893', 'control19': '0207ea'}
+    for index, event in enumerate(events, 1):
+        kind, cycles = event['kind'], int(event['cycles'])
+        if (int(event['ordinal']) != index or cycles <= previous or addresses.get(kind) != event['address']
+                or event.get('identity') != 'debugger_Execute_hook' or event.get('operands') != 'context_only'):
+            raise ValueError('completion identity/order mismatch')
+        previous = cycles
+        for key in ('pending', 'supplied', 'target', 'field6'):
+            if not 0 <= int(event[key], 16) <= 0xffff:
+                raise ValueError('completion context outside word domain')
+        if not 0x80 <= int(event['target'], 16) <= 0xfff9:
+            raise ValueError('completion object outside RAM scope')
+        if kind == 'entry':
+            if pending is not None:
+                raise ValueError('overlapping completion entries')
+            if int(event['pending'], 16):
+                pending = event
+            else:
+                inactive += 1
+        elif kind == 'updated':
+            if pending is None:
+                raise ValueError('completion update without active entry')
+            model = reference_refill_completion(*(int(pending[key], 16) for key in ('pending', 'supplied', 'field6')))
+            if (event['target'] != pending['target'] or event['supplied'] != pending['supplied']
+                    or int(event['pending'], 16) != model['pending'] or int(event['field6'], 16) != model['field6']):
+                raise ValueError('completion cursor or pending clear differs from source model')
+            counts.append(model['last_supplied'])
+            handled += 1
+            pending = None
+        else:
+            if pending is not None:
+                raise ValueError('control19 overlaps an unfinished completion')
+            controls.append({'cycles': cycles, 'argument': int(event['supplied'], 16),
+                             'pending_refill_context': int(event['pending'], 16)})
+    if pending is not None or not handled or not controls:
+        raise ValueError('missing completion return or lifecycle control')
+    return {'events': len(events), 'handled_completions': handled, 'inactive_entries': inactive,
+            'supplied_word_sum': sum(counts), 'control19': controls,
+            'scope': 'Paired debugger Execute-hook snapshots agree with source cursor/pending model; '
+                     'not retained operands, file-read retirement, native EOF draining or audio acceptance'}
 
 
 def inspect_ram(data, pointer, cursor, limit):
@@ -39,9 +109,18 @@ def inspect_ram(data, pointer, cursor, limit):
                        ('file_bytes', 'sha256', 'candidate_count', 'first_candidate_chain',
                         'chain_stop', 'chain_stop_reason')}
         views[name]['candidate_headers'] = inventory['candidates']
+    file_buffer = word(0x15e7)
+    file_object = None
+    if FIRST <= file_buffer <= 0xfff3:
+        file_object = {'address': f'{file_buffer:04x}',
+                       'words': [f'{word(file_buffer+i):04x}' for i in range(12)],
+                       'field0_1_difference': (word(file_buffer+1)-word(file_buffer)) & 0xffff}
     return {'ram_sha256': hashlib.sha256(data).hexdigest(),
             'object': f'{pointer:04x}', 'object_words': [f'{word(pointer+i):04x}' for i in range(12)],
             'lifecycle': f'{word(0x373e):04x}', 'file_buffer_ref': f'{word(0x15e7):04x}',
+            'pending_refill': word(0x15e0), 'last_supplied': word(0x15df),
+            'file_buffer_object': file_object,
+            'mailbox_first_words': {'0080': f'{word(0x80):04x}', '0090': f'{word(0x90):04x}'},
             'cursor': f'{cursor:04x}', 'limit': f'{limit:04x}', 'available_words': limit-cursor,
             'bit_reader': {'remaining': word(0xa854),
                            'reservoir': f'{(word(0xa858)<<16)|word(0xa859):08x}',
@@ -135,10 +214,15 @@ def main():
     parser.add_argument('ram', type=Path)
     parser.add_argument('--reference-aac', type=Path,
                         help='Compare reservoir plus high-byte-first buffer with the projection at the captured processing ordinal')
+    parser.add_argument('--completion-log', type=Path,
+                        help='Also check a separate passive refill-completion capture')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text(), args.ram.read_bytes(),
-                               args.reference_aac.read_bytes() if args.reference_aac else None), indent=2))
+        result = check(args.log.read_text(), args.ram.read_bytes(),
+                       args.reference_aac.read_bytes() if args.reference_aac else None)
+        if args.completion_log:
+            result['separate_completion_capture'] = check_completions(args.completion_log.read_text())
+        print(json.dumps(result, indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'cleanup buffer check: {error}', file=sys.stderr)
         return 1

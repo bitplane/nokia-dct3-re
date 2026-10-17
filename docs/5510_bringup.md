@@ -8750,11 +8750,44 @@ search-selected alignment is accepted. Tests preserve reservoir low-bit
 selection and reject a wrong fixed tail, failed ordinal, partial snapshot,
 pointer mismatch or unaligned reservoir.
 
-Next establish the input-12 receiver/completion contract and whether the
-producer lifecycle can finish buffered input before teardown. The current
-one-pass source path is now explained, but its early cleanup is not yet
-classified as an emulation defect or correct handset behavior. Preserve
-the strict audio-completion failure and do not replay this RAM snapshot.
+`playback_refill_completion` pins the receiver's 80 source words. Dispatch
+`0207b5` selects input `12` at `020862`. A zero pending word `15e0` skips
+the buffer update and produces reply `8000`. Otherwise frame word 3 is
+copied to `15df`, and `02976d` adds it modulo 16 bits to field 6 of the
+object referenced by `15e7`; metadata is updated and `020888` clears the
+pending word. The common tail sets the reply high bit and publishes via
+`020944 -> 02961e`. The small reference model covers the pending test and
+cursor delta only, not all metadata or an EOF/drain protocol.
+
+The existing snapshot has pending `15e0=00ba` and last supplied
+`15df=00ba`. File-buffer object `1622` has fields 0/1 both `1e0a` (empty
+by the same difference helper), with field 6 at `1d50`; the downstream
+buffer still contains the tail described above. Mailbox first words are
+`0080=8012`, `0090=8011`. These raw markers do not identify an individual
+message or prove its payload/lifetime.
+
+`mu4_refill_completion_observe.lua` captures paired entry/updated debugger
+hooks and control-19 contexts. Its complete ten-second run has 752 events
+(budget 2,048), 375 active completion pairs and zero inactive entries.
+Every cursor delta and pending clear agrees with the source model; supplied
+counts total 71,834 words. Control 19 first appears with argument zero and
+no pending request, then with argument one and a pending 186-word request
+after the final successful completion. This is cleanup-associated control,
+not a claim that input 19 means DSP stop, mute or drain. All 925 output
+artifacts remain byte-identical and `illegal=0`. Add
+`--completion-log COMPLETION_RUN/error.log` to the buffer checker to verify
+this separate capture; capped, overlapping, unpaired, wrong-cursor and
+out-of-session traces fail rather than become absence evidence.
+
+Thus ordinary completion delivery is functioning on the observed path.
+The final request takes the file-length cleanup branch before its completion
+publisher, leaving it pending; there is no evidence here for repairing a
+missing peripheral interrupt by synthesizing input 12. Next classify the
+original controller's cleanup/drain policy and its legitimate producers,
+rather than extending decoding with invented completions. The current
+one-pass path is explained, but its early cleanup is not yet classified
+as an emulation defect or correct handset behavior. Preserve the strict
+audio-completion failure and never replay this RAM snapshot.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

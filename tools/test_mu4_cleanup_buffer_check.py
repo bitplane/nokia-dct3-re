@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from tools.mu4_cleanup_buffer_check import FIRST, WORDS, inspect_ram, check, compare_projection_tail
+from tools.mu4_cleanup_buffer_check import FIRST, WORDS, inspect_ram, check, compare_projection_tail, check_completions
 
 
 def fixture():
@@ -15,6 +15,38 @@ def fixture():
 
 
 class CleanupBufferTest(unittest.TestCase):
+    def completion_log(self):
+        context = [line for line in self.log().splitlines() if not line.startswith('mu4_cleanup_buffer')]
+        events = []
+        for index, (kind, address, pending, supplied, field6) in enumerate((
+                ('entry', '020862', '00ba', '00ba', '1d50'),
+                ('updated', '020893', '0000', '00ba', '1e0a'),
+                ('control19', '0207ea', '00ba', '0001', '1d50')), 1):
+            events.append(f'mu4_refill_completion: ordinal={index} kind={kind} address={address} '
+                          f'cycles={100+index} pending={pending} supplied={supplied} target=1622 field6={field6} '
+                          'identity=debugger_Execute_hook operands=context_only observer_writes=0')
+        return '\n'.join([
+            'mu4_refill_completion_scope: identity=debugger_Execute_hook operands=context_only observer_writes=0 audio_acceptance=0',
+            *context[:2], *events, context[2],
+            'mu4_refill_completion_terminal: events=3 cap=2048 observer_writes=0 audio_acceptance=0',
+            'mu4_refill_completion_stop: t=10 illegal=0 observer_writes=0 audio_acceptance=0', context[3]])
+
+    def test_completion_capture_checks_cursor_delta_and_preserves_pending_control_context(self):
+        result = check_completions(self.completion_log())
+        self.assertEqual(result['handled_completions'], 1)
+        self.assertEqual(result['supplied_word_sum'], 186)
+        self.assertEqual(result['control19'][-1]['pending_refill_context'], 186)
+
+    def test_completion_capture_rejects_unpaired_corrupt_and_capped_evidence(self):
+        for before, after in [('events=3', 'events=2'), ('cap=2048', 'cap=3'),
+                              ('field6=1e0a', 'field6=1e0b'),
+                              ('kind=updated', 'kind=entry'), ('cycles=102', 'cycles=101'),
+                              ('pending=0000', 'pending=0001'), ('target=1622', 'target=0000'),
+                              ('illegal=0', 'illegal=1'), ('words=49843', 'words=1'),
+                              ('observer_writes=0', 'observer_writes=1')]:
+            with self.subTest(before=before, after=after), self.assertRaises(ValueError):
+                check_completions(self.completion_log().replace(before, after))
+
     def test_projection_tail_uses_processing_ordinal_not_search(self):
         data = fixture()
         result = inspect_ram(data, 0x160a, 0x162e, 0x1632)
@@ -82,6 +114,18 @@ class CleanupBufferTest(unittest.TestCase):
         self.assertEqual(result['available_words'], 4)
         self.assertEqual(result['byte_views']['high_byte_first']['first_candidate_chain'], [0])
         self.assertEqual(result['byte_views']['low_byte_first']['candidate_count'], 0)
+
+    def test_snapshot_distinguishes_pending_refill_from_buffered_input(self):
+        data = bytearray(fixture())
+        for address, value in ((0x15e0, 186), (0x15df, 186), (0x15e7, 0x1622),
+                               (0x1622, 0x1e0a), (0x1623, 0x1e0a), (0x1628, 0x1d50),
+                               (0x80, 0x8012), (0x90, 0x8011)):
+            struct.pack_into('<H', data, 2*(address-FIRST), value)
+        result = inspect_ram(data, 0x160a, 0x162e, 0x1632)
+        self.assertEqual(result['pending_refill'], 186)
+        self.assertEqual(result['file_buffer_object']['field0_1_difference'], 0)
+        self.assertEqual(result['available_words'], 4)
+        self.assertEqual(result['mailbox_first_words'], {'0080': '8012', '0090': '8011'})
 
     def test_rejects_partial_wrapped_and_unbound_snapshots(self):
         for data, obj, cursor, limit in ((fixture()[:-1], 0x160a, 0x162e, 0x1632),

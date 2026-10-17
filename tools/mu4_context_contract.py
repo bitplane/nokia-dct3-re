@@ -932,6 +932,51 @@ def decode_playback_refill_control(words):
                      'alternate seek/read path is not an established drain-only mode; no runtime forcing'}
 
 
+PLAYBACK_REFILL_COMPLETION = {
+    0x207B5: (0x7710,0x0012,0xF4A9,0xF830,0x0862),
+    0x20862: (0x10F8,0x15E0,0xF844,0x086A,0x7602,0x8000,0xF073,
+             0x093D,0x7103,0x15DF,0x10F8,0x15E7,0x7000,0x15DF,
+             0xF982,0x976D,0x1210,0xF1EF,0x120F,0xF3E1,0xF2A0,
+             0x4EF8,0xAAD0,0x10F8,0x15E7,0xF982,0x9752,0xF495,
+             0x4808,0x58F8,0xAAD0,0x4EF8,0xAAD0,0x4E00,0x10F8,
+             0x15E7,0xF982,0x978C,0x76F8,0x15E0,0x0000),
+    0x2093D: (0x6902,0x8000,0x4818,0x7000,0x0016,0xF000,0x0002,
+             0xF982,0x961E,0x10F8,0x0017,0xF845,0x094D),
+    0x2960C: (0x8812,0xF495,0x7713,0x0080,0xEC0F,0xE598,0xF495,0xF495,0xF4E4),
+    0x2976D: (0x4A11,0xEEFF,0x8811,0xF495,0x1004,0x00E1,0x0006,
+             0x80E1,0x0006,0xEE01,0x8A11,0xF4E4),
+}
+
+
+def reference_refill_completion(pending, supplied, field6):
+    """Only the pending test and low-word cursor update, not the full receiver."""
+    if any(not 0 <= word <= 0xffff for word in (pending, supplied, field6)):
+        raise ValueError('completion operands must be 16-bit')
+    if pending == 0:
+        return {'handled': False, 'field6': field6, 'pending': 0, 'reply': 0x8000}
+    return {'handled': True, 'field6': (field6+supplied) & 0xffff,
+            'pending': 0, 'last_supplied': supplied, 'reply': 0x8012}
+
+
+def decode_playback_refill_completion(words):
+    for base, witness in PLAYBACK_REFILL_COMPLETION.items():
+        for offset, expected in enumerate(witness):
+            if words.get(base+offset) != expected:
+                raise ValueError(f'refill completion witness changed at {base+offset:06x}')
+    return {'pinned_words': sum(map(len, PLAYBACK_REFILL_COMPLETION.values())),
+            'input': '0012', 'dispatch': '0207b5 -> 020862',
+            'pending': '15e0', 'inactive': 'local reply <- 8000; skip buffer update',
+            'active': {'supplied': 'local frame word 3 -> 15df',
+                       'buffer': 'object referenced by 15e7',
+                       'advance': '02976d: object[6] += supplied modulo 16 bits',
+                       'pending_clear': '020888',
+                       'other_effects': 'aad0 and object metadata updated; not modeled by cursor reference'},
+            'acknowledgement': '02093d sets high bit; 020944 -> 02961e',
+            'mailbox_copy': '02960c copies 16 words from data 0080 to local frame',
+            'scope': 'Pinned software completion path, not all callers or an EOF/drain protocol; '
+                     'no completion injection, native tail decoding or audio acceptance'}
+
+
 MASK = 0xC004
 WITNESS = (
     0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
@@ -1583,6 +1628,7 @@ def contract(source):
     result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
     result['playback_input_units'] = decode_playback_input_units(rel_words, bootstrap_words)
     result['playback_refill_control'] = decode_playback_refill_control(rel_words)
+    result['playback_refill_completion'] = decode_playback_refill_completion(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)

@@ -20,6 +20,7 @@ from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
 from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
 from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_refill_control, reference_refill_control
+from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
@@ -50,6 +51,31 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_refill_completion_only_advances_with_a_pending_request(self):
+        self.assertEqual(reference_refill_completion(0, 186, 0x1d50),
+                         {'handled': False, 'field6': 0x1d50, 'pending': 0, 'reply': 0x8000})
+        self.assertEqual(reference_refill_completion(186, 6, 0x1d50),
+                         {'handled': True, 'field6': 0x1d56, 'pending': 0, 'last_supplied': 6, 'reply': 0x8012})
+        self.assertEqual(reference_refill_completion(1, 1, 0xffff)['field6'], 0)
+        self.assertEqual(reference_refill_completion(1, 0xffff, 0)['field6'], 0xffff)
+        self.assertEqual(reference_refill_completion(1, 0, 0x1d50)['field6'], 0x1d50)
+        self.assertEqual(reference_refill_completion(1, 0, 0x1d50)['pending'], 0)
+        for args in ((-1, 0, 0), (0, 0x10000, 0), (0, 0, -1)):
+            with self.assertRaises(ValueError):
+                reference_refill_completion(*args)
+
+    def test_refill_completion_witness_protects_pending_guard_and_clear(self):
+        words = {base+i: value for base, witness in PLAYBACK_REFILL_COMPLETION.items()
+                 for i, value in enumerate(witness)}
+        result = decode_playback_refill_completion(words)
+        self.assertEqual(result['pinned_words'], len(words))
+        self.assertEqual(result['active']['pending_clear'], '020888')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_playback_refill_completion(changed)
+
     def test_refill_control_prefix_requires_ack_and_preserves_nonzero_payload(self):
         self.assertIsNone(reference_refill_control(0, 1, 1))
         self.assertIsNone(reference_refill_control(0x8000, 0, 0))
