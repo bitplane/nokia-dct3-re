@@ -167,7 +167,16 @@ NSE-1 ROM4 acquisition, external reproduction and local native loader/menu
 execution are established, not future milestones. The local backend executes
 the recovered resident program/DROM and firmware uploads without synthesized
 DSP completion. `make check-c54x-observed-coverage` validates the exact 626-word
-cold-idle opcode set and its Menu/power controls. Isolated native FR and EFR
+cold-idle opcode set and its Menu/power controls. The separate laboratory
+`nse1pin` configuration replaces the default untimed boot echo with actual
+externally clocked BSP transmit/receive pins. Its native self-test, physical
+key-2 DTMF output and partial-word save replay pass
+`make check-c54x-rom4-clocked-boot`; the observed instruction union is 643
+words, with exact-word assertion coverage checked separately. The supplied
+1 MHz bit clock, 8 kHz frame cadence and sync phase are laboratory inputs,
+not recovered production handset wiring. See the authoritative
+[physical-clock contract](cobba_control_boundary.md#nse-1-physical-clock-contract).
+Isolated native FR and EFR
 encoder/decoder gates validate algorithm results, not handset speech. The
 EFR reference, entry order and replay scope are maintained in
 [COBBA control boundary](cobba_control_boundary.md#native-efr-encoder-acceptance).
@@ -238,7 +247,7 @@ a hardware specification:
 |---|---|---|
 | `SEEDDARAM` | without the assist, the old core produced 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | **Resolved.** Loader1 repeatedly executes MVDP from data source `0x0d00` to program destination `0x23c4`. The core bypassed its OVLY-aware `prog_write()` helper, so it wrote an inert program backing store instead of executable DARAM. Correct MVDP routing restores 74 acknowledgements and stable UI with `SEEDDARAM=0`. |
 | `SELFTEST_MEAS` | the old donor EEPROM made the DSP reach the validator with a record that triggered an organic reason-4 warm reboot | **Resolved without the assist.** The generated 24C16 profile supplies records encoded for COBBA serial `00160010`; the real C54x transform decodes them and the MCU validator continues with `r6=1`. The native harness's direct overwrite remains classified as output synthesis and is not part of the MAME path. |
-| COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
+| COBBA codec-serial loopback | external reproduction proceeds through upload and self-test measurement with 74 acknowledgements, but presents `CONTACT SERVICE`; this is not the current local graphical-boot result | The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` owns the evidenced register predicate. The default local backend retains untimed completed-word echo; separate `nse1pin` acceptance completes the exchange through actual externally clocked BSP pins with zero untimed echoes. That laboratory timing does not establish the production clock attachment. |
 
 The earlier failed promotion runs remain useful negative controls. With donor
 EEPROM contents the backend still reaches the MCU validator and requests an
