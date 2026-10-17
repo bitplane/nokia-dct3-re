@@ -1365,6 +1365,24 @@ proof that all bits of the packed parameter themselves assert INT2, nor
 does it identify the DSP-side request-latch register. Keep the API trigger,
 HPI DARAM payload and DSP port request/accept registers distinct during
 the next ownership audit.
+The tone-level runner also retains `host_mmio_census.json`, reusing the
+literal-seeded Thumb analyzer on a byte-lane-corrected view of the original
+MCU image. It resolves three seeds and three halfword writes to DSPIF
+`30000`: `271764`, `272048` and `2721d2`. Exact original-byte fixtures
+check the constant-4 store sequences and their literal destinations.
+Every tone-level run requires all three writes on the upper bus halfword.
+The last store is observed with word-aligned bus-context PC `2721d0`;
+that is not a different instruction or an extra writer. Boot's bytewise
+zero initialization is dynamically observed but outside these literal-seed
+results. Dynamic/table-driven sources and other MMIO windows are not closed.
+
+At the packed-field publisher, field 8/value `8426` has R5=1 and immediately
+reaches the DSPIF trigger; field 9/value `920c` has R5=0 and its trigger
+follows a later update. This independently exposes batching: payload writes
+must not be assumed to assert the hardware request at their own timestamp.
+The passive publisher capture records raw field, wire, R5--R8 and caller
+context, with per-phase counts; it is not a producer-absence proof or a
+replacement interrupt-source specification.
 The native HPINT/vector-25 entry `3772` checks busy word `0870` and local
 state `00ef`; its admitted path calls `a51b` at `3796`, strobes data `0029`
 bit 3 and clears `0870` at `379e..37a0`. Both ranges are exact-word fixtures.

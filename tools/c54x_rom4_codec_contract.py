@@ -627,6 +627,9 @@ MCU_SPEECH_FIELD_BYTES = {
     0x27201e: bytes.fromhex("2c2ed00946612900d005881146664031430104080c008010"),
     0x272036: bytes.fromhex("2d01d0012c2ed108200146415258498f20048008498f20027008"),
     0x272284: bytes.fromhex("0003000000020008"),
+    0x271760: bytes.fromhex("49ad2004800849ad20027008"),
+    0x271a18: bytes.fromhex("0003000000020008"),
+    0x2721ce: bytes.fromhex("2004492c8008"),
     0x272214: bytes.fromhex("000100bc"),
 }
 
@@ -638,6 +641,20 @@ def check_mcu_speech_field(image):
         if image[offset:offset + len(expected)] != expected:
             raise ValueError(f"MCU speech field contract differs at {address:08x}")
     return len(MCU_SPEECH_FIELD_BYTES)
+
+
+def census_mcu_host_interface(image):
+    """Reuse conservative literal-seeded analysis, not a writer-absence proof."""
+    from tools.mad2_static_census import analyze_image
+    if len(image) % 2:
+        raise ValueError('MCU image requires complete big-endian halfwords')
+    swapped = bytearray(image)
+    swapped[0::2], swapped[1::2] = image[1::2], image[0::2]
+    accesses, coverage = analyze_image(bytes(swapped), window_base=0x30000,
+                                       window_size=4, constant_indexes=True)
+    return {'schema': 1, 'window_base': 0x30000, 'window_size': 4,
+            'scope': 'literal-seeded Thumb candidates; dynamic and table-driven writers excluded',
+            'coverage': coverage, 'accesses': accesses}
 
 
 def decode_mcu_speech_descriptor(image):

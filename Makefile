@@ -1357,7 +1357,7 @@ check-c54x-rom4-compare: build
 .PHONY: check-c54x-rom4-codec-tone
 .PHONY: check-c54x-rom4-tone-levels
 check-c54x-rom4-tone-levels: build
-	$(PYTHON) tools/run_c54x_rom4_tone_levels.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root $(RUN_DIR)
+	$(VENV)/bin/python tools/run_c54x_rom4_tone_levels.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root $(RUN_DIR)
 
 check-c54x-rom4-codec-tone: build
 	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \

@@ -1,6 +1,7 @@
 """Capture native 5110 keypad-tone Off/three-level physical-input controls."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -8,11 +9,11 @@ import sys
 import tempfile
 
 try:
-    from .c54x_rom4_tone_levels_check import check_level, check_frame
-    from .c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask
+    from .c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
+    from .c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask, census_mcu_host_interface
 except ImportError:
-    from c54x_rom4_tone_levels_check import check_level, check_frame
-    from c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask
+    from c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
+    from c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask, census_mcu_host_interface
 
 
 def main():
@@ -24,11 +25,16 @@ def main():
     repo = Path(__file__).resolve().parent.parent
     program = (args.rompath / 'noki5110/nse1_rom4_dsp_program.bin').read_bytes()
     check(program)
-    check_mcu_speech_field((args.rompath / 'noki5110/5110f530.fls').read_bytes())
+    mcu_image = (args.rompath / 'noki5110/5110f530.fls').read_bytes()
+    check_mcu_speech_field(mcu_image)
     print(f'Reviewed ISR predicate union: {decode_host_dispatch_mask(program):04x}; hardware acknowledgement unresolved', flush=True)
     args.output_root.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix='rom4-tone-levels-', dir=args.output_root.resolve()))
     print(f'Native tone-level evidence: {root}', flush=True)
+    host_report = census_mcu_host_interface(mcu_image)
+    (root / 'host_mmio_census.json').write_text(json.dumps(host_report, indent=2) + '\n')
+    if not {0x271764, 0x272048, 0x2721d2} <= {item['pc'] for item in host_report['accesses']}:
+        raise ValueError('host MMIO census lost a reviewed direct writer')
     for option, name in enumerate(('off', 'low', 'medium', 'high'), 1):
         run = root / name
         nvram = run / 'nvram' / 'noki5110'
@@ -56,7 +62,9 @@ def main():
                 env=env, cwd=run, stdout=output, stderr=subprocess.STDOUT)
         if result.returncode:
             raise ValueError(f'{name}: MAME exited {result.returncode}; see {run}')
-        check_level((run / 'error.log').read_text(), option)
+        text = (run / 'error.log').read_text()
+        check_level(text, option)
+        check_host_writers(text, host_report)
         check_frame(run / 'snap/noki5110/0000.png')
         print(f'Native tone setting {name}: PASS (control only; no native audio claim)', flush=True)
     return 0

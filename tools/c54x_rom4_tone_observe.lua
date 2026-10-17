@@ -34,6 +34,22 @@ watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
 watch(dsp, 'program', 0x0854, 'codec_shared_overlay')
 watch(dsp, 'data', 0x0870, 'codec_pending_dsp')
 watch(mcu, 'program', 0x100e0, 'codec_pending_mcu', 0x100e3)
+watch(mcu, 'program', 0x30000, 'codec_dspif_mcu', 0x30003)
+watch(mcu, 'program', 0x40000, 'codec_mcuif_mcu', 0x40003)
+local parameter_publications = {boot = 0, interactive = 0}
+taps[#taps + 1] = mcu.spaces['program']:install_write_tap(
+    0x100a8, 0x100ab, 'codec_parameter_publisher', function(_, value, mask)
+        if mcu.state['PC'].value ~= 0x272034 or mask ~= 0xffff0000 then return end
+        local phase = machine.time:as_double() >= 7 and 'interactive' or 'boot'
+        parameter_publications[phase] = parameter_publications[phase] + 1
+        if parameter_publications[phase] <= 64 then
+            machine:logerror(string.format(
+                'rom4_codec_parameter_publish: phase=%s field=%04x wire=%04x r5=%08x r6=%08x r7=%08x r8=%08x lr=%08x t=%.9f\n',
+                phase, mcu.state['R4'].value, (value >> 16) & 0xffff,
+                mcu.state['R5'].value, mcu.state['R6'].value, mcu.state['R7'].value,
+                mcu.state['R8'].value, mcu.state['R14'].value, machine.time:as_double()))
+        end
+    end)
 for _, address in ipairs({0x19a2, 0x19a4, 0x1f92}) do
     watch(dsp, 'data', address, 'codec_level_local')
     watch(dsp, 'program', address, 'codec_level_overlay')
@@ -148,6 +164,8 @@ local stop = emu.add_machine_stop_notifier(function()
         control_calls, machine.time:as_double()))
     machine:logerror(string.format('rom4_codec_host_summary: requests=%d accepts=%d t=%.9f\n',
         request_reads, request_accepts, machine.time:as_double()))
+    machine:logerror(string.format('rom4_codec_parameter_summary: boot=%d interactive=%d t=%.9f\n',
+        parameter_publications.boot, parameter_publications.interactive, machine.time:as_double()))
     machine:logerror(string.format(
         'rom4_tone_summary: tx_words=%d rx_reads=%d tone_reads=%d tone_copies=%d t=%.9f\n',
         serial['data_write_33'], serial['data_read_32'],

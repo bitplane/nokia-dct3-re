@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
                                           UPLOADED_COUNTER_BLOCKS, check_mcu_upload_counters,
@@ -6,9 +7,20 @@ from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
 from tools.c54x_rom4_codec_contract import MCU_SPEECH_FIELD_BYTES, check_mcu_speech_field
 from tools.c54x_rom4_codec_contract import decode_mcu_speech_descriptor
 from tools.c54x_rom4_codec_contract import decode_host_dispatch_mask
+from tools.c54x_rom4_codec_contract import census_mcu_host_interface
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_host_mmio_census_byte_lanes_and_scope(self):
+        with patch('tools.mad2_static_census.analyze_image', return_value=([{'pc': 0x272048}], {'literal_seeds': 1})) as analyze:
+            result = census_mcu_host_interface(bytes.fromhex('1234abcd'))
+        analyze.assert_called_once_with(bytes.fromhex('3412cdab'), window_base=0x30000,
+                                         window_size=4, constant_indexes=True)
+        self.assertEqual(result['accesses'], [{'pc': 0x272048}])
+        self.assertEqual(result['coverage'], {'literal_seeds': 1})
+        self.assertIn('excluded', result['scope'])
+        with self.assertRaises(ValueError):
+            census_mcu_host_interface(bytes(3))
     def test_host_dispatch_mask_and_every_word_mutation(self):
         image = self.image()
         self.assertEqual(decode_host_dispatch_mask(image), 0x17ff)

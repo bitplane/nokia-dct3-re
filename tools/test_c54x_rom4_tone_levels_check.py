@@ -3,11 +3,19 @@ import tempfile
 from pathlib import Path
 from PIL import Image
 
-from tools.c54x_rom4_tone_levels_check import check_level, check_frame
+from tools.c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
 from tools import test_c54x_rom4_codec_contract as codec_fixtures
 
 
 class NativeToneLevelsTest(unittest.TestCase):
+    def test_writer_join_preserves_thumb_vs_bus_context_pc(self):
+        report = {'accesses': [{'pc': 0x2721d2, 'kind': 'write', 'width': 2, 'address': 0x30000}]}
+        text = 'rom4_tone_access: owner=codec_dspif_mcu direction=write address=030000 value=40000 mask=ffff0000 pc=2721d0 t=0.13'
+        check_host_writers(text, report)
+        for old, new in (('value=40000', 'value=80000'), ('mask=ffff0000', 'mask=ffff'),
+                         ('pc=2721d0', 'pc=2721d2'), ('direction=write', 'direction=read')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_host_writers(text.replace(old, new), report)
     def trace(self, option):
         lines = [codec_fixtures.CodecTraceTests().trace()]
         for index, key in enumerate(('menu', '9', '5', str(option), 'clear', 'clear', 'clear', '2')):

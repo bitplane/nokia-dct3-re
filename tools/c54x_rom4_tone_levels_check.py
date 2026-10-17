@@ -19,6 +19,21 @@ def check_frame(path):
             raise ValueError('missing final digit-2 frame; input acceptance is not proved')
 
 
+def check_host_writers(text, report):
+    writes = re.findall(
+        r'rom4_tone_access: owner=codec_dspif_mcu direction=write address=030000 '
+        r'value=([0-9a-f]+) mask=([0-9a-f]+) pc=([0-9a-f]{6}) t=[0-9.]+', text)
+    for access in report['accesses']:
+        if (access['kind'], access['width'], access['address']) != ('write', 2, 0x30000):
+            continue
+        # The ARM debugger's bus-context PC is word-aligned, not necessarily
+        # the Thumb instruction address (2721d2 is observed as 2721d0).
+        if not any(int(value, 16) == 0x40000 and int(mask, 16) == 0xffff0000
+                   and int(pc, 16) == (access['pc'] & ~3)
+                   for value, mask, pc in writes):
+            raise ValueError(f"unobserved checked DSPIF writer {access['pc']:08x}")
+
+
 def check_level(text, option):
     if option not in (1, 2, 3, 4):
         raise ValueError('unknown keypad-tone setting')
