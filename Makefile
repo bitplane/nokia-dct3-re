@@ -1424,7 +1424,7 @@ check-c54x-rom4-pcm-wire: build
 
 .PHONY: check-c54x-rom4-clocked-boot
 check-c54x-rom4-clocked-boot: build
-	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp --wire --restore --clocked-loopback
+	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp --wire --restore --clocked-loopback --coverage
 
 check-c54x-rom4-codec-tone: build
 	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \

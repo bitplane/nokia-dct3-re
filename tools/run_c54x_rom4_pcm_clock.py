@@ -27,12 +27,23 @@ def paired_screen(first, reference):
                 rgb_sha256=hashlib.sha256(actual.tobytes()).hexdigest())
 
 
-def instruction_report(text):
+INSTRUCTION_SETS = {
+    'control': (626, 110, '05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59'),
+    'tone': (642, 111, 'e150bf2c9d9b52db524eab63c7270be0abfa9e7889b143e015bf3401de0f9fe7'),
+    'pin_boot': (643, 111, '5cb892b2da30d8489a37d0c6a403c4ead9976b0d5ee1aa5765f869ca567a26fd'),
+}
+
+
+def instruction_report(text, profile=None):
     observed = summarize(text)
     require_extension_capture(observed)
     require_extension_decoding(observed)
     if set(observed['decoded']) != set(observed['first_pc']) or decoded_boundaries(observed) != set(observed['first_pc']):
         raise ValueError('missing or unsupported native instruction decoder records')
+    if profile is not None:
+        actual = (observed['opcodes'], observed['high_byte_groups'], observed['set_sha256'])
+        if actual != INSTRUCTION_SETS[profile]:
+            raise ValueError(f'native {profile} instruction-set drift: {actual!r}')
     return dict(opcodes=observed['opcodes'], groups=observed['high_byte_groups'],
                 sha256=observed['set_sha256'], independent_arithmetic_assertion_claim=False)
 
@@ -115,7 +126,8 @@ def main():
                     root / reference_case / 'snap' / reference_machine / '0000.png')
             result['codec_demand'] = demand_transitions(text)
             if args.coverage:
-                result['instruction_observations'] = instruction_report(text)
+                profile = 'control' if not clock else 'pin_boot' if machine == 'nse1pin' else 'tone'
+                result['instruction_observations'] = instruction_report(text, profile)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
             result = dict(clock=clock, status='failed', error=str(error))

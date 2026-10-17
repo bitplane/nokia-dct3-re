@@ -1461,7 +1461,12 @@ Native DTMF, all 480 active samples and silent pre/post windows pass. The
 partial-word checkpoint exactly replays 400 words and timestamps. Decoded
 84x48 screen pixels match the paired original wire fixture, rather than
 comparing PNG metadata. Reproduce all seven isolated controls and replay
-cases with `make check-c54x-rom4-clocked-boot`.
+cases with `make check-c54x-rom4-clocked-boot`. That gate also requires
+complete instruction/extension decoding and the exact banked opcode-set
+fingerprints: 626 words for the unclocked control, 642 for the original tone
+clocks and 643 for clock-owned boot. Count, group or fingerprint drift fails
+the gate; it must be reviewed rather than silently accepted. These execution
+sets are not independent arithmetic assertions or silicon timing evidence.
 
 This retires the untimed echo only in that declared clock-owned composition.
 The real clock-enable/mux contract, physical sync timing, microphone data and

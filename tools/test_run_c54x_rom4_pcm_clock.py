@@ -1,8 +1,9 @@
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.run_c54x_rom4_pcm_clock import instruction_report, paired_screen
+from tools.run_c54x_rom4_pcm_clock import INSTRUCTION_SETS, instruction_report, paired_screen
 
 
 CAPTURE = ("[opcov] op=6f83 first_pc=0800 count=1\n"
@@ -44,6 +45,28 @@ class NativePcmInstructionReportTests(unittest.TestCase):
         self.assertEqual(result['groups'], 2)
         self.assertEqual(len(result['sha256']), 64)
         self.assertFalse(result['independent_arithmetic_assertion_claim'])
+
+    def test_profile_fingerprints_reject_each_changed_dimension(self):
+        from tools.c54x_opcode_coverage import summarize
+        base = summarize(CAPTURE)
+        for profile, expected in INSTRUCTION_SETS.items():
+            for changed in (None, 0, 1, 2):
+                values = list(expected)
+                if changed is not None:
+                    values[changed] = '0' * 64 if changed == 2 else values[changed] + 1
+                observed = dict(base, opcodes=values[0], high_byte_groups=values[1], set_sha256=values[2])
+                with self.subTest(profile=profile, changed=changed), patch(
+                        'tools.run_c54x_rom4_pcm_clock.summarize', return_value=observed):
+                    if changed is None:
+                        self.assertEqual(instruction_report(CAPTURE, profile)['sha256'], expected[2])
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'instruction-set drift'):
+                            instruction_report(CAPTURE, profile)
+
+    def test_real_small_capture_is_not_a_banked_handset_set(self):
+        for profile in INSTRUCTION_SETS:
+            with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'instruction-set drift'):
+                instruction_report(CAPTURE, profile)
 
     def test_missing_unsupported_and_truncated_records_fail(self):
         for bad in (CAPTURE.replace('[opdecode] op=f47f supported=1 words=1\n', ''),
