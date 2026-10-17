@@ -521,11 +521,13 @@ def check_tone(text: str) -> None:
     if not any(float(t) <= min(record_writes) for t in configuration):
         raise ValueError("missing preceding speech EEPROM configuration read")
     cursor = entries[0][1]
+    # Byte-pinned MVDK at 27ac is 7194,1f2b. The destination extension
+    # is consumed before its source read, so both bus taps report PC 27ae.
     for expected, earliest in (
             (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
-            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ad"), 0.0),
+            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ae"), 0.0),
             (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), 0.0),
-            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ad"), start),
+            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ae"), start),
             (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), start)):
         matches = [float(t) for *fields, t in flag_events
                    if tuple(fields) == expected and float(t) >= max(cursor, earliest)]

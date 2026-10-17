@@ -706,8 +706,11 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   `0x085e`, not a local encoder arithmetic correction.
   The organic 11-second physical-key gate now correlates MCU write
   `PC=272034`, bus word `100bc`, upper-halfword mask `ffff0000`, value
-  `df290000`, with DSP shared read `085e=df29` at reported PC `27ad`
-  and flag write `1f2b=df29` at `27ae`. Thus the duplicate copy does
+  `df290000`, with DSP shared read `085e=df29` and flag write
+  `1f2b=df29`, both at reported PC `27ae`. The byte-pinned MVDK
+  `7194,1f2b` begins at `27ac`; both bus accesses follow consumption of
+  its destination extension. The observed bus PC is not the instruction
+  entry. Thus the duplicate copy does
   execute; native mode remains separate from static label ownership.
   The same ordered read/copy occurs after the physical keypress. Bit 0
   stays set in this boot/tone lifecycle, while speech mode is inactive;
