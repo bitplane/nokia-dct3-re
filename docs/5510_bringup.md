@@ -851,9 +851,24 @@ Executable acceptance passes with `run_c54x_core.py --profile` for
 `shifted-alu`. These retain the existing complete case counts, bus assertions
 and save/restore checks; the Python suite passes 3,106 tests with one skip.
 
-Remaining: apply the same domain discipline to long BANZ and other older
-generators. Their existing modulo results are not upgraded to hardware
-legality by the corrected shared generator.
+Long BANZ/BANZD and repeat-block BANZ also carry BK through their shared
+fixture. Circular forms use BK=32768 with initial indices below that size;
+linear forms retain their 16-bit wrap inputs. Circular zero/nonzero branch
+cases include positive wrap (`7fff + 1`), negative wrap (`0234 - 2923`)
+and a full-buffer negative step (`0 - 32768`). The repeated-case oracle
+checks the domain on every iteration, not just the initial pointer. No
+operand memory access is introduced. Signed offsets, raw case IDs, delayed
+instruction layouts and replay checkpoints are retained.
+
+The existing `banzd-long` profile covers ordinary BANZ before BANZD, without
+adding a BIOS slot; its runner requires both 2,304-case and 4,608-case
+markers. `rptb-banz` separately covers 768 cases at repeat counts 0/1/2/7.
+Both profiles pass, as do the neighboring `rptb-bcd` and `rptb-bd` controls.
+The runner rejects missing or duplicate ordinary/delayed completion markers.
+
+Remaining: apply the same domain discipline to other older generators,
+including immediate-long and accumulator-long stores. Their existing modulo
+results are not upgraded to hardware legality by these corrected fixtures.
 
 ### Signed circular memory loads
 

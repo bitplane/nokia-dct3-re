@@ -1668,10 +1668,16 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(old, new), 3, profile='carry-branch')
 
     def test_long_delayed_banz_scope(self):
-        marker, ending = EXTRA_PROFILES['banzd-long']
-        output = marker + '\n' + ending + '\n'
+        markers, ending = EXTRA_PROFILES['banzd-long']
+        self.assertEqual(len(markers), 2)
+        output = '\n'.join((*markers, ending)) + '\n'
         check_result(output, 3, profile='banzd-long')
-        for old, new in (('restore=4608', 'restore=0'),
+        for marker in markers:
+            for changed in (output.replace(marker, ''), marker + '\n' + output):
+                with self.subTest(marker=marker), self.assertRaises(ValueError):
+                    check_result(changed, 3, profile='banzd-long')
+        for old, new in (('restore=2304', 'restore=0'),
+                         ('restore=4608', 'restore=0'),
                          ('delay_forms=two_single,one_double', 'delay_forms=two_single'),
                          ('offset_fetches=1', 'offset_fetches=2'),
                          ('data_accesses=0', 'data_accesses=1')):
