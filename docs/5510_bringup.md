@@ -72,10 +72,10 @@ domains exclude short preincrement, without substituting duplicate legal cases:
 The LDU/shift-16/variable-load and DLD banks preserve raw case IDs and skip
 only the invalid form; their totals count admitted cases, not raw ID ranges.
 These totals certify removal of the forbidden read encoding, not every input
-domain: the shared arithmetic generator still includes oversized signed/index
-steps with nonzero BK. The paired DST/DLD domains are now corrected and
-guarded as described [below](#paired-circular-fixture-domains); other families
-still need independent audit. Modulo expectations alone are not silicon evidence.
+domain. The paired DST/DLD and shared arithmetic/load circular domains are
+corrected and guarded as described [below](#circular-fixture-domains);
+other generators still need independent audit. Modulo expectations alone are
+not silicon evidence.
 The TS-load bank reindexes its 17-form Cartesian domain. Long MOD=13 remains
 admitted. Atomic `LD/LDU/LD TS/LDR/LD shift-16/DLD` reject short MOD=3 before
 operand access. Staged load classifiers reject it; `6fxx` LD rejects only after
@@ -91,7 +91,8 @@ The multiply/T-load fixtures also omit `memory_multiply_case` RAM kind 5,
 preserving raw case IDs. Their four banks each retain 52,224 cases/restores:
 27,648 RAM cases over nine address forms and 24,576 mapped-source cases.
 These are MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T, totaling 208,896.
-This corrects the forbidden source encoding, not every circular input domain.
+Their shared circular source generator also carries the documented buffer
+domain described below; unrelated multiply generators still require audit.
 
 `mul-mod3-edge` passes 4,352 rejection/replay cases over 34 opcode classes,
 all ARs, CMPT settings, pages, both frontends and two snapshots. It covers
@@ -794,7 +795,7 @@ program spans. Debugger history records logical Execute PCs, but disassembles
 current raw program memory; apply the established OVLY projection separately
 for common-window instruction bytes.
 
-### Paired Circular Fixture Domains
+### Circular Fixture Domains
 
 [SPRU131G section 5.5.3.4](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
 printed page 5-16, requires a base aligned to the smallest `2^N` strictly
@@ -826,9 +827,33 @@ python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
   --output-root tmp/c54x-paired-circular --profile indirect-dld
 ```
 
-Remaining: apply the same domain discipline to shared arithmetic/load,
-multiply/T-load, long BANZ and other older generators. Their existing
-modulo results are not upgraded to hardware legality by this paired result.
+The shared arithmetic/load generator carries BK through its callers rather
+than configuring BK=16 independently of their expected addresses. Short
+indexed circular forms start all ARs at `5007`, so AR0 supplies a signed
+step of that magnitude even when another AR is selected. Those forms and
+long circular forms use BK=32768, aligned base zero and initial index
+`5007`: both the AR0-derived step and every signed 16-bit literal fit the
+buffer. Unit-step circular forms retain BK=16. The guarded modulo oracle
+computes the indexed pointer update and long circular address only after
+checking this domain. Raw case IDs, signed literals, case counts and
+read/restore assertions are retained; no CPU behavior changes.
+
+This contract applies to the shared ADD/SUB, unsigned and shift-16 arithmetic,
+CMPM/BITF, offset/unsigned/shifted/variable/TS loads, memory multiply/T-load
+and TS arithmetic fixtures. Their initializers use the fixture's BK;
+handwritten register-only aggregates retain their default BK=16. It does
+not establish physical memory-bank placement or instruction timing.
+
+Executable acceptance passes with `run_c54x_core.py --profile` for
+`memory-alu`, `memory-shift16`, `adds`, `subs`, `cmpm-smem`, `bitf-smem`,
+`load-offset`, `ldu-shift16`, `load-variable`, `ld-ts`, `ld-ts-producer`,
+`mul-t-sources`, `t-load-control`, `ts-alu`, `ts-alu-producer` and
+`shifted-alu`. These retain the existing complete case counts, bus assertions
+and save/restore checks; the Python suite passes 3,106 tests with one skip.
+
+Remaining: apply the same domain discipline to long BANZ and other older
+generators. Their existing modulo results are not upgraded to hardware
+legality by the corrected shared generator.
 
 ### Signed circular memory loads
 

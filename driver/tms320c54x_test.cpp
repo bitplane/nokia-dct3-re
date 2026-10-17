@@ -6339,6 +6339,7 @@ private:
 		unsigned form, reg, selected, read_cycle;
 		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
 		u64 source, result;
+		u16 bk = 16;
 	};
 	static u64 ts_load_expected(u16 memory, u16 t, bool sxm)
 	{
@@ -6391,7 +6392,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 0xf : f.t);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -7823,11 +7824,15 @@ private:
 		u16 const memory = std::array<u16, 8>{1, 1, 1, 0xffff, 0x8000, 0xffff, 0x1234, 0xffff}[pattern];
 		s16 const offset = std::array<s16, 8>{0, 1, -1, 17, s16(0xf495), 0x7fff, s16(0x8000), 2}[pattern];
 		u8 const mode = form < 2 ? reg * 16 + pattern + (sxm ? 8 : 0) : form == 17 ? 0xf8 : 0x80 | ((form - 2) << 3) | reg;
-		int const index = (7 + offset) % 16;
+		// AR0 starts at 0x5007, including when it is the selected pointer.
+		// Indexed and long circular forms need a buffer large enough for that
+		// step and every signed literal (SPRU131G section 5.5.3.4).
+		u16 const bk = form == 11 || form == 13 || form == 16 ? 0x8000 : 16;
 		u16 const address = form == 0 ? 0x200 + mode : form == 1 ? 0x1000 + mode : form == 5 ? 0x5008 :
-			form == 16 ? 0x5000 + (index < 0 ? index + 16 : index) : form >= 14 && form < 17 ? u16(0x5007 + offset) :
+			form == 16 ? circular_fixture_next(0x5007, offset, bk) : form >= 14 && form < 17 ? u16(0x5007 + offset) :
 			form == 17 ? u16(0x1500 + offset) : 0x5007;
 		u16 const next_ar = form < 2 || form == 17 ? 0x5007 : form >= 14 ? (form == 14 ? 0x5007 : address) :
+			form == 11 || form == 13 ? circular_fixture_next(0x5007, form == 11 ? -0x5007 : 0x5007, bk) :
 			std::array<u16, 12>{0x5007, 0x5006, 0x5008, 0x5008, 0, 0, 0xa00e, 0x2803, 0x5006, 0x5000, 0x5008, 0x500e}[form - 2];
 		u16 const st0 = (shift16 ? 0x1004 | (pattern & 1 ? 0x800 : 0) : 0x1804) | (compatibility ? 0x6000 : 0) | (pattern & 1 ? 0x600 : 0);
 		u16 const st1 = 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compatibility ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
@@ -7840,7 +7845,7 @@ private:
 		result_st0 |= overflow ? ((shift16 ? shift16_selector : selector) & 1 ? 0x200 : 0x400) : 0;
 		u64 const result = u64(overflow && ovm ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
 		return {form, reg, selected, form >= 14 ? 6U : 5U, u16((shift16 ? (subtract ? 0x4000 : 0x3c00) | ((shift16_selector & 3) << 8) : (unsigned_memory ? (subtract ? 0x0a00 : 0x0200) : subtract ? 0x0800 : 0) | ((selector & 1) << 8)) | mode),
-			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result};
+			u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result, bk};
 	}
 	static memory_arithmetic_fixture memory_unsigned_case(unsigned variant, bool subtract = true)
 	{
@@ -7867,7 +7872,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, shift16 ? 9 : 8) ? 0x123456789aULL : f.source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, shift16 ? 9 : 8) ? f.source : 0x123456789aULL);
@@ -8082,7 +8087,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (f.st0 & ~0x1000) | (((variant / 1152) % 2) ? 0x1000 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -8267,7 +8272,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
@@ -8656,7 +8661,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
@@ -8785,7 +8790,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1122); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x3344);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc);
@@ -12493,7 +12498,7 @@ private:
 		program.write_word(f.base + 0x601 + f.prefix + unsigned(o.form >= 14), 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 15 : f.t);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 15 : f.t);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x5007);
 		if (producer && f.producer_kind == 1) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5100); data.write_word(0x5100, f.t); } data.write_word(o.address, f.memory);
 		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
