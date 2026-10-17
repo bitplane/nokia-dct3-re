@@ -7608,6 +7608,22 @@ independent volume extraction yields 143,680-byte `TEST`, SHA256
 `4ba59580f8bf50b8d45d7a62d8ddf42ea94dfb7d884ff05b5092e7c13141470d`.
 These identify the post-DST-fix recording, not a decoded-audio oracle.
 
+Fresh read-only transform observations match all 96 source prefixes,
+scalar outputs and independently extracted saved chunks (3,072 bytes,
+unique file origin 622, one state and cursor 0..3,040 in steps of 32).
+Captured plaintext SHA256 is
+`5b722a6fc85fb40368b7d4099d4cc7fbaae99e520161fd3875d7952e29295938`.
+FFmpeg decodes its first 2,977 bytes as eight packets/eight frames,
+8,192 samples and zero decode errors, versus one frame/seven errors before
+the DST correction. This is host validation of captured native encoder
+output, not native decoder or analog audio acceptance. Reusing a prior
+run's transform state fails and is not a valid substitute for fresh capture.
+Native cold playback takes the processing body on its first invocation,
+then stops at unsupported staged word `3692` at `0260ba` (present in the
+original AA99 upload). Its 20-second terminal observation has illegal=1
+and zero nonzero DMA/TX/DIN samples; strict playback checks fail. Verify the
+preceding control transfer and instruction contract before extending support.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a
