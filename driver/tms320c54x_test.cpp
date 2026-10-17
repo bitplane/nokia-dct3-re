@@ -17050,6 +17050,7 @@ private:
 	}
 	void start_rom4_efr_decoder(unsigned frame, bool initialize)
 	{
+		m_rom4_efr_pitch_observations = m_rom4_efr_code_observations = 0;
 		auto &data = m_cpu->space(AS_DATA);
 		auto const fixture = rom4_efr_decoder_fixture();
 		if (initialize)
@@ -17094,6 +17095,59 @@ private:
 		m_phase = initialize ? 302000 : 302001 + frame;
 		m_check_timer->adjust(attotime::from_msec(20));
 		if (!initialize) save_rom4_codec_frame(frame);
+	}
+	void observe_rom4_efr_state(offs_t address, u16 opcode)
+	{
+		if (m_rom4_codec_replay || m_phase < 302001 || m_phase > 302163) return;
+		unsigned const frame = m_phase - 302001;
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		auto words = [&](char const *kind, unsigned source, unsigned count) {
+			std::string values;
+			for (unsigned i = 0; i < count; ++i)
+			{
+				u16 const value = data.read_word(source + i);
+				for (int shift = 12; shift >= 0; shift -= 4) values += "0123456789abcdef"[(value >> shift) & 15];
+			}
+			osd_printf_info("EFRSTATE frame=%u kind=%s values=%s\n", frame, kind, values.c_str());
+		};
+		if (address == 0x28ee || address == 0x28f1)
+		{
+			bool const before = address == 0x28ee;
+			expect(opcode == (before ? 0x76f8 : 0x68f8), "EFR flag observation brackets the original recovery clear");
+			if (before)
+				expect(m_cpu->space(AS_PROGRAM).read_word(0x28ef) == 0x0ab9 && m_cpu->space(AS_PROGRAM).read_word(0x28f0) == 0,
+					"Original recovery wrapper explicitly stores zero to previous-bad-frame state");
+			osd_printf_info("EFRFLAG frame=%u stage=%s value=%04x\n", frame, before ? "before" : "after", unsigned(data.read_word(0xab9)));
+		}
+		if (address == 0xc7a0)
+		{
+			expect(opcode == 0xe801, "EFR LSF observation is the original post-decoder instruction");
+			words("R2", 0x0b80, 10); words("LSF", 0x0b94, 10);
+		}
+		if (address == 0xc907)
+		{
+			expect(opcode == 0x7215, "EFR raw synthesis observation precedes original postprocessing");
+			words("RAW", 0x1388, 160); words("LPC", 0x1317, 44);
+		}
+		if (address == 0xc4d0)
+		{
+			expect(opcode == 0x1039 && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1ff) == 0x15,
+				"EFR code-gain clamp reads the original previous-bad-frame field through DP");
+			osd_printf_info("EFRCANDIDATE frame=%u subframe=%u prev_bf=%04x previous_gain=%04x value=%04x\n",
+				frame, m_rom4_efr_code_observations, unsigned(data.read_word(0xab9)), unsigned(data.read_word(0xabe)),
+				unsigned((m_cpu->state_int(tms320c54x_device::STATE_B) >> 16) & 0xffff));
+		}
+		if (address == 0xc809 || address == 0xc85a)
+		{
+			bool const pitch = address == 0xc809;
+			expect(opcode == (pitch ? 0x61f8 : 0x1149), "EFR gain observation follows the original gain-decoder call");
+			unsigned &subframe = pitch ? m_rom4_efr_pitch_observations : m_rom4_efr_code_observations;
+			expect(subframe < 4, "EFR observer records exactly four gain results per frame");
+			// These routines publish gains in RAM, not an accumulator return ABI.
+			osd_printf_info("EFRGAIN frame=%u kind=%s subframe=%u value=%04x\n", frame,
+				pitch ? "pitch" : "code", subframe++, unsigned(data.read_word(pitch ? 0x1303 : 0x1302)));
+		}
 	}
 
 	void start_rom4_efr_packing(unsigned vector, unsigned stage)
@@ -47347,6 +47401,8 @@ private:
 	unsigned m_rom4_cni_nonzero_frames = 0;
 	bool m_rom4_codec_replay = false;
 	unsigned m_rom4_codec_replays = 0;
+	// Read-only bench counters stay outside the snapshot; replay emits no duplicate observations.
+	unsigned m_rom4_efr_pitch_observations = 0, m_rom4_efr_code_observations = 0;
 	u32 m_rom4_checkpoint_pc = 0;
 	std::vector<u16> m_rom4_replay_data, m_rom4_checkpoint_data;
 	emu_timer *m_check_timer = nullptr;
@@ -47723,6 +47779,8 @@ void tms320c54x_test_state::test(machine_config &config)
 void tms320c54x_test_state::rom4(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
+	if (!strcmp(config.options().bios(), "efr-loss-observe"))
+		m_cpu->instruction_observer_cb().set(FUNC(tms320c54x_test_state::observe_rom4_efr_state));
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::rom4_program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::rom4_data_map);
 }

@@ -153,6 +153,46 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def observe_erasures(source, commands, log):
+    """Link read-only wrappers without changing the verified decoder binary."""
+    tools = Path(__file__).resolve().parent
+    wrapper, rules = tools / 'etsi_efr_state_observer.c', tools / 'etsi_efr_state_observer.mk'
+    original_decoder = digest((source / 'decoder').read_bytes())
+    command = ['make', '-f', 'makefile.gcc', '-f', str(rules),
+               f'CFLAGS={CFLAGS}', f'OBSERVER_SOURCE={wrapper}', 'decoder_observed']
+    commands.append(command)
+    subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    if digest((source / 'decoder').read_bytes()) != original_decoder:
+        raise ValueError('EFR observer build replaced the verified decoder')
+    for suffix in ('', '_replay'):
+        command = ['./decoder_observed', 'erasure.dec', f'erasure_observed{suffix}.out']
+        commands.append(command)
+        with (source / f'erasure_state{suffix}.log').open('w') as state_log:
+            subprocess.run(command, cwd=source, stdout=log, stderr=state_log, check=True)
+        if (source / f'erasure_observed{suffix}.out').read_bytes() != (source / 'erasure.out').read_bytes():
+            raise ValueError('read-only EFR observer changed reference PCM')
+    try:
+        from tools.c54x_rom4_efr_state_check import parse, parse_policy
+    except ModuleNotFoundError:
+        from c54x_rom4_efr_state_check import parse, parse_policy
+    records = []
+    for suffix in ('', '_replay'):
+        text = (source / f'erasure_state{suffix}.log').read_text()
+        parse(text)
+        parse_policy(text)
+        records.append(('\n'.join(line for line in text.splitlines()
+                                  if line.startswith(('EFRSTATE ', 'EFRGAIN ', 'EFRPOLICY '))) + '\n').encode())
+    state = records[0]
+    if state != records[1]:
+        raise ValueError('EFR state observations differ across fresh processes')
+    (source / 'erasure_state.records').write_bytes(state)
+    return dict(reference_pcm_unchanged=True, fresh_process_replay=True,
+                original_decoder_sha256=original_decoder,
+                state_records_sha256=digest(state), wrapper_sha256=digest(wrapper.read_bytes()),
+                rules_sha256=digest(rules.read_bytes()),
+                executable_sha256=digest((source / 'decoder_observed').read_bytes()))
+
+
 def erasure_input(decoder):
     """Retain the installation payload/TAF and mark fixed active-speech losses."""
     if len(decoder) != 163 * 494:
@@ -306,7 +346,11 @@ def main():
                         help="generate a repeated-speech decoder homing conversation")
     parser.add_argument("--encoder-homing-fixture", action="store_true",
                         help="generate repeated speech and EHF inputs for encoder reset coverage")
+    parser.add_argument('--erasure-state-observer', action='store_true',
+                        help='also link output-preserving erasure-state observers; requires --erasure-fixture')
     args = parser.parse_args()
+    if args.erasure_state_observer and not args.erasure_fixture:
+        parser.error('--erasure-state-observer requires --erasure-fixture')
     evidence_path = None
     evidence = {}
     try:
@@ -345,6 +389,8 @@ def main():
         if args.erasure_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["erasures"] = generate_erasures(source, commands, log)
+                if args.erasure_state_observer:
+                    evidence['erasure_state_observer'] = observe_erasures(source, commands, log)
         if args.homing_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["homing"] = generate_homing(source, commands, log)

@@ -17,7 +17,7 @@ Current native scope is split deliberately:
 
 - [Isolated codec gates](#independent-efr-speech-reference) establish FR/EFR
   algorithm results; EFR additionally has nonzero DTX and clean encoder/decoder
-  homing coverage. The active-speech erasure precision difference remains a
+  homing coverage. The active-speech recovery precision/policy difference remains a
   separate strict comparison, not a reason to alter CPU arithmetic.
 - [BSP ownership and pin gates](#serial-control-ownership-correction) cover
   externally clocked burst and continuous FIG=0/1 reception/transmission,
@@ -2381,8 +2381,8 @@ pairs, eight signed fractional patterns and four memory operands. It checks
 the old source store even when source equals destination. This is atomic
 ordinary-RAM arithmetic coverage, not staged timing, every flag/saturation
 case or proof of physical DSP output. Do not truncate the CPU's accumulator
-to make the reference comparison pass. The remaining question is the extent
-of the recovered implementation's precision differences under errors, not
+to make the reference comparison pass. The remaining question is how the
+implementation's precision and recovery-policy differences account for errors, not
 whether frame 9 can be matched by changing expected output or forcing state.
 
 #### Complete loss/recovery characterization
@@ -2419,11 +2419,65 @@ words. The strict gate still fails at frame 9 with 127 differences; clean
 speech, decoder homing and DTX comparisons remain independently bit-exact.
 
 This narrows the unresolved comparison to recovery state, not missing execution
-of the longer concealment bursts. The frame-8 residual arithmetic above
-explains the first divergence; it is not proof that every later difference has
-the same cause. Following recovery-state producers against the independent
-reference is the next discriminator. No ROM arithmetic, expected samples,
-codec state or conformance criterion is altered by the observation mode.
+of the longer concealment bursts. No ROM arithmetic, expected samples, codec
+state or conformance criterion is altered by the observation mode.
+
+#### Recovery-state comparison
+
+The observation bench uses the CPU's Execute-entry callback, not program-read
+or live-PC coincidence, to capture saved residuals/LSFs, four pitch/code gains,
+raw synthesis and LPC coefficients. Replay emits no duplicate records.
+Gain results are the published RAM words `1303`/`1302`, not an assumed
+accumulator-return ABI. At code-gain predicate `c4d0`, the candidate is B(31--16)
+as subsequently stored by original `STH B`; the observer checks opcode and DP
+before reading `ab9` and `abe` as previous-bad-frame and previous gain.
+
+The external reference has separate read-only link-time wrappers. Its original
+decoder executable is not replaced, observed PCM must equal the unwrapped
+reference exactly, and state records must reproduce across fresh processes.
+No reference algorithm or source is imported into the driver. Reproduce with:
+
+```sh
+python3 tools/verify_etsi_efr_reference.py \
+  roms/research/etsi-efr/original/ts_146053v080000p0.zip \
+  --erasure-fixture --erasure-state-observer
+make observe-c54x-rom4-efr-loss
+python3 tools/c54x_rom4_efr_state_check.py \
+  NATIVE_RUN/console.log REFERENCE_RUN/source/erasure_state.log \
+  --output tmp/efr-state-comparison.json
+```
+
+The printed run directories supply `NATIVE_RUN` and `REFERENCE_RUN`. The
+comparator requires all 163 ordered frame boundaries, all eight gain results
+per frame, all 540 good-frame code-gain policy records on each side and the
+four original recovery clears. Missing, duplicate and malformed observations
+fail closed; a complete comparison still claims no conformance.
+
+All 652 pitch gains match. Code gains differ in seven of 652 subframes:
+
+| Recovery frame | Native code gains | Reference code gains |
+| --- | --- | --- |
+| 35 | 53, 59, 88, 122 | 23, 23, 23, 23 |
+| 136 | 18, 57, 108, 23 | 18, 18, 18, 18 |
+
+The original `76f8 0ab9 0000` at `28ee` changes `ab9` from 1 to 0 on
+frames 9, 35, 88 and 136, before gain decoding. This is executed recovered
+code, not bench initialization or a missing device response. The reference
+passes previous-bad-frame=1 for those four frames and caps each good-frame
+code gain at its preceding gain. All 16 reference recovery gains equal
+`min(native pre-clamp candidate, reference previous gain)`. The native
+publication matches its own observed flag/candidate/previous-gain predicate
+for all 540 good-frame subframes. On frames 9/88 the cap is nonbinding;
+on 35/136 it changes the reference output. Restoring a flag to force agreement
+would undo the original firmware's policy.
+
+Residual precision remains a separate difference: among 280 residual words
+after the 28 erased frames, 180 native words are one lower and 100 match.
+Saved LSFs first differ only on the four recovery frames. This extends the
+earlier first-loss localization without proving every later PCM sample's
+cause. Neither the policy difference nor exact concealed PCM justifies
+changing CPU arithmetic, replacing reference samples or promoting handset
+speech; strict whole-sequence reference equality remains unresolved.
 
 ### Native EFR decoder homing
 
