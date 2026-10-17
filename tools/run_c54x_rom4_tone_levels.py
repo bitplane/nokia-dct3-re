@@ -9,10 +9,10 @@ import sys
 import tempfile
 
 try:
-    from .c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
+    from .c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers, check_private_shadows
     from .c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask, census_mcu_host_interface
 except ImportError:
-    from c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
+    from c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers, check_private_shadows
     from c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask, census_mcu_host_interface
 
 
@@ -65,6 +65,8 @@ def main():
         text = (run / 'error.log').read_text()
         check_level(text, option)
         check_host_writers(text, host_report)
+        shadow_report = check_private_shadows(text)
+        (run / 'private_shadows.json').write_text(json.dumps(shadow_report, indent=2) + '\n')
         check_frame(run / 'snap/noki5110/0000.png')
         print(f'Native tone setting {name}: PASS (control only; no native audio claim)', flush=True)
     return 0

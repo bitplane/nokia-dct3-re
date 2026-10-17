@@ -29,9 +29,55 @@ def check_host_writers(text, report):
         # The ARM debugger's bus-context PC is word-aligned, not necessarily
         # the Thumb instruction address (2721d2 is observed as 2721d0).
         if not any(int(value, 16) == 0x40000 and int(mask, 16) == 0xffff0000
-                   and int(pc, 16) == (access['pc'] & ~3)
+                   and int(pc, 16) in (access['pc'], access['pc'] & ~3)
                    for value, mask, pc in writes):
             raise ValueError(f"unobserved checked DSPIF writer {access['pc']:08x}")
+
+
+def check_private_shadows(text):
+    """Join passive ARM bus writes to later packed parameter publications."""
+    state, valid, revision, consumed, counts = ({8: 0, 9: 0} for _ in range(5))
+    subfields = set()
+    write = re.compile(r'rom4_tone_access: owner=codec_selector([89])_shadow direction=write '
+                       r'address=([0-9a-f]+) value=([0-9a-f]+) mask=([0-9a-f]+) pc=[0-9a-f]+ t=[0-9.]+')
+    publish = re.compile(r'rom4_codec_parameter_publish: phase=(?:boot|interactive) '
+                         r'field=([0-9a-f]{4}) wire=([0-9a-f]{4}) ')
+    for line in text.splitlines():
+        match = write.search(line)
+        if match:
+            selector = int(match[1])
+            address, value, mask = (int(item, 16) for item in match.groups()[1:])
+            if address != (0x10a9e4 if selector == 8 else 0x10a9e8):
+                raise ValueError('private shadow bus address differs')
+            shift = 0 if selector == 8 else 16
+            word_mask = (mask >> shift) & 0xffff
+            if not word_mask:
+                continue
+            state[selector] = (state[selector] & ~word_mask) | ((value >> shift) & word_mask)
+            valid[selector] |= word_mask
+            revision[selector] += 1
+        elif re.search(r'owner=codec_selector[89]_shadow direction=write', line):
+            raise ValueError('malformed private shadow write')
+        match = publish.search(line)
+        if not match:
+            if 'rom4_codec_parameter_publish:' in line:
+                raise ValueError('malformed packed parameter publication')
+            continue
+        field, wire = (int(item, 16) for item in match.groups())
+        selector = 8 if field == 8 or 0x10 <= field <= 0x16 else 9 if field == 9 or 0x17 <= field <= 0x1a else None
+        if selector is None:
+            continue
+        if (valid[selector] != 0xffff or state[selector] != wire or
+                revision[selector] == consumed[selector]):
+            raise ValueError('packed publication lacks its matching fresh private-shadow write')
+        consumed[selector] = revision[selector]
+        counts[selector] += 1
+        if field >= 0x10:
+            subfields.add(field)
+    if not counts[8] or not counts[9]:
+        raise ValueError('missing selector-8/9 private-shadow positive controls')
+    return dict(selector8_publications=counts[8], selector9_publications=counts[9],
+                observed_subfields=sorted(subfields), hardware_request_latch_claim=False)
 
 
 def check_level(text, option):

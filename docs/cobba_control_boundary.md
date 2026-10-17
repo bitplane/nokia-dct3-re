@@ -1692,20 +1692,49 @@ MCU image. It resolves three seeds and three halfword writes to DSPIF
 `30000`: `271764`, `272048` and `2721d2`. Exact original-byte fixtures
 check the constant-4 store sequences and their literal destinations.
 Every tone-level run requires all three writes on the upper bus halfword.
-The last store is observed with word-aligned bus-context PC `2721d0`;
-that is not a different instruction or an extra writer. Boot's bytewise
+The last store can be observed with Thumb PC `2721d2` or word-aligned
+bus-context PC `2721d0`; the checker accepts exactly those two forms, not
+neighboring instructions or odd PCs. Those are not different writers. Boot's bytewise
 zero initialization is dynamically observed but outside these literal-seed
 results. Dynamic/table-driven sources and other MMIO windows are not closed.
 
 The isolated MCU poster audit (`tools.c54x_rom4_host_poster`) executes the
 original BE Thumb routine at `271d70` with Unicorn, stubbing only its paired
-scheduler-lock calls. The 2,352-case matrix covers 47 dispatcher fields, two
+scheduler-lock calls. The baseline 2,352-case matrix covers 47 dispatcher fields, two
 out-of-range field probes (`2f/ffff`), four payload probes, both notification
 settings, two retained shared-word patterns and busy values `0/1/ffff`.
 The 752 valid-field/zero-busy cases succeed. Fields `00..0f` write `(field << 12) | (payload & 0xfff)`
-to `100a8`, independent of the retained word. Field `1b` writes the supplied
-halfword to `100aa`; fields `10..1a` use masked updates and later fields write
-other shared parameters. These are software field identities, not hardware
+to `100a8`, independent of the retained HPI word. Selectors 8 and 9 additionally
+initialize private shadows `10a9e6` and `10a9e8`. Fields `10..16` preserve the
+first shadow except for one selected bit (`0400,0200,0020,0010,0008,0004,0001`);
+only payload bit 0 controls that bit, not payload truthiness. Fields
+`17..1a` update two-, two-, four- and four-bit slices of the second shadow
+at shifts 10, 8, 4 and 0. Each writes its updated shadow to `100a8`.
+Thus these are subfield updates of the packed selector-8/9 words, not
+evidence of independent DSP request bits. For example, shadow `9209`
+and field `1a`/value `000c` produce `920c`, regardless of the old HPI word.
+The earlier retained-HPI probes did not exercise preservation of these
+private shadows; they must not be cited as doing so.
+
+All remaining parameter transformations are also independently checked:
+
+| Fields | Shared output | Transformation |
+| --- | --- | --- |
+| `1b` | `100aa` | Full halfword. |
+| `1c..1f` | `100ac` | Low-byte slices: widths 3/1/1/3 at shifts 5/0/1/2; upper byte cleared. |
+| `20..23` | `100ae,100b0,100b2,100b4` | Low 14 payload bits. |
+| `24,25,28,29,2d` | `100b6,100ac,100bc,100b8,100be` | Full halfword. |
+| `26,27` | `100be` | Replace high/low byte, preserve the other HPI byte. |
+| `2a..2c` | `100ba` | Replace bit 15, bit 14 or low four bits, preserve other HPI bits. |
+| `2e` | None | Trigger only. |
+
+An additional 3,168 original-routine executions test the eleven shadow-backed
+fields using zero, all-ones and every single payload bit, both notification
+settings, two independent HPI patterns and four nonzero shadow pairs,
+including the observed packed `8426/9209` pair. All 5,520 cases check external
+stores and the two private-shadow write streams against separately expressed
+mask/shift rules. The extended cases have busy=0; busy rejection remains
+covered by the baseline matrix. These are software field identities, not hardware
 request-bit names. For every field, notification enabled produces the ordered
 external stores `100e0=1`, `30000=4` (halfwords), then `20008=2` (byte).
 Field `2e` emits that sequence even when notification is disabled, without
@@ -1722,15 +1751,29 @@ Reproduce with:
 ```sh
 .venv/bin/python -m tools.c54x_rom4_host_poster roms/noki5110/5110f530.fls --output tmp/native-host-poster-audit.json
 ```
-The report records the original image hash, emulator version and per-case
-external stores. RAM contents and busy values are isolated fixture inputs,
+The schema-3 report records the original image hash, emulator version and per-case
+external/private-shadow stores. RAM contents and busy values are isolated fixture inputs,
 not a handset boot or silicon experiment. The four payload/two retained-value
-probes are not exhaustive data coverage; private-RAM effects, scheduler lock
+probes are not exhaustive data coverage; private-RAM effects beyond the two
+checked shadows, scheduler lock
 semantics, live contention and caller retry behavior are excluded. This enumerates the poster's dispatch
 surface, not all MCU callers or the DSP port-1/2 alias. In particular,
 the trigger-only field does not identify which DSP request bits assert, and
 software stores to `100aa` do not prove that a DSP I/O acknowledgement clears
 the parameter at `100a8`. The backend alias remains unresolved.
+
+`check-c54x-rom4-tone-levels` joins these shadows to live publications without
+reading or changing them in its Lua taps. The ARM bus places selector 8 in
+the lower halfword at `10a9e4` and selector 9 in the upper halfword at
+`10a9e8`; neighboring record traffic is excluded by lane masks. Every captured
+publication must follow a fresh shadow write with the same word, rather than
+merely matching an old cached value. Off/Low observe two selector-8 and nine
+selector-9 publications each; Medium/High observe two and nineteen.
+`private_shadows.json` retains per-run counts. No subfield ID `10..1a` is
+observed in those four live captures: their coverage remains the isolated
+matrix, not an organic handset claim. Existing physical keys, control
+transactions and final digit-2 pixels remain independently required; none
+of these results validates native gain or production audio clocks.
 
 At the packed-field publisher, field 8/value `8426` has R5=1 and immediately
 reaches the DSPIF trigger; field 9/value `920c` has R5=0 and its trigger

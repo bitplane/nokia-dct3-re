@@ -3,17 +3,60 @@ import tempfile
 from pathlib import Path
 from PIL import Image
 
-from tools.c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers
+from tools.c54x_rom4_tone_levels_check import check_level, check_frame, check_host_writers, check_private_shadows
 from tools import test_c54x_rom4_codec_contract as codec_fixtures
 
 
 class NativeToneLevelsTest(unittest.TestCase):
+    def shadow_trace(self):
+        return '\n'.join([
+            'rom4_tone_access: owner=codec_selector8_shadow direction=write address=10a9e4 value=8426 mask=ffff pc=271fd8 t=1.0',
+            'rom4_codec_parameter_publish: phase=boot field=0008 wire=8426 r5=00000001',
+            'rom4_tone_access: owner=codec_selector9_shadow direction=write address=10a9e8 value=92090000 mask=ffff0000 pc=271fd8 t=1.1',
+            'rom4_codec_parameter_publish: phase=boot field=0009 wire=9209 r5=00000000',
+            'rom4_tone_access: owner=codec_selector9_shadow direction=write address=10a9e8 value=920c0000 mask=ffff0000 pc=271f14 t=9.0',
+            'rom4_codec_parameter_publish: phase=interactive field=001a wire=920c r5=00000001',
+        ])
+
+    def test_private_shadow_join_preserves_lanes_and_subfield_ownership(self):
+        result = check_private_shadows(self.shadow_trace())
+        self.assertEqual(result['selector8_publications'], 1)
+        self.assertEqual(result['selector9_publications'], 2)
+        self.assertEqual(result['observed_subfields'], [0x1a])
+        self.assertFalse(result['hardware_request_latch_claim'])
+        changed = self.shadow_trace().replace(
+            'value=920c0000 mask=ffff0000 pc=271f14 t=9.0',
+            'value=92000000 mask=ff000000 pc=271f14 t=9.0\n'
+            'rom4_tone_access: owner=codec_selector9_shadow direction=write address=10a9e8 value=c0000 mask=ff0000 pc=271f14 t=9.1')
+        self.assertEqual(check_private_shadows(changed), result)
+
+    def test_private_shadow_join_rejects_missing_wrong_or_stale_writes(self):
+        original = self.shadow_trace()
+        for text in ('', '\n'.join(original.splitlines()[1:]),
+                     original.replace('address=10a9e8', 'address=10a9e4'),
+                     original.replace('mask=ffff0000', 'mask=ffff'),
+                     original.replace('wire=920c', 'wire=9209'),
+                     original + '\n' + original.splitlines()[-1],
+                     original.replace('field=001a', 'field=bad')):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check_private_shadows(text)
+
+    def test_adjacent_halfword_is_not_a_fresh_shadow_write(self):
+        text = self.shadow_trace() + '\n' + '\n'.join([
+            'rom4_tone_access: owner=codec_selector9_shadow direction=write address=10a9e8 value=1234 mask=ffff pc=271fd8 t=10.0',
+            'rom4_codec_parameter_publish: phase=interactive field=001a wire=920c r5=00000001',
+        ])
+        with self.assertRaisesRegex(ValueError, 'fresh private-shadow'):
+            check_private_shadows(text)
+
     def test_writer_join_preserves_thumb_vs_bus_context_pc(self):
         report = {'accesses': [{'pc': 0x2721d2, 'kind': 'write', 'width': 2, 'address': 0x30000}]}
         text = 'rom4_tone_access: owner=codec_dspif_mcu direction=write address=030000 value=40000 mask=ffff0000 pc=2721d0 t=0.13'
         check_host_writers(text, report)
+        check_host_writers(text.replace('pc=2721d0', 'pc=2721d2'), report)
         for old, new in (('value=40000', 'value=80000'), ('mask=ffff0000', 'mask=ffff'),
-                         ('pc=2721d0', 'pc=2721d2'), ('direction=write', 'direction=read')):
+                         ('pc=2721d0', 'pc=2721d4'), ('pc=2721d0', 'pc=2721d1'),
+                         ('direction=write', 'direction=read')):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_host_writers(text.replace(old, new), report)
     def trace(self, option):

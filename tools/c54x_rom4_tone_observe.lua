@@ -3,13 +3,14 @@ local machine = manager.machine
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
 local mcu = assert(machine.devices[':maincpu'])
 local taps, counts, emitted = {}, {}, {}
-local function watch(cpu, kind, address, owner, last)
+local function watch(cpu, kind, address, owner, last, lane)
     local space = assert(cpu.spaces[kind])
     for _, direction in ipairs({'read', 'write'}) do
         local key = owner .. '_' .. address .. '_' .. direction
         counts[key] = 0
         local install = direction == 'read' and space.install_read_tap or space.install_write_tap
         taps[#taps + 1] = install(space, address, last or address, key, function(_, value, mask)
+            if lane and (mask & lane) == 0 then return end
             counts[key] = counts[key] + 1
             local phase = machine.time:as_double() >= 7 and 'interactive' or 'boot'
             local output_key = key .. '_' .. phase
@@ -33,6 +34,10 @@ watch(dsp, 'data', 0x06be, 'dsp')
 watch(dsp, 'data', 0x00ef, 'codec_demand')
 watch(dsp, 'program', 0x00ef, 'codec_demand_overlay')
 watch(mcu, 'program', 0x100a8, 'codec_shared_mcu', 0x100ab)
+-- These private shadows occupy different ARM bus halfword lanes. Keep raw
+-- masks: retained HPI data is not the source of selector-8/9 subfield updates.
+watch(mcu, 'program', 0x10a9e4, 'codec_selector8_shadow', 0x10a9e7, 0x0000ffff)
+watch(mcu, 'program', 0x10a9e8, 'codec_selector9_shadow', 0x10a9eb, 0xffff0000)
 watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
 watch(dsp, 'program', 0x0854, 'codec_shared_overlay')
 watch(dsp, 'data', 0x0870, 'codec_pending_dsp')
