@@ -566,6 +566,58 @@ DECODER_OUTPUT_WITNESSES = (
                0xF982,0x48A6,0x80E1,0x0400,0x7111,0x0012,0x6EEA,0xFFFF,0x3E14,0x7011,0x0012)),
 )
 
+DECODER_DISPATCH_WITNESSES = (
+    (0xC6A0, (0x0002,0x3D5D)),
+    (0x29879, (0xE90D,0xF882,0x98B8)),
+    (0x298B8, (0x8812,0xF845,0x98C4,0xF741,0x0182,0x8912,0xF495,
+               0xF495,0x5782,0xF84D,0x98C4,0xF5E6,0xF020,0xFFFF,0xF4E4)),
+    (0x2936D, (0x10F8,0x1310,0xF845,0x9375,0x7711,0,0xF073,0x9377,0x7711,0x0400)),
+    (0x293A2, (0x10F8,0x15E9,0xF982,0x96AC,0x10F8,0x15E9,0xF982,0x973C,0x8812,
+               0xF495,0xE710,0xF5AA,0xF830,0x940B,0x7211,0x15D9,0x4811,0x1AE6,0x0016,0xF845,0x940B)),
+    (0x293C6, (0x10E6,0x0012,0x8001,0x7000,0x15E9,0x10F8,0x15EB,0xF982,0x9879,0x8811)),
+    (0x23D5D, (0x4A11,0x4A16,0x4A17,0xEEED,0x8816,0x1019,0x800C,0x1018,0x800D,
+               0x10E6,2,0x8006,0x10E6,3,0x8005,0x100C,0x8004,0x100D,0xF982,0x973C)),
+    (0x2973C, (0x4A11,0xEEFF,0x8811,0xF495,0xF495,0x10E1,1,0x0881,0xEE01,0x8A11,0xF4E4)),
+    (0x23E2C, (0x10E6,1,0xF982,0x9F2B)),
+    (0x29F2B, (0xE90C,0xF882,0x98B8)),
+)
+
+
+def decode_decoder_dispatch(words):
+    for base,witness in DECODER_DISPATCH_WITNESSES:
+        if any(words.get(base+offset) != value for offset,value in enumerate(witness)):
+            raise ValueError(f'decoder dispatch witness changed or absent at {base:06x}')
+    adjacent = [address for address in words if address+1 in words]
+    far_refs = sorted(address for address in adjacent if (words[address],words[address+1]) == (2,0x3d5d))
+    direct = sorted(address for address in adjacent if words[address] in (0xf982,0xfb82,0xf882) and words[address+1] == 0x9879)
+    return {'segment':'aa99','pinned_words':sum(len(witness) for _,witness in DECODER_DISPATCH_WITNESSES),
+        'method':13,'selected_table_pointer':'00c6a0','body':'023d5d',
+        'wrapper':'029879','common_dispatch':'0298b8','selected_callsite':'0293cd',
+        'receiver_reference':'15eb','input_object_reference':'15e9',
+        'availability_helper':{'entry':'02973c','operation':'low16(object[1] - object[0])'},
+        'local_gate':{'compare':'0293ad','branch':'0293ae','skip_target':'02940b',
+            'condition':'unsigned AR2 < AR0; CMPR CC=1,AR2',
+            'threshold':'1310 != 0 selects zero; otherwise 0400',
+            'activity':'15d9 OR context[0x16] must be nonzero at 0293b5'},
+        'post_frame':{'call':'023e2e','wrapper':'029f2b','virtual_method':12},
+        'census':{'mapped_words':len(words),'adjacent_pairs':len(adjacent),
+            'encoded_far_reference_candidates':[f'{address:06x}' for address in far_refs],
+            'recognized_direct_wrapper_candidates':[f'{address:06x}' for address in direct],
+            'scope':'Contiguous word pairs and FCALL/FCALLD/FB forms only; not code/data classification or complete indirect-call closure'},
+        'scope':'Pinned local software dispatch gates; no physical counter units, runtime operand ownership or session-termination cause'}
+
+
+def reference_decoder_local_gate(cursor, limit, threshold_flag, activity, context_activity):
+    values = (cursor,limit,threshold_flag,activity,context_activity)
+    if any(not isinstance(value,int) or not 0 <= value <= 0xffff for value in values):
+        raise ValueError('decoder gate requires five unsigned words')
+    available = (limit-cursor)&0xffff
+    threshold = 0 if threshold_flag else 0x400
+    route = ('insufficient_input' if available < threshold else
+             'inactive' if not (activity|context_activity) else 'call_method_13')
+    return {'available':available,'threshold':threshold,'route':route,
+            'scope':'Local gate after buffer refresh only; counter units and earlier lifecycle branches are not inferred'}
+
 PCM_CONVERSION_WITNESSES = (
     (0x248A6, (0xEEFC,0xF495,0x1106,0x7600,0,0xF784,0x7602,0,0x8101,0xF982,0x4E38,
                0xF7B8,0xF540,0xF768,0xF778,0xF84B,0x48C4,0xF540,0xF768,0xF778,0xF6B8,
@@ -1356,6 +1408,7 @@ def contract(source):
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['decoder_output'] = decode_decoder_output(rel_words)
+    result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)

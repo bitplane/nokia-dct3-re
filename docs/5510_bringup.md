@@ -8526,6 +8526,44 @@ Tests reject partial/pending/capped captures, wrong ordering/times/scope,
 changed counts/hash and missing successful blocks. Waveform disagreement
 remains an explicit diagnostic, never fitted away or labeled conformance.
 
+##### Dispatch and termination boundary
+
+`decoder_dispatch` in `mu4_context_contract.py` pins 99 additional AA99 words
+around the original caller and ABI. Receiver reference `15eb` selects table
+`c686`; method index 13 uses the far pointer at `c6a0`, `0002,3d5d`.
+Wrapper `029879` supplies index 13 to common dispatch `0298b8`; its selected
+direct caller is `0293cd`. Body `023d5d` sets up the already verified
+processing call/conversion loop. Its post-conversion call at `023e2e`
+delegates through `029f2b` to virtual method 12; no hardware meaning is
+assigned to that method here.
+
+Before dispatch, `0293a2` refreshes the input object referenced by `15e9`.
+Helper `02973c` returns `object[1] - object[0]`; the caller retains its low
+word in AR2. The threshold setup at `02936d` selects AR1=0 for nonzero
+`1310`, otherwise `0400`; `0293ac` copies AR1 to AR0. Opcode `f5aa` at
+`0293ad` is `CMPR 1,AR2`: [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+page 4-34, specifies unsigned AR2<AR0. The TC branch at `0293ae` skips to
+`02940b` when that local availability test fails. Independently, the AEQ
+branch at `0293b5` skips the same way when `15d9 OR context[0x16]` is zero.
+Counter units, complete buffer-refresh effects and runtime branch operands
+remain unvalidated; do not translate `0400` into bytes, samples or a physical
+FIFO depth without evidence.
+
+The source census covers 49,843 mapped AA99 words and 49,828 adjacent pairs.
+It finds one encoded `0002,3d5d` pair (`c6a0`) and one wrapper target among
+the recognized direct FCALL/FCALLD/FB forms (`0293cd`). This is quantified
+raw-pattern coverage, not code/data classification, all indirect callers or
+a whole-ROM absence proof. Tests mutate every pinned word, retain additional
+candidate references, and distinguish threshold equality, unsigned high-bit
+values, cursor wrap and the separate activity condition.
+
+Next observe the executed caller paths around the final successful block:
+`0293ae`, `0293b5`, `0293cd` and `02940b`, alongside the actual input-object
+fields and activity words. Determine which branch changes, or whether this
+caller stops being scheduled altogether. Static gates identify where to
+look; they do not yet establish why the session ends at 375 calls, and no
+gate, input count or lifecycle flag should be forced to extend it.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a

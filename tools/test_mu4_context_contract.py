@@ -20,6 +20,7 @@ from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RE
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
+from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
@@ -502,6 +503,34 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address),self.assertRaises(ValueError):
                 decode_decoder_output(changed)
+
+    def test_decoder_dispatch_pins_method_gate_and_quantifies_raw_census(self):
+        words = {address:value for base,witness in DECODER_DISPATCH_WITNESSES
+                 for address,value in enumerate(witness,base)}
+        result = decode_decoder_dispatch(words)
+        self.assertEqual(result['method'],13)
+        self.assertEqual(result['census']['encoded_far_reference_candidates'],['00c6a0'])
+        self.assertEqual(result['census']['recognized_direct_wrapper_candidates'],['0293cd'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_dispatch(changed)
+        words.update({0x4000:2,0x4001:0x3d5d})
+        self.assertEqual(decode_decoder_dispatch(words)['census']['encoded_far_reference_candidates'],['004000','00c6a0'])
+
+    def test_decoder_local_gate_keeps_unsigned_threshold_and_activity_distinct(self):
+        for values,route in (((0,0x3ff,0,1,0),'insufficient_input'),
+                             ((0,0x400,0,1,0),'call_method_13'),
+                             ((0,0x400,0,0,0),'inactive'),
+                             ((0,0,1,0,1),'call_method_13'),
+                             ((0,0xffff,0,1,0),'call_method_13'),
+                             ((0xffff,0,0,1,0),'insufficient_input')):
+            with self.subTest(values=values):
+                self.assertEqual(reference_decoder_local_gate(*values)['route'],route)
+        for values in ((-1,0,0,1,0),(0,0,65536,1,0)):
+            with self.assertRaises(ValueError):
+                reference_decoder_local_gate(*values)
 
     def test_pcm_conversion_pins_rounding_shift_and_symmetric_clamp(self):
         words = {address:value for base,witness in PCM_CONVERSION_WITNESSES
