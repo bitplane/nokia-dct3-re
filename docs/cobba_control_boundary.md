@@ -1054,12 +1054,13 @@ for NSE-5. In particular, neither that description nor control-bus
 traffic establishes registers 5/6 as analog measurements or unique identity
 fields. Their current values are calibrated inputs, not measured defaults.
 
-The public 5110 ROM4 analysis provides a software-only route when its
-bring-your-own mask image is available. It identifies serial I/O ports
-`0x2c/0x2d`, a distinct parallel MFI `0xCxxx` control frame, and bidirectional
-PCM ports. These are separate buses and must remain separate local device
-interfaces. See `djr_dsp_integration.md` for provenance, addresses and the
-missing-overlay limitation.
+The public 5110 ROM4 analysis provides reproduction leads when its
+bring-your-own mask image is available. Local evidence admits the opaque
+serial control transport on I/O `0x2c/0x2d`, but does not admit the reference's
+parallel-MFI or PCM port labels. Data `0x22` is BSPC; its `0xCxxx` words are
+not independent MFI evidence. Keep data MMRs, I/O control and sample
+interfaces distinct. See `djr_dsp_integration.md` for provenance and each
+claim's admission status.
 
 The ROM4 boot self-test separates the two owners. It first reads COBBA control
 register 8, sets `0x0610`, and writes it back. It then writes C54x BSPC
@@ -1423,6 +1424,34 @@ The last store is observed with word-aligned bus-context PC `2721d0`;
 that is not a different instruction or an extra writer. Boot's bytewise
 zero initialization is dynamically observed but outside these literal-seed
 results. Dynamic/table-driven sources and other MMIO windows are not closed.
+
+The isolated MCU poster audit (`tools.c54x_rom4_host_poster`) executes the
+original BE Thumb routine at `271d70` with Unicorn, stubbing only its paired
+scheduler-lock calls. All 47 dispatcher fields return successfully for four
+payload probes, both notification settings and two retained shared-word
+patterns: 752 cases. Fields `00..0f` write `(field << 12) | (payload & 0xfff)`
+to `100a8`, independent of the retained word. Field `1b` writes the supplied
+halfword to `100aa`; fields `10..1a` use masked updates and later fields write
+other shared parameters. These are software field identities, not hardware
+request-bit names. For every field, notification enabled produces the ordered
+external stores `100e0=1`, `30000=4` (halfwords), then `20008=2` (byte).
+Field `2e` emits that sequence even when notification is disabled, without
+storing a parameter. Other fields with notification disabled do not emit it.
+
+Reproduce with:
+
+```sh
+.venv/bin/python -m tools.c54x_rom4_host_poster roms/noki5110/5110f530.fls --output tmp/native-host-poster-audit.json
+```
+The report records the original image hash, emulator version and per-case
+external stores. RAM inputs and a zero busy flag are isolated fixture inputs,
+not a handset boot or silicon experiment. The four payload/two retained-value
+probes are not exhaustive data coverage; private-RAM effects, scheduler lock
+semantics and busy handling are excluded. This enumerates the poster's dispatch
+surface, not all MCU callers or the DSP port-1/2 alias. In particular,
+the trigger-only field does not identify which DSP request bits assert, and
+software stores to `100aa` do not prove that a DSP I/O acknowledgement clears
+the parameter at `100a8`. The backend alias remains unresolved.
 
 At the packed-field publisher, field 8/value `8426` has R5=1 and immediately
 reaches the DSPIF trigger; field 9/value `920c` has R5=0 and its trigger
