@@ -113,6 +113,14 @@ these placeholders in a test baseline.
 
 ### External EFR reference input
 
+The optional `--homing-fixture` derives a canonical DHF from the unmodified
+reference encoder's second EHF input frame. It generates a locally pinned
+46-frame decoder conversation with repeated speech between DHF pairs;
+two fresh interface/decoder sequences must agree. `homing.dec` and
+`homing.out` remain private research fixtures. The native acceptance and
+caller convention are documented in
+`docs/cobba_control_boundary.md#native-efr-decoder-homing`.
+
 The optional `--erasure-fixture` generates fixed active-speech BFI bursts
 of 1, 3, 8 and 16 frames from the verified installation decoder input.
 Payload and TAF are unchanged; two fresh decoder processes must reproduce

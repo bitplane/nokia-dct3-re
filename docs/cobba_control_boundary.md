@@ -1974,3 +1974,35 @@ to make the reference comparison pass. The remaining question is the extent
 of the recovered implementation's precision differences under errors, not
 whether frame 9 can be matched by changing expected output or forcing state.
 
+### Native EFR decoder homing
+
+**Accepted boundary:** `make check-c54x-rom4-efr-homing-decoder` reproduces
+all 46 frames and 7,360 PCM samples of a generated external-reference homing
+conversation. Each frame replays all 65,440 ordinary RAM words after restore.
+This is clean decoder-homing acceptance, not error/homing combinations,
+encoder-homing acceptance or handset speech transport.
+
+After verifying the original installation vectors, the unmodified reference
+encoder processes two frames of the EHF sample pattern (`0008`). Its second
+encoded frame supplies the canonical DHF; no pattern table is copied into
+the generator. The conversation is two DHFs, the first 20 installation speech
+frames, two DHFs, the same 20 speech frames, then two DHFs. Two fresh
+interface/decoder process sequences must reproduce the locally pinned input
+and output. Steady homing frames 0, 1, 23 and 45 emit `0008` in every sample;
+the two nontrivial 20-frame speech outputs are byte-identical. Generated
+vectors and external source remain private research inputs, not Git or
+MAME-overlay content or published conformance vectors.
+
+The unchanged native `c941` reset and `c8dc` wrapper handle all resets after
+the initial fixture entry. No reset is injected between frames. The private
+caller must supply `AR2=1344`: the first-subframe homing check consumes the
+entry parameter pointer. The real caller's `c8c7` unpack path establishes it
+with `c8d7..c8d9` (`7712 1343 8092`, load then postincrementing store).
+The fixture checks those original words before using the calling convention.
+Leaving AR2 at the previous routine's arbitrary value can leave ordinary
+speech tests green while silently disabling this first homing check. Treat
+that as a fixture-ABI error, not missing hardware or a reason to synthesize
+a reset flag. Clean speech and nonzero DTX results remain separately gated;
+active-speech erasure precision remains the distinct unresolved comparison
+above.
+

@@ -7,9 +7,41 @@ from unittest.mock import patch
 from tools.verify_etsi_efr_reference import check_vectors, digest, validate_members
 from tools.verify_etsi_efr_reference import dtx_input, inspect_dtx, DTX_FRAMES
 from tools.verify_etsi_efr_reference import erasure_input, inspect_erasures, ERASURE_BURSTS
+from tools.verify_etsi_efr_reference import homing_conversation, inspect_homing, HOMING_FRAMES
 
 
 class EtsiEfrReferenceTest(unittest.TestCase):
+    def test_homing_conversation_preserves_encoded_speech(self):
+        canonical = struct.pack('<246H', *([0] * 244 + [1, 1]))
+        speech = bytes(i % 251 for i in range(80196))
+        output = homing_conversation(canonical, speech)
+        self.assertEqual(len(output), HOMING_FRAMES * 492)
+        for start in (0, 22, 44):
+            self.assertEqual(output[start * 492:(start + 2) * 492], canonical * 2)
+        for start in (2, 24):
+            self.assertEqual(output[start * 492:(start + 20) * 492], speech[:20 * 492])
+        for first, second in ((canonical[:-1], speech), (canonical, speech[:-1]),
+                              (b'\x02\x00' + canonical[2:], speech)):
+            with self.assertRaises(ValueError):
+                homing_conversation(first, second)
+
+    def test_homing_requires_reset_output_and_repeated_nontrivial_speech(self):
+        decoder = bytes(HOMING_FRAMES * 494)
+        pattern = struct.pack('<160h', *([8] * 160))
+        pcm = bytearray(pattern * HOMING_FRAMES)
+        speech = bytes([1, 0]) * (20 * 160)
+        pcm[2 * 320:22 * 320] = speech
+        pcm[24 * 320:44 * 320] = speech
+        self.assertEqual(inspect_homing(decoder, pcm)['repeated_speech_frames'], 20)
+        changed = bytearray(pcm)
+        changed[24 * 320] = 2
+        for first, second in ((decoder[:-1], pcm), (decoder, pcm[:-1]),
+                              (b'\x01\x00' + decoder[2:], pcm),
+                              (decoder, bytes(len(pcm))), (decoder, pattern * HOMING_FRAMES),
+                              (decoder, changed), (decoder, b'\x00' + pcm[1:])):
+            with self.assertRaises(ValueError):
+                inspect_homing(first, second)
+
     def test_erasure_input_changes_only_scheduled_bfi(self):
         original = b''.join(struct.pack('<247H', *([0] + [i % 2] * 244 + [0, i % 2]))
                             for i in range(163))

@@ -30,6 +30,11 @@ ERASURE_EXPECTED = {
     "dec": "ec37dbbd0f498b5e19b6e549b80687acafe03859c68ff5f337940a25dfb370d5",
     "out": "1c05e9951ffbe91fb25e2ddd4b349f4e563a021ebd5ad7d1e3115881ce326fc9",
 }
+HOMING_FRAMES = 46
+HOMING_EXPECTED = {
+    "dec": "0ca6dbc6caff2cf556aa6f7458dc4d8c3044750af1ad977a2af6edc6920d1fc1",
+    "out": "7dad66375d871bb518cd00bac53e57b698a6fee1e1b3555cea0e06109a022205",
+}
 DTX_EXPECTED = {
     "inp": "f7c76955e1f79777b6a67eab3c6cc346d13351974b40817a6765acc89739ba1d",
     "cod": "b06b7dd60d251b6fa48931ecb3e313f7b03a754bb0a0b3807be1781cd73e590b",
@@ -158,6 +163,61 @@ def generate_erasures(source, commands, log):
             "published_expected_vector_claim": False}
 
 
+def homing_conversation(canonical, speech):
+    """Two initial DHFs, repeated speech separated by two DHFs, final two DHFs."""
+    if len(canonical) != 492 or len(speech) != 80196:
+        raise ValueError("homing source requires one encoded frame and verified installation speech")
+    if any(word > 1 for (word,) in struct.iter_unpack('<H', canonical)):
+        raise ValueError("homing source contains a nonbinary bit or flag")
+    segment = speech[:20 * 492]
+    return canonical * 2 + segment + canonical * 2 + segment + canonical * 2
+
+
+def inspect_homing(decoder, pcm):
+    if len(decoder) != HOMING_FRAMES * 494 or len(pcm) != HOMING_FRAMES * 320:
+        raise ValueError("homing conversation frame count differs")
+    for frame in struct.iter_unpack('<247H', decoder):
+        if frame[0] or frame[245] or frame[246] > 1 or any(bit > 1 for bit in frame[1:245]):
+            raise ValueError("homing conversation requires clean active-speech frames")
+    pattern = struct.pack('<160h', *([8] * 160))
+    for frame in (0, 1, 23, 45):
+        if pcm[frame * 320:(frame + 1) * 320] != pattern:
+            raise ValueError("steady homing output is not the EHF pattern")
+    first, second = pcm[2 * 320:22 * 320], pcm[24 * 320:44 * 320]
+    if not any(first) or first == pattern * 20 or first != second:
+        raise ValueError("speech after homing does not reproduce from reset")
+    return {"frames": HOMING_FRAMES, "homing_frames": [0, 1, 22, 23, 44, 45],
+            "steady_ehf_frames": [0, 1, 23, 45], "repeated_speech_frames": 20}
+
+
+def generate_homing(source, commands, log):
+    (source / "homing_probe.inp").write_bytes(struct.pack('<320h', *([8] * 320)))
+    command = ["./coder", "homing_probe.inp", "homing_probe.cod"]
+    commands.append(command)
+    subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    probe = (source / "homing_probe.cod").read_bytes()
+    if len(probe) != 2 * 492:
+        raise ValueError("homing encoder did not produce two complete frames")
+    canonical = probe[492:]
+    (source / "homing.cod").write_bytes(homing_conversation(canonical, (source / "verified.cod").read_bytes()))
+    for prefix in ("homing", "homing_replay"):
+        for command in (["./ed_iface", "homing.cod", f"{prefix}.dec"],
+                        ["./decoder", f"{prefix}.dec", f"{prefix}.out"]):
+            commands.append(command)
+            subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    outputs = {}
+    for suffix in ("dec", "out"):
+        data = (source / f"homing.{suffix}").read_bytes()
+        if data != (source / f"homing_replay.{suffix}").read_bytes():
+            raise ValueError("homing reference differs across fresh processes")
+        if digest(data) != HOMING_EXPECTED[suffix]:
+            raise ValueError("homing reference differs from its local reproducibility pin")
+        outputs[suffix] = {"bytes": len(data), "sha256": digest(data)}
+    coverage = inspect_homing((source / "homing.dec").read_bytes(), (source / "homing.out").read_bytes())
+    return {"coverage": coverage, "outputs": outputs, "canonical_sha256": digest(canonical),
+            "fresh_process_replay": True, "published_expected_vector_claim": False}
+
+
 def validate_members(names):
     """This specific archive is flat; reject paths and lowercase collisions."""
     seen = set()
@@ -195,6 +255,8 @@ def main():
                         help="generate a deterministic DTX conversation after installation verification")
     parser.add_argument("--erasure-fixture", action="store_true",
                         help="generate fixed active-speech BFI bursts after installation verification")
+    parser.add_argument("--homing-fixture", action="store_true",
+                        help="generate a repeated-speech decoder homing conversation")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -234,6 +296,9 @@ def main():
         if args.erasure_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["erasures"] = generate_erasures(source, commands, log)
+        if args.homing_fixture:
+            with (run / "build-and-run.log").open("a") as log:
+                evidence["homing"] = generate_homing(source, commands, log)
         evidence["frames"] = evidence["outputs"]["out"]["bytes"] // 320
         evidence["unused_input_samples"] = len((source / "spch_dos.inp").read_bytes()) // 2 - evidence["frames"] * 160
         evidence["executables"] = {name: digest((source / name).read_bytes())
@@ -252,6 +317,10 @@ def main():
                 for suffix in ("dec", "out"):
                     name = f"erasure.{suffix}"
                     (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+            if args.homing_fixture:
+                for suffix in ("dec", "out"):
+                    name = f"homing.{suffix}"
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
     except (OSError, ValueError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
         if evidence_path is not None:
@@ -264,6 +333,8 @@ def main():
         print("ETSI EFR DTX reference: PASS frames=518 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     if args.erasure_fixture:
         print("ETSI EFR erasure reference: PASS frames=163 erased=28 bursts=1,3,8,16 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
+    if args.homing_fixture:
+        print("ETSI EFR homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     return 0
 
 

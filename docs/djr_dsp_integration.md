@@ -176,6 +176,10 @@ target nonzero background/SID/unusable-frame intervals and speech resumption.
 They reproduce the complete 518-frame nonzero-background conversation after
 correcting generic XC Access-stage condition visibility. Active-speech error
 policy and handset audio transport remain outside that acceptance.
+The separate [decoder homing gate](cobba_control_boundary.md#native-efr-decoder-homing)
+also reproduces a 46-frame reset/repeated-speech conversation with full RAM
+replay. It models the original caller's parameter-pointer convention, not an
+extra reset between frames. Error/homing combinations remain unproved.
 
 The remaining NSE-1 boundaries are RF sample ownership/encoding and SCU
 tuning, and an organic DSP-to-PCM speech lifecycle. Matching internal images

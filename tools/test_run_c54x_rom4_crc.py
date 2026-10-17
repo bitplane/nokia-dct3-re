@@ -17,9 +17,25 @@ from tools.run_c54x_rom4_crc import EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE, EFR_
 from tools.run_c54x_rom4_crc import EFR_DTX_DECODER_PASS, EFR_DTX_DECODER_COMPLETE, EFR_DTX_DECODER_REPLAY
 from tools.run_c54x_rom4_crc import EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLETE, EFR_DTX_ENCODER_REPLAY
 from tools.run_c54x_rom4_crc import EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE, EFR_ERASURE_REPLAY
+from tools.run_c54x_rom4_crc import EFR_HOMING_PASS, EFR_HOMING_COMPLETE, EFR_HOMING_REPLAY
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_homing_decoder_requires_every_frame_and_replay(self):
+        frames = "\n".join(f"ROM4 EFR homing decoder comparison: frame={frame} mismatches=0" for frame in range(46))
+        text = "\n".join((frames, EFR_HOMING_REPLAY, EFR_HOMING_PASS, EFR_HOMING_COMPLETE))
+        check_result(text, 3, efr_homing_decoder=True)
+        check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_homing_decoder=True)
+        for invalid in (text.replace("frame=45 mismatches=0", "frame=45 mismatches=1"),
+                        text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),
+                        text.replace(EFR_HOMING_REPLAY, ""), text.replace("homing=6", "homing=0"),
+                        text.replace("steady_ehf=4", "steady_ehf=0"),
+                        text.replace("repeated_speech=20", "repeated_speech=0"),
+                        text.replace("ram_words=65440", "ram_words=160"),
+                        text + "\nunexpected trailer"):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_homing_decoder=True)
+
     def test_efr_erasure_decoder_completion(self):
         frames = "\n".join(f"ROM4 EFR erasure decoder comparison: frame={frame} mismatches=0" for frame in range(163))
         text = "\n".join((frames, EFR_ERASURE_REPLAY, EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE))
