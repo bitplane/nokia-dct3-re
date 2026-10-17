@@ -1523,7 +1523,7 @@ check-c54x-rom4-processing: build
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
 			-skip_gameinfo -nothrottle -seconds_to_run 30 \
 			-autoboot_script $(abspath tools/c54x_rom4_processing_observe.lua) >console.log 2>&1; \
-		$(PYTHON) $(abspath tools/c54x_rom4_processing_check.py) error.log
+		$(PYTHON) $(abspath tools/c54x_rom4_processing_check.py) error.log --scan-30s
 
 check-c54x-rom4-rf-boundary: build
 	@set -eu; mkdir -p "$(abspath tmp)"; \

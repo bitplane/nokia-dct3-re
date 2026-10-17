@@ -2,6 +2,7 @@ import unittest
 
 from tools.c54x_rom4_processing_check import check
 from tools.test_c54x_rom4_rf_boundary_check import summary
+from tools import test_c54x_rom4_rf_boundary_check as rf_fixtures
 
 
 def fixture():
@@ -29,7 +30,61 @@ def fixture():
     return "\n".join(lines)
 
 
+def scan_fixture():
+    text = fixture().replace(summary(), rf_fixtures.C54xRom4RfBoundaryCheckTest().scan_summary())
+    for old, new in [('6033', '1024'), ('48264', '8192'), ('6031', '1004'),
+                     ('3017', '512'), ('207040', '648032'), ('st1=e900', 'st1=c900'),
+                     ('address=33ac count=0', 'address=33ac count=2')]:
+        text = text.replace(old, new)
+    rows = ['rom4_comparison_count: address=332b count=20']
+    for index in range(1, 21):
+        flags = ['0838', '083a'][index - 1] if index <= 2 else ('0828' if index % 2 else '082a')
+        candidate = {1: '0027', 2: '002d'}.get(index, '005a')
+        rows.append(f'rom4_processing_transition: address=332b sequence={index} fd=0000 mode=0001 flags={flags} '
+                    f'candidate={candidate} control2180=005a control21c2=f4cf a=0000000000 b=0000000000 t={1 + index * .01:.9f}')
+        if index == 1:
+            rows.append('rom4_processing_transition: address=33ac sequence=1 fd=0000 mode=0001 flags=083a '
+                        'candidate=0027 control2180=005a control21c2=f4cf a=00002d0000 b=00005a0000 t=1.010001')
+    rows += ['rom4_processing_transition: address=33ac sequence=2 fd=0001 mode=0001 flags=0832 '
+             'candidate=0027 control2180=005a control21c2=f4cf a=00002d0000 b=00005a0000 t=6.4',
+             'rom4_comparison_write: t=0.1 pc=0f10 address=06fd data=0000',
+             'rom4_comparison_write: t=1.025 pc=312c address=06fd data=0000',
+             'rom4_comparison_write: t=2.0 pc=3135 address=06fd data=0001']
+    return text + '\n' + '\n'.join(rows)
+
+
 class ProcessingCheckTest(unittest.TestCase):
+    def test_accepts_separate_multi_entry_scan_contract(self):
+        self.assertEqual(check(scan_fixture(), scan_30s=True), 1024)
+        with self.assertRaises(ValueError):
+            check(fixture(), scan_30s=True)
+        with self.assertRaises(ValueError):
+            check(scan_fixture())
+
+    def test_scan_rejects_changed_selector_operands_counts_and_order(self):
+        for old, new in [('address=332b count=20', 'address=332b count=19'),
+                         ('address=32f4 count=1024', 'address=32f4 count=1023'),
+                         ('address=3347 count=1004', 'address=3347 count=1005'),
+                         ('fd=0000 mode=0001', 'fd=0001 mode=0001'),
+                         ('candidate=002d', 'candidate=002e'),
+                         ('a=00002d0000', 'a=00002d0001'),
+                         ('control2180=005a', 'control2180=005b'),
+                         ('st1=c900', 'st1=e900'),
+                         ('pc=3135 address=06fd data=0001', 'pc=3134 address=06fd data=0001'),
+                         ('t=1.025 pc=312c', 't=1.0 pc=312c'),
+                         ('t=2.0 pc=3135', 't=7.0 pc=3135'),
+                         ('t=6.4', 't=1.0')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check(scan_fixture().replace(old, new), scan_30s=True)
+
+    def test_scan_requires_complete_transition_capture(self):
+        text = scan_fixture()
+        line = next(line for line in text.splitlines() if 'rom4_processing_transition:' in line)
+        for changed in (text.replace(line, ''), text + '\n' + line,
+                        text.replace(line, line.replace('sequence=1', 'sequence=broken'))):
+            with self.assertRaises(ValueError):
+                check(changed, scan_30s=True)
+
     def test_accepts_observed_no_cell_pipeline(self):
         self.assertEqual(check(fixture()), 6033)
 

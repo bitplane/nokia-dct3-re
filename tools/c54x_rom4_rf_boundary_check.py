@@ -66,17 +66,22 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
         # EF_SMSS belongs to DF_TELECOM. Restoring its old incorrect GSM
         # placement alone restores the previous totals; see rom4_dsp_loader.md.
         # This is an exact cold-input regression snapshot, not silicon timing.
-        expected_count = 1520
-        expected_writes += [(6, 0x2A04, 6, 0xA240), (7, 0x2A04, 6, 0xA240)]
-        expected_writes += [(sequence, 0x2727 + sequence - 8, 0x30, 0x4028)
-                            for sequence in range(8, 17)]
-        if (result["frame_expiries"], result["rf_reads"]) != (20285, 648192):
+        # Independent port-4 completion drains the original five-pair
+        # descriptor bursts. This replaces, rather than accepts alongside,
+        # the old payload-alias and ring-plus-slot snapshots.
+        expected_count = 1537
+        burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
+                 (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
+                 (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
+        prefix = burst * 2 + [(0x2813, 0x30, 0x4028)] + burst[:3]
+        expected_writes = [(i, *row) for i, row in enumerate(prefix, 1)]
+        if (result["frame_expiries"], result["rf_reads"]) != (20280, 648032):
             raise ValueError(
                 "30-second scan frame/read snapshot changed: "
-                f"frames={result['frame_expiries']} expected=20285 "
-                f"delta={result['frame_expiries'] - 20285:+d}; "
-                f"rf_reads={result['rf_reads']} expected=648192 "
-                f"delta={result['rf_reads'] - 648192:+d}; "
+                f"frames={result['frame_expiries']} expected=20280 "
+                f"delta={result['frame_expiries'] - 20280:+d}; "
+                f"rf_reads={result['rf_reads']} expected=648032 "
+                f"delta={result['rf_reads'] - 648032:+d}; "
                 f"rf_port32_writes={result['rf_port32_writes']} expected={expected_count} "
                 f"delta={result['rf_port32_writes'] - expected_count:+d}"
             )

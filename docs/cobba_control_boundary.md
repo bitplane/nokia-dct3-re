@@ -1666,7 +1666,7 @@ for radio/call operation. The port-2 in-service mask still projects onto shared
 `0855`/MCU `100aa` in this partial model; its full electrical ownership remains
 unvalidated.
 
-**RF validation remains open:** a retained 30-second ring-plus-slot capture
+**RF snapshot provenance:** a retained pre-transfer 30-second ring-plus-slot capture
 has 20,285 frame expiries and 648,192 RF reads, as in the existing scan
 oracle, but 1,518 rather than 1,520 programming pairs. The two absent
 `0041/0040` writes belong to queued writer `3712`; producer `a1bc` still
@@ -1677,14 +1677,13 @@ word. The independent port-4 compare model below now services that queue;
 the 1,518-pair capture characterizes the earlier ring-plus-slot model, not
 the newly accepted queued-transfer fixture.
 
-The strict scan oracle remains unchanged and rejects this difference pending
-queue-source closure. The separate processing checker still assumes its older
-five-write/single-entry profile; the current multi-entry capture has 1,022
-mode-1 executions, 8,176 filter iterations, zero-valued RF/reduction inputs
-and two `33ac` continuations. Do not interpret its five-to-1,518 failure as
-the effect of this parameter change, or silently rebase either checker.
-The long-scan RF/processing snapshots still require explicit review with the
-queued-transfer model; this short gate does not re-bank either snapshot.
+The accepted current scan profile is distinct from that negative control:
+20,280 frame expiries, 648,032 RF reads and 1,537 programming pairs. Its
+first sixteen outputs require two complete descriptor bursts, the original
+scan writer and the beginning of the next burst. Both prior count regimes
+are rejected, not accepted through a tolerance. The legacy single-entry
+processing fixture remains a separately named checker mode; the Makefile's
+30-second gate explicitly selects the multi-entry contract below.
 
 The extended passive gate (`python -m tools.run_c54x_rom4_transfer
 --mame mame/mame --rompath mame/roms --seconds 30`) retains an uncapped
@@ -1704,11 +1703,26 @@ descriptor bursts complete at about 1.563/1.590 s and the next starts at
 6.436 s. These are deterministic emulator observations, not physical clock
 measurements. The independent processing capture now executes mode 1 1,024
 times, its eight-iteration filter 8,192 times and continuation `33ac` twice;
-RF and reduction inputs remain zero. The original RF snapshot rejects this
-run and the old processing gate still assumes the superseded single-entry
-profile. Neither checker has been weakened or silently re-banked. Next is
-an explicit multi-entry processing contract and coordinated snapshot review,
-not synthesis of RF samples or a native acquisition claim.
+RF and reduction inputs remain zero. The coordinated RF/processing snapshot
+update is explicit, with negative tests for the former payload-alias and
+missing-transfer regimes. No RF samples or firmware state are synthesized.
+
+The processing contract checks all 20 early-reduction entries at `332b`:
+`06fd=0` selects that arm until the original `3135` writer sets it to one.
+The observed writer sequence is `0f10:0,312c:0,3135:1`, not twenty resets.
+The remaining 1,004 mode-1 frames take the steady reduction. The unchanged
+filter coefficients, circular pointers and four full-width operand snapshots
+remain required; current filter-entry ST1 is `c900` rather than the legacy
+fixture's `e900` (the difference is XF output bit 13).
+
+Two original `33ac` control continuations occur with `00ad=0027`,
+`2180=005a`, A=`002d0000` and B=`005a0000`; the first precedes the second
+early reduction, the second follows the `06fd=1` publication. Both run in
+mode 1 with zero RF/reduction input. Checked ROM signatures cover the
+`06fd` selector and full comparison/call arm at `3376..33af`.
+The gate joins selector writers, transition order, flags, control words and
+accumulators rather than treating a global `42f6` count as proof of this
+call site. These continuations are not a detection/acquisition result.
 
 The passive `c54x_rom4_transfer_observe.lua` eight-second capture records ten
 port-4 writes: initialization/disabling uses `3a98` (15,000), the four `a244`

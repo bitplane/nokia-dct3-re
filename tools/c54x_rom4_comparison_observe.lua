@@ -32,7 +32,7 @@ for _, address in ipairs({0x2194, 0x2195, 0x2196, 0x2197, 0x06fd}) do
             end
         end)
 end
-for _, address in ipairs({0x330a, 0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
+for _, address in ipairs({0x330a, 0x332b, 0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
     0x2400, 0x2402, 0x3382, 0x3385, 0x33a1, 0x33a4, 0x33ac}) do
     counts[address] = 0
     taps[#taps + 1] = program:install_read_tap(address, address,
@@ -40,6 +40,14 @@ for _, address in ipairs({0x330a, 0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if (address == 0x332b or address == 0x33ac) and counts[address] <= 64 then
+                    machine:logerror(string.format(
+                        'rom4_processing_transition: address=%04x sequence=%d fd=%04x mode=%04x flags=%04x candidate=%04x control2180=%04x control21c2=%04x a=%010x b=%010x t=%.9f\n',
+                        address, counts[address], memory:read_u16(0x06fd), memory:read_u16(0x00ac),
+                        memory:read_u16(0x06bc), memory:read_u16(0x00ad), memory:read_u16(0x2180),
+                        memory:read_u16(0x21c2), cpu.state['A'].value, cpu.state['B'].value,
+                        machine.time:as_double()))
+                end
                 if counts[address] <= 4 then
                     machine:logerror(string.format(
                         "rom4_comparison_fetch: t=%.9f address=%04x word=%04x pair94=%04x%04x pair96=%04x%04x a=%010x b=%010x ar2=%04x ar3=%04x\n",

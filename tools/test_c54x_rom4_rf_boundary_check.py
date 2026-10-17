@@ -24,33 +24,42 @@ def summary(*, frames=6499, reads=207040, first_frame=30, pairs=5,
 
 class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
     def scan_summary(self):
-        text = summary(frames=20285, reads=648192, pairs=1520)
+        text = '\n'.join(line for line in summary(frames=20280, reads=648032, pairs=1537).splitlines()
+                         if not line.startswith('rom4_rf_port32:')) + '\n'
+        burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
+                 (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
+                 (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
         extra = "".join(
             f"rom4_rf_port32: sequence={n} port31={value:04x} port32={command:04x} pc={pc:04x}\n"
-            for n, value, command, pc in
-            [(6, 0x2a04, 6, 0xa240), (7, 0x2a04, 6, 0xa240)] +
-            [(n, 0x2727 + n - 8, 0x30, 0x4028) for n in range(8, 17)])
+            for n, (value, command, pc) in enumerate(burst * 2 + [(0x2813, 0x30, 0x4028)] + burst[:3], 1))
         return text + extra + (
             "rom4_serial_audit: space=io direction=write address=000e value=0546 mask=ffff pc=0959 t=6.454\n"
             "rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f t=6.426\n")
 
     def test_accepts_exact_scan_snapshot(self):
-        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1520)
+        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1537)
 
     def test_rejects_previous_private_latch_snapshot(self):
         with self.assertRaisesRegex(ValueError, "snapshot changed"):
-            check(self.scan_summary().replace("frame_expiries=20285", "frame_expiries=20288")
-                  .replace("rf_reads=648192", "rf_reads=648288"), scan_30s=True)
+            check(self.scan_summary().replace("frame_expiries=20280", "frame_expiries=20288")
+                  .replace("rf_reads=648032", "rf_reads=648288"), scan_30s=True)
+
+    def test_rejects_payload_alias_and_missing_transfer_snapshots(self):
+        for count in (1520, 1518):
+            with self.assertRaises(ValueError):
+                check(self.scan_summary().replace('frame_expiries=20280', 'frame_expiries=20285')
+                      .replace('rf_reads=648032', 'rf_reads=648192')
+                      .replace('rf_port32_writes=1537', f'rf_port32_writes={count}'), scan_30s=True)
 
     def test_snapshot_failure_reports_current_drift_without_accepting_it(self):
-        text = (self.scan_summary().replace("frame_expiries=20285", "frame_expiries=20282")
-                .replace("rf_reads=648192", "rf_reads=648096")
-                .replace("rf_port32_writes=1520", "rf_port32_writes=1519"))
+        text = (self.scan_summary().replace("frame_expiries=20280", "frame_expiries=20282")
+                .replace("rf_reads=648032", "rf_reads=648096")
+                .replace("rf_port32_writes=1537", "rf_port32_writes=1519"))
         with self.assertRaises(ValueError) as caught:
             check(text, scan_30s=True)
-        for detail in ("frames=20282 expected=20285 delta=-3",
-                       "rf_reads=648096 expected=648192 delta=-96",
-                       "rf_port32_writes=1519 expected=1520 delta=-1"):
+        for detail in ("frames=20282 expected=20280 delta=+2",
+                       "rf_reads=648096 expected=648032 delta=+64",
+                       "rf_port32_writes=1519 expected=1537 delta=-18"):
             self.assertIn(detail, str(caught.exception))
 
     def test_sequence_failure_distinguishes_count_from_prefix(self):
@@ -66,7 +75,7 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_scan_requires_reload_selector_and_exact_sequence(self):
         for old, new in (("value=0546", "value=0547"), ("value=007c", "value=0001"),
-                         ("port31=2727", "port31=2728"), ("rf_port32_writes=1520", "rf_port32_writes=1521")):
+                         ("port31=27a2", "port31=27a3"), ("rf_port32_writes=1537", "rf_port32_writes=1538")):
             with self.assertRaises(ValueError):
                 check(self.scan_summary().replace(old, new), scan_30s=True)
 

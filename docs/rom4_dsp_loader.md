@@ -442,7 +442,8 @@ port-`0x38` status reads. A coherent 12-second run records zero reads on both
 activation and sample encoding must be recovered before a controlled GSM
 burst can be meaningfully attached.
 
-The current absolute-compare fresh boot reaches `4414/4428/4460` three
+The earlier isolated single-entry profile (not current cold-scan acceptance)
+reaches `4414/4428/4460` three
 times and `4433` once. Mode `00ac` is cleared at startup, then written as
 `1` at 2.104547481 s, `2` at 2.109165308 s, `9` at 2.138664673 s, and `1`
 at 2.161736846 s. The first three writes occur at PC `442b`; the final write
@@ -460,7 +461,7 @@ retained for the whole machine lifetime; otherwise Lua garbage collection
 can invalidate a cached-fetch tap. The next receiver analysis must start
 from this active mode-1 path rather than try to activate `4414` again.
 
-The current mode-1 processing census records 48,264 fetches of `330a`,
+That isolated mode-1 processing census records 48,264 fetches of `330a`,
 eight per mode-1 frame, followed by 6,033 executions of the absolute
 `CMPM 06fd,#1` at `3326`. The reduction branch at `332b` executes twice;
 `3347` executes 6,031 times, with `06fd=1` at its first two observed entries.
@@ -1077,16 +1078,25 @@ MVPD's preincrement ordering is the separately evidenced correction above.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
 Access-stage address-update timing, overlapping execution or interrupt drain.
 
-The exact isolated 30-second RF snapshot is 20,285 frame expiries,
-648,192 RF reads and 1,520 port-32 writes. The checker also requires the
+The accepted isolated 30-second RF snapshot is 20,280 frame expiries,
+648,032 RF reads and 1,537 port-32 writes. Independent queued-transfer
+completion accounts for twenty native `3712` writes; four immediate
+`a240` writes and 1,513 scan `4028` writes complete the inventory.
+The multi-entry processing profile requires 1,024 mode-1 frames, twenty
+early reductions, 1,004 steady reductions and two control continuations,
+with zero RF/reduction inputs. See
+[the boundary contract](cobba_control_boundary.md) for descriptor, selector,
+operand and ordering evidence. Neither continuation establishes acquisition.
+The checker also requires the
 ordered programming sequence, frame-30 activation, 32-word read cadence,
 firmware queue producers, IMR `035f` and zero port-38/39 reads. Two isolated
-cold runs reproduce it (`tmp/rf-smss-correct-oracle-a.log` and
-`tmp/rf-smss-correct-oracle-b.log`). Each generates this handset's own EEPROM
+long transfer runs reproduce its complete inventory; independent fresh RF
+and processing acceptance gates pass. Each generates this handset's own EEPROM
 and fresh flash state. This is an emulator regression snapshot, not measured
 RF timing or acquisition.
 
-The snapshot depends on the card contract: EF_SMSS (`6f43`) belongs to
+The earlier 20,285/648,192/1,520 snapshot depended on the card contract:
+EF_SMSS (`6f43`) belongs to
 DF_TELECOM (`7f10`), not DF_GSM (`7f20`). A reversible source control changing
 only that parent to the incorrect `7f20` reproduces the previous exact
 20,282/648,096/1,519 totals. Restoring the correct parent reproduces
@@ -2488,7 +2498,7 @@ without reaching the foreground mask write, so this ordering correction does
 not resolve that pipeline-drain boundary or promote recorder completion.
 The previously banked `check-c54x-rom4-rf-boundary` snapshot is 20,282 frame
 expiries, 648,096 RF reads and 1,519 port-`32` writes. Current fresh-storage
-runs instead reproduce 20,285 / 648,192 / 1,520, with no port-`38/39` reads.
+runs at that milestone instead reproduced 20,285 / 648,192 / 1,520, with no port-`38/39` reads.
 A generated-overlay control using the original instruction-boundary interrupt
 routine reproduces the same changed totals: the staged-frontend refactor is
 not their cause. A second generated-overlay control restores the CPU's
@@ -2497,8 +2507,9 @@ documented passing interrupt-entry milestone); it reproduces those same totals
 too. These clock/reset additions therefore do not explain the mismatch either.
 Both controls use newly generated own EEPROM and no retained flash/SIM state;
 reusing the first run's NVRAM is not a valid cold control. The exact snapshot
-gate remains failing and unchanged pending a wider provenance audit; this is
-not a new accepted oracle.
+gate was deliberately left failing pending the provenance audit. The
+EF_SMSS parent correction above settled that mismatch; the current
+independent-transfer scan snapshot supersedes both historical counts.
 The earlier save-state pass protects its tested restoration boundary, not
 RF acquisition or handset speech.
 
@@ -4531,8 +4542,9 @@ Native 5110 save/load passes. The four timer-boundary observations still
 stall with short PRD and complete with long PRD: this cost correction does
 not replace Decode/Execute ownership. A new fresh 30-second 5110 run retains
 20,285 frame expiries, 648,192 RF reads and 1,520 port-32 writes, exactly the
-previously reproduced mismatching snapshot. The strict RF gate remains
-failing and unchanged, not re-banked as part of this correction.
+previously reproduced mismatching snapshot. The strict RF gate was not
+re-banked as part of that correction; the current independent-transfer
+snapshot is documented separately above.
 The opt-in staged frontend holds pipeline advancement for one clock before
 a peripheral LD read, STL/STH write or ANDM/ORM read. A saved per-operation
 flag owns the paid wait and travels with the retained operand; RMW does not
