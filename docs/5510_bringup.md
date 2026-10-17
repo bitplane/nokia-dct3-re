@@ -55,171 +55,85 @@ passing mechanically decoded cases is not hardware-legality evidence.
 Long-offset MOD=13 preincrement is a distinct read-capable form and must not
 be removed by that audit.
 
-### Short-preincrement fixture audit
+### Operand-domain acceptance
 
-SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 (`*+ARx`,
-encoded Smem byte `98..9f`) to write accesses. The corrected load fixture
-domains exclude short preincrement, without substituting duplicate legal cases:
+[SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) table 5-4 and
+section 5.5.3.1 restrict short MOD=3 (`*+ARx`, Smem byte `98..9f`) to writes.
+The rejection banks below check both frontends, CMPT settings, program
+pages and two save/load checkpoints. They require no operand transaction,
+pointer change, accumulator/T or status effect; stack and transfer banks
+also observe stack, program and I/O effects as applicable. These are
+fail-closed emulator contracts, not claims about silicon traps.
 
-| Load fixture | Read-capable encoding cases/restores | Domain correction |
+| Profile | Rejection cases/restores | Selected scope |
 | --- | --- | --- |
-| `indirect-load` | 6 | Stationary/postdecrement/postincrement for both destinations; 2 invalid cases removed. |
-| `ldu-shift16` | 54,528 per family | 17 RAM address forms plus mapped AR sources; 3,072 invalid cases removed per family. |
-| `ld-ts` | 208,896 | 17 address forms; 12,288 invalid cases removed. |
-| `load-variable` | 104,448 | 17 address forms and all 32 shifts; 6,144 invalid cases removed. |
-| `indirect-dld` | 23,040 | 15 indirect/long address forms; 1,536 invalid cases removed. |
+| `load-mod3-edge` | 9,728 | LD/LDU/LD TS/LDR/shift-16/DLD/variable LD; all ARs and destinations, all 32 variable shifts. |
+| `mul-mod3-edge` | 4,352 | 34 classes covering multiply/MAC/square, T/ASM loads, BITT, POLY, immediate MAC, DP loads and RPT; ASM and RC retained. |
+| `mpy-mod3-edge` | 256 | Memory/immediate MPY to both destinations. |
+| `arith-mod3-edge` | 35,840 | 24 scalar classes and eight variable-shift selectors over all 32 shifts. |
+| `bitf-mod3-edge` | 512 | CMPM/BITF with both initial TC values. |
+| `subc-mod3-edge` | 512 | Both destinations; standalone and short-repeat SUBC. |
+| `long-pair` / `drsub` | 3,584 each | 14 paired-arithmetic classes including C16; rejection adds no positive staged T-variant support. |
+| `logic-short` | 2,560 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW and WRITA; includes 576 positive logic cases. |
+| `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
 
-The LDU/shift-16/variable-load and DLD banks preserve raw case IDs and skip
-only the invalid form; their totals count admitted cases, not raw ID ranges.
-These totals certify removal of the forbidden read encoding, not every input
-domain. The paired DST/DLD and shared arithmetic/load circular domains are
-corrected and guarded as described [below](#circular-fixture-domains);
-other generators still need independent audit. Modulo expectations alone are
-not silicon evidence.
-The TS-load bank reindexes its 17-form Cartesian domain. Long MOD=13 remains
-admitted. Atomic `LD/LDU/LD TS/LDR/LD shift-16/DLD` reject short MOD=3 before
-operand access. Staged load classifiers reject it; `6fxx` LD rejects only after
-the operation extension has identified a read, leaving stores unchanged.
-`load-mod3-edge` covers 9,728 rejection/replay cases across these seven load
-families, all ARs, both destinations, CMPT settings, pages, frontends and two
-snapshots; variable LD additionally covers all 32 shifts. It requires no data
-transaction, AR change, accumulator, T or ST0 change. This is not an exhaustive
-opcode census: read-only ALU/test sources and MMR addressing remain open,
-as do instruction-specific read/modify/write and implicit-copy classifications.
-The scalar arithmetic entry points now omit `memory_arithmetic_case` form 5.
-The multiply/T-load fixtures also omit `memory_multiply_case` RAM kind 5,
-preserving raw case IDs. Their four banks each retain 52,224 cases/restores:
-27,648 RAM cases over nine address forms and 24,576 mapped-source cases.
-These are MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T, totaling 208,896.
-Their shared circular source generator also carries the documented buffer
-domain described below; unrelated multiply generators still require audit.
+Corrected positive load domains are:
 
-`mul-mod3-edge` passes 4,352 rejection/replay cases over 34 opcode classes,
-all ARs, CMPT settings, pages, both frontends and two snapshots. It covers
-the multiply/MAC/square families, T/ASM loads, BITT, POLY, immediate MAC,
-DP loads and RPT. Rejection preserves data, pointers, accumulators, T,
-status (including ASM) and RC. The atomic RPT guard and legacy immediate-MAC
-fixture obey the same read restriction. This adds no positive staged support
-for otherwise unsupported operations and makes no silicon-trap claim.
-Fifteen neighboring profiles pass, covering MAC, ASM consumers, repeats,
-T-load composition, prior rejection banks and short-preincrement stores.
+| Profile | Admitted cases/restores | Domain |
+| --- | --- | --- |
+| `indirect-load` | 6 | Stationary/postdecrement/postincrement, both destinations; two invalid cases omitted. |
+| `ldu-shift16` | 54,528 per family | 17 RAM forms plus mapped AR sources; 3,072 invalid cases omitted per family. |
+| `ld-ts` | 208,896 | Reindexed 17-form domain; 12,288 invalid cases omitted. |
+| `load-variable` | 104,448 | 17 forms and all 32 shifts; 6,144 invalid cases omitted. |
+| `indirect-dld` | 23,040 | 15 indirect/long forms; 1,536 invalid cases omitted. |
 
-LDM (`48xx/49xx`), PSHM (`4axx`) and PSHD (`4bxx`) also reject short
-MOD=3 before operand effects in the atomic frontend; the staged frontend
-already excludes these forms. `stack-mod3-edge` first runs the legacy atomic
-prefix, including the corrected `489a` LDM rejection, then passes 512
-rejection/replay cases over four opcode classes, all ARs, CMPT settings,
-pages, frontends and two snapshots. Data, pointers (including MMR upper
-bits), accumulators, T, status and SP remain unchanged. It claims no silicon
-trap or full staged-suite coverage. Twelve neighboring profiles pass,
-including extended/mapped/repeated PSHD, stack IRQs, RAM POPD, legal short
-preincrement stores and the multiply rejection bank. Native 5110 save-state
-restoration and 2,927 tool tests (one skipped) pass. MMR long forms, other
-read-source families, implicit copies and read/modify/write remain separate
-audit questions. Long MOD=13 remains a valid ordinary Smem read encoding,
-but is not an MMR addressing form (SPRU131G section 5.6).
+The LDU/shift-16/variable/DLD banks preserve raw case IDs and skip invalid
+forms rather than substituting duplicate legal cases. Shared scalar
+arithmetic omits `memory_arithmetic_case` form 5; the four memory multiply/T
+banks omit RAM kind 5. Each latter bank retains 52,224 cases: 27,648 RAM
+cases over nine forms plus 24,576 mapped-source cases, totaling 208,896
+across MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T. Unrelated multiply
+generators still require independent domain audit.
 
-Paired arithmetic reads also reject short MOD=3. The atomic guard covers
-DADD, DSUB, DRSUB, DADST, DSUBT and DSADT; the staged DADD/DSUB/DRSUB
-classifier excludes the form without adding positive support for the T
-variants. The corrected positive banks retain raw IDs and omit form 4:
-6,144 DSUB, 12,288 DADD and 6,144 DRSUB cases/restores over eight read-capable
-address forms. Both `long-pair` and `drsub` additionally require a 3,584-case
-rejection bank covering all 14 opcode classes, ARs, CMPT and C16 settings,
-pages, frontends and two snapshots. No data access, pointer or arithmetic
-state change is allowed. The atomic-prefix/MMR gate, DLD, write-side
-preincrement and previous load/multiply rejection controls pass. These are
-focused regressions, not a fresh full staged-suite run or physical-timing
-acceptance. Implicit copies and read/modify/write remain unclassified.
+Other positive domains retain 104,448 scalar ADD/SUB cases, 52,224 each for
+ADDS/SUBS, 208,896 shift-16 and 153,984 TS arithmetic cases (6,528 address
+plus 147,456 numeric). Variable-shift arithmetic retains 245,760 cases.
+CMPM and BITF each retain 52,224 cases over 17 forms, omitting 3,072 invalid
+cases. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
+memory/immediate MPY retains 98,304. Paired reads retain 6,144 DSUB,
+12,288 DADD and 6,144 DRSUB cases over eight forms, omitting raw form 4.
+These totals describe selected fixture domains, not every legal operand.
+Circular-input constraints have their own
+[contract](#circular-fixture-domains); modulo expectations alone are not
+silicon evidence.
 
-AND/OR/XOR and source-side MVDK, MVMD, PORTW and WRITA reject short
-MOD=3 in the atomic frontend; their staged classifiers already exclude it.
-The encoded operand is a read even when the instruction writes another
-data location, a port or program memory. Conversely MVKD/MVDM, PORTR and
-MVPD encode a destination and must not inherit this source restriction.
-`logic-short` requires the unchanged 576 positive logic cases and 2,560
-rejection/replay cases over ten opcode classes, all ARs, CMPT settings,
-initial TC values, pages, frontends and two snapshots. It observes data,
-program and I/O writes independently and requires no operand effects.
-Thirteen neighboring profiles and three external-I/O controls pass,
-including long-offset logic, source/destination transfers, short write-side
-preincrement, the atomic prefix and paired reads. Native 5110 save-state
-restoration and 2,928 tool tests (one skipped) pass. This is a focused
-source-domain correction, not closure of implicit-copy/RMW semantics,
-MMR long forms, circular inputs or physical timing. Those independent
-questions do not change POPD's encoded destination role.
+Operand role is essential. MVKD/MVDM, PORTR, MVPD and POPD encode a
+destination and must not inherit a read-only Smem restriction. In particular,
+`7c9a` in operand-fetch case 45 is a valid MVPD destination, not a missed
+source rejection. Xmem/Ymem have separate grammars. For `6fxx`, classify the
+operation extension before deciding source versus destination; shifted
+STL/STH remain unchanged. Rejection support does not imply positive staged
+support for ADC/SUBB, paired T variants or otherwise unsupported operations.
+Implicit-copy, read/modify/write and unenumerated read families remain open.
 
-Scalar ADD/SUB, ADDS/SUBS, T-shifted and shift-16 arithmetic now reject short
-MOD=3 sources in both frontends. Variable-shift ADD/SUB classifies the operation
-extension before rejecting; STL/STH extensions are unchanged. The
-`arith-mod3-edge` bank passes 35,840 rejection/replay cases: 24 scalar opcode
-classes, eight variable-shift operation/source/destination selectors, all 32
-shifts, all ARs, both CMPT settings, pages, frontends and two scheduler
-checkpoints. No data access, pointer update, accumulator/T or ST0 change is
-permitted. This does not add staged positive support for ADC/SUBB or certify
-silicon trap behavior.
+### MMR long-form boundary
 
-The corrected positive banks retain raw case IDs: 104,448 scalar ADD/SUB
-cases, 52,224 each for ADDS and SUBS, 208,896 shift-16 cases and 153,984
-TS cases (6,528 address plus 147,456 numeric cases). Their addressing domains
-have 17 read-capable forms, not 18. The 245,760-case variable-shift bank already
-excluded short preincrement and is unchanged. All six positive profiles and
-ten producer/mapped-register/write-side/rejection controls pass; circular-input
-constraints remain a separate audit.
-Native 5110 save-state restoration and 2,924 tool tests (one skipped) also pass.
+SPRU131G section 5.6 separately excludes `*ARx(lk)`, `*+ARx(lk)`,
+`*+ARx(lk)%` and `*(lk)` from MMR addressing. These are bytes `e0..f8`;
+`f9..ff` are reserved. The shared guard rejects these bytes before operand
+effects in the nine encoded LDM A/B, PSHM, MVDM, MVMD, STM, STLM A/B and
+POPM classes. MVMM has its own compact operand grammar and is not covered
+by this byte-oriented guard. Valid short MMR forms keep their page-zero and
+AR-upper-bit-clearing semantics. Ordinary Smem long MOD=13 (`e8..ef` plus
+offset) remains read-capable and must not be rejected by this MMR rule.
 
-CMPM and BITF now exclude short MOD=3 in both frontends, before any operand
-access or TC publication. Each positive Smem bank retains 52,224 cases/restores
-over 17 read-capable encoding forms; 3,072 invalid cases per bank are omitted
-while preserving raw case IDs. `bitf-mod3-edge` passes 512 cases/restores:
-both operations and initial TC states, all ARs, both CMPT settings, pages,
-frontends and snapshots before/after rejection. It requires no data transaction,
-AR update, accumulator/T change or status change, including TC. Eleven
-neighboring profiles pass, covering mapped/peripheral BITF, CMPM's direct,
-absolute and immediate-branch consumers, delayed comparisons and exclusions,
-TC branches, and the existing MPY/SUBC/load rejection banks. These changes do
-not decide read/modify/write or other bit-test source domains.
-Native 5110 save-state restoration and 2,922 tool tests (one skipped) also pass.
-
-SUBC's corresponding defect is corrected: 7,680 invalid short-preincrement
-cases were removed, leaving 38,400 legal positive cases/restores. The
-`rpt-subc-st` profile passes those cases plus the unchanged 38,400 repeated
-immediate-store cases. `subc-mod3-edge` passes 512 cases/restores: all ARs,
-both destinations, CMPT settings, pages, frontends and snapshots, with both
-standalone SUBC and a short-repeat body. Rejection performs no data transaction,
-pointer update, accumulator, T or ST0 change. The staged instruction classifier,
-repeat-body admission and body-length classifier agree on the source domain;
-the atomic guard precedes operand access. The other ALU families remain open.
-
-Memory/immediate MPY's corresponding defect is corrected: 8,192 invalid
-`629a`/`639a` cases were removed, leaving 98,304 legal positive cases/restores.
-`mpy-mod3-edge` passes 256 cases/restores: all eight ARs, both destinations,
-both CMPT settings, both pages, atomic and staged frontends, and snapshots
-before/after rejection. No data access, AR update, accumulator, T or ST0 change
-is permitted. The atomic guard precedes `immediate_smem_read`; the staged
-classifier excludes short MOD=3. This does not close the other read families.
-At `eb451576`, the full 288-check default CPU suite passes with the corrected load,
-SUBC, CMPM/BITF, scalar-arithmetic and multiply/T-load domains, including the
-legacy atomic immediate-MAC rejection control. The isolated multiply/load
-rejection bank, four positive multiply/T-load banks, fifteen neighboring
-profiles and absolute DP-load control also pass. Native 5110 save-state
-restoration and 2,926 tool tests (one skipped) pass. The subsequent MMR/push
-correction uses the atomic-prefix and focused profiles above, not a fresh
-full staged run. This remains a prototype
-regression net, not proof that remaining operand domains or all circular
-inputs are legal.
-
-Do not blanket-reject low bytes `98..9f`: Xmem/Ymem use different encoding
-grammars, and Smem destination writes are eligible for short preincrement.
-For example, operand-fetch case 45 uses `7c9a` (MVPD destination), not a
-read-source defect. The repeated immediate-ST bank currently excludes form 4
-already. Long MOD=13 (`e8..ef` plus offset) remains read-capable.
-Read/modify/write and implicit-copy instructions require instruction-specific
-classification; this audit does not settle them. For `6fxx`, classify the
-operation extension before deciding whether the encoded Smem is a source or
-destination. Correct both execution frontends and their fixture domains before
-claiming the legality audit complete; disassembler recognition alone is not
-execution acceptance evidence.
+`mmr-long-edge` in the `tms54xtra` namespace covers 4,608 cases/restores:
+nine classes, 25 forbidden plus seven reserved bytes, CMPT settings, two
+pages, both frontends and two checkpoints. It requires no data/stack access,
+AR update/truncation, accumulator/T, SP or status effect. The guard applies
+to opcode words, not immediate extensions or annulled words. The old core
+fails this fixture with an operand transaction. The corrected behavior is
+unsupported-form rejection, not a hardware exception specification.
 
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data

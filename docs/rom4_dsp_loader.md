@@ -2009,6 +2009,14 @@ and dual-memory moves. Focused core tests cover selected encodings in these
 families; execution alone does not establish every variant's semantics. None
 recognizes a Nokia address or loader byte pattern.
 
+Operand admission is separate from observed instruction coverage. MMR
+addressing excludes the long-offset/absolute Smem forms even where the same
+modifier is legal for an ordinary memory instruction. The nine byte-encoded
+MMR classes have a 4,608-case rejection/replay fixture, including reserved
+bytes and both execution frontends. See the current
+[operand-domain contract](5510_bringup.md#mmr-long-form-boundary) for scope;
+this is not a hardware-trap claim or complete closure of RMW/copy operands.
+
 ## Executed-opcode coverage
 
 ### Current audit boundary

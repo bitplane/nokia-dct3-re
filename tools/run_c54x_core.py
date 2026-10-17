@@ -1403,6 +1403,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVKD delay: PASS cases=1728 restore=1728 registers=8 forms=AR_source,postincrement,same_RAM outcomes=taken,untaken sources=none,IRQ,NMI source_read=9 ram_write=10 literal_fetches=2 reads=1 writes=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVKD delay complete",
     ),
+    "mmr-long-edge": (
+        "TMS320C54x MMR long exclusions: PASS cases=4608 restore=4608 opcode_classes=9 forbidden_modes=25 reserved_modes=7 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated MMR long exclusions complete",
+    ),
     "mac-smem": (
         (
         "TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0",
@@ -1484,7 +1488,7 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    machine = "tms54xtra" if args.profile in ("stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub") else "tms54test"
+    machine = "tms54xtra" if args.profile in ("stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge") else "tms54test"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the

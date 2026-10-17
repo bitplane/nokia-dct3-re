@@ -295,6 +295,23 @@ constexpr bool staged_short_repeat(u16 word)
 	return (word & 0xff00) == 0xec00;
 }
 
+constexpr bool invalid_mmr_long_form(u16 word)
+{
+	if (u8(word) < 0xe0)
+		return false;
+	// SPRU131G 5.6 excludes the long-offset and absolute Smem forms
+	// from MMR addressing. The remaining low bytes f9..ff are reserved.
+	switch (word & 0xff00)
+	{
+	case 0x4800: case 0x4900: case 0x4a00:
+	case 0x7200: case 0x7300: case 0x7700:
+	case 0x8800: case 0x8900: case 0x8a00:
+		return true;
+	default:
+		return false;
+	}
+}
+
 constexpr bool staged_memory_repeat(u16 word)
 {
 	// SPRU131G table 5-4: short MOD=3 preincrement is write-only.
@@ -2996,6 +3013,11 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_decode_remaining == 1 && staged_move(m_pipeline_decode_word);
 	if (m_pipeline_valid[2])
 	{
+		if (!m_pipeline_decode_remaining && invalid_mmr_long_form(m_pipeline_word[2]))
+		{
+			logerror("%s: staged long-offset MMR addressing is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
 		if (m_pipeline_delay_decode_words)
 		{
 			u16 const word = m_pipeline_word[2];
@@ -4996,6 +5018,11 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
+	if (invalid_mmr_long_form(op))
+	{
+		m_illegal = true;
+		return;
+	}
 	// These scalar arithmetic, multiply, load, repeat and test families read Smem.
 	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
 	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf000) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfc00) == 0x4800 || (op & 0xf000) == 0x5000 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400 || (op & 0xff00) == 0x7100 || (op & 0xff00) == 0x7300 || (op & 0xff00) == 0x7500 || (op & 0xff00) == 0x7f00))

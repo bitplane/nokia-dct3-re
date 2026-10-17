@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mmr_long_rejection_requires_full_domain_and_no_effects(self):
+        marker, ending = EXTRA_PROFILES['mmr-long-edge']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mmr-long-edge')
+        for field in ('cases=4608', 'restore=4608', 'opcode_classes=9', 'forbidden_modes=25',
+                      'reserved_modes=7', 'cmpt=2', 'pages=2', 'frontends=2', 'snapshots=2',
+                      'data_reads=0', 'data_writes=0', 'pointer_changes=0', 'stack_changes=0',
+                      'silicon_trap_claim=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='mmr-long-edge')
+        with self.assertRaises(ValueError):
+            check_result(marker + '\n' + text, 3, profile='mmr-long-edge')
+
     def test_parallel_sub_fraction_scope_and_replay(self):
         marker, ending = EXTRA_PROFILES['parallel-sub']
         text = marker + '\n' + ending + '\n'
