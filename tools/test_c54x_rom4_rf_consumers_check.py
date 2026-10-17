@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_consumers_check import FAMILIES, check, check_program
+from tools.c54x_rom4_rf_consumers_check import FAMILIES, DISPATCH_SIGNATURES, SEQUENCES, check, check_program
 
 
 def fixture():
@@ -12,7 +12,8 @@ def fixture():
         'scan_filter': [(1, 0, 8008), (1, 0x100, 8), (1, 0x105, 176)],
         'capture_filter': [(2, 0x104, 40), (2, 0x105, 200)],
     }
-    rows = [f'rom4_rf_consumer: xpc=00 pc={address + 2:04x} mode={mode:04x} control={control:04x} count={count} first=1.0 last=29.0'
+    rows = [f'rom4_rf_consumer: xpc=00 pc={address + 2:04x} mode={mode:04x} control={control:04x} '
+            f'holdoff={int(name == "unfiltered_history")} count={count} first=1.0 last=29.0'
             for name, addresses in FAMILIES.items() for address in addresses
             for mode, control, count in groups[name]]
     return '\n'.join(rows + [
@@ -43,6 +44,8 @@ class RfConsumerTests(unittest.TestCase):
 
     def test_count_control_and_duration_changes_fail(self):
         for old, new in [('count=2432', 'count=2433'), ('control=0104', 'control=0105'),
+                         ('holdoff=1', 'holdoff=0'), ('holdoff=0', 'holdoff=1'),
+                         ('mode=0002', 'mode=0001'),
                          ('buckets=64', 'buckets=63'), ('rf_reads=648032', 'rf_reads=648031'),
                          ('physical_rate_claim=0', 'physical_rate_claim=1'),
                          ('t=30.016666667', 't=8.0')]:
@@ -55,12 +58,26 @@ class RfConsumerTests(unittest.TestCase):
             for address in addresses:
                 opcode = 0x74d4 if name == 'unfiltered_history' else 0x74d6
                 image[2 * address:2 * address + 4] = opcode.to_bytes(2, 'big') + b'\x00\x27'
+        for name in DISPATCH_SIGNATURES:
+            address, words = SEQUENCES[name]
+            image[2 * address:2 * (address + len(words))] = b''.join(word.to_bytes(2, 'big') for word in words)
         self.assertEqual(len(check_program(image)), 16)
+        for name in DISPATCH_SIGNATURES:
+            address, words = SEQUENCES[name]
+            for index in range(len(words)):
+                changed = bytearray(image)
+                changed[2 * (address + index)] ^= 1
+                with self.subTest(name=name, index=index), self.assertRaises(ValueError):
+                    check_program(changed)
         for offset in (0x3249 * 2, 0x3249 * 2 + 1, 0x3249 * 2 + 3):
             changed = bytearray(image)
             changed[offset] ^= 1
             with self.assertRaises(ValueError):
                 check_program(changed)
+        changed = bytearray(image)
+        changed[0x100:0x104] = bytes.fromhex('74d60033')
+        with self.assertRaisesRegex(ValueError, 'port-33'):
+            check_program(changed)
         image[0x100:0x104] = bytes.fromhex('74d60027')
         with self.assertRaisesRegex(ValueError, 'census changed'):
             check_program(image)

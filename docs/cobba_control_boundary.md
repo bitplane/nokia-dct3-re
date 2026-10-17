@@ -1007,6 +1007,28 @@ runtime attribution additionally requires XPC zero and the corresponding
 advanced PCs (instruction address plus two). This covers the acquired
 resident image and this execution, not unseen uploaded/computed readers.
 
+The byte-pinned INT0 entry first loads `00aa` into AR2 and tests it with
+`BANZ` at `322a`, before consulting mode `00ac`. A nonzero value selects
+the circular-history fill at `32c5`; the delayed return commits the updated
+counter through `32db`. With zero holdoff, mode 1 selects the scan filter,
+mode 2 selects the capture filter, and the other observed modes select
+the initial filter. Every read in the full census must match this priority
+order using passively observed `00aa != 0` and `00ac`; these words never
+drive a model clock or interrupt. All 242,144 unfiltered-history reads have
+nonzero holdoff and all other reads have zero holdoff in this execution.
+
+The entry's I/O operation is the existing port-`21` read/mask/write-back,
+not a newly decoded receive-ready discriminator. The external reference's
+decimal `pa33` denotes this same hexadecimal `0x21`; the resident immediate
+port census has no `0x33` accesses. Do not create a second status register
+from that notation. Nokia's
+[NSE-3 manual, p. 3-32](https://www.manualshelf.com/manual/nokia/6110/5-user-guide-english/page-32.html)
+independently documents a data-available strobe on the parallel interface
+and a separate PCM clock/frame interface. It does not map that strobe to
+a DSP port or interrupt vector. The consumer dispatch therefore does not
+identify a physical receive-ready producer or justify a 32-quarter-symbol
+interrupt period by itself.
+
 | Family | Instruction starts | Reads | Reads with port-3 bit 0 clear |
 | --- | --- | ---: | ---: |
 | Initial filter | `3249,324f,3255,325b` | 372,160 | 81,920 |
@@ -1015,7 +1037,7 @@ resident image and this execution, not unseen uploaded/computed readers.
 | Capture filter | `33c9,33cf,33d5,33db` | 960 | 160 |
 
 The passive observer latches port-3 writes, observes ordinary mode RAM
-and counts every input read. It does not read I/O to obtain a control
+and the holdoff predicate, and counts every input read. It does not read I/O to obtain a control
 value or feed mode RAM back into the emulator. Its 64 buckets preserve
 raw mode/control values and first/last timestamps. All four instructions
 within each family must have identical mode/control/count partitions;

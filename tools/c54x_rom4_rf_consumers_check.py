@@ -7,8 +7,10 @@ import sys
 
 try:
     from tools.c54x_rom4_port_census import census
+    from tools.c54x_rom4_codec_contract import SEQUENCES
 except ModuleNotFoundError:
     from c54x_rom4_port_census import census
+    from c54x_rom4_codec_contract import SEQUENCES
 
 
 FAMILIES = {
@@ -19,11 +21,21 @@ FAMILIES = {
 }
 EXPECTED_TOTALS = dict(initial_filter=372160, unfiltered_history=242144,
                        scan_filter=32768, capture_filter=960)
+DISPATCH_SIGNATURES = ('frame_entry_port21_set', 'receive_holdoff_before_mode_dispatch',
+                       'receive_holdoff_history_and_commit')
 
 
 def check_program(image):
+    for name in DISPATCH_SIGNATURES:
+        address, words = SEQUENCES[name]
+        expected = b''.join(word.to_bytes(2, 'big') for word in words)
+        if image[address * 2:address * 2 + len(expected)] != expected:
+            raise ValueError('resident RF dispatch signature changed: ' + name)
     sites = sorted(address for addresses in FAMILIES.values() for address in addresses)
-    if census(image).get(('R', 0x27), []) != sites:
+    ports = census(image)
+    if ports.get(('R', 0x33)) or ports.get(('W', 0x33)):
+        raise ValueError('unreviewed hexadecimal port-33 access')
+    if ports.get(('R', 0x27), []) != sites:
         raise ValueError('resident RF reader census changed')
     for family, addresses in FAMILIES.items():
         opcode = 0x74d4 if family == 'unfiltered_history' else 0x74d6
@@ -36,7 +48,7 @@ def check_program(image):
 
 def check(text):
     pattern = re.compile(r'rom4_rf_consumer: xpc=([0-9a-f]{2}) pc=([0-9a-f]{4}) mode=([0-9a-f]{4}) '
-                         r'control=([0-9a-f]{4}) count=(\d+) first=([0-9.]+) last=([0-9.]+)')
+                         r'control=([0-9a-f]{4}) holdoff=([01]) count=(\d+) first=([0-9.]+) last=([0-9.]+)')
     rows = pattern.findall(text)
     if text.count('rom4_rf_consumer:') != len(rows):
         raise ValueError('malformed RF consumer row')
@@ -49,9 +61,16 @@ def check(text):
         raise ValueError('RF consumer accounting differs')
     by_pc, seen = {}, set()
     clear_reads = 0
-    for xpc, pc, mode, control, count, first, last in rows:
+    for xpc, pc, mode, control, holdoff, count, first, last in rows:
         if xpc != '00':
             raise ValueError('unclassified RF program page')
+        is_history = int(pc, 16) in {address + 2 for address in FAMILIES['unfiltered_history']}
+        if int(holdoff) != int(is_history):
+            raise ValueError('RF consumer contradicts holdoff-before-mode dispatch')
+        if not is_history:
+            expected_family = {'0001': 'scan_filter', '0002': 'capture_filter'}.get(mode, 'initial_filter')
+            if int(pc, 16) not in {address + 2 for address in FAMILIES[expected_family]}:
+                raise ValueError('RF consumer contradicts mode dispatch')
         key = (pc, mode, control)
         if key in seen or int(count) <= 0 or not (0 <= float(first) <= float(last) <= float(summaries[0][2])):
             raise ValueError('invalid RF consumer bucket')
@@ -70,13 +89,13 @@ def check(text):
         count = sum(groups[0].values()) * 4
         if count != EXPECTED_TOTALS[name]:
             raise ValueError('RF consumer family snapshot changed')
-        families[name] = dict(reads=count, control_clear_reads=4 * sum(
+        families[name] = dict(reads=count, holdoff_required=name == 'unfiltered_history', control_clear_reads=4 * sum(
             value for (_, control), value in groups[0].items() if not int(control, 16) & 1),
             mode_controls=[dict(mode=mode, control=control, reads=value * 4)
                            for (mode, control), value in sorted(groups[0].items())])
     if sum(row['reads'] for row in families.values()) != total or clear_reads != 114144:
         raise ValueError('RF control-clear accounting changed')
-    return dict(schema=1, reads=total, buckets=buckets, families=families,
+    return dict(schema=2, reads=total, buckets=buckets, families=families,
                 control_clear_reads=clear_reads, resident_read_sites=16,
                 physical_rate_claim=False, iq_lane_claim=False, acquisition_claim=False)
 
