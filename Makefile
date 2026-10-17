@@ -1505,8 +1505,9 @@ check-c54x-rom4-coherent: build
 
 .PHONY: check-c54x-rom4-processing
 check-c54x-rom4-processing: build
-	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-processing.XXXXXX)"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
+	@set -eu; mkdir -p "$(abspath tmp)"; \
+		tmp="$$(mktemp -d "$(abspath tmp)/noki5110-c54x-processing.XXXXXX")"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native processing evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
@@ -1516,12 +1517,13 @@ check-c54x-rom4-processing: build
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
 			-skip_gameinfo -nothrottle -seconds_to_run 30 \
-			-autoboot_script $(abspath tools/c54x_rom4_processing_observe.lua) >/dev/null; \
+			-autoboot_script $(abspath tools/c54x_rom4_processing_observe.lua) >console.log 2>&1; \
 		$(PYTHON) $(abspath tools/c54x_rom4_processing_check.py) error.log
 
 check-c54x-rom4-rf-boundary: build
-	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-rf.XXXXXX)"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
+	@set -eu; mkdir -p "$(abspath tmp)"; \
+		tmp="$$(mktemp -d "$(abspath tmp)/noki5110-c54x-rf.XXXXXX")"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native RF evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \

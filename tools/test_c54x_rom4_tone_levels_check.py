@@ -69,17 +69,25 @@ class NativeToneLevelsTest(unittest.TestCase):
             'rom4_codec_control_call: hit=1 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=8.06',
             'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.05'))
         count = 1
-        if option != 1:
-            count = 2
-            lines.extend((
-                'rom4_codec_control_call: hit=2 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=11.02',
-                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=11.0'))
+        copies = 1
         if option in (3, 4):
             word = '920c' if option == 3 else '9209'
-            lines.append('rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 '
-                         f'value={word}0000 mask=ffff0000 pc=272034 t=10.98')
+            value = '000000020c' if option == 3 else '0000000209'
+            lines.extend((
+                'rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 '
+                f'value={word}0000 mask=ffff0000 pc=272034 t=10.98',
+                'rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 '
+                f'value={word} mask=ffff pc=0027f2 t=10.99',
+                f'rom4_codec_control_call: hit=2 a={value} b=0000000009 sp=1ea7 return=a598 t=10.991'))
+            count += 1
+        if option != 1:
+            count += 1
+            copies += 1
+            lines.extend((
+                f'rom4_codec_control_call: hit={count} a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=11.02',
+                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=11.0'))
         lines.extend((f'rom4_codec_control_summary: calls={count} t=15.0',
-                      f'rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=40 tone_copies={count}'))
+                      f'rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=40 tone_copies={copies}'))
         return '\n'.join(lines)
 
     def test_all_settings(self):
@@ -90,7 +98,7 @@ class NativeToneLevelsTest(unittest.TestCase):
     def test_wrong_sequences_and_observation_bounds(self):
         for before, after in (
                 ('name=clear', 'name=menu'), ('input-release:', 'lost-release:'),
-                ('t=15.0', 't=11.2'), ('calls=2', 'calls=3'),
+                ('t=15.0', 't=11.2'), ('calls=3', 'calls=4'),
                 ('tone_copies=2', 'tone_copies=3'), ('tx_words=2', 'tx_words=3'),
                 ('t=8.05', 't=7.05'), ('hit=2', 'hit=1')):
             with self.subTest(before=before), self.assertRaises(ValueError):
@@ -116,6 +124,15 @@ class NativeToneLevelsTest(unittest.TestCase):
     def test_level_controls_require_correct_lane_and_order(self):
         for before, after in (('920c0000', '92090000'), ('mask=ffff0000', 'mask=ffff'),
                               ('t=10.98', 't=11.03')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_level(self.trace(3).replace(before, after), 3)
+
+    def test_packed_control_must_survive_native_consumption(self):
+        for before, after in (('value=920c mask=ffff', 'value=0000 mask=ffff'),
+                              ('pc=0027f2', 'pc=0027f4'),
+                              ('a=000000020c', 'a=0000000000'),
+                              ('b=0000000009', 'b=0000000000'),
+                              ('t=10.991', 't=11.01')):
             with self.subTest(before=before), self.assertRaises(ValueError):
                 check_level(self.trace(3).replace(before, after), 3)
 

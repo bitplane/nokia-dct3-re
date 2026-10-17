@@ -14,9 +14,9 @@ class BackendBspResultTest(unittest.TestCase):
 
     def test_slot_requests_require_all_cases_and_terminal_result(self):
         original = REQUESTS + '\n' + REQUEST_COMPLETION
-        for token in ('cases=6', 'pending_restore=6', 'armed_restore=6',
+        for token in ('cases=8', 'pending_restore=8', 'armed_restore=8',
                       'payload_preserved=1', 'masked_pending=1', 'ack_ports=1,2',
-                      'reset=6', 'mapping_claim=0'):
+                      'reset=8', 'mapping_claim=0'):
             with self.subTest(token=token), self.assertRaises(ValueError):
                 check_result(original.replace(token, token.split('=')[0] + '=9'), 3, host_requests=True)
         for text in (REQUEST_COMPLETION, original + '\n' + REQUEST_COMPLETION,

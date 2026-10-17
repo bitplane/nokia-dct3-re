@@ -421,21 +421,15 @@ u16 nokia_dsp_c54x_device::host_request() const
 {
 	const u16 tx_producer = m_transport->shared_word(0x0a4 / 2);
 	const u16 tx_consumer = m_transport->shared_word(0x0a6 / 2);
-	const u16 command = m_transport->shared_word(0x0a8 / 2);
-	return (command & ~u16(0x0002)) | (m_slot_request_pending ? 0x0008 : 0) |
+	return (m_slot_request_pending ? 0x0008 : 0) |
 			(tx_producer != tx_consumer ? 0x0002 : 0x0000);
 }
 
 void nokia_dsp_c54x_device::acknowledge_host_command(u16 mask)
 {
 	if (BIT(mask, 3)) m_slot_request_pending = false;
-	// The remaining MCU-request/DARAM alias is still provisional. Retain it
-	// until its independent producer contract is recovered; do not infer that
-	// the slot latch makes packed-parameter acknowledgement faithful.
-	const u16 command = m_transport->shared_word(0x0a8 / 2);
-	const u16 acknowledged = mask & ~u16(0x0002);
-	if (command & acknowledged)
-		m_transport->peer_shared_w(0x0a8 / 2, command & ~acknowledged);
+	// MCU parameter delivery uses its explicit HPINT doorbell. Peripheral
+	// acceptance must not reinterpret or clear packed DARAM parameter bits.
 }
 
 void nokia_dsp_c54x_device::update_host_command_line()
@@ -450,9 +444,9 @@ void nokia_dsp_c54x_device::update_host_command_line()
 	// Firmware may leave bit 1 set in the in-service mask; it must not suppress
 	// a later empty-to-nonempty MDISND transition.
 	const u16 acknowledgement = m_transport->shared_word(0x0aa / 2) & ~u16(0x0002);
-	// This partial model combines the provisional MCU alias, saved slot latch
-	// and live MDISND comparator on INT2. The physical MCU source mapping is
-	// unresolved; bit 1 is a comparator rather than persistent pending RAM.
+	// Only modeled peripheral sources drive INT2: the saved slot latch and
+	// live MDISND comparator. Other ROM dispatcher bits need independently
+	// evidenced producers; packed MCU parameter data is not a request bitmap.
 	const u16 vector = host_request() & ~acknowledgement;
 	const bool level = vector != 0;
 	// Re-arm the CPU latch when the effective request changes. Command work and
@@ -516,9 +510,9 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	m_io[port] = data;
 	if (port == 0x02)
 	{
-		// Retain the current in-service/accept model. Acceptance clears the
-		// independent slot latch; MCU payload clearing remains provisional.
-		// The ring comparator retires only when its consumer advances.
+		// Acceptance clears the independent slot latch, not parameter data.
+		// The ring comparator retires only when its consumer advances. The
+		// in-service mask's shared-0aa projection remains a partial model.
 		m_transport->peer_shared_w(0x0aa / 2, data);
 		acknowledge_host_command(data);
 		update_host_command_line();

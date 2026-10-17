@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nse1_packed_parameter_as_peripheral_request_bitmap",
+      "status": "disproven",
+      "hypothesis": "Directly aliasing packed MCU parameter 100a8/0854 onto DSP port-1 requests and clearing its bits on acceptance is necessary for ordinary native 5110 boot and correctly delivers codec controls",
+      "conclusion": "The original poster creates packed selector/value words and private selector-8/9 shadows, with an explicit HPINT notification handshake. The direct alias cleared physical level-3 word 9209 before native 27f2 consumed it, causing register-0 rather than register-9 delivery; limiting the clear to ISR mask union 17ff would still corrupt the selector. Keeping the live ring comparator and independently saved slot timer while removing only payload-derived requests/clears passes all four physical tone settings, exact native boot instruction fingerprints, paired frames and native save/load. Medium/High now deliver 920c/9209 intact and produce register-9 values 020c/0209. The older blank ring-only experiment also removed the slot source, so it did not falsify this composition. Do not restore the direct alias to manufacture other dispatcher bits. This does not close the electrical in-service-mask projection, other peripheral request sources, analog gain or production audio clocks.",
+      "evidence": ["docs/cobba_control_boundary.md", "driver/nokia_dsp_c54x.cpp", "driver/tms320c54x_test.cpp", "tools/c54x_rom4_host_poster.py", "tools/c54x_rom4_tone_levels_check.py", "tools/test_c54x_rom4_tone_levels_check.py", "tools/run_c54x_rom4_tone_levels.py", "tools/run_c54x_rom4_pcm_clock.py"]
+    },
+    {
       "id": "nse1_data22_cxxx_proves_cobba_parallel_register_c",
       "status": "disproven",
       "hypothesis": "Resident data-space 0022 writes c008/c0c8 prove a packed COBBA parallel register-C transaction, and data 0032 has the same recovered owner",

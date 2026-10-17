@@ -28,8 +28,9 @@ Current native scope is split deliberately:
   additionally validates runtime ROM synthesis of physical key 2's two
   frequency components. Its supplied clock is laboratory input, not recovered
   handset enable wiring or native call speech.
-- The native request/acknowledgement alias can still destroy shared command
-  payloads; its electrical ownership is unresolved. RF sample encoding,
+- Native MCU parameter delivery preserves packed words through HPINT;
+  the in-service-mask projection and other peripheral request sources remain
+  unresolved. RF sample encoding,
   production/consumption timing and SCU serialization are also open. None of
   the codec or peripheral gates promotes native handset speech or acquisition.
 
@@ -1635,8 +1636,8 @@ when the tone command is absent.
 | --- | --- |
 | Off (1) | No new `00e1` tone copy to DSP `00fe` and no register-8 `0626` activation during the remaining capture. Earlier menu keys supply the positive control. |
 | Level 1 (2) | Tone copy and register-8 `0626` activation occur; no new level-dependent shared control is required. |
-| Level 2 (3) | MCU publishes packed `920c` before the tone copy; register-8 activation is still `0626`. |
-| Level 3 (4) | MCU publishes packed `9209` before the tone copy; register-8 activation is still `0626`. |
+| Level 2 (3) | MCU `920c` reaches native `27f2` intact and produces register 9/value `020c` before the tone copy; register-8 activation is still `0626`. |
+| Level 3 (4) | MCU `9209` reaches native `27f2` intact and produces register 9/value `0209` before the tone copy; register-8 activation is still `0626`. |
 
 The checker requires all eight physical press/release pairs, complete
 helper-call and tone-copy observations, ordered level controls and the
@@ -1644,49 +1645,86 @@ unchanged two boot serial transfers. Per-access trace caps are 64 per
 owner/direction/phase. The Off absence claim is rejected if tone-copy
 counts do not cover the complete trace. These observations separate the
 level-dependent packed control from the common activation write; they do
-not establish the analog gain law, register-9 wire transformation, clock
+not establish the analog gain law, additional register-9 bit meanings, clock
 enable bits, additional PCM samples or audible/native speech output.
 
-**Current transport caveat:** the native backend aliases DSP port-1 requests
-to shared `0854` (MCU `100a8`) and clears every acknowledged bit except the
-ring-comparator bit. In the high-level fixture, the final key publishes
-`9209`; the ISR reads `9209` at post-operand PC `35bf`, then writes port 2
-with `ffff` at PC `3602`. Backend acknowledgement clears the shared word
-before `27f2` reads it as zero. The later helper therefore writes register
-0 rather than proving delivery of the packed register-9 command. Local
-`19a2/19a4/1f92` taps see initialization, not a level-dependent update in
-this fixture. These observations invalidate using the current level traces
-as a COBBA gain-map oracle; they do not establish what real hardware clears.
+**Accepted native parameter boundary:** MCU parameters at shared `0854`
+(MCU `100a8`) do not assert INT2 or get cleared by peripheral acceptance.
+Their explicit doorbell drives HPINT. The modeled INT2 sources are the live
+ring-not-empty comparator and an independent saved slot-compare latch.
+All four physical tone-setting boots, native save/load and the clocked-boot
+suite pass, retaining the exact reviewed instruction fingerprints and paired
+pixels. Medium/High acceptance requires the ordered MCU publication, intact
+native `27f2` read, register-9 delivery and tone copy; the former destructive
+alias's captured zero read is a negative control for this check.
+
+Do not reintroduce the direct payload/request alias to produce other ROM
+dispatcher bits. It turned `9209` into zero before consumption and selected
+register 0 instead of 9. Physical sources of other request bits still need
+independent evidence; successful boot does not prove those bits unnecessary
+for radio/call operation. The port-2 in-service mask still projects onto shared
+`0855`/MCU `100aa` in this partial model; its full electrical ownership remains
+unvalidated.
+
+**RF validation remains open:** a retained 30-second ring-plus-slot capture
+has 20,285 frame expiries and 648,192 RF reads, as in the existing scan
+oracle, but 1,518 rather than 1,520 programming pairs. The two absent
+`0041/0040` writes belong to queued writer `3712`; producer `a1bc` still
+publishes them at `1922/1923`. Resident dispatcher `35c0` selects `369a`
+on request bit `1000`, and that handler acknowledges `1000` before queue
+service. The model no longer derives that request from a packed selector-9
+word. The port-4 transfer-control write is a candidate hardware predecessor,
+not an established completion source or permission to inject the bit.
+
+The strict scan oracle remains unchanged and rejects this difference pending
+queue-source closure. The separate processing checker still assumes its older
+five-write/single-entry profile; the current multi-entry capture has 1,022
+mode-1 executions, 8,176 filter iterations, zero-valued RF/reduction inputs
+and two `33ac` continuations. Do not interpret its five-to-1,518 failure as
+the effect of this parameter change, or silently rebase either checker.
+Next question: which peripheral transition legitimately requests the queued
+transfer service, independently of MCU parameter data?
+
+The passive `c54x_rom4_transfer_observe.lua` eight-second capture records ten
+port-4 writes: initialization/disabling uses `3a98` (15,000), the four `a244`
+writes use `0834` (2,100), and uploaded paths write `0032` (50) and `03e8`
+(1,000). At `a244`, descriptor `1914..1917` is
+`0005,0834,0001,0884`, with pointers `197b=1914`, `197d=1920`.
+Later control writes see those pointers advanced to `1916/1922` while the
+second data pair remains queued. All 1,485 observed request reads are `0002`,
+`0008` or `000a`; none contains service bit `1000`. These position-shaped
+values motivate an independent timed-compare hypothesis, not a serial-baud
+constant or an accepted timer implementation. The observer retains the last
+firmware counter read without adding I/O reads; its sometimes stale values
+do not alone determine the match phase or distinguish relative from absolute
+programming. Raw descriptor words, request counts and timing stay observable
+until that contract is recovered.
 
 The exact checked ISR block `35c0..35f6` has predicate-mask union `17ff`:
 bits 0--10 and 12 are tested, not bits 11 or 13--15. This independently
 corroborates the external emulator's dispatch-mask hypothesis, but software
 dispatch coverage is not an electrical acknowledgement specification.
-Even restricting clears to `17ff & ~2` would turn `9209` into `8000`,
-still losing part of the packed register index. Do not transplant that
-mask as a complete fix. Recover which request signals are independently
-latched, how MCU control writes assert them, and whether port-1/2 acceptance
-can alter DARAM before reinterpreting COBBA bits or attaching its clock.
+Restricting the former DARAM clears to `17ff & ~2` would still turn `9209`
+into `8000`, losing part of the packed selector. That mask is not a justified
+replacement source model or reason to clear parameter data.
 
 The existing modeled slot-compare request now has its own saved pending bit.
 Expiry sets that bit without OR-ing `0008` into the shared parameter word;
-the modeled port-1 result still combines it with the ring comparator and the
-provisional MCU-request alias. Port-1/2 acceptance of bit 3 and DSP reset clear
+the modeled port-1 result combines it with the ring comparator, not parameter
+bits. Port-1/2 acceptance of bit 3 and DSP reset clear
 the slot latch. Its cadence and request-bit assignment are unchanged.
-`check-c54x-backend-requests` exercises six isolated cases: payloads
-`0000/8000/9201` through both accept ports, masked expiry and later unmask,
+`check-c54x-backend-requests` exercises eight isolated cases: payloads
+`0000/8000/9201/9209` through both accept ports, masked expiry and later unmask,
 unrelated completion, pending-state restoration after acknowledgement,
 and armed-timer restoration after reset cancellation. CPU-line observations
 settle at scheduler boundaries before snapshots. The old implementation
 fails the payload-integrity assertion on its first expiry.
 
 This is model storage/transition conformance, not independent silicon evidence
-for the timer clock, port map or INT2 assignment. Payload bit 3 is deliberately
-clear in those fixtures to isolate the slot latch: a packed parameter such as
-`9209` still overlaps the unresolved MCU alias and is not proved safe under
-acknowledgement. Do not cite this gate as fixing that alias, establishing all
-request producers or validating native gain/audio. Separating one peripheral
-event from DARAM does not justify inventing the other sources.
+for the timer clock, port map or INT2 assignment. It includes the overlapping
+bit-3 parameter `9209` and requires its preservation under acceptance and reset.
+The live tone gate independently proves actual native parameter consumption.
+Neither gate establishes all request producers, analog gain or native speech.
 
 The checked MCU continuation `272036..27204e` distinguishes parameter data
 from its explicit trigger: after the shared-field store at `272034`, the
@@ -1781,7 +1819,8 @@ semantics, live contention and caller retry behavior are excluded. This enumerat
 surface, not all MCU callers or the DSP port-1/2 alias. In particular,
 the trigger-only field does not identify which DSP request bits assert, and
 software stores to `100aa` do not prove that a DSP I/O acknowledgement clears
-the parameter at `100a8`. The backend alias remains unresolved.
+the parameter at `100a8`. The native backend therefore keeps parameter data
+independent of its modeled peripheral request sources.
 
 `check-c54x-rom4-tone-levels` joins these shadows to live publications without
 reading or changing them in its Lua taps. The ARM bus places selector 8 in
@@ -1806,18 +1845,12 @@ replacement interrupt-source specification.
 The native HPINT/vector-25 entry `3772` checks busy word `0870` and local
 state `00ef`; its admitted path calls `a51b` at `3796`, strobes data `0029`
 bit 3 and clears `0870` at `379e..37a0`. Both ranges are exact-word fixtures.
-Suppressing all non-ring INT2 requests while retaining HPINT and the ring
-comparator preserves parameter `900f`: it reaches `27f2`, writes register
-9/value `000f`, and clears busy at post-extension PC `37a1`. However that
-candidate makes only 18 control calls, never reaches the ordinary `8426`
-activation, and captures a blank final frame. It is not a complete fix and
-is not retained in the driver. This rules out simply deleting the inferred
-request sources; recover their legitimate producers rather than substituting
-the ring-only result or restoring a guessed bitmap with a new name.
-That experiment also suppressed the modeled slot request. It does not test
-retaining the independently stored slot event while removing only requests
-derived from the MCU parameter payload; the two hypotheses must not share
-an absence/closure claim.
+Suppressing every non-ring INT2 request also suppresses the slot timer: the
+ring-only negative capture preserves `900f` but makes only 18 control calls,
+never reaches ordinary `8426` activation and ends blank. That negative does
+not apply to the accepted ring-plus-slot boundary, which retains HPINT,
+reaches the ordinary native UI and delivers level commands intact. Keep the
+two hypotheses distinct; neither result identifies all future hardware sources.
 The tone-level fixture passively records capped request reads and their
 following accept writes, with uncapped totals; it does not require the
 current destructive behavior as an acceptance condition.

@@ -138,3 +138,12 @@ def check_level(text, option):
             rf'value={word}0000 mask=ffff0000 pc=272034 t=([0-9.]+)', text)
         if not any(start <= float(time) < min(tone) for time in updates):
             raise ValueError('missing ordered level-dependent packed control')
+        reads = re.findall(
+            r'rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 '
+            rf'value={word} mask=ffff pc=0027f2 t=([0-9.]+)', text)
+        expected = f'{int(word, 16) & 0xfff:010x}'
+        delivered = [float(time) for _, a, b, ret, time in calls
+                     if a == expected and b == '0000000009' and ret == 'a598']
+        if not any(start <= float(update) <= float(read) <= call < min(tone)
+                   for update in updates for read in reads for call in delivered):
+            raise ValueError('packed level control did not reach native register-9 delivery intact')
