@@ -9,29 +9,31 @@ import sys
 
 
 SOURCE_OFFSET = 0x99704
-STOP = 'unsupported staged C54x form 7728 at 000f05'
+STOP = 'unsupported staged C54x form 7cf8 at 000f12'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
-                 r'illegal=([01]) pmst=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
+                 r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
+                 r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
 
 
 def check(text, firmware):
     rows = ROW.findall(text)
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
-    pc, xpc, illegal, pmst, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst) != ('0f07', '00', '1', 'ffa8') or not 0.5 <= float(timestamp) <= 1:
+    pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0f14', '00', '1', 'ffa8', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
     words = [int(word, 16) for word in encoded.split(',')]
-    if len(words) != 16 or words[5:7] != [0x7728, 0x2000]:
+    if len(words) != 32 or words[5:9] != [0x7728, 0x2000, 0x7758, 0x3146] or words[18:21] != [0x7cf8, 0x0802, 0xff87]:
         raise ValueError('uploaded instruction or operand changed')
-    packed = struct.pack('>16H', *words)
+    packed = struct.pack('>32H', *words)
     if firmware.find(packed) != SOURCE_OFFSET or firmware.find(packed, SOURCE_OFFSET + 1) != -1:
         raise ValueError('observed upload does not bind uniquely to the reviewed NSE-1 MCU source')
-    return dict(status='unsupported_legacy_bus_control', source_offset=SOURCE_OFFSET,
-                observed_words=16, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction=0x7728, operand=0x2000, boot_claim=False,
+    return dict(status='unsupported_staged_absolute_mvpd', source_offset=SOURCE_OFFSET,
+                observed_words=32, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
+                instruction=0x7cf8, destination=0x0802, program_source=0xff87,
+                swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)
 
 

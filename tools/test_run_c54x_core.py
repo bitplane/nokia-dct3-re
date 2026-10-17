@@ -14,6 +14,26 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_clkmd_stm_does_not_promote_a_physical_pll_clock(self):
+        marker, ending = EXTRA_PROFILES['clock-stm']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='clock-stm')
+        for field in ('cases=12', 'restore=12', 'writes=1', 'publish_clock=8',
+                      'pll_reference=unconfigured', 'physical_clock_claim=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='clock-stm')
+
+    def test_standard_swwsr_scope_does_not_promote_c5416_controls(self):
+        for profile in ('std-swwsr', 'std-stm', 'std-io', 'std-io-atomic'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' not in field:
+                    continue
+                with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_staged_cold_requires_exact_reset_frontier(self):
         marker, ending = EXTRA_PROFILES['cold-pipeline']
         text = marker + '\n' + ending + '\n'

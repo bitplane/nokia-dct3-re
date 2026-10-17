@@ -21,7 +21,9 @@ public:
 	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
 	// Opt-in compatibility; retained I/O has bounded RAM-operand acceptance.
 	void set_c5416_bus_profile(bool enabled) { m_c5416_bus_profile = enabled; }
-	unsigned external_io_wait_states() const { return m_c5416_bus_profile ? ((m_swwsr >> 12) & 7) * (1 + (m_swcr & 1)) : 0; }
+	// SPRU131G table 10-2 only; no C5416 BSCR/SWCR or external RAM map implied.
+	void set_standard_swwsr(bool enabled) { m_standard_swwsr = enabled; }
+	unsigned external_io_wait_states() const { return software_wait_enabled() ? ((m_swwsr >> 12) & 7) * (m_c5416_bus_profile ? 1 + (m_swcr & 1) : 1) : 0; }
 	unsigned clkout_divisor() const { return m_c5416_bus_profile ? 1 + ((m_bscr >> 13) & 3) : 1; }
 	bool iack_output_enabled() const { return m_c5416_bus_profile && !(m_bscr & 0x1000); }
 	auto clkout_divisor_cb() { return m_clkout_divisor_cb.bind(); }
@@ -149,8 +151,10 @@ private:
 	void dual_modify(u8 operand, unsigned stage = 6);
 	void circular_modify(unsigned ar, s16 step, unsigned stage = 6);
 	void execute_one(u16 op);
-	bool staged_bus_control(u16 op) const { return m_c5416_bus_profile && (op == 0x7728 || op == 0x7729 || op == 0x772b); }
+	bool software_wait_enabled() const { return m_standard_swwsr || m_c5416_bus_profile; }
+	bool staged_bus_control(u16 op) const { return (software_wait_enabled() && op == 0x7728) || (m_c5416_bus_profile && (op == 0x7729 || op == 0x772b)); }
 	bool staged_timer_control(u16 op) const { return op >= 0x7724 && op <= 0x7726; }
+	bool staged_clock_control(u16 op) const { return op == 0x7758; }
 	void retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
 		bool repeat_was_armed, bool delayed, bool xc_guarded);
 	bool service_interrupt();
@@ -262,6 +266,7 @@ private:
 	bool m_extended_program = false;
 	u16 m_clkmd = 0;
 	bool m_c5416_bus_profile = false;
+	bool m_standard_swwsr = false;
 	u16 m_swwsr = 0;
 	u16 m_bscr = 0;
 	u16 m_swcr = 0;

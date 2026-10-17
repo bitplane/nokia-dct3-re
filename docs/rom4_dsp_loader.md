@@ -271,21 +271,43 @@ staged clocks. `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms
 or execute a loader.
 
 `nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,
-DSPIF, native backend and product inputs. Only the C54x frontend selection
-differs from `noki5110`. The MCU organically uploads loader1; staged
-execution stops at `000f05`, instruction `7728`, operand `2000`, with
-PC `0f07`, PMST `ffa8` and ILLEGAL set. The live `0f00..0f0f` words bind
+DSPIF, native backend and product inputs, with the staged frontend and
+explicit standard SWWSR option. The MCU organically uploads loader1;
+staged execution stops at `000f12`, instruction `7cf8 0802 ff87` (absolute
+MVPD from program `ff87` to data `0802`), with PC `0f14`, PMST `ffa8` and
+ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
+remain zero. The live `0f00..0f1f` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x99704`. The backend
 reports two bootstrap mailbox writes and no completion strobe. Neither
 upload completion nor handset boot is accepted for this machine.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
-register admission currently belongs to the explicit C5416-compatible bus
-profile. `nse1pipe` does not select that dialect. The next contract is the
-legacy/Lead-side register and external-wait behavior; enabling the C5416
-profile merely to advance this loader would not establish that contract.
-The distinct 5510/MU4 request `7728 7fff` must not replace this handset's
-observed `7728 2000` operand.
+register admission can use `set_standard_swwsr(true)` independently of the
+C5416-compatible bus profile. SPRU131G section 10.3.1/table 10-2 defines the
+standard option: reset `7fff`, reserved bit 15 reads zero, and five 3-bit
+wait fields without a multiplier. I/O uses waits 0..7 and samples READY
+only with at least two software waits. BSCR/SWCR ownership, the C5416
+multiplier and its output controls are not imported. Program/data fields
+are retained but their external-memory waits remain unimplemented; physical
+Lead bus mapping is not established by this option. Ordinary `noki5110`
+retains its previous configuration. The distinct 5510/MU4 request
+`7728 7fff` must not replace this handset's observed `7728 2000` operand.
+
+The `std-swwsr` fixture exhausts all 65,536 encodings, partial writes,
+save/restore and reset, including non-ownership of BSCR/SWCR. `std-stm`
+checks 12 retained STM writes/restores. `std-io` and `std-io-atomic` check
+288 and 1,440 cases/restores respectively, including READY, IRQ/NMI,
+ongoing timer clocks and exactly-once transfers. Multiplier-enabled raw
+cases are omitted rather than relabeled as duplicate original-family
+cases. These tests do not assert a fitted bus or external RAM-bank map.
+
+`clock-stm` separately checks 12 retained CLKMD writes/restores through its
+existing register implementation, including the loader's `3146` request.
+No PLL reference is configured in that fixture. Its success validates
+instruction publication, not the handset's physical clock source, lock
+latency or frequency. Unsupported younger Decode can halt before older
+slots retire: accepting an opcode alone is not evidence that its write
+occurred; the integration observer checks the actual SWWSR state.
 
 For a bounded reproduction, seed `nvram/nse1pipe/eeprom` with
 `tools/make_5110_eeprom_profile.py` using the NSE-1's own `nse-1.bin` and
@@ -295,7 +317,7 @@ and `-autoboot_delay 0 -autoboot_script` pointing to the absolute path of
 `tools/c54x_rom4_staged_observe.lua`. The observer reads ordinary uploaded
 program RAM, never status or I/O. Then run
 `python3 tools/c54x_rom4_staged_check.py CASE/error.log roms/noki5110/5110f530.fls`.
-Its result classifies an unsupported boundary, binds all 16 observed words
+Its result classifies an unsupported boundary, binds all 32 observed words
 to the source image, and explicitly declines boot, complete-upload and
 fitted-bus-dialect claims. The normal atomic and clocked native fixtures
 retain their existing acceptance contracts.
@@ -3951,27 +3973,23 @@ is accepted only after publication. Bus-phase timing is a partial model
 (SPRU172C 4-176/class 12A; SPRU131G 6.10.2).
 The full C54x conformance run, native 5110 save-state gate and original
 resident-memory checker pass; fixture IRQ/NMI inputs return low on exit.
-The current original run advances to `STM #7fff,*(0028)` (`7728 7fff`,
-`02:6d05`, live PC `026d07`) while retaining both memory-audit passes.
+The MU4 sequence includes `STM #7fff,*(0028)` (`7728 7fff`, `02:6d05`).
 SWWSR at `0028` and the following BSCR write (`7729 8006`, `02:6d07`)
 configure external wait states/bank switching (SPRU131G 10.3.1/10.3.2).
-Their register and external-bus effects are the next contract; storage
-alone must not be described as faithful wait-state modeling. No
+Storage alone must not be described as faithful wait-state modeling. No
 filesystem or cluster state is synthesized; full boot remains unaccepted.
 The [MU4 external-bus contract](5510_bringup.md#external-bus-compatibility-contract)
 pins these original requests using SPRS095P's C5416-compatible dialect:
 BSCR's upper fields differ from the older generic family table. Its field
-decoder is tested exhaustively, but physical DA150 identity, program/data
-bank ownership and runtime bus timing remain unvalidated. External I/O
-wait integration is the next software target; no new register opcode is
-admitted merely to cross this boundary.
+decoder and retained I/O paths are tested as described below, but physical
+DA150 identity, program/data bank ownership and physical bus phases remain
+unvalidated. This compatibility profile is distinct from the optional
+standard SWWSR model used by the NSE-1 staged execution probe.
 The isolated C5416-compatible register profile now validates reset,
 masking, partial writes and saved-state/output restoration across all
 65,536 encodings. Its CLKOUT divider and IACK-enable callbacks are
 configuration outputs, not pin waveforms; logical IRQ acknowledgement
 remains independent. No handset selects this compatibility profile.
-The profile gate, full legacy CPU suite, native 5110 save-state gate and
-original memory audit passed at the retained-I/O checkpoint.
 The isolated staged I/O profile now validates software waits `0..14`,
 READY eligibility after at least two software waits, single read/write
 side effects and saved transaction ownership across 576 replays. Timers

@@ -1531,7 +1531,7 @@ void tms320c54x_device::device_reset()
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
 	m_clkmd = m_reset_clkmd_enabled ? m_reset_clkmd : 0;
-	m_swwsr = m_c5416_bus_profile ? 0x7fff : 0;
+	m_swwsr = software_wait_enabled() ? 0x7fff : 0;
 	m_bscr = m_c5416_bus_profile ? 0xf000 : 0;
 	m_swcr = 0;
 	publish_bus_controls();
@@ -1869,7 +1869,7 @@ void tms320c54x_device::internal_data_map(address_map &map)
 	for (u16 address = 0; address <= 0x58; ++address)
 		if (address <= 1 || (address >= 6 && address <= 0x1d) ||
 			(address == 0x1e && m_extended_program) || (address >= 0x24 && address <= 0x26) || address == 0x58 ||
-			(m_c5416_bus_profile && (address == 0x28 || address == 0x29 || address == 0x2b)))
+			(software_wait_enabled() && address == 0x28) || (m_c5416_bus_profile && (address == 0x29 || address == 0x2b)))
 			// Device submaps use byte addresses; the C54x data space is word-addressed.
 			map(u32(address) << 1, (u32(address) << 1) | 1).lrw16(
 				NAME(([this, address]() { return register_read(address); })),
@@ -1936,7 +1936,7 @@ u16 tms320c54x_device::register_read(u16 address)
 	}
 	if (address == 0x58)
 		return m_clkmd;
-	if (m_c5416_bus_profile && address == 0x28) return m_swwsr;
+	if (software_wait_enabled() && address == 0x28) return m_swwsr;
 	if (m_c5416_bus_profile && address == 0x29) return m_bscr;
 	if (m_c5416_bus_profile && address == 0x2b) return m_swcr;
 	fatalerror("Unmapped C54x register read %04x", address);
@@ -2005,8 +2005,8 @@ void tms320c54x_device::register_write(u16 address, u16 value)
 		}
 		arm_timer();
 	}
-	else if (m_c5416_bus_profile && address == 0x28)
-		m_swwsr = value;
+	else if (software_wait_enabled() && address == 0x28)
+		m_swwsr = m_c5416_bus_profile ? value : value & 0x7fff;
 	else if (m_c5416_bus_profile && address == 0x29)
 	{
 		m_bscr = value & 0xf006;
@@ -2649,7 +2649,7 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
-	if (m_c5416_bus_profile)
+	if (software_wait_enabled())
 	{
 		bool const read = m_pipeline_valid[3] && staged_port_read(m_pipeline_word[3]);
 		bool const write = m_pipeline_valid[4] && staged_port_write(m_pipeline_word[4]);
@@ -2834,7 +2834,7 @@ void tms320c54x_device::pipeline_step()
 		(staged_mvdd(m_pipeline_word[3]) && m_pipeline_immediate[3] >= 0x20 && m_pipeline_immediate[3] <= 0x5f));
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		(((staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
-		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || staged_timer_control(m_pipeline_word[4]));
+		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
 	if (read_peripheral && write_peripheral)
 	{
 		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported\n", machine().describe_context());
@@ -3145,7 +3145,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_data_to_program(m_pipeline_word[2]) || staged_extended_push(m_pipeline_word[2]) || (staged_write_a(m_pipeline_word[2]) && u8(m_pipeline_word[2]) >= 0xe0) || staged_shifted_smem(m_pipeline_word[2]) || staged_extended_dld(m_pipeline_word[2]) || staged_offset_load(m_pipeline_word[2]) || staged_bitfield(m_pipeline_word[2]) || staged_extended_smem_arithmetic(m_pipeline_word[2]) || staged_extended_smem_special(m_pipeline_word[2]) || staged_port_read(m_pipeline_word[2]) || staged_port_write(m_pipeline_word[2]) || staged_absolute_add(m_pipeline_word[2]) || m_pipeline_word[2] == 0x47f8 || staged_banz(m_pipeline_word[2]) || m_pipeline_word[2] == 0x7ef8 || staged_program_move(m_pipeline_word[2]) || staged_far_call(m_pipeline_word[2]) || (staged_absolute_load(m_pipeline_word[2]) || staged_extended_logic(m_pipeline_word[2])) || staged_far_branch(m_pipeline_word[2]) || staged_long_mar(m_pipeline_word[2]) || staged_move(m_pipeline_word[2]) || staged_call(m_pipeline_word[2]) || staged_conditional_branch(m_pipeline_word[2]) || staged_immediate_alu(m_pipeline_word[2]) || (m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 || staged_extended_pop(m_pipeline_word[2]) || staged_immediate_multiply(m_pipeline_word[2]) || staged_extended_accumulator_store(m_pipeline_word[2]) || staged_extended_dst(m_pipeline_word[2]) || staged_extended_long_arithmetic(m_pipeline_word[2]) || staged_data_copy(m_pipeline_word[2]) ||
 			m_pipeline_word[2] == 0xf070 || staged_block_repeat(m_pipeline_word[2]) || m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
-			m_pipeline_word[2] == 0x46f8 || m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x771a || m_pipeline_word[2] == 0x7700 || staged_bus_control(m_pipeline_word[2]) || staged_timer_control(m_pipeline_word[2]) || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
+			m_pipeline_word[2] == 0x46f8 || m_pipeline_word[2] == 0x771d || m_pipeline_word[2] == 0x771a || m_pipeline_word[2] == 0x7700 || staged_bus_control(m_pipeline_word[2]) || (staged_timer_control(m_pipeline_word[2]) || staged_clock_control(m_pipeline_word[2])) || m_pipeline_word[2] == 0x770e || ((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xff00) == 0x7600 && (u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0xa0 || staged_indexed_immediate_store(m_pipeline_word[2]) || staged_extended_immediate_store(m_pipeline_word[2]))) ||
 			(staged_rmw(m_pipeline_word[2]) && (staged_extended_rmw(m_pipeline_word[2]) || u8(m_pipeline_word[2]) == 0xf8 || u8(m_pipeline_word[2]) < 0x98)))
 		{
@@ -3287,7 +3287,7 @@ void tms320c54x_device::pipeline_step()
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		bool const immediate_brc = word == 0x771a;
 		bool const immediate_t = word == 0x770e;
-		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || staged_timer_control(word);
+		bool const immediate_control = word == 0x771d || word == 0x7700 || staged_bus_control(word) || (staged_timer_control(word) || staged_clock_control(word));
 		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && !staged_memory_repeat(word) && !staged_immediate_arp(word) && !staged_immediate_asm(word) && word != 0xf070 && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
@@ -3399,7 +3399,7 @@ void tms320c54x_device::pipeline_step()
 			}
 		}
 	}
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700 && m_pipeline_word[3] != 0x771d && m_pipeline_word[3] != 0x7700 && !staged_bus_control(m_pipeline_word[3]) && !staged_timer_control(m_pipeline_word[3]))
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700 && m_pipeline_word[3] != 0x771d && m_pipeline_word[3] != 0x7700 && !staged_bus_control(m_pipeline_word[3]) && !staged_timer_control(m_pipeline_word[3]) && !staged_clock_control(m_pipeline_word[3]))
 	{
 		// SPRU131G 7.5.2: STM writes DAGEN in the opcode word's Read,
 		// coincident with Access of our retained two-word operation. An older
@@ -4323,7 +4323,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			// Non-DAGEN PMST/IMR/bus controls retain their literal until Execute; do not
 			// inherit address-generator early publication. Phase is partial.
-			if (m_op == 0x771d || m_op == 0x7700 || staged_bus_control(m_op) || staged_timer_control(m_op)) data_write(u8(m_op), m_pipeline_immediate[5]);
+			if (m_op == 0x771d || m_op == 0x7700 || staged_bus_control(m_op) || (staged_timer_control(m_op) || staged_clock_control(m_op))) data_write(u8(m_op), m_pipeline_immediate[5]);
 			++m_pc;
 		}
 		else if (staged_write_a(m_op))
@@ -6223,7 +6223,7 @@ void tms320c54x_device::execute_one(u16 op)
 			address = prepare_smem_address(low);
 			port = fetch();
 		}
-		if (m_c5416_bus_profile)
+		if (software_wait_enabled())
 		{
 			m_atomic_io_pending = true;
 			m_atomic_io_write = false;
@@ -6240,7 +6240,7 @@ void tms320c54x_device::execute_one(u16 op)
 			data_write(address, m_io.read_word(port));
 			finish_smem_access(low);
 		}
-		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
+		if (!software_wait_enabled()) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7500: // PORTW Smem, port
@@ -6258,7 +6258,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		const u16 value = data_read(address);
 		finish_smem_access(low);
-		if (m_c5416_bus_profile)
+		if (software_wait_enabled())
 		{
 			m_atomic_io_pending = true;
 			m_atomic_io_write = true;
@@ -6271,7 +6271,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_atomic_io_wait_remaining += address >= 0x20 && address <= 0x5f;
 		}
 		else m_io.write_word(port, value);
-		if (!m_c5416_bus_profile) m_icount -= low >= 0xe0 ? 2 : 1;
+		if (!software_wait_enabled()) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem

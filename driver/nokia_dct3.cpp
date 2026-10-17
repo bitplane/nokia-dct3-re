@@ -4649,7 +4649,8 @@ ROM_START( nsb6hle )
 ROM_END
 
 // Explicit CPU execution probe. The ordinary MCU uploads through DSPIF;
-// only the selected CPU frontend differs from the native NSE-1 machine.
+// The staged frontend and standard SWWSR model are explicit research choices,
+// not a claim that the fitted Lead external-bus dialect has been identified.
 class nse1_pipeline_fixture_state : public nokia_dct3_state
 {
 public:
@@ -4658,6 +4659,7 @@ public:
 	{
 		noki5110(config);
 		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(true);
+		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
 	}
 };
 

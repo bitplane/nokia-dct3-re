@@ -11914,7 +11914,8 @@ private:
 		bool write, hold;
 		u16 value;
 	};
-	bool atomic_bus_io() const { return !strcmp(machine().options().bios(), "bus-io-atomic"); }
+	bool standard_bus_io() const { return !strcmp(machine().options().bios(), "std-io") || !strcmp(machine().options().bios(), "std-io-atomic"); }
+	bool atomic_bus_io() const { return !strcmp(machine().options().bios(), "bus-io-atomic") || !strcmp(machine().options().bios(), "std-io-atomic"); }
 	unsigned bus_io_form(unsigned variant) const { return atomic_bus_io() ? variant / 576 : 0; }
 	u16 bus_io_address(unsigned variant) const { unsigned const form = bus_io_form(variant); return form == 3 ? 0x30 : form == 4 ? 0x11 : 0x1400; }
 	u64 bus_io_clock() const { return atomic_bus_io() ? m_cpu->total_cycles() - m_bus_start_cycles + 1 : m_cpu->pipeline_cycles(); }
@@ -11957,6 +11958,33 @@ private:
 		m_pipeline_fetch_tap = program.install_read_tap(0x601, extended ? 0x602 : 0x601, "bus_io_literal",
 			[this, extended](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(m_pipeline_extensions_reads < 1 + unsigned(extended) && address == 0x601 + m_pipeline_extensions_reads, "External I/O extensions retain their order across stalls"); ++m_pipeline_extensions_reads; } });
 		m_phase = 253550; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_standard_swwsr_test()
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto &data = m_cpu->space(AS_DATA);
+		expect(data.read_word(0x28) == 0x7fff, "Original-family SWWSR resets to seven waits in each field");
+		for (unsigned value = 0; value < 0x10000; ++value)
+		{
+			data.write_word(0x29, value); data.write_word(0x2b, value);
+			data.write_word(0x28, value);
+			expect(data.read_word(0x28) == (value & 0x7fff) && m_cpu->external_io_wait_states() == ((value >> 12) & 7), "Original SWWSR masks reserved bit 15 and has no multiplier");
+			expect(data.read_word(0x29) == value && data.read_word(0x2b) == value && m_cpu->state_int(tms320c54x_device::STATE_BSCR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_SWCR) == 0, "Original SWWSR option does not acquire C5416 register ownership");
+		}
+		data.write_word(0x28, 0x7fff); data.write_word(0x28, 0, 0x8000);
+		expect(data.read_word(0x28) == 0x7fff, "Partial reserved-bit write cannot clear wait fields");
+		data.write_word(0x28, 0xabcd, 0x00ff);
+		expect(data.read_word(0x28) == 0x7fcd, "Partial original SWWSR write preserves other fields");
+		data.write_word(0x28, 0x2000);
+		m_saved_pipeline.str({}); m_saved_pipeline.clear();
+		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original-family SWWSR");
+		data.write_word(0x28, 0);
+		m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+		expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && data.read_word(0x28) == 0x2000 && m_cpu->external_io_wait_states() == 2, "Restore the firmware's two-I/O-wait setting");
+		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		expect(data.read_word(0x28) == 0x7fff, "Reset restores the original SWWSR contract");
+		osd_printf_info("TMS320C54x standard SWWSR: PASS encodings=65536 reserved_bit15=0 multiplier=0 separate_BSCR_SWCR=1 partial_writes=1 restore=1 reset=1 program_data_wait_claim=0 physical_mapping=unvalidated\n");
+		throw emu_fatalerror(0, "TMS320C54x isolated standard SWWSR complete");
 	}
 	void start_bus_register_test()
 	{
@@ -13830,8 +13858,10 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const timer = !strcmp(machine().options().bios(), "timer-stm");
-		u16 const address = (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-		u16 const value = (address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
+		bool const standard = !strcmp(machine().options().bios(), "std-stm");
+		bool const clock = !strcmp(machine().options().bios(), "clock-stm");
+		u16 const address = standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
+		u16 const value = (clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
 		program.write_word(0x600, 0x7700 | address); program.write_word(0x601, value);
@@ -13845,6 +13875,7 @@ private:
 			data.write_word(0x25, 0x4567); data.write_word(0x26, 0x33); data.write_word(0x24, 0x2345);
 		}
 		else { data.write_word(0x28, 0); data.write_word(0x29, 0); data.write_word(0x2b, 0); }
+		if (clock) { data.write_word(0x58, 0); data.write_word(0x58, 0); }
 		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_write_tap = data.install_write_tap(address, address, "staged_bus_stm_write",
 			[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && m_cpu->pipeline_cycles() == 8, "Control STM publishes once in Execute after its peripheral clock"); ++m_pipeline_store_writes; });
@@ -15850,6 +15881,10 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().options().bios(), "std-swwsr")) { start_standard_swwsr_test(); return; }
+		if (standard_bus_io()) { start_bus_io_test(); return; }
+		if (!strcmp(machine().options().bios(), "std-stm")) { start_staged_bus_stm(); return; }
+		if (!strcmp(machine().options().bios(), "clock-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
@@ -46642,8 +46677,10 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const timer = !strcmp(machine().options().bios(), "timer-stm");
-			u16 const address = (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-			u16 const value = (address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
+			bool const standard = !strcmp(machine().options().bios(), "std-stm");
+			bool const clock = !strcmp(machine().options().bios(), "clock-stm");
+			u16 const address = standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
+			u16 const value = (clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
 			unsigned const checkpoint = std::array<unsigned, 3>{6, 7, 9}[variant / 12];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Only configured bus STM forms execute");
 			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, value ^ 0xffff); }
@@ -46663,7 +46700,8 @@ private:
 						expect(data.read_word(0x25) == (address == 0x25 ? value : 0x4567) && data.read_word(0x26) == expected_tcr, "Timer STM applies PRD, writable TCR mask and TRB-owned PSC reload");
 						expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "Stopped timer STM cannot generate an interrupt");
 					}
-					else expect(data.read_word(address) == (value & (address == 0x29 ? 0xf006 : address == 0x2b ? 1 : 0xffff)), "Bus STM retains the device register mask");
+					else if (clock) expect(data.read_word(0x58) == ((value & ~u16(1)) | BIT(value, 1)), "CLKMD STM uses the existing unclocked DIV/PLL status contract");
+					else expect(data.read_word(address) == (value & (standard ? 0x7fff : address == 0x29 ? 0xf006 : address == 0x2b ? 1 : 0xffff)), "Bus STM retains the device register mask");
 				}
 				expect(m_pipeline_store_writes == 1 && !m_pipeline_operand_reads && m_pipeline_extensions_reads == 1, "Bus STM has one literal and one write without destination reads");
 				if (!m_pipeline_replay)
@@ -46672,7 +46710,17 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore bus STM without repeating the wait or write"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253600; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 35) { start_staged_bus_stm(variant + 1); return; }
+				if (variant + (standard || clock ? 3 : 1) < 36) { start_staged_bus_stm(variant + (standard || clock ? 3 : 1)); return; }
+				if (clock)
+				{
+					osd_printf_info("TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated staged CLKMD STM complete");
+				}
+				if (standard)
+				{
+					osd_printf_info("TMS320C54x standard SWWSR STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 physical_mapping=unvalidated\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated standard SWWSR STM complete");
+				}
 				if (timer)
 				{
 					osd_printf_info("TMS320C54x staged timer STM: PASS cases=36 restore=36 registers=TIM,PRD,TCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 stopped_timer=1 trb_reload=1 psc_write_mask=1 silicon_phase_claim=0\n");
@@ -46749,8 +46797,17 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained wait/READY state without duplicate I/O"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253560; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (atomic_bus_io() ? 2879 : 575)) { start_bus_io_test(variant + 1); return; }
+				unsigned next = variant + 1;
+				// Original SWWSR has no multiplier: omit, rather than relabel,
+				// the existing fixture's multiplier-enabled raw case IDs.
+				if (standard_bus_io() && (next & 8)) next += 8;
+				if (next < (atomic_bus_io() ? 2880 : 576)) { start_bus_io_test(next); return; }
 				m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+				if (standard_bus_io())
+				{
+					osd_printf_info("TMS320C54x standard SWWSR I/O: PASS frontend=%s cases=%u restore=%u software_waits=0..7 ready_threshold=2 sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 program_data_wait_claim=0 physical_mapping=unvalidated\n", atomic_bus_io() ? "atomic" : "staged", atomic_bus_io() ? 1440 : 288, atomic_bus_io() ? 1440 : 288);
+					throw emu_fatalerror(0, "TMS320C54x isolated standard SWWSR I/O complete");
+				}
 				if (atomic_bus_io())
 				{
 					osd_printf_info("TMS320C54x atomic external I/O waits: PASS cases=2880 restore=2880 forms=short,offset,absolute,peripheral,AR_alias software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 physical_mapping=unvalidated\n");
@@ -47901,6 +47958,7 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Retained multiply observation rejects a mismatched instruction address");
 		});
 	m_cpu->set_extended_program(true);
+	if (!strcmp(config.options().bios(), "std-swwsr") || !strcmp(config.options().bios(), "std-stm") || !strcmp(config.options().bios(), "std-io") || !strcmp(config.options().bios(), "std-io-atomic")) m_cpu->set_standard_swwsr(true);
 	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose") || !strcmp(config.options().bios(), "bus-stm")) m_cpu->set_c5416_bus_profile(true);
 	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
@@ -49686,6 +49744,11 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(13, "mvdp-pair", "Adjacent retained data-to-program transfers")
 	ROM_SYSTEM_BIOS(14, "rpt-mvdp", "Repeated retained data-to-program transfers")
 	ROM_SYSTEM_BIOS(15, "rpt-mvdp-irq", "Repeated program copies with deferred IRQ and NMI")
+	ROM_SYSTEM_BIOS(16, "std-swwsr", "Original-family SWWSR without C5416 bus controls")
+	ROM_SYSTEM_BIOS(17, "std-stm", "Retained original-family SWWSR publication")
+	ROM_SYSTEM_BIOS(18, "std-io", "Staged I/O with original SWWSR waits and READY")
+	ROM_SYSTEM_BIOS(19, "std-io-atomic", "Atomic I/O with original SWWSR waits and READY")
+	ROM_SYSTEM_BIOS(20, "clock-stm", "Retained CLKMD writes without an asserted physical PLL clock")
 ROM_END
 
 ROM_START(tms54rom4)

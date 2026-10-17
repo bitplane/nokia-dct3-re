@@ -323,6 +323,26 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "clock-stm": (
+        "TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0",
+        "Fatal error: TMS320C54x isolated staged CLKMD STM complete",
+    ),
+    "std-swwsr": (
+        "TMS320C54x standard SWWSR: PASS encodings=65536 reserved_bit15=0 multiplier=0 separate_BSCR_SWCR=1 partial_writes=1 restore=1 reset=1 program_data_wait_claim=0 physical_mapping=unvalidated",
+        "Fatal error: TMS320C54x isolated standard SWWSR complete",
+    ),
+    "std-stm": (
+        "TMS320C54x standard SWWSR STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 physical_mapping=unvalidated",
+        "Fatal error: TMS320C54x isolated standard SWWSR STM complete",
+    ),
+    "std-io": (
+        "TMS320C54x standard SWWSR I/O: PASS frontend=staged cases=288 restore=288 software_waits=0..7 ready_threshold=2 sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 program_data_wait_claim=0 physical_mapping=unvalidated",
+        "Fatal error: TMS320C54x isolated standard SWWSR I/O complete",
+    ),
+    "std-io-atomic": (
+        "TMS320C54x standard SWWSR I/O: PASS frontend=atomic cases=1440 restore=1440 software_waits=0..7 ready_threshold=2 sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 program_data_wait_claim=0 physical_mapping=unvalidated",
+        "Fatal error: TMS320C54x isolated standard SWWSR I/O complete",
+    ),
     "cold-pipeline": (
         "TMS320C54x ROM4 staged cold frontier: fetch=000f00 pc=0f01 sp=0000 pmst=ffa8 cycles=12",
         "Fatal error: TMS320C54x ROM4 staged cold frontier complete",
@@ -1512,7 +1532,7 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
+    machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the
