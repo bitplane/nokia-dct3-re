@@ -45,12 +45,30 @@ class PlaybackCaptureTests(unittest.TestCase):
 
     def test_timestamp_pairing_handles_underflow_gaps_without_fitting(self):
         data, _, _ = self.slots([(5,0),(15,1),(25,0),(35,1),(45,0)])
-        result = compare_serial_callbacks([1,2,3], [1,21,41], [1,0,2,0,3], data, 4)
+        result = compare_serial_callbacks([2,4,6], [1,21,41], [2,0,4,0,6], data, 4)
         self.assertTrue(result['all_completed_tx_paired'])
         self.assertEqual(result['paired_words'], 3)
         self.assertEqual(result['din_without_completed_tx'], 2)
         self.assertEqual(result['delay_ns'], {4:3})
+        self.assertEqual(result['unmatched_din']['consistent_with_held_last_bit'], 2)
+        self.assertEqual(result['unmatched_din']['held_level_mismatches'], 0)
         self.assertFalse(result['native_audio_validated'])
+
+    def test_unmatched_din_distinguishes_initial_level_and_held_bit_exceptions(self):
+        data, _, _ = self.slots([(1,0),(5,1),(10,0),(15,1),(20,0)])
+        result = compare_serial_callbacks([1], [4], [7,1,0xffff,9,0xffff], data, 1)
+        report = result['unmatched_din']
+        self.assertEqual(report['before_first_tx'], 1)
+        self.assertEqual(report['preceded_by_tx'], 3)
+        self.assertEqual(report['consistent_with_held_last_bit'], 2)
+        self.assertEqual(report['held_level_mismatches'], 1)
+        self.assertEqual(report['first_held_level_exceptions'][0]['din_index'], 3)
+        self.assertEqual(report['values_by_slot']['slot_0'], {'0007':1,'ffff':2})
+        self.assertFalse(report['pin_ownership_validated'])
+        # A stream without TX has no preceding-word evidence, not a held-zero proof.
+        report = compare_serial_callbacks([], [], [7,1,0xffff,9,0xffff], data)['unmatched_din']
+        self.assertEqual(report['before_first_tx'], 5)
+        self.assertEqual(report['preceded_by_tx'], 0)
 
     def test_timestamp_pairing_does_not_skip_a_wrong_word_for_a_match(self):
         data, _, _ = self.slots([(5,0),(6,1),(25,0)])

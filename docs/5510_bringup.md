@@ -8292,10 +8292,16 @@ This covers the complete observed serial callback stream, including both
 later reloads, rather than only its first fixed-offset prefix.
 
 The remaining 30,777 DIN callbacks have no completed TX word in that clock
-window. Their existence is not a failed transmitted-word comparison:
-the codec also samples idle pins during underflow/reset. Only the first
-14,900-word underflow interval is classified above; keep the other unmatched
-intervals unresolved. This result does not establish channel-3 DMA-to-DXR
+window. All have value `0000`: 737 in slot 0 and 30,040 in slot 1. Every
+one follows a completed TX word and equals the uniform level implied by
+that word's last bit. The checker reports this held-level consistency
+separately from actual pin ownership, with no exceptions in this capture.
+It does not infer the initial pin state when no TX word precedes a sample.
+Their existence is not a failed transmitted-word comparison: the codec also
+samples idle pins during underflow/reset. Only the first 14,900-word interval
+has the independent DXR/configuration-write coverage above; the other 15,877
+have value consistency, not a causal reset/pin-ownership proof.
+This result does not establish channel-3 DMA-to-DXR
 ownership, correct handling of every overwritten/interrupted transmission,
 PCM accuracy, analog output or native speech. The original strict playback
 completion check still exits rejecting audio acceptance at 20 s, illegal=0.
@@ -8309,7 +8315,9 @@ Unit tests reject malformed/duplicate metadata, changed hashes and extents,
 non-increasing TX times and missing required sidecars, and report pairings
 outside the clock bound as unpaired.
 A wrong first word followed by a matching word stays a mismatch; an
-underflow gap cannot shift subsequent pairings by index.
+underflow gap cannot shift subsequent pairings by index. Unmatched-sample
+tests distinguish initial unknown pin state, held-high/held-low consistency
+and contrary samples without dropping exceptions from the report.
 
 The DIN sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
 `311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa`.

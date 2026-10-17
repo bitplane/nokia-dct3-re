@@ -76,13 +76,35 @@ def compare_serial_callbacks(tx, times, din, slots, max_delay_ns=84):
     sink = paired = mismatches = 0
     delays = Counter()
     examples, unpaired = [], []
+    unmatched_values = Counter()
+    before_first_tx = held_matches = 0
+    held_exceptions = []
+    last_completed = None
+
+    def observe_unmatched(index):
+        nonlocal before_first_tx, held_matches
+        when, slot = struct.unpack_from('<QB', slots, index*9)
+        if slot not in (0,1):
+            raise ValueError('invalid slot in unmatched DIN callback')
+        value = din[index]
+        unmatched_values[(slot, value)] += 1
+        if last_completed is None:
+            before_first_tx += 1
+        elif value == (0xffff if last_completed & 1 else 0):
+            held_matches += 1
+        elif len(held_exceptions) < 8:
+            held_exceptions.append({'din_index':index, 'time_ns':when, 'slot':slot,
+                'word':f'{value:04x}', 'preceding_tx_word':f'{last_completed:04x}'})
+
     for index, when in enumerate(times):
         while sink < len(din) and struct.unpack_from('<Q', slots, sink*9)[0] < when:
+            observe_unmatched(sink)
             sink += 1
         delay = None if sink == len(din) else struct.unpack_from('<Q', slots, sink*9)[0]-when
         if delay is None or delay > max_delay_ns:
             if len(unpaired) < 8:
                 unpaired.append({'tx_index':index, 'tx_time_ns':when})
+            last_completed = tx[index]
             continue
         paired += 1
         delays[delay] += 1
@@ -93,11 +115,28 @@ def compare_serial_callbacks(tx, times, din, slots, max_delay_ns=84):
                     'din_time_ns':when+delay, 'slot':slots[sink*9+8],
                     'tx_word':f'{tx[index]:04x}', 'din_word':f'{din[sink]:04x}'})
         sink += 1
+        last_completed = tx[index]
+    for index in range(sink, len(din)):
+        observe_unmatched(index)
+    unmatched_count = sum(unmatched_values.values())
+    if unmatched_count != len(din)-paired:
+        raise ValueError('unmatched DIN accounting differs from timestamp pairing')
     return {'paired_words':paired, 'mismatched_words':mismatches,
         'unpaired_tx_words':len(tx)-paired, 'din_without_completed_tx':len(din)-paired,
         'delay_ns':dict(delays), 'max_delay_ns':max_delay_ns,
         'first_mismatches':examples, 'first_unpaired_tx':unpaired,
         'all_completed_tx_paired':bool(tx) and paired == len(tx) and mismatches == 0,
+        'unmatched_din':{
+            'values_by_slot':{f'slot_{slot}':{f'{value:04x}':count
+                for (owner,value),count in sorted(unmatched_values.items()) if owner == slot}
+                for slot in (0,1)},
+            'before_first_tx':before_first_tx,
+            'preceded_by_tx':unmatched_count-before_first_tx,
+            'consistent_with_held_last_bit':held_matches,
+            'held_level_mismatches':unmatched_count-before_first_tx-held_matches,
+            'first_held_level_exceptions':held_exceptions,
+            'pin_ownership_validated':False,
+            'scope':'Value consistency with the preceding completed TX low bit only; not observation of intermediate bits or reset ownership'},
         'native_audio_validated':False,
         'scope':'Timestamp-paired completed TX and DIN callbacks only; unmatched DIN, DMA, resets and audio quality remain separate'}
 
