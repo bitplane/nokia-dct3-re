@@ -8230,21 +8230,42 @@ Its complete stream identities are:
 Chronological first-nonzero anchors, checked over 64 words, give initial
 DMA-to-TX offset 92 and TX-to-DIN offset 367. The first 783,108 and 783,200
 overlapping words respectively match exactly, including zero words.
-Thereafter a single-offset comparison diverges. The codec sidecar now rules
-out a DIN slot discontinuity during this window; source/TX reset and direct
-write epochs still need alignment before calling the divergence a transport
-defect. The checker reports the complete mismatch extent, not a best-fit
-realignment, and never promotes integrity or overlap to decoded-audio
-acceptance.
+Thereafter a single-offset comparison diverges. The codec sidecar rules
+out a DIN slot discontinuity; the first disagreement is the underflow
+interval described below, not evidence of a corrupted transmitted word.
+Later source/TX reset and direct-write epochs still require alignment.
+The checker reports the complete mismatch extent, not a best-fit realignment,
+and never promotes integrity or overlap to decoded-audio acceptance.
 
 With verified slot metadata, the checker also reports the actual DIN time
 and slot for each retained fixed-offset mismatch. In this capture the first
 TX-to-DIN difference is source index 783,200 / sink index 783,567 at
 9,702,093,026 ns, slot 1 (`ffbc` versus `0000`). This precedes the next
 logged system-clock change at 9.869008605 s; that later change cannot explain
-the onset. This locates a diagnostic disagreement, not its cause or a new
-alignment. Trace TX buffering, reset and codec state around 9.702 s before
-changing any timing or interpreting the remainder as lost samples.
+the onset.
+
+The passive transport observation brackets DXR writes at `0023` from
+9.698 through 9.876 s and records every McBSP0 indexed configuration write
+at `0038/0039` from boot. The last DXR write before the gap is `ffbc` at
+9.702069134 s. There are no further DXR writes until the observed SPCR2
+reset (`0102`) at 9.871026174 s; the next write is `0000` at 9.874720177 s.
+All 14,900 DIN words from the first disagreement until that reset match
+the modeled underflow pattern: slot 0 receives repeated `ffbc`, while slot 1
+samples the held-low serial pin as `0000`. McBSP completes only the repeated
+first word, whereas the codec continues sampling both slots. Comparing
+these callbacks at one constant word offset therefore ceases to be valid.
+This explains the first divergence without changing clocks or samples; it
+does not establish later epoch pairing, analog behavior or decoder accuracy.
+
+Two fresh ten-second runs reproduce the twenty-second capture as exact
+prefixes in all four files. The full-interval observation records 147
+configuration writes and 474 DXR writes, ending at 10.016666667 s with
+illegal=0. `tools/mu4_transport_observe.lua` retains this recording-specific,
+read-only observation preset; use it as `-autoboot_script` with the same
+`mu4nand -bios bootplaystage` media fixture and a ten-second run. It is not
+a generic transport-acceptance gate, a source of MMIO writes or a claim
+that file-capture save/restore is supported. Next classify the remaining
+reset/reload intervals before asserting complete DMA/TX/DIN pairing.
 
 The sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
 `311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa`.
