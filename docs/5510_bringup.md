@@ -38,7 +38,8 @@ the first nonzero block's maximum sample error falls from 43,740 to 7
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
 post-transform rotation/permutation match for all 30 vectors too. Next audit
-overlap carry, dispatch and final buffer movement and establish the cause and independent acceptance
+cross-call history ownership, coefficient-callback effects and final buffer movement
+and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6108,7 +6109,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is overlap carry, dispatch and final buffer movement,
+Remaining work is cross-call history ownership, coefficient-callback effects and final buffer movement,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6248,6 +6249,44 @@ outputs before window processing. Tests cover zero/positive/negative shifts,
 signed arguments, 32-bit wrap, malformed metadata and consistently rehashed
 wrong outputs. Dispatch, overlap carry, final buffer movement, other media,
 decoded waveform conformance, analog output and speech remain unvalidated.
+
+#### Window Callback Buffer Exchange
+
+The two indirect calls at `024a60` and `024a63` select these source-pinned
+entry pairs from the observed mode:
+
+| Mode | First callback | Second callback | Observed invocations |
+| --- | --- | --- | ---: |
+| 0 | `024af8` | `024955` | 10 |
+| 1 | `024b13` | `024955` | 2 |
+| 2 | `024b3e` | `02496e` | 16 |
+| 3 | `024b59` | `02496e` | 2 |
+
+Both calls, actual callee entries and returns are observed for all 30
+invocations. The first callback exchanges signed 32-bit samples with a
+16-bit buffer: modes 0/1 use 512 history words, mode 2 uses 64. New history
+uses `((signed32 + 0x8000) >> 16) & 0xffff`, in reversed order. Old history
+is sign-extended and shifted left 16 into the raw buffer. Mode 3 additionally
+copies 64 reversed old history words into raw component indices `896..959`
+and uses forward old-history order in the first 512 raw components.
+
+All 16,384 raw components and 8,192 history words match the independent
+buffer model, including unchanged regions. The 120 added snapshots leave
+all four native word/slot streams and all 642 earlier snapshots unchanged.
+Packet binding and the first 4,096 conversions still pass.
+
+```sh
+python3 tools/mu4_overlap_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+The combined checker pins 1,347 source words, verifies both dispatch targets
+against actual entry/return observations, and checks first-callback buffers.
+Tests cover all four modes, signed history, rounding boundaries, untouched
+regions, dispatch corruption and consistently rehashed wrong outputs.
+This does not yet validate second-callback memory effects, ownership of
+history between calls, final buffer rearrangement, other media, decoded
+waveform conformance, analog output or speech.
 
 ### Resident reload contract
 

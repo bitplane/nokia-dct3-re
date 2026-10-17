@@ -86,6 +86,10 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 &&
+						((address >= 0x24a60 && address <= 0x24a64) || address == 0x24af8 || address == 0x24b13 ||
+						 address == 0x24b3e || address == 0x24b59 || address == 0x24955 || address == 0x2496e))
+						observe_playback_window_callback(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && (address == 0x24a46 || address == 0x24a48))
 						observe_playback_scale(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && (address == 0x24a70 || address == 0x24a72))
@@ -480,6 +484,9 @@ private:
 	u16 m_playback_pre_base = 0, m_playback_pre_parameter = 0;
 	u16 m_playback_window_base = 0, m_playback_window_parameter = 0;
 	u16 m_playback_scale_base = 0, m_playback_scale_parameter = 0;
+	u16 m_playback_callback_base = 0, m_playback_callback_history = 0, m_playback_callback_mode = 0;
+	u32 m_playback_callback_target = 0;
+	u8 m_playback_callback_site = 0;
 	u32 m_playback_fft_invocation = 0;
 	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
 	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
@@ -1010,6 +1017,42 @@ private:
 		logerror("%s_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
 			marker,invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
 			parameter,hash,name.c_str(),machine().time().as_double());
+	}
+	void observe_playback_window_callback(offs_t address, u16 opcode)
+	{
+		if (!m_playback_processing_pending) return;
+		char const *phase = nullptr;
+		if (address == 0x24a60 || address == 0x24a63)
+		{
+			auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+			m_playback_callback_site = address == 0x24a60 ? 1 : 2;
+			m_playback_callback_target = m_cpu->state_int(tms320c54x_device::STATE_B) & 0x7fffff;
+			m_playback_callback_mode = data.read_word(u16(sp+9));
+			m_playback_callback_base = m_cpu->state_int(tms320c54x_device::STATE_A);
+			m_playback_callback_history = data.read_word(u16(sp+2));
+			phase = "call";
+		}
+		else if (!m_playback_callback_site) return;
+		else if (address == 0x24a61 || address == 0x24a64) phase = "return";
+		else if (address == m_playback_callback_target) phase = "entry";
+		if (!phase) return;
+		logerror("mu4_window_callback: invocation=%u call=%u site=%u phase=%s address=%06x opcode=%04x target=%06x mode=%04x base=%04x history=%04x parameter=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+			m_playback_fft_invocation,m_playback_processing[0],unsigned(m_playback_callback_site-1),phase,
+			unsigned(address),opcode,m_playback_callback_target,m_playback_callback_mode,m_playback_callback_base,
+			m_playback_callback_history,m_playback_fft_parameter,machine().time().as_double());
+		if (m_playback_callback_site == 1 && address != m_playback_callback_target)
+		{
+			unsigned const history_words = m_playback_callback_target == 0x24b3e ? 64 : 512;
+			if (m_playback_callback_base < 0x60 || m_playback_callback_history < 0x60 ||
+				unsigned(m_playback_callback_base)+2*m_playback_fft_parameter > 0x10000 ||
+				unsigned(m_playback_callback_history)+history_words > 0x10000)
+				fatalerror("MU4 window callback observation geometry changed");
+			unsigned const stage = address == 0x24a60 ? 0 : 2;
+			write_playback_snapshot("mu4_history","mu4_history",m_playback_fft_invocation,stage,address,opcode,m_playback_callback_base,2*m_playback_fft_parameter,m_playback_fft_parameter);
+			write_playback_snapshot("mu4_history","mu4_history",m_playback_fft_invocation,stage+1,address,opcode,m_playback_callback_history,history_words,m_playback_fft_parameter);
+		}
+		if (address == 0x24a61 || address == 0x24a64) m_playback_callback_site = 0;
 	}
 	void observe_playback_scale(offs_t address, u16 opcode)
 	{
@@ -2481,6 +2524,8 @@ private:
 			save_item(NAME(m_playback_window_base));
 			save_item(NAME(m_playback_window_parameter));
 			save_item(NAME(m_playback_scale_base)); save_item(NAME(m_playback_scale_parameter));
+			save_item(NAME(m_playback_callback_base)); save_item(NAME(m_playback_callback_history)); save_item(NAME(m_playback_callback_mode));
+			save_item(NAME(m_playback_callback_target)); save_item(NAME(m_playback_callback_site));
 			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
 			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
 			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
@@ -2731,6 +2776,8 @@ private:
 		m_playback_pre_base = m_playback_pre_parameter = 0;
 		m_playback_window_base = m_playback_window_parameter = 0;
 		m_playback_scale_base = m_playback_scale_parameter = 0;
+		m_playback_callback_base = m_playback_callback_history = m_playback_callback_mode = 0;
+		m_playback_callback_target = m_playback_callback_site = 0;
 		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
 		m_playback_processing_pending = m_playback_conversion_active = false;
 		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;
