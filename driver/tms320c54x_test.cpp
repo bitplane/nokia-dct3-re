@@ -5894,6 +5894,27 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_rotate(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const form = variant % 6, pattern = (variant / 6) % 8, flags = (variant / 48) % 4;
+		u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
+		u16 const opcode = 0xf490 + form / 2 + (form % 2 ? 0x100 : 0);
+		u64 const initial = std::array<u64, 8>{0, 1, 0x80000000ULL, 0xffffffffULL, 0x5fb0001234ULL, 0x81c0005555ULL, 0xff00000000ULL, 0x7f12345678ULL}[pattern];
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x9000 + i, 0xf495);
+		program.write_word(base + 0x9000, opcode); program.write_word(base + 0x9001, opcode); program.write_word(base + 0x9002, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa024 | ((flags & 1) ? 0x800 : 0) | ((flags & 2) ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (((variant / 192) % 4) << 8));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, form % 2 ? 0x123456789aULL : initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, form % 2 ? initial : 0x123456789aULL);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = rotate_phase;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_ar_addm_load(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -16049,6 +16070,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-controls")) { start_pipeline_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "literal-guard")) { start_literal_guard(); return; }
+		if (!strcmp(machine().options().bios(), "rotate")) { start_rotate(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar")) { start_ar_addm(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar-load")) { start_ar_addm_load(); return; }
 		if (!strcmp(machine().options().bios(), "std-swwsr")) { start_standard_swwsr_test(); return; }
@@ -17964,6 +17986,48 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase == rotate_phase)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const form = variant % 6, pattern = (variant / 6) % 8, flags = (variant / 48) % 4;
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 7}[variant / 1536];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Register-only rotates are admitted by staged Decode");
+			u64 value = std::array<u64, 8>{0, 1, 0x80000000ULL, 0xffffffffULL, 0x5fb0001234ULL, 0x81c0005555ULL, 0xff00000000ULL, 0x7f12345678ULL}[pattern];
+			bool carry = flags & 1;
+			// Independent bit-position oracle: no CPU arithmetic helper or guard sign extension.
+			for (unsigned n = 0; n < (tick < 6 ? 0 : tick == 6 ? 1 : 2); ++n)
+			{
+				bool const right = form / 2 == 0, incoming = form / 2 == 2 ? bool(flags & 2) : carry;
+				bool const outgoing = (value >> (right ? 0 : 31)) & 1;
+				value = right ? ((value & 0xffffffffULL) >> 1) | (u64(incoming) << 31) : ((value & 0x7fffffffULL) << 1) | incoming;
+				carry = outgoing;
+			}
+			expect(m_cpu->state_int(form % 2 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value &&
+				m_cpu->state_int(form % 2 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x123456789aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa024 | (carry ? 0x800 : 0) | ((flags & 2) ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (((variant / 192) % 4) << 8)), "Rotates publish in order, clear guard bits, preserve TC/overflow/modes and forward carry");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save rotate before or between Execute publications");
+			}
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Rotate pair reaches its real IDLE instruction");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rotate pipeline and carry without duplicate publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = rotate_phase + 1; m_check_timer->enable(true); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 4607) { start_rotate(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged rotates: PASS cases=4608 restore=4608 forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated staged rotates complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == rotate_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = rotate_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == ar_addm_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = ar_addm_case(variant);
@@ -48223,6 +48287,7 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned literal_guard_phase = 62010;
+	static constexpr unsigned rotate_phase = 62024;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
@@ -50090,6 +50155,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(24, "literal-guard", "Opcode-shaped literal words in legal block stores")
 	ROM_SYSTEM_BIOS(25, "addm-ar", "Retained absolute mapped-AR addition and flags")
 	ROM_SYSTEM_BIOS(26, "addm-ar-load", "Legal-gap indirect consumers after mapped-AR addition")
+	ROM_SYSTEM_BIOS(27, "rotate", "Staged accumulator rotates and carry forwarding")
 ROM_END
 
 ROM_START(tms54rom4)

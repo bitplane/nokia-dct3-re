@@ -3201,7 +3201,8 @@ void tms320c54x_device::pipeline_step()
 		bool const long_arithmetic = staged_long_arithmetic(word);
 		// Register forms fetch no data operands and redirect no control flow.
 		// Accumulators are Execute-owned; T/TS sampling has dedicated Read handlers.
-		bool const register_alu = register_product_form(word) || staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
+		bool const register_rotate = (word & 0xfeff) == 0xf490 || (word & 0xfeff) == 0xf491 || (word & 0xfeff) == 0xf492;
+		bool const register_alu = register_rotate || register_product_form(word) || staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) || staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
 		bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);

@@ -273,14 +273,15 @@ or execute a loader.
 `nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,
 DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
-staged execution executes `000f1f`'s `6bf8 0013 0800` (ADDM of `0800`
-to AR3), enters the initialization routine, and stops at `008031`,
-instruction `f591` (ROL B through carry), with prefetched PC
-`8033`, PMST `ffa8` and
+staged execution executes its mapped-AR ADDM and the initialization routine's
+ROL B, then reaches a replacement upload at `0f00`. It stops at `000f0d`,
+instruction `f071 079f` (RPTZ A, #079f), with prefetched PC
+`0f0f`, PMST `ffa8` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
-uniquely to the 5110 v5.30 MCU image at file offset `0x99704`. The backend
-reports four MCU bootstrap-mailbox writes and no completion strobe. Neither
+uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
+loader1 image is at `0x99704`). The backend
+reports 69 MCU bootstrap-mailbox writes and no completion strobe. Neither
 upload completion nor handset boot is accepted for this machine.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
@@ -2644,6 +2645,17 @@ Category II consumer. Forbidden-gap behavior is not claimed. Other mapped
 destinations, long-offset ADDM addressing, repeats, compiler-mode direct
 sources and adjacent producer/consumer hazards remain excluded or unvalidated.
 The phase placement inherits the bounded RMW prototype, not measured silicon.
+
+Register-only ROR, ROL and ROLTC on A/B are admitted through the existing
+semantic backend. SPRU172C pages 4-143..4-145 specify rotation of the low
+32 bits and clearing of bits 39..32: ROR/ROL use C as input; ROLTC uses TC;
+all publish the shifted-out bit to C and leave other status bits unchanged.
+The `rotate` profile independently checks 4,608 cases plus save/load replay:
+six forms, eight guard/sign/endpoint patterns, all C/TC combinations, four
+SXM/OVM combinations, two pages and three snapshots. Each case executes two
+adjacent rotates and checks state every clock, including carry forwarding
+and preservation of the other accumulator. Repeat-body admission remains
+excluded; these fixtures make no silicon bus-phase claim.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;
