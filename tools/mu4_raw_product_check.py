@@ -8,12 +8,70 @@ if __package__:
     from .mu4_playback_frame_check import rows
     from .mu4_raw_output_check import verify as verify_copies
     from .mu4_context_contract import (contract, RAW_PRODUCT_BASE, RAW_PRODUCT_WITNESS, reference_raw_product,
-                                       RAW_UPSTREAM_WITNESSES, reference_raw_complex_prefix, reference_raw_scale)
+                                       RAW_UPSTREAM_WITNESSES, reference_raw_complex_prefix, reference_raw_scale, reference_raw_butterfly)
 else:
     from mu4_playback_frame_check import rows
     from mu4_raw_output_check import verify as verify_copies
     from mu4_context_contract import (contract, RAW_PRODUCT_BASE, RAW_PRODUCT_WITNESS, reference_raw_product,
-                                     RAW_UPSTREAM_WITNESSES, reference_raw_complex_prefix, reference_raw_scale)
+                                     RAW_UPSTREAM_WITNESSES, reference_raw_complex_prefix, reference_raw_scale, reference_raw_butterfly)
+
+
+def read_material(reads,begin,end,addresses):
+    result={}
+    for row in reads:
+        address=int(row['address'],16)
+        if address in addresses and begin<=float(row['t'])<=end:
+            if int(row['mask'],16)!=0xffff or row.get('ownership')!='data_bus':
+                raise ValueError('upstream operand bus scope changed')
+            value=int(row['value'],16)
+            if not 0<=value<=0xffff or (address in result and result[address]!=value):
+                raise ValueError('upstream operand changed or is outside its word domain')
+            result[address]=value
+    if set(result)!=set(addresses):
+        raise ValueError('upstream operand reads incomplete')
+    return result
+
+
+def verify_butterfly(text):
+    executed,reads,writes=[rows(text,marker) for marker in
+                           ('mu4_upstream_execute','mu4_upstream_read','mu4_raw_writer')]
+    addresses=[0x2419d,0x2419f,0x241a0,0x241a1,0x241a2,0x241a3,0x241a5,0x241a6,
+               0x241a7,0x241a8,0x241aa,0x241ac,0x241ad,0x241af,0x241b1,0x241b2,
+               0x241b3,0x241b5,0x241b7,0x241b8,0x241ba,0x241bc]
+    proofs=[]
+    for base in (0x7800,0xe800):
+        starts=[i for i,r in enumerate(executed) if int(r['address'],16)==0x2419d and int(r['ar2'],16)==base]
+        if len(starts)!=1:
+            raise ValueError('selected butterfly missing or duplicated')
+        block=executed[starts[0]:starts[0]+len(addresses)]
+        if [int(r['address'],16) for r in block]!=addresses:
+            raise ValueError('butterfly instruction sequence incomplete')
+        for row in block:
+            if row.get('identity')!='Execute_entry' or row.get('context_only')!='1' or int(row['st1'],16)&0x3c0!=0x100 or int(row['opcode'],16)!=RAW_UPSTREAM_WITNESSES[0x2419d][int(row['address'],16)-0x2419d]:
+                raise ValueError('butterfly instruction/status regime changed')
+        other=int(block[0]['ar3'],16)
+        targets=list(range(base,base+4))+list(range(other,other+4))
+        begin,end=float(block[0]['t']),float(block[-1]['t'])
+        material=read_material(reads,begin,end,targets)
+        def pair(address):
+            return (material[address]<<16)|material[address+1]
+        inputs=[pair(base),pair(other),pair(base+2),pair(other+2)]
+        expected,outputs=reference_raw_butterfly(*inputs)
+        for row in block:
+            for accumulator,value in expected.get(int(row['address'],16),{}).items():
+                if int(row[accumulator],16)!=value:
+                    raise ValueError('native butterfly intermediate differs from scalar arithmetic')
+        stores=[r for r in writes if begin<=float(r['t'])<=end and int(r['address'],16) in targets]
+        if len(stores)!=8 or any(int(r['mask'],16)!=0xffff for r in stores):
+            raise ValueError('butterfly output writes incomplete')
+        actual={int(r['address'],16):int(r['value'],16) for r in stores}
+        for address,value in zip((base,other,base+2,other+2),outputs):
+            if actual.get(address)!=value>>16 or actual.get(address+1)!=value&0xffff:
+                raise ValueError('butterfly shifted output store differs')
+        proofs.append({'base':f'{base:04x}','other':f'{other:04x}',
+                       'inputs':[f'{x:08x}' for x in inputs],
+                       'outputs':[f'{x:08x}' for x in outputs]})
+    return proofs
 
 
 def verify_upstream(text, products):
@@ -21,28 +79,18 @@ def verify_upstream(text, products):
     terminal=rows(text,'mu4_upstream_terminal')
     if len(terminal)!=1 or terminal[0].get('closed')!='1' or terminal[0].get('capped')!='0' or int(terminal[0]['reads'])!=len(reads):
         raise ValueError('upstream operand capture incomplete or capped')
-    if any(r.get('identity')!='Execute_entry' for r in executed) or any(
+    if any(r.get('identity')!='Execute_entry' or r.get('context_only')!='1' for r in executed) or any(
             r.get('ownership')!='data_bus' or int(r['mask'],16)!=0xffff for r in reads):
         raise ValueError('upstream identity or bus scope changed')
     for row in executed:
         address=int(row['address'],16)
-        origin=0x23f8a if address<0x24000 else 0x25ce2
-        if not origin<=address<origin+len(RAW_UPSTREAM_WITNESSES[origin]):
+        origin=next((base for base,witness in RAW_UPSTREAM_WITNESSES.items() if base<=address<base+len(witness)),None)
+        if origin is None:
             continue
         if int(row['opcode'],16)!=RAW_UPSTREAM_WITNESSES[origin][address-origin]:
             raise ValueError('upstream opcode differs from source')
     def material(begin,end,addresses):
-        result={}
-        for row in reads:
-            address=int(row['address'],16)
-            if address in addresses and begin<=float(row['t'])<=end:
-                value=int(row['value'],16)
-                if address in result and result[address]!=value:
-                    raise ValueError('upstream operand changed within selected prefix')
-                result[address]=value
-        if set(result)!=set(addresses):
-            raise ValueError('upstream operand reads incomplete')
-        return result
+        return read_material(reads,begin,end,addresses)
     proofs=[]
     for channel,base in enumerate((0x7880,0xe880)):
         starts=[i for i,r in enumerate(executed) if int(r['address'],16)==0x23f8a and int(r['ar2'],16)==base]
@@ -97,6 +145,11 @@ def verify_upstream(text, products):
                        'coefficients':[f'{c:08x}',f'{d:08x}'],'complex_result':f'{raw:08x}',
                        'scale_arguments':[args[first],args[second]],'left_shifts':-delta,
                        'scaled_accumulator':f'{final:010x}','product_input':products[channel]['input']})
+    butterflies=verify_butterfly(text)
+    for proof,butterfly in zip(proofs,butterflies):
+        if [butterfly['outputs'][i] for i in (1,3)]!=proof['inputs']:
+            raise ValueError('butterfly outputs do not match subsequent complex inputs')
+        proof['butterfly']=butterfly
     return proofs
 
 

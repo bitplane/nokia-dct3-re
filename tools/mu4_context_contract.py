@@ -20,6 +20,10 @@ RAW_PRODUCT_BASE = 0x25bd2
 RAW_PRODUCT_WITNESS = (0xe800,0xa669,0xa652,0xf450,0xb01a,0xf443,0xe900,
                        0xa778,0xa743,0xf750,0xb30b,0xf743,0xf520,0x4ff8,0xaadc)
 RAW_UPSTREAM_WITNESSES = {
+    0x2419d: (0x7102,0x001a,0xe764,0xe775,0x4a10,0xf495,0x7104,0x0010,
+              0x5782,0x5583,0x5683,0x6f93,0x0d7f,0x6f93,0x0d9f,0xf501,
+              0x6f92,0x0d7f,0x6f92,0x0d9f,0x5683,0x5182,0x6f92,0x0d7f,
+              0x6f92,0x0d9f,0xf521,0x6f93,0x0d7f,0xf272,0x41eb,0x6f93,0x0d9f),
     0x23f8a: (0xe800,0xa668,0xa642,0xf450,0xb0a8,0x6d92,0xe900,0xa778,0xa743,
               0xf750,0xb3b4,0x6d8a,0xf620,0x6f91,0x0c63,0x6f89,0x0c83),
     0x25ce2: (0x4a11,0x4a16,0x4a17,0xed00,0xf6b6,0xf6b7,0xf7b8,0xf6b9,
@@ -35,10 +39,32 @@ def decode_raw_upstream(words):
     for base,witness in RAW_UPSTREAM_WITNESSES.items():
         if any(words.get(base+i)!=word for i,word in enumerate(witness)):
             raise ValueError('raw upstream product/scale source changed or absent')
-    return {'pinned_words':62,'complex_prefix':'023f8a..023f9a',
+    return {'pinned_words':95,'complex_prefix':'023f8a..023f9a',
+            'butterfly':'02419d..0241bd: real/imaginary sum and difference, arithmetic right 1, stored to AR2/AR3 pairs',
             'complex_output':'first partial product minus second, stored with shift 3 to AR1 scratch',
             'scale':'025ce2..025d0e: signed SP(5)-SP(6); positive right shifts, negative left shifts; one-bit RPT body',
-            'scope':'Selected complex difference prefixes and two negative scale counts only; not the full transform or correct inputs'}
+            'scope':'Two selected sum/difference blocks, complex difference prefixes and negative scale counts only; not the full transform or correct inputs'}
+
+
+def reference_raw_butterfly(x0,y0,x1,y1):
+    if any(not 0 <= word <= 0xffffffff for word in (x0,y0,x1,y1)):
+        raise ValueError('butterfly requires four 32-bit words')
+    def signed(word):
+        return word-(1<<32) if word & (1<<31) else word
+    x0,y0,x1,y1=map(signed,(x0,y0,x1,y1))
+    mask=(1<<40)-1
+    diff0,sum0,diff1,sum1=x0-y0,x0+y0,x1-y1,x1+y1
+    states={0x241a6:{'b':x0&mask},0x241a7:{'b':diff0&mask}}
+    for address in (0x241a8,0x241aa,0x241ac):
+        states[address]={'a':y0&mask,'b':diff0&mask}
+    for address in (0x241ad,0x241af,0x241b1):
+        states[address]={'a':y0&mask,'b':sum0&mask}
+    states[0x241b2]={'a':y1&mask,'b':sum0&mask}
+    for address in (0x241b3,0x241b5,0x241b7):
+        states[address]={'a':y1&mask,'b':sum1&mask}
+    for address in (0x241b8,0x241ba,0x241bc):
+        states[address]={'a':y1&mask,'b':diff1&mask}
+    return states,[((value>>1)&0xffffffff) for value in (sum0,diff0,sum1,diff1)]
 
 
 def reference_raw_scale(value, first, second):

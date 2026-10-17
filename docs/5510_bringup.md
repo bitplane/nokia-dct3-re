@@ -6049,8 +6049,9 @@ Live GENPC remains context rather than retained instruction ownership.
 
 Reproduce with `tools/mu4_raw_output_observe.lua` as the two-second run's
 autoboot script, then run `python3 tools/mu4_raw_output_check.py RUN_DIR/error.log`.
-The probe observes ten word pairs during call 2 and removes its taps
-afterwards. The fresh run has 805 records, no partial masks or truncation;
+The probe observes fourteen word pairs during the relevant call-2 transform
+interval and removes its taps afterwards. The fresh run has 854 records,
+no partial masks or truncation;
 the checker validates all seven transfers and rejects missing material,
 incorrect channel lifetimes, partial buses and incomplete captures. It does
 not establish upstream arithmetic correctness or native audio acceptance.
@@ -6112,8 +6113,9 @@ values and matching subsequent copy material; do not alter MACSU semantics
 to fit the waveform.
 
 The same checker follows the selected preceding complex-product difference
-at `023f8a..023f99` and scale helper `025ce2..025d0e`. A further 62-word
-witness pins these paths; 130 additional actual operand reads support the
+at `023f8a..023f99` and scale helper `025ce2..025d0e`, plus the preceding
+sum/difference block `02419d..0241bd`. A further 95-word
+witness pins these paths; 154 additional actual operand reads support the
 selected intermediate arithmetic and scale arguments. Both complex
 prefixes use coefficients `168ed1ea` and `16b25ced`:
 
@@ -6131,12 +6133,37 @@ accumulator is `ff069e0c00`: the subsequent unsaturated double-word store
 keeps low 32 bits `069e0c00`. This sign change is source-consistent, not
 evidence to change global accumulator signedness or add saturation.
 
+The selected `02419d` blocks also match their complete first unweighted
+sum/difference calculations. For signed real inputs `x0,y0` and imaginary
+inputs `x1,y1`, the four stored outputs are `(x0+y0)>>1`, `(x0-y0)>>1`,
+`(x1+y1)>>1`, `(x1-y1)>>1`, in base-real, other-real, base-imaginary,
+other-imaginary order. All selected intermediate registers and all eight
+word writes per block agree. The difference outputs are precisely the
+later complex-product input pairs above.
+
+| Base pair | Real inputs | Imaginary inputs | Differences supplied to complex product |
+| --- | --- | --- | --- |
+| `7800`, `7880` | `0185edda`, `2db9ba35` | `0001432d`, `fffc8948` | `e9e619d2`, `00025cf2` |
+| `e800`, `e880` | `f4b3b77f`, `d656547d` | `001a5cc7`, `fff8fb7d` | `0f2eb181`, `0010b0a5` |
+
 These are bounded arithmetic exclusions, not full-transform validation.
-The next target is the earlier producer/value chain of both complex input
-pairs: `7880/7881` plus `7882/7883` before 1.019018655 s, and
-`e880/e881` plus `e882/e883` before 1.021053978 s. Numeric addresses are
-reused later: scope observations before the `023f8a` iteration rather than
-at the partial-product helper or final output copy.
+The unresolved inputs now precede these blocks at 1.018995996 s and
+1.021031319 s. Their preceding writers span earlier transform stages;
+the next instrument should compare complete stage inputs/outputs, rather
+than multiply single-word probes along the branching dependency tree.
+Numeric addresses are reused later: observations after these blocks cannot
+establish the earlier inputs.
+
+TI's [SPRA554B double-precision C54x FFT report](https://www.ti.com/lit/an/spra554b/spra554b.pdf)
+is a candidate algorithm reference, not an identification of this binary.
+It describes 32-bit interleaved real/imaginary data, specialized combined
+early stages, and a general butterfly with separate unity-coefficient cases.
+Those features make a complete stage comparison worth investigating.
+Its scaling-flag descriptions on PDF pages 4 and 5 conflict; derive this
+firmware's flag and stage ordering from its own source instead of importing
+either description. The ignored local PDF is
+`roms/reference-docs/npm5/ti_spra554b_c54x_double_precision_fft.pdf`, SHA-256
+`0dafa8acb794d328a6835cb718f93d367884adf15bd3e540d9ecd7e7e6fba7a0`.
 
 ### Resident reload contract
 

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_selected_unweighted_butterflies",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "The two selected 02419d unweighted sum/difference blocks produce all four expected signed half-scaled outputs and supply the later complex-product inputs",
+      "current": "A 33-word source witness, retained Execute identities and actual operand reads validate both selected blocks before 1.018996255 s and 1.021031577 s. All selected intermediate accumulators and all eight output word writes per block match independent signed (x+y)>>1 and (x-y)>>1 calculations for real and imaginary pairs. The difference pairs match the later 023f8a inputs. This excludes these two unweighted blocks, not their earlier-stage inputs, weighted loop bodies, full transform or native audio. The source/data/PCM identity chain remains bounded to the selected packet samples.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_raw_output_observe.lua", "tools/mu4_raw_product_observe.lua", "tools/mu4_raw_product_check.py", "tools/test_mu4_raw_product_check.py"]
+    },
+    {
       "id": "mu4_native_selected_upstream_product_scale",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
@@ -31,7 +39,7 @@
       "owner": "mu4_native_dsp",
       "status": "unresolved",
       "predicate": "Packet-bound native processing output agrees with independently decoded samples before claiming native audio",
-      "current": "Eight processing calls consume exact host-valid AAC packets, return zero and produce corresponding output loops. Conversion and RAM correspondence are exact for the first two blocks, but reference samples first differ at packet 1/sample 448. Seven value-preserving transfers, selected helper 025bb3 partial products, preceding complex differences and scale counts are independently validated. Trace both input pairs before the selected 023f8a iterations next: 7880/7881 and 7882/7883 before 1.019018655 s; e880/e881 and e882/e883 before 1.021053978 s. Do not retune conversion or samples, conflate later buffer lifetimes, add saturation to the source-consistent low32 store, or infer arithmetic ownership from live GENPC. Native waveform, analog audio and speech remain unvalidated.",
+      "current": "Eight processing calls consume exact host-valid AAC packets, return zero and produce corresponding output loops. Conversion and RAM correspondence are exact for the first two blocks, but reference samples first differ at packet 1/sample 448. Seven transfers, selected helper partial products, complex differences, scale counts and preceding unweighted butterfly blocks are independently validated. The unknowns now precede the selected 02419d entries at 1.018995996 s and 1.021031319 s. Pursue a complete source-derived transform-stage comparison rather than proliferating single-word probes across earlier branching stages. TI SPRA554B is a candidate algorithm reference only; neither binary identity nor its contradictory scaling prose is a firmware contract. Do not tune samples, conflate later buffer lifetimes, add saturation to the low32 store or infer ownership from live GENPC. Native waveform, analog audio and speech remain unvalidated.",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_processing_check.py", "tools/test_mu4_processing_check.py", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_raw_output_observe.lua", "tools/mu4_raw_output_check.py", "tools/test_mu4_raw_output_check.py"]
     },
     {

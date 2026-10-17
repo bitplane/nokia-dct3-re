@@ -6,18 +6,18 @@ local handles, count, closed = {}, 0, false
 local function record(kind, address, value, mask)
     if machine:side_effects_disabled() then return end
     local time = machine.time:as_double()
-    if time < 1.0168 or time > 1.023 then return end
+    if time < 1.0188 or time > 1.023 then return end
     count = count + 1
     if count > 1024 then return end
     machine:logerror(string.format('mu4_raw_%s: address=%04x value=%04x mask=%04x context_pc=%06x a=%010x b=%010x ar1=%04x ar2=%04x t=%.9f ownership=data_bus observer_writes=0\n',
         kind, address, value, mask, cpu.state.GENPC.value, cpu.state.A.value,
         cpu.state.B.value, cpu.state.AR1.value, cpu.state.AR2.value, time))
 end
-for _, base in ipairs({0xf380, 0xeb80, 0x7b80, 0xf300, 0x7800, 0xe800, 0x787e, 0xe87e, 0x7880, 0xe880}) do
+for _, base in ipairs({0xf380, 0xeb80, 0x7b80, 0xf300, 0x7800, 0xe800, 0x787e, 0xe87e, 0x7880, 0xe880, 0x7882, 0xe882, 0x7802, 0xe802}) do
     handles[#handles + 1] = cpu.spaces.data:install_write_tap(base, base + 1, 'raw_writer_' .. base,
         function(address, value, mask) record('writer', address, value, mask) end)
 end
-for _, base in ipairs({0x7b80, 0xf300, 0x7800, 0xe800, 0x787e, 0xe87e, 0x7880, 0xe880}) do
+for _, base in ipairs({0x7b80, 0xf300, 0x7800, 0xe800, 0x787e, 0xe87e, 0x7880, 0xe880, 0x7882, 0xe882, 0x7802, 0xe802}) do
     handles[#handles + 1] = cpu.spaces.data:install_read_tap(base, base + 1, 'raw_reader_' .. base,
         function(address, value, mask) record('reader', address, value, mask) end)
 end

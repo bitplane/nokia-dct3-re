@@ -12,7 +12,8 @@ local function record(address, value, mask)
     local t = machine.time:as_double()
     if address >= 0x7000 and ((t >= 1.0190183 and t <= 1.01901896) or
         (t >= 1.0210536 and t <= 1.02105428) or (t >= 1.0190675 and t <= 1.01906804) or
-        (t >= 1.02110175 and t <= 1.02110228)) then
+        (t >= 1.02110175 and t <= 1.02110228) or (t >= 1.01899595 and t <= 1.01899626) or
+        (t >= 1.02103127 and t <= 1.02103158)) then
         upstream = upstream + 1
         if upstream <= 512 then
             machine:logerror(string.format('mu4_upstream_read: address=%04x value=%04x mask=%04x context_pc=%06x t=%.9f ownership=data_bus observer_writes=0\n',address,value,mask,cpu.state.GENPC.value,t))

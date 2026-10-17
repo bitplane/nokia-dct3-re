@@ -1,12 +1,12 @@
 import unittest
 from tools.mu4_context_contract import RAW_PRODUCT_BASE, RAW_PRODUCT_WITNESS, decode_raw_product, reference_raw_product
-from tools.mu4_context_contract import RAW_UPSTREAM_WITNESSES, decode_raw_upstream, reference_raw_scale, reference_raw_complex_prefix
+from tools.mu4_context_contract import RAW_UPSTREAM_WITNESSES, decode_raw_upstream, reference_raw_scale, reference_raw_complex_prefix, reference_raw_butterfly
 
 
 class RawUpstreamTests(unittest.TestCase):
     def test_every_source_word_is_pinned(self):
         words={base+i:w for base,witness in RAW_UPSTREAM_WITNESSES.items() for i,w in enumerate(witness)}
-        self.assertEqual(decode_raw_upstream(words)['pinned_words'],62)
+        self.assertEqual(decode_raw_upstream(words)['pinned_words'],95)
         for address in words:
             changed=dict(words)
             changed[address]^=1
@@ -28,6 +28,20 @@ class RawUpstreamTests(unittest.TestCase):
             states,word=reference_raw_complex_prefix(x,y,0x168ed1ea,0x16b25ced)
             self.assertEqual(word,expected)
             self.assertEqual((states[0x23f97]['a']<<3)&0xffffffff,word)
+
+    def test_butterfly_signed_averages_and_reconstruction(self):
+        values=(0,1,0xffffffff,0x80000000,0x7fffffff,0x0185edda,0x2db9ba35)
+        def signed(word):
+            return word-(1<<32) if word & (1<<31) else word
+        for x in values:
+            for y in values:
+                _,out=reference_raw_butterfly(x,y,y,x)
+                self.assertIn(signed(x)-(signed(out[0])+signed(out[1])),(0,1))
+                self.assertEqual(signed(out[1]),(signed(x)-signed(y))>>1)
+                self.assertEqual(signed(out[2]),(signed(x)+signed(y))>>1)
+                self.assertEqual(signed(out[3]),(signed(y)-signed(x))>>1)
+        with self.assertRaises(ValueError):
+            reference_raw_butterfly(1<<32,0,0,0)
 
 
 class RawProductTests(unittest.TestCase):
