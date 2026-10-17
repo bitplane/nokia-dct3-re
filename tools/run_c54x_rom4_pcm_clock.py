@@ -8,9 +8,20 @@ import sys
 import tempfile
 
 from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, demand_transitions
+from tools.c54x_opcode_coverage import summarize, require_extension_capture, require_extension_decoding, decoded_boundaries
 from tools.c54x_rom4_codec_contract import check as check_codec, check_mcu_speech_field
 from tools.c54x_rom4_rf_delivery_check import check_observer_health
 from tools.run_c54x_rom4_rf_delivery import input_provenance
+
+
+def instruction_report(text):
+    observed = summarize(text)
+    require_extension_capture(observed)
+    require_extension_decoding(observed)
+    if set(observed['decoded']) != set(observed['first_pc']) or decoded_boundaries(observed) != set(observed['first_pc']):
+        raise ValueError('missing or unsupported native instruction decoder records')
+    return dict(opcodes=observed['opcodes'], groups=observed['high_byte_groups'],
+                sha256=observed['set_sha256'], independent_arithmetic_assertion_claim=False)
 
 
 def main():
@@ -20,6 +31,7 @@ def main():
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
     parser.add_argument('--restore', action='store_true', help='also compare an active native tone suffix after save/load')
     parser.add_argument('--wire', action='store_true', help='also test explicit 1 MHz edges with assumed one-clock sync and RX/TX fan-out')
+    parser.add_argument('--coverage', action='store_true', help='retain native opcode/extension observations using MAME verbose teardown')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -60,6 +72,8 @@ def main():
                    '-nvram_directory', str(case / 'nvram'), '-noreadconfig', '-video', 'none',
                    '-sound', 'none', '-log', '-skip_gameinfo', '-nothrottle', '-seconds_to_run', '12',
                    '-autoboot_script', str(restore_observer if restoring else observer)]
+        if args.coverage:
+            command.append('-verbose')
         (case / 'invocation.json').write_text(json.dumps(dict(command=command, cwd=str(case),
             fixture_env={key: value for key, value in env.items() if key.startswith('NOKIA_DCT3_')},
             generated_storage=input_provenance({'eeprom': nvram / 'eeprom'})), indent=2) + '\n')
@@ -75,6 +89,8 @@ def main():
             else:
                 result = check_wire(text) if machine == 'nse1bit' else check(text, clock=clock)
             result['codec_demand'] = demand_transitions(text)
+            if args.coverage:
+                result['instruction_observations'] = instruction_report(text)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
             result = dict(clock=clock, status='failed', error=str(error))

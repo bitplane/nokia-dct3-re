@@ -128,12 +128,17 @@ def check_wire(text):
     result = check(text, clock=True)
     # This laboratory source has a fixed phase: the 16th sampled bit is at
     # +16 us in each 125-us frame. It is not a measured NSE-1 pulse shape.
-    for _, time in WORDS.findall(text):
+    for value, time in WORDS.findall(text):
         cycles = float(time) * 1_000_000
         if abs(cycles - round(cycles)) > 0.002 or round(cycles) % 125 != 16:
             raise ValueError('wire output does not complete on the assumed 1 MHz/125-clock phase')
+        word = int(value, 16)
+        signed = word - (65536 if word & 0x8000 else 0)
+        if not -4096 <= signed <= 4095:
+            raise ValueError('wire output is not a sign-extended 13-bit converter word')
     result.update(bit_clock_hz=1_000_000, frame_clocks=125,
-                  assumed_sync_clocks=1, assumed_receive_transmit_fanout=True)
+                  converter_word_bits=13, assumed_sync_clocks=1,
+                  assumed_receive_transmit_fanout=True)
     return result
 
 

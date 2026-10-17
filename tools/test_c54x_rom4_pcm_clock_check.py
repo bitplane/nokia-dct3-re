@@ -51,6 +51,11 @@ class NativeClockTests(unittest.TestCase):
             check_wire(shifted)
         with self.assertRaisesRegex(ValueError, 'partial word'):
             check_restore(restore_log(), wire=True)
+        first = next(WORDS.finditer(text))
+        bad_word = text[:first.start()] + f'native_pcm_fixture_word: value=1000 t={first[2]}' + text[first.end():]
+        self.assertTrue(check(bad_word, clock=True)['clock'])
+        with self.assertRaisesRegex(ValueError, '13-bit'):
+            check_wire(bad_word)
 
     def test_demand_bitmap_acquire_release_and_complete_commits(self):
         text = ('rom4_codec_demand_entry: hit=1 operation=acquire mask=0001 previous=0002 t=1.0\n'

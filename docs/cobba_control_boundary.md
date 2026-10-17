@@ -1427,7 +1427,10 @@ exclusive, and ordinary `noki5110` still has no attached audio clock.
 The wire run observes 78,908 native writes/reads and 78,901 captured words.
 All captured completions lie at the fixture's +16 us phase on its 125 us
 grid; the checker rejects a half-microsecond phase shift even if the sample
-rate and waveform still pass. Silent pre/post intervals and the complete
+rate and waveform still pass. It also checks sign extension of the documented
+13-bit converter word across the entire capture, not only the active window.
+The captured range is -2040..2039; this is word-format evidence, not ADC/DAC
+full-scale, linearity or analogue gain validation. Silent pre/post intervals and the complete
 480-sample DTMF window pass independently (697/1336 Hz projections about
 0.2007/0.8008). These counts differ from the completed-frame shortcut:
 interrupt and reset timing are not asserted to be interchangeable.
@@ -1437,6 +1440,33 @@ timestamps at printed 1 ns resolution. The fixture's partial capture and
 clock-device state are saved alongside the BSP shifters. This demonstrates
 native edge-driven synthesis and partial-word replay, not electrical pulse
 shape, production enable semantics, analogue output or native call speech.
+
+For instruction-level auditing, add `--coverage` to
+`python -m tools.run_c54x_rom4_pcm_clock --mame mame/mame --rompath mame/roms --wire`.
+This retains verbose opcode and fetched-extension records and requires a
+supported real instruction boundary for every observed word. In particular,
+actual `6f` extension tuples override the deliberately incomplete zero-extension
+decoder probes; first-word support alone is insufficient. The unclocked control
+reproduces the 626-form cold fingerprint;
+completed-frame and wire cases both observe 642 forms in 111 high-byte groups,
+set SHA-256 `e150bf2c9d9b52db524eab63c7270be0abfa9e7889b143e015bf3401de0f9fe7`.
+The 16 additions are `0085 0193 0889 1184 1891 23f8 30f8 8194 f3f1 f461
+f467 f47f f48c f658 f771 fd4c`. This identifies the arithmetic/status and
+addressing surface exercised by native synthesis; decoder support and a valid
+waveform do not establish independent exact-encoding conformance for that
+surface. Do not extend the cold 626-form assertion claim to all 642 without
+reconciling them against a completed executable fixture log.
+
+The completed default CPU conformance run passes all required completion
+markers. Its comparison with the wire trace establishes 627 exact-encoding
+assertion records, 13 executed-only forms and two absent forms (`8194`, `f48c`).
+The 15 forms without exact assertion records are the additions above except
+`23f8`. These are inventory classifications for this completed fixture, not
+claims that no other profile tests the instruction family. Inspect existing
+behavioral fixtures before adding tests or altering the CPU. Reproduce the
+comparison with `tools/c54x_opcode_coverage.py WIRE/error.log --fixture-log
+CORE/error.log --all-gaps --require-extension-decoded`; independent status,
+addressing and arithmetic assertions remain the next validation boundary.
 
 The external emulator at commit `2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd`
 does not independently settle this attachment. Its

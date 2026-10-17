@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "native_nse1_clocked_instruction_assertions", "owner": "native_dsp_cpu", "status": "unresolved",
+      "predicate": "Every exact instruction form exercised by externally clocked native NSE-1 DTMF has reconciled executable arithmetic/status/addressing assertions",
+      "current": "Fresh unclocked execution reproduces the established 626-form fingerprint. Completed-frame and bit-clock key-2 cases both observe 642 forms in 111 groups, fingerprint e150bf2c9d9b52db524eab63c7270be0abfa9e7889b143e015bf3401de0f9fe7. Actual fetched 6f variants decode completely even when synthetic zero-extension probes do not. A completed default CPU conformance run passes, but its inventory covers only 627 observed forms with exact assertion records; 13 are executed-only and 8194/f48c are absent. The 15-record gap is an evidence-accounting boundary, not evidence of 15 implementation bugs or absence of other behavioral profiles. Inspect existing fixtures before extending tests. Waveform, converter-word format and replay results do not establish all ISA status semantics or native speech.",
+      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_opcode_coverage.py", "tools/run_c54x_rom4_pcm_clock.py", "tools/test_run_c54x_rom4_pcm_clock.py", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "native_nse1_bit_clock_dtmf", "owner": "native_dsp_serial", "status": "satisfied",
       "predicate": "Native NSE-1 synthesizes physical key-2 DTMF through externally supplied bit-clock transitions and exactly restores an active partial word",
       "current": "Separate nse1bit supplies 1 MHz RX/TX edges, a sync every 125 clocks and zero microphone bits through clock-input methods, not completed-frame methods. One-clock active-high sync and shared RX/TX fan-out remain explicit laboratory assumptions. Untimed self-test echo stays exclusive. Native firmware writes/reads 78908 serial words and the fixture assembles 78901 complete 16-bit outputs; all completions lie at +16 us on its 125 us grid. Complete silent pre/post intervals and 480 active samples pass 697/1336 Hz projection checks. Save at 8.150008 s inside a word restores the checked CPU/peripheral snapshot and exactly replays 400 output words and absolute timestamps at 1 ns printed resolution. The normal 5110 remains unclocked. This does not establish production gating, physical sync shape, analogue routing, RF acquisition or native call speech.",
