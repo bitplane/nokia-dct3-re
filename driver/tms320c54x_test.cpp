@@ -15,6 +15,7 @@
 #include "tms320c54x_dma.h"
 #include "tms320c54x_bsp_state.h"
 #include <sstream>
+#include <bitset>
 
 namespace {
 
@@ -17495,7 +17496,12 @@ private:
 	void expect_opcode(u16 opcode, bool condition, const char *message)
 	{
 		expect(condition, message);
-		logerror("[opassert] op=%04x\n", opcode);
+		// Deduplicate only the diagnostic record, never the assertion itself.
+		if (!m_asserted_opcodes.test(opcode))
+		{
+			m_asserted_opcodes.set(opcode);
+			logerror("[opassert] op=%04x\n", opcode);
+		}
 	}
 
 	TIMER_CALLBACK_MEMBER(check_results)
@@ -25245,34 +25251,50 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 6540 && m_phase <= 6542)
+		if ((m_phase >= 6540 && m_phase <= 6542) || m_phase == native_store_phase)
 		{
-			const unsigned variant = m_phase - 6540;
-			const u16 opcode = variant == 0 ? 0x8190 : variant == 1 ? 0x8191 : 0x8090;
-			const u16 destination = variant == 1 ? 0x0f28 : 0x0f26;
+			const unsigned variant = m_phase == native_store_phase ? 3 : m_phase - 6540;
+			const u16 opcode = variant == 0 ? 0x8190 : variant == 1 ? 0x8191 : variant == 2 ? 0x8090 : 0x8194;
+			const u16 destination = variant == 1 ? 0x0f28 : variant == 3 ? 0x0f2a : 0x0f26;
 			expect_opcode(opcode,
 				data.read_word(destination) == (variant == 2 ? 0x5678 : 0xbeef) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (variant == 1 ? 0x0f26 : 0x0f27) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (variant == 1 || variant == 3 ? 0x0f26 : 0x0f27) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR1) == (variant == 1 ? 0x0f29 : 0x0f28) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f25 &&
+				(variant != 3 || (m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f2b &&
+					data.read_word(0x0f2b) == 0xcafe && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800)) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 STL selects A/B and AR0/AR1 independently, postincrements only its destination and preserves both accumulators in one cycle");
-			if (variant < 2)
+				"ROM4 STL selects A/B and AR0/AR1/AR4 independently, postincrements only its destination and preserves accumulators/status in one cycle");
+			if (variant < 3)
 			{
-				program.write_word(0x05e3, variant == 0 ? 0x8191 : 0x8090);
+				program.write_word(0x05e3, variant == 0 ? 0x8191 : variant == 1 ? 0x8090 : 0x8194);
 				data.write_word(0x0f26, 0);
 				data.write_word(0x0f28, 0);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f26);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f28);
+				if (variant == 2)
+				{
+					m_native_store_context = {u16(m_cpu->state_int(tms320c54x_device::STATE_AR4)),
+						u16(m_cpu->state_int(tms320c54x_device::STATE_ST0)), u16(m_cpu->state_int(tms320c54x_device::STATE_ST1))};
+					m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f2a);
+					m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+					m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+					data.write_word(0x0f2a, 0);
+					data.write_word(0x0f2b, 0xcafe);
+				}
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = variant == 2 ? native_store_phase : m_phase + 1;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, m_native_store_context[0]);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, m_native_store_context[1]);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_native_store_context[2]);
 			program.write_word(0x05e3, 0x7582); // PORTW *AR2,0124h
 			program.write_word(0x05e4, 0x0124);
 			program.write_word(0x05e5, 0x75f8);
@@ -39880,7 +39902,8 @@ private:
 			{
 				u64 const expected = operation == 0 ? 0x55 & operand : operation == 1 ? 0x55 | operand : 0x55 ^ operand;
 				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+				u16 const opcode = std::array<u16, 3>{0x1800, 0x1a00, 0x1c00}[operation] | (b ? 0x100 : 0) | (mode == 0 ? 0x25 : mode == 1 ? 0x81 : 0x91);
+				expect_opcode(opcode, m_pipeline_operand_reads == 1 && m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
 					m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (mode == 2 ? 0x26 : 0x25) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0)) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0x1234,
@@ -40303,7 +40326,8 @@ private:
 			}
 			if (tick == 24)
 			{
-				expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 &&
+				u16 const consumer_opcode = 0x1080 | ((source ^ 1) << 8) | reg;
+				expect_opcode(consumer_opcode, m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == stlm_fixture_value(variant) &&
 					m_cpu->state_int(source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value &&
 					m_cpu->state_int(source ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == loaded,
@@ -40500,7 +40524,12 @@ private:
 			}
 			if (tick == 16)
 			{
-				expect(m_pipeline_extensions_reads == 1, "Accumulator shift has one opcode fetch");
+				u16 const opcode = (variant % 2 ? 0xf0e0 : 0xf460) | (((variant / 2) % 4) << 8) | ((int((variant / 8) % 32) - 16) & 31);
+				expect_opcode(opcode, m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2],
+					"Accumulator shift has one opcode fetch and the independently checked result/status");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
@@ -41305,7 +41334,7 @@ private:
 			if (tick == 18)
 			{
 				u64 const other = shift16 && BIT(f.opcode, 8) != BIT(f.opcode, 9) ? f.source : 0x123456789aULL;
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
+				expect_opcode(f.opcode, m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? other : f.result) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : other) &&
@@ -41704,7 +41733,8 @@ private:
 			}
 			if (tick == 18)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) + unsigned(variable_shift) &&
+				u16 const opcode = variable_shift ? 0x6f00 | u8(f.opcode) : f.opcode;
+				expect_opcode(opcode, m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) + unsigned(variable_shift) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL),
@@ -41938,7 +41968,11 @@ private:
 			}
 			if (tick == 18)
 			{
-				expect(m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(f.producer), "Register arithmetic has no extension read or duplicate opcode fetch");
+				expect_opcode(f.opcode, m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(f.producer) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0,
+					"Register arithmetic retains its opcode and independently checked result/status");
 				if (f.producer) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Load-to-register-arithmetic producer fixture drains to IDLE");
 				if (!m_pipeline_replay)
 				{
@@ -41996,7 +42030,9 @@ private:
 			}
 			if (tick == 18)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(o.form >= 14), "Memory multiply has no source/literal resampling");
+				expect_opcode(o.opcode, m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(o.form >= 14) &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0,
+					"Memory multiply/T load has no resampling and preserves its independently checked status and later T");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
@@ -44473,7 +44509,7 @@ private:
 				auto const result=register_product_reference(f);
 				if (m_cpu->state_int(tms320c54x_device::STATE_A)!=result[0] || m_cpu->state_int(tms320c54x_device::STATE_B)!=result[1] || m_cpu->state_int(tms320c54x_device::STATE_ST0)!=result[2])
 					osd_printf_info("product_dependency_failure: case=%u opcode=%04x layout=%u replay=%u a=%010llx b=%010llx expected_a=%010llx expected_b=%010llx\n",variant,f.opcode,f.mode,unsigned(m_pipeline_replay),(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),(unsigned long long)result[0],(unsigned long long)result[1]);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A)==result[0] && m_cpu->state_int(tms320c54x_device::STATE_B)==result[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0)==result[2],"T-input products use retained operands and Execute accumulator sources with correct arithmetic and flags");
+				expect_opcode(f.opcode,m_cpu->state_int(tms320c54x_device::STATE_A)==result[0] && m_cpu->state_int(tms320c54x_device::STATE_B)==result[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0)==result[2],"T-input products use retained operands and Execute accumulator sources with correct arithmetic and flags");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_T)==(f.mode==4 ? 0xbeef : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1)==f.st1,"T-input products preserve later T and ST1");
 				expect(m_pipeline_operand_reads==unsigned(f.smem || f.poly) && m_pipeline_store_writes==unsigned(f.mode==1 || f.mode==2 || f.mode==4) && m_pipeline_extensions_reads==1 && m_pipeline_register_writes==f.length-1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Products own only their source, extension and producer transactions and reach the following IDLE");
 				if (!m_pipeline_replay)
@@ -45906,7 +45942,8 @@ private:
 			if (tick == 16)
 			{
 				unsigned const writes = unsigned(f.taken) + unsigned(f.taken || f.layout != 1);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == writes && m_pipeline_extensions_reads == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b ? 0x1234 : f.opposite) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ? f.opposite : 0x3456), "Signed XC uses a retained 40-bit comparison, legal slot layout and no duplicate effects");
+				u16 const opcode = 0xfd42 + f.condition + (f.b ? 8 : 0) + (f.layout ? 0x200 : 0);
+				expect_opcode(opcode, m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == writes && m_pipeline_extensions_reads == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b ? 0x1234 : f.opposite) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ? f.opposite : 0x3456), "Signed XC uses a retained 40-bit comparison, legal slot layout and no duplicate effects");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
@@ -47275,6 +47312,9 @@ private:
 	unsigned m_operand_extension_count = 0, m_operand_extensions = 0, m_operand_reads = 0;
 	bool m_operand_order_violation = false;
 	unsigned m_phase = 0;
+	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
+	std::bitset<65536> m_asserted_opcodes;
+	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;

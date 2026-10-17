@@ -12,6 +12,31 @@ from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_completed_fixture_union_requires_assertions_not_just_execution(self):
+        with TemporaryDirectory() as root:
+            root = Path(root)
+            observed, first, second = (root / name for name in ('observed', 'first', 'second'))
+            observed.write_text('[opcov] op=8194 first_pc=a66c count=10\n[opcov] op=f48c first_pc=a6c3 count=10\n')
+            first.write_text('[opcov] op=8194 first_pc=05e3 count=1\n[opassert] op=8194\n')
+            second.write_text('[opcov] op=f48c first_pc=0600 count=1\n[opassert] op=f48c\n')
+            args = ['coverage', str(observed), '--fixture-log', str(first), '--require-all-asserted']
+            with patch('sys.argv', args), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 1)
+            with patch('sys.argv', [*args, '--additional-fixture-log', str(second)]), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 0)
+            second.write_text('[opcov] op=f48c first_pc=0600 count=1\n')
+            with patch('sys.argv', [*args, '--additional-fixture-log', str(second)]), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 1)
+            first.write_text(first.read_text() + '[opassert] op=f48c\n')
+            with patch('sys.argv', [*args, '--additional-fixture-log', str(second)]), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 1)
+
+    def test_additional_fixture_requires_primary_fixture(self):
+        with patch('sys.argv', ['coverage', 'observed', '--additional-fixture-log', 'extra']), redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as error:
+                main()
+            self.assertEqual(error.exception.code, 2)
+
     def test_tuple_decoding_requires_every_captured_variant(self):
         capture = ("[opcov] op=6f83 first_pc=0800 count=2\n"
                    "[opwords] op=6f83 words=2 ext1=0c1e ext2=0000 first_pc=010800 count=1\n"
@@ -164,6 +189,8 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
         self.assertEqual(result["asserted"], {0x7212})
         with self.assertRaisesRegex(ValueError, "absent from the execution trace"):
             summarize("[opcov] op=7212 first_pc=0f1d\n[opassert] op=7312")
+        with self.assertRaisesRegex(ValueError, "positive"):
+            summarize("[opcov] op=7212 first_pc=0f1d count=0\n[opassert] op=7212")
 
     def test_rejects_empty_log(self):
         with self.assertRaisesRegex(ValueError, "no.*records"):

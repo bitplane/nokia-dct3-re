@@ -1440,6 +1440,10 @@ timestamps at printed 1 ns resolution. The fixture's partial capture and
 clock-device state are saved alongside the BSP shifters. This demonstrates
 native edge-driven synthesis and partial-word replay, not electrical pulse
 shape, production enable semantics, analogue output or native call speech.
+The input bits in this handset fixture are all zero. Its output waveform
+therefore does not validate nonzero RX alignment against TX on a common wire;
+that requires an independently specified sync/clock phase and nonzero input
+words, not an inferred loopback from the tone alone.
 
 For instruction-level auditing, add `--coverage` to
 `python -m tools.run_c54x_rom4_pcm_clock --mame mame/mame --rompath mame/roms --wire`.
@@ -1453,20 +1457,34 @@ set SHA-256 `e150bf2c9d9b52db524eab63c7270be0abfa9e7889b143e015bf3401de0f9fe7`.
 The 16 additions are `0085 0193 0889 1184 1891 23f8 30f8 8194 f3f1 f461
 f467 f47f f48c f658 f771 fd4c`. This identifies the arithmetic/status and
 addressing surface exercised by native synthesis; decoder support and a valid
-waveform do not establish independent exact-encoding conformance for that
-surface. Do not extend the cold 626-form assertion claim to all 642 without
-reconciling them against a completed executable fixture log.
+waveform alone do not establish independent exact-encoding conformance.
 
-The completed default CPU conformance run passes all required completion
-markers. Its comparison with the wire trace establishes 627 exact-encoding
-assertion records, 13 executed-only forms and two absent forms (`8194`, `f48c`).
-The 15 forms without exact assertion records are the additions above except
-`23f8`. These are inventory classifications for this completed fixture, not
-claims that no other profile tests the instruction family. Inspect existing
-behavioral fixtures before adding tests or altering the CPU. Reproduce the
-comparison with `tools/c54x_opcode_coverage.py WIRE/error.log --fixture-log
-CORE/error.log --all-gaps --require-extension-decoded`; independent status,
-addressing and arithmetic assertions remain the next validation boundary.
+The completed default CPU conformance run and the separately completed
+`mac-smem` and `xc-signed` profiles jointly cover all 642 forms with executable
+assertion records: zero executed-only or absent forms. Existing independent
+result/status, retained-operand, address-update and replay checks supply the
+records; the exact `8194` selector additionally checks the stored word,
+neighbour, AR4 increment, preserved accumulators/status and instruction cost.
+Assertion logging is deduplicated, but every behavioral assertion still runs.
+This is encoding coverage by selected fixtures, not proof of every operand,
+all ISA flags, disputed silicon timing or native speech. In particular, the
+accumulator-left-shift carry policy retains its documented manual-formula
+qualification.
+
+Validate each fixture's terminal completion and required markers with
+`tools.run_c54x_core.check_result` before combining its inventory. Reproduce
+the strict comparison with:
+
+```sh
+python tools/c54x_opcode_coverage.py WIRE/error.log \
+  --fixture-log CORE/error.log \
+  --additional-fixture-log MAC_SMEM/error.log \
+  --additional-fixture-log XC_SIGNED/error.log \
+  --all-gaps --require-extension-decoded --require-all-asserted
+```
+
+Each assertion must have execution evidence in its own fixture log; execution
+in another profile cannot legitimize an orphan assertion.
 
 The external emulator at commit `2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd`
 does not independently settle this attachment. Its

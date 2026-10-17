@@ -66,6 +66,8 @@ def summarize(text: str) -> dict[str, object]:
         match = OPCODE.match(line)
         if match:
             opcode, pc = (int(value, 16) for value in match.groups()[:2])
+            if match.group(3) is not None and not int(match.group(3)):
+                raise ValueError("opcode execution count must be positive")
             first_pc.setdefault(opcode, pc)
             counts[opcode] = counts.get(opcode, 0) + int(match.group(3) or 1)
         match = ASSERTION.match(line)
@@ -225,6 +227,8 @@ def main() -> int:
                         help="include another observed ROM4 trace in coverage")
     parser.add_argument("--require-rom4-idle", action="store_true")
     parser.add_argument("--fixture-log", type=pathlib.Path)
+    parser.add_argument("--additional-fixture-log", type=pathlib.Path, action="append", default=[],
+                        help="include another independently completed CPU fixture in assertion coverage")
     parser.add_argument("--decoder-source", type=pathlib.Path,
                         help="report source-declared opcode matches absent from the fixture")
     parser.add_argument("--group-report", action="store_true",
@@ -245,6 +249,8 @@ def main() -> int:
     parser.add_argument("--require-all-asserted", action="store_true",
                         help="fail unless every observed ROM4 word has a fixture assertion")
     args = parser.parse_args()
+    if args.additional_fixture_log and not args.fixture_log:
+        parser.error("--additional-fixture-log requires --fixture-log")
     if args.group_report and not args.fixture_log:
         parser.error("--group-report requires --fixture-log")
     if args.require_all_asserted and not args.fixture_log:
@@ -269,7 +275,14 @@ def main() -> int:
             require_extension_capture(result)
         if args.require_extension_decoded:
             require_extension_decoding(result)
-        fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
+        fixture = None
+        if args.fixture_log:
+            fixture_texts = [path.read_text(errors="replace") for path in [args.fixture_log, *args.additional_fixture_log]]
+            # An assertion must have execution evidence in its own run, not
+            # accidentally acquire that evidence from a different fixture.
+            for text in fixture_texts:
+                summarize(text)
+            fixture = summarize("\n".join(fixture_texts))
         declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
             require_rom4_idle(primary)

@@ -26,6 +26,10 @@ inputs at 1 MHz with an assumed sync pulse/fan-out and exact active partial-word
 save/load replay. Neither is another supported product, and neither attaches
 clocks or promotes call media on the ordinary 5110 machine; see
 `cobba_control_boundary.md`.
+The clocked tone inventory is separately reconciled: all 642 observed forms
+have exact-opcode executable assertions across completed default, `mac-smem`
+and `xc-signed` CPU fixtures. This extends instruction-evidence coverage, not
+the cold-idle fingerprint, physical clock ownership or native speech support.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
