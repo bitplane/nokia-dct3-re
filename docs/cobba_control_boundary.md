@@ -1649,3 +1649,33 @@ diagnoses parallel/serial-bus failure, but the reviewed public pages do not
 yet establish equivalent exposed data/strobe pads. Do not transfer NSE-1 test
 point numbers to NSE-8. Schematics or board continuity work are still needed
 before proposing a 3210 probe layout.
+# Bounded EFR table contract
+
+`tools/c54x_rom4_efr_tables.py` checks the acquired NSE-1 ROM4 data image
+independently against GSM parameter widths and CRC input positions:
+
+```
+python3 tools/c54x_rom4_efr_tables.py roms/noki5110/nse1_rom4_dsp_data.bin
+python3 -m unittest tools.test_c54x_rom4_efr_tables
+```
+
+The 272 descriptors at data `d8c2` cover all 244 EFR speech bits, eight CRC
+bits, two extra copies each of speech bits 70/120/173/223, and twelve references
+to CRC parameter bit 8. The latter are padding positions, zero only while the
+CRC parameter is eight-bit. Descriptor high bytes select parameters; the low
+nibble uses TI BITT numbering (actual bit `15 - selector`).
+
+The 65 descriptors at `d9d2` match the standard's protected-input sequence,
+with its first eight entries reversed. This matches the routine's eight-bit
+seed followed by LSB-first processing; CRC arithmetic is not yet executed or
+validated by this checker. Packing-table coverage is checked as a multiset,
+not as a proof of the full channel-importance ordering. Neither result proves
+native EFR encode/decode, a running handset codec, or an attached audio clock.
+
+Normative references: [GSM 06.60, table 6](https://www.etsi.org/deliver/etsi_en/301200_301299/301245/04.01.01_60/en_301245v040101p.pdf)
+for the 57 parameter widths, and [TS 45.003, section 3.1.1 and table 6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145003/08.02.00_60/ts_145003v080200p.pdf)
+for preliminary EFR coding and channel ordering. The next executable boundary
+is the acquired `c28f` packer / `c2b7` unpacker / `c2f2` CRC routine, using an
+independent normative bit-order and polynomial oracle rather than the ROM
+table as its own expected result.
+
