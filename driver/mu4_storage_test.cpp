@@ -1062,6 +1062,14 @@ private:
 			m_playback_callback_mode = data.read_word(u16(sp+9));
 			m_playback_callback_base = m_cpu->state_int(tms320c54x_device::STATE_A);
 			m_playback_callback_history = data.read_word(u16(sp+2));
+			if (m_playback_callback_site == 2)
+			{
+				if (m_playback_callback_base < 0x60 || m_playback_callback_base > 0xfffe)
+					fatalerror("MU4 coefficient-selector observation geometry changed");
+				logerror("mu4_coefficient_selection: invocation=%u call=%u target=%06x base=%04x flag0=%04x flag1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+					m_playback_fft_invocation,m_playback_processing[0],m_playback_callback_target,m_playback_callback_base,
+					data.read_word(m_playback_callback_base),data.read_word(m_playback_callback_base+1),machine().time().as_double());
+			}
 			phase = "call";
 		}
 		else if (!m_playback_callback_site) return;
@@ -1083,6 +1091,9 @@ private:
 			write_playback_snapshot("mu4_history","mu4_history",m_playback_fft_invocation,stage,address,opcode,m_playback_callback_base,2*m_playback_fft_parameter,m_playback_fft_parameter);
 			write_playback_snapshot("mu4_history","mu4_history",m_playback_fft_invocation,stage+1,address,opcode,m_playback_callback_history,history_words,m_playback_fft_parameter);
 		}
+		if (m_playback_callback_site == 2 && address != m_playback_callback_target)
+			write_playback_snapshot("mu4_coefficients","mu4_coefficients",m_playback_fft_invocation,address == 0x24a63 ? 0 : 1,
+				address,opcode,0xf000,2048,m_playback_fft_parameter);
 		if (address == 0x24a61 || address == 0x24a64) m_playback_callback_site = 0;
 	}
 	void observe_playback_scale(offs_t address, u16 opcode)

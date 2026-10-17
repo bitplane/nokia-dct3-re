@@ -37,9 +37,10 @@ the first nonzero block's maximum sample error falls from 43,740 to 7
 (RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
-post-transform rotation/permutation match for all 30 vectors too. Next audit
-coefficient-callback effects and establish the cause and independent acceptance
-criteria for the remaining residual. Other media remain unvalidated.
+post-transform rotation/permutation match for all 30 vectors too. Published
+window coefficients match their original descriptor recurrences. Next
+cross-check the remaining decoder paths and establish independent acceptance
+criteria for the small residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
@@ -6116,8 +6117,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is coefficient-callback effects,
-understanding the small PCM residual against a floating-point decoder,
+Remaining work is understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
 The earlier per-word arithmetic exclusions were valid for corrupted inputs;
@@ -6319,6 +6319,50 @@ register values directly would invent differences on zero-extended DLDs.
 Second-callback memory effects, complete writer coverage,
 other media, spectral input correctness,
 decoded waveform conformance, analog output and speech remain unvalidated.
+
+#### Coefficient Cache Publication
+
+The second window callback publishes coefficients using two original
+finite-difference decoders. `025c35 -> 025ffa` integrates signed word
+corrections through three recurrence states; `025c6a -> 026038` integrates
+four high-to-low signed nibbles per correction word through four states.
+Each descriptor supplies an explicit prefix, initial states and correction
+stream. The host model uses those original upload words, not fitted curves.
+The checked descriptors stay in a non-saturating 32-bit domain; other
+descriptor and overflow domains are not accepted by this model.
+
+| Descriptor | Coefficients | Correction format | Observed loads |
+| --- | ---: | --- | ---: |
+| `bbe6` | 1,024 | Packed signed nibbles | 2 |
+| `c4e8` | 1,024 | Packed signed nibbles | 10 |
+| `bc72` | 128 | Signed words | 18 |
+| `c572` | 128 | Signed words | 2 |
+
+Callback `024955` writes `bbe6` at `f000` when its first flag is zero,
+otherwise `c4e8`. Callback `02496e` writes `c572` at `f100` when either flag
+is nonzero and writes `bc72` at `f000` when either flag is zero. Flags are
+observed at the callback's actual argument pointer, not selected by the
+harness. The other cache values are preserved in the expected image.
+
+Sixty snapshots cover `f000..f7ff` before and after all 30 callbacks.
+Every one of the 61,440 resulting cache words matches the source-derived
+publication model. Every captured coefficient operand of the following
+window helper is byte-identical to its published cache slice. The four
+native word/slot streams and all 858 earlier arithmetic snapshots remain
+unchanged; the strict eight-block processing/conversion check still passes.
+
+```sh
+python3 tools/mu4_coefficient_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+Run this alongside the processing checker with `--require-eight-blocks`.
+The combined coefficient check pins 1,750 source words. Tests compare both
+recurrences with independent binomial integration, exercise the selector
+truth table and reject rehashed corruption in preserved cache regions.
+Generator scratch effects, complete writer coverage, unseen decoder/media
+paths, independent waveform criteria, analog output and native speech
+remain outside acceptance. Cache equality is not absence-of-writes evidence.
 
 ### Resident reload contract
 
