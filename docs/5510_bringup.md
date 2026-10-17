@@ -17,8 +17,10 @@ red/green CPU fixture now protects the correction. All 30 transforms in the
 first eight packet-bound calls match source-derived integer arithmetic at
 every captured stage, including fourteen 512-point transforms.
 All completed TX callbacks in the twenty-second capture pair exactly with
-the next codec DIN sample by timestamp. DMA-to-TX provenance, unmatched DIN
-intervals and native audio conformance remain unvalidated.
+the next codec DIN sample by timestamp. Every observed channel-3 source read
+also binds to an actual owned DXR write. DXR buffering-to-TX provenance,
+unmatched DIN interval ownership and native audio conformance remain
+unvalidated.
 
 Corrected pending-double-store forwarding removes the observed overwide
 encoder fields. Fresh transform observations account for 3,072 saved bytes;
@@ -8327,6 +8329,40 @@ spacing 22,675/22,676 ns, consistent with the modeled 44.1 kHz clock.
 CPU clock changes do not interrupt that cadence. Slot metadata remains
 byte-identical to the pre-fix baseline; numerical word hashes change as above.
 
+#### DMA source-to-DXR ownership
+
+`mu4_playback_dxr.writes` records every observed full-word DXR bus write
+after the AA99 playback selection: little-endian nanoseconds (8 bytes),
+channel-3 source-read ordinal (4), word (2), active DMA owner (1), reserved
+zero (1). Owner zero means no active DMA destination write, not an inferred
+CPU instruction; owners 1 through 6 identify channels 0 through 5. Only
+channel 3 carries a source ordinal. Ownership comes from the synchronous
+DMA destination-write inspector, not matching sample values or GENPC.
+The terminal record binds extent and raw-byte FNV hash. Like the other
+capture files, this is fresh-run evidence without save/restore support.
+
+The complete twenty-second observation contains 1,631,772 DXR writes,
+all owned by channel 3. Every actual source-read ordinal occurs exactly
+once, in order, with its original source value. No other writer appears
+within this capture window; this does not assert that CPU code never
+writes DXR in other profiles or before selection. A fresh run preserves
+all three word streams, DIN slots and TX timestamps byte-for-byte.
+The ownership file is 26,108,352 bytes, SHA256
+`1da07329b20a74191a13ea61c91655347463e6e5ee29969b2b875e264239e1ad`.
+
+```sh
+python3 tools/mu4_playback_dxr_check.py RUN_DIR
+```
+
+The checker first requires capture integrity and both serial time sidecars,
+then rejects missing, duplicated, skipped or out-of-order source ordinals,
+wrong source values, foreign-owner ordinals, reserved bytes and malformed
+metadata. Rehashed corruption tests exercise those semantic failures.
+This proves the actual source-to-DXR bus transaction, not that the controller
+accepted the write, preserved it through overwrite/reset, or generated exactly
+one TX callback. Keep `dxr_to_tx_validated` false until buffer loads,
+discarded writes and underflow repetition are causally accounted for.
+
 #### Independent Reference Comparison
 
 The first 2,977 captured plaintext bytes form eight host-valid AAC packets,
@@ -8730,7 +8766,8 @@ save/restore. Neither inspector changes the DMA index or persists a bus
 owner into a save state. I/O-space destination ownership is not independently
 exercised by this fixture. Use this explicit write owner when binding
 playback source reads to DXR; matching a word or timestamp alone is not
-ownership evidence. Playback DMA-to-DXR provenance remains unvalidated.
+ownership evidence. The complete playback capture now validates this
+source-to-DXR leg; DXR-to-TX buffering remains separate.
 Every uncancelled generated word matches the independent
 tone calculation in alternating left/right source order. Bounded queues
 then require every observed DMA source word to match McBSP TX, followed by

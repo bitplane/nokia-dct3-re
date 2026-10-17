@@ -464,6 +464,8 @@ private:
 	std::ofstream m_playback_slot_capture;
 	std::ofstream m_playback_tx_time_capture;
 	u32 m_playback_tx_time_hash = 2166136261U;
+	std::ofstream m_playback_dxr_capture;
+	u32 m_playback_dxr_hash = 2166136261U, m_playback_dxr_writes = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -961,6 +963,10 @@ private:
 		if (!m_playback_tx_time_capture || tx_bytes != std::streamoff(counts[0])*8) fatalerror("MU4 playback TX time observation is incomplete");
 		logerror("mu4_playback_tx_time_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns file=mu4_playback_tx.times save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			counts[0],counts[0]*8,m_playback_tx_time_hash);
+		m_playback_dxr_capture.flush(); auto const dxr_bytes=m_playback_dxr_capture.tellp(); m_playback_dxr_capture.close();
+		if (!m_playback_dxr_capture || dxr_bytes != std::streamoff(m_playback_dxr_writes)*16) fatalerror("MU4 playback DXR observation is incomplete");
+		logerror("mu4_playback_dxr_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u32ordinal_u16word_u8owner_u8reserved file=mu4_playback_dxr.writes save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+			m_playback_dxr_writes,m_playback_dxr_writes*16,m_playback_dxr_hash);
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -2306,6 +2312,25 @@ private:
 						else ++m_ac_received[found - alphabet.begin()];
 					});
 			if (playback_profile())
+			{
+				m_cpu->space(AS_DATA).install_write_tap(0x23, 0x23, "mu4_playback_dxr_owner",
+					[this](offs_t address, u16 &value, u16 mask) {
+						if (!m_playback_overlay_checked || machine().side_effects_disabled()) return;
+						if (mask != 0xffff) fatalerror("MU4 playback DXR observer requires full-word writes");
+						u8 owner = 0;
+						for (unsigned channel=0;channel<6;++channel)
+							if (m_dma->destination_write_matches(channel, AS_DATA, address)) owner = channel+1;
+						// Owner 0 means no active DMA write, not an inferred CPU instruction.
+						u64 const ns = machine().time().as_ticks(1'000'000'000);
+						u32 const ordinal = owner == 4 ? m_playback_dma_reads : 0;
+						char bytes[16]{};
+						for (unsigned i=0;i<8;++i) bytes[i] = char(ns >> (8*i));
+						for (unsigned i=0;i<4;++i) bytes[8+i] = char(ordinal >> (8*i));
+						bytes[12] = char(value); bytes[13] = char(value >> 8); bytes[14] = char(owner);
+						m_playback_dxr_capture.write(bytes,sizeof(bytes));
+						for (char byte : bytes) m_playback_dxr_hash = (m_playback_dxr_hash ^ u8(byte)) * 16777619U;
+						++m_playback_dxr_writes;
+					});
 				m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mu4_playback_dma_source",
 					[this](offs_t address, u16 &value, u16) {
 						if (!m_playback_overlay_checked || machine().side_effects_disabled() ||
@@ -2334,6 +2359,7 @@ private:
 							logerror("mu4_playback_dma_word: kind=nonzero ordinal=%u read=%u address=%04x word=%04x t=%.9f channel=3 space=data ownership=active_source_read\n",
 								m_playback_dma_nonzero, m_playback_dma_reads, unsigned(address), value, m_playback_dma_last_nonzero);
 					});
+			}
 			if (staged_original_profile())
 			{
 				m_cpu->space(AS_IO).install_write_handler(0x80, 0x80,
@@ -2825,6 +2851,7 @@ private:
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
 		m_playback_tx_time_hash = 2166136261U;
+		m_playback_dxr_hash = 2166136261U; m_playback_dxr_writes = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
@@ -2838,12 +2865,16 @@ private:
 		m_playback_slot_capture.clear();
 		if (m_playback_tx_time_capture.is_open()) m_playback_tx_time_capture.close();
 		m_playback_tx_time_capture.clear();
+		if (m_playback_dxr_capture.is_open()) m_playback_dxr_capture.close();
+		m_playback_dxr_capture.clear();
 		if (playback_profile())
 		{
 			m_playback_slot_capture.open("mu4_playback_din.slots",std::ios::binary|std::ios::trunc);
 			if (!m_playback_slot_capture) fatalerror("MU4 playback slot observation could not be opened");
 			m_playback_tx_time_capture.open("mu4_playback_tx.times",std::ios::binary|std::ios::trunc);
 			if (!m_playback_tx_time_capture) fatalerror("MU4 playback TX time observation could not be opened");
+			m_playback_dxr_capture.open("mu4_playback_dxr.writes",std::ios::binary|std::ios::trunc);
+			if (!m_playback_dxr_capture) fatalerror("MU4 playback DXR observation could not be opened");
 		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;
