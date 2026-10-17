@@ -143,23 +143,28 @@ static void transmit_word(tms320c54x_bsp_state &port, std::uint16_t extension,
 		unsigned width, std::uint16_t word, bool ready, unsigned hold = 1)
 {
 	const bool active = !(extension & 0x20), suppressed = (extension & 0x200) && (word & 0x8000);
+	const bool status = port.transmit_no_underflow || ready;
 	auto pin = transmit_edge(port, extension, active);
 	assert(pin.supported && pin.transmit_ready_edge == ready && pin.driven == !suppressed);
 	assert(port.transmit_ready);
+	assert(bool(port.control_r() & 0x1000) == status);
 	if (pin.driven) assert(pin.data == bool((word >> (width - 1)) & 1));
 	for (unsigned i = 1; i < hold; ++i)
 	{
 		const auto held = transmit_edge(port, extension, active);
 		assert(held.supported && !held.transmit_ready_edge && held.driven == pin.driven && held.data == pin.data);
+		assert(bool(port.control_r() & 0x1000) == status);
 	}
 	for (unsigned i = 1; i < width; ++i)
 	{
 		pin = transmit_edge(port, extension, !active);
 		assert(pin.supported && !pin.transmit_ready_edge && pin.driven == !suppressed);
+		assert(bool(port.control_r() & 0x1000) == status);
 		if (pin.driven) assert(pin.data == bool((word >> (width - 1 - i)) & 1));
 	}
 	pin = transmit_edge(port, extension, !active);
 	assert(pin.supported && !pin.driven && !pin.transmit_ready_edge);
+	assert(!(port.control_r() & 0x1000));
 }
 
 static void check_transmit_pins()
@@ -174,6 +179,7 @@ static void check_transmit_pins()
 				port.control_w(0x48 | (format & 1 ? 4 : 0));
 				port.transmit_w(word);
 				assert(!port.transmit_ready);
+				assert(!(port.control_r() & 0x1000)); // A write alone is not FSX.
 				transmit_word(port, extension, widths[format], word, true, 1 + word % 4);
 			}
 	for (unsigned format = 0; format < 4; ++format)
@@ -192,6 +198,7 @@ static void check_transmit_pins()
 				{
 					const auto a = transmit_edge(port, extension, extension & 0x20), b = transmit_edge(replay, extension, extension & 0x20);
 					assert(a.supported == b.supported && a.driven == b.driven && a.data == b.data && a.transmit_ready_edge == b.transmit_ready_edge);
+					assert(port.control_r() == replay.control_r());
 				}
 			}
 			for (auto word : {0x7fff, 0x8000, 0x0080, 0xffff})
@@ -219,6 +226,7 @@ static void check_transmit_pins()
 		assert(pin.driven && pin.data == bool((0x1234 >> (15 - i)) & 1) && !pin.transmit_ready_edge);
 	}
 	assert(!transmit_edge(port, 0, false).driven);
+	assert(port.control_r() & 0x1000); // Queued BDXR prevents end-of-word underrun.
 	transmit_word(port, 0, 16, 0x5678, true);
 	port.transmit_w(0xabcd);
 	assert(transmit_edge(port, 0, true).transmit_ready_edge);
@@ -228,6 +236,7 @@ static void check_transmit_pins()
 	port.transmit_w(0xabcd);
 	assert(transmit_edge(port, 0, true).driven);
 	port.control_w(8);
+	assert(!(port.control_r() & 0x1000));
 	assert(!transmit_edge(port, 0, true).driven && !port.transmit_loaded);
 	port.control_w(0x48); port.transmit_w(0x5678);
 	assert(!transmit_edge(port, 0, true).driven); // Held sync is not a new FSX.

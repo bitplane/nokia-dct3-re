@@ -14,6 +14,7 @@ struct tms320c54x_bsp_state
 	bool receive_ready = false, transmit_ready = true;
 	bool transmit_pending = false, receive_overrun = false;
 	bool transmit_loaded = false;
+	bool transmit_no_underflow = false;
 	std::uint16_t receive_shift = 0;
 	std::uint8_t receive_bits_left = 0, receive_width = 0;
 	bool receive_clock_level = false, receive_sync_active = false;
@@ -42,6 +43,7 @@ struct tms320c54x_bsp_state
 			transmit_ready = true;
 			transmit_pending = false;
 			transmit_loaded = false;
+			transmit_no_underflow = false;
 			reset_transmit_shift();
 		}
 	}
@@ -49,6 +51,7 @@ struct tms320c54x_bsp_state
 	{
 		return control | (receive_ready ? 0x0400 : 0) |
 				(transmit_ready ? 0x0800 : 0) | (receive_overrun ? 0x2000 : 0) |
+				(transmit_no_underflow ? 0x1000 : 0) |
 				(receive_clock_level ? 0x0100 : 0) | (transmit_clock_level ? 0x0200 : 0);
 	}
 	void transmit_w(std::uint16_t value)
@@ -93,7 +96,7 @@ struct tms320c54x_bsp_state
 			if (active && !previous_sync)
 			{
 				std::uint16_t word;
-				if (frame_transmit(word, &ready_edge, extension))
+				if (start_transmit(word, &ready_edge, extension))
 				{
 					transmit_bits_left = word_bits(extension);
 					transmit_shift = word << (16 - transmit_bits_left);
@@ -106,7 +109,11 @@ struct tms320c54x_bsp_state
 				// MSB is driven during FSX; long FSX holds it. The remaining
 				// bits advance after FSX deasserts (SPRU131G 9.2.4).
 				if (--transmit_bits_left) transmit_shift <<= 1;
-				else reset_transmit_shift();
+				else
+				{
+					finish_transmit();
+					reset_transmit_shift();
+				}
 			}
 		}
 		return {supported, bool(transmit_bits_left) && !transmit_suppressed,
@@ -114,6 +121,13 @@ struct tms320c54x_bsp_state
 	}
 	bool frame_transmit(std::uint16_t &value, bool *ready_edge = nullptr,
 			std::uint16_t extension = 0)
+	{
+		const bool sent = start_transmit(value, ready_edge, extension);
+		if (sent) finish_transmit();
+		return sent;
+	}
+	bool start_transmit(std::uint16_t &value, bool *ready_edge,
+			std::uint16_t extension)
 	{
 		if (ready_edge)
 			*ready_edge = false;
@@ -124,9 +138,18 @@ struct tms320c54x_bsp_state
 		value = transmit & ((1U << word_bits(extension)) - 1);
 		if (ready_edge)
 			*ready_edge = !transmit_ready;
+		// BSP XSREMPTY deasserts only after a fresh BDXR write AND FSX;
+		// retransmitting a retained word does not clear a prior underrun.
+		if (transmit_pending) transmit_no_underflow = true;
 		transmit_pending = false;
 		transmit_ready = true;
 		return true;
+	}
+	void finish_transmit()
+	{
+		// SPRU131G 9.2.3: underrun asserts after the final bit only when
+		// BDXR has not been reloaded since the last BDXR-to-XSR transfer.
+		if (!transmit_pending) transmit_no_underflow = false;
 	}
 	bool frame_receive(std::uint16_t value, std::uint16_t extension = 0)
 	{

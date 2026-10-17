@@ -50,6 +50,7 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_bsp.transmit_ready));
 	save_item(NAME(m_bsp.transmit_pending));
 	save_item(NAME(m_bsp.transmit_loaded));
+	save_item(NAME(m_bsp.transmit_no_underflow));
 	save_item(NAME(m_bsp.receive_overrun));
 	save_item(NAME(m_bsp.receive_shift));
 	save_item(NAME(m_bsp.receive_bits_left));

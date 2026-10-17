@@ -1468,11 +1468,26 @@ fixture saves with eight bits shifted, CLKX low, a queued successor and a
 pending BXINT0. Original and restored suffixes agree, the queued word follows,
 and independently acknowledged interrupts distinguish underrun silence from
 the reset-generated interrupt. Its mandatory transmit-pin marker requires
-four words, four vector entries, partial restoration, queued-word preservation,
+five words, four vector entries, partial restoration, queued-word preservation,
 underrun suppression and reset abort/interrupt checks. Saved state includes
 the output shifter, remaining bits, clock/sync phase and PCM suppression.
 This interface supplies no production clock or handset audio; physical COBBA
 attachment and dynamic mid-word format changes remain unvalidated.
+
+BSPC XSREMPTY (bit 12) is an active-low underrun indicator, not a direct
+"shifter currently idle" flag (SPRU131G section 9.2.3 and table 9-5).
+A BDXR write alone cannot set it: a fresh write followed by FSX sets it.
+It clears after the last bit only when no successor was queued, and clears
+on transmitter/device reset. A queued BDXR preserves it between words;
+retransmitting an old word does not clear a previous underrun. PCM output
+suppression does not change these transfer-status rules. The explicit pin
+matrix checks status at load, every bit, long sync and completion; backend
+acceptance requires `shift_status=1` and restores this state with both the
+partial output word and queued successor after an extra live transfer has
+asserted underrun. Its asynchronous interrupt is allowed to settle before
+restoration, so this tests restoration from a genuinely different status
+without leaving an undelivered scheduler edge behind. Completed-word calls represent
+the whole transfer and therefore include its end-of-word underrun check.
 
 BSPC IN0/IN1 (bits 8/9) reflect the supplied CLKR/CLKX levels, including
 while RRST/XRST hold the engines reset; control writes cannot change them.
@@ -1493,7 +1508,7 @@ command delivery and exact idle save/load pass with this state model. The
 tone run observes only the boot echo and its one receive ISR, not continuous
 or post-key operational samples.
 
-This remains partial hardware: clock-input synchronization latency, transmit-shifter status readback,
+This remains partial hardware: clock-input synchronization latency,
 autobuffering, reset-time transmit preloading and physical frame/bit timing
 are not established. Only the separately evidenced external boot echo
 provides an untimed transfer; ordinary pending samples do not acquire a

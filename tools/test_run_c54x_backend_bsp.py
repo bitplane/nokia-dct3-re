@@ -17,8 +17,8 @@ class BackendBspResultTest(unittest.TestCase):
 
     def test_transmit_pins_are_mandatory_and_exact(self):
         alternatives = ['', TRANSMIT_PINS + '\n' + TRANSMIT_PINS]
-        for field in ('words=4', 'partial_restore=1', 'queued_word=1',
-                      'underrun_no_irq=1', 'reset_abort=1', 'reset_irq=1', 'vectors=4'):
+        for field in ('words=5', 'partial_restore=1', 'queued_word=1',
+                      'underrun_no_irq=1', 'shift_status=1', 'reset_abort=1', 'reset_irq=1', 'vectors=4'):
             alternatives.append(TRANSMIT_PINS.replace(field, field.split('=')[0] + '=0'))
         alternatives.append(TRANSMIT_PINS.replace('handset_audio_claim=0', 'handset_audio_claim=1'))
         for alternative in alternatives:

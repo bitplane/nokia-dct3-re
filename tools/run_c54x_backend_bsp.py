@@ -9,7 +9,7 @@ MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 hand
 OBSERVATION = 'C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0'
 RF_OBSERVATION = 'C54x native backend RF observation: PASS debugger_reads=8 ordinary_reads=3 source_restore=1 reset=1 physical_rf_claim=0'
 RECEIVE_PINS = 'C54x native backend BSP receive pins: PASS words=3 partial_restore=1 reset_abort=1 vectors=3 handset_audio_claim=0'
-TRANSMIT_PINS = 'C54x native backend BSP transmit pins: PASS words=4 partial_restore=1 queued_word=1 underrun_no_irq=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0'
+TRANSMIT_PINS = 'C54x native backend BSP transmit pins: PASS words=5 partial_restore=1 queued_word=1 underrun_no_irq=1 shift_status=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0'
 CLOCK_INPUTS = 'C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 

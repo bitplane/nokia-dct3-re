@@ -46489,6 +46489,7 @@ private:
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			data.write_word(0x21, 0x1234); data.write_word(0x21, 0x5678);
 			expect(!(data.read_word(0x22) & 0x800), "BDXR overwrite does not manufacture a frame");
+			expect(!(data.read_word(0x22) & 0x1000), "BDXR write alone cannot clear BSP underrun");
 			unsigned word = 0;
 			for (unsigned i = 0; i < 8; ++i)
 			{
@@ -46498,6 +46499,7 @@ private:
 				if (i == 3) data.write_word(0x21, 0x9abc);
 			}
 			expect(word == 0x56 && !(data.read_word(0x22) & 0x800), "active XSR is independent of queued BDXR");
+			expect(data.read_word(0x22) & 0x1000, "fresh FSX clears underrun while output is active");
 			m_backend->codec_transmit_clock_w(false, false);
 		}
 		else if (m_stage == 22)
@@ -46506,16 +46508,26 @@ private:
 			m_saved.str({}); m_saved.clear();
 			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save partial XSR, queued BDXR and pending TX interrupt");
 			transmit_pin_suffix(); m_cpu->resume(SUSPEND_REASON_DISABLE);
+			expect(data.read_word(0x22) & 0x1000, "queued BDXR prevents output-completion underrun");
 		}
 		else if (m_stage == 23)
 		{
 			check_transmit_vector();
+			prepare_transmit_irq(); transmit_pin_word(0x9abc, true);
+			expect(!(data.read_word(0x22) & 0x1000), "advance the live output to underrun before restoring non-underrun state");
+			m_stage = 32; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		else if (m_stage == 32)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "allow the displaced transfer's asynchronous source to settle before restore");
 			m_saved.clear(); m_saved.seekg(0);
 			expect(machine().save().read_stream(m_saved) == STATERR_NONE &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && !(data.read_word(0x22) & 0x800),
 				"restore partial TX and its independently pending interrupt");
+			expect(data.read_word(0x22) & 0x1000, "partial TX restores XSREMPTY independently of ready state");
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true); transmit_pin_suffix(); m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_stage = 24; m_timer->adjust(attotime::from_usec(100)); return;
 		}
 		else if (m_stage == 24)
 		{
@@ -46523,6 +46535,7 @@ private:
 		}
 		else if (m_stage == 25 || m_stage == 28)
 		{
+			expect(!(data.read_word(0x22) & 0x1000), "unqueued completion or reset asserts underrun");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20 && (data.read_word(0x22) & 0x800), "queued-word or XRST XRDY transition reaches BXINT0");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 		}
@@ -46532,6 +46545,7 @@ private:
 		}
 		else if (m_stage == 27)
 		{
+			expect(!(data.read_word(0x22) & 0x1000), "retained-word replay does not clear prior underrun");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "retained-word underrun cannot retrigger BXINT0");
 			prepare_transmit_irq();
 			for (unsigned i = 0; i < 4; ++i)
@@ -46557,7 +46571,7 @@ private:
 		{
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "empty frames do not create a late TX interrupt");
 			check_clock_inputs();
-			osd_printf_info("C54x native backend BSP transmit pins: PASS words=4 partial_restore=1 queued_word=1 underrun_no_irq=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0\n");
+			osd_printf_info("C54x native backend BSP transmit pins: PASS words=5 partial_restore=1 queued_word=1 underrun_no_irq=1 shift_status=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend BSP tests complete");
