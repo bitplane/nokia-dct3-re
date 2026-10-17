@@ -1414,6 +1414,21 @@ when an independently evidenced production serial attachment replaces it.
 
 ### NSE-1 physical clock contract
 
+The external emulator at commit `2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd`
+does not independently settle this attachment. Its
+`third_party/c54x/mad2_dsp_c54x.c` frame source tests DSP RAM `00fe` bit 0
+or nonzero `00aa`, then directly requests vector 20 and captures held DXR.
+Those are software-lifecycle predicates, not recovered COBBA clock-enable
+pins. Its `src/mad2/mad2.h` derives 18,642 Hz from phase increment `0c5c`
+and an assumed 900 Hz beep, explicitly leaving the absolute hardware rate
+unconfirmed. This is a useful candidate model, not independent clock evidence.
+For comparison, our original key-2 initializer's steps 10945/5710 would yield
+about 3113/1624 Hz at that rate instead of the standard 1336/697 Hz pair
+observed with 8 kHz external frames. This rejects borrowing that rate for our
+checked DTMF path; it does not prove every codec mode has the same clock.
+Resolve the control/divider contract independently rather than copying RAM
+gates, direct vector injection or the beep identity assumption into a device.
+
 The control-write helper at `45c2` has 27 raw direct CALL/CALLD candidates
 in the resident image. Reproduce their operand windows with
 `c54x_rom4_port_census.py IMAGE --call-target 0x45c2 --context 10`.
