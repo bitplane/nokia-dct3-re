@@ -16,8 +16,9 @@ DAGEN ordering defect corrupted younger doubleword loads; an isolated
 red/green CPU fixture now protects the correction. All 30 transforms in the
 first eight packet-bound calls match source-derived integer arithmetic at
 every captured stage, including fourteen 512-point transforms.
-Exact DMA/TX/DIN pairing and native audio conformance remain
-unvalidated.
+All completed TX callbacks in the twenty-second capture pair exactly with
+the next codec DIN sample by timestamp. DMA-to-TX provenance, unmatched DIN
+intervals and native audio conformance remain unvalidated.
 
 Corrected pending-double-store forwarding removes the observed overwide
 encoder fields. Fresh transform observations account for 3,072 saved bytes;
@@ -6101,10 +6102,12 @@ alignment nor gain. They do not define a codec-conformance tolerance.
 Keep the captured-recording comparison distinct from a normative decoder
 test. [ISO/IEC 14496-26:2024](https://www.iso.org/standard/86376.html)
 describes audio-conformance tests with compressed examples and reference
-waveforms in an electronic annex. Its MPEG-4 scope must not silently be
-assigned to this older decoder: first establish the captured stream's
-MPEG version, profile and supported tools, then select the applicable suite.
-The present eight packets and FFmpeg output are not that official suite.
+waveforms in an electronic annex. All eight captured ADTS headers identify
+MPEG-2, profile bits 1 (LC), sampling index 4 (44.1 kHz), channel
+configuration 2 and one raw-data block per frame. The MPEG-4 suite must not
+silently be assigned to this MPEG-2 stream; select the applicable procedure
+and establish supported payload tools separately. The present packets and
+FFmpeg output are not that official suite.
 
 [ETSI TS 126 406, section 5.1](https://www.etsi.org/deliver/etsi_ts/126400_126499/126406/19.00.00_60/ts_126406v190000p.pdf)
 requires at least accuracy K=15 for its AAC-LC RMS/LSB criterion and refers
@@ -8214,6 +8217,16 @@ its terminal record, count and raw-byte FNV hash; legacy word-only captures
 remain explicitly identified as lacking slot evidence. File save/restore is
 unsupported for both outputs.
 
+New captures additionally write `mu4_playback_tx.times`, one little-endian
+64-bit emulated-nanosecond timestamp per existing completed-TX callback.
+The terminal record binds count, byte extent and raw-byte FNV hash.
+`--require-tx-times` requires both TX times and validated DIN slot metadata.
+Pairing selects the next chronological DIN callback within one BCLK period
+(84 ns at this fixture's 11.9952 MHz codec clock); it never chooses by sample
+value, searches for a matching word or fits an offset. The checker reports
+unpaired TX and unmatched DIN separately. Legacy captures cannot establish
+this timestamp-pairing result; file save/restore remains unsupported.
+
 The post-DAGEN-correction twenty-second replay completes with illegal=0
 and completed parent dispatch. Its numerical streams are deliberately
 re-banked after the evidenced CPU fix; they are not the pre-fix oracle.
@@ -8267,7 +8280,38 @@ a generic transport-acceptance gate, a source of MMIO writes or a claim
 that file-capture save/restore is supported. Next classify the remaining
 reset/reload intervals before asserting complete DMA/TX/DIN pairing.
 
-The sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
+#### Timestamp-paired serial callbacks
+
+A fresh twenty-second run with the TX observer preserves the three word
+streams and DIN sidecar byte-for-byte. All 1,661,065 completed TX callbacks
+pair with the immediately following DIN callback: 525,994 at 41 ns and
+1,135,071 at 42 ns, with zero value mismatches and zero unpaired TX words.
+The TX timestamp file has 13,288,520 bytes, SHA256
+`e59e55b476e7f0d280e814f2782c3a3cd6343ac95aeb099b008be56f658e270f`.
+This covers the complete observed serial callback stream, including both
+later reloads, rather than only its first fixed-offset prefix.
+
+The remaining 30,777 DIN callbacks have no completed TX word in that clock
+window. Their existence is not a failed transmitted-word comparison:
+the codec also samples idle pins during underflow/reset. Only the first
+14,900-word underflow interval is classified above; keep the other unmatched
+intervals unresolved. This result does not establish channel-3 DMA-to-DXR
+ownership, correct handling of every overwritten/interrupted transmission,
+PCM accuracy, analog output or native speech. The original strict playback
+completion check still exits rejecting audio acceptance at 20 s, illegal=0.
+
+```sh
+python3 tools/mu4_playback_capture_check.py RUN_DIR \
+  --require-framing --require-tx-times
+```
+
+Unit tests reject malformed/duplicate metadata, changed hashes and extents,
+non-increasing TX times and missing required sidecars, and report pairings
+outside the clock bound as unpaired.
+A wrong first word followed by a matching word stays a mismatch; an
+underflow gap cannot shift subsequent pairings by index.
+
+The DIN sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
 `311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa`.
 It begins at slot 0, yields 845,921 complete pairs, and has zero orphan
 words or slot discontinuities. Pair spacing is 1,333/1,334 ns and frame

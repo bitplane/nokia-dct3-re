@@ -462,6 +462,8 @@ private:
 	// Observation-only streams are deliberately not save-state outputs.
 	std::array<std::ofstream, 3> m_playback_word_capture;
 	std::ofstream m_playback_slot_capture;
+	std::ofstream m_playback_tx_time_capture;
+	u32 m_playback_tx_time_hash = 2166136261U;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -955,11 +957,24 @@ private:
 		if (!m_playback_slot_capture || slot_bytes != std::streamoff(counts[1])*9) fatalerror("MU4 playback slot observation is incomplete");
 		logerror("mu4_playback_slot_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u8slot file=mu4_playback_din.slots save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			counts[1],counts[1]*9,m_playback_slot_hash);
+		m_playback_tx_time_capture.flush(); auto const tx_bytes=m_playback_tx_time_capture.tellp(); m_playback_tx_time_capture.close();
+		if (!m_playback_tx_time_capture || tx_bytes != std::streamoff(counts[0])*8) fatalerror("MU4 playback TX time observation is incomplete");
+		logerror("mu4_playback_tx_time_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns file=mu4_playback_tx.times save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+			counts[0],counts[0]*8,m_playback_tx_time_hash);
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
 		unsigned const which = din ? 1 : 0;
 		capture_playback_word(which,value);
+		if (!din)
+		{
+			// Timestamp the existing completed-word callback, not a guest read.
+			u64 const ns = machine().time().as_ticks(1'000'000'000);
+			char bytes[8];
+			for (unsigned i=0;i<8;++i) bytes[i] = char(ns >> (8*i));
+			m_playback_tx_time_capture.write(bytes,sizeof(bytes));
+			for (char byte : bytes) m_playback_tx_time_hash = (m_playback_tx_time_hash ^ u8(byte)) * 16777619U;
+		}
 		if (m_playback_audio_words[which]++ < 4)
 			logerror("mu4_playback_audio_word: boundary=%s word=%04x t=%.9f pc=%06x\n", din ? "codec_din" : "mcbsp_tx", value, machine().time().as_double(), unsigned(m_cpu->state_int(STATE_GENPC)));
 		if (value)
@@ -2790,6 +2805,7 @@ private:
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
+		m_playback_tx_time_hash = 2166136261U;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
@@ -2801,10 +2817,14 @@ private:
 		}
 		if (m_playback_slot_capture.is_open()) m_playback_slot_capture.close();
 		m_playback_slot_capture.clear();
+		if (m_playback_tx_time_capture.is_open()) m_playback_tx_time_capture.close();
+		m_playback_tx_time_capture.clear();
 		if (playback_profile())
 		{
 			m_playback_slot_capture.open("mu4_playback_din.slots",std::ios::binary|std::ios::trunc);
 			if (!m_playback_slot_capture) fatalerror("MU4 playback slot observation could not be opened");
+			m_playback_tx_time_capture.open("mu4_playback_tx.times",std::ios::binary|std::ios::trunc);
+			if (!m_playback_tx_time_capture) fatalerror("MU4 playback TX time observation could not be opened");
 		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;

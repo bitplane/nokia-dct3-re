@@ -27,6 +27,79 @@ SLOT_ROW = re.compile(
     r'mu4_playback_slot_capture: records=(\d+) bytes=(\d+) fnv1a=([0-9a-f]{8}) '
     r'encoding=le64ns_u8slot file=mu4_playback_din.slots '
     r'save_restore=unsupported observer_writes=0 audio_acceptance=0$')
+TX_TIME_FILE = 'mu4_playback_tx.times'
+TX_TIME_ROW = re.compile(
+    r'mu4_playback_tx_time_capture: records=(\d+) bytes=(\d+) fnv1a=([0-9a-f]{8}) '
+    r'encoding=le64ns file=mu4_playback_tx.times '
+    r'save_restore=unsupported observer_writes=0 audio_acceptance=0$')
+
+
+def parse_tx_time_row(text, required=False):
+    lines = [line for line in text.splitlines() if 'mu4_playback_tx_time_capture:' in line]
+    if not lines and not required:
+        return None
+    if len(lines) != 1 or not (match := TX_TIME_ROW.search(lines[0])):
+        raise ValueError('missing, malformed or duplicate TX time capture')
+    return {'records':int(match[1]), 'bytes':int(match[2]), 'hash':match[3]}
+
+
+def validate_tx_times(row, data, word_count):
+    if not word_count or len(data) != row['bytes'] or len(data) != 8*word_count or row['records'] != word_count:
+        raise ValueError('TX time/word count mismatch')
+    fingerprint = 2166136261
+    for byte in data:
+        fingerprint = ((fingerprint ^ byte)*16777619) & 0xffffffff
+    if f'{fingerprint:08x}' != row['hash']:
+        raise ValueError('TX time capture hash mismatch')
+    times = array('Q')
+    times.frombytes(data)
+    if sys.byteorder != 'little':
+        times.byteswap()
+    if any(right <= left for left, right in zip(times, times[1:])):
+        raise ValueError('non-increasing TX timestamps')
+    return times
+
+
+def compare_serial_callbacks(tx, times, din, slots, max_delay_ns=84):
+    """Pair by chronology and clock bound, never by matching sample values.
+
+    84 ns is one BCLK period at the bench's fixed 11.9952 MHz codec clock.
+    This diagnostic does not establish DMA provenance or analog behavior.
+    """
+    if len(tx) != len(times) or len(slots) != 9*len(din):
+        raise ValueError('serial callback metadata count mismatch')
+    if not isinstance(max_delay_ns, int) or max_delay_ns < 0:
+        raise ValueError('serial callback delay bound must be nonnegative')
+    if any(right <= left for left, right in zip(times, times[1:])):
+        raise ValueError('non-increasing TX timestamps')
+    # Slot integrity/time ordering is independently checked by validate_slots.
+    sink = paired = mismatches = 0
+    delays = Counter()
+    examples, unpaired = [], []
+    for index, when in enumerate(times):
+        while sink < len(din) and struct.unpack_from('<Q', slots, sink*9)[0] < when:
+            sink += 1
+        delay = None if sink == len(din) else struct.unpack_from('<Q', slots, sink*9)[0]-when
+        if delay is None or delay > max_delay_ns:
+            if len(unpaired) < 8:
+                unpaired.append({'tx_index':index, 'tx_time_ns':when})
+            continue
+        paired += 1
+        delays[delay] += 1
+        if tx[index] != din[sink]:
+            mismatches += 1
+            if len(examples) < 8:
+                examples.append({'tx_index':index, 'din_index':sink, 'tx_time_ns':when,
+                    'din_time_ns':when+delay, 'slot':slots[sink*9+8],
+                    'tx_word':f'{tx[index]:04x}', 'din_word':f'{din[sink]:04x}'})
+        sink += 1
+    return {'paired_words':paired, 'mismatched_words':mismatches,
+        'unpaired_tx_words':len(tx)-paired, 'din_without_completed_tx':len(din)-paired,
+        'delay_ns':dict(delays), 'max_delay_ns':max_delay_ns,
+        'first_mismatches':examples, 'first_unpaired_tx':unpaired,
+        'all_completed_tx_paired':bool(tx) and paired == len(tx) and mismatches == 0,
+        'native_audio_validated':False,
+        'scope':'Timestamp-paired completed TX and DIN callbacks only; unmatched DIN, DMA, resets and audio quality remain separate'}
 
 
 def parse_slot_row(text, required=False):
@@ -244,7 +317,7 @@ def locate_sink_mismatches(comparison, slot_data, word_count):
     return result
 
 
-def verify(text, directory, *, require_framing=False, reference=None, reference_rate=44100):
+def verify(text, directory, *, require_framing=False, require_tx_times=False, reference=None, reference_rate=44100):
     observation = verify_playback_dma(text)
     rows = parse_rows(text)
     streams, reports = {}, {}
@@ -261,12 +334,19 @@ def verify(text, directory, *, require_framing=False, reference=None, reference_
             'dma_to_tx':compare_streams(streams['dma_source'],streams['mcbsp_tx']),
             'native_audio_validated':False,
             'scope':'Complete fresh-run observed words; no save/restore capture, waveform quality, analog audio or speech claim'}
-    slot_row = parse_slot_row(text,require_framing or reference is not None)
+    time_row = parse_tx_time_row(text, require_tx_times)
+    slot_row = parse_slot_row(text,require_framing or reference is not None or time_row is not None)
     if slot_row is not None:
         data = (directory/SLOT_FILE).read_bytes()
         result['codec_slots'] = validate_slots(slot_row,data,len(streams['codec_din']))
         result['tx_to_din']['located_mismatches'] = locate_sink_mismatches(
             result['tx_to_din'], data, len(streams['codec_din']))
+        if time_row is not None:
+            raw_times = (directory/TX_TIME_FILE).read_bytes()
+            times = validate_tx_times(time_row, raw_times, len(streams['mcbsp_tx']))
+            result['serial_callbacks'] = compare_serial_callbacks(
+                streams['mcbsp_tx'], times, streams['codec_din'], data)
+            result['serial_callbacks']['tx_time_sha256'] = hashlib.sha256(raw_times).hexdigest()
         if reference is not None:
             result['reference_comparison'] = compare_reference(streams['codec_din'],data,reference,reference_rate)
     else:
@@ -278,13 +358,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--require-framing',action='store_true')
+    parser.add_argument('--require-tx-times',action='store_true',help='require timestamp-based serial callback diagnostics')
     parser.add_argument('--reference-pcm',type=Path,help='independently decoded signed LE16 stereo; diagnostic comparison only')
     parser.add_argument('--reference-rate',type=int,default=44100)
     args = parser.parse_args()
     try:
         reference = args.reference_pcm.read_bytes() if args.reference_pcm else None
         report = verify((args.directory/'error.log').read_text(),args.directory,
-                        require_framing=args.require_framing,reference=reference,reference_rate=args.reference_rate)
+                        require_framing=args.require_framing,require_tx_times=args.require_tx_times,
+                        reference=reference,reference_rate=args.reference_rate)
     except (OSError,ValueError) as error:
         print(f'MU4 playback capture: {error}',file=sys.stderr)
         return 1

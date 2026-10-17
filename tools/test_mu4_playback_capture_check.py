@@ -6,12 +6,65 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.mu4_playback_capture_check import (
-    FILES, SLOT_FILE, compare_reference, compare_streams, framed_words,
-    locate_sink_mismatches, parse_rows, parse_slot_row, validate_slots, validate_stream, verify,
+    FILES, SLOT_FILE, TX_TIME_FILE, compare_reference, compare_streams, framed_words,
+    compare_serial_callbacks, locate_sink_mismatches, parse_rows, parse_slot_row,
+    parse_tx_time_row, validate_slots, validate_stream, validate_tx_times, verify,
 )
 
 
 class PlaybackCaptureTests(unittest.TestCase):
+    @staticmethod
+    def times(values):
+        data = b''.join(struct.pack('<Q', value) for value in values)
+        fingerprint = 2166136261
+        for byte in data:
+            fingerprint = ((fingerprint ^ byte)*16777619) & 0xffffffff
+        row = {'records':len(values), 'bytes':len(data), 'hash':f'{fingerprint:08x}'}
+        text = (f'mu4_playback_tx_time_capture: records={len(values)} bytes={len(data)} '
+                f'fnv1a={fingerprint:08x} encoding=le64ns file={TX_TIME_FILE} '
+                'save_restore=unsupported observer_writes=0 audio_acceptance=0')
+        return data, row, text
+
+    def test_tx_metadata_is_strict_and_hash_bound(self):
+        data, row, text = self.times([10, 20, 30])
+        self.assertEqual(list(validate_tx_times(row, data, 3)), [10,20,30])
+        self.assertEqual(parse_tx_time_row(text), row)
+        self.assertIsNone(parse_tx_time_row('legacy'))
+        for bad in ('', text+' extra', text+'\n'+text,
+                    text.replace(TX_TIME_FILE, 'other.times'),
+                    text.replace('observer_writes=0', 'observer_writes=1')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                parse_tx_time_row(bad, True)
+        for bad in (data[:-1], data+b'\0', data[:8]+bytes(8)+data[16:]):
+            with self.assertRaises(ValueError):
+                validate_tx_times(row,bad,3)
+        for values in ([10,10], [20,10]):
+            bad, changed, _ = self.times(values)
+            with self.assertRaises(ValueError):
+                validate_tx_times(changed,bad,2)
+
+    def test_timestamp_pairing_handles_underflow_gaps_without_fitting(self):
+        data, _, _ = self.slots([(5,0),(15,1),(25,0),(35,1),(45,0)])
+        result = compare_serial_callbacks([1,2,3], [1,21,41], [1,0,2,0,3], data, 4)
+        self.assertTrue(result['all_completed_tx_paired'])
+        self.assertEqual(result['paired_words'], 3)
+        self.assertEqual(result['din_without_completed_tx'], 2)
+        self.assertEqual(result['delay_ns'], {4:3})
+        self.assertFalse(result['native_audio_validated'])
+
+    def test_timestamp_pairing_does_not_skip_a_wrong_word_for_a_match(self):
+        data, _, _ = self.slots([(5,0),(6,1),(25,0)])
+        result = compare_serial_callbacks([1,2], [1,21], [9,1,2], data, 4)
+        self.assertEqual(result['mismatched_words'], 1)
+        self.assertEqual(result['first_mismatches'][0]['din_index'], 0)
+        self.assertFalse(result['all_completed_tx_paired'])
+        result = compare_serial_callbacks([1,2], [1,21], [9,1,2], data, 3)
+        self.assertEqual(result['unpaired_tx_words'], 2)
+        with self.assertRaises(ValueError):
+            compare_serial_callbacks([1], [2,3], [], b'')
+        with self.assertRaises(ValueError):
+            compare_serial_callbacks([1], [2], [], b'', -1)
+
     def test_mismatch_localization_preserves_fixed_offset_and_actual_slot(self):
         source = array('H', [0, 1, 2, 3, 4, 5])
         sink = array('H', [0, 0, 1, 2, 3, 9, 5])
@@ -220,6 +273,19 @@ class PlaybackCaptureTests(unittest.TestCase):
                 (root/SLOT_FILE).write_bytes(slots)
                 report = verify(text+'\n'+slot_text,root,require_framing=True)
                 self.assertTrue(report['codec_slots']['capture_integrity_validated'])
+                with self.assertRaises(ValueError):
+                    verify(text+'\n'+slot_text,root,require_tx_times=True)
+                tx_times, _, tx_text = self.times([9,19,29,39])
+                (root/TX_TIME_FILE).write_bytes(tx_times)
+                report = verify(text+'\n'+slot_text+'\n'+tx_text,root,require_tx_times=True)
+                self.assertTrue(report['serial_callbacks']['all_completed_tx_paired'])
+                self.assertEqual(report['serial_callbacks']['delay_ns'], {1:4})
+                self.assertFalse(report['native_audio_validated'])
+                with self.assertRaises(ValueError):
+                    verify(text+'\n'+tx_text,root)
+                (root/TX_TIME_FILE).write_bytes(tx_times[:-1])
+                with self.assertRaises(ValueError):
+                    verify(text+'\n'+slot_text+'\n'+tx_text,root)
                 report = verify(text+'\n'+slot_text,root,reference=payload,reference_rate=50_000_000)
                 self.assertEqual(report['reference_comparison']['compared_frames'],2)
                 self.assertFalse(report['native_audio_validated'])
