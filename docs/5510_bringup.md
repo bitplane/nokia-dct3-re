@@ -8700,6 +8700,62 @@ after the modeled cleanup. This establishes consistency of the word-count
 interpretation, not correctness of decoder draining, the final packet,
 waveform conformance or native handset audio completion.
 
+##### Refill Control and Buffered Tail
+
+`playback_refill_control` pins 140 source words. Sender `020643` checks
+the high bit of its local reply word, then prioritizes pending `12fb`
+(input `16`) over pending `12fc` (input `17`), before ordinary refill
+gates. Input `11` is built at `020709`; all three use `02073b -> 029629`.
+Receiver `029264` copies 16 words from data `0090..009f` to its local
+frame; these mailboxes are RAM in this bench, not modeled external devices.
+The input-17 builder forwards the nonzero pending value in AR1. Exhaustive
+16-bit tests show this prefix cannot construct a zero-valued input 17;
+that is not closure over other producers or pending-word writers.
+
+The alternate `aa1a != 1` path is not an established drain-only mode.
+When its AR2 test is nonzero, `02950a` resets the counter from `3726`,
+clears `aa1c` and seeks via `2092`, then calls the selected reader. The
+shared tail builds input `12` at `029542` and publishes through `029568`.
+Do not manufacture a zero control/message to reach this seek/read path
+and present the result as organic draining.
+
+`mu4_cleanup_buffer_observe.lua` captures one passive data-RAM snapshot
+(`0080..ffff`, 130,816 LE16 bytes) at the first opcode-guarded `02956f`
+debugger hook. Its complete ten-second run has `illegal=0` and the same
+925 output artifacts as the previous run, byte-for-byte. Check using
+`mu4_cleanup_buffer_check.py RUN/error.log RUN/mu4_cleanup_input.le16`.
+The checker binds object, cursor, limit and context to the verified first
+AA99 session, preserving the observation-only/retirement-unclaimed scope.
+
+Object `160a` has cursor `162e`, limit `1d46`: 1,816 words / 3,632 bytes
+remain in the captured contiguous extent. Its high-byte-first view has
+eight ADTS-header candidates at offsets 369, 741, 1113, 1485, 1857, 2229,
+2601 and 2973; the other byte view has none. Signatures alone do not prove
+valid payloads. More decisively, bit-reader `a854` holds 24 valid bits,
+reservoir `a858/a859=e0ff/f950`, base `b332=162e`, index `b331=00ba`.
+The low 24 reservoir bits supply prefix `ff f9 50`.
+
+With `--reference-aac tmp/mu4-complete-host-reference/projected.aac`, the
+checker uses the 375 captured successful processing blocks as a fixed
+packet ordinal, not an offset search. Prefix plus high-byte-first buffer
+matches all 3,348 projected bytes from packet 375 at offset 139,501 through
+the projected end; 287 additional buffer bytes remain uninterpreted. The
+reference SHA-256 is
+`812882ea5da3fb9051a04e421922694366e580e75ae98df469936426eef1a873`.
+Thus this buffer contains bytes matching reference-valid packets 375--382
+and the already-rejected final packet 383. This is tail-content equality,
+not native decoding of those packets or validation of the malformed final
+packet. Prefix searches are ambiguous because the fixture repeats; no
+search-selected alignment is accepted. Tests preserve reservoir low-bit
+selection and reject a wrong fixed tail, failed ordinal, partial snapshot,
+pointer mismatch or unaligned reservoir.
+
+Next establish the input-12 receiver/completion contract and whether the
+producer lifecycle can finish buffered input before teardown. The current
+one-pass source path is now explained, but its early cleanup is not yet
+classified as an emulation defect or correct handset behavior. Preserve
+the strict audio-completion failure and do not replay this RAM snapshot.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a

@@ -19,6 +19,7 @@ from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, RE
 from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
 from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
+from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_refill_control, reference_refill_control
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
@@ -49,6 +50,29 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_refill_control_prefix_requires_ack_and_preserves_nonzero_payload(self):
+        self.assertIsNone(reference_refill_control(0, 1, 1))
+        self.assertIsNone(reference_refill_control(0x8000, 0, 0))
+        self.assertEqual(reference_refill_control(0x8011, 3, 1), {'input': 0x16, 'payload': 3})
+        for pending in range(1, 0x10000):
+            self.assertEqual(reference_refill_control(0x8011, 0, pending),
+                             {'input': 0x17, 'payload': pending})
+        for args in ((-1, 0, 0), (0, 0x10000, 0), (0, 0, -1)):
+            with self.assertRaises(ValueError):
+                reference_refill_control(*args)
+
+    def test_refill_sender_and_alternate_path_are_source_pinned(self):
+        words = {base+i: value for base, witness in PLAYBACK_REFILL_CONTROL.items()
+                 for i, value in enumerate(witness)}
+        result = decode_playback_refill_control(words)
+        self.assertEqual(result['pinned_words'], len(words))
+        self.assertEqual(result['sender']['input11_builder'], '020709')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_playback_refill_control(changed)
+
     def test_input_units_pins_descriptor_and_word_reader_argument_flow(self):
         images = [{base+i: value for base, witness in spans.items()
                    for i, value in enumerate(witness)}

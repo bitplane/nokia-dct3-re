@@ -872,6 +872,66 @@ def decode_playback_input_units(words, bootstrap_words):
                      'read/seek retirement, all counter writers, odd-byte tails or decoder drain correctness'}
 
 
+PLAYBACK_REFILL_CONTROL = {
+    0x2065A: (0x6102,0x8000,0xF820,0x073D,0x7211,0x12FB,0xF495,
+             0x6C81,0x0727,0x7211,0x12FC,0xF495,0x6C81,0x071C),
+    0x20704: (0x80F8,0x15E2,0x7004,0x0017,0x8106,0x7602,0x0011,
+             0x7007,0x15E1,0x7711,0x0006,0xF073,0x0733),
+    0x2071C: (0x7003,0x0011,0x7602,0x0017,0x76F8,0x12FC,0x0000,
+             0x7711,0x0002,0xF073,0x0733,0x7003,0x0011,0x7602,
+             0x0016,0x76F8,0x15E0,0x0000,0x76F8,0x12FB,0x0000,
+             0x7711,0x0002,0x4816,0xF982,0x0443,0x4818,0x7000,
+             0x0011,0xF000,0x0002,0xF982,0x9629),
+    0x29264: (0x8812,0xF495,0x7713,0x0090,0xEC0F,0xE598,0xF495,0xF495,0xF4E4),
+    0x29502: (0xF7B8,0x10F8,0x0011,0x4E68,0x10F8,0x0012,0xF845,
+             0x953E,0x56F8,0x3726,0x4EF8,0xA9F6,0x76F8,0xAA1C,
+             0x0000,0x7602,0x3AEA,0x4E00,0xF020,0x3708,0xF980,0x2092),
+    0x2953E: (0x5668,0x50F8,0xA9F6,0x4E68,0x7604,0x0012,0x7005,
+             0x0011,0x10F8,0x0016,0xF844,0x954C,0x7716,0xFFFF,
+             0x7006,0x0016,0x7007,0xAA1D,0x106E,0xF000,0x007A,
+             0x7601,0x0008,0x8000,0x4818,0xF000,0x0008,0xF982,
+             0x99CC,0x7010,0xAA1C,0xF6B8,0xF495,0x5668,0x8011,
+             0xF0F0,0x8012,0x7600,0x000F,0x4818,0xF000,0x0004,
+             0xF982,0x92A7,0x76F8,0xAA1D,0x0000,0xF073,0x95A8),
+}
+
+
+def reference_refill_control(reply, pending16, pending17):
+    """Control-only sender prefix; ordinary input-11 refill gates are excluded."""
+    if any(not 0 <= word <= 0xffff for word in (reply, pending16, pending17)):
+        raise ValueError('refill control words must be 16-bit')
+    if not reply & 0x8000:
+        return None
+    if pending16:
+        return {'input': 0x16, 'payload': pending16}
+    if pending17:
+        return {'input': 0x17, 'payload': pending17}
+    return None
+
+
+def decode_playback_refill_control(words):
+    for base, witness in PLAYBACK_REFILL_CONTROL.items():
+        for offset, expected in enumerate(witness):
+            if words.get(base+offset) != expected:
+                raise ValueError(f'refill control witness changed at {base+offset:06x}')
+    return {'pinned_words': sum(map(len, PLAYBACK_REFILL_CONTROL.values())),
+            'sender': {'entry': '020643', 'reply_high_bit_gate': '02065a',
+                       'priority': ['12fb nonzero -> input16', '12fc nonzero -> input17'],
+                       'input11_builder': '020709', 'input17_builder': '02071c',
+                       'input16_builder': '020727', 'send': '02073b -> 029629',
+                       'input17_payload': 'nonzero pending word in AR1, not literal zero'},
+            'receiver_copy': {'entry': '029264', 'source_data_words': '0090..009f',
+                              'words': 16, 'direction': 'RAM mailbox -> local frame'},
+            'alternate_end': {'entry': '029502 when aa1a != 1',
+                              'conditional_seek': 'AR2 != 0: counter <- 3726; aa1c <- 0; seek 2092',
+                              'read_callback': '02952f -> 0292cc',
+                              'completion_builder': '029542: input12',
+                              'completion_send': '029568 -> 0292a7'},
+            'scope': 'Pinned software sender and alternate end path, not all producers or pending-word '
+                     'writers; input17 through this prefix cannot clear aa1a to zero; '
+                     'alternate seek/read path is not an established drain-only mode; no runtime forcing'}
+
+
 MASK = 0xC004
 WITNESS = (
     0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
@@ -1522,6 +1582,7 @@ def contract(source):
     }
     result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
     result['playback_input_units'] = decode_playback_input_units(rel_words, bootstrap_words)
+    result['playback_refill_control'] = decode_playback_refill_control(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
