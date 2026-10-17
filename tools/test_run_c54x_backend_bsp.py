@@ -1,10 +1,20 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, COMPLETION)) + '\n'
+
+    def test_transmit_pins_are_mandatory_and_exact(self):
+        alternatives = ['', TRANSMIT_PINS + '\n' + TRANSMIT_PINS]
+        for field in ('words=4', 'partial_restore=1', 'queued_word=1',
+                      'underrun_no_irq=1', 'reset_abort=1', 'reset_irq=1', 'vectors=4'):
+            alternatives.append(TRANSMIT_PINS.replace(field, field.split('=')[0] + '=0'))
+        alternatives.append(TRANSMIT_PINS.replace('handset_audio_claim=0', 'handset_audio_claim=1'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'transmit-pin'):
+                check_result(self.output().replace(TRANSMIT_PINS, alternative), 3)
 
     def test_success(self):
         check_result(self.output(), 3)

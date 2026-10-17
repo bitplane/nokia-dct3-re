@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 #include "tms320c54x_bsp_state.h"
 #include <cassert>
+#include <initializer_list>
 
 static auto receive_edge(tms320c54x_bsp_state &port, std::uint16_t extension, bool sync, bool bit)
 {
@@ -108,9 +109,121 @@ static void check_receive_pins()
 	}
 }
 
+static auto transmit_edge(tms320c54x_bsp_state &port, std::uint16_t extension, bool sync)
+{
+	const bool shift_level = !(extension & 0x40);
+	const auto opposite = port.transmit_clock(!shift_level, sync, extension);
+	assert(!opposite.transmit_ready_edge);
+	return port.transmit_clock(shift_level, sync, extension);
+}
+
+static void transmit_word(tms320c54x_bsp_state &port, std::uint16_t extension,
+		unsigned width, std::uint16_t word, bool ready, unsigned hold = 1)
+{
+	const bool active = !(extension & 0x20), suppressed = (extension & 0x200) && (word & 0x8000);
+	auto pin = transmit_edge(port, extension, active);
+	assert(pin.supported && pin.transmit_ready_edge == ready && pin.driven == !suppressed);
+	assert(port.transmit_ready);
+	if (pin.driven) assert(pin.data == bool((word >> (width - 1)) & 1));
+	for (unsigned i = 1; i < hold; ++i)
+	{
+		const auto held = transmit_edge(port, extension, active);
+		assert(held.supported && !held.transmit_ready_edge && held.driven == pin.driven && held.data == pin.data);
+	}
+	for (unsigned i = 1; i < width; ++i)
+	{
+		pin = transmit_edge(port, extension, !active);
+		assert(pin.supported && !pin.transmit_ready_edge && pin.driven == !suppressed);
+		if (pin.driven) assert(pin.data == bool((word >> (width - 1 - i)) & 1));
+	}
+	pin = transmit_edge(port, extension, !active);
+	assert(pin.supported && !pin.driven && !pin.transmit_ready_edge);
+}
+
+static void check_transmit_pins()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+			for (unsigned word = 0; word <= 0xffff; ++word)
+			{
+				tms320c54x_bsp_state port;
+				const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+				port.control_w(0x48 | (format & 1 ? 4 : 0));
+				port.transmit_w(word);
+				assert(!port.transmit_ready);
+				transmit_word(port, extension, widths[format], word, true, 1 + word % 4);
+			}
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+		{
+			const unsigned width = widths[format];
+			const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+			for (unsigned checkpoint = 1; checkpoint < width; ++checkpoint)
+			{
+				tms320c54x_bsp_state port;
+				port.control_w(0x48 | (format & 1 ? 4 : 0)); port.transmit_w(0xa597);
+				assert(transmit_edge(port, extension, !(extension & 0x20)).transmit_ready_edge);
+				for (unsigned i = 1; i < checkpoint; ++i) transmit_edge(port, extension, extension & 0x20);
+				auto replay = port;
+				for (unsigned i = checkpoint; i <= width; ++i)
+				{
+					const auto a = transmit_edge(port, extension, extension & 0x20), b = transmit_edge(replay, extension, extension & 0x20);
+					assert(a.supported == b.supported && a.driven == b.driven && a.data == b.data && a.transmit_ready_edge == b.transmit_ready_edge);
+				}
+			}
+			for (auto word : {0x7fff, 0x8000, 0x0080, 0xffff})
+			{
+				tms320c54x_bsp_state port;
+				port.control_w(0x48 | (format & 1 ? 4 : 0)); port.transmit_w(word);
+				transmit_word(port, extension | 0x200, width, word, true);
+			}
+		}
+	tms320c54x_bsp_state port;
+	port.control_w(0x48);
+	assert(!transmit_edge(port, 0, true).driven); // Nothing loaded since reset.
+	transmit_edge(port, 0, false);
+	port.transmit_w(0x1234); port.transmit_w(0x5678);
+	transmit_word(port, 0, 16, 0x5678, true); // Delayed FSX uses the last write.
+	transmit_word(port, 0, 16, 0x5678, false); // Underrun repeats without XINT.
+	port.transmit_w(0x1234);
+	assert(transmit_edge(port, 0, true).transmit_ready_edge);
+	for (unsigned i = 1; i < 8; ++i)
+		assert(transmit_edge(port, 0, false).data == bool((0x1234 >> (15 - i)) & 1));
+	port.transmit_w(0x5678); // Queued DXR must not rewrite the current XSR.
+	for (unsigned i = 8; i < 16; ++i)
+	{
+		const auto pin = transmit_edge(port, 0, false);
+		assert(pin.driven && pin.data == bool((0x1234 >> (15 - i)) & 1) && !pin.transmit_ready_edge);
+	}
+	assert(!transmit_edge(port, 0, false).driven);
+	transmit_word(port, 0, 16, 0x5678, true);
+	port.transmit_w(0xabcd);
+	assert(transmit_edge(port, 0, true).transmit_ready_edge);
+	for (unsigned i = 1; i < 4; ++i) transmit_edge(port, 0, false);
+	port.transmit_w(0x5678);
+	transmit_word(port, 0, 16, 0x5678, true); // New sync aborts the old word.
+	port.transmit_w(0xabcd);
+	assert(transmit_edge(port, 0, true).driven);
+	port.control_w(8);
+	assert(!transmit_edge(port, 0, true).driven && !port.transmit_loaded);
+	port.control_w(0x48); port.transmit_w(0x5678);
+	assert(!transmit_edge(port, 0, true).driven); // Held sync is not a new FSX.
+	transmit_edge(port, 0, false);
+	transmit_word(port, 0, 16, 0x5678, true);
+	for (unsigned mode = 0; mode < 5; ++mode)
+	{
+		port.reset(); port.control_w(mode == 0 ? 0x40 : mode == 1 ? 0x58 : mode == 2 ? 0x68 : mode == 3 ? 0x4a : 0x48);
+		port.transmit_w(0x1234);
+		const auto pin = transmit_edge(port, mode == 4 ? 0x400 : 0, true);
+		assert(!pin.supported && !pin.driven && !pin.transmit_ready_edge && !port.transmit_ready);
+	}
+}
+
 int main()
 {
 	check_receive_pins();
+	check_transmit_pins();
 	tms320c54x_bsp_state port;
 	std::uint16_t duplex_output = 0xaaaa;
 	port.control_w(0x00c2);

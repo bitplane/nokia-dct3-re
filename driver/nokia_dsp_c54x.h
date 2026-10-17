@@ -27,6 +27,8 @@ public:
 	// Explicit external receive pins; no clock is generated here. False means
 	// the configured mode is outside the non-DLB, non-autobuffer burst subset.
 	bool codec_receive_clock_w(bool clock, bool sync, bool data);
+	// External CLKX/FSX output state; driven=false represents high impedance.
+	tms320c54x_bsp_state::transmit_clock_result codec_transmit_clock_w(bool clock, bool sync);
 
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override { }

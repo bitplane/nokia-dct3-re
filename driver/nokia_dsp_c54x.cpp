@@ -56,6 +56,11 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_bsp.receive_width));
 	save_item(NAME(m_bsp.receive_clock_level));
 	save_item(NAME(m_bsp.receive_sync_active));
+	save_item(NAME(m_bsp.transmit_shift));
+	save_item(NAME(m_bsp.transmit_bits_left));
+	save_item(NAME(m_bsp.transmit_clock_level));
+	save_item(NAME(m_bsp.transmit_sync_active));
+	save_item(NAME(m_bsp.transmit_suppressed));
 	save_item(NAME(m_host_command_line));
 	save_item(NAME(m_reset_released));
 	save_item(NAME(m_host_command_vector));
@@ -286,6 +291,14 @@ bool nokia_dsp_c54x_device::codec_receive_frame(u16 word)
 	return accepted;
 }
 
+tms320c54x_bsp_state::transmit_clock_result nokia_dsp_c54x_device::codec_transmit_clock_w(bool clock, bool sync)
+{
+	const auto result = m_bsp.transmit_clock(clock, sync, m_data[0x0023]);
+	if (result.transmit_ready_edge)
+		m_cpu->set_input_line(5, HOLD_LINE);
+	return result;
+}
+
 bool nokia_dsp_c54x_device::codec_receive_clock_w(bool clock, bool sync, bool data)
 {
 	const auto result = m_bsp.receive_clock(clock, sync, data, m_data[0x0023]);
@@ -312,7 +325,11 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		// Resident reset/release and BDXR/BDRR traffic corroborate BSPC0,
 		// not a COBBA parallel register-C write. Status bits belong to the
 		// completed-word state, not the firmware's writable control value.
+		const bool was_ready = m_bsp.transmit_ready;
 		m_bsp.control_w(data);
+		// XRST=0 while XRDY=0 creates XINT (SPRU131G table 9-5).
+		if (!was_ready && m_bsp.transmit_ready)
+			m_cpu->set_input_line(5, HOLD_LINE);
 		return;
 	}
 	if (address == 0x0032)

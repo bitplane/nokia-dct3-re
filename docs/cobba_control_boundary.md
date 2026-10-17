@@ -1429,6 +1429,30 @@ Completed-word calls and pin-edge calls are alternative attachments to the
 same receiver, not independent channels to drive simultaneously. The backend
 pin gate, native tone-control and exact 5110 save/load gates pass; native FR
 encoder/decoder frame-history replay remains bit-exact.
+
+The corresponding `codec_transmit_clock_w(clock, sync)` interface accepts
+external CLKX/FSX in standard burst mode (internal clock/frame generation,
+DLB and autobuffering are not implemented by this pin interface). TI SPRU131G
+sections 9.2.4/9.2.6 define MSB-first output, long-sync MSB holding and
+high-impedance DX after the final bit. BDXR loads the output shifter at FSX;
+XRDY and BXINT0 occur at that load, not word completion. A subsequent BDXR
+write queues a separate word without changing the active shifter. Underrun
+repeats the retained word without another ready interrupt; a new frame sync
+restarts output. PCM mode suppresses DX for BDXR bit 15 set without suppressing
+the transfer or readiness. Table 9-5 additionally requires XRST assertion
+with XRDY clear to raise XRDY and XINT; whole-device reset is distinct.
+
+The helper covers 1,048,576 word/format/polarity combinations, 168 partial
+copies, PCM suppression, overwrite, restart, underrun and reset. The backend
+fixture saves with eight bits shifted, CLKX low, a queued successor and a
+pending BXINT0. Original and restored suffixes agree, the queued word follows,
+and independently acknowledged interrupts distinguish underrun silence from
+the reset-generated interrupt. Its mandatory transmit-pin marker requires
+four words, four vector entries, partial restoration, queued-word preservation,
+underrun suppression and reset abort/interrupt checks. Saved state includes
+the output shifter, remaining bits, clock/sync phase and PCM suppression.
+This interface supplies no production clock or handset audio; physical COBBA
+attachment and dynamic mid-word format changes remain unvalidated.
 This establishes completed-frame wiring, reset suppression and backend
 state restoration, not a production frame-clock caller, handset ISR,
 COBBA control interpretation or native audio. No physical clock is supplied
@@ -1439,7 +1463,7 @@ command delivery and exact idle save/load pass with this state model. The
 tone run observes only the boot echo and its one receive ISR, not continuous
 or post-key operational samples.
 
-This remains partial hardware: clock-pin status, transmit-shifter status,
+This remains partial hardware: clock-pin status readback, transmit-shifter status readback,
 autobuffering, reset-time transmit preloading and physical frame/bit timing
 are not established. Only the separately evidenced external boot echo
 provides an untimed transfer; ordinary pending samples do not acquire a

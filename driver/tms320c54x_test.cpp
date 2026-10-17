@@ -46392,6 +46392,155 @@ protected:
 	}
 private:
 	u16 rf_sample() { return 0x1200 + (++m_rf_source_reads) * 0x111; }
+	auto transmit_pin_edge(bool sync)
+	{
+		const auto opposite = m_backend->codec_transmit_clock_w(false, sync);
+		expect(opposite.supported && !opposite.transmit_ready_edge, "falling CLKX does not shift default-polarity TX");
+		const auto result = m_backend->codec_transmit_clock_w(true, sync);
+		expect(result.supported, "external burst transmit pins supported");
+		return result;
+	}
+	void transmit_pin_word(u16 word, bool ready)
+	{
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			const auto pin = transmit_pin_edge(i == 0);
+			expect(pin.driven && pin.data == bool((word >> (15 - i)) & 1) &&
+				pin.transmit_ready_edge == (!i && ready), "native TX pin word and load-time XRDY edge");
+		}
+		const auto pin = transmit_pin_edge(false);
+		expect(!pin.driven && !pin.transmit_ready_edge, "TX releases DX after the final bit");
+	}
+	void transmit_pin_suffix()
+	{
+		unsigned word = 0;
+		for (unsigned i = 0; i < 8; ++i)
+		{
+			// Checkpoint ends with CLKX low; no intervening low write on replay.
+			const auto pin = m_backend->codec_transmit_clock_w(true, false);
+			expect(pin.supported && pin.driven && !pin.transmit_ready_edge, "restored TX suffix shifts without another load interrupt");
+			word = (word << 1) | unsigned(pin.data);
+			if (i != 7) m_backend->codec_transmit_clock_w(false, false);
+		}
+		expect(word == 0x78, "queued BDXR cannot rewrite the current output shifter");
+		const auto pin = transmit_pin_edge(false);
+		expect(!pin.driven && !pin.transmit_ready_edge, "replayed output word releases DX");
+	}
+	void prepare_transmit_irq()
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(STATE_GENPC, 0x0801);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 1);
+	}
+	void check_transmit_vector()
+	{
+		expect(m_cpu->state_int(STATE_GENPC) == 0x00d5 &&
+			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+			m_cpu->space(AS_DATA).read_word(0x0fff) == 0x0801 &&
+			!m_cpu->state_int(tms320c54x_device::STATE_IFR), "TX source dispatches native vector 21 once");
+	}
+	void check_transmit_pins()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 18)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_backend->reset_line_w(0);
+		}
+		else if (m_stage == 19) m_backend->reset_line_w(1);
+		else if (m_stage == 20)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x00a0);
+			data.write_word(0x0800, 0xf4e1); data.write_word(0x00d4, 0xf4e1);
+			data.write_word(0x22, 0x48); data.write_word(0x23, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+			prepare_transmit_irq();
+			m_cpu->set_state_int(STATE_GENPC, 0x0800); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 21)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x0801 && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "TX fixture starts from IDLE");
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			data.write_word(0x21, 0x1234); data.write_word(0x21, 0x5678);
+			expect(!(data.read_word(0x22) & 0x800), "BDXR overwrite does not manufacture a frame");
+			unsigned word = 0;
+			for (unsigned i = 0; i < 8; ++i)
+			{
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(pin.driven && pin.transmit_ready_edge == !i, "XRDY rises at output-shifter load, not word completion");
+				word = (word << 1) | unsigned(pin.data);
+				if (i == 3) data.write_word(0x21, 0x9abc);
+			}
+			expect(word == 0x56 && !(data.read_word(0x22) & 0x800), "active XSR is independent of queued BDXR");
+			m_backend->codec_transmit_clock_w(false, false);
+		}
+		else if (m_stage == 22)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "load-time BXINT0 arrives before the output word finishes");
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save partial XSR, queued BDXR and pending TX interrupt");
+			transmit_pin_suffix(); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 23)
+		{
+			check_transmit_vector();
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && !(data.read_word(0x22) & 0x800),
+				"restore partial TX and its independently pending interrupt");
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true); transmit_pin_suffix(); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 24)
+		{
+			check_transmit_vector(); prepare_transmit_irq(); transmit_pin_word(0x9abc, true);
+		}
+		else if (m_stage == 25 || m_stage == 28)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20 && (data.read_word(0x22) & 0x800), "queued-word or XRST XRDY transition reaches BXINT0");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 26)
+		{
+			check_transmit_vector(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); transmit_pin_word(0x9abc, false);
+		}
+		else if (m_stage == 27)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "retained-word underrun cannot retrigger BXINT0");
+			prepare_transmit_irq();
+			for (unsigned i = 0; i < 4; ++i)
+			{
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(pin.driven && !pin.transmit_ready_edge, "underrun starts the reset-abort word without an interrupt");
+			}
+			data.write_word(0x21, 0x5678); data.write_word(0x22, 8);
+			expect(data.read_word(0x22) & 0x800, "XRST raises XRDY for an unwritten pending transfer");
+			data.write_word(0x22, 0x48);
+			for (unsigned i = 0; i < 16; ++i) expect(!transmit_pin_edge(false).driven, "XRST aborts output and cancels the queued word");
+		}
+		else if (m_stage == 29)
+		{
+			check_transmit_vector(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			for (unsigned i = 0; i < 17; ++i)
+			{
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(!pin.driven && !pin.transmit_ready_edge, "no reset-time preload is invented");
+			}
+		}
+		else if (m_stage == 30)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "empty frames do not create a late TX interrupt");
+			osd_printf_info("C54x native backend BSP transmit pins: PASS words=4 partial_restore=1 queued_word=1 underrun_no_irq=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0\n");
+			osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
+			osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "C54x backend BSP tests complete");
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
 	void receive_pin_cycle(bool sync, bool bit)
 	{
 		expect(m_backend->codec_receive_clock_w(true, sync, bit) &&
@@ -46472,9 +46621,7 @@ private:
 				if (m_stage == 17)
 				{
 					osd_printf_info("C54x native backend BSP receive pins: PASS words=3 partial_restore=1 reset_abort=1 vectors=3 handset_audio_claim=0\n");
-					osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
-					osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
-					throw emu_fatalerror(0, "C54x backend BSP tests complete");
+					m_stage = 18; m_timer->adjust(attotime::from_usec(100)); return;
 				}
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_cpu->set_state_int(STATE_GENPC, 0x0801);
@@ -46530,6 +46677,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 18) { check_transmit_pins(); return; }
 		if (m_stage >= 8) { check_receive_pins(); return; }
 		if (m_stage == 0)
 		{

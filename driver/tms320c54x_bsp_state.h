@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-// Standard-mode completed-word state and external burst receiver. The
+// Standard-mode completed-word state and external burst shifters. The
 // attachment owns clocks and interrupt routing; autobuffering is not modeled.
 struct tms320c54x_bsp_state
 {
@@ -17,6 +17,10 @@ struct tms320c54x_bsp_state
 	std::uint16_t receive_shift = 0;
 	std::uint8_t receive_bits_left = 0, receive_width = 0;
 	bool receive_clock_level = false, receive_sync_active = false;
+	std::uint16_t transmit_shift = 0;
+	std::uint8_t transmit_bits_left = 0;
+	bool transmit_clock_level = false, transmit_sync_active = false;
+	bool transmit_suppressed = false;
 
 	void reset() { *this = {}; }
 	void reset_receive_shift()
@@ -38,6 +42,7 @@ struct tms320c54x_bsp_state
 			transmit_ready = true;
 			transmit_pending = false;
 			transmit_loaded = false;
+			reset_transmit_shift();
 		}
 	}
 	std::uint16_t control_r() const
@@ -59,6 +64,52 @@ struct tms320c54x_bsp_state
 	{
 		return extension & 0x0080 ? (control & 0x0004 ? 12 : 10)
 				: (control & 0x0004 ? 8 : 16);
+	}
+	void reset_transmit_shift()
+	{
+		transmit_shift = 0;
+		transmit_bits_left = 0;
+		transmit_suppressed = false;
+	}
+	struct transmit_clock_result
+	{
+		bool supported, driven, data, transmit_ready_edge;
+	};
+	transmit_clock_result transmit_clock(bool clock, bool sync,
+			std::uint16_t extension = 0)
+	{
+		// Explicit external CLKX/FSX, standard burst mode, no DLB/ABU.
+		const bool supported = (control & 0x003a) == 0x0008 && !(extension & 0xfc00);
+		const bool edge = clock != transmit_clock_level && clock != bool(extension & 0x0040);
+		transmit_clock_level = clock;
+		const bool active = sync != bool(extension & 0x0020);
+		const bool previous_sync = transmit_sync_active;
+		if (edge) transmit_sync_active = active;
+		bool ready_edge = false;
+		if (!supported || !(control & 0x0040)) reset_transmit_shift();
+		else if (edge)
+		{
+			if (active && !previous_sync)
+			{
+				std::uint16_t word;
+				if (frame_transmit(word, &ready_edge, extension))
+				{
+					transmit_bits_left = word_bits(extension);
+					transmit_shift = word << (16 - transmit_bits_left);
+					transmit_suppressed = (extension & 0x0200) && (transmit & 0x8000);
+				}
+				else reset_transmit_shift();
+			}
+			else if (!active && transmit_bits_left)
+			{
+				// MSB is driven during FSX; long FSX holds it. The remaining
+				// bits advance after FSX deasserts (SPRU131G 9.2.4).
+				if (--transmit_bits_left) transmit_shift <<= 1;
+				else reset_transmit_shift();
+			}
+		}
+		return {supported, bool(transmit_bits_left) && !transmit_suppressed,
+			bool(transmit_shift & 0x8000), ready_edge};
 	}
 	bool frame_transmit(std::uint16_t &value, bool *ready_edge = nullptr,
 			std::uint16_t extension = 0)
