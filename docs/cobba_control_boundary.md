@@ -1686,6 +1686,30 @@ the effect of this parameter change, or silently rebase either checker.
 The long-scan RF/processing snapshots still require explicit review with the
 queued-transfer model; this short gate does not re-bank either snapshot.
 
+The extended passive gate (`python -m tools.run_c54x_rom4_transfer
+--mame mame/mame --rompath mame/roms --seconds 30`) retains an uncapped
+histogram keyed by producer PC and both output words, alongside the capped
+ordered prefix. The checker rejects missing/duplicate counts, disagreement
+with the prefix, incomplete requested duration and changed queued/immediate
+producer totals. Two fresh 30-second captures reproduce 1,537 output pairs:
+four at `a240`, twenty at `3712` (each of the five queued payload pairs four
+times), and 1,513 at scan writer `4028`. The earlier ring-plus-slot processing
+capture counted 1,514 executions of scan-output block `4433` and 1,518 total
+pairs. Thus the new total is twenty queued pairs gained and one scan pair
+fewer at the fixed cutoff, not an unexplained nineteen-write producer.
+
+The current long scan has 20,280 frame expiries, 648,032 RF reads and 18,927
+transfer-compare expiries; port `38/39` reads remain zero. The first two
+descriptor bursts complete at about 1.563/1.590 s and the next starts at
+6.436 s. These are deterministic emulator observations, not physical clock
+measurements. The independent processing capture now executes mode 1 1,024
+times, its eight-iteration filter 8,192 times and continuation `33ac` twice;
+RF and reduction inputs remain zero. The original RF snapshot rejects this
+run and the old processing gate still assumes the superseded single-entry
+profile. Neither checker has been weakened or silently re-banked. Next is
+an explicit multi-entry processing contract and coordinated snapshot review,
+not synthesis of RF samples or a native acquisition claim.
+
 The passive `c54x_rom4_transfer_observe.lua` eight-second capture records ten
 port-4 writes: initialization/disabling uses `3a98` (15,000), the four `a244`
 writes use `0834` (2,100), and uploaded paths write `0032` (50) and `03e8`

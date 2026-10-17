@@ -19,7 +19,7 @@ def words(value):
     return [int(item, 16) for item in value.split(',')]
 
 
-def check(text):
+def check(text, *, minimum_seconds=8):
     controls = records(text, 'rom4_transfer_control',
         r'sequence=(?P<sequence>\d+) value=(?P<value>[0-9a-f]{4}) mask=ffff pc=(?P<pc>[0-9a-f]{4}) '
         r'flags=[0-9a-f,]+ pointers=(?P<pointers>[0-9a-f,]+) descriptor=[0-9a-f,]+ '
@@ -35,12 +35,31 @@ def check(text):
     summaries = records(text, 'rom4_transfer_summary',
         r'controls=(?P<controls>\d+) requests=(?P<requests>\d+) service_requests=(?P<service>\d+) '
         r'pairs=(?P<pairs>\d+) completion_injected=0 t=(?P<time>[0-9.]+)')
-    if len(summaries) != 1 or float(summaries[0]['time']) < 7.9:
-        raise ValueError('missing complete eight-second transfer summary')
+    if len(summaries) != 1 or float(summaries[0]['time']) < minimum_seconds - 0.1:
+        raise ValueError('missing complete transfer summary')
     summary = summaries[0]
+    inventory = records(text, 'rom4_transfer_pair_count',
+        r'pc=(?P<pc>[0-9a-f]{4}) low=(?P<low>[0-9a-f]{4}) high=(?P<high>[0-9a-f]{4}) count=(?P<count>\d+)')
+    keys = [(row['pc'], row['low'], row['high']) for row in inventory]
+    if len(set(keys)) != len(keys) or any(int(row['count']) <= 0 for row in inventory):
+        raise ValueError('invalid transfer pair inventory')
+    if sum(int(row['count']) for row in inventory) != int(summary['pairs']):
+        raise ValueError('transfer pair inventory does not cover all writes')
+    by_producer = {}
+    for row in inventory:
+        by_producer[row['pc']] = by_producer.get(row['pc'], 0) + int(row['count'])
+    if by_producer.get('a240') != 4 or by_producer.get('3712') != 20:
+        raise ValueError('transfer pair producer totals changed')
     for rows, count, cap in ((controls, int(summary['controls']), 64), (pairs, int(summary['pairs']), 64)):
         if len(rows) != min(count, cap) or [int(row['sequence']) for row in rows] != list(range(1, len(rows) + 1)):
             raise ValueError('missing or unordered transfer observations')
+    prefix_counts = {}
+    for row in pairs:
+        key = (row['pc'], row['low'], row['high'])
+        prefix_counts[key] = prefix_counts.get(key, 0) + 1
+    inventory_counts = dict(zip(keys, (int(row['count']) for row in inventory)))
+    if any(inventory_counts.get(key, 0) < count for key, count in prefix_counts.items()):
+        raise ValueError('transfer pair inventory contradicts captured prefix')
     if len(controls) != int(summary['controls']):
         raise ValueError('transfer-control capture is truncated')
     expiry_counts = re.findall(r'\btransfer_expiries=(\d+)\b', text)
@@ -94,7 +113,9 @@ def check(text):
             if words(chain[index + 1]['pointers']) != [0x1916 + 2 * index, 0x1924 + 2 * index]:
                 raise ValueError('firmware queue pointers did not advance')
         output.append(dict(start=float(chain[0]['time']), positions=positions, payload=payload))
-    return dict(schema=1, bursts=output, queued_pairs=20, controls=int(summary['controls']),
+    return dict(schema=2, bursts=output, queued_pairs=20, controls=int(summary['controls']),
+                total_pairs=int(summary['pairs']), pairs_by_producer=by_producer,
+                pair_inventory=inventory,
                 timer_expiries=int(expiry_counts[0]), captured_timer_prefix=len(timers),
                 service_reads=int(summary['service']), physical_timing_claim=False,
                 acquisition_claim=False, handset_speech_claim=False)

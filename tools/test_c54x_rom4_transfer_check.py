@@ -23,7 +23,10 @@ def fixture():
             timers.append(f'rom4_transfer_timer: expiry={len(timers) + 1} target={position:04x} counter={position:04x} delay=80 t={time + .00005:.9f}')
             low, high = payload[index * 2 + 2:index * 2 + 4]
             pairs.append(f'rom4_transfer_pair: sequence={len(pairs) + 1} low={low:04x} high={high:04x} pc=3712 t={time + .00006:.9f}')
-    return '\n'.join(controls + tables + pairs + timers + [
+    inventory = [f'rom4_transfer_pair_count: pc={pc} low={low:04x} high={high:04x} count=4'
+                 for pc, low, high in [('a240', payload[0], payload[1])] +
+                 [('3712', payload[i], payload[i + 1]) for i in range(2, 12, 2)]]
+    return '\n'.join(controls + tables + pairs + timers + inventory + [
         'rom4_transfer_request_count: value=1000 count=20',
         'rom4_transfer_summary: controls=24 requests=20 service_requests=20 pairs=24 completion_injected=0 t=8.0',
         'rom4_interface_summary: transfer_expiries=20',
@@ -37,6 +40,18 @@ class TransferTests(unittest.TestCase):
         self.assertEqual(report['queued_pairs'], 20)
         self.assertFalse(report['physical_timing_claim'])
         self.assertFalse(report['acquisition_claim'])
+        self.assertEqual(report['pairs_by_producer'], {'a240': 4, '3712': 20})
+
+    def test_inventory_and_requested_duration_cannot_be_truncated(self):
+        text = fixture()
+        line = 'rom4_transfer_pair_count: pc=a240 low=2a04 high=0006 count=4'
+        for changed in (text.replace(line, ''), text + '\n' + line,
+                        text.replace(line, line.replace('count=4', 'count=0')),
+                        text.replace(line, line.replace('pc=a240', 'pc=4028'))):
+            with self.assertRaises(ValueError):
+                check(changed)
+        with self.assertRaisesRegex(ValueError, 'complete transfer summary'):
+            check(text, minimum_seconds=30)
 
     def test_missing_or_truncated_accounting_fails(self):
         text = fixture()

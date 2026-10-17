@@ -5,6 +5,7 @@ local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local taps = {}
 local controls, requests, service_requests = 0, 0, 0
 local pairs_written, pair_low = 0, 0
+local pair_counts = {}
 local values = {}
 local counter, counter_time = 0xffff, 0
 taps[#taps + 1] = cpu.spaces.io:install_read_tap(0x0d, 0x0d, 'native_transfer_counter', function(_, value)
@@ -37,6 +38,8 @@ taps[#taps + 1] = cpu.spaces.io:install_write_tap(0x31, 0x31, 'native_transfer_l
 end)
 taps[#taps + 1] = cpu.spaces.io:install_write_tap(0x32, 0x32, 'native_transfer_pair', function(_, value)
     pairs_written = pairs_written + 1
+    local key = string.format('%04x:%04x:%04x', cpu.state['PC'].value, pair_low, value)
+    pair_counts[key] = (pair_counts[key] or 0) + 1
     if pairs_written <= 64 then
         machine:logerror(string.format('rom4_transfer_pair: sequence=%d low=%04x high=%04x pc=%04x t=%.9f\n',
             pairs_written, pair_low, value, cpu.state['PC'].value, machine.time:as_double()))
@@ -54,6 +57,14 @@ taps[#taps + 1] = cpu.spaces.io:install_read_tap(1, 1, 'native_transfer_request'
     end
 end)
 local stop = emu.add_machine_stop_notifier(function()
+    local pair_keys = {}
+    for key in pairs(pair_counts) do pair_keys[#pair_keys + 1] = key end
+    table.sort(pair_keys)
+    for _, key in ipairs(pair_keys) do
+        local pc, low, high = key:match('(%x+):(%x+):(%x+)')
+        machine:logerror(string.format('rom4_transfer_pair_count: pc=%s low=%s high=%s count=%d\n',
+            pc, low, high, pair_counts[key]))
+    end
     local keys = {}
     for value in pairs(values) do keys[#keys + 1] = value end
     table.sort(keys)

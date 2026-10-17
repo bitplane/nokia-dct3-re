@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--mame', type=Path, required=True)
     parser.add_argument('--rompath', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
+    parser.add_argument('--seconds', type=int, choices=(8, 30), default=8)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -32,7 +33,7 @@ def main():
     observer = repo / 'tools/c54x_rom4_transfer_observe.lua'
     command = [str(args.mame.resolve()), 'noki5110', '-rompath', str(args.rompath.resolve()),
                '-nvram_directory', str(run / 'nvram'), '-noreadconfig', '-video', 'none',
-               '-sound', 'none', '-log', '-skip_gameinfo', '-nothrottle', '-seconds_to_run', '8',
+               '-sound', 'none', '-log', '-skip_gameinfo', '-nothrottle', '-seconds_to_run', str(args.seconds),
                '-autoboot_script', str(observer)]
     inputs = [args.mame, observer, generator, Path(__file__),
               repo / 'tools/c54x_rom4_transfer_check.py', repo / 'tools/c54x_rom4_codec_contract.py', seed]
@@ -47,7 +48,7 @@ def main():
     console = (run / 'console.log').read_text()
     if result.returncode or any(token in console for token in ('Lua error', 'runtime error', 'Fatal error:')):
         raise ValueError('native transfer run failed; see retained console')
-    report = check((run / 'error.log').read_text())
+    report = check((run / 'error.log').read_text(), minimum_seconds=args.seconds)
     (run / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')
     print(f"Native descriptor transfers: PASS bursts={len(report['bursts'])} queued_pairs={report['queued_pairs']} physical_timing_claim=0 acquisition_claim=0")
     return 0
