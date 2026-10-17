@@ -1426,6 +1426,7 @@ private:
 	unsigned m_read_words = 0;
 	std::stringstream m_saved_dma;
 	unsigned m_dma_observed_reads = 0;
+	unsigned m_dma_observed_writes = 0;
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
@@ -2254,6 +2255,9 @@ private:
 			[this](offs_t address, u16 &, u16) {
 				if (m_phase < 25 || m_phase > 29 || machine().side_effects_disabled()) return;
 				if (!m_dma->source_read_matches(0, AS_DATA, address)) return;
+				if (m_dma->destination_write_matches(0, AS_DATA, 0x6100) ||
+					m_dma->destination_write_matches(0, AS_PROGRAM, 0x2ffff))
+					fatalerror("MU4 DMA source read also claimed destination-write ownership");
 				if (m_dma->source_read_matches(1, AS_DATA, address) ||
 					m_dma->source_read_matches(6, AS_DATA, address) ||
 					m_dma->source_read_matches(0, AS_PROGRAM, address) ||
@@ -2261,6 +2265,21 @@ private:
 					fatalerror("MU4 actual DMA source read matched another channel/space/address");
 				++m_dma_observed_reads;
 			});
+		auto observe_dma_write = [this](int space, offs_t address) {
+			if (m_phase < 25 || m_phase > 29 || machine().side_effects_disabled()) return;
+			if (!m_dma->destination_write_matches(0, space, address)) return;
+			if (m_dma->destination_write_matches(1, space, address) ||
+				m_dma->destination_write_matches(6, space, address) ||
+				m_dma->destination_write_matches(0, space == AS_DATA ? AS_PROGRAM : AS_DATA, address) ||
+				m_dma->destination_write_matches(0, space, address ^ 1) ||
+				m_dma->source_read_matches(0, AS_DATA, 0x6000) || m_dma->source_read_matches(0, AS_DATA, 0x6001))
+				fatalerror("MU4 actual DMA destination write matched another owner or source read");
+			++m_dma_observed_writes;
+		};
+		m_cpu->space(AS_DATA).install_write_tap(0x6100, 0x6100, "mu4_dma_data_write_ownership",
+			[observe_dma_write](offs_t address, u16 &, u16) { observe_dma_write(AS_DATA, address); });
+		m_cpu->space(AS_PROGRAM).install_write_tap(0x20000, 0x2ffff, "mu4_dma_program_write_ownership",
+			[observe_dma_write](offs_t address, u16 &, u16) { observe_dma_write(AS_PROGRAM, address); });
 		logerror("mu4_clock_reset_profile: pins=111 clkmd=0000 divider=2 family=C5416_compatible exact_da150_identity=0\n");
 		if (original_bootstrap_profile())
 		{
@@ -2969,6 +2988,7 @@ private:
 		if (m_phase >= 25 && m_phase <= 29)
 		{
 			m_dma_observed_reads = 0;
+			m_dma_observed_writes = 0;
 			program.write_word(0x1809, 0xf4e1);
 			auto &data = m_cpu->space(AS_DATA);
 			data.write_word(0x6000, 0x1234); data.write_word(0x6001, 0xabcd);
@@ -2996,6 +3016,8 @@ private:
 				fatalerror("MU4 DMA source inspection changed index or matched wrong channel/address/space");
 			if (m_dma->source_read_matches(0, AS_DATA, 0x6000) || data.read_word(0x6000) != 0x1234 || m_dma_observed_reads)
 				fatalerror("MU4 enabled DMA source falsely attributed an ordinary read");
+			if (m_dma->destination_write_matches(0, AS_DATA, 0x6100) || m_dma_observed_writes)
+				fatalerror("MU4 DMA destination falsely attributed ordinary fixture writes");
 			if (!(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff || program.read_word(0x2ffff) != 0xffff)
 				fatalerror("MU4 DMA completed synchronously");
 			if (m_phase == 27) data.write_word(0x54, 0);
@@ -3953,6 +3975,10 @@ private:
 			if (m_dma->source_read_matches(0, AS_DATA, 0x6000) ||
 				m_dma_observed_reads != (m_phase == 25 || m_phase == 29 ? 2U : m_phase == 27 ? 0U : 1U))
 				fatalerror("MU4 actual DMA read ownership count mismatch phase=%u reads=%u", m_phase, m_dma_observed_reads);
+			if (m_dma->destination_write_matches(0, AS_DATA, 0x6100) ||
+				m_dma->destination_write_matches(0, AS_PROGRAM, 0x2ffff) ||
+				m_dma_observed_writes != m_dma_observed_reads)
+				fatalerror("MU4 actual DMA write ownership count mismatch phase=%u reads=%u writes=%u", m_phase, m_dma_observed_reads, m_dma_observed_writes);
 			if (m_phase == 25 && (program.read_word(0x2ffff) != 0x1234 || program.read_word(0x20000) != 0xabcd))
 				fatalerror("MU4 DMA program page wrap mismatch");
 			if (m_phase == 26 && data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA zero-count single-word mismatch");
@@ -3988,6 +4014,7 @@ private:
 				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1 reload_banks=6 frame_mask=1 reserved=1\n");
 				logerror("mu4_dma_source_inspection: PASS disabled=1 active=1 space=1 address=1 channel=1 index_preserved=1\n");
 				logerror("mu4_dma_read_ownership: PASS source_reads=1 ordinary_read_excluded=1 channel=1 space=1 address=1 canceled=1 restored=1\n");
+				logerror("mu4_dma_write_ownership: PASS data_program=1 ordinary_write_excluded=1 channel=1 space=1 address=1 source_phase_excluded=1 canceled=1 restored=1\n");
 				m_phase = 0;
 			}
 			else ++m_phase;

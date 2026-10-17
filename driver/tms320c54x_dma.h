@@ -23,6 +23,8 @@ public:
 	bool source_matches(unsigned channel, int space, u32 address) const;
 	// Unlike source_matches, true only inside this channel's actual source read.
 	bool source_read_matches(unsigned channel, int space, u32 address) const;
+	// True only inside this channel's actual destination write, not a CPU write.
+	bool destination_write_matches(unsigned channel, int space, u32 address) const;
 	// Indexed register contents without changing the CPU-facing index latch.
 	u16 inspect_register(unsigned index) const;
 
@@ -54,6 +56,8 @@ private:
 	// Synchronous bus-observer context, never hardware or save-state contents.
 	int m_source_read_channel = -1, m_source_read_space = -1;
 	u32 m_source_read_address = 0;
+	int m_destination_write_channel = -1, m_destination_write_space = -1;
+	u32 m_destination_write_address = 0;
 	emu_timer *m_timers[6] = {};
 };
 

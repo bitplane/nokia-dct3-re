@@ -1089,6 +1089,7 @@ check-mu4-storage-original: build
 		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
 		grep -q 'mu4_dma_source_inspection: PASS' error.log; \
 		grep -q 'mu4_dma_read_ownership: PASS' error.log; \
+		grep -q 'mu4_dma_write_ownership: PASS data_program=1 ordinary_write_excluded=1 channel=1 space=1 address=1 source_phase_excluded=1 canceled=1 restored=1' error.log; \
 		grep -q 'mu4_dma_frame_pause: PASS' error.log; \
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
 		grep -q 'mu4_mcbsp_overwrite: PASS widths=8,12,16 dxr_replaced=1 xsr_retained=1 ready_edges=1 physical_bits=1' error.log; \

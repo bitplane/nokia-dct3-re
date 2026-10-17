@@ -8721,7 +8721,17 @@ bus read to that channel. `source_read_matches` is scoped to the actual
 synchronous source read and is false during the destination write and
 outside the transfer. Device conformance checks cover ordinary reads while
 enabled, wrong channel/space/address, cancellation and a pending-transfer
-save/restore. Every uncancelled generated word matches the independent
+save/restore. The symmetric `destination_write_matches` inspector is true
+only inside the actual destination bus write, after source-read ownership
+has ended. Executable data/program-write checks reject wrong channel,
+space and address, exclude ordinary fixture writes, require matching
+source/destination transaction counts, and cover cancellation and pending
+save/restore. Neither inspector changes the DMA index or persists a bus
+owner into a save state. I/O-space destination ownership is not independently
+exercised by this fixture. Use this explicit write owner when binding
+playback source reads to DXR; matching a word or timestamp alone is not
+ownership evidence. Playback DMA-to-DXR provenance remains unvalidated.
+Every uncancelled generated word matches the independent
 tone calculation in alternating left/right source order. Bounded queues
 then require every observed DMA source word to match McBSP TX, followed by
 the existing independent codec-DIN comparison.
