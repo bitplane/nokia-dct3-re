@@ -14,6 +14,47 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_conditional_register_store_scope(self):
+        markers, ending = EXTRA_PROFILES['cond-reg-store']
+        text = '\n'.join((*markers, ending)) + '\n'
+        check_result(text, 3, profile='cond-reg-store')
+        for before, after in (('restore=18432', 'restore=0'),
+                              ('false_read_writeback=1', 'false_read_writeback=0'),
+                              ('circular_update=1', 'circular_update=0')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(text.replace(before, after), 3, profile='cond-reg-store')
+        for marker in markers:
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                check_result(text.replace(marker, ''), 3, profile='cond-reg-store')
+
+    def test_atomic_return_scope(self):
+        marker, ending = EXTRA_PROFILES['atomic-ret']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='atomic-ret')
+        for before, after in (('restore=144', 'restore=0'), ('untaken_reads=0', 'untaken_reads=1'), ('stack_writes=0', 'stack_writes=1')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(text.replace(before, after), 3, profile='atomic-ret')
+
+    def test_saccd_requires_both_existing_banks(self):
+        markers, ending = EXTRA_PROFILES['saccd']
+        text = '\n'.join((*markers, ending)) + '\n'
+        check_result(text, 3, profile='saccd')
+        for marker in markers:
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                check_result(text.replace(marker, ''), 3, profile='saccd')
+
+    def test_overflow_branch_scope_and_replay(self):
+        marker, ending = EXTRA_PROFILES['ov-branch']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='ov-branch')
+        for before, after in (('restore=64', 'restore=0'),
+                              ('selected_flag_clear=1', 'selected_flag_clear=0'),
+                              ('delay_condition_retained=1', 'delay_condition_retained=0')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(text.replace(before, after), 3, profile='ov-branch')
+        with self.assertRaises(ValueError):
+            check_result(marker + '\n' + text, 3, profile='ov-branch')
+
     def test_stlm_t_requires_both_register_banks_and_replay(self):
         markers, ending = EXTRA_PROFILES['stlm-t']
         output = '\n'.join((*markers, ending)) + '\n'

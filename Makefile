@@ -1269,6 +1269,11 @@ check-c54x-rom4-efr-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-decoder
 
+.PHONY: check-c54x-rom4-efr-encoder
+check-c54x-rom4-efr-encoder: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-encoder
+
 check-c54x-rom4-efr-packing: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/c54x_rom4_efr_tables.py $(MAME_DIR)/roms/tms54rom4/dsp_cold_data.bin
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-packing

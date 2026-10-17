@@ -13,9 +13,30 @@ from tools.run_c54x_rom4_crc import EFR_PACKING_PASS, EFR_PACKING_COMPLETE
 from tools.run_c54x_rom4_crc import EFR_DECODER_PASS, EFR_DECODER_COMPLETE
 from tools.run_c54x_rom4_crc import DELAYED_REPEAT_PASS
 from tools.run_c54x_rom4_crc import EFR_DECODER_REPLAY
+from tools.run_c54x_rom4_crc import EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE, EFR_ENCODER_REPLAY
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_encoder_completion(self):
+        frames = "\n".join(f"ROM4 EFR encoder comparison: frame={frame} mismatches=0" for frame in range(163))
+        text = "\n".join((frames, EFR_ENCODER_REPLAY, EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE))
+        check_result(text, 3, efr_encoder=True)
+        check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_encoder=True)
+        for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
+                        text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),
+                        text.replace(EFR_ENCODER_REPLAY, ""),
+                        text.replace(EFR_ENCODER_REPLAY, EFR_ENCODER_REPLAY + "\n" + EFR_ENCODER_REPLAY),
+                        text.replace("ram_words=65440", "ram_words=160"),
+                        text.replace("flags=326", "flags=0"),
+                        text.replace("parameters=9291", "parameters=0"),
+                        text.replace("packed_words=2771", "packed_words=0"),
+                        text.replace(EFR_ENCODER_PASS, EFR_DECODER_PASS),
+                        text + "\nunexpected trailer"):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_encoder=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 0, efr_encoder=True)
+
     def test_efr_decoder_completion(self):
         frames = "\n".join(f"ROM4 EFR decoder comparison: frame={frame} mismatches=0" for frame in range(163))
         text = DELAYED_REPEAT_PASS + "\n" + frames + "\n" + EFR_DECODER_REPLAY + "\n" + EFR_DECODER_PASS + "\n" + EFR_DECODER_COMPLETE

@@ -61,7 +61,7 @@ def main():
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / "tmp")
     parser.add_argument("--fixture-dir", type=Path,
-                        help="export verified decoder inputs/PCM to isolated MAME fixture ROM storage")
+                        help="export verified codec inputs/outputs to isolated MAME fixture ROM storage")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -102,7 +102,7 @@ def main():
         evidence["status"] = "pass"
         if args.fixture_dir is not None:
             args.fixture_dir.mkdir(parents=True, exist_ok=True)
-            for suffix in ("dec", "out"):
+            for suffix in ("inp", "cod", "dec", "out"):
                 name = f"spch_dos.{suffix}"
                 (args.fixture_dir / name).write_bytes((source / name).read_bytes())
             evidence["fixture_directory"] = str(args.fixture_dir.resolve())

@@ -690,6 +690,15 @@ public:
 			static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
 			util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
 		};
+		if ((op & 0xfc00) == 0x9c00 && (op & 7) >= 2)
+		{
+			bool const accumulator_store = BIT(op, 9);
+			util::stream_format(stream, "%-8s", accumulator_store ? "SACCD" : BIT(op, 8) ? "SRCCD" : "STRCD");
+			if (accumulator_store) util::stream_format(stream, "%c, ", BIT(op, 8) ? 'B' : 'A');
+			dual(op >> 4);
+			util::stream_format(stream, ", %s", predicate_name(0x40 | (op & 15)));
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xfc00) == 0x9800)
 		{
 			util::stream_format(stream, "%-8s%c, %u, ", BIT(op, 9) ? "STH" : "STL", BIT(op, 8) ? 'B' : 'A', op & 15);
@@ -5086,6 +5095,26 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
 	}
+	if ((op & 0xfde7) == 0xf860) // BC[D] pmad, AOV/ANOV/BOV/BNOV
+	{
+		const u16 destination = fetch();
+		const u16 mask = u16(1U << (10 - BIT(op, 3)));
+		const bool take = bool(m_st0 & mask) == BIT(op, 4);
+		// SPRU131G table 4-1: testing OV/NOV consumes the selected sticky flag.
+		m_st0 &= ~mask;
+		if (take)
+		{
+			if (BIT(op, 9))
+			{
+				m_delayed_target = destination;
+				m_delayed_words = 2;
+			}
+			else
+				m_pc = destination;
+		}
+		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
+		return;
+	}
 	if ((op & 0xfcff) == 0xf4e1 && op != 0xf7e1) // IDLE 1/2/3; NN=11 is reserved.
 	{
 		// SPRU172C encodes K=2 as NN=10 and K=3 as NN=01.
@@ -6466,7 +6495,7 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
-	if ((op & 0xfe00) == 0x9e00 && (op & 7) >= 2) // SACCD (SPRU172C 4-152)
+	if ((op & 0xfc00) == 0x9c00 && (op & 7) >= 2) // STRCD / SRCCD / SACCD
 	{
 		const u8 x = op >> 4;
 		const unsigned xar = 2 + (x & 3);
@@ -6486,13 +6515,18 @@ void tms320c54x_device::execute_one(u16 op)
 		u16 value = data_read(address);
 		if (take)
 		{
-			const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
-			const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
-			// SACCD obeys SXM, but is not an SST-saturating store (SPRU131G table 4-3).
-			const u64 shifted = shift < 0
-				? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift)
-				: (source << shift) & ACC_MASK;
-			value = u16(shifted >> 16);
+			if ((op & 0xfe00) == 0x9c00)
+				value = BIT(op, 8) ? m_brc : m_t;
+			else
+			{
+				const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
+				const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
+				// SACCD obeys SXM, but is not an SST-saturating store (SPRU131G table 4-3).
+				const u64 shifted = shift < 0
+					? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift)
+					: (source << shift) & ACC_MASK;
+				value = u16(shifted >> 16);
+			}
 		}
 		// A false condition still performs a read/write-back bus transaction.
 		data_write(address, value);
@@ -6637,7 +6671,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		return;
 	}
-	if ((op & 0xfff0) == 0xfe40 && (op & 7) >= 2) // RCD accumulator conditions (SPRU172C 4-133)
+	if ((op & 0xfdf0) == 0xfc40 && (op & 7) >= 2) // RC[D] accumulator conditions (SPRU172C 4-133)
 	{
 		const u64 raw = accumulator(BIT(op, 3)) & ACC_MASK;
 		const s64 value = s64(raw << 24) >> 24;
@@ -6651,12 +6685,17 @@ void tms320c54x_device::execute_one(u16 op)
 		case 6: take = value > 0; break;
 		case 7: take = value <= 0; break;
 		}
-		if (take)
+		if (!BIT(op, 9))
+			return_if(take);
+		else
 		{
-			m_delayed_target = pop();
-			m_delayed_words = 2;
+			if (take)
+			{
+				m_delayed_target = pop();
+				m_delayed_words = 2;
+			}
+			m_icount -= 2;
 		}
-		m_icount -= 2;
 		return;
 	}
 	switch (op)
@@ -6685,26 +6724,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfc30: // RETC TC
 		return_if(m_st0 & 0x1000);
 		return;
-	case 0xfc45: // RETC AEQ
-		return_if((m_a & ACC_MASK) == 0);
-		return;
-	case 0xfc43: // RC ALT (signed 40-bit accumulator)
-		return_if((s64(m_a << 24) >> 24) < 0);
-		return;
-	case 0xfc47: // RETC ALEQ
-		return_if((s64(m_a << 24) >> 24) <= 0);
-		return;
 	case 0xfc20: // RETC NTC
 		return_if(!(m_st0 & 0x1000));
-		return;
-	case 0xfc4b: // RC BLT
-		return_if((s64(m_b << 24) >> 24) < 0);
-		return;
-	case 0xfc4d: // RC BEQ
-		return_if((m_b & ACC_MASK) == 0);
-		return;
-	case 0xfc44: // RC ANEQ
-		return_if((m_a & ACC_MASK) != 0);
 		return;
 	case 0xf072: // RPTB pmad
 		m_rsa = u16(m_pc + 1);

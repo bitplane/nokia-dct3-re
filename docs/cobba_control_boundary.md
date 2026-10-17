@@ -1707,8 +1707,8 @@ representation, balanced return and adjacent memory guards.
 
 The packing fixture explicitly selects ordinary speech (`09ba` bit 0 set).
 SID/DTX transformation, repetition-error combining policy and native EFR speech
-encoding remain outside its result. Native synthesis has a separate acceptance
-boundary below; neither fixture attaches a handset clock.
+encoding remain outside its result. Native synthesis and encoding have separate
+acceptance boundaries below; none of these fixtures attaches a handset clock.
 
 ### Independent EFR speech reference
 
@@ -1775,7 +1775,61 @@ Three CPU contracts are required by this ordinary native path:
 Temporary synthesis/gain probes are not part of acceptance. The runner requires
 every exact frame result, full-RAM replay and delayed-repeat marker, validated
 ROM inputs and the terminal completion. Existing FR packing, encoder and
-decoder gates remain independent regressions. The next speech-codec boundary
-is native EFR encoding and broader receive policy; the separate MCU request
-latch and physical audio-clock boundaries remain unresolved.
+decoder gates remain independent regressions. Broader receive/DTX policy and
+the separate MCU request latch and physical audio-clock boundaries remain
+unresolved; ordinary EFR encoding is covered separately below.
+
+### Native EFR encoder acceptance
+
+`make check-c54x-rom4-efr-encoder` verifies the same external reference and
+executes the acquired encoder with DTX disabled, matching the reference coder's
+default invocation. The private caller follows this byte-checked ROM order:
+
+| Role | Entry |
+| --- | --- |
+| Reset | `cc0e` |
+| Preprocessing | `cf9a` |
+| LPC analysis and preparation | `bed6`, `befa`, `bf20`, `bf92` |
+| Four subframes | `c093`, with native index `0e2c` set to 0 through 3 |
+| Final packing and homing-reset policy | `c273` |
+
+These are isolated algorithm calls, not a reproduction of the handset's
+scheduler or request/interrupt lifecycle. Synthetic caller instructions occupy
+private fixture program memory; no acquired routine is patched. Input samples
+come from verified `spch_dos.inp`, at native buffer `0cf4`. All 163 frames
+retain their histories. The 57 parameters at `0e36` match all 9,291 parameters
+decoded from external `spch_dos.cod`; native `09ba` VAD/SP bits match its 326
+sideband values. All 2,771 packed output words at `1897` match the independent
+normative packing reference applied to those external serial bits. Every frame
+is restored before preprocessing and replayed, comparing all 65,440 ordinary
+data-space words, not just the output. The 96 trailing source samples are not
+a complete frame and are unused, as in the reference's loop.
+
+This path exposed three missing atomic instruction surfaces:
+
+- Single-condition `BC/BCD AOV/ANOV/BOV/BNOV`: tests use the original flag,
+  clear only the selected sticky flag, and retain the delayed decision across
+  flag-changing slots. The focused `ov-branch` gate covers all eight forms,
+  four initial flag combinations and two save points (64 cases/restores).
+  Flag consumption follows [SPRU131G table 4-1](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+  SPRU172C's BOV example table retains OVB, contrary to that explicit CPU-guide
+  rule; the gate is model conformance, not an independent silicon measurement.
+- `SRCCD` and `STRCD`: even a false predicate performs a destination read and
+  write-back, and updates Xmem. `cond-reg-store` covers all twelve predicates,
+  six signed 40-bit patterns, sixteen Xmem forms, four source values and two
+  save points (18,432 cases/restores), including circular wrap. Existing SACCD
+  arithmetic is unchanged; the separate `saccd` profile retains its 672 cases.
+  These semantics follow SPRU172C 4-165/4-186; mapped peripheral timing is not
+  established by the RAM fixtures.
+- All twelve signed accumulator `RC` predicates now share the already decoded
+  `RCD` predicate logic. `atomic-ret` covers 144 cases/restores, including
+  positive guard-width values and negative values, exact taken stack reads,
+  no untaken stack access and unchanged status. The staged return gate remains
+  a separate regression, not newly inferred pipeline behavior.
+
+The runner requires every exact frame, the complete history-replay result,
+validated ROM/reference identities and terminal completion. This is ordinary
+installation-vector acceptance, not full GSM 06.54 conformance, DTX/SID or
+bad-frame policy, a production PCM clock, native handset speech or an
+end-to-end call. Those transport and physical boundaries remain separate.
 

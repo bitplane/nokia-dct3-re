@@ -323,6 +323,28 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "atomic-ret": (
+        "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated atomic conditional returns complete",
+    ),
+    "cond-reg-store": (
+        (
+            "TMS320C54x conditional-store disassembler: PASS opcodes=1024 supported=768 rejected=256 pages=2 bounded_extensions=1 pipeline_claim=0",
+            "TMS320C54x atomic conditional register stores: PASS cases=18432 restore=18432 forms=STRCD,SRCCD predicates=12 patterns=6 xmem=16 source_values=4 snapshots=2 false_read_writeback=1 circular_update=1 silicon_phase_claim=0",
+        ),
+        "Fatal error: TMS320C54x isolated conditional register stores complete",
+    ),
+    "saccd": (
+        (
+            "TMS320C54x SACCD conformance: PASS variants=576",
+            "TMS320C54x SACCD boundaries: PASS cases=96 asm=-16,-1,0,15 sxm=0,1 sst_ignored=1 sources=A,B false_store=1 pipeline_claim=0",
+        ),
+        "Fatal error: TMS320C54x isolated SACCD complete",
+    ),
+    "ov-branch": (
+        "TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated overflow branches complete",
+    ),
     "stack-mod3-edge": (
         (
             "TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0",
@@ -1429,7 +1451,7 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    machine = "tms54xtra" if args.profile == "stlm-t" else "tms54test"
+    machine = "tms54xtra" if args.profile in ("stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret") else "tms54test"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the

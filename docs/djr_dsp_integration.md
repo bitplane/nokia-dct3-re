@@ -167,8 +167,10 @@ NSE-1 ROM4 acquisition, external reproduction and local native loader/menu
 execution are established, not future milestones. The local backend executes
 the recovered resident program/DROM and firmware uploads without synthesized
 DSP completion. `make check-c54x-observed-coverage` validates the exact 626-word
-cold-idle opcode set and its Menu/power controls. Isolated native FR encoder
-and decoder gates validate algorithm results, not handset speech.
+cold-idle opcode set and its Menu/power controls. Isolated native FR and EFR
+encoder/decoder gates validate algorithm results, not handset speech. The
+EFR reference, entry order and replay scope are maintained in
+[COBBA control boundary](cobba_control_boundary.md#native-efr-encoder-acceptance).
 
 The remaining NSE-1 boundaries are RF sample ownership/encoding and SCU
 tuning, and an organic DSP-to-PCM speech lifecycle. Matching internal images
