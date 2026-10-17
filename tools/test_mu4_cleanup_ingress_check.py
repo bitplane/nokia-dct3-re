@@ -1,0 +1,65 @@
+import unittest
+
+from tools.mu4_cleanup_ingress_check import check
+
+
+def fixture():
+    events = []
+    for ordinal, (address, opcode) in enumerate(((0x29438, 0x1004), (0x29500, 0xf830), (0x2956f, 0x60f8)), 1):
+        events.append(f'mu4_cleanup_ingress: ordinal={ordinal} address={address:06x} opcode={opcode:04x} '
+                      f'cycles={100+ordinal} sp=d6f4 f4=0011 f5=162e f6=0000 f7=0000 f8=0000 f9=0000 '
+                      'control=0001 ar1=0000 ar2=0000 identity=debugger_Execute_hook operands=context_only observer_writes=0')
+    return '\n'.join([
+        'mu4_cleanup_ingress_scope: identity=debugger_Execute_hook operands=context_only '
+        'annulment=unclaimed observer_writes=0 audio_acceptance=0',
+        'mu4_playback_execute_entry: address=026d62 opcode=fd00 t=0.2',
+        'mu4_native_playback_overlay: PASS marker=aa99 records=3127 words=49843 checked_ram_words=49839 excluded_register_words=4 before_execution=1',
+        *events,
+        'mu4_playback_execute_entry: address=026d62 opcode=fd00 t=9.86',
+        'mu4_cleanup_ingress_terminal: events=3 cap=4096 observer_writes=0 audio_acceptance=0',
+        'mu4_cleanup_ingress_stop: t=10 illegal=0 observer_writes=0 audio_acceptance=0',
+        'mu4_playback_parent_terminal: first_session_complete=1 overlay_verified=1 illegal=0 '
+        'opcode_mismatch=0 selection=first_verified_aa99_session observer_writes=0'])
+
+
+class CleanupIngressTest(unittest.TestCase):
+    def test_successor_defines_cleanup_without_operand_claim(self):
+        result = check(fixture())
+        self.assertEqual(result['cleanup_successors'], {'02956f': 1})
+        self.assertEqual(result['input_counts'], {'0011': 1})
+        # A snapshot alone is not a retained operand or branch outcome.
+        self.assertEqual(check(fixture().replace('control=0001', 'control=0000'))['cleanup_successors'],
+                         {'02956f': 1})
+
+    def test_rejects_incomplete_capped_or_wrong_identity(self):
+        for before, after in [('events=3', 'events=4'), ('cap=4096', 'cap=3'),
+                              ('ordinal=2', 'ordinal=3'), ('cycles=102', 'cycles=101'),
+                              ('opcode=f830', 'opcode=0000'), ('illegal=0', 'illegal=1'),
+                              ('operands=context_only', 'operands=retired'),
+                              ('f7=0000', 'f7=10000'), ('words=49843', 'words=1'),
+                              ('address=02956f opcode=60f8', 'address=0294fd opcode=60f8'),
+                              ('observer_writes=0', 'observer_writes=1')]:
+            with self.subTest(before=before, after=after), self.assertRaises(ValueError):
+                check(fixture().replace(before, after))
+
+    def test_rejects_missing_terminal_and_censored_branch(self):
+        for marker in ('mu4_cleanup_ingress_terminal:', 'ordinal=3'):
+            text = '\n'.join(line for line in fixture().splitlines() if marker not in line)
+            if marker == 'ordinal=3':
+                text = text.replace('events=3', 'events=2')
+            with self.assertRaises(ValueError):
+                check(text)
+
+    def test_length_route_uses_executed_successor(self):
+        text = fixture().replace('address=029438 opcode=1004', 'address=0294c3 opcode=f84a')
+        text = text.replace('address=029500 opcode=f830', 'address=0294fd opcode=60f8')
+        with self.assertRaisesRegex(ValueError, 'no observed cleanup'):
+            check(text)
+        # An unrelated selected site cannot stand in for the branch outcome.
+        text = text.replace('address=0294fd opcode=60f8', 'address=029471 opcode=1005')
+        with self.assertRaisesRegex(ValueError, 'unresolved length'):
+            check(text)
+
+
+if __name__ == '__main__':
+    unittest.main()

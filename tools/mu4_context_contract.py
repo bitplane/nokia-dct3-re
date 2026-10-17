@@ -787,6 +787,13 @@ PLAYBACK_CLEANUP_INGRESS = {
     0x29471: (0x1005,0x8066,0x7107,0x0011,0x7108,0x0016,0x7604,
               0x8011,0x7109,0xAA1E,0x7600,0x0001,0x4818,0xF000,
               0x0004,0xF982,0x929C,0x76F8,0xAA1B,0x0000),
+    0x294A7: (0x56F8,0x371A,0x4E6A,0xF0FF,0x4E6C,0x4EF8,0xAA22),
+    0x294BB: (0x566C,0xF7B8,0x11F8,0x0011,0x53F8,0xA9F6,0xF3E0,
+              0xF520,0xF84A,0x94EA,0xF6B8,0xF495,0x566A,0x54F8,
+              0xA9F6,0xF847,0x94FB),
+    0x294EA: (0x566C,0x08F8,0xA9F7,0x8811,0x76F8,0xAA1C,0x0001,
+              0x566A,0x4EF8,0xA9F6,0xF073,0x94FB,0x566A,0x4EF8,
+              0xA9F6,0x7711,0x0000,0x7712,0x0001),
     0x294FD: (0x60F8,0xAA1A,0x0001,0xF830,0x956F),
 }
 
@@ -807,6 +814,12 @@ def decode_playback_cleanup_ingress(words):
                         'gate': '0294fd', 'predicate': 'aa1a == 1',
                         'taken_target': '02956f',
                         'scope': 'intervening processing paths are not modeled'},
+            'length_path': {'source_doubleword': '371a', 'local_full': 'SP+006a',
+                            'local_logical_half': 'SP+006c', 'counter_doubleword': 'a9f6',
+                            'compare': '0294c3 BGEQ -> 0294ea',
+                            'taken_updates': 'AR1 = low16(local_half - a9f7); aa1c = 1; counter = local_full',
+                            'join': '0294fb -> 0294fd',
+                            'scope': 'Pinned dataflow; counter units and complete producer contract unvalidated'},
             'scope': 'Pinned dispatch/store/compare patterns; no runtime message ownership, '
                      'all-writer closure, EOF meaning or decoder failure claim'}
 

@@ -8614,12 +8614,12 @@ so it does not pass that separate contract; do not weaken the checker or
 claim the complete repeating lifecycle from this shorter observation.
 
 The next static boundary is now pinned as `playback_cleanup_ingress` in
-the context tool (60 AA99 words). Routine `029422` fills a local frame via
+the context tool (103 AA99 words). Routine `029422` fills a local frame via
 `029264`; the selector at frame word 4 dispatches inputs `11`, `16`, `17`.
 Input `17` copies frame word 5 to `aa1a` at `02944b`, writes reply selector
 `8017` and takes the ordinary tail. Input `11` enters at `029471`, writes
 reply selector `8011`, and has a later compare at `0294fd`: `aa1a == 1`
-branches to cleanup `02956f`. Intervening processing paths are not yet
+branches to cleanup `02956f`. The complete interpreter/producer is not yet
 modeled. The mapped AA99 image has three literal `aa1a` references, including
 an immediate-one store pattern at `027887`; this is not an indirect-writer
 closure. Local-frame roles beyond the shown copies remain unassigned.
@@ -8642,6 +8642,38 @@ length/cursor fields and the intervening paths that reach `0294fd`. This is
 not proof of EOF, a decoder error, absence of indirect writers, or Execute
 ownership at the context PCs. No control word or input selector should be
 forced to extend playback.
+
+`mu4_cleanup_ingress_observe.lua` uses bounded debugger breakpoints with
+opcode guards. The staged core calls this hook at Execute entry; live
+register/frame snapshots remain context only and annulment is unclaimed.
+Run with the same fresh NAND fixture plus `-debug -debugger none`, an initial
+`g` debugger script, and this observer as the autoboot script. Check with
+`python3 tools/mu4_cleanup_ingress_check.py RUN/error.log`. The checker
+requires the verified original AA99 image, first-resident-session bounds,
+ordered identities/opcodes, a non-capped terminal and explicit branch
+successors; it rejects the earlier 512-event prefix as incomplete.
+
+The complete ten-second capture has 1,881 events (budget 4,096), 376 inputs
+of `0011`, no selected input-17 store, and one observed cleanup successor.
+The first 375 length branches select `0294ca`; the final branch selects
+`0294fd`, then `029500 -> 02956f`. The final local frame still has
+`f6=f7=00ba`, as do the preceding two transactions. At `0294c3`, live B
+changes from `fffffffffa` (-6) on the preceding transaction to `00000000b4`
+(180) on the final one. At the join, live AR1 is 6, AR2 is 1 and A is
+`0000023140`; no callback site `0294e6` occurs on this final path.
+
+The pinned source derives local full/half doublewords from `371a`, compares
+the counter at `a9f6` plus an incoming signed word against the logical half,
+and takes `0294ea` on BGEQ. That path computes a low-word remainder into AR1,
+sets `aa1c=1`, replaces the counter with the local full value, and joins
+the `aa1a` test. These source operations and the observed successors locate
+the immediate stop in input-length handling, not a decoder-return failure.
+Units, the producer's field contract, and whether this represents intended
+end-of-input or an emulation defect remain unresolved. Next follow the
+source/meaning of `371a`, `a9f6` and frame word 7, including how buffered
+decoder input is meant to drain at this boundary. Do not force a larger
+length or suppress cleanup. All 925 output artifacts remain byte-identical
+to the earlier ten-second capture, with `illegal=0` and the gate check green.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
