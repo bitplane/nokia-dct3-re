@@ -8237,6 +8237,15 @@ defect. The checker reports the complete mismatch extent, not a best-fit
 realignment, and never promotes integrity or overlap to decoded-audio
 acceptance.
 
+With verified slot metadata, the checker also reports the actual DIN time
+and slot for each retained fixed-offset mismatch. In this capture the first
+TX-to-DIN difference is source index 783,200 / sink index 783,567 at
+9,702,093,026 ns, slot 1 (`ffbc` versus `0000`). This precedes the next
+logged system-clock change at 9.869008605 s; that later change cannot explain
+the onset. This locates a diagnostic disagreement, not its cause or a new
+alignment. Trace TX buffering, reset and codec state around 9.702 s before
+changing any timing or interpreting the remainder as lost samples.
+
 The sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
 `311d7ef1e63b60307fdbe9846d4220168b443334add930fab29580e905241bfa`.
 It begins at slot 0, yields 845,921 complete pairs, and has zero orphan

@@ -7,11 +7,31 @@ from unittest.mock import patch
 
 from tools.mu4_playback_capture_check import (
     FILES, SLOT_FILE, compare_reference, compare_streams, framed_words,
-    parse_rows, parse_slot_row, validate_slots, validate_stream, verify,
+    locate_sink_mismatches, parse_rows, parse_slot_row, validate_slots, validate_stream, verify,
 )
 
 
 class PlaybackCaptureTests(unittest.TestCase):
+    def test_mismatch_localization_preserves_fixed_offset_and_actual_slot(self):
+        source = array('H', [0, 1, 2, 3, 4, 5])
+        sink = array('H', [0, 0, 1, 2, 3, 9, 5])
+        comparison = compare_streams(source, sink, anchor=3)
+        data, _, _ = self.slots([(10+i*10, (i+1)%2) for i in range(7)])
+        located = locate_sink_mismatches(comparison, data, 7)
+        self.assertEqual(comparison['sink_offset_words'], 1)
+        self.assertEqual(located, [dict(source_index=4, sink_index=5,
+            source_word='0004', sink_word='0009', sink_time_ns=60, sink_slot=0)])
+        self.assertNotIn('sink_time_ns', comparison['first_mismatches'][0])
+        self.assertFalse(comparison['transport_pairing_validated'])
+        self.assertEqual(locate_sink_mismatches({}, data, 7), [])
+        with self.assertRaises(ValueError):
+            locate_sink_mismatches(comparison, data[:-1], 7)
+        with self.assertRaises(ValueError):
+            locate_sink_mismatches({'first_mismatches':[{'sink_index':7}]}, data, 7)
+        damaged = data[:53]+b'\x02'+data[54:]
+        with self.assertRaises(ValueError):
+            locate_sink_mismatches(comparison, damaged, 7)
+
     @staticmethod
     def slots(records):
         payload = b''.join(struct.pack('<QB',*record) for record in records)

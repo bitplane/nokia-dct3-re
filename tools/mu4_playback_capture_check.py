@@ -228,6 +228,22 @@ def compare_streams(source, sink, anchor=64):
     return result
 
 
+def locate_sink_mismatches(comparison, slot_data, word_count):
+    """Locate the existing fixed-offset diagnostic, without realigning it."""
+    if len(slot_data) != 9*word_count:
+        raise ValueError('mismatch localization requires one slot record per sink word')
+    result = []
+    for mismatch in comparison.get('first_mismatches', []):
+        index = mismatch['sink_index']
+        if not 0 <= index < word_count:
+            raise ValueError('mismatch sink index outside codec capture')
+        when, slot = struct.unpack_from('<QB', slot_data, 9*index)
+        if slot not in (0, 1):
+            raise ValueError('invalid codec slot at mismatch')
+        result.append(dict(mismatch, sink_time_ns=when, sink_slot=slot))
+    return result
+
+
 def verify(text, directory, *, require_framing=False, reference=None, reference_rate=44100):
     observation = verify_playback_dma(text)
     rows = parse_rows(text)
@@ -249,6 +265,8 @@ def verify(text, directory, *, require_framing=False, reference=None, reference_
     if slot_row is not None:
         data = (directory/SLOT_FILE).read_bytes()
         result['codec_slots'] = validate_slots(slot_row,data,len(streams['codec_din']))
+        result['tx_to_din']['located_mismatches'] = locate_sink_mismatches(
+            result['tx_to_din'], data, len(streams['codec_din']))
         if reference is not None:
             result['reference_comparison'] = compare_reference(streams['codec_din'],data,reference,reference_rate)
     else:
