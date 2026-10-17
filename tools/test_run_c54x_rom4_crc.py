@@ -10,9 +10,27 @@ from tools.run_c54x_rom4_crc import DECODER_REPLAY, ENCODER_REPLAY
 from tools.run_c54x_rom4_crc import file_identity
 from tools.run_c54x_rom4_crc import EFR_CRC_PASS, EFR_CRC_COMPLETE
 from tools.run_c54x_rom4_crc import EFR_PACKING_PASS, EFR_PACKING_COMPLETE
+from tools.run_c54x_rom4_crc import EFR_DECODER_PASS, EFR_DECODER_COMPLETE
+from tools.run_c54x_rom4_crc import DELAYED_REPEAT_PASS
+from tools.run_c54x_rom4_crc import EFR_DECODER_REPLAY
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_decoder_completion(self):
+        frames = "\n".join(f"ROM4 EFR decoder comparison: frame={frame} mismatches=0" for frame in range(163))
+        text = DELAYED_REPEAT_PASS + "\n" + frames + "\n" + EFR_DECODER_REPLAY + "\n" + EFR_DECODER_PASS + "\n" + EFR_DECODER_COMPLETE
+        check_result(text, 3, efr_decoder=True)
+        check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_decoder=True)
+        for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
+                        text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),
+                        text.replace(EFR_DECODER_PASS, EFR_PACKING_PASS),
+                        text.replace(DELAYED_REPEAT_PASS, ""),
+                        text.replace(EFR_DECODER_REPLAY, ""),
+                        text + "\nunexpected trailer",
+                        text + "\nAverage speed: 1234.56% (6 seconds)\nunexpected trailer"):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_decoder=True)
+
     def test_efr_packing_completion(self):
         text = EFR_PACKING_PASS + "\n" + EFR_PACKING_COMPLETE
         check_result(text, 3, efr_packing=True)

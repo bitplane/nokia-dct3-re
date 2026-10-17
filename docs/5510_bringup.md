@@ -377,8 +377,8 @@ The merge repeat `03:da71..03:da93` decrements AR5 by two per iteration;
 its setup AR5=`c35b`, BRC=`0247` should leave AR5=`becb`. Instead one
 exit left AR5=`c0f1`, BRC=`0113`: exactly 275 iterations and 550 words
 short. The following full-length pass consequently consumed stale output.
-This was not EXP latency or a reason to widen NORM's documented -16..31
-range. The producer uses CPL/SP-relative parameters, not literal AR3/AR4
+This was not EXP latency: the wrong T came from incomplete preparation, not
+the independent negative-count alias used by ROM4 Pow2. The producer uses CPL/SP-relative parameters, not literal AR3/AR4
 reads. Seven seconds was too short to observe the stop; ten-second
 debugger, observer-free and source-observer controls agreed on the failing
 sample. Do not attribute that window difference to observer perturbation.
@@ -1721,15 +1721,18 @@ bank described above. CPU low-page pairs remain excluded; physical phase timing 
 general producer/interrupt composition are not established by these fixtures.
 
 NORM (`f48f/f58f/f68f/f78f`) retains T in Read before older Execute publishes
-and uses that signed six-bit shift at Execute. SPRU172C 4-122 defines its
-supported shift domain as -16..31. Raw TS codes 32..47 are rejected by the
-staged prototype before register publication; this is not a silicon trap claim.
+and decodes that retained count at Execute. SPRU172C 4-122 defines the
+documented shift domain as -16..31. ROM4's Pow2 helper additionally uses raw
+TS codes 32..47 as aliases of right shifts -16..-1, followed by conditional
+SFTA -16 for larger shifts. Atomic and staged NORM share this decode; see
+`docs/cobba_control_boundary.md` for its independent evidence and limits.
 The shared shift helper supplies SXM right shifts, sticky destination overflow
 and OVM saturation while preserving carry and the unselected accumulator.
 `norm` passes 98,304 cases/restores over all selectors, 48 supported shifts,
 eight 40-bit patterns, eight status combinations, two pages and four snapshots.
-Later T mutation cannot change the captured count. `norm-edge` adds 256
-save/replay exclusions for the unsupported codes.
+Later T mutation cannot change the captured count. The compatibility profile
+name `norm-edge` now covers 16,384 alias cases/restores across all selectors,
+eight source patterns, eight status combinations, two pages and two snapshots.
 
 SPRU131G table 7-13 and example 7-40 require one separating word after EXP.
 `exp-norm` passes 6,144 cases/restores over all selectors, 16 patterns,
@@ -7557,8 +7560,9 @@ TS-controlled memory loads (`14xx`/`15xx`, SPRU172C LD syntax 2) use the
 shared retained Smem address path and capture both memory and T in Read.
 The current implementation projects all six-bit codes to -32..31; coverage of
 raw codes 32..47 is not evidence that their behavior is architecturally defined.
-In particular, NORM's documented -16..31 domain is independently enforced;
-do not use this memory-load fixture as a NORM shift-domain oracle.
+NORM's separately evidenced negative aliases do not establish the behavior of
+this memory-load family outside its documented range; neither fixture should
+be used as the other's shift-domain oracle.
 SXM selects sign extension and
 arithmetic right shifting; OVM does not saturate this load form, and carry
 and accumulator-overflow flags are preserved. Atomic and staged execution

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,10 @@ EFR_CRC_PASS = "TMS320C54x ROM4 EFR CRC: PASS cases=554 basis_bits=244 protected
 EFR_CRC_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR CRC complete"
 EFR_PACKING_PASS = "TMS320C54x ROM4 EFR packing: PASS vectors=277 basis_bits=244 corrupt_frames=277 handset_audio_claim=0"
 EFR_PACKING_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR packing complete"
+EFR_DECODER_PASS = "TMS320C54x ROM4 EFR decoder: PASS frames=163 samples=26080 mismatches=0 handset_audio_claim=0"
+EFR_DECODER_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR decoder complete"
+DELAYED_REPEAT_PASS = "TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39"
+EFR_DECODER_REPLAY = "TMS320C54x ROM4 EFR decoder replay: PASS frames=163 ram_words=65440 checkpoints=frame_input handset_audio_claim=0"
 
 
 def file_identity(path):
@@ -36,13 +41,24 @@ def file_identity(path):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest}
 
 
-def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False):
+def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False, efr_decoder=False):
     lines = text.splitlines()
+    if efr_decoder and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
+        lines.pop()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
     if efr_crc:
         marker, complete = EFR_CRC_PASS, EFR_CRC_COMPLETE
     if efr_packing:
         marker, complete = EFR_PACKING_PASS, EFR_PACKING_COMPLETE
+    if efr_decoder:
+        marker, complete = EFR_DECODER_PASS, EFR_DECODER_COMPLETE
+        if lines.count(DELAYED_REPEAT_PASS) != 1:
+            raise ValueError("missing unique delayed-repeat regression and replay result")
+        if lines.count(EFR_DECODER_REPLAY) != 1:
+            raise ValueError("missing unique native EFR frame/history replay")
+        for frame in range(163):
+            if lines.count(f"ROM4 EFR decoder comparison: frame={frame} mismatches=0") != 1:
+                raise ValueError("missing unique bit-exact EFR frame comparison")
     if fr_packing:
         marker, complete = FR_PASS, FR_COMPLETE
     if fr_decoder:
@@ -82,6 +98,7 @@ def main():
     mode.add_argument("--fr-encoder", action="store_true", help="compare native FR encoding against independent parameters")
     mode.add_argument("--efr-crc", action="store_true", help="compare native EFR CRC against normative polynomial division")
     mode.add_argument("--efr-packing", action="store_true", help="validate native EFR packing, unpacking and CRC rejection")
+    mode.add_argument("--efr-decoder", action="store_true", help="compare native EFR decoder with verified ETSI PCM")
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
@@ -90,15 +107,21 @@ def main():
         bios = "efr-crc"
     if args.efr_packing:
         bios = "efr-packing"
+    if args.efr_decoder:
+        bios = "efr-decoder"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "2"]
+               "-seconds_to_run", "10" if args.efr_decoder else "2"]
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
-                                           "driver/gsm_tch_f_l1.cpp", "driver/gsm_tch_f_l1.h"))
+                                           "driver/gsm_tch_f_l1.cpp", "driver/gsm_tch_f_l1.h",
+                                           "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h"))
     inputs.extend(sorted((args.rompath / "tms54rom4").glob("*.bin")))
+    if args.efr_decoder:
+        for name in ("spch_dos.dec", "spch_dos.out"):
+            inputs.append(args.rompath / "tms54rom4" / name)
     evidence = {"command": command, "bios": bios,
                 "inputs": [file_identity(path) for path in inputs],
                 "handset_audio_claim": False}
@@ -109,7 +132,7 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing)
+        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1

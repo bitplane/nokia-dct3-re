@@ -3677,12 +3677,14 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
-		unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
+		bool const high = variant >= 768;
+		unsigned const operation = 3 + (variant % 768) / 256;
+		unsigned const shift = high ? 16 : std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
 		u16 const literal = BIT(variant, 6) ? 0xf495 : 0x8001;
 		u64 const source = BIT(variant, 6) ? 0xff89abcdefULL : 0x0012345678ULL;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, 0xf000 | ((3 + variant / 256) << 4) | (BIT(variant, 0) << 9) | (BIT(variant, 1) << 8) | shift);
+		program.write_word(0x600, (high ? 0xf060 | operation : 0xf000 | (operation << 4) | shift) | (BIT(variant, 0) << 9) | (BIT(variant, 1) << 8));
 		program.write_word(0x601, literal);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -8986,7 +8988,9 @@ private:
 			if (!(flags & 2)) stored = value > 0xffffffffULL ? 0xffffffffU : u32(value);
 			else stored = u32(std::clamp(BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value), s64(-2147483648LL), s64(2147483647LL)));
 		}
-		u16 const consumed = gap ? u16(stored) : trn ? 0x1357 : 0x9abc;
+		// Multiply samples T after older Execute (SPRU131G 7.5.6/table 7-13);
+		// unlike the TRN LDM consumer, it sees even a zero-gap STLM publication.
+		u16 const consumed = gap || !trn ? u16(stored) : 0x1357;
 		u16 const memory = std::array<u16, 8>{0, 1, 0x8000, 0xffff, 0x7fff, 0x8000, 0xffff, 0x5678}[pattern];
 		u16 const st0 = 0x1804 | (pattern & 1 ? 0x600 : 0), st1 = 0x800 | (flags & 2 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0) | (flags & 8 ? 0x40 : 0) | (pattern & 2 ? 0x4000 : 0);
 		s64 product = kind == 2 ? s64(consumed) * memory : s64(s16(consumed)) * s16(memory);
@@ -13558,10 +13562,10 @@ private:
 	static normalization_fixture normalization_case(unsigned variant, bool producer, bool edge)
 	{
 		unsigned const selector = variant % 4;
-		unsigned const pattern = producer ? (variant / 4) % 16 : edge ? 6 : (variant / 192) % 8;
-		unsigned const flags = producer ? (variant / 192) % 4 : edge ? 7 : (variant / 1536) % 8;
+		unsigned const pattern = producer ? (variant / 4) % 16 : edge ? (variant / 64) % 8 : (variant / 192) % 8;
+		unsigned const flags = producer ? (variant / 192) % 4 : edge ? (variant / 512) % 8 : (variant / 1536) % 8;
 		unsigned const gap = producer ? (variant / 64) % 3 : 0, prefix = unsigned(producer);
-		u32 const base = (producer ? (variant / 768) % 2 : edge ? (variant / 64) % 2 : (variant / 12288) % 2) ? 0x20000 : 0;
+		u32 const base = (producer ? (variant / 768) % 2 : edge ? (variant / 4096) % 2 : (variant / 12288) % 2) ? 0x20000 : 0;
 		std::array<u64, 2> before = producer ? std::array<u64, 2>{exponent_case(pattern).value, exponent_case((pattern + 7) % 16).value} : std::array<u64, 2>{
 			std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0x123456789aULL}[pattern],
 			std::array<u64, 8>{1, 0xffffffffULL, 0xff80000000ULL, 0x7fffffff, 0xffffffffffULL, 0x123456789aULL, 0x8000000000ULL, 0x7fffffffffULL}[pattern]};
@@ -13571,10 +13575,9 @@ private:
 		int const basic_shift = int((variant / 4) % 48) - 16;
 		u16 const t = producer ? 0xa5c1 : edge ? u16(0xa5e0 | ((variant / 4) % 16)) : u16(0xa5c0 | (basic_shift & 63));
 		exponent_fixture const exponent{source, false, false, 0, 0, 0, 0};
-		int const shift = producer ? gap ? s16(exponent.exponent()) : 1 : basic_shift;
+		int const shift = producer ? gap ? s16(exponent.exponent()) : 1 : edge ? int((variant / 4) % 16) - 16 : basic_shift;
 		u64 result = 0;
 		bool overflow = false;
-		if (!edge)
 		{
 			bool const sign = source & 0x8000000000ULL;
 			for (int bit = 0; bit < 40; ++bit)
@@ -13594,9 +13597,9 @@ private:
 			if (overflow && (flags & 2)) result = sign ? 0xff80000000ULL : 0x7fffffff;
 		}
 		auto after = before;
-		if (!edge) after[selector & 1] = result;
+		after[selector & 1] = result;
 		return {selector, prefix, gap, 5 + prefix + gap, 6 + prefix + gap, t, st0, st1,
-			u16(st0 | (!edge && overflow ? selector & 1 ? 0x200 : 0x400 : 0)), base, before, after};
+			u16(st0 | (overflow ? selector & 1 ? 0x200 : 0x400 : 0)), base, before, after};
 	}
 	void start_normalization(unsigned variant = 0)
 	{
@@ -15740,6 +15743,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rpt-ld")) { start_repeat_load(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-ld-block")) { start_repeat_load(198656); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst")) { start_stlm_pmst(); return; }
+		if (!strcmp(machine().options().bios(), "stlm-t")) { start_pipeline_stlm_t(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-long")) { start_extended_push(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-long-map")) { start_extended_push(96000); return; }
@@ -15889,6 +15893,12 @@ private:
 			for (unsigned address = 0; address != 0x10000; ++address)
 				// A memory snapshot seeds RAM, not live CPU/peripheral registers.
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "efr-decoder"))
+		{
+			start_rom4_delayed_repeat(0);
+			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "efr-packing"))
@@ -16400,12 +16410,13 @@ private:
 		return serial;
 	}
 
+	// GSM 06.60 parameter order, independent of the acquired descriptor tables.
+	static constexpr unsigned ROM4_EFR_WIDTHS[] = {7,8,9,8,6,
+		9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5,
+		9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5};
+	static_assert(std::size(ROM4_EFR_WIDTHS) == 57);
 	static u8 rom4_efr_parameters(unsigned vector, u16 (&parameters)[57], std::array<u8, 244> *speech = nullptr)
 	{
-		// GSM 06.60 parameter order, independent of the acquired descriptor tables.
-		static constexpr unsigned widths[] = {7,8,9,8,6,
-			9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5,
-			9,4,4,4,4,4,4,3,3,3,3,3,5, 6,4,4,4,4,4,4,3,3,3,3,3,5};
 		static constexpr unsigned protected_bits[] = {
 			39,40,41,42,43,44,48,87,45,2,3,8,10,18,19,24,46,47,142,143,
 			144,145,146,147,92,93,195,196,98,137,148,94,197,149,150,95,198,
@@ -16417,7 +16428,7 @@ private:
 		for (unsigned p = 0; p < 57; ++p)
 		{
 			parameters[p] = 0;
-			for (unsigned bit = 0; bit < widths[p]; ++bit, ++position)
+			for (unsigned bit = 0; bit < ROM4_EFR_WIDTHS[p]; ++bit, ++position)
 			{
 				random ^= random << 13; random ^= random >> 17; random ^= random << 5;
 				serial[position] = vector < 244 ? position == vector : vector == 244 ? 0 : random & 1;
@@ -16494,6 +16505,78 @@ private:
 		append(-1); append(-1);
 		for (int d = 259; d >= 246; --d) append(d);
 		return packed;
+	}
+
+	void start_rom4_delayed_repeat(unsigned index)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const count = std::array<unsigned, 5>{0, 1, 2, 9, 39}[index / 2];
+		bool const returning = index & 1;
+		u16 *const program = &memregion("dspprg")->as_u16();
+		program[0x0e00] = returning ? 0xfe00 : 0xf273;
+		if (!returning) program[0x0e01] = 0x0e20;
+		program[returning ? 0x0e01 : 0x0e02] = 0xec00 | count;
+		program[returning ? 0x0e02 : 0x0e03] = 0xe5ab;
+		program[returning ? 0x0e03 : 0x0e04] = 0xf4e1;
+		program[0x0e20] = 0xf4e1;
+		for (unsigned i = 0; i < 40; ++i)
+		{
+			data.write_word(0x1400 + i, 0x1357 + i * 257);
+			data.write_word(0x1600 + i, 0xdead);
+		}
+		data.write_word(0x15ff, 0x1234); data.write_word(0x1628, 0x5678);
+		data.write_word(0x1ec3, 0x0e20);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0e00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
+		m_phase = 303000 + index;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
+	void start_rom4_efr_decoder(unsigned frame, bool initialize)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (initialize)
+		{
+			data.write_word(0x0ac8, 0);
+			m_rom4_pcm_mismatches = 0;
+		}
+		else
+		{
+			u8 const *const input = memregion("efr_reference_input")->base() + frame * 494;
+			auto word = [&](unsigned index) { return u16(input[index * 2] | (input[index * 2 + 1] << 8)); };
+			data.write_word(0x1343, word(0));
+			unsigned bit = 1;
+			for (unsigned p = 0; p < 57; ++p)
+			{
+				u16 value = 0;
+				for (unsigned i = 0; i < ROM4_EFR_WIDTHS[p]; ++i) value = (value << 1) | word(bit++);
+				data.write_word(0x1344 + p, value);
+			}
+			data.write_word(0x79, word(245));
+			data.write_word(0x0ac8, (data.read_word(0x0ac8) & ~0x000c) | (word(0) << 2) | (word(246) << 3));
+			data.write_word(0x130a, 0x1388);
+			for (unsigned i = 0; i < 160; ++i) data.write_word(0x1388 + i, 0xdead);
+		}
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, initialize ? 0xc941 : 0xc8dc);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, initialize ? 0 : data.read_word(0x1343));
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = initialize ? 302000 : 302001 + frame;
+		m_check_timer->adjust(attotime::from_msec(20));
+		if (!initialize) save_rom4_codec_frame(frame);
 	}
 
 	void start_rom4_efr_packing(unsigned vector, unsigned stage)
@@ -16588,9 +16671,9 @@ private:
 			for (unsigned i = 0x60; i < 0x10000; ++i) m_rom4_checkpoint_data[i - 0x60] = m_cpu->space(AS_DATA).read_word(i);
 		}
 		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save native FR frame with its existing history and prepared input");
+		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save native codec frame with its existing history and prepared input");
 	}
-	bool replay_rom4_codec_frame(unsigned phase)
+	bool replay_rom4_codec_frame(unsigned phase, unsigned milliseconds = 5)
 	{
 		// The reference codec and oracle remain outside the machine snapshot:
 		// replay must not advance the independent reference a second time.
@@ -16601,19 +16684,19 @@ private:
 			m_rom4_replay_data.resize(0x10000 - 0x60);
 			for (unsigned i = 0x60; i < 0x10000; ++i) m_rom4_replay_data[i - 0x60] = data.read_word(i);
 			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore native FR frame without reconstructing its histories");
+			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore native codec frame without reconstructing its histories");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == m_rom4_checkpoint_pc &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec3,
-				"FR restore returns to the live frame entry, not the completed IDLE result");
+				"Codec restore returns to the live frame entry, not the completed IDLE result");
 			for (unsigned i = 0x60; i < 0x10000; ++i)
-				expect(data.read_word(i) == m_rom4_checkpoint_data[i - 0x60], "FR restore recovers every pre-frame RAM word before re-execution");
+				expect(data.read_word(i) == m_rom4_checkpoint_data[i - 0x60], "Codec restore recovers every pre-frame RAM word before re-execution");
 			m_phase = phase; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_msec(5));
+			m_check_timer->adjust(attotime::from_msec(milliseconds));
 			return true;
 		}
 		for (unsigned i = 0x60; i < 0x10000; ++i)
-			expect(data.read_word(i) == m_rom4_replay_data[i - 0x60], "Native FR replay reproduces every ordinary RAM word, including codec histories");
+			expect(data.read_word(i) == m_rom4_replay_data[i - 0x60], "Native codec replay reproduces every ordinary RAM word, including histories");
 		++m_rom4_codec_replays;
 		return false;
 	}
@@ -36760,10 +36843,11 @@ private:
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const variant = m_pipeline_peripheral_case;
 			bool const source_b = BIT(variant, 0), destination_b = BIT(variant, 1);
-			unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
+			unsigned const shift = variant >= 768 ? 16 : std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
 			u64 const source = BIT(variant, 6) ? 0xff89abcdefULL : 0x0012345678ULL;
 			u64 const operand = u64(BIT(variant, 6) ? 0xf495 : 0x8001) << shift;
-			u64 const result = variant / 256 == 0 ? source & operand : variant / 256 == 1 ? source | operand : source ^ operand;
+			unsigned const operation = (variant % 768) / 256;
+			u64 const result = operation == 0 ? source & operand : operation == 1 ? source | operand : source ^ operand;
 			u64 const initial_a = source_b ? 0x1111222233ULL : source;
 			u64 const initial_b = source_b ? source : 0x4444555566ULL;
 			u64 const checkpoint = BIT(variant, 7) ? 4 : 3;
@@ -36792,8 +36876,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 767) { start_pipeline_logical_immediate(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged logical immediates: PASS cases=768 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15 restore=768 duplicate_literals=0\n");
+				if (variant < 1535) { start_pipeline_logical_immediate(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged logical immediates: PASS cases=1536 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15,16 restore=1536 duplicate_literals=0\n");
 				start_pipeline_memory_dp(); return;
 			}
 			++m_pipeline_expected_cycle;
@@ -41703,7 +41787,9 @@ private:
 				m_cpu->state_int(target_state) == target &&
 				m_cpu->state_int(f.trn ? tms320c54x_device::STATE_T : tms320c54x_device::STATE_TRN) == (f.trn ? 0x9abc : 0x1357) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > f.read_cycle ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
-				"STLM T/TRN publishes in Execute and its consumer retains the earlier Read value without store forwarding");
+				util::string_format("STLM T/TRN publication variant=%u tick=%u A=%010x B=%010x target=%04x expected=%04x ST0=%04x expected_ST0=%04x", variant, tick,
+					m_cpu->state_int(tms320c54x_device::STATE_A), m_cpu->state_int(tms320c54x_device::STATE_B), m_cpu->state_int(target_state), target,
+					m_cpu->state_int(tms320c54x_device::STATE_ST0), tick > f.read_cycle ? f.result_st0 : f.st0).c_str());
 			if (tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
 			if (f.brc) expect(m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x1357, "STLM BRC does not alter TRN");
 			if (tick == f.read_cycle)
@@ -41731,6 +41817,7 @@ private:
 				if (variant == 12287) osd_printf_info("TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 				if (variant < 15359) { start_pipeline_stlm_t(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged STLM BRC: PASS cases=3072 sources=2 patterns=8 flags=16 gaps=0,1,2,3 restore=3072 register_write=Execute ldm_sample=Read block_repeat_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "stlm-t")) throw emu_fatalerror(0, "TMS320C54x isolated STLM T/TRN complete");
 				start_pipeline_swap_body(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -45365,11 +45452,11 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const producer = !strcmp(machine().options().bios(), "exp-norm"), edge = !strcmp(machine().options().bios(), "norm-edge");
 			auto const f = normalization_case(variant, producer, edge);
-			unsigned const checkpoint = edge ? 3 + variant / 128 : producer ? std::array<unsigned, 4>{3, f.read_cycle - 1, f.read_cycle, f.execute_cycle + 1}[variant / 1536] : 3 + variant / 24576;
-			bool const retired = !edge && tick >= f.execute_cycle;
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_cycle), "NORM admits the documented TS range and rejects unsupported shifts at Read");
+			unsigned const checkpoint = edge ? 3 + variant / 8192 : producer ? std::array<unsigned, 4>{3, f.read_cycle - 1, f.read_cycle, f.execute_cycle + 1}[variant / 1536] : 3 + variant / 24576;
+			bool const retired = tick >= f.execute_cycle;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "NORM admits documented counts and recovered negative aliases");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (retired ? f.after[0] : f.before[0]) && m_cpu->state_int(tms320c54x_device::STATE_B) == (retired ? f.after[1] : f.before[1]) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (retired ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "NORM publishes its shifted result/sticky overflow only at Execute and preserves carry and other status");
-			if (!edge && tick == f.read_cycle) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
+			if (tick == f.read_cycle) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot[0] = m_pipeline_extensions_reads; m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -45377,7 +45464,7 @@ private:
 			}
 			if (tick == 20)
 			{
-				expect(m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? f.t : 0xdead), "NORM retains TS despite later T mutation and never rewrites T");
+				expect(m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead, "NORM retains TS despite later T mutation and never rewrites T");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0];
@@ -45385,12 +45472,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254870; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				unsigned const count = edge ? 256 : producer ? 6144 : 98304;
+				unsigned const count = edge ? 16384 : producer ? 6144 : 98304;
 				if (variant + 1 < count) { start_normalization(variant + 1); return; }
 				if (edge)
 				{
-					osd_printf_info("TMS320C54x staged NORM exclusions: PASS cases=256 restore=256 selectors=4 ts_codes=32..47 pages=2 snapshots=2 register_publication=0 data_accesses=0 silicon_trap_claim=0\n");
-					throw emu_fatalerror(0, "TMS320C54x isolated NORM exclusions complete");
+					osd_printf_info("TMS320C54x staged NORM aliases: PASS cases=16384 restore=16384 selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 data_accesses=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated NORM aliases complete");
 				}
 				if (producer)
 					osd_printf_info("TMS320C54x staged EXP NORM: PASS cases=6144 restore=6144 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0\n");
@@ -45812,6 +45899,79 @@ private:
 			if (index < 7) { start_rom4_pcm_mute(index + 1); return; }
 			osd_printf_info("TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR encoder complete");
+		}
+		if (m_phase >= 303000 && m_phase < 303010)
+		{
+			unsigned const index = m_phase - 303000;
+			unsigned const count = std::array<unsigned, 5>{0, 1, 2, 9, 39}[index / 2];
+			bool const returning = index & 1;
+			unsigned const body = returning ? 0x0e02 : 0x0e03;
+			if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == body &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save pending delayed control and armed RPT before its body");
+				m_rom4_codec_replays = 1;
+			}
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
+			{
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0e21,
+				"Delayed repeat reaches its control target after an armed-state checkpoint");
+			for (unsigned i = 0; i < 40; ++i)
+				expect(data.read_word(0x1600 + i) == (i <= count ? u16(0x1357 + i * 257) : 0xdead),
+					"RPT in delayed branch/return completes every copy before transfer");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1401 + count &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1601 + count &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (returning ? 0x1ec4 : 0x1ec3) &&
+				data.read_word(0x15ff) == 0x1234 && data.read_word(0x1628) == 0x5678,
+				"Delayed repeat preserves guards and publishes complete pointers and return stack");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore armed RPT and pending delayed transfer");
+				m_phase = 303000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index < 9) { start_rom4_delayed_repeat(index + 1); return; }
+			osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
+			start_rom4_efr_decoder(0, true); return;
+		}
+		if (m_phase >= 302000 && m_phase < 302164)
+		{
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				osd_printf_info("ROM4 EFR decoder stop: phase=%u pc=%04x sp=%04x illegal=%u\n", m_phase,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native EFR decoder reset/frame returns with balanced stack");
+			if (m_phase == 302000) { start_rom4_efr_decoder(0, false); return; }
+			unsigned const frame = m_phase - 302001;
+			if (replay_rom4_codec_frame(302001 + frame, 20)) return;
+			u8 const *const reference = memregion("efr_reference_pcm")->base() + frame * 320;
+			unsigned mismatches = 0;
+			for (unsigned i = 0; i < 160; ++i)
+			{
+				u16 const expected = reference[i * 2] | (reference[i * 2 + 1] << 8);
+				u16 const actual = data.read_word(0x1388 + i);
+				if (actual != expected)
+				{
+					if (mismatches < 8) osd_printf_info("ROM4 EFR PCM mismatch: frame=%u sample=%u actual=%04x expected=%04x\n", frame, i, actual, expected);
+					++mismatches;
+				}
+			}
+			osd_printf_info("ROM4 EFR decoder comparison: frame=%u mismatches=%u\n", frame, mismatches);
+			m_rom4_pcm_mismatches += mismatches;
+			expect(!mismatches, "native EFR decoder matches independent ETSI PCM");
+			if (frame < 162) { start_rom4_efr_decoder(frame + 1, false); return; }
+			expect(m_rom4_codec_replays == 163, "EFR replays every frame with its original codec histories");
+			osd_printf_info("TMS320C54x ROM4 EFR decoder replay: PASS frames=163 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
+			osd_printf_info("TMS320C54x ROM4 EFR decoder: PASS frames=163 samples=26080 mismatches=0 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR decoder complete");
 		}
 		if (m_phase >= 301000 && m_phase < 301831)
 		{
@@ -47433,7 +47593,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(126, "drsub", "Retained reversed long-word subtraction")
 	ROM_SYSTEM_BIOS(127, "long-pair", "DADD and DSUB retained long-pair controls")
 	ROM_SYSTEM_BIOS(128, "norm", "Retained normalization shift sampling and replay")
-	ROM_SYSTEM_BIOS(129, "norm-edge", "Unsupported normalization shift-domain controls")
+	ROM_SYSTEM_BIOS(129, "norm-edge", "Recovered negative normalization-count aliases")
 	ROM_SYSTEM_BIOS(130, "exp-norm", "EXP producer and normalization T latency")
 	ROM_SYSTEM_BIOS(131, "xc-signed", "Signed XC predicate and protected-slot replay")
 	ROM_SYSTEM_BIOS(132, "xc-controls", "Existing XC sampling and interrupt controls")
@@ -47562,6 +47722,10 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(254, "stack-mod3-edge", "Atomic prefix and write-only MMR/push source exclusions")
 ROM_END
 
+ROM_START(tms54xtra)
+	ROM_SYSTEM_BIOS(0, "stlm-t", "Accumulator T/TRN and BRC publication with retained consumers")
+ROM_END
+
 ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(0, "entry", "Transform-entry snapshot")
 	ROM_SYSTEM_BIOS(1, "cold", "Cold reset from mask ROM and DROM")
@@ -47572,6 +47736,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(6, "fr-encoder", "Isolated acquired ROM FR encoder")
 	ROM_SYSTEM_BIOS(7, "efr-crc", "Isolated acquired ROM EFR CRC")
 	ROM_SYSTEM_BIOS(8, "efr-packing", "Isolated acquired ROM EFR packing and error detection")
+	ROM_SYSTEM_BIOS(9, "efr-decoder", "Isolated acquired ROM EFR speech decoder")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -47600,6 +47765,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(8))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(9))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -47628,6 +47796,13 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(8))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(9))
+	ROM_REGION(80522, "efr_reference_input", 0)
+	ROMX_LOAD("spch_dos.dec", 0, 80522, CRC(cdaa4997) SHA1(e93d62943336e4327e7bab5905dee73a58b7ce4b), ROM_BIOS(9))
+	ROM_REGION(52160, "efr_reference_pcm", 0)
+	ROMX_LOAD("spch_dos.out", 0, 52160, CRC(bbfe268c) SHA1(d738d872bbb4bcf84bc68031166a8981003eea94), ROM_BIOS(9))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
@@ -47642,6 +47817,9 @@ ROM_END
 
 SYST(2026, tms54test, 0, 0, test, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x core conformance tests",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, tms54xtra, 0, 0, test, 0, tms320c54x_test_state, empty_init,
+		"MAME", "TMS320C54x extended conformance profiles",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, tms54bsp, 0, 0, test, 0, c54x_backend_bsp_test_state, empty_init,
 		"MAME", "C54x native backend completed-frame fixture",

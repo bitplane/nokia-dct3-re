@@ -530,7 +530,7 @@ Relevant original annotations and their current validation scope:
 | Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Native FR parameter round trip validated; see packing contract below |
 | Program `0x812f` | `EFR_FR_crc3_AR4` | Candidate CRC helper used by the type-`0x50` buffer consumer |
 | Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Decoder and encoder validated in isolated algorithm fixtures |
-| Program `0xc8dc` | `EFR_decoder` | Candidate enhanced-full-rate decoder |
+| Program `0xc8dc` | `EFR_decoder` | Isolated decoder matches 163 ETSI reference frames, with full-RAM frame replay; see `cobba_control_boundary.md` |
 
 There are no named addresses in `0x8d00..0x93ff`. Querying both ordinary
 comment slots (`S,0` and `S,1`) at every address in that range and at

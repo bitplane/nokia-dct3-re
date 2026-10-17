@@ -1705,11 +1705,10 @@ Flipping the packed MSB (`d30 = s24`, protected by CRC8) changes only its decode
 parameter bit and returns one for every vector. All stages check CRC parameter
 representation, balanced return and adjacent memory guards.
 
-The fixture explicitly selects ordinary speech (`09ba` bit 0 set). SID/DTX
-transformation, repetition-error combining policy, native EFR speech encoding
-and synthesis remain outside this result. The next EFR boundary is native
-parameter/PCM comparison, not attaching a handset clock on the strength of
-packing acceptance.
+The packing fixture explicitly selects ordinary speech (`09ba` bit 0 set).
+SID/DTX transformation, repetition-error combining policy and native EFR speech
+encoding remain outside its result. Native synthesis has a separate acceptance
+boundary below; neither fixture attaches a handset clock.
 
 ### Independent EFR speech reference
 
@@ -1729,4 +1728,54 @@ the reference implementation into the MAME device/CPU sources or substitute an
 AMR codec on the assumption that its 12.2-kbit/s mode is identical. The next
 comparison must align native initialization, parameter order, postfilter and
 DTX/homing policy before interpreting a PCM mismatch as a CPU defect.
+
+### Native EFR decoder acceptance
+
+`make check-c54x-rom4-efr-decoder` rebuilds and verifies the external reference,
+exports only the verified decoder input/PCM into ignored fixture ROM storage,
+and executes acquired reset `c941` and frame wrapper `c8dc`. All 163 frames and
+26,080 final signed PCM samples match the ETSI installation output bit-for-bit.
+History persists between frames. Each frame is saved at its prepared-input
+boundary and re-executed after restore; every ordinary data-space word
+(`0060..ffff`, 65,440 words) must reproduce, not just the 160 output samples.
+The native routines are unchanged; synthetic return sentinels and CPU
+microtests occupy separate fixture program addresses.
+
+The accepted input has BFI=0 and SID=0 throughout, with six TAF=1 frames.
+This is not bad-frame/comfort-noise conformance, native EFR encoding, handset
+transport activation or speech delivered through COBBA. The twenty-millisecond
+fixture polling allowance is an execution budget, not measured codec latency.
+
+Three CPU contracts are required by this ordinary native path:
+
+- **NORM negative-count alias:** raw TS codes `20..2f` select right shifts
+  `-16..-1`, like codes `30..3f`. The documented domain remains -16..31.
+  ROM4 Pow2 at `d54e` uses T=`ffe5` with a later conditional SFTA -16,
+  yielding an overall -27 shift. Treating NORM alone as -27 collapses the
+  gain to zero; the alias returns 6 for exponent 2/fraction 16683, matching
+  the independent reference. A [first-hand 2001 C54x report](https://ftp.fpgarelated.com/showthread/c55x/51-1.php)
+  independently describes -17 behaving as -1. This supports an inferred
+  execution model outside the [TI documented range](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+  not a new datasheet guarantee or a measurement of every silicon revision.
+  Atomic and staged NORM share the decode; `norm-edge` is a compatibility
+  profile name for 16,384 alias cases/restores. Other TS instruction families
+  are not broadened by this result.
+- **High logical immediates:** AND/OR/XOR with an unsigned literal shifted
+  by sixteen support all A/B source/destination selectors. The postfilter
+  uses `f363 ffff` at `c588`; the staged logical-immediate bank covers
+  1,536 cases/restores, including the existing 0/1/7/15 shifts and shift 16.
+- **Repeated delayed-control slot:** an atomic RPT body in a BD/RETD slot
+  completes before the transfer takes effect. The LSF path at `c6ff..c702`
+  uses BD, RPT #9 and MVDD to publish all ten predictor-history words;
+  redirecting after the first iteration leaves nine stale words and breaks
+  the next speech frame. Ten focused BD/RETD cases cover counts 0/1/2/9/39,
+  pointers, guards and replay from an armed-repeat/pending-control snapshot.
+  This does not establish staged RPT-in-control-delay or interrupt composition.
+
+Temporary synthesis/gain probes are not part of acceptance. The runner requires
+every exact frame result, full-RAM replay and delayed-repeat marker, validated
+ROM inputs and the terminal completion. Existing FR packing, encoder and
+decoder gates remain independent regressions. The next speech-codec boundary
+is native EFR encoding and broader receive policy; the separate MCU request
+latch and physical audio-clock boundaries remain unresolved.
 

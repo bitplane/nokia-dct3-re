@@ -3401,25 +3401,29 @@ the covered AR destinations. It ignores DP/CPL, publishes the saturated low
 source word in Execute and does not read its destination. SST handling is
 supported by SPRU131G's saturation-on-store list, which explicitly includes
 STLM; the instruction's unchanged status flags do not imply SST is ignored.
-SPRU131G table 7-3 category 7 requires the word immediately after STLM T
-not to consume T. The multiply path therefore retains T in Read before an
-older Execute store, rather than adding an invented store-forwarding path.
+T latency depends on the consumer: SPRU131G 7.5.6/table 7-13 distinguishes
+multiply from Category-I TS consumers. The multiply path retains T in Read
+after older Execute but before younger Read publications. A zero-gap
+STLM-to-multiply therefore sees the published value without a separate
+store-forwarding mechanism; this does not relax spacing for TS consumers.
 The 12,288 replay cases cover A/B sources, eight guarded/boundary values,
 SST/SXM/OVM/FRCT, gaps `0..3`, MPY/MPYR/MPYU T consumers and LDM TRN
 consumers. Source changes after Read test Execute-live STLM sampling;
 changed T/TRN and RAM after consumer Read test retained operands.
 Decode/Read/consumer snapshots require one register write, one consumer
-read, unchanged source and no replay duplication. Gap-zero T consumers
-violate the documented restriction: their old-value result is a declared
-stage projection, not an architectural guarantee or valid firmware pattern.
-Gap-zero TRN behavior is likewise only a stage projection. Spaced consumers
+read, unchanged source and no replay duplication. Gap-zero TRN behavior
+remains a stage projection, not a measured silicon guarantee. Spaced consumers
 have distinct acceptance coverage; other non-DAGEN MMR destinations and
 indirect STLM forms remain outside this extension.
+The focused `stlm-t` runner uses the separate `tms54xtra` fixture namespace
+because `tms54test` has exhausted its eight-bit BIOS index. It also checks
+3,072 STLM BRC/LDM cases and restores; neither bank substitutes for an
+interrupt or block-repeat composition test.
 
 Memory LD T (`30xx`, SPRU172C LD syntax 1 at 4-70) publishes one
 retained Smem sample in Read, after older Execute. Retirement advances the
 instruction but never rewrites T. Signed MPY/MPYR (`20xx..23xx`) retain
-Smem and T in Read before older Execute; Execute multiplies signed 16-bit inputs, applies FRCT,
+Smem in Read and T after older Execute; Execute multiplies signed 16-bit inputs, applies FRCT,
 rounds MPYR by adding `8000` and clearing the low word, then applies the
 existing destination OVM/overflow handling. SXM does not reinterpret their
 signed operands. Each family has 52,224 RAM/mapped-source replay cases;

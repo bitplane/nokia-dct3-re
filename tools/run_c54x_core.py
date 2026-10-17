@@ -61,7 +61,7 @@ REQUIRED = [
     "TMS320C54x staged immediate ADD: PASS cases=256 selectors=4 shifts=0,1,7,15 sxm=0,1 ovm=0,1 restore=256 duplicate_literals=0",
     "TMS320C54x staged DST: PASS cases=192 sources=A,B sst=0,1 parity=0,1 addressing=DP,CPL writes=6,7 restore=192 duplicate_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged LDM: PASS cases=288 sources=9 destinations=A,B pages=2 sxm=0,1 cpl=0,1 restore=288 duplicate_reads=0",
-    "TMS320C54x staged logical immediates: PASS cases=768 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15 restore=768 duplicate_literals=0",
+    "TMS320C54x staged logical immediates: PASS cases=1536 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15,16 restore=1536 duplicate_literals=0",
     "TMS320C54x staged memory DP: PASS pages=512 cases=1536 source_read=5 producer_execute=8 consumer_execute=9 restore=1536 duplicate_reads=0 silicon_phase_claim=0",
     "TMS320C54x staged conditional branches: PASS cases=96 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 memory_dp_delay=48 restore=96 duplicate_fetches=0 silicon_phase_claim=0",
     "TMS320C54x staged plain returns: PASS cases=36 forms=RET,RETE pages=2 adjacent_old_word=12 nop_new_word=12 restore=36 duplicate_accesses=0",
@@ -345,6 +345,13 @@ EXTRA_PROFILES = {
     "stlm-pmst": (
         "TMS320C54x STLM PMST: PASS cases=38912 restore=38912 mapping_cases=4096 interrupt_cases=34816 sources=A,B patterns=8 old_sst_sxm=4 cpl=0,1 pages=2 entry_regions=low,high old_overlay=0,1 interrupt_sources=IRQ0..15,NMI arrivals=early,late snapshots=4 writes=1 source_sample=Execute prefetched_mapping=retained next_mapping=new vector_mapping=Prefetch balanced_frames=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST complete",
+    ),
+    "stlm-t": (
+        (
+            "TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0",
+            "TMS320C54x staged STLM BRC: PASS cases=3072 sources=2 patterns=8 flags=16 gaps=0,1,2,3 restore=3072 register_write=Execute ldm_sample=Read block_repeat_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0",
+        ),
+        "Fatal error: TMS320C54x isolated STLM T/TRN complete",
     ),
     "stlm-pmst-edge": (
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
@@ -793,8 +800,8 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated NORM complete",
     ),
     "norm-edge": (
-        "TMS320C54x staged NORM exclusions: PASS cases=256 restore=256 selectors=4 ts_codes=32..47 pages=2 snapshots=2 register_publication=0 data_accesses=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated NORM exclusions complete",
+        "TMS320C54x staged NORM aliases: PASS cases=16384 restore=16384 selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 data_accesses=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated NORM aliases complete",
     ),
     "exp-norm": (
         "TMS320C54x staged EXP NORM: PASS cases=6144 restore=6144 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0",
@@ -1422,7 +1429,8 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    command = [str(args.mame.resolve()), "tms54test", "-rompath", str(args.rompath.resolve()),
+    machine = "tms54xtra" if args.profile == "stlm-t" else "tms54test"
+    command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the
                # intentional test-completion exit remain mandatory.

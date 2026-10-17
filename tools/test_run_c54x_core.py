@@ -14,6 +14,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_stlm_t_requires_both_register_banks_and_replay(self):
+        markers, ending = EXTRA_PROFILES['stlm-t']
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='stlm-t')
+        for marker in markers:
+            for changed in (output.replace(marker, ''), marker + '\n' + output):
+                with self.subTest(marker=marker), self.assertRaises(ValueError):
+                    check_result(changed, 3, profile='stlm-t')
+        with self.assertRaises(ValueError):
+            check_result(output.replace('restore=12288', 'restore=0'), 3, profile='stlm-t')
+
     def test_long_store_move_profile_requires_every_shared_address_consumer(self):
         markers, ending = EXTRA_PROFILES['long-mvkd']
         self.assertEqual(len(markers), 7)
@@ -1769,7 +1780,7 @@ class CoreResultTests(unittest.TestCase):
                     check_result(output.replace(old, new), 3, profile=profile)
 
     def test_normalization_profile_scopes(self):
-        for profile, restores in (('norm', 98304), ('norm-edge', 256), ('exp-norm', 6144)):
+        for profile, restores in (('norm', 98304), ('norm-edge', 16384), ('exp-norm', 6144)):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)

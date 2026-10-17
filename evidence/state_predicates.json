@@ -590,6 +590,12 @@
       "evidence": ["docs/cobba_control_boundary.md", "driver/nokia_dsp_c54x.cpp", "tools/c54x_rom4_codec_contract.py", "tools/c54x_rom4_tone_observe.lua", "tools/run_c54x_rom4_tone_levels.py"]
     },
     {
+      "id": "native_rom4_efr_decoder", "owner": "native_dsp_codec", "status": "satisfied",
+      "predicate": "Acquired NSE-1 ROM4 EFR reset and decoder routines reproduce all 163 verified ETSI installation PCM frames with persistent histories and full ordinary-RAM save/replay",
+      "current": "Reset c941 and frame c8dc run unchanged in the isolated fixture. All 26080 final PCM samples match the separately built and verified ETSI reference. Every prepared-input frame is restored and re-executed, comparing 65440 ordinary RAM words; ten BD/RETD single-repeat cases also replay an armed-repeat/pending-transfer checkpoint. The path requires inferred NORM negative-count aliases, complete unsigned high-immediate logical selectors and atomic delayed-control retirement after the full repeated body. Staged NORM aliases have 16384 cases/restores; logical immediates have 1536. Input BFI/SID are zero; TAF is set in six frames. No handset PCM clock is attached, no phone state is forced, and this does not prove native encoding, bad-frame/comfort-noise policy or end-to-end speech. Temporary gain/synthesis probes were removed.",
+      "evidence": ["docs/cobba_control_boundary.md", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/run_c54x_rom4_crc.py", "tools/test_run_c54x_rom4_crc.py", "tools/verify_etsi_efr_reference.py"]
+    },
+    {
       "id": "external_etsi_efr_reference", "owner": "native_dsp_codec_validation", "status": "satisfied",
       "predicate": "The independently acquired ETSI EFR ANSI-C reference reproduces its supplied installation vectors before serving as a native DSP comparison oracle",
       "current": "The pinned ts_146053v080000p0.zip mirror archive builds without source edits using its original GCC makefile with gnu89, O2, fwrapv and WMOPS=0. All three generated outputs match the supplied expected bytes and independently pinned hashes: 80196 encoded bytes, 80522 interface bytes and 52160 decoded PCM bytes over 163 frames. The original input has 96 trailing samples unused by its full-frame loop. The isolated verifier retains commands, archive and executable identities, output hashes and terminal status. This is installation verification, not full GSM 06.54 conformance, native DSP execution, handset audio or a reference implementation imported into MAME.",

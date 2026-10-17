@@ -11,6 +11,14 @@ namespace {
 
 constexpr u16 ST1_BRAF = 0x8000;
 
+constexpr int normalization_shift(u16 t)
+{
+	// Negative NORM counts alias by sixteen outside the documented range.
+	// ROM4 Pow2 uses this together with a conditional SFTA -16.
+	unsigned const code = t & 63;
+	return code < 32 ? int(code) : int(code & 15) - 16;
+}
+
 constexpr bool staged_xmem_bit(u16 word)
 {
 	return (word & 0xff00) == 0x9600;
@@ -85,7 +93,9 @@ constexpr bool staged_repeat_accumulator_load(u16 word)
 constexpr bool staged_immediate_alu(u16 word)
 {
 	u16 const form = word & 0xfcf0;
-	return form == 0xf000 || form == 0xf010 || form == 0xf030 || form == 0xf040 || form == 0xf050 || (word & 0xfcfe) == 0xf060;
+	u16 const high = word & 0xfcff;
+	return form == 0xf000 || form == 0xf010 || form == 0xf030 || form == 0xf040 || form == 0xf050 ||
+		(word & 0xfcfe) == 0xf060 || (high >= 0xf063 && high <= 0xf065);
 }
 
 constexpr bool staged_tc_branch(u16 word)
@@ -3858,11 +3868,6 @@ void tms320c54x_device::pipeline_step()
 		// SPRU172C 4-122 samples TS in Read. EXP needs one separating
 		// word (SPRU131G table 7-13); do not sample after older Execute.
 		m_pipeline_immediate[4] = m_t;
-		unsigned const code = m_t & 63;
-		if (code >= 32 && code < 48)
-		{
-			logerror("%s: staged NORM shift outside documented -16..31 range instruction=%06x word=%04x t=%04x code=%02x cycle=%llu\n", machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_immediate[4], code, (unsigned long long)m_pipeline_cycles); m_illegal = true; return;
-		}
 	}
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1400 || staged_ts_arithmetic(m_pipeline_word[4])))
 	{
@@ -4256,8 +4261,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_norm(m_op))
 		{
-			int const code = m_pipeline_immediate[5] & 63;
-			accumulator(BIT(m_op, 8)) = shifted_load(accumulator(BIT(m_op, 9)), code >= 32 ? code - 64 : code, BIT(m_op, 8));
+			accumulator(BIT(m_op, 8)) = shifted_load(accumulator(BIT(m_op, 9)), normalization_shift(m_pipeline_immediate[5]), BIT(m_op, 8));
 		}
 		else if (staged_long_arithmetic(m_op))
 		{
@@ -4439,18 +4443,18 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_immediate_alu(m_op))
 		{
 			++m_pc;
-			bool const high_arithmetic = (m_op & 0xfcfe) == 0xf060;
-			unsigned const operation = high_arithmetic ? BIT(m_op, 0) : (m_op >> 4) & 15;
+			bool const high_immediate = (m_op & 0xfcf8) == 0xf060;
+			unsigned const operation = high_immediate ? m_op & 7 : (m_op >> 4) & 15;
 			u64 const source = accumulator(BIT(m_op, 9));
 			u64 &destination = accumulator(BIT(m_op, 8));
 			if (operation <= 1)
 			{
-				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (high_arithmetic ? 16 : m_op & 15)) & ACC_MASK;
+				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15)) & ACC_MASK;
 				destination = add_sub(source, operand, operation == 1, BIT(m_op, 8));
 			}
 			else
 			{
-				u64 const operand = u64(m_pipeline_immediate[5]) << (m_op & 15);
+				u64 const operand = u64(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15);
 				destination = operation == 3 ? source & operand : operation == 4 ? source | operand : source ^ operand;
 			}
 		}
@@ -5278,8 +5282,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	if ((op & 0xfcff) == 0xf48f) // NORM source accumulator, destination
 	{
-		const int shift = s8(u8(m_t << 2)) >> 2;
-		accumulator(BIT(op, 8)) = shifted_load(accumulator(BIT(op, 9)), shift, BIT(op, 8));
+		accumulator(BIT(op, 8)) = shifted_load(accumulator(BIT(op, 9)), normalization_shift(m_t), BIT(op, 8));
 		return;
 	}
 	if ((op & 0xfcff) == 0xf49f) // RND source accumulator, destination
@@ -5423,6 +5426,14 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 operand = (data_operand(fetch()) << 16) & ACC_MASK;
 		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
 				BIT(op, 0), BIT(op, 8));
+		--m_icount;
+		return;
+	}
+	if ((op & 0xfcff) >= 0xf063 && (op & 0xfcff) <= 0xf065)
+	{
+		u64 const operand = u64(fetch()) << 16;
+		u64 const source = accumulator(BIT(op, 9));
+		accumulator(BIT(op, 8)) = (op & 7) == 3 ? source & operand : (op & 7) == 4 ? source | operand : source ^ operand;
 		--m_icount;
 		return;
 	}
@@ -6888,10 +6899,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf842: // BC pmad, AGEQ
 		branch_if((s64(m_a << 24) >> 24) >= 0);
 		return;
-	case 0xf063: // AND #lk << 16, A
-		m_a &= u64(fetch()) << 16;
-		--m_icount;
-		return;
 	case 0xf062: // LD #lk, 16, A
 	case 0xf162: // LD #lk, 16, B
 		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
@@ -7003,7 +7010,10 @@ void tms320c54x_device::retire_atomic_instruction(u16 instruction_pc, u16 previo
 	const unsigned words = u16(m_pc - instruction_pc);
 	// Repeat setup arms its body; setup retirement must not consume an iteration.
 	if (repeat_was_armed || !m_rpt_armed) finish_repeats();
-	if (delayed)
+	// A repeated body occupies its delay slot until the final iteration.
+	// Do not redirect after the first copy in BD/RETD; ROM4 uses RPT there.
+	const bool repeated_body_continues = m_rpt_end != REPEAT_END_UNSET && m_pc == m_rpt_address;
+	if (delayed && !repeated_body_continues)
 	{
 		m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
 		if (!m_delayed_words)

@@ -60,6 +60,8 @@ def main():
     parser.add_argument("archive", type=Path)
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / "tmp")
+    parser.add_argument("--fixture-dir", type=Path,
+                        help="export verified decoder inputs/PCM to isolated MAME fixture ROM storage")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -98,6 +100,12 @@ def main():
         evidence["executables"] = {name: digest((source / name).read_bytes())
                                    for name in ("coder", "ed_iface", "decoder")}
         evidence["status"] = "pass"
+        if args.fixture_dir is not None:
+            args.fixture_dir.mkdir(parents=True, exist_ok=True)
+            for suffix in ("dec", "out"):
+                name = f"spch_dos.{suffix}"
+                (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+            evidence["fixture_directory"] = str(args.fixture_dir.resolve())
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
     except (OSError, ValueError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
         if evidence_path is not None:
