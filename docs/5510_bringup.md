@@ -12,11 +12,12 @@ streams, not a matching handset PMM or an internal DSP mask image.
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
 The current software frontier is [recorded payload generation](#recording-header-and-selected-windows):
-source-derived headers match the first eight saved frames after selected-block
-inverse processing. The host decoder accepts one frame and rejects seven;
-native playback remains silent. Verify transform phase/state across those
-packets before attributing their errors to payload packing. Do not treat raw
-transformed bytes as plain AAC or force decoder success.
+96 pre-transform chunks and native block outputs account for 3,072 saved
+bytes, with one state and a cursor advancing by 32. The host decoder accepts
+one frame and rejects seven directly from the captured plaintext, not just
+an inverse-model derivative. Compare bit-writer inputs with that plaintext
+to distinguish packing errors from incorrect encoder fields. Native playback
+remains silent; do not force decoder success.
 The earlier seven-word initializer discrepancy is corrected and fresh
 recording remains byte-identical. Continue without forcing counters, keys,
 lengths or file offsets. These bench results do not establish whole-handset
@@ -5010,9 +5011,10 @@ equivalence over the stated window, not a shorter substitute for the complete
 #### Recording Header and Selected Windows
 
 **Open question:** why do seven of the first eight source-framed packets
-remain rejected after the bounded inverse-window model? First verify the
-transform phase/state across those packets, then recover remaining payload
-field/packing behavior rather than altering headers or forcing decoder results.
+remain rejected directly from the recorder's captured pre-transform arrays?
+The selected-block phase/state and saved-byte correspondence are accounted
+for across this region. Compare bit-writer inputs and their output arrays
+before attributing the problem to encoder field values or CPU packing.
 Partial tails, global phase ownership and complete REL framing remain open.
 
 AA88 `03a930..03a9c5` contains fifteen ten-word field blocks. Each loads
@@ -5039,17 +5041,36 @@ source fields predict suffix `802e8600`, while saved bytes at 1742 are
 words `2e80,0086` to `cd4f,01d2`, and the inverse recovers them exactly.
 It is not evidence of a malformed header field or bad bit packing.
 
-Eight consecutive native transform calls at `03ee95` also match the scalar
-block model. The first input is `f9ff,8050`; the next seven are zero pairs,
-producing `fe90,b156`. Saved bytes `90fe56b1` occur at 32-byte intervals
-after the first block. The inner frame places its far return at SP+8;
-candidate wrapper SP is SP+10. All eight wrapper snapshots show source
-`fd4e`, local position zero and words `16..1b` equal to
-`0000,0020,ffa0,0000,001c,0004`. The pinned wrapper prefix sums arguments
-`1a/1b` and calls `03e69b` with the retained span and cursor. These facts
-support a bounded aligned-chunk model: process the first four bytes of
-each 32-byte chunk and preserve the following 28. They do not establish
-the complete modulo helper, arbitrary starting phases or partial-tail rules.
+96 consecutive native transform calls at `03ee95` match the scalar block
+model. The first input is `f9ff,8050`; the next seven are zero pairs,
+producing `fe90,b156`. The observer captures the full 32-word byte array
+before each transform as well as actual output writes. In all 96 samples,
+the array's first four bytes agree with the inner caller-frame inputs.
+These remain data-read-selected context snapshots, not retained CPU operands.
+
+The inner frame places its far return at SP+8; candidate wrapper SP is
+SP+10. Wrapper snapshots show source `fd4e`, local position zero and
+words `16..1b` equal to `0000,0020,ffa0,0000,001c,0004`. The cursor
+snapshot advances from 0 to 3,040 in exact 32-byte steps, and all 96
+captured 82-word states are identical. The pinned wrapper prefix sums
+arguments `1a/1b` and calls `03e69b` with the retained span and cursor.
+
+The actual first output block plus unchanged source-array tail uniquely
+matches saved `TEST` at offset 622; the checker does not assume this origin.
+All 96 native output blocks plus their 28-byte source tails then match the
+next 3,072 saved bytes exactly. This establishes the selected first-four/
+preserve-28 correspondence across the first eight framed packets, not just
+a recurring byte pattern. The concatenated captured plaintext SHA-256 is
+`58b898113ee90aa6aeaf2d5e75ea3a75650d271137692e9367765c4a3ee94da8`.
+It does not close the complete modulo helper, arbitrary starting phases,
+later state changes or partial-tail rules.
+
+`mu4_recorder_transform_check.py` verifies upload provenance, sample order,
+time and frame domains, scalar/native outputs, input-array correspondence,
+unique file origin, cursor continuity and saved chunks. Malformed evidence
+fails; genuine model/file disagreements remain explicit research results
+with exit 2, never coerced to match. Tests cover changed states per call,
+ambiguous origins, corruption, malformed records and read-only CLI behavior.
 
 In a host-only experiment, this inverse model processes bytes
 `[622,3630)` in memory and supplies only the first 2,977 bytes to FFmpeg
@@ -5059,6 +5080,10 @@ frame/1,024 samples at 44,100 Hz stereo, but rejects seven packets with
 band-count errors. Exit zero is therefore not whole-stream acceptance.
 No derived bytes are fed to MAME. This is partial host validation of
 native-produced media, not native decoded PCM, analog audio or speech.
+The same host test using the first 2,977 captured pre-transform bytes directly
+gives the same one-frame/seven-error result. Transform state/phase or saved
+file changes therefore do not explain those errors within the observed region;
+encoder fields, CPU packing and their syntax interpretation remain open.
 The earlier host test on raw bytes omitted this transform layer and cannot
 by itself establish encoder failure.
 

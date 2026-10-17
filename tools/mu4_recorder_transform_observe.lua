@@ -13,7 +13,7 @@ handles[#handles + 1] = data:install_read_tap(0xfc6c, 0xfc6c, 'mu4_record_transf
     local sp = cpu.state.SP.value
     local page, caller = data:read_u16((sp + 8) & 0xffff), data:read_u16((sp + 9) & 0xffff)
     -- These are reviewed delayed-call return addresses, not key-expansion calls.
-    if page ~= 3 or (caller ~= 0xedae and caller ~= 0xee95) or (seen[caller] or 0) >= 8 then sampling = false; return end
+    if page ~= 3 or (caller ~= 0xedae and caller ~= 0xee95) or (seen[caller] or 0) >= 96 then sampling = false; return end
     seen[caller] = (seen[caller] or 0) + 1
     local ordinal = seen[caller]
     local target = data:read_u16((sp + 2) & 0xffff)
@@ -27,13 +27,23 @@ handles[#handles + 1] = data:install_read_tap(0xfc6c, 0xfc6c, 'mu4_record_transf
     for offset = 0x16, 0x1b do arguments[#arguments + 1] = string.format('%04x', data:read_u16((outer + offset) & 0xffff)) end
     local source = data:read_u16((outer + 2) & 0xffff)
     local position_hi, position_lo = data:read_u16((outer + 4) & 0xffff), data:read_u16((outer + 5) & 0xffff)
+    local cursor_pointer = data:read_u16((outer + 0x18) & 0xffff)
+    local cursor = 'unobserved'
+    if cursor_pointer >= 0x80 and cursor_pointer < 0xffff then
+        cursor = string.format('%04x%04x', data:read_u16(cursor_pointer), data:read_u16(cursor_pointer + 1))
+    end
+    local source_words = {}
+    if arguments[1] == '0000' and arguments[2] == '0020' and source >= 0x80 and source <= 0xffe0 then
+        for offset = 0, 31 do source_words[#source_words + 1] = string.format('%04x', data:read_u16(source + offset)) end
+    end
     sampling = false
     machine:logerror(string.format(
         'mu4_record_transform_input: caller=%06x target=%04x left=%04x right=%04x state_base=fc6c state=%s sp=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0 sample=%u\n',
         0x30000 + caller, target, left, right, table.concat(state, ','), sp, time, pc, ordinal))
     machine:logerror(string.format(
-        'mu4_record_transform_outer: caller=%06x sample=%u candidate_sp=%04x source=%04x position=%04x%04x words_16_1b=%s t=%.9f context_only=1 observer_writes=0\n',
-        0x30000 + caller, ordinal, outer, source, position_hi, position_lo, table.concat(arguments, ','), time))
+        'mu4_record_transform_outer: caller=%06x sample=%u candidate_sp=%04x source=%04x position=%04x%04x words_16_1b=%s t=%.9f context_only=1 observer_writes=0 cursor_pointer=%04x cursor=%s source_words=%s\n',
+        0x30000 + caller, ordinal, outer, source, position_hi, position_lo, table.concat(arguments, ','), time,
+        cursor_pointer, cursor, #source_words > 0 and table.concat(source_words, ',') or 'unobserved'))
     if target < 0x80 or target >= 0xffff then
         machine:logerror('mu4_record_transform_unobserved: target_outside_ram=1 observer_writes=0\n')
         return
