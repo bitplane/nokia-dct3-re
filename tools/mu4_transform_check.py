@@ -94,7 +94,7 @@ def stage3(values,coefficient):
 
 
 def weighted_stage(values,coefficients,width):
-    if width not in (16,32,64) or not values or len(values)%(2*width) or len(coefficients)!=512:
+    if width not in (16,32,64,128,256,512) or not values or len(values)%(2*width) or len(coefficients)!=512:
         raise ValueError('weighted stage requires complete supported groups and coefficient table')
     def parts(value,coefficient):
         return ((coefficient&0xffff)*(value>>16)+(value&0xffff)*(coefficient>>16),
@@ -138,6 +138,8 @@ def invocation_inventory(text, words):
     if ([r['call'] for r in entries]!=list(map(str,range(1,9))) or
             [r['call'] for r in returns]!=list(map(str,range(1,9))) or not invocations):
         raise ValueError('transform inventory requires eight complete processing calls')
+    if [int(r['call']) for r in invocations]!=sorted(int(r['call']) for r in invocations):
+        raise ValueError('transform invocation call order changed')
     result=[]
     previous=-1.0
     for call,(entry,returned) in enumerate(zip(entries,returns),1):
@@ -172,9 +174,79 @@ def invocation_inventory(text, words):
             'scope':'Observed wrapper entries and geometry only; no additional vector arithmetic acceptance'}
 
 
+def verify_all_vectors(directory, words, text):
+    inventory=invocation_inventory(text,words)
+    invocations=rows(text,'mu4_fft_invocation')
+    snapshots=rows(text,'mu4_fft_vector_snapshot')
+    reports=[]
+    cursor=0
+    sites={1:0x2400a,2:0x2401e,3:0x24036,4:0x24051,5:0x2406c,
+           6:0x2408b,7:0x240a6,8:0x240be}
+    for ordinal,entry in enumerate(invocations,1):
+        parameter=int(entry['parameter'],16)
+        final=5 if parameter==0x80 else 8
+        stages=[0,10,11]+list(range(1,final+1))+[9]
+        selected=snapshots[cursor:cursor+len(stages)]
+        cursor+=len(stages)
+        if [int(r['stage']) for r in selected]!=stages:
+            raise ValueError('complete transform stage sequence missing or duplicated')
+        data={}
+        previous=float(entry['t'])
+        for row in selected:
+            stage=int(row['stage'])
+            address=(int(entry['address'],16) if stage in (0,10,11) else
+                     (0x2491e if parameter==0x80 else 0x24946) if stage==9 else sites[stage])
+            base=0xf400 if stage==10 else 0x117a if stage==11 else int(entry['base'],16)
+            count=1024 if stage==10 else 2 if stage==11 else 2*parameter
+            name=f'mu4_fft_{ordinal:03d}_stage{stage}.be16'
+            if (int(row['invocation'])!=ordinal or row['call']!=entry['call'] or
+                    int(row['parameter'],16)!=parameter or int(row['address'],16)!=address or
+                    int(row['opcode'],16)!=words[address] or int(row['base'],16)!=base or
+                    int(row['words'])!=count or row['file']!=name or
+                    row.get('identity')!='Execute_entry' or row.get('context_only')!='1' or
+                    row.get('audio_acceptance')!='0' or float(row['t'])<previous):
+                raise ValueError('complete transform snapshot identity/geometry changed')
+            previous=float(row['t'])
+            returned=next(r for r in rows(text,'mu4_processing_return') if r['call']==entry['call'])
+            if previous>=float(returned['t']):
+                raise ValueError('complete transform snapshot outside processing call')
+            blob=(directory/name).read_bytes()
+            if len(blob)!=count*2 or fnv(blob)!=int(row['hash'],16):
+                raise ValueError('complete transform snapshot length/hash mismatch')
+            data[stage]=blob
+        if data[final]!=data[9]:
+            raise ValueError('complete transform return changes final vector')
+        if ordinal<len(invocations) and previous>float(invocations[ordinal]['t']):
+            raise ValueError('complete transform snapshots overlap next invocation')
+        if data[11]!=struct.pack('>HH',words[0x117a],words[0x117b]):
+            raise ValueError('complete transform constant differs from source')
+        vectors={stage:list(struct.unpack(f'>{parameter}i',data[stage])) for stage in range(final+1)}
+        coefficients=struct.unpack('>512i',data[10])
+        expected={1:radix4(vectors[0]),2:stage3(vectors[1],int.from_bytes(data[11],'big'))}
+        for stage in range(3,final+1):
+            expected[stage]=weighted_stage(vectors[stage-1],coefficients,1<<(stage+1))
+        checks=[]
+        for stage in range(1,final+1):
+            differences=[{'component':i,'native':a,'expected':b}
+                         for i,(a,b) in enumerate(zip(vectors[stage],expected[stage])) if a!=b]
+            checks.append({'stage':stage+1,'mismatched_components':len(differences),
+                           'first_differences':differences[:8]})
+        reports.append({'invocation':ordinal,'call':int(entry['call']),
+                        'base':entry['base'],'complex_points':parameter//2,'stages':checks,
+                        'selected_transform_validated':not any(r['mismatched_components'] for r in checks)})
+    if cursor!=len(snapshots):
+        raise ValueError('unexpected complete transform snapshots')
+    return {'transforms':reports,'invocations':inventory['invocations'],
+            'source_words_pinned':sum(n for _,n,_ in BLOCKS),'native_audio_validated':False,
+            'selected_transform_validated':all(r['selected_transform_validated'] for r in reports),
+            'scope':'All captured transforms in eight packet-bound calls; no all-media, decoder input, PCM, analog or speech acceptance'}
+
+
 def verify(directory,source):
     words=source_contract(source)
     text=(directory/'error.log').read_text()
+    if 'mu4_fft_vector_snapshot:' in text:
+        return verify_all_vectors(directory,words,text)
     snapshots=rows(text,'mu4_fft_snapshot')
     if len(snapshots)!=18:
         raise ValueError('expected nine complete snapshots per selected channel')

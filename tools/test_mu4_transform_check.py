@@ -41,7 +41,72 @@ def fixture(directory):
     return words
 
 
+def complete_fixture(directory):
+    words={site:0xf982 for site in (0x24919,0x24944,0x2491e,0x24946,
+           0x2400a,0x2401e,0x24036,0x24051,0x2406c,0x2408b,0x240a6,0x240be)}
+    words.update({0x117a:0x16a0,0x117b:0x9e66})
+    lines=[]
+    sites={1:0x2400a,2:0x2401e,3:0x24036,4:0x24051,5:0x2406c,
+           6:0x2408b,7:0x240a6,8:0x240be}
+    for call in range(1,9):
+        parameter=0x80 if call%2 else 0x400
+        address=0x24919 if parameter==0x80 else 0x24944
+        final=5 if parameter==0x80 else 8
+        lines.extend((f'mu4_processing_entry: call={call} t={call} observer_writes=0',
+                      f'mu4_processing_return: call={call} t={call+0.9} observer_writes=0',
+                      f'mu4_fft_invocation: call={call} address={address:06x} opcode=f982 '
+                      f'parameter={parameter:04x} base=7000 t={call+0.1} identity=Execute_entry '
+                      'context_only=1 observer_writes=0 audio_acceptance=0'))
+        vectors={0:[((i*1103515245+12345)>>5)%80000-40000 for i in range(parameter)]}
+        vectors[1]=radix4(vectors[0])
+        vectors[2]=stage3(vectors[1],0x16a09e66)
+        for stage in range(3,final+1):
+            vectors[stage]=weighted_stage(vectors[stage-1],coefficients(),1<<(stage+1))
+        vectors[9]=vectors[final]
+        for ordinal,stage in enumerate([0,10,11]+list(range(1,final+1))+[9]):
+            blob=(struct.pack('>512i',*coefficients()) if stage==10 else bytes.fromhex('16a09e66') if stage==11
+                  else struct.pack(f'>{parameter}i',*vectors[stage]))
+            name=f'mu4_fft_{call:03d}_stage{stage}.be16'
+            (directory/name).write_bytes(blob)
+            site=address if stage in (0,10,11) else (0x2491e if parameter==0x80 else 0x24946) if stage==9 else sites[stage]
+            base=0xf400 if stage==10 else 0x117a if stage==11 else 0x7000
+            lines.append(f'mu4_fft_vector_snapshot: invocation={call} call={call} stage={stage} '
+                         f'address={site:06x} opcode=f982 base={base:04x} words={len(blob)//2} '
+                         f'parameter={parameter:04x} hash={fnv(blob):08x} file={name} '
+                         f't={call+0.1+ordinal*0.001:.3f} identity=Execute_entry context_only=1 '
+                         'observer_writes=0 audio_acceptance=0')
+    (directory/'error.log').write_text('\n'.join(lines))
+    return words
+
+
 class TransformTests(unittest.TestCase):
+    def test_complete_short_and_long_snapshot_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            words=complete_fixture(directory)
+            with patch('tools.mu4_transform_check.source_contract',return_value=words):
+                report=verify(directory,b'source')
+                self.assertEqual(report['invocations'],8)
+                self.assertTrue(report['selected_transform_validated'])
+                self.assertFalse(report['native_audio_validated'])
+                text=(directory/'error.log').read_text()
+                for before,after in [('invocation=1','invocation=2'),('words=2048','words=256'),
+                                     ('stage=11','stage=10'),('base=117a','base=117b'),
+                                     ('file=mu4_fft_001_stage0.be16','file=../bad'),
+                                     ('identity=Execute_entry','identity=live_pc')]:
+                    (directory/'error.log').write_text(text.replace(before,after,1))
+                    with self.subTest(before=before),self.assertRaises(ValueError):
+                        verify(directory,b'source')
+                path=directory/'mu4_fft_002_stage6.be16'
+                blob=path.read_bytes()
+                changed=bytes([blob[0]^1])+blob[1:]
+                path.write_bytes(changed)
+                (directory/'error.log').write_text(text)
+                with self.assertRaises(ValueError):
+                    verify(directory,b'source')
+                (directory/'error.log').write_text(text.replace(f'hash={fnv(blob):08x}',f'hash={fnv(changed):08x}',1))
+                self.assertFalse(verify(directory,b'source')['selected_transform_validated'])
+
     def test_invocation_inventory_bounds_and_identity(self):
         words={0x24919:0xf982,0x24944:0xf982}
         lines=[]
@@ -92,17 +157,20 @@ class TransformTests(unittest.TestCase):
 
     def test_complete_model_against_independent_inverse_dft_impulses(self):
         # A numerical model sanity check, not a native/codec error tolerance.
-        for impulse in (0,1,7,31):
-            reverse=sum(((impulse>>b)&1)<<(5-b) for b in range(6))
-            data=[0]*128
-            data[2*reverse]=1<<20
-            result=stage3(radix4(data),0x16a09e66)
-            for width in (16,32,64):
-                result=weighted_stage(result,coefficients(),width)
-            for k in range(64):
-                angle=2*math.pi*k*impulse/64
-                self.assertLessEqual(abs(result[2*k]-(1<<14)*math.cos(angle)),32)
-                self.assertLessEqual(abs(result[2*k+1]-(1<<14)*math.sin(angle)),32)
+        for size in (64,512):
+            bits=size.bit_length()-1
+            for impulse in (0,1,7,size//2-1):
+                reverse=sum(((impulse>>b)&1)<<(bits-1-b) for b in range(bits))
+                data=[0]*(2*size)
+                data[2*reverse]=1<<20
+                result=stage3(radix4(data),0x16a09e66)
+                for power in range(4,bits+1):
+                    result=weighted_stage(result,coefficients(),1<<power)
+                for k in range(size):
+                    angle=2*math.pi*k*impulse/size
+                    amplitude=(1<<20)/size
+                    self.assertLessEqual(abs(result[2*k]-amplitude*math.cos(angle)),32)
+                    self.assertLessEqual(abs(result[2*k+1]-amplitude*math.sin(angle)),32)
 
     def test_capture_and_semantic_mutation_guards(self):
         with tempfile.TemporaryDirectory() as temporary:

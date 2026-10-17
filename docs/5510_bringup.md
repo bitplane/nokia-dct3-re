@@ -13,9 +13,10 @@ The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions. Native playback reaches digital output,
 but the strict audio-completion gate remains rejecting. A shifted-store
 DAGEN ordering defect corrupted younger doubleword loads; an isolated
-red/green CPU fixture now protects the correction. Both selected complete
-64-complex transforms match source-derived integer arithmetic at every
-captured stage. Exact DMA/TX/DIN pairing and native audio conformance remain
+red/green CPU fixture now protects the correction. All 30 transforms in the
+first eight packet-bound calls match source-derived integer arithmetic at
+every captured stage, including fourteen 512-point transforms.
+Exact DMA/TX/DIN pairing and native audio conformance remain
 unvalidated.
 
 Corrected pending-double-store forwarding removes the observed overwide
@@ -35,9 +36,9 @@ rounded-shift/clamp model and match later RAM. After the DAGEN correction,
 the first nonzero block's maximum sample error falls from 43,740 to 7
 (RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
 13 and RMS 1.1492 against the independent decoder. These are measurements,
-not an established codec tolerance. Next broaden transform coverage beyond
-the two selected vectors, including the 512-point path, and establish the
-cause and independent acceptance criteria for the remaining residual.
+not an established codec tolerance. Next audit the pre/post-transform and
+overlap/window processing and establish the cause and independent acceptance
+criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
@@ -6038,9 +6039,9 @@ comes from its source loop bounds, not an imported library prototype.
 The wrapper calls pre-transform `023f05`, bit reversal `023fc5`, transform
 driver `023fee`, then post-transform `023f68`.
 
-The passive Execute observer selects the first `7800` and `e800` vectors
-in processing call 2. It captures full vectors after bit reversal, combined
-stages 1-2, stage 3, stages 4/5/6 and the driver return. Coefficients are
+The passive Execute observer captures every short and long vector in the
+first eight packet-bound calls: after bit reversal, combined stages 1-2,
+stage 3, each weighted stage and the driver return. Coefficients are
 captured separately at `f400..f7ff` and `117a/117b`. The `117b` pointer
 names the coefficient's low halfword; starting a pair there would capture
 the wrong constant.
@@ -6048,9 +6049,10 @@ the wrong constant.
 `tools/mu4_transform_check.py` pins 645 source words across the wrapper,
 bit reversal, controller and three kernel bodies. It verifies snapshot
 identity, geometry, hashes, enclosing processing call and stage order.
-Independent integer formulas reproduce all 128 components at every stage
-for both selected vectors, including source truncation points and return
-preservation. The weighted real cross terms share a shift before high-half
+Independent integer formulas reproduce every component at every captured
+stage for all 30 vectors, including source truncation points and return
+preservation. The 192 checked kernel-stage vectors comprise 124,928 signed
+components. The weighted real cross terms share a shift before high-half
 products are added; separately truncating them changes low bits. The source
 deliberately omits low*low products, so a full-precision multiply is not the
 bit-exact reference.
@@ -6079,14 +6081,14 @@ Across the eight packet-bound source-block pairs, maximum error is 13 and
 RMS 1.1492 over 16,384 signed samples. These comparisons use neither fitted
 alignment nor gain. They do not define a codec-conformance tolerance.
 
-Two 64-point transforms are validated, not every transform invocation or the
-512-point path. The passive `--inventory` report observes 30 wrapper entries
+The passive `--inventory` report observes 30 wrapper entries
 across the eight packet-bound processing calls: call 2 has sixteen 64-point
 vectors (`7800..7f00` and `e800..ef00`, step `0100`); each other call has two
 512-point vectors. The first long vector alternates between `7000` and
 `7800`; its companion is `e800`. Entry identity, source opcode, parameter,
 vector bounds and enclosing call times are checked. This is execution
-coverage, not arithmetic validation of the other 28 vectors. The long driver
+coverage; the snapshot checker separately validates all 30 arithmetic paths.
+The long driver
 uses the same early kernels followed by additional weighted stages at
 return sites `02408b`, `0240a6` and `0240be`; its wrapper return is `024946`.
 
@@ -6095,8 +6097,19 @@ python3 tools/mu4_transform_check.py RUN_DIR --inventory \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00
 ```
 
-Remaining work is broader vector coverage, understanding the
-small PCM residual against a floating-point decoder, and complete digital
+The current snapshot format uses invocation-numbered files and records the
+processing call, parameter, vector geometry and source opcode. It captures
+312 snapshots, including per-invocation coefficients and constants. The
+checker rejects missing/duplicate stages, altered identities or files,
+overlapping invocations and changed return vectors. Synthetic short/long
+fixtures include rehashed arithmetic corruption; independent inverse-DFT
+impulses sanity-check the model at both sizes without defining a codec
+tolerance. The four native word/slot streams and the original eighteen
+selected snapshots reproduce the smaller proof byte-for-byte.
+
+Remaining work is pre/post-transform and overlap/window arithmetic,
+understanding the small PCM residual against a floating-point decoder,
+coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
 The earlier per-word arithmetic exclusions were valid for corrupted inputs;
 they are superseded by this stage-level contract, not current frontiers.

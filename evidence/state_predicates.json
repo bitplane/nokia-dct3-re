@@ -7,7 +7,7 @@
       "owner": "mu4_native_dsp",
       "status": "satisfied",
       "predicate": "Passive source-pinned wrapper observations enumerate short and long transforms inside all eight packet-bound processing calls",
-      "current": "The fresh two-second replay observes 30 entries: sixteen parameter-0080 (64-complex) vectors in call 2 and two parameter-0400 (512-complex) vectors in each other call. The report verifies source opcodes, caller parameter, vector bounds, Execute identity, read-only scope and enclosing call chronology. The four complete word/slot outputs and all eighteen selected transform snapshots remain byte-identical to the pre-inventory proof. Packet binding and 4096 conversion checks still pass. This inventories executed shapes; only two selected short vectors have stage-level arithmetic acceptance. The remaining 28 vectors, waveform conformance, analog output and speech are not validated.",
+      "current": "The fresh two-second replay observes 30 entries: sixteen parameter-0080 (64-complex) vectors in call 2 and two parameter-0400 (512-complex) vectors in each other call. The report verifies source opcodes, caller parameter, vector bounds, Execute identity, read-only scope and enclosing call chronology. The four complete word/slot outputs and the original eighteen selected transform snapshots remain byte-identical to the smaller proof. Packet binding and 4096 conversion checks still pass. This predicate inventories executed shapes; arithmetic acceptance is separate. Waveform conformance, analog output and speech remain unvalidated.",
       "evidence": ["driver/mu4_storage_test.cpp", "tools/mu4_transform_check.py", "tools/test_mu4_transform_check.py", "docs/5510_bringup.md"]
     },
     {
@@ -24,11 +24,11 @@
       ]
     },
     {
-      "id": "mu4_native_selected_64point_transforms",
+      "id": "mu4_native_packet_bound_transforms",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
-      "predicate": "Both selected 64-complex transforms match source-derived integer arithmetic at every captured stage and preserve their final vectors through return",
-      "current": "The Execute observer captures complete 256-word vectors after bit reversal, combined stages 1-2, stages 3/4/5/6 and return, plus the original coefficient table and aligned 117a/117b constant. The checker pins 645 source words and validates all 128 components per stage for both selected vectors in processing call 2. Before the DAGEN fix, stage 3 differed in 31/29 components; afterward every selected stage matches. Coefficients are observed inputs, not fitted values. This does not validate all transform invocations, the 512-point path, decoder input correctness, PCM tolerance, analog output or speech.",
+      "predicate": "All 30 transforms in the first eight packet-bound processing calls match source-derived integer arithmetic at every captured stage and preserve final vectors through return",
+      "current": "The passive Execute observer captures 312 snapshots across sixteen 64-complex and fourteen 512-complex transforms, including their coefficient tables and aligned 117a/117b constant. The checker pins 645 original source words and independently checks 192 kernel-stage vectors (124928 signed components), exact stage chronology, geometry, hashes, enclosing processing calls and return preservation. Every captured stage matches. Synthetic short/long fixtures reject rehashed numerical corruption; independent inverse-DFT impulses sanity-check both model sizes without defining a codec tolerance. All four word/slot outputs and the original eighteen short-transform snapshots reproduce the smaller proof exactly. Coefficients are observed inputs, not fitted values. Pre/post-transform and overlap/window arithmetic, other media, decoder input correctness, PCM conformance, analog output and speech remain unvalidated.",
       "evidence": [
         "docs/5510_bringup.md",
         "driver/mu4_storage_test.cpp",
@@ -49,7 +49,7 @@
       "owner": "mu4_native_dsp",
       "status": "unresolved",
       "predicate": "Packet-bound native processing output agrees with independently decoded samples before claiming native audio",
-      "current": "Eight calls consume all 2977 host-valid AAC bytes and produce the corresponding output loops. The shifted-store DAGEN correction removes the large numerical corruption. Across eight source-block pairs (16384 signed samples), unfitted host-reference error has maximum 13 and RMS 1.1492; the first nonzero block has maximum 7 and RMS 0.8426, with its first mismatch at channel 0/sample 478 rather than 448. Both selected 64-complex transforms match source-derived arithmetic at all stages. Next broaden transform coverage to other invocations and the 512-point path, then establish the cause and appropriate independent acceptance criteria for the small fixed-point/float residual. Exact digital transport alignment, native waveform conformance, analog audio and speech remain unvalidated.",
+      "current": "Eight calls consume all 2977 host-valid AAC bytes and produce the corresponding output loops. The shifted-store DAGEN correction removes the large numerical corruption. Across eight source-block pairs (16384 signed samples), unfitted host-reference error has maximum 13 and RMS 1.1492; the first nonzero block has maximum 7 and RMS 0.8426, with its first mismatch at channel 0/sample 478 rather than 448. All 30 transforms in these calls, including fourteen 512-complex vectors, match source-derived arithmetic at all captured stages. Next audit pre/post-transform and overlap/window processing and establish the cause and appropriate independent acceptance criteria for the small fixed-point/float residual. Exact digital transport alignment, native waveform conformance, analog audio and speech remain unvalidated.",
       "evidence": ["docs/5510_bringup.md","driver/mu4_storage_test.cpp","tools/mu4_processing_check.py","tools/test_mu4_processing_check.py","tools/mu4_transform_check.py","tools/test_mu4_transform_check.py","cpu/tms320c54x/tms320c54x.cpp"]
     },
     {
