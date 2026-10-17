@@ -11,6 +11,7 @@ from tools.test_c54x_rom4_rf_score_check import TONE
 class RepeatTests(unittest.TestCase):
     def case_checks(self, **overrides):
         functions = dict(check_observer_health=lambda text: None,
+                         check_window=lambda text: {'reads_on': 800000, 'reads_off': 100000, 'physical_gate_claim': False},
                          check_consumption=lambda text, scan=False: {'scan': scan, 'reads': 64},
                          check_delivery=lambda text: ('00101438', '006d'),
                          check_request=lambda text: 109,
@@ -35,9 +36,18 @@ class RepeatTests(unittest.TestCase):
             report = inspect_case(TONE, '', 'tone')
         self.assertEqual(report['status'], 'pass')
         self.assertFalse(report['failures'])
-        self.assertEqual(len(report['checks']), 9)
+        self.assertEqual(len(report['checks']), 10)
         self.assertEqual(report['results'], 5000)
         self.assertEqual(report['accepted'], 8)
+
+    def test_window_failure_does_not_discard_delivery(self):
+        def failed(text):
+            raise ValueError('window counts differ')
+        with self.case_checks(check_window=failed):
+            report = inspect_case(TONE, '', 'tone')
+        self.assertEqual(set(report['failures']), {'window_observation'})
+        self.assertEqual(report['checks']['delivery']['status'], 'pass')
+        self.assertEqual(report['status'], 'failed')
 
     def test_mode_and_correlations_cannot_pass_silently(self):
         with self.case_checks(check_request=lambda text: 110,

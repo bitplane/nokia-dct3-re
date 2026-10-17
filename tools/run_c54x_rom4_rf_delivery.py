@@ -12,12 +12,12 @@ import tempfile
 try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
-    from tools.c54x_rom4_rf_score_check import check as check_score, observe as observe_score
+    from tools.c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window
     from tools.c54x_rom4_rf_consumption_check import check as check_consumption
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
-    from c54x_rom4_rf_score_check import check as check_score, observe as observe_score
+    from c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window
     from c54x_rom4_rf_consumption_check import check as check_consumption
 
 
@@ -60,6 +60,7 @@ def inspect_case(text, console, mode):
 
     capture('observer_health', lambda: check_observer_health(console))
     score = capture('score_observation', lambda: observe_score(text))
+    capture('window_observation', lambda: check_window(text))
     capture('score_acceptance', lambda: check_score(text))
     capture('consumption', lambda: check_consumption(text))
     capture('scan_consumption', lambda: check_consumption(text, scan=True))

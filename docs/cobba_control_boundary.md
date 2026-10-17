@@ -501,6 +501,40 @@ Its required fixture ROM directory is `mame/roms`, not the handset `roms`
 directory. Native RF/CRC evidence runners now default to ignored repo `tmp/`
 on disk and accept `--output-root`; they no longer default to tmpfs.
 
+#### Port-3 receive-window candidate
+
+The port-3 receive-window interpretation from the reviewed external emulator
+is a candidate control boundary, not an admitted universal INT0 gate. Original
+resident words independently pin read/OR-`0005`/write at `44a7..44af`,
+read/AND-`fffe`/write at `44b8..44c0`, and zero initialization at
+`4567..456b`. The contract checker names these three sequences explicitly.
+This establishes the firmware's bit operations, not the physical clock or
+interrupt effect of bit 0.
+
+The passive RF observer accounts for every port-`27` read against the last
+observed port-3 bit 0, without changing cadence or the mathematical stimulus.
+Fresh 60-second zero and rotating controls agree: 5,291 port-3 writes, 3,977
+bit-0 transitions, 857,440 reads with bit 0 set and 133,920 with it clear.
+
+| DSP mode `00ac` | Reads with bit 0 set | Reads with bit 0 clear |
+| --- | ---: | ---: |
+| `0000` | 0 | 9,760 |
+| `0001` | 157,888 | 32,000 |
+| `0002` | 864 | 160 |
+| `0004` | 380,928 | 92,000 |
+| `0009` | 320 | 0 |
+| `000c` | 317,440 | 0 |
+
+The runner retains validated window totals and per-mode accounting separately
+from score acceptance; `c54x_rom4_rf_score_check.py --window-only <error.log>`
+checks those observations without promoting acquisition. The rotating score
+still reaches only `0538`; first-response delivery remains `006d`.
+Thus simply suppressing all sample reads/interrupts when bit 0 is clear
+would alter multiple observed lifecycles, including startup. Which phases
+use the control, which pending requests may drain after a clear, and how
+sample availability is clocked remain open. Do not infer a universal gate or
+import a firmware-mode-conditioned sample schedule from the external model.
+
 #### Earlier RF score and delivery captures (not current acceptance)
 
 The following runtime counts and accepted-store/delivery observations describe

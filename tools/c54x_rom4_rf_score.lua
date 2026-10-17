@@ -16,6 +16,19 @@ local mode_writers = {}
 local message_counts = {}
 local search_requests = 0
 local taps = {}
+local port3 = cpu.spaces["io"]:read_u16(3)
+local port3_writes, port3_transitions, reads_on, reads_off = 0, 0, 0, 0
+local window_modes = {}
+taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(3, 3, "rf_window_control", function(_, value, mask)
+    local next_value = (port3 & ~mask) | (value & mask)
+    port3_writes = port3_writes + 1
+    if (port3 & 1) ~= (next_value & 1) then port3_transitions = port3_transitions + 1 end
+    if port3_writes <= 32 then
+        machine:logerror(string.format("rom4_rf_window_write: t=%.9f pc=%04x old=%04x value=%04x mask=%04x\n",
+            machine.time:as_double(), cpu.state["PC"].value, port3, next_value, mask))
+    end
+    port3 = next_value
+end)
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
 local post_fetches = 0
@@ -256,6 +269,11 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
             value = math.floor(2048 * component + 0.5) & 0xffff
         end
         reads = reads + 1
+        local state = memory:read_u16(0x00ac)
+        local window = window_modes[state] or {on = 0, off = 0}
+        window_modes[state] = window
+        if (port3 & 1) ~= 0 then reads_on = reads_on + 1; window.on = window.on + 1
+        else reads_off = reads_off + 1; window.off = window.off + 1 end
         if reads <= 64 then
             machine:logerror(string.format(
                 "rom4_rf_sample_consumption: index=%d t=%.12f pc=%04x counter=%04x\n",
@@ -419,6 +437,11 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
 end
 local stop = emu.add_machine_stop_notifier(function()
     observing = true
+    machine:logerror(string.format("rom4_rf_window_summary: writes=%d transitions=%d reads_on=%d reads_off=%d physical_gate_claim=0\n",
+        port3_writes, port3_transitions, reads_on, reads_off))
+    for state, window in pairs(window_modes) do
+        machine:logerror(string.format("rom4_rf_window_mode: mode=%04x reads_on=%d reads_off=%d\n", state, window.on, window.off))
+    end
     for _, target in ipairs({0x0b6a, 0x0a5c, 0x0ac2}) do
     for _, space_name in ipairs({"program", "data"}) do
         local space = cpu.spaces[space_name]
