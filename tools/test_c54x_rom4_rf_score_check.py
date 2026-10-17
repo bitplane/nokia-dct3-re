@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_score_check import check
+from tools.c54x_rom4_rf_score_check import check, observe
 
 
 ZERO = "rom4_rf_score_summary: mode=zero reads=900000 results=5000 nonzero=0 maximum=0000000000 second=0 accepted=0 acquisition_claim=0"
@@ -8,6 +8,16 @@ TONE = "rom4_rf_score_summary: mode=tone reads=900000 results=5000 nonzero=5000 
 
 
 class ScoreTests(unittest.TestCase):
+    def test_failed_acceptance_still_has_an_unpromoted_observation(self):
+        text = TONE.replace('0000007fff', '0000000538').replace('second=400', 'second=0').replace('accepted=8', 'accepted=0')
+        self.assertEqual(observe(text)['maximum'], 0x538)
+        self.assertEqual(observe(text)['accepted'], 0)
+        with self.assertRaisesRegex(ValueError, 'accepted-value store'):
+            check(text)
+        for invalid in ('', text + '\n' + text):
+            with self.assertRaises(ValueError):
+                observe(invalid)
+
     def test_controls(self):
         self.assertEqual(check(ZERO), ("zero", 5000, 0))
         self.assertEqual(check(ZERO.replace("mode=zero", "mode=dc")), ("dc", 5000, 0))

@@ -13,6 +13,21 @@ data. They are not decoded COBBA register semantics. The production driver
 must not translate MCU call state or Nokia mailbox values directly into COBBA
 register writes.
 
+Current native scope is split deliberately:
+
+- [Isolated codec gates](#independent-efr-speech-reference) establish FR/EFR
+  algorithm results; EFR additionally has nonzero DTX and clean encoder/decoder
+  homing coverage. The active-speech erasure precision difference remains a
+  separate strict comparison, not a reason to alter CPU arithmetic.
+- [BSP ownership and pin gates](#serial-control-ownership-correction) cover
+  externally clocked burst and continuous FIG=0 reception/transmission,
+  ready/status interrupts and saved state. No production handset clock is
+  attached by those tests.
+- The native request/acknowledgement alias can still destroy shared command
+  payloads; its electrical ownership is unresolved. RF sample encoding,
+  production/consumption timing and SCU serialization are also open. None of
+  the codec or peripheral gates promotes native handset speech or acquisition.
+
 Nokia's NSE-1 System Module manual (03/98, pp. 3-11, 3-32 and 3-41)
 distinguishes the physical interfaces: the parallel connection has twelve
 data lines, four address lines, read/write strobes and a data-available signal;
@@ -307,48 +322,59 @@ the active TC-mode interpretation remain to be validated numerically.
 ### Current RF-control reproducibility boundary
 
 A fresh `run_c54x_rom4_rf_delivery.py --repeats 1` check against binary
-SHA-256 `67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`
-does not reproduce the accepted-store result below. Zero produces 4889
-completed zero scores; rotating input produces 4889 nonzero scores, maximum
+SHA-256 `a4de2e3a9a48dcfb9cb305bbca31d4df550ec5306a8097eff6c4c55c1fda76fd`
+does not reproduce the accepted-store result below. Zero produces 4890
+completed zero scores; rotating input produces 4890 nonzero scores, maximum
 `0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
 `0x0574`. The strict rotating-input gate fails and is not rebanked.
 The retained comparison data below therefore describes earlier captures,
-not verified acceptance on this executable. First reconcile the score-path
-instruction/peripheral changes and capture provenance; do not increase input
+not verified acceptance on this executable. Further comparison needs matched
+capture provenance or independently supported RF input; do not increase input
 amplitude or lower the acceptance threshold to make this diagnostic pass.
 The RF delivery runner writes `inputs.json` before launching any case and
 per-case `invocation.json` before emulation: binary/observer/generator/loose-ROM
 hashes, explicit missing inputs, command and generated EEPROM hash survive a
 failed gate. Source revision alone is not treated as executable provenance.
+Both controls currently consume 991,360 input words and independently pass
+startup/scan consumption, first response delivery (`1390`, object `101438`,
+body `006d`), request correlation and channel-109 numerical tuning consistency.
+Neither has an accepted score. The zero case passes its control conditions;
+the rotating case fails only score acceptance. This is not physical RF input,
+successful acquisition or registered-network evidence.
 
-A fresh cold run with the minimal observer from `ee56297f` (the same
-rotating port input and only the three score-path taps, without the later
-delivery/tuning observations) reproduces the current result exactly:
-991360 input reads, 4889 nonzero scores, maximum `0x0538`, zero second
-comparisons and zero accepted stores. The added observation layer is therefore
-not the cause of this discrepancy. Executable/configuration history and the
-provenance of the earlier capture remain to be reconciled; neither score is
-yet grounds for changing instruction semantics or physical-input assumptions.
+The runner writes schema-2 `result.json` per case and `summary.json` even
+when a checker fails. Observed values and independently evaluated boundaries
+remain visible alongside named failures; a decoded summary is not score
+acceptance. Failed cases cannot make the overall exit status green. Binary,
+observer, generator and actual ROM identities remain in `inputs.json`, with
+the per-case command and generated storage identity in `invocation.json`.
 
-The same executable passes all 64 signed RF-filter impulse controls after
+The retained arithmetic audit used binary SHA-256
+`67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`.
+A minimal-observer control from `ee56297f`, without delivery/tuning taps,
+also produced 991360 reads, 4889 nonzero scores, maximum `0x0538` and zero
+accepted stores. That rules out the added observation layer on that binary,
+not all executable/configuration differences. The operand-level proofs below
+belong to that retained capture; they do not assert that every present
+instruction operand is unchanged.
+
+That arithmetic-audit executable passes all 64 signed RF-filter impulse controls after
 correcting fixture alignment. The previous fixed `1.6402`-second onset selected
 port reads at `0x33cb/0x33d1/0x33d7/0x33dd`, not the filter under test, and
 failed its unchanged input-PC check. The fixture now waits for the first filter
 read at `0x330c` after that minimum time. All 32 positions at both `+16384`
 and `-16384` match the existing coefficient, lane and rounding expectations.
-This validates the isolated filter contract on the current core, not the
+This validates the isolated filter contract on that executable, not the
 continuous correlation score, physical RF timing or acquisition.
 
-Bounded passive taps localize the current rotating-input result further.
+Retained passive taps localize the rotating-input arithmetic.
 The first eight entries at `0x4778` have `A=0x0d047a80`, `B=0`,
 `ST1=0x6103`; at `0x478a` the scratch denominator at data `0x0060`
 is `0x0a90` and both accumulators are zero. At `0x4791`, `A=0x6e40`
 and `B=0`; at `0x4796`, `A=0x800538`, before the returned low-word
-score becomes `0x0538`. These are current execution observations, not an
-independent arithmetic oracle. The next discriminator is an instruction-level
-audit of this normalization path and its incoming correlation state against
-the documented C54x semantics; changing divisor, scaling or threshold is not
-supported by these observations.
+score becomes `0x0538`. Independent integer checks below reproduce that
+captured path through normalization; it is not an outstanding instruction
+defect or grounds for changing divisor, scaling or threshold.
 
 The captured division tail is independently consistent: at `0x4791`,
 `ADD B,A` leaves `A=0x6e40`, and `SFTA A,8` supplies numerator `0x6e4000`.
@@ -474,6 +500,15 @@ threshold, input amplitude or CPU instruction semantics is changed.
 Its required fixture ROM directory is `mame/roms`, not the handset `roms`
 directory. Native RF/CRC evidence runners now default to ignored repo `tmp/`
 on disk and accept `--output-root`; they no longer default to tmpfs.
+
+#### Earlier RF score and delivery captures (not current acceptance)
+
+The following runtime counts and accepted-store/delivery observations describe
+earlier captures whose matched executable/input provenance is incomplete.
+They do not supersede the failed current reproducibility check above. Retain
+the byte-checked consumer paths and costly negative knowledge, but do not
+interpret the nine accepted stores as current acceptance or change arithmetic
+to recover them. The strict delivery gate remains the promotion condition.
 
 `c54x_rom4_rf_score.lua` supplies three explicit mathematical controls
 at port `0x27`: zero; DC word pairs `(2048,0)`; and rotating word pairs
@@ -871,13 +906,16 @@ captures do not supersede the same-object consumer-effects acceptance check.
 
 The MCU bitmap-to-entry path and selected-entry tuning arithmetic are now
 correlated with the native capture; see the synthesizer sections above.
-The remaining operational boundaries are SCU serialization/settling and
+The mapped operational boundaries are SCU serialization/settling and
 RF sample lane, scaling and cadence. Task 10's counted flag-clear return and
 one flag setter are mapped above; successful acquisition remains open. The
-score checker still passes (5146 nonzero results, 500 second comparisons,
-nine accepted stores); it does not validate packet delivery or acquisition.
+score checker passed on that earlier capture (5146 nonzero results, 500 second
+comparisons, nine accepted stores); it is not a current passing result or
+evidence of acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,
 not proof that the resident lifecycle is blocked there.
+
+### RF receive observation contract
 
 The present port-`27` receive implementation calls
 `nokia_cobba_device::rf_receive_sample()` synchronously for every DSP

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "native_nse1_rf_acquisition", "owner": "native_dsp_rf", "status": "unresolved",
+      "predicate": "Native NSE-1 completes acquisition from independently supported RF sample and tuning boundaries without HLE output or firmware-state forcing",
+      "current": "The current fresh zero and rotating diagnostic controls each consume 991360 port words and produce 4890 scores. Zero remains zero; rotating scores reach maximum 0538, below unchanged threshold 0574, with zero second comparisons and accepted stores. Both independently pass startup/scan consumption, native first-response delivery of 006d, request correlation and channel-109 numerical tuning consistency. Only rotating-score acceptance fails, so the strict overall gate remains rejecting. Schema-2 case and summary reports preserve each boundary rather than discarding delivery evidence after the score failure. Earlier nine-store captures are explicitly historical and unreproduced, not a CPU-correction oracle. Diagnostic lane order, amplitude and read-indexed waveform are not physical RF-format/cadence evidence; SCU serialization/settling and valid GSM input remain open. Codec and serial-peripheral acceptance do not promote acquisition or native handset speech.",
+      "evidence": ["docs/cobba_control_boundary.md", "docs/rom4_dsp_loader.md", "tools/run_c54x_rom4_rf_delivery.py", "tools/test_run_c54x_rom4_rf_delivery.py", "tools/c54x_rom4_rf_score_check.py", "tools/test_c54x_rom4_rf_score_check.py", "tools/c54x_rom4_rf_delivery_check.py", "tools/c54x_rom4_rf_consumption_check.py"]
+    },
+    {
       "id": "mu4_native_coefficient_cache_publication",
       "owner": "mu4_native_dsp",
       "status": "satisfied",

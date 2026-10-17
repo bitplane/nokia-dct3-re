@@ -355,14 +355,16 @@ not wake from suspended ARM execution. The NSE-1 profile still disables the
 ROM6-derived clock-stop action until a ROM4 path actually requesting it and
 its wake contract are characterized.
 
-The backend also terminates the distinct C54x memory-mapped `0x22`/`0x32`
-parallel control path at COBBA. Frames retain their recovered opaque form:
-bits 15--12 select one of 16 registers and bits 11--0 carry data. The coherent
-ROM organically emits register-C transitions `0x008 -> 0x0c8` during codec
-bring-up and writes codec serial port `0x21`. A corrected twelve-second
-interface census originally recorded zero reads from DSP sample port `0x27`
-and zero writes to port `0x32`. That absence is now
-explained by the ROM4 cold-entry interrupt-mask contract rather than RF data.
+The backend maps C54x data `0x20/0x21/0x22` to BSP receive, transmit and
+control state. The observed `c008 -> c0c8` words reset/release the serial
+engines; their upper nibble is not evidence of a COBBA register-C write.
+Data `0x32` is an opaque saved latch with no COBBA forwarding. These data
+addresses are distinct from DSP I/O ports `0x21/0x27/0x31/0x32` and control
+ports `0x2c/0x2d`. The authoritative ownership and pin-level acceptance are
+in [COBBA serial-control ownership](cobba_control_boundary.md#serial-control-ownership-correction).
+
+Cold-entry interrupt masking explains the earlier absence of RF sample
+reads and SCU-port writes, not a missing codec completion.
 The recovered code ORs `0x0204` and then `0x015a` into retained IMR state, and
 the INT0 vector at `0x3204` owns the receiver. Supplying cold-entry bit 0 yields
 terminal `IMR=0x035f` and organic sample reads; routing the same frame edge to
@@ -1986,8 +1988,11 @@ in `0x07` across `0x9000..0xdfff`. A live run proved code at `0x37fc` otherwise
 attempts to overwrite `0xb707` immediately before the challenge. The backend now treats
 those mask-ROM writes as no-ops. This prevents later dispatcher corruption but
 does not by itself correct the first challenge's task selection.
-COBBA control ports `0x2c`/`0x2d` and codec serial port `0x21` now terminate in
-the COBBA device. PCM sample timing remains open.
+DSP I/O control ports `0x2c/0x2d` terminate in the opaque COBBA transport.
+Data-space BDXR/BDRR use the separately owned BSP state and evidenced untimed
+boot echo; I/O port `0x21` remains an opaque mask/write-back word, not a proven
+microphone/DAC port. Operational PCM attachment remains open; see
+[the address-space contract](cobba_control_boundary.md#native-nse-1-address-space-audit).
 
 The core corrections required to reach this point are generic C54x semantics:
 absolute `STM` extension order, `MVDM`, `DLD`/`DST`, `CMPL`, immediate `XOR`,

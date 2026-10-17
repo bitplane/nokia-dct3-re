@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nse1_data22_cxxx_proves_cobba_parallel_register_c",
+      "status": "disproven",
+      "hypothesis": "Resident data-space 0022 writes c008/c0c8 prove a packed COBBA parallel register-C transaction, and data 0032 has the same recovered owner",
+      "conclusion": "TI SPRU131G 8.2 maps 0020/0021/0022 to BDRR/BDXR/BSPC on the relevant buffered-serial variants, corroborated by the original reset/release, BDXR write and BDRR self-test path. The backend now owns those serial registers and its pin/status/save-state gates pass. Data 0032 has no established MAD2 peripheral owner and retains an opaque latch; its unsupported COBBA forwarding was removed. DSP I/O 0021 is a different address space and remains opaque mask/write-back state, not demonstrated microphone/DAC samples. A Cxxx upper nibble is not a peripheral-ownership proof; do not restore the former MFI forwarding from stale loader notes.",
+      "evidence": ["docs/cobba_control_boundary.md", "docs/rom4_dsp_loader.md", "docs/djr_dsp_integration.md", "driver/nokia_dsp_c54x.cpp", "tools/run_c54x_backend_bsp.py", "tools/c54x_rom4_codec_contract.py"]
+    },
+    {
       "id": "c54x_blanket_stlm_t_gap_for_register_products",
       "status": "disproven",
       "hypothesis": "The generic STLM-to-T recommendation makes an adjacent register MPYA/MACA/MASA consumer use old T, so every such multiplier needs a separating word",
