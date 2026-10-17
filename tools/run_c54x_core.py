@@ -1429,7 +1429,7 @@ EXTRA_PROFILES = {
 }
 
 
-def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False, profile=None):
+def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False, profile=None, verbose_teardown=False):
     scopes = [(bus_registers, BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION),
               (bus_io, BUS_IO_REQUIRED, BUS_IO_COMPLETION),
               (atomic_io, ATOMIC_IO_REQUIRED, ATOMIC_IO_COMPLETION),
@@ -1447,6 +1447,10 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit status {returncode}; expected test completion exit 3")
     lines = text.splitlines()
+    # Verbose SDL shutdown follows the intentional fatal-error completion.
+    # Admit only the exact suffix, never arbitrary output after the result.
+    if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:
+        lines = lines[:-2]
     if "Errors:" in lines:
         raise ValueError("MAME reported driver validity errors")
     required, completion = ([selected[0][0]], selected[0][1]) if selected else (REQUIRED, COMPLETION)

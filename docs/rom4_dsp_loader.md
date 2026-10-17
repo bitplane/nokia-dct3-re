@@ -5446,11 +5446,19 @@ The generated report gives the current fixture-only total; these are *word*
 counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
-`make check-c54x-observed-coverage` regenerates both verbose logs and fails if
+`make check-c54x-observed-coverage` regenerates the fixture and handset logs and fails if
 the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
+Its core-fixture leg uses the standalone runner's five-emulated-second stop
+bound and `check_result` contract: every required conformance marker, the
+intentional completion exit, and the terminal completion message are mandatory.
+A coverage capture keeps verbose mode to emit opcode records; only its exact
+two-line SDL teardown suffix is permitted after completion.
+A timed normal exit is not acceptance. Failed coverage runs retain their
+isolated directory and print its location; successful runs remove scratch
+artifacts. The stop bound is a harness budget, not a DSP timing claim.
 `make check-c54x-cross-rom` combines
 native core conformance, ROM4 RF-boundary and observed coverage checks,
 3210 coherent frontier, native 5110 physical Phone book menu, and the

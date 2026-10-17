@@ -1602,14 +1602,14 @@ check-c54x-opcode-coverage:
 
 check-c54x-observed-coverage: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-c54x-coverage.XXXXXX")"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native coverage failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
+		status=0; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
 			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none \
-			-log -verbose -nothrottle -seconds_to_run 2 >output.log 2>&1 \
-			|| { status=$$?; test "$$status" -eq 3; }; \
-			grep -q 'TMS320C54x core conformance: PASS' output.log \
-				|| { cat output.log >&2; exit 1; }); \
+			-log -verbose -noreadconfig -nothrottle -seconds_to_run 5 >output.log 2>&1) || status=$$?; \
+		$(PYTHON) -c 'from pathlib import Path; import sys; from tools.run_c54x_core import check_result; check_result(Path(sys.argv[1]).read_text(), int(sys.argv[2]), verbose_teardown=True)' \
+			"$$tmp/core/output.log" "$$status"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \

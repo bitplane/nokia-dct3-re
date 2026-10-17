@@ -2453,6 +2453,22 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(output, 3)
 
+    def test_verbose_teardown_is_exact_and_opt_in(self):
+        suffix = 'Enter sdlwindow_exit\nLeave sdlwindow_exit\n'
+        check_result(self.output + suffix, 3, verbose_teardown=True)
+        check_result(self.output, 3, verbose_teardown=True)
+        with self.assertRaises(ValueError):
+            check_result(self.output + suffix, 3)
+        for output in (self.output + suffix + 'crash\n',
+                       self.output + 'unexpected\n' + suffix,
+                       self.output + 'Enter sdlwindow_exit\n',
+                       self.output.replace(COMPLETION, '') + suffix,
+                       self.output.replace(REQUIRED[0] + '\n', '') + suffix):
+            with self.subTest(output=output[-100:]), self.assertRaises(ValueError):
+                check_result(output, 3, verbose_teardown=True)
+        with self.assertRaises(ValueError):
+            check_result(self.output + suffix, 0, verbose_teardown=True)
+
     def test_other_fatal_error_rejected(self):
         with self.assertRaises(ValueError):
             check_result('Fatal error: unexpected failure\n' + self.output, 3)
