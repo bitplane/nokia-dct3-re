@@ -17,12 +17,21 @@ FRAME_IGNORE = 'C54x native backend BSP frame ignore: PASS directions=2 words=4 
 JOINED_PINS = 'C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0'
 CLOCKED_STORE = 'C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
+REQUESTS = 'C54x native backend slot request: PASS cases=6 pending_restore=6 armed_restore=6 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=6 mapping_claim=0'
+REQUEST_COMPLETION = 'Fatal error: C54x backend slot request tests complete'
 
 
-def check_result(text, returncode, *, verbose_teardown=False):
+def check_result(text, returncode, *, verbose_teardown=False, host_requests=False):
     lines = text.splitlines()
     if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:
         lines = lines[:-2]
+    if host_requests:
+        if (returncode != 3 or lines.count(REQUESTS) != 1 or lines.count(REQUEST_COMPLETION) != 1
+                or not lines or lines[-1] != REQUEST_COMPLETION):
+            raise ValueError('missing unique slot-request storage/restoration completion')
+        if any(line.startswith('Fatal error:') and line != REQUEST_COMPLETION for line in lines):
+            raise ValueError('unexpected slot-request fatal error')
+        return
     if returncode != 3 or lines.count(MARKER) != 1:
         raise ValueError('missing unique successful backend BSP completion')
     if lines.count(OBSERVATION) != 1:
@@ -56,6 +65,7 @@ def main():
     parser.add_argument('--mame', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
     parser.add_argument('--coverage', action='store_true', help='retain native opcode/decoder records with verbose teardown')
+    parser.add_argument('--host-requests', action='store_true', help='check slot pending storage, masking, acceptance and save/load, not physical source mapping')
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix='c54x-backend-bsp-', dir=args.output_root.resolve()))
@@ -64,13 +74,15 @@ def main():
                '-seconds_to_run', '1']
     if args.coverage:
         command.append('-verbose')
+    if args.host_requests:
+        command.extend(['-bios', 'requests'])
     print(f'Native backend BSP evidence: {run}', flush=True)
     with (run / 'console.log').open('w') as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / 'console.log').read_text()
     print(text, end='')
     try:
-        check_result(text, result.returncode, verbose_teardown=args.coverage)
+        check_result(text, result.returncode, verbose_teardown=args.coverage, host_requests=args.host_requests)
     except ValueError as error:
         print(f'Native backend BSP: FAIL: {error}', file=sys.stderr)
         return 1

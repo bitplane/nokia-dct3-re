@@ -101,6 +101,7 @@ private:
 	u16 m_frame_counter_base = 0;
 	attotime m_frame_counter_epoch;
 	bool m_slot_compare_written = false;
+	bool m_slot_request_pending = false;
 	u64 m_slot_timer_expiries = 0;
 	u64 m_frame_timer_expiries = 0;
 	u32 m_io_trace_count = 0;

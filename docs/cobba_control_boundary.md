@@ -1667,6 +1667,27 @@ still losing part of the packed register index. Do not transplant that
 mask as a complete fix. Recover which request signals are independently
 latched, how MCU control writes assert them, and whether port-1/2 acceptance
 can alter DARAM before reinterpreting COBBA bits or attaching its clock.
+
+The existing modeled slot-compare request now has its own saved pending bit.
+Expiry sets that bit without OR-ing `0008` into the shared parameter word;
+the modeled port-1 result still combines it with the ring comparator and the
+provisional MCU-request alias. Port-1/2 acceptance of bit 3 and DSP reset clear
+the slot latch. Its cadence and request-bit assignment are unchanged.
+`check-c54x-backend-requests` exercises six isolated cases: payloads
+`0000/8000/9201` through both accept ports, masked expiry and later unmask,
+unrelated completion, pending-state restoration after acknowledgement,
+and armed-timer restoration after reset cancellation. CPU-line observations
+settle at scheduler boundaries before snapshots. The old implementation
+fails the payload-integrity assertion on its first expiry.
+
+This is model storage/transition conformance, not independent silicon evidence
+for the timer clock, port map or INT2 assignment. Payload bit 3 is deliberately
+clear in those fixtures to isolate the slot latch: a packed parameter such as
+`9209` still overlaps the unresolved MCU alias and is not proved safe under
+acknowledgement. Do not cite this gate as fixing that alias, establishing all
+request producers or validating native gain/audio. Separating one peripheral
+event from DARAM does not justify inventing the other sources.
+
 The checked MCU continuation `272036..27204e` distinguishes parameter data
 from its explicit trigger: after the shared-field store at `272034`, the
 selected update path writes a pending flag, writes halfword `4` to DSPIF
@@ -1793,6 +1814,10 @@ activation, and captures a blank final frame. It is not a complete fix and
 is not retained in the driver. This rules out simply deleting the inferred
 request sources; recover their legitimate producers rather than substituting
 the ring-only result or restoring a guessed bitmap with a new name.
+That experiment also suppressed the modeled slot request. It does not test
+retaining the independently stored slot event while removing only requests
+derived from the MCU parameter payload; the two hypotheses must not share
+an absence/closure claim.
 The tone-level fixture passively records capped request reads and their
 following accept writes, with uncapped totals; it does not require the
 current destructive behavior as an acceptance condition.

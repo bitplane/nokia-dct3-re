@@ -47873,7 +47873,7 @@ protected:
 	}
 	virtual void machine_reset() override
 	{
-		m_stage = 0;
+		m_stage = !strcmp(machine().options().bios(), "requests") ? 90 : 0;
 		m_case = 0;
 		m_rf_source_reads = 0;
 		m_timer->adjust(attotime::from_usec(100));
@@ -48572,8 +48572,97 @@ private:
 	{
 		if (!condition) throw emu_fatalerror("C54x backend BSP: %s", message);
 	}
+	void check_slot_request()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		auto &io = m_cpu->space(AS_IO);
+		// Keep payload bit 3 clear to isolate the slot latch from the still
+		// unresolved MCU-request alias. This is not an overlap/alias proof.
+		u16 const payload = std::array<u16, 3>{0, 0x8000, 0x9201}[m_case / 2];
+		unsigned const accept_port = 1 + m_case % 2;
+		if (m_stage == 90)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			m_backend->reset_line_w(0);
+			m_cpu->space(AS_PROGRAM).write_word(0xff80, 0xf4e1); // Bench reset entry: IDLE.
+			data.write_word(0x0852, 0); data.write_word(0x0853, 0);
+			data.write_word(0x0854, payload); data.write_word(0x0855, 0);
+			m_backend->reset_line_w(1);
+			io.write_word(2, 8); // Mask this source before its future expiry.
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			expect(io.read_word(1) == payload, "No slot request before its programmed compare");
+			io.write_word(0x0f, (io.read_word(0x0d) + 100) % 5000);
+		}
+		else if (m_stage == 91)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			expect(data.read_word(0x0854) == payload, "Slot expiry cannot rewrite the shared parameter payload");
+			expect(io.read_word(1) == (payload | 8), "Slot expiry adds its existing request bit independently of payload storage");
+			if (!payload) expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "In-service masking retains the pending slot without asserting INT2");
+			io.write_word(1, 0x40);
+			expect(io.read_word(1) == (payload | 8), "An unrelated completion cannot retire the slot request");
+			io.write_word(2, 0);
+		}
+		else if (m_stage == 92)
+		{
+			// CPU input changes settle between callbacks, before the snapshot.
+			if (!payload) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 4, "Unmasking the retained slot request asserts native source 2");
+			m_timer->adjust(attotime::never);
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
+			io.write_word(accept_port, 8);
+			expect(io.read_word(1) == payload && data.read_word(0x0854) == payload, "Either accept port retires the slot without changing these payloads");
+		}
+		else if (m_stage == 93)
+		{
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE && io.read_word(1) == (payload | 8) && data.read_word(0x0854) == payload,
+				"Restoring pending hardware state does not reconstruct it from shared data");
+		}
+		else if (m_stage == 94)
+		{
+			if (!payload) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 4, "The pending snapshot restores the native source-2 latch");
+			io.write_word(accept_port, 8);
+			m_backend->reset_line_w(0);
+			expect(io.read_word(1) == payload, "DSP reset does not retain a stale slot request");
+		}
+		else if (m_stage == 95) m_backend->reset_line_w(1);
+		else if (m_stage == 96)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			io.write_word(2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			io.write_word(0x0f, (io.read_word(0x0d) + 100) % 5000);
+			m_timer->adjust(attotime::never);
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the armed timer before expiry");
+			m_backend->reset_line_w(0);
+		}
+		else if (m_stage == 97)
+		{
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE && io.read_word(1) == payload,
+				"Restore an armed, not-yet-pending timer after live reset cancellation");
+		}
+		else
+		{
+			expect(io.read_word(1) == (payload | 8) && data.read_word(0x0854) == payload,
+				"The restored compare expires through its saved timer without changing the payload");
+			if (!payload) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 4, "Restored armed timer delivers the same native interrupt source");
+			m_backend->reset_line_w(0);
+			expect(io.read_word(1) == payload, "Reset clears a pending slot but preserves DARAM");
+			if (++m_case == 6)
+			{
+				osd_printf_info("C54x native backend slot request: PASS cases=6 pending_restore=6 armed_restore=6 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=6 mapping_claim=0\n");
+				throw emu_fatalerror(0, "C54x backend slot request tests complete");
+			}
+			m_stage = 90; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 90) { check_slot_request(); return; }
 		if (m_stage >= 80) { check_clocked_store(); return; }
 		if (m_stage >= 70) { check_joined_pins(); return; }
 		if (m_stage >= 60) { check_frame_ignore(); return; }
@@ -49399,6 +49488,8 @@ ROM_START(tms54rom4)
 ROM_END
 
 ROM_START(tms54bsp)
+	ROM_SYSTEM_BIOS(0, "bsp", "Native backend serial peripherals")
+	ROM_SYSTEM_BIOS(1, "requests", "Native backend slot request storage")
 	ROM_REGION16_LE(0x20000, "dsp_program", ROMREGION_ERASE00)
 	ROM_REGION16_LE(0x20000, "dsp_data", ROMREGION_ERASE00)
 ROM_END

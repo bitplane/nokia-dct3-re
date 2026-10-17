@@ -1,8 +1,32 @@
 import unittest
 from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import REQUESTS, REQUEST_COMPLETION
 
 
 class BackendBspResultTest(unittest.TestCase):
+    def test_slot_requests_are_separate_from_bsp_acceptance(self):
+        text = REQUESTS + '\n' + REQUEST_COMPLETION
+        check_result(text, 3, host_requests=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 3)
+        with self.assertRaises(ValueError):
+            check_result(self.output(), 3, host_requests=True)
+
+    def test_slot_requests_require_all_cases_and_terminal_result(self):
+        original = REQUESTS + '\n' + REQUEST_COMPLETION
+        for token in ('cases=6', 'pending_restore=6', 'armed_restore=6',
+                      'payload_preserved=1', 'masked_pending=1', 'ack_ports=1,2',
+                      'reset=6', 'mapping_claim=0'):
+            with self.subTest(token=token), self.assertRaises(ValueError):
+                check_result(original.replace(token, token.split('=')[0] + '=9'), 3, host_requests=True)
+        for text in (REQUEST_COMPLETION, original + '\n' + REQUEST_COMPLETION,
+                     REQUESTS + '\n' + original, original + '\nunexpected',
+                     'Fatal error: unexpected\n' + original):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check_result(text, 3, host_requests=True)
+        with self.assertRaises(ValueError):
+            check_result(original, 0, host_requests=True)
+
     def output(self):
         return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION)) + '\n'
 

@@ -372,6 +372,7 @@ help:
 	@echo "make check-c54x-rom4-pcm-wire verify native DTMF under explicit 1 MHz edges (assumed sync/fan-out)"
 	@echo "make check-c54x-rom4-clocked-boot verify pin-clocked native boot loopback, DTMF and replay"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
+	@echo "make check-c54x-backend-requests verify slot pending storage and save/load (no physical request-map claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
 	@echo "make verify-3310-radio-authentication-boundary reproduce organic 3310 authenticated registration"
@@ -1251,6 +1252,10 @@ check-mu4-nand: build
 .PHONY: check-c54x-backend-bsp
 check-c54x-backend-bsp: build
 	$(PYTHON) tools/run_c54x_backend_bsp.py --mame $(MAME_DIR)/mame --output-root tmp
+
+.PHONY: check-c54x-backend-requests
+check-c54x-backend-requests: build
+	$(PYTHON) tools/run_c54x_backend_bsp.py --mame $(MAME_DIR)/mame --output-root tmp --host-requests
 
 check-c54x-core: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
