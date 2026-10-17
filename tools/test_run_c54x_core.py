@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_atomic_xorm_scope(self):
+        marker, ending = EXTRA_PROFILES['xorm']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='xorm')
+        for before, after in (('restore=1024', 'restore=0'), ('reads=1', 'reads=2'),
+                              ('flags_preserved=1', 'flags_preserved=0'), ('staged_acceptance=0', 'staged_acceptance=1')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(text.replace(before, after), 3, profile='xorm')
+
     def test_conditional_register_store_scope(self):
         markers, ending = EXTRA_PROFILES['cond-reg-store']
         text = '\n'.join((*markers, ending)) + '\n'

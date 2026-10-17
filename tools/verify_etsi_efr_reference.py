@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tempfile
 import zipfile
@@ -23,6 +24,72 @@ EXPECTED = {
     "dec": (80522, "c3abf186ad28c28d8aa71737cf10a1d54fb2148b8c1ff1f2739cb9b92c139e68"),
     "out": (52160, "738af1ead354b8960504bd7d9656d53c1a11880051d01e79b97c276f739c187a"),
 }
+DTX_FRAMES = 518
+DTX_EXPECTED = {
+    "inp": "f7c76955e1f79777b6a67eab3c6cc346d13351974b40817a6765acc89739ba1d",
+    "cod": "b06b7dd60d251b6fa48931ecb3e313f7b03a754bb0a0b3807be1781cd73e590b",
+    "dec": "6d21b356fdeb8ff24309659a1caa8b5c6ad3f10ec49b998133fc628ffa9cb409",
+    "out": "1d8a85ae33572c9e9035512fd35b59269e76a5914303b429380ebf57b3c6a385",
+}
+
+
+def dtx_input(speech):
+    """Two complete supplied-speech segments separated by low-level noise."""
+    if len(speech) != 52352:
+        raise ValueError("DTX source requires the complete supplied installation input")
+    complete = speech[:163 * 320]
+    noise = bytearray()
+    state = 0x51d
+    for _ in range(192 * 160):
+        state = (state * 1664525 + 1013904223) & 0xffffffff
+        noise.extend(struct.pack('<h', (((state >> 24) & 15) - 8) * 8))
+    return bytes(noise[:96 * 320]) + complete + bytes(noise[96 * 320:]) + complete
+
+
+def inspect_dtx(coded, decoder, pcm):
+    if (len(coded), len(decoder), len(pcm)) != (DTX_FRAMES * 492, DTX_FRAMES * 494, DTX_FRAMES * 320):
+        raise ValueError("DTX reference frame counts differ")
+    flags = []
+    for frame in struct.iter_unpack("<246H", coded):
+        if any(bit > 1 for bit in frame):
+            raise ValueError("DTX encoder contains a nonbinary serial bit or flag")
+        flags.append(frame[245])
+    sid, bfi = {}, {}
+    for frame in struct.iter_unpack("<247H", decoder):
+        if frame[0] > 1 or frame[245] > 2 or frame[246] > 1 or any(bit > 1 for bit in frame[1:245]):
+            raise ValueError("DTX decoder input contains an invalid bit or flag")
+        sid[frame[245]] = sid.get(frame[245], 0) + 1
+        bfi[frame[0]] = bfi.get(frame[0], 0) + 1
+    resumptions = sum(a == 0 and b == 1 for a, b in zip(flags, flags[1:]))
+    nonzero_cni = sum(not flag and any(pcm[i * 320:(i + 1) * 320]) for i, flag in enumerate(flags))
+    if not (0 in flags and 1 in flags and resumptions >= 2 and sid.get(2, 0) and bfi.get(1, 0) and nonzero_cni):
+        raise ValueError("DTX conversation did not exercise silence, SID, unusable frames and speech resumption")
+    return {"frames": DTX_FRAMES, "speech_frames": sum(flags),
+            "inactive_frames": flags.count(0), "speech_resumptions": resumptions,
+            "sid": sid, "bfi": bfi, "nonzero_cni_frames": nonzero_cni}
+
+
+def generate_dtx(source, commands, log):
+    (source / "dtx.inp").write_bytes(dtx_input((source / "spch_dos.inp").read_bytes()))
+    for prefix in ("dtx", "dtx_replay"):
+        batch = [["./coder", "dtx.inp", f"{prefix}.cod", "dtx"],
+                 ["./ed_iface", f"{prefix}.cod", f"{prefix}.dec"],
+                 ["./decoder", f"{prefix}.dec", f"{prefix}.out"]]
+        commands.extend(batch)
+        for command in batch:
+            subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    outputs = {}
+    for suffix in ("inp", "cod", "dec", "out"):
+        data = (source / f"dtx.{suffix}").read_bytes()
+        if suffix != "inp" and data != (source / f"dtx_replay.{suffix}").read_bytes():
+            raise ValueError(f"DTX reference {suffix} is not deterministic across fresh processes")
+        if digest(data) != DTX_EXPECTED[suffix]:
+            raise ValueError(f"DTX generated {suffix} differs from its local reproducibility pin")
+        outputs[suffix] = {"bytes": len(data), "sha256": digest(data)}
+    coverage = inspect_dtx(*((source / f"dtx.{suffix}").read_bytes() for suffix in ("cod", "dec", "out")))
+    return {"profile": "noise96-speech163-noise96-speech163",
+            "outputs": outputs, "coverage": coverage, "fresh_process_replay": True,
+            "published_expected_vector_claim": False}
 
 
 def digest(data):
@@ -62,6 +129,8 @@ def main():
                         default=Path(__file__).resolve().parents[1] / "tmp")
     parser.add_argument("--fixture-dir", type=Path,
                         help="export verified codec inputs/outputs to isolated MAME fixture ROM storage")
+    parser.add_argument("--dtx-fixture", action="store_true",
+                        help="generate a deterministic DTX conversation after installation verification")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -95,6 +164,9 @@ def main():
                 subprocess.run(command, cwd=source, stdout=log,
                                stderr=subprocess.STDOUT, check=True)
         evidence["outputs"] = check_vectors(source)
+        if args.dtx_fixture:
+            with (run / "build-and-run.log").open("a") as log:
+                evidence["dtx"] = generate_dtx(source, commands, log)
         evidence["frames"] = evidence["outputs"]["out"]["bytes"] // 320
         evidence["unused_input_samples"] = len((source / "spch_dos.inp").read_bytes()) // 2 - evidence["frames"] * 160
         evidence["executables"] = {name: digest((source / name).read_bytes())
@@ -105,6 +177,9 @@ def main():
             for suffix in ("inp", "cod", "dec", "out"):
                 name = f"spch_dos.{suffix}"
                 (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+                if args.dtx_fixture:
+                    name = f"dtx.{suffix}"
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
             evidence["fixture_directory"] = str(args.fixture_dir.resolve())
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
     except (OSError, ValueError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
@@ -114,6 +189,8 @@ def main():
         print(f"ETSI EFR reference: FAIL: {error}", file=sys.stderr)
         return 1
     print("ETSI EFR reference: PASS frames=163 encoder=exact interface=exact decoder=exact native_dsp_claim=0")
+    if args.dtx_fixture:
+        print("ETSI EFR DTX reference: PASS frames=518 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     return 0
 
 

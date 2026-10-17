@@ -899,6 +899,9 @@ private:
 			{0x69f1, 3 | dasm::SUPPORTED, "ORM     #$2345, *+AR1($6789)%"},
 			{0x6891, 2 | dasm::SUPPORTED, "ANDM    #$2345, *AR1+"},
 			{0x69d9, 2 | dasm::SUPPORTED, "ORM     #$2345, *AR1+0%"},
+			{0x6af8, 3 | dasm::SUPPORTED, "XORM    #$6789, *($2345)"},
+			{0x6aeb, 3 | dasm::SUPPORTED, "XORM    #$2345, *+AR3($6789)"},
+			{0x6a93, 2 | dasm::SUPPORTED, "XORM    #$2345, *AR3+"},
 			{0x77e1, 1, ".word   $77E1"},
 		};
 		for (auto const &test : literals)
@@ -15771,6 +15774,7 @@ private:
 		if (!strcmp(machine().options().bios(), "ov-branch")) { start_atomic_overflow_branch(0); return; }
 		if (!strcmp(machine().options().bios(), "cond-reg-store")) { check_control_disassembler(); start_conditional_register_store(0); return; }
 		if (!strcmp(machine().options().bios(), "atomic-ret")) { start_atomic_conditional_return(0); return; }
+		if (!strcmp(machine().options().bios(), "xorm")) { check_control_disassembler(); start_atomic_xorm(0); return; }
 		if (!strcmp(machine().options().bios(), "saccd")) { start_saccd_case(0); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-long")) { start_extended_push(); return; }
@@ -15923,7 +15927,13 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "efr-encoder"))
+				!strcmp(machine().options().bios(), "efr-dtx-decoder"))
+		{
+			start_rom4_efr_decoder(0, true);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
+				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-dtx-encoder")))
 		{
 			start_rom4_efr_encoder(0, true);
 			return;
@@ -16645,6 +16655,64 @@ private:
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	struct xorm_fixture
+	{
+		u16 mode, address, next, source, mask, st1;
+		unsigned words;
+	};
+	static xorm_fixture atomic_xorm_case(unsigned index)
+	{
+		unsigned const form = index % 8, flags = (index / 128) % 4;
+		return {std::array<u16, 8>{5,5,0x83,0x93,0x8b,0xdb,0xeb,0xf8}[form],
+			std::array<u16, 8>{0x1505,0x1505,0x1500,0x1500,0x1500,0x1503,0x1502,0x1507}[form],
+			std::array<u16, 8>{0x1500,0x1500,0x1500,0x1501,0x14ff,0x1501,0x1502,0x1500}[form],
+			std::array<u16, 4>{0,0xffff,0xff,0x8000}[(index / 8) % 4],
+			std::array<u16, 4>{0,0xffff,0x5555,0x8001}[(index / 32) % 4],
+			u16(0x800 | ((flags & 1) << 8) | ((flags & 2) << 8) | (form == 1 ? 0x4000 : 0)), form >= 6 ? 3U : 2U};
+	}
+	void start_atomic_xorm(unsigned index)
+	{
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		auto const f = atomic_xorm_case(index);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		program.write_word(0x600, 0x6a00 | f.mode);
+		program.write_word(0x601, f.mode == 0xf8 ? f.address : f.mask);
+		if (f.words == 3) program.write_word(0x602, f.mode == 0xf8 ? f.mask : 2);
+		program.write_word(0x600 + f.words, 0xf4e1);
+		data.write_word(f.address, f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, index % 8 == 1 ? 0x1500 : 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff76543210ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1357);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, index % 8 == 5 ? 0x1503 : 0x1500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1e2a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "atomic_xorm_read", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(at == f.address && word == f.source && !m_pipeline_operand_reads++ && !m_pipeline_store_writes, "XORM retains one destination read before its write"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "atomic_xorm_write", [this, f](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(at == f.address && word == u16(f.source ^ f.mask) && m_pipeline_operand_reads == 1 && !m_pipeline_store_writes++, "XORM writes the XOR result once to its resolved address"); });
+		m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
+		m_phase = 520000 + index;
+		if (index < 512)
+		{
+			m_recurring_irq_snapshot = {0, 0};
+			m_saved_pipeline.str({}); m_saved_pipeline.clear();
+			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XORM before address/literal consumption");
+			m_rom4_codec_replays = 1;
+		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	void start_atomic_conditional_return(unsigned index)
 	{
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
@@ -16717,10 +16785,11 @@ private:
 	void start_rom4_efr_encoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
 		u16 *const program = &memregion("dspprg")->as_u16();
 		if (initialize)
 		{
-			data.write_word(0x0bac, 0); // DTX disabled, matching the reference coder invocation.
+			data.write_word(0x0bac, dtx ? 4 : 0); // Encoder DTX mode is an explicit algorithm input.
 			m_rom4_pcm_mismatches = 0;
 			unsigned pc = 0x0e00;
 			auto call = [&](u16 target) { program[pc++] = 0xf074; program[pc++] = target; };
@@ -16737,7 +16806,7 @@ private:
 		}
 		else
 		{
-			u8 const *const input = memregion("efr_encoder_pcm")->base() + frame * 320;
+			u8 const *const input = memregion(dtx ? "efr_dtx_encoder_pcm" : "efr_encoder_pcm")->base() + frame * 320;
 			for (unsigned i = 0; i < 160; ++i)
 				data.write_word(0x0cf4 + i, input[i * 2] | (input[i * 2 + 1] << 8));
 		}
@@ -16759,14 +16828,16 @@ private:
 	void start_rom4_efr_decoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-decoder");
 		if (initialize)
 		{
 			data.write_word(0x0ac8, 0);
 			m_rom4_pcm_mismatches = 0;
+			m_rom4_cni_nonzero_frames = 0;
 		}
 		else
 		{
-			u8 const *const input = memregion("efr_reference_input")->base() + frame * 494;
+			u8 const *const input = memregion(dtx ? "efr_dtx_input" : "efr_reference_input")->base() + frame * 494;
 			auto word = [&](unsigned index) { return u16(input[index * 2] | (input[index * 2 + 1] << 8)); };
 			data.write_word(0x1343, word(0));
 			unsigned bit = 1;
@@ -46156,6 +46227,40 @@ private:
 			osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
 			start_rom4_efr_decoder(0, true); return;
 		}
+		if (m_phase >= 520000 && m_phase < 521024)
+		{
+			unsigned const index = m_phase - 520000;
+			auto const f = atomic_xorm_case(index);
+			if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x600 + f.words)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XORM after its single read/write transaction");
+				m_rom4_codec_replays = 1;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic XORM remains admitted");
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			auto const disable = machine().disable_side_effects();
+			expect(m_rom4_codec_replays == 1 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 &&
+				data.read_word(f.address) == u16(f.source ^ f.mask) && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601 + f.words &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.next && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (index % 8 == 1 ? 0x1500 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff76543210ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1357 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1e2a &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
+				"XORM preserves arithmetic state and updates its address once independently of SXM/OVM");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XORM without duplicating its resolved transaction");
+				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+				m_phase = 520000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index < 1023) { start_atomic_xorm(index + 1); return; }
+			osd_printf_info("TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated XORM complete");
+		}
 		if (m_phase >= 519000 && m_phase < 519144)
 		{
 			unsigned const index = m_phase - 519000;
@@ -46258,8 +46363,11 @@ private:
 			osd_printf_info("TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated overflow branches complete");
 		}
-		if (m_phase >= 304000 && m_phase < 304164)
+		if (m_phase >= 304000 && m_phase < 304519)
 		{
+			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
+			unsigned const frames = dtx ? 518 : 163;
+			expect(m_phase <= 304000 + frames, "EFR encoder phase stays within the selected reference input");
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 				osd_printf_info("ROM4 EFR encoder stop: phase=%u pc=%04x sp=%04x illegal=%u\n", m_phase,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
@@ -46270,7 +46378,7 @@ private:
 			if (m_phase == 304000) { start_rom4_efr_encoder(0, false); return; }
 			unsigned const frame = m_phase - 304001;
 			if (replay_rom4_codec_frame(304001 + frame, 20)) return;
-			u8 const *const reference = memregion("efr_encoder_serial")->base() + frame * 492;
+			u8 const *const reference = memregion(dtx ? "efr_dtx_encoder_serial" : "efr_encoder_serial")->base() + frame * 492;
 			auto word = [&](unsigned index) { return u16(reference[index * 2] | (reference[index * 2 + 1] << 8)); };
 			unsigned bit = 0, mismatches = 0;
 			for (unsigned p = 0; p < 57; ++p)
@@ -46291,17 +46399,26 @@ private:
 			auto const packed = rom4_efr_packed(speech);
 			for (unsigned i = 0; i < packed.size(); ++i)
 				if (data.read_word(0x1897 + i) != packed[i]) ++mismatches;
-			osd_printf_info("ROM4 EFR encoder comparison: frame=%u mismatches=%u\n", frame, mismatches);
+			osd_printf_info("ROM4 EFR%s encoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : "", frame, mismatches);
 			m_rom4_pcm_mismatches += mismatches;
 			expect(!mismatches, "Native EFR encoder parameters and VAD/SP match independent ETSI output");
-			if (frame < 162) { start_rom4_efr_encoder(frame + 1, false); return; }
-			expect(m_rom4_codec_replays == 163, "EFR encoder replays every frame with its existing histories");
+			if (frame + 1 < frames) { start_rom4_efr_encoder(frame + 1, false); return; }
+			expect(m_rom4_codec_replays == frames, "EFR encoder replays every frame with its existing histories");
+			if (dtx)
+			{
+				osd_printf_info("TMS320C54x ROM4 EFR DTX encoder replay: PASS frames=518 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0\n");
+				osd_printf_info("TMS320C54x ROM4 EFR DTX encoder: PASS frames=518 parameters=29526 flags=1036 packed_words=8806 mismatches=0 handset_audio_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x ROM4 EFR DTX encoder complete");
+			}
 			osd_printf_info("TMS320C54x ROM4 EFR encoder replay: PASS frames=163 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x ROM4 EFR encoder: PASS frames=163 parameters=9291 flags=326 packed_words=2771 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR encoder complete");
 		}
-		if (m_phase >= 302000 && m_phase < 302164)
+		if (m_phase >= 302000 && m_phase < 302519)
 		{
+			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-decoder");
+			unsigned const frames = dtx ? 518 : 163;
+			expect(m_phase <= 302000 + frames, "EFR decoder phase stays within the selected reference input");
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 				osd_printf_info("ROM4 EFR decoder stop: phase=%u pc=%04x sp=%04x illegal=%u\n", m_phase,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
@@ -46314,23 +46431,40 @@ private:
 			if (m_phase == 302000) { start_rom4_efr_decoder(0, false); return; }
 			unsigned const frame = m_phase - 302001;
 			if (replay_rom4_codec_frame(302001 + frame, 20)) return;
-			u8 const *const reference = memregion("efr_reference_pcm")->base() + frame * 320;
+			u8 const *const reference = memregion(dtx ? "efr_dtx_pcm" : "efr_reference_pcm")->base() + frame * 320;
 			unsigned mismatches = 0;
+			bool nonzero = false;
 			for (unsigned i = 0; i < 160; ++i)
 			{
 				u16 const expected = reference[i * 2] | (reference[i * 2 + 1] << 8);
 				u16 const actual = data.read_word(0x1388 + i);
+				nonzero |= actual != 0;
 				if (actual != expected)
 				{
 					if (mismatches < 8) osd_printf_info("ROM4 EFR PCM mismatch: frame=%u sample=%u actual=%04x expected=%04x\n", frame, i, actual, expected);
 					++mismatches;
 				}
 			}
-			osd_printf_info("ROM4 EFR decoder comparison: frame=%u mismatches=%u\n", frame, mismatches);
+			osd_printf_info("ROM4 EFR%s decoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : "", frame, mismatches);
 			m_rom4_pcm_mismatches += mismatches;
 			expect(!mismatches, "native EFR decoder matches independent ETSI PCM");
-			if (frame < 162) { start_rom4_efr_decoder(frame + 1, false); return; }
-			expect(m_rom4_codec_replays == 163, "EFR replays every frame with its original codec histories");
+			if (dtx)
+			{
+				u8 const *const input = memregion("efr_dtx_input")->base() + frame * 494;
+				if ((input[0] || input[490] == 2) && nonzero) ++m_rom4_cni_nonzero_frames;
+			}
+			if (frame + 1 < frames) { start_rom4_efr_decoder(frame + 1, false); return; }
+			expect(m_rom4_codec_replays == frames, "EFR replays every frame with its original codec histories");
+			if (dtx)
+			{
+				u8 const *const input = memregion("efr_dtx_input")->base();
+				unsigned sid = 0, erased = 0;
+				for (unsigned f = 0; f < frames; ++f) { sid += input[f * 494 + 490] == 2; erased += input[f * 494] == 1; }
+				expect(sid == 8 && erased == 135 && m_rom4_cni_nonzero_frames == 46, "DTX decoder produces nonzero comfort noise across valid SID and unusable-frame intervals");
+				osd_printf_info("TMS320C54x ROM4 EFR DTX decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
+				osd_printf_info("TMS320C54x ROM4 EFR DTX decoder: PASS frames=518 samples=82880 sid=8 erased=135 nonzero_cni_frames=46 mismatches=0 handset_audio_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x ROM4 EFR DTX decoder complete");
+			}
 			osd_printf_info("TMS320C54x ROM4 EFR decoder replay: PASS frames=163 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x ROM4 EFR decoder: PASS frames=163 samples=26080 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR decoder complete");
@@ -46730,6 +46864,7 @@ private:
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
 	std::array<u16, 76> m_rom4_parameters{};
 	unsigned m_rom4_pcm_mismatches = 0;
+	unsigned m_rom4_cni_nonzero_frames = 0;
 	bool m_rom4_codec_replay = false;
 	unsigned m_rom4_codec_replays = 0;
 	u32 m_rom4_checkpoint_pc = 0;
@@ -48090,6 +48225,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(2, "cond-reg-store", "Atomic conditional T/BRC stores with read/write-back")
 	ROM_SYSTEM_BIOS(3, "saccd", "Existing conditional accumulator-store regression banks")
 	ROM_SYSTEM_BIOS(4, "atomic-ret", "Atomic signed conditional returns and stack ownership")
+	ROM_SYSTEM_BIOS(5, "xorm", "Atomic memory XOR addressing, flags and transaction replay")
 ROM_END
 
 ROM_START(tms54rom4)
@@ -48104,6 +48240,8 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(8, "efr-packing", "Isolated acquired ROM EFR packing and error detection")
 	ROM_SYSTEM_BIOS(9, "efr-decoder", "Isolated acquired ROM EFR speech decoder")
 	ROM_SYSTEM_BIOS(10, "efr-encoder", "Isolated acquired ROM EFR speech encoder")
+	ROM_SYSTEM_BIOS(11, "efr-dtx-decoder", "Isolated acquired ROM EFR silence and speech decoder")
+	ROM_SYSTEM_BIOS(12, "efr-dtx-encoder", "Isolated acquired ROM EFR silence and speech encoder")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -48138,6 +48276,12 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(10))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(11))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(12))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -48172,6 +48316,20 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(10))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(11))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(12))
+	ROM_REGION(165760, "efr_dtx_encoder_pcm", 0)
+	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(12))
+	ROM_REGION(254856, "efr_dtx_encoder_serial", 0)
+	ROMX_LOAD("dtx.cod", 0, 254856, CRC(6b2a679f) SHA1(00c8972a74dd4e06843058d7a1899e0d5d957bdc), ROM_BIOS(12))
+	ROM_REGION(255892, "efr_dtx_input", 0)
+	ROMX_LOAD("dtx.dec", 0, 255892, CRC(8bb21b82) SHA1(464b9f354aa4cd2828c3f80e812b18af170f7624), ROM_BIOS(11))
+	ROM_REGION(165760, "efr_dtx_pcm", 0)
+	ROMX_LOAD("dtx.out", 0, 165760, CRC(a2bc82da) SHA1(44ea0a4b98623d3282f8bdafb0a068287a879f47), ROM_BIOS(11))
 	ROM_REGION(52352, "efr_encoder_pcm", 0)
 	ROMX_LOAD("spch_dos.inp", 0, 52352, CRC(36fb2ba9) SHA1(3d4abd66d2d033de929175f1d84e970f78007628), ROM_BIOS(10))
 	ROM_REGION(80196, "efr_encoder_serial", 0)

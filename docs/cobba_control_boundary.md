@@ -1833,3 +1833,75 @@ installation-vector acceptance, not full GSM 06.54 conformance, DTX/SID or
 bad-frame policy, a production PCM clock, native handset speech or an
 end-to-end call. Those transport and physical boundaries remain separate.
 
+### Native EFR DTX conversation
+
+**Current frontier:** the nonzero-background target is not accepted. Native
+encoding matches frames 0--96, then diverges at speech-resumption frame 97,
+starting at pitch parameter 5 while the five LSF parameters still match.
+Native decoding matches frames 0--50, then differs at the first SID frame 51.
+The gates below intentionally reject these results; ordinary installation
+encoder/decoder acceptance remains independent.
+
+`make check-c54x-rom4-efr-dtx-encoder` and
+`make check-c54x-rom4-efr-dtx-decoder` use a generated reference conversation:
+96 quiet-background frames, all 163 complete installation speech frames,
+another 96 quiet-background frames, then the same 163 speech frames. Background
+samples are deterministic values from -64 through 56 in steps of eight, not a
+physical microphone calibration. The original partial trailing
+frame is excluded. The unmodified reference coder runs with its `dtx` argument;
+its original encoder/decoder interface and decoder produce the receive input
+and PCM. Each program is also run in a second fresh process and must reproduce
+its output. The verifier first requires the original installation checks,
+then checks local hashes for the generated input and three generated outputs.
+These hashes are reproducibility pins, not published conformance vectors.
+The archive/source identities, commands and coverage remain in isolated run
+metadata; no reference source or speech data enters the MAME overlay or Git.
+
+The 518-frame conversation has 375 speech and 143 inactive encoder frames,
+with two resumptions of speech. The reference interface produces eight valid
+SID frames and 135 unusable frames between SID updates. The reference has
+nonzero PCM in 46 inactive frames, avoiding a degenerate zero-output oracle.
+The native gates retain histories and require the following complete result:
+
+- The encoder uses the same native call order as the ordinary encoder gate,
+  with `0bac` bit 2 selecting DTX. All 29,526 parameters, 1,036 VAD/SP values
+  and 8,806 native packed words must match the external reference and normative
+  packing model; this remains unachieved.
+- The unchanged `c941` reset and `c8dc` decoder must reproduce all 82,880 PCM
+  samples exactly, including nonzero PCM in 46 inactive frames and return to speech.
+  Both reference generation and native acceptance require this nondegenerate
+  comfort-noise coverage; matching zero PCM alone is not sufficient. Each native encoder
+  and decoder frame is restored at its input boundary and re-executed,
+  comparing all 65,440 ordinary data-space words.
+
+The recovered CNI path includes atomic `XORM` at `28ac`, toggling word `0e2b`.
+Its implementation
+follows [SPRU172C 4-203](https://www.ti.com/lit/ug/spru172c/spru172c.pdf):
+a sixteen-bit memory XOR with unchanged arithmetic status. The focused `xorm`
+profile checks 1,024 cases/restores over DP, SP/CPL, indirect, increment,
+decrement, circular, long preincrement and absolute RAM addresses; source and
+literal boundary patterns; SXM/OVM combinations; and snapshots before/after
+the single read/write transaction. Decoder text also checks literal/address
+ordering. This adds atomic execution, not staged timing, peripheral ownership,
+repeat legality or interrupt composition for the instruction.
+
+The next discriminating boundary is the shared native pseudonoise helper
+`cbc5..cbe2`. A passive program-read observer captures its first decoder call
+with seed `70816958`, two requested bits and seed pointer `09c4`. Native
+execution stores `1c205a56`, whereas the reference polynomial
+`x^31+x^3+1` requires `7c205a56`. Returned noise bits initially agree, but the
+seed already differs. At `cbd2` TC is zero; after the conditional SSBX, `cbd4`
+sees TC one and clears it again. The native paired XC/SSBX/XC/RSBX sequence
+requires the XC predicates' Access-stage view, before the older Execute
+publication (SPRU131G example 7-13); the atomic executor currently samples
+live TC in program order. Validate this with an isolated producer/consumer
+fixture and the staged core before changing atomic visibility. A correction
+must then pass both full conversation gates; explaining the first seed
+difference does not yet prove either complete codec result.
+
+These gates target this software conversation only. The unusable frames
+occur during comfort-noise intervals; active-speech erasure bursts, invalid SID
+classification and homing/error combinations remain separate acceptance work.
+No RF scheduling, handset PCM clock, organic native speech transport or
+end-to-end calling follows from the result.
+

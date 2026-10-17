@@ -131,6 +131,15 @@ decoder output with the supplied installation vectors. It does not run the
 DSP or establish native EFR speech. See `docs/cobba_control_boundary.md` for
 the independent-reference acceptance boundary.
 
+The optional `--dtx-fixture` generates a separate 518-frame quiet-background/speech
+conversation after installation verification, with DTX enabled. Two fresh
+reference process sequences must reproduce the locally pinned `dtx.*` outputs,
+including nonzero comfort-noise output.
+These are generated research vectors, not published conformance files or
+handset ROMs. `--fixture-dir` exports them only into ignored private fixture
+storage; the native acceptance scope is documented in
+`docs/cobba_control_boundary.md#native-efr-dtx-conversation`.
+
 ### Nokia 5110 DSP ROM4 research input
 
 A complete 5110 ROM4 DSP mask image was historically published by AlexD in

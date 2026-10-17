@@ -918,13 +918,13 @@ public:
 			}
 			return (2 + extended) | SUPPORTED;
 		}
-		if (family == 0x6800 || family == 0x6900 || family == 0x6b00 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
+		if (family == 0x6800 || family == 0x6900 || family == 0x6a00 || family == 0x6b00 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
 		{
 			bool const extended = family != 0x7700 && mode >= 0xe0;
-			bool const immediate_first = (family == 0x6800 || family == 0x6900) && mode >= 0xe0 && mode < 0xf8;
+			bool const immediate_first = (family == 0x6800 || family == 0x6900 || family == 0x6a00) && mode >= 0xe0 && mode < 0xf8;
 			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
 			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
-			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x6b00 ? "ADDM" : family == 0x7600 ? "ST" : "STM";
+			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x6a00 ? "XORM" : family == 0x6b00 ? "ADDM" : family == 0x7600 ? "ST" : "STM";
 			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
 			smem(offset);
 			return (2 + extended) | SUPPORTED;
@@ -5932,6 +5932,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6800: // ANDM #lk, Smem
 	case 0x6900: // ORM #lk, Smem
+	case 0x6a00: // XORM #lk, Smem (SPRU172C 4-203); status unchanged.
 	{
 		u16 address;
 		u16 immediate;
@@ -5947,7 +5948,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		const u16 value = data_read(address);
 		data_write(address, (op & 0xff00) == 0x6800
-				? value & immediate : value | immediate);
+				? value & immediate : (op & 0xff00) == 0x6900 ? value | immediate : value ^ immediate);
 		if (low >= 0x80 && low < 0xe0)
 			indirect_modify(low);
 		m_icount -= low >= 0xe0 ? 2 : 1;

@@ -35,6 +35,12 @@ EFR_DECODER_REPLAY = "TMS320C54x ROM4 EFR decoder replay: PASS frames=163 ram_wo
 EFR_ENCODER_PASS = "TMS320C54x ROM4 EFR encoder: PASS frames=163 parameters=9291 flags=326 packed_words=2771 mismatches=0 handset_audio_claim=0"
 EFR_ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR encoder complete"
 EFR_ENCODER_REPLAY = "TMS320C54x ROM4 EFR encoder replay: PASS frames=163 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0"
+EFR_DTX_DECODER_PASS = "TMS320C54x ROM4 EFR DTX decoder: PASS frames=518 samples=82880 sid=8 erased=135 nonzero_cni_frames=46 mismatches=0 handset_audio_claim=0"
+EFR_DTX_DECODER_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR DTX decoder complete"
+EFR_DTX_DECODER_REPLAY = "TMS320C54x ROM4 EFR DTX decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0"
+EFR_DTX_ENCODER_PASS = "TMS320C54x ROM4 EFR DTX encoder: PASS frames=518 parameters=29526 flags=1036 packed_words=8806 mismatches=0 handset_audio_claim=0"
+EFR_DTX_ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 EFR DTX encoder complete"
+EFR_DTX_ENCODER_REPLAY = "TMS320C54x ROM4 EFR DTX encoder replay: PASS frames=518 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0"
 
 
 def file_identity(path):
@@ -44,9 +50,9 @@ def file_identity(path):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest}
 
 
-def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False, efr_decoder=False, efr_encoder=False):
+def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False, efr_decoder=False, efr_encoder=False, efr_dtx_decoder=False, efr_dtx_encoder=False):
     lines = text.splitlines()
-    if (efr_decoder or efr_encoder) and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
+    if (efr_decoder or efr_encoder or efr_dtx_decoder or efr_dtx_encoder) and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
         lines.pop()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
     if efr_crc:
@@ -69,6 +75,20 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
         for frame in range(163):
             if lines.count(f"ROM4 EFR encoder comparison: frame={frame} mismatches=0") != 1:
                 raise ValueError("missing unique bit-exact EFR encoder frame comparison")
+    if efr_dtx_decoder:
+        marker, complete = EFR_DTX_DECODER_PASS, EFR_DTX_DECODER_COMPLETE
+        if lines.count(EFR_DTX_DECODER_REPLAY) != 1:
+            raise ValueError("missing unique native EFR DTX decoder frame/history replay")
+        for frame in range(518):
+            if lines.count(f"ROM4 EFR DTX decoder comparison: frame={frame} mismatches=0") != 1:
+                raise ValueError("missing unique bit-exact EFR DTX decoder frame comparison")
+    if efr_dtx_encoder:
+        marker, complete = EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLETE
+        if lines.count(EFR_DTX_ENCODER_REPLAY) != 1:
+            raise ValueError("missing unique native EFR DTX encoder frame/history replay")
+        for frame in range(518):
+            if lines.count(f"ROM4 EFR DTX encoder comparison: frame={frame} mismatches=0") != 1:
+                raise ValueError("missing unique bit-exact EFR DTX encoder frame comparison")
     if fr_packing:
         marker, complete = FR_PASS, FR_COMPLETE
     if fr_decoder:
@@ -110,6 +130,8 @@ def main():
     mode.add_argument("--efr-packing", action="store_true", help="validate native EFR packing, unpacking and CRC rejection")
     mode.add_argument("--efr-decoder", action="store_true", help="compare native EFR decoder with verified ETSI PCM")
     mode.add_argument("--efr-encoder", action="store_true", help="compare native EFR encoder with verified ETSI parameters and VAD/SP")
+    mode.add_argument("--efr-dtx-decoder", action="store_true", help="compare native EFR silence/SID/unusable-frame decoding with the external reference")
+    mode.add_argument("--efr-dtx-encoder", action="store_true", help="compare native EFR VAD/DTX encoding with the external reference")
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
@@ -122,10 +144,14 @@ def main():
         bios = "efr-decoder"
     if args.efr_encoder:
         bios = "efr-encoder"
+    if args.efr_dtx_decoder:
+        bios = "efr-dtx-decoder"
+    if args.efr_dtx_encoder:
+        bios = "efr-dtx-encoder"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "10" if args.efr_decoder or args.efr_encoder else "2"]
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder else "10" if args.efr_decoder or args.efr_encoder else "2"]
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
@@ -138,6 +164,12 @@ def main():
     if args.efr_encoder:
         for name in ("spch_dos.inp", "spch_dos.cod"):
             inputs.append(args.rompath / "tms54rom4" / name)
+    if args.efr_dtx_decoder:
+        for name in ("dtx.dec", "dtx.out"):
+            inputs.append(args.rompath / "tms54rom4" / name)
+    if args.efr_dtx_encoder:
+        for name in ("dtx.inp", "dtx.cod"):
+            inputs.append(args.rompath / "tms54rom4" / name)
     evidence = {"command": command, "bios": bios,
                 "inputs": [file_identity(path) for path in inputs],
                 "handset_audio_claim": False}
@@ -148,7 +180,7 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder)
+        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1

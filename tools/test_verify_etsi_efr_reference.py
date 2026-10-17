@@ -1,12 +1,46 @@
 from pathlib import Path
 import tempfile
 import unittest
+import struct
 from unittest.mock import patch
 
 from tools.verify_etsi_efr_reference import check_vectors, digest, validate_members
+from tools.verify_etsi_efr_reference import dtx_input, inspect_dtx, DTX_FRAMES
 
 
 class EtsiEfrReferenceTest(unittest.TestCase):
+    def test_dtx_input_preserves_speech_and_uses_deterministic_quiet_noise(self):
+        speech = bytes((i % 251 for i in range(163 * 320)))
+        generated = dtx_input(speech + bytes(192))
+        self.assertEqual(generated, dtx_input(speech + bytes([255]) * 192))
+        self.assertEqual(generated[96 * 320:259 * 320], speech)
+        self.assertEqual(generated[355 * 320:], speech)
+        noise = generated[:96 * 320] + generated[259 * 320:355 * 320]
+        self.assertTrue(any(noise))
+        self.assertTrue(all(-64 <= x <= 56 and x % 8 == 0 for (x,) in struct.iter_unpack('<h', noise)))
+        self.assertEqual(len(generated), DTX_FRAMES * 320)
+        with self.assertRaises(ValueError):
+            dtx_input(speech)
+
+    def test_dtx_coverage_requires_real_transitions_and_valid_flags(self):
+        coded, decoder = [], []
+        for i in range(DTX_FRAMES):
+            speech = int(96 <= i < 259 or i >= 355)
+            coded.append(struct.pack('<246H', *([0] * 244 + [speech, speech])))
+            decoder.append(struct.pack('<247H', *([int(not speech)] + [0] * 244 + [0 if speech else 2, int(i % 24 == 0)])))
+        cod, dec, pcm = b''.join(coded), b''.join(decoder), b'\x01\x00' + bytes(DTX_FRAMES * 320 - 2)
+        coverage = inspect_dtx(cod, dec, pcm)
+        self.assertEqual(coverage['speech_resumptions'], 2)
+        self.assertEqual(coverage['inactive_frames'], 192)
+        self.assertEqual(coverage['nonzero_cni_frames'], 1)
+        for values in ((cod[:-1], dec, pcm), (bytes(len(cod)), dec, pcm),
+                       (cod, b'\x02\x00' + dec[2:], pcm), (cod, dec, pcm[:-2]),
+                       (b'\x02\x00' + cod[2:], dec, pcm)):
+            with self.subTest(lengths=list(map(len, values))), self.assertRaises(ValueError):
+                inspect_dtx(*values)
+        with self.assertRaises(ValueError):
+            inspect_dtx(cod, dec, bytes(len(pcm)))
+
     def test_flat_archive_only(self):
         validate_members(["CODER.C", "SPCH_DOS.INP"])
         for names in (["../coder.c"], ["/coder.c"], ["sub/coder.c"],

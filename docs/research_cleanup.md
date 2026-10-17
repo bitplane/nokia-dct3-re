@@ -152,6 +152,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
   and destination paths: a copy of zero-filled data can produce the same
   write trace. Keep copy source, copy destination and initializer length
   separate until their caller contract is established.
+- Exact output matching can still be degenerate coverage. Require transitions
+  and nondegenerate output specific to the claimed feature: zero PCM does not
+  establish nonzero comfort-noise synthesis, and a blank frame does not
+  establish an interactive display. Preserve those coverage checks alongside
+  the byte-comparison oracle.
 - Similar addressing names need not have the same legal operand domain.
   On C54x, short MOD=3 preincrement is write-only (SPRU131G table 5-4),
   while long-offset MOD=13 preincrement can read. A passing fixture for
