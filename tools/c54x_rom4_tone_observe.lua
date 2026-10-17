@@ -29,6 +29,8 @@ watch(mcu, 'program', 0x100ac, 'mcu', 0x100af)
 watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
+watch(mcu, 'program', 0x100a8, 'codec_shared_mcu', 0x100ab)
+watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
 watch(mcu, 'program', 0x100bc, 'mcu', 0x100bf)
 -- The selector-0x28 source is the lower halfword of this ARM bus word.
 -- Preserve wide writes and masks to distinguish record initialization from

@@ -1269,8 +1269,28 @@ words are checked by `codec_register8_constant_setup`, including mutation
 tests. This is another local control-use context, not evidence that `0600`
 means clock enable or that this path executes during the tone fixture.
 
-The passive helper-entry capture in the physical `1` fixture observes 43
-calls over 11 seconds, including register 8/value `0626` returning to
+The resident `a580..a597` block also consumes packed shared data `0854`:
+`B = word >> 12` selects the register and `A & 0fff` supplies its payload.
+When B is 8, a BITF test of local data `00ef & 000f` selects either
+`A & 09ff` or `A | 0600` before the final 12-bit mask and `45c2` call.
+This is a software control transformation, not a recovered analog bit map.
+The executed reader is the alternate block at `27f0`: it handles register 9
+through local data `1f92`, `19a2` and `19a4`, then rejoins `a584` or `a594`.
+Both blocks have exact-word, mutation-tested contract fixtures; the raw
+resident call census alone does not describe this block's data flow.
+
+The native tone gate requires the ordered pre-key chain: MCU write
+`84260000` with mask `ffff0000` at `100a8`/PC `272034`, DSP read `8426`
+at `0854`/post-extension PC `27f2`, helper write register 8/value `0026`
+returning to `a598`, then register 8/value `0626` returning to `a4bb`.
+Thus `0426` is not passed unchanged to COBBA: the DSP clears `0600` in
+one context and subsequently sets it in another. The separate post-key
+activation observation remains required. Observation caps are per owner,
+direction and boot/interactive phase; this is a bounded fixture, not an
+exhaustive inventory of all writes or uploaded/indirect producers.
+
+The passive helper-entry capture in the physical `1` fixture observes
+register 8/value `0626` returning to
 `a4bb` during the keypress (8.077 s). The tone checker requires that
 post-key caller independently of the shared tone-cell writes. The constant
 setup at `b8a2` is not observed in this fixture. This confirms execution of

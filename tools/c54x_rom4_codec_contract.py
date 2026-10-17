@@ -346,6 +346,16 @@ SEQUENCES.update({
     "codec_register8_deactivation": (0xa502, (
         0x7722, 0xc008, 0xe908, 0xf074, 0x4610,
         0xf030, 0x09ff, 0xf074, 0x45c2)),
+    "codec_shared_control_dispatch": (0xa580, (
+        0xf6bb, 0x12f8, 0x0854, 0xf1f4, 0x60f8, 0x000b, 0x0008,
+        0xf820, 0xa594, 0x61f8, 0x00ef, 0x000f, 0xf830, 0xa592,
+        0xf030, 0x09ff, 0xf073, 0xa594, 0xf040, 0x0600,
+        0xf030, 0x0fff, 0xf074, 0x45c2)),
+    "codec_shared_control_alternate_dispatch": (0x27f0, (
+        0x12f8, 0x0854, 0xf1f4, 0x60f8, 0x000b, 0x0009,
+        0xf820, 0x2805, 0xf030, 0x0fff, 0x80f8, 0x1f92,
+        0x60f8, 0x19a2, 0x0000, 0xf830, 0xa594,
+        0xf030, 0x0f0f, 0x1af8, 0x19a4, 0xf073, 0xa584)),
     "codec_register8_constant_setup": (0xb89c, (
         0xe908, 0xf074, 0xa484, 0xf020, 0x0602, 0xe908,
         0xf074, 0x45c2, 0xf020, 0x0944, 0xe909, 0xf074, 0x45c2)),
@@ -461,6 +471,31 @@ def check_restore(text: str) -> None:
         raise ValueError("native restore harness failed")
 
 
+def check_shared_codec_control(text: str) -> None:
+    """Observed original-MCU packed control, not inferred COBBA bit meanings."""
+    presses = re.findall(r"input-press: t=([0-9.]+) name=1\b", text)
+    if len(presses) != 1:
+        raise ValueError("packed codec-control provenance requires the physical-key phase boundary")
+    limit = float(presses[0])
+    patterns = (
+        r"rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 "
+        r"value=84260000 mask=ffff0000 pc=272034 t=([0-9.]+)",
+        r"rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 "
+        r"value=8426 mask=ffff pc=0027f2 t=([0-9.]+)",
+        r"rom4_codec_control_call: hit=\d+ a=0000000026 b=0000000008 "
+        r"sp=[0-9a-f]{4} return=a598 t=([0-9.]+)",
+        r"rom4_codec_control_call: hit=\d+ a=0000000626 b=0000000008 "
+        r"sp=[0-9a-f]{4} return=a4bb t=([0-9.]+)",
+    )
+    previous = -1.0
+    for pattern in patterns:
+        times = [float(time) for time in re.findall(pattern, text)
+                 if previous < float(time) < limit]
+        if not times:
+            raise ValueError("missing ordered packed codec-control provenance: " + pattern)
+        previous = min(times)
+
+
 def check_tone(text: str) -> None:
     check_trace(text)
     if not re.search(r"rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8", text):
@@ -477,6 +512,7 @@ def check_tone(text: str) -> None:
                and start <= float(time) < end
                for _, a, b, _, ret, time in calls):
         raise ValueError("missing organic register-8 activation caller after physical key")
+    check_shared_codec_control(text)
     events = re.findall(
         r"rom4_tone_access: owner=(mcu|dsp) direction=(read|write) "
         r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "

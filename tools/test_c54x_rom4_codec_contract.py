@@ -219,6 +219,10 @@ class NativeToneTests(unittest.TestCase):
         return CodecTraceTests().trace() + "\n" + "\n".join([
             "rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8 bspce23=0000 t=1.58",
             "input-press: t=8.0 name=1 port=1f",
+            "rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 value=84260000 mask=ffff0000 pc=272034 t=1.55854",
+            "rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 value=8426 mask=ffff pc=0027f2 t=1.55855",
+            "rom4_codec_control_call: hit=21 a=0000000026 b=0000000008 sp=1eab return=a598 t=1.55856",
+            "rom4_codec_control_call: hit=24 a=0000000626 b=0000000008 sp=1ea3 return=a4bb t=1.57959",
             "rom4_codec_control_call: hit=37 a=0000000626 b=0000000008 sp=1ea3 return=a4bb t=8.077",
             "rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.07",
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
@@ -237,6 +241,17 @@ class NativeToneTests(unittest.TestCase):
 
     def test_organic_tone_boundary(self):
         check_tone(self.trace())
+
+    def test_packed_control_provenance_requires_lane_payload_caller_and_order(self):
+        for before, after in (
+                ('value=84260000 mask=ffff0000', 'value=8426 mask=ffff'),
+                ('value=8426 mask=ffff pc=0027f2', 'value=8426 mask=ffff pc=00a583'),
+                ('a=0000000026 b=0000000008', 'a=0000000426 b=0000000008'),
+                ('return=a598 t=1.55856', 'return=a4bb t=1.55856'),
+                ('t=1.55855', 't=1.55853'),
+                ('t=1.57959', 't=1.55854')):
+            with self.subTest(before=before), self.assertRaisesRegex(ValueError, 'packed codec-control'):
+                check_tone(self.trace().replace(before, after))
 
     def test_speech_shared_copy_requires_correct_lane(self):
         with self.assertRaisesRegex(ValueError, "speech-control copy"):
