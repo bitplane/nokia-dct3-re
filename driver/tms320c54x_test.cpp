@@ -48577,29 +48577,32 @@ private:
 		auto &data = m_cpu->space(AS_DATA);
 		auto &io = m_cpu->space(AS_IO);
 		// Include a packed parameter whose bit 3 overlaps the slot request.
-		u16 const payload = std::array<u16, 4>{0, 0x8000, 0x9201, 0x9209}[m_case / 2];
+		u16 const payload = std::array<u16, 4>{0, 0x8000, 0x9201, 0x9209}[(m_case % 8) / 2];
+		u16 const request = m_case < 8 ? 8 : 0x1000;
+		unsigned const compare_port = m_case < 8 ? 0x0f : 4;
 		unsigned const accept_port = 1 + m_case % 2;
 		if (m_stage == 90)
 		{
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			m_backend->reset_line_w(0);
+			io.write_word(4, 15000); io.write_word(0x0f, 15000);
 			m_cpu->space(AS_PROGRAM).write_word(0xff80, 0xf4e1); // Bench reset entry: IDLE.
 			data.write_word(0x0852, 0); data.write_word(0x0853, 0);
 			data.write_word(0x0854, payload); data.write_word(0x0855, 0);
 			m_backend->reset_line_w(1);
-			io.write_word(2, 8); // Mask this source before its future expiry.
+			io.write_word(2, request); // Mask this source before its future expiry.
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 			expect(!io.read_word(1), "Shared parameter data alone cannot assert a peripheral request");
-			io.write_word(0x0f, (io.read_word(0x0d) + 100) % 5000);
+			io.write_word(compare_port, (io.read_word(0x0d) + 100) % 5000);
 		}
 		else if (m_stage == 91)
 		{
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			expect(data.read_word(0x0854) == payload, "Slot expiry cannot rewrite the shared parameter payload");
-			expect(io.read_word(1) == 8, "Slot expiry exposes only its pending request, not parameter bits");
+			expect(io.read_word(1) == request, "Compare expiry exposes only its pending request, not parameter bits");
 			expect(!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4), "In-service masking retains the pending slot without asserting INT2");
 			io.write_word(1, 1);
-			expect(io.read_word(1) == 8 && data.read_word(0x0854) == payload, "An unrelated completion cannot retire the slot or change parameter bits");
+			expect(io.read_word(1) == request && data.read_word(0x0854) == payload, "An unrelated completion cannot retire the compare or change parameter bits");
 			io.write_word(2, 0);
 		}
 		else if (m_stage == 92)
@@ -48609,19 +48612,19 @@ private:
 			m_timer->adjust(attotime::never);
 			m_saved.str({}); m_saved.clear();
 			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
-			io.write_word(accept_port, 8);
+			io.write_word(accept_port, request);
 			expect(!io.read_word(1) && data.read_word(0x0854) == payload, "Either accept port retires the slot without changing these payloads");
 		}
 		else if (m_stage == 93)
 		{
 			m_saved.clear(); m_saved.seekg(0);
-			expect(machine().save().read_stream(m_saved) == STATERR_NONE && io.read_word(1) == 8 && data.read_word(0x0854) == payload,
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE && io.read_word(1) == request && data.read_word(0x0854) == payload,
 				"Restoring pending hardware state does not reconstruct it from shared data");
 		}
 		else if (m_stage == 94)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "The pending snapshot restores the native source-2 latch");
-			io.write_word(accept_port, 8);
+			io.write_word(accept_port, request);
 			m_backend->reset_line_w(0);
 			expect(!io.read_word(1), "DSP reset does not retain a stale slot request");
 		}
@@ -48631,7 +48634,7 @@ private:
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			io.write_word(2, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-			io.write_word(0x0f, (io.read_word(0x0d) + 100) % 5000);
+			io.write_word(compare_port, (io.read_word(0x0d) + 100) % 5000);
 			m_timer->adjust(attotime::never);
 			m_saved.str({}); m_saved.clear();
 			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the armed timer before expiry");
@@ -48645,22 +48648,70 @@ private:
 		}
 		else
 		{
-			expect(io.read_word(1) == 8 && data.read_word(0x0854) == payload,
+			expect(io.read_word(1) == request && data.read_word(0x0854) == payload,
 				"The restored compare expires through its saved timer without changing the payload");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "Restored armed timer delivers the same native interrupt source");
 			m_backend->reset_line_w(0);
 			expect(!io.read_word(1), "Reset clears a pending slot but preserves DARAM");
-			if (++m_case == 8)
+			if (++m_case == 16)
 			{
-				osd_printf_info("C54x native backend slot request: PASS cases=8 pending_restore=8 armed_restore=8 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=8 mapping_claim=0\n");
-				throw emu_fatalerror(0, "C54x backend slot request tests complete");
+				m_stage = 100; m_timer->adjust(attotime::from_usec(100)); return;
 			}
 			m_stage = 90; m_timer->adjust(attotime::from_usec(100)); return;
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
 	}
+	void check_compare_overlap()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		auto &io = m_cpu->space(AS_IO);
+		if (m_stage == 100)
+		{
+			m_backend->reset_line_w(0);
+			io.write_word(4, 15000); io.write_word(0x0f, 15000);
+			data.write_word(0x0854, 0x9209); data.write_word(0x0855, 0);
+			m_backend->reset_line_w(1); io.write_word(2, 0x1008);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			u16 const target = (io.read_word(0x0d) + 100) % 5000;
+			io.write_word(4, target); io.write_word(0x0f, target);
+		}
+		else if (m_stage == 101)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			expect(io.read_word(1) == 0x1008 && !(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
+				"Masked coincident compares retain both independent requests");
+			m_timer->adjust(attotime::never); m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save both pending comparators and their mask");
+			io.write_word(2, 8);
+			expect(io.read_word(1) == 0x1000, "Accepting the slot leaves the transfer pending");
+		}
+		else if (m_stage == 102)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "The unmasked transfer asserts the shared CPU source");
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE && io.read_word(1) == 0x1008,
+				"Restore recovers both pending sources after one was accepted");
+		}
+		else if (m_stage == 103)
+		{
+			expect(!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4), "Restored in-service mask suppresses the CPU line");
+			io.write_word(1, 0x1000);
+			expect(io.read_word(1) == 8, "Transfer completion leaves the slot pending");
+			io.write_word(2, 0);
+		}
+		else
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "The remaining unmasked slot asserts the same CPU source");
+			io.write_word(1, 8);
+			expect(!io.read_word(1) && data.read_word(0x0854) == 0x9209, "Both acknowledgements preserve packed parameter data");
+			osd_printf_info("C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=16 mapping_claim=0\n");
+			throw emu_fatalerror(0, "C54x backend compare request tests complete");
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 100) { check_compare_overlap(); return; }
 		if (m_stage >= 90) { check_slot_request(); return; }
 		if (m_stage >= 80) { check_clocked_store(); return; }
 		if (m_stage >= 70) { check_joined_pins(); return; }

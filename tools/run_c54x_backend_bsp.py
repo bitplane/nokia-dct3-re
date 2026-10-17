@@ -17,8 +17,8 @@ FRAME_IGNORE = 'C54x native backend BSP frame ignore: PASS directions=2 words=4 
 JOINED_PINS = 'C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0'
 CLOCKED_STORE = 'C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
-REQUESTS = 'C54x native backend slot request: PASS cases=8 pending_restore=8 armed_restore=8 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=8 mapping_claim=0'
-REQUEST_COMPLETION = 'Fatal error: C54x backend slot request tests complete'
+REQUESTS = 'C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=16 mapping_claim=0'
+REQUEST_COMPLETION = 'Fatal error: C54x backend compare request tests complete'
 
 
 def check_result(text, returncode, *, verbose_teardown=False, host_requests=False):

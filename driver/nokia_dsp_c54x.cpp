@@ -39,6 +39,7 @@ void nokia_dsp_c54x_device::device_start()
 	std::copy_n(&m_program_rom[0], m_program.size(), m_program.begin());
 	std::copy_n(&m_data_rom[0], m_data.size(), m_data.begin());
 	m_slot_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::slot_timer_expired), this);
+	m_transfer_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::transfer_timer_expired), this);
 	m_frame_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::frame_timer_expired), this);
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
@@ -71,11 +72,15 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_host_command_vector));
 	save_item(NAME(m_slot_frame_length));
 	save_item(NAME(m_slot_delay));
+	save_item(NAME(m_transfer_delay));
 	save_item(NAME(m_frame_counter_base));
 	save_item(NAME(m_frame_counter_epoch));
 	save_item(NAME(m_slot_compare_written));
 	save_item(NAME(m_slot_request_pending));
+	save_item(NAME(m_transfer_compare_written));
+	save_item(NAME(m_transfer_request_pending));
 	save_item(NAME(m_slot_timer_expiries));
+	save_item(NAME(m_transfer_timer_expiries));
 	save_item(NAME(m_frame_timer_expiries));
 	save_item(NAME(m_io_trace_count));
 	save_item(NAME(m_rf_trace_count));
@@ -97,11 +102,15 @@ void nokia_dsp_c54x_device::device_reset()
 	m_host_command_vector = 0;
 	m_slot_frame_length = 0;
 	m_slot_delay = 0;
+	m_transfer_delay = 0;
 	m_frame_counter_base = 0;
 	m_frame_counter_epoch = machine().time();
 	m_slot_compare_written = false;
 	m_slot_request_pending = false;
+	m_transfer_compare_written = false;
+	m_transfer_request_pending = false;
 	m_slot_timer_expiries = 0;
+	m_transfer_timer_expiries = 0;
 	m_frame_timer_expiries = 0;
 	m_io_trace_count = 0;
 	m_rf_trace_count = 0;
@@ -113,6 +122,7 @@ void nokia_dsp_c54x_device::device_reset()
 	m_completion_strobes = 0;
 	m_boot_mailbox_writes = 0;
 	m_slot_timer->adjust(attotime::never);
+	m_transfer_timer->adjust(attotime::never);
 	m_frame_timer->adjust(attotime::never);
 	m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 }
@@ -122,7 +132,7 @@ void nokia_dsp_c54x_device::device_stop()
 	machine().logerror("rom4_interface_summary: completion_strobes=%u mailbox_writes=%u "
 			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_port32_writes=%u "
 			"rf_port38_reads=%u rf_port39_reads=%u "
-			"pc=%04x pmst=%04x ifr=%04x imr=%04x mode_aa=%04x mode_ac=%04x\n",
+			"pc=%04x pmst=%04x ifr=%04x imr=%04x mode_aa=%04x mode_ac=%04x transfer_expiries=%llu\n",
 			m_completion_strobes, m_boot_mailbox_writes,
 			m_slot_timer_expiries, m_frame_timer_expiries,
 			m_rf_trace_count, m_rf_port32_writes,
@@ -131,7 +141,7 @@ void nokia_dsp_c54x_device::device_stop()
 			u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
 			u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 			u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
-			m_data[0x00aa], m_data[0x00ac]);
+			m_data[0x00aa], m_data[0x00ac], m_transfer_timer_expiries);
 }
 
 u32 nokia_dsp_c54x_device::frame_period() const
@@ -183,20 +193,43 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 
 void nokia_dsp_c54x_device::arm_slot_timer(u16 quarter_symbols)
 {
+	m_slot_compare_written = true;
+	arm_compare_timer(m_slot_timer, quarter_symbols, m_slot_delay);
+}
+
+void nokia_dsp_c54x_device::arm_transfer_timer(u16 quarter_symbols)
+{
+	m_transfer_compare_written = true;
+	arm_compare_timer(m_transfer_timer, quarter_symbols, m_transfer_delay);
+}
+
+void nokia_dsp_c54x_device::arm_compare_timer(emu_timer *timer, u16 quarter_symbols, u16 &delay)
+{
 	// ROM4 writes absolute event positions, not relative delays. Its 15000
 	// sentinel cannot match a counter with the ordinary 4999 reload.
-	m_slot_compare_written = true;
 	if (!m_reset_released || quarter_symbols >= frame_period())
 	{
-		m_slot_timer->adjust(attotime::never);
+		timer->adjust(attotime::never);
 		return;
 	}
 	const u32 period = frame_period();
 	const u32 delta = (quarter_symbols + period - frame_counter()) % period;
 	// Equality on a newly written compare is scheduled at the next wrap;
 	// sub-quarter-symbol write/match ordering remains unvalidated.
-	m_slot_delay = delta ? delta : period;
-	m_slot_timer->adjust(attotime::from_ticks(u64(m_slot_delay) * 12, 13'000'000));
+	delay = delta ? delta : period;
+	timer->adjust(attotime::from_ticks(u64(delay) * 12, 13'000'000));
+}
+
+TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::transfer_timer_expired)
+{
+	if (!m_reset_released) return;
+	m_transfer_timer->adjust(attotime::from_ticks(u64(frame_period()) * 12, 13'000'000));
+	++m_transfer_timer_expiries;
+	if (m_transfer_timer_expiries <= 256)
+		machine().logerror("rom4_transfer_timer: expiry=%llu target=%04x counter=%04x delay=%u t=%.9f\n",
+			m_transfer_timer_expiries, m_io[4], frame_counter(), m_transfer_delay, machine().time().as_double());
+	m_transfer_request_pending = true;
+	update_host_command_line();
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::slot_timer_expired)
@@ -225,7 +258,7 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	m_frame_counter_base = frame_counter();
 	m_frame_counter_epoch = machine().time();
 	m_reset_released = released;
-	if (!released) m_slot_request_pending = false;
+	if (!released) m_slot_request_pending = m_transfer_request_pending = false;
 	m_host_command_line = false;
 	m_host_command_vector = 0;
 	m_cpu->set_input_line(INPUT_LINE_RESET,
@@ -235,6 +268,8 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 		arm_frame_timer();
 		if (m_slot_compare_written)
 			arm_slot_timer(m_io[0x0f]);
+		if (m_transfer_compare_written)
+			arm_transfer_timer(m_io[4]);
 		update_host_command_line();
 	}
 	else
@@ -243,6 +278,7 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 		m_cobba->codec_serial_receive_ack();
 		m_frame_timer->adjust(attotime::never);
 		m_slot_timer->adjust(attotime::never);
+		m_transfer_timer->adjust(attotime::never);
 	}
 }
 
@@ -421,13 +457,14 @@ u16 nokia_dsp_c54x_device::host_request() const
 {
 	const u16 tx_producer = m_transport->shared_word(0x0a4 / 2);
 	const u16 tx_consumer = m_transport->shared_word(0x0a6 / 2);
-	return (m_slot_request_pending ? 0x0008 : 0) |
+	return (m_slot_request_pending ? 0x0008 : 0) | (m_transfer_request_pending ? 0x1000 : 0) |
 			(tx_producer != tx_consumer ? 0x0002 : 0x0000);
 }
 
 void nokia_dsp_c54x_device::acknowledge_host_command(u16 mask)
 {
 	if (BIT(mask, 3)) m_slot_request_pending = false;
+	if (BIT(mask, 12)) m_transfer_request_pending = false;
 	// MCU parameter delivery uses its explicit HPINT doorbell. Peripheral
 	// acceptance must not reinterpret or clear packed DARAM parameter bits.
 }
@@ -444,8 +481,8 @@ void nokia_dsp_c54x_device::update_host_command_line()
 	// Firmware may leave bit 1 set in the in-service mask; it must not suppress
 	// a later empty-to-nonempty MDISND transition.
 	const u16 acknowledgement = m_transport->shared_word(0x0aa / 2) & ~u16(0x0002);
-	// Only modeled peripheral sources drive INT2: the saved slot latch and
-	// live MDISND comparator. Other ROM dispatcher bits need independently
+	// Only modeled peripheral sources drive INT2: independent compare latches
+	// and the live MDISND comparator. Other ROM dispatcher bits need independently
 	// evidenced producers; packed MCU parameter data is not a request bitmap.
 	const u16 vector = host_request() & ~acknowledgement;
 	const bool level = vector != 0;
@@ -499,7 +536,7 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 {
 	const u8 port = offset & 0xff;
-	if (port == 0x03 || port == 0x0e || port == 0x0f)
+	if (port == 0x03 || port == 0x04 || port == 0x0e || port == 0x0f)
 		machine().logerror("rom4_timing_port: port=%02x data=%04x pc=%04x t=%.6f\n",
 				port, data, u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 				machine().time().as_double());
@@ -531,6 +568,12 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		if (BIT(data, 1))
 			m_transport->notify_tx();
 	}
+	else if (port == 4)
+	{
+		// Research hypothesis: port 4 schedules the queued-transfer compare
+		// serviced by request bit 1000. Fine match phase remains unmeasured.
+		arm_transfer_timer(data);
+	}
 	else if (port == 0x27)
 	{
 		m_cobba->rf_transmit_sample(data);
@@ -545,6 +588,8 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 			arm_frame_timer();
 		if (m_slot_compare_written)
 			arm_slot_timer(m_io[0x0f]);
+		if (m_transfer_compare_written)
+			arm_transfer_timer(m_io[4]);
 	}
 	else if (port == 0x0d)
 	{
@@ -554,6 +599,8 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 			arm_frame_timer();
 		if (m_slot_compare_written)
 			arm_slot_timer(m_io[0x0f]);
+		if (m_transfer_compare_written)
+			arm_transfer_timer(m_io[4]);
 	}
 	else if (port == 0x0f)
 	{

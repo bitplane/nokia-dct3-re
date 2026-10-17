@@ -1651,7 +1651,7 @@ enable bits, additional PCM samples or audible/native speech output.
 **Accepted native parameter boundary:** MCU parameters at shared `0854`
 (MCU `100a8`) do not assert INT2 or get cleared by peripheral acceptance.
 Their explicit doorbell drives HPINT. The modeled INT2 sources are the live
-ring-not-empty comparator and an independent saved slot-compare latch.
+ring-not-empty comparator and independent saved slot/queued-transfer compare latches.
 All four physical tone-setting boots, native save/load and the clocked-boot
 suite pass, retaining the exact reviewed instruction fingerprints and paired
 pixels. Medium/High acceptance requires the ordered MCU publication, intact
@@ -1673,8 +1673,9 @@ oracle, but 1,518 rather than 1,520 programming pairs. The two absent
 publishes them at `1922/1923`. Resident dispatcher `35c0` selects `369a`
 on request bit `1000`, and that handler acknowledges `1000` before queue
 service. The model no longer derives that request from a packed selector-9
-word. The port-4 transfer-control write is a candidate hardware predecessor,
-not an established completion source or permission to inject the bit.
+word. The independent port-4 compare model below now services that queue;
+the 1,518-pair capture characterizes the earlier ring-plus-slot model, not
+the newly accepted queued-transfer fixture.
 
 The strict scan oracle remains unchanged and rejects this difference pending
 queue-source closure. The separate processing checker still assumes its older
@@ -1682,8 +1683,8 @@ five-write/single-entry profile; the current multi-entry capture has 1,022
 mode-1 executions, 8,176 filter iterations, zero-valued RF/reduction inputs
 and two `33ac` continuations. Do not interpret its five-to-1,518 failure as
 the effect of this parameter change, or silently rebase either checker.
-Next question: which peripheral transition legitimately requests the queued
-transfer service, independently of MCU parameter data?
+The long-scan RF/processing snapshots still require explicit review with the
+queued-transfer model; this short gate does not re-bank either snapshot.
 
 The passive `c54x_rom4_transfer_observe.lua` eight-second capture records ten
 port-4 writes: initialization/disabling uses `3a98` (15,000), the four `a244`
@@ -1698,7 +1699,32 @@ constant or an accepted timer implementation. The observer retains the last
 firmware counter read without adding I/O reads; its sometimes stale values
 do not alone determine the match phase or distinguish relative from absolute
 programming. Raw descriptor words, request counts and timing stay observable
-until that contract is recovered.
+as the baseline negative control for the independently modeled source.
+
+**Derived queued-transfer compare:** checked original code initializes I/O
+port 4 to the same `3a98` disabled position as the other compare channels.
+Uploaded `a244` supplies descriptor position `0834`; resident handler
+`369a` acknowledges request `1000`, and `3706..371c` emits the queued pair
+and programs the next descriptor position. The model uses the existing
+frame counter/quarter-symbol clock for an absolute, wrapping compare and
+keeps its request latch separate from parameter RAM. This is a
+firmware-derived partial controller model: the physical peripheral identity,
+fine write-to-counter phase and measured clock relationship remain unvalidated.
+
+`make check-c54x-rom4-transfers` runs a fresh own-profile native 5110 for
+eight seconds. Its passive observer reads ordinary descriptor/payload RAM,
+observes firmware I/O and retains the firmware's own counter reads; it never
+posts a completion or changes firmware state. Two fresh captures reproduce
+four complete bursts. Each starts with the original `a240` pair, then five
+compare expiries drive original `3712` pairs at positions
+`0834,0884,08d4,0924,0974`; firmware advances both pointers and disables
+the channel with `3a98`. The checker joins each output to its captured
+descriptor and payload, requires the acknowledgement-family request reads,
+and checks trace accounting. All 20 queued pairs are required, not merely
+the two previously fabricated by the payload alias. Native tone settings,
+clocked-boot instruction/pixel fingerprints, save/load and the 3210 default
+and coherent frontier regressions remain unchanged. This proves neither
+native RF acquisition nor speech nor a measured serial-transfer cadence.
 
 The exact checked ISR block `35c0..35f6` has predicate-mask union `17ff`:
 bits 0--10 and 12 are tested, not bits 11 or 13--15. This independently
@@ -1713,10 +1739,13 @@ Expiry sets that bit without OR-ing `0008` into the shared parameter word;
 the modeled port-1 result combines it with the ring comparator, not parameter
 bits. Port-1/2 acceptance of bit 3 and DSP reset clear
 the slot latch. Its cadence and request-bit assignment are unchanged.
-`check-c54x-backend-requests` exercises eight isolated cases: payloads
+`check-c54x-backend-requests` exercises sixteen isolated cases across both
+compare channels: payloads
 `0000/8000/9201/9209` through both accept ports, masked expiry and later unmask,
 unrelated completion, pending-state restoration after acknowledgement,
-and armed-timer restoration after reset cancellation. CPU-line observations
+and armed-timer restoration after reset cancellation. A separate coincident
+expiry case restores both pending sources and accepts each independently.
+CPU-line observations
 settle at scheduler boundaries before snapshots. The old implementation
 fails the payload-integrity assertion on its first expiry.
 

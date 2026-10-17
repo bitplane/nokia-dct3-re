@@ -60,8 +60,11 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(slot_timer_expired);
+	TIMER_CALLBACK_MEMBER(transfer_timer_expired);
 	TIMER_CALLBACK_MEMBER(frame_timer_expired);
 	void arm_slot_timer(u16 quarter_symbols);
+	void arm_transfer_timer(u16 quarter_symbols);
+	void arm_compare_timer(emu_timer *timer, u16 quarter_symbols, u16 &delay);
 	void arm_frame_timer();
 	u32 frame_period() const;
 	u16 frame_counter() const;
@@ -95,14 +98,19 @@ private:
 	bool m_external_codec_clock = false;
 	u16 m_host_command_vector = 0;
 	emu_timer *m_slot_timer = nullptr;
+	emu_timer *m_transfer_timer = nullptr;
 	emu_timer *m_frame_timer = nullptr;
 	u16 m_slot_frame_length = 0;
 	u16 m_slot_delay = 0;
+	u16 m_transfer_delay = 0;
 	u16 m_frame_counter_base = 0;
 	attotime m_frame_counter_epoch;
 	bool m_slot_compare_written = false;
 	bool m_slot_request_pending = false;
+	bool m_transfer_compare_written = false;
+	bool m_transfer_request_pending = false;
 	u64 m_slot_timer_expiries = 0;
+	u64 m_transfer_timer_expiries = 0;
 	u64 m_frame_timer_expiries = 0;
 	u32 m_io_trace_count = 0;
 	u32 m_rf_trace_count = 0;
