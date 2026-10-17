@@ -2552,6 +2552,43 @@ a reset flag. Clean speech and nonzero DTX results remain separately gated;
 active-speech erasure precision remains the distinct unresolved comparison
 above.
 
+### Native EFR homing with bad frames
+
+**Unresolved conformance boundary:** `check-c54x-rom4-efr-homing-errors`
+rejects the acquired decoder's reset sequence and PCM. The separate
+`observe-c54x-rom4-efr-homing-errors` captures every output and reset entry,
+independently recomputes PCM differences and requires all 49 full-RAM frame
+replays. A completed observation is not a conformance pass.
+
+The generated input uses three canonical DHFs, speech20, three DHFs,
+the same speech20 and three final DHFs. Only the first DHF in each triplet
+has BFI=1 (frames 0, 23 and 46); payload, SID=0 and TAF are retained.
+The installation-verified external decoder reproduces the input/output
+hashes in two fresh processes. Its reset sequence contains frames
+1, 2, 24, 25, 47 and 48. The native wrapper instead resets at 2, 25 and 48:
+bad-frame suppression holds, but the first clean DHF after each loss fails
+the full homing comparison.
+
+The acquired recovery code explains a concrete obstruction. The canonical
+parameter 45 at `1371` matches the ROM table's `000b` at entry. Recovery
+executes `28dc` (`9e0f`, `SACCD A, *AR2, BLEQ`) and changes that parameter
+to zero before the full comparison at `c930`. The original `c941` reset is
+not reached on that frame. These are passive instruction/data observations;
+the fixture must not restore the parameter, reset the codec or alter a CPU
+condition to force the reference sequence. Generic SACCD behavior has its
+own independent instruction fixtures. This identifies an original-code
+input mutation, not every source of PCM differences or silicon validation.
+
+The full conversation differs in 512 samples: frames 2, 24, 25, 47 and 48
+have respectively 160, 96, 80, 96 and 80 differences. All three bad DHFs
+match the reference. Both post-reset speech segments (3..22 and 26..45)
+match all 6,400 samples exactly. The second clean DHF in each triplet is
+still state-dependent in this implementation; it must not be relabeled
+as the reference EHF mask merely because reset occurs at its end.
+[TS 46.060 section 8](https://www.etsi.org/deliver/etsi_ts/146000_146099/146060/14.00.00_60/ts_146060v140000p.pdf)
+defines homing/reset behavior; the generated fixture is not a published
+conformance vector and proves no handset audio transport.
+
 ### Native EFR encoder homing
 
 **Accepted boundary:** `make check-c54x-rom4-efr-homing-encoder` reproduces

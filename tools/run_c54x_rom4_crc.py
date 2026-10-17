@@ -176,8 +176,12 @@ def main():
     mode.add_argument("--efr-erasure-decoder", action="store_true", help="compare native EFR active-speech erasure concealment with the external reference")
     mode.add_argument("--efr-erasure-observe", action="store_true", help="characterize all native EFR loss frames without claiming reference conformance")
     mode.add_argument("--efr-homing-decoder", action="store_true", help="compare native EFR homing and repeated speech with the external reference")
+    mode.add_argument('--efr-homing-errors', action='store_true', help='compare the full native homing/error PCM and reset sequence against the reference')
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
+    parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
     args = parser.parse_args()
+    if args.observe_homing_errors and not args.efr_homing_errors:
+        parser.error('--observe-homing-errors requires --efr-homing-errors')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
@@ -201,12 +205,14 @@ def main():
         bios = "efr-loss-observe"
     if args.efr_homing_decoder:
         bios = "efr-homing"
+    if args.efr_homing_errors:
+        bios = 'efr-home-errors'
     if args.efr_homing_encoder:
         bios = "efr-enc-homing"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder else "2"]
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
@@ -234,12 +240,18 @@ def main():
     if args.efr_homing_decoder:
         for name in ("homing.dec", "homing.out"):
             inputs.append(args.rompath / "tms54rom4" / name)
+    if args.efr_homing_errors:
+        for name in ('homing_error.dec', 'homing_error.out'):
+            inputs.append(args.rompath / 'tms54rom4' / name)
+        inputs.append(root / 'tools/c54x_rom4_efr_homing_error_check.py')
     if args.efr_homing_encoder:
         for name in ("homing_enc.inp", "homing_enc.cod"):
             inputs.append(args.rompath / "tms54rom4" / name)
     evidence = {"command": command, "bios": bios,
                 "inputs": [file_identity(path) for path in inputs],
                 "handset_audio_claim": False}
+    if args.efr_homing_errors:
+        evidence['comparison_scope'] = 'characterization' if args.observe_homing_errors else 'whole_sequence'
     (run / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(f"ROM4 helper evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
@@ -258,6 +270,18 @@ def main():
             (run / 'characterization.json').write_text(json.dumps(report, indent=2) + '\n')
             (run / 'native.pcm').write_bytes(pcm)
             print(f"ROM4 EFR loss characterized: frames={report['frames']} differing_frames={report['differing_frames']} mismatches={report['mismatches']} conformance_claim=0")
+        elif args.efr_homing_errors:
+            try:
+                from tools.c54x_rom4_efr_homing_error_check import check as check_homing_errors
+            except ModuleNotFoundError:
+                from c54x_rom4_efr_homing_error_check import check as check_homing_errors
+            reference = (args.rompath / 'tms54rom4/homing_error.out').read_bytes()
+            report = check_homing_errors(text, result.returncode, reference)
+            report['strict_reference_required'] = not args.observe_homing_errors
+            (run / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')
+            if not args.observe_homing_errors:
+                check_homing_errors(text, result.returncode, reference, strict=True)
+            print(f"ROM4 EFR homing/error characterized: total_mismatches={report['total_mismatches']} reset_mismatch_frames={report['reset_mismatch_frames']} conformance_claim=0")
         else:
             check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid)
     except ValueError as error:

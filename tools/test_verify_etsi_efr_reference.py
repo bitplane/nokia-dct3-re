@@ -9,9 +9,37 @@ from tools.verify_etsi_efr_reference import dtx_input, inspect_dtx, DTX_FRAMES
 from tools.verify_etsi_efr_reference import erasure_input, inspect_erasures, ERASURE_BURSTS
 from tools.verify_etsi_efr_reference import homing_conversation, inspect_homing, HOMING_FRAMES
 from tools.verify_etsi_efr_reference import encoder_homing_input, inspect_encoder_homing
+from tools.verify_etsi_efr_reference import homing_error_input, inspect_homing_errors
 
 
 class EtsiEfrReferenceTest(unittest.TestCase):
+    def test_bad_homing_changes_only_declared_bfi(self):
+        frame = struct.pack('<247H', *([0] + [1] * 244 + [0, 1]))
+        source = frame * 49
+        result = homing_error_input(source)
+        for index in range(49):
+            self.assertEqual(result[index * 494], int(index in (0, 23, 46)))
+            self.assertEqual(result[index * 494 + 1:(index + 1) * 494],
+                             source[index * 494 + 1:(index + 1) * 494])
+        changed = bytearray(source)
+        changed[24 * 494 + 2] = 0
+        for invalid in (source[:-1], b'\x01\x00' + source[2:], changed):
+            with self.assertRaises(ValueError):
+                homing_error_input(invalid)
+
+    def test_homing_error_coverage_requires_ehf_and_repeated_speech(self):
+        frame = struct.pack('<247H', *([0] * 247))
+        source = homing_error_input(frame * 49)
+        pcm = bytearray(b'\x01\x00' * (49 * 160))
+        for index in (2, 25, 48):
+            pcm[index * 320:(index + 1) * 320] = b'\x08\x00' * 160
+        self.assertEqual(inspect_homing_errors(source, pcm)['bad_homing_frames'], [0, 23, 46])
+        changed = bytearray(pcm)
+        changed[26 * 320] = 2
+        for data in (pcm[:-1], bytes(len(pcm)), changed):
+            with self.assertRaises(ValueError):
+                inspect_homing_errors(source, data)
+
     def test_encoder_homing_input_preserves_repeated_speech(self):
         speech = bytes(i % 251 for i in range(52352))
         result = encoder_homing_input(speech)

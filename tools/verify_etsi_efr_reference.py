@@ -42,6 +42,13 @@ ERASURE_EXPECTED = {
     "out": "1c05e9951ffbe91fb25e2ddd4b349f4e563a021ebd5ad7d1e3115881ce326fc9",
 }
 HOMING_FRAMES = 46
+HOMING_ERROR_FRAMES = 49
+BAD_HOMING_FRAMES = (0, 23, 46)
+STEADY_ERROR_HOMING_FRAMES = (2, 25, 48)
+HOMING_ERROR_EXPECTED = {
+    'dec': '4e0479de662a10c8e0f6ea9bcd491b6f3143bec22584655bf614b16ef841f7d4',
+    'out': 'd742f052436adb03ccec6940eca0584c2d0c08095f7ad3b35b6de025b3b436e3',
+}
 HOMING_EXPECTED = {
     "dec": "0ca6dbc6caff2cf556aa6f7458dc4d8c3044750af1ad977a2af6edc6920d1fc1",
     "out": "7dad66375d871bb518cd00bac53e57b698a6fee1e1b3555cea0e06109a022205",
@@ -338,14 +345,74 @@ def generate_erasures(source, commands, log):
             "published_expected_vector_claim": False}
 
 
-def homing_conversation(canonical, speech):
-    """Two initial DHFs, repeated speech separated by two DHFs, final two DHFs."""
+def homing_conversation(canonical, speech, boundary_frames=2):
+    """Canonical DHF boundaries surrounding two identical speech segments."""
     if len(canonical) != 492 or len(speech) != 80196:
         raise ValueError("homing source requires one encoded frame and verified installation speech")
     if any(word > 1 for (word,) in struct.iter_unpack('<H', canonical)):
         raise ValueError("homing source contains a nonbinary bit or flag")
+    if boundary_frames not in (2, 3):
+        raise ValueError('homing boundaries require two or three frames')
     segment = speech[:20 * 492]
-    return canonical * 2 + segment + canonical * 2 + segment + canonical * 2
+    boundary = canonical * boundary_frames
+    return boundary + segment + boundary + segment + boundary
+
+
+def homing_error_input(decoder):
+    if len(decoder) != HOMING_ERROR_FRAMES * 494:
+        raise ValueError('homing/error source requires all 49 frames')
+    frames = list(struct.iter_unpack('<247H', decoder))
+    if any(row[0] or row[245] or row[246] > 1 or any(bit > 1 for bit in row[1:245]) for row in frames):
+        raise ValueError('homing/error source requires clean active-speech input')
+    for start in BAD_HOMING_FRAMES:
+        if any(frames[index][1:245] != frames[0][1:245] for index in range(start, start + 3)):
+            raise ValueError('homing/error boundaries must retain the same canonical payload')
+    result = bytearray(decoder)
+    for frame in BAD_HOMING_FRAMES:
+        struct.pack_into('<H', result, frame * 494, 1)
+    return bytes(result)
+
+
+def inspect_homing_errors(decoder, pcm):
+    if len(decoder) != HOMING_ERROR_FRAMES * 494 or len(pcm) != HOMING_ERROR_FRAMES * 320:
+        raise ValueError('homing/error conversation frame counts differ')
+    frames = list(struct.iter_unpack('<247H', decoder))
+    for index, row in enumerate(frames):
+        if row[0] != int(index in BAD_HOMING_FRAMES) or row[245] or row[246] > 1 or any(bit > 1 for bit in row[1:245]):
+            raise ValueError('homing/error flags or speech bits differ')
+    pattern = b'\x08\x00' * 160
+    if any(pcm[index * 320:(index + 1) * 320] != pattern for index in STEADY_ERROR_HOMING_FRAMES):
+        raise ValueError('steady homing after a bad frame did not produce EHF')
+    if any(pcm[index * 320:(index + 1) * 320] == pattern for index in BAD_HOMING_FRAMES):
+        raise ValueError('bad homing fixture unexpectedly produces the EHF mask')
+    first, second = pcm[3 * 320:23 * 320], pcm[26 * 320:46 * 320]
+    if not any(first) or first == pattern * 20 or first != second:
+        raise ValueError('speech after bad/clean homing does not reproduce from reset')
+    return dict(frames=HOMING_ERROR_FRAMES, bad_homing_frames=list(BAD_HOMING_FRAMES),
+                steady_ehf_frames=list(STEADY_ERROR_HOMING_FRAMES), repeated_speech_frames=20)
+
+
+def generate_homing_errors(source, commands, log):
+    canonical = (source / 'homing_probe.cod').read_bytes()[492:]
+    (source / 'homing_error.cod').write_bytes(homing_conversation(canonical, (source / 'verified.cod').read_bytes(), 3))
+    command = ['./ed_iface', 'homing_error.cod', 'homing_error_clean.dec']
+    commands.append(command)
+    subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    decoder = homing_error_input((source / 'homing_error_clean.dec').read_bytes())
+    (source / 'homing_error.dec').write_bytes(decoder)
+    for name in ('homing_error.out', 'homing_error_replay.out'):
+        command = ['./decoder', 'homing_error.dec', name]
+        commands.append(command)
+        subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    pcm = (source / 'homing_error.out').read_bytes()
+    if pcm != (source / 'homing_error_replay.out').read_bytes():
+        raise ValueError('homing/error reference differs across fresh processes')
+    if any(digest(data) != HOMING_ERROR_EXPECTED[suffix] for suffix, data in (('dec', decoder), ('out', pcm))):
+        raise ValueError('homing/error reference differs from its local reproducibility pin')
+    return dict(coverage=inspect_homing_errors(decoder, pcm), fresh_process_replay=True,
+                published_expected_vector_claim=False,
+                outputs={suffix: dict(bytes=len(data), sha256=digest(data))
+                         for suffix, data in (('dec', decoder), ('out', pcm))})
 
 
 def inspect_homing(decoder, pcm):
@@ -438,6 +505,8 @@ def main():
                         help='also link output-preserving erasure-state observers; requires --erasure-fixture')
     parser.add_argument('--invalid-sid-fixture', action='store_true',
                         help='derive a payload-classified invalid-SID DTX conversation')
+    parser.add_argument('--homing-error-fixture', action='store_true',
+                        help='derive bad-DHF/clean-DHF recovery and repeated speech')
     args = parser.parse_args()
     if args.erasure_state_observer and not args.erasure_fixture:
         parser.error('--erasure-state-observer requires --erasure-fixture')
@@ -484,9 +553,12 @@ def main():
                 evidence["erasures"] = generate_erasures(source, commands, log)
                 if args.erasure_state_observer:
                     evidence['erasure_state_observer'] = observe_erasures(source, commands, log)
-        if args.homing_fixture:
+        if args.homing_fixture or args.homing_error_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["homing"] = generate_homing(source, commands, log)
+        if args.homing_error_fixture:
+            with (run / 'build-and-run.log').open('a') as log:
+                evidence['homing_errors'] = generate_homing_errors(source, commands, log)
         if args.encoder_homing_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["encoder_homing"] = generate_encoder_homing(source, commands, log)
@@ -516,6 +588,10 @@ def main():
                 for suffix in ("dec", "out"):
                     name = f"homing.{suffix}"
                     (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+            if args.homing_error_fixture:
+                for suffix in ('dec', 'out'):
+                    name = f'homing_error.{suffix}'
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
             if args.encoder_homing_fixture:
                 for suffix in ("inp", "cod"):
                     name = f"homing_enc.{suffix}"
@@ -536,6 +612,8 @@ def main():
         print('ETSI EFR invalid-SID reference: PASS frames=518 invalid_codewords=4 bad_valid_codewords=1 payload_classification=1 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0')
     if args.homing_fixture:
         print("ETSI EFR homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
+    if args.homing_error_fixture:
+        print('ETSI EFR homing/error reference: PASS frames=49 bad_homing=3 steady_ehf=3 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0')
     if args.encoder_homing_fixture:
         print("ETSI EFR encoder homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     return 0
