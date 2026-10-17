@@ -28,7 +28,8 @@ public:
 	// the configured mode is outside the non-DLB, non-autobuffer receive subset
 	// (burst, or continuous with FIG=0).
 	bool codec_receive_clock_w(bool clock, bool sync, bool data);
-	// External CLKX/FSX output state; driven=false represents high impedance.
+	// External CLKX/FSX output state (burst, or continuous FIG=0);
+	// driven=false represents high impedance.
 	tms320c54x_bsp_state::transmit_clock_result codec_transmit_clock_w(bool clock, bool sync);
 
 	virtual void tx_commit_w(int state) override;

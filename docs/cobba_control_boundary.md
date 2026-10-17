@@ -1550,8 +1550,8 @@ Continuous receive derives from SPRU131G section 9.2.5 and table 9-8.
 After one qualified FSR, each word boundary arms the next word without another
 sync. An unread BDRR is retained when its successor overruns; BSP then requires
 both a BDRR read and a fresh FSR to restart. RRST clears continuous arming.
-FIG=1 frame-ignore behavior, mode changes without reset and continuous TX
-remain outside this pin subset. The helper checks 1,048,576 continuous
+FIG=1 frame-ignore behavior and mode changes without reset remain outside
+this pin subset. The helper checks 1,048,576 continuous
 word/format/polarity combinations with partial-state copies, plus overrun,
 restart and reset controls. The actual-backend gate separately requires
 `C54x native backend BSP continuous RX: PASS` with five successful word
@@ -1566,14 +1566,16 @@ pin gate, native tone-control and exact 5110 save/load gates pass; native FR
 encoder/decoder frame-history replay remains bit-exact.
 
 The corresponding `codec_transmit_clock_w(clock, sync)` interface accepts
-external CLKX/FSX in standard burst mode (internal clock/frame generation,
-DLB and autobuffering are not implemented by this pin interface). TI SPRU131G
+external CLKX/FSX in standard burst or continuous FIG=0 mode (internal
+clock/frame generation, DLB and autobuffering are not implemented by this
+pin interface). TI SPRU131G
 sections 9.2.4/9.2.6 define MSB-first output, long-sync MSB holding and
-high-impedance DX after the final bit. BDXR loads the output shifter at FSX;
+high-impedance DX after the final bit when no continuous successor loads.
+BDXR loads the output shifter at FSX;
 XRDY and BXINT0 occur at that load, not word completion. A subsequent BDXR
-write queues a separate word without changing the active shifter. Underrun
-repeats the retained word without another ready interrupt; a new frame sync
-restarts output. PCM mode suppresses DX for BDXR bit 15 set without suppressing
+write queues a separate word without changing the active shifter. A new external
+frame sync can repeat the retained word after underrun without another ready
+interrupt. PCM mode suppresses DX for BDXR bit 15 set without suppressing
 the transfer or readiness. Table 9-5 additionally requires XRST assertion
 with XRDY clear to raise XRDY and XINT; whole-device reset is distinct.
 
@@ -1588,6 +1590,22 @@ underrun suppression and reset abort/interrupt checks. Saved state includes
 the output shifter, remaining bits, clock/sync phase and PCM suppression.
 This interface supplies no production clock or handset audio; physical COBBA
 attachment and dynamic mid-word format changes remain unvalidated.
+
+Continuous FIG=0 transmission follows section 9.2.5: a queued BDXR loads
+at the next word boundary without another FSX, raising XRDY/BXINT0 at that
+load. No queued word means underrun and high-impedance halt. This external-sync
+subset does not invent a restart pulse for a later BDXR write; a supplied FSX
+restarts it. Extra FSX aborts the active word just as in burst mode.
+FIG=1 and switching modes without reset remain outside acceptance.
+An additional helper matrix checks 1,048,576 continuous word/format/polarity
+cases, 168 partial copies, suppression, restart and reset. The actual backend
+requires `C54x native backend BSP continuous TX: PASS`: six word completions
+(including suffix replay), five independently settled load-source observations,
+queued boundary transfer, underrun halt, external restart and reset abort.
+Its checkpoint is restored after resetting the live transmitter, requiring
+saved continuous arming as well as the queued and partial words. These are
+caller-clocked peripheral tests, not operational handset speech or a physical
+COBBA attachment.
 
 BSPC XSREMPTY (bit 12) is an active-low underrun indicator, not a direct
 "shifter currently idle" flag (SPRU131G section 9.2.3 and table 9-5).

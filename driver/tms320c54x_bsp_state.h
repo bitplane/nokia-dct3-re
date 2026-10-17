@@ -23,6 +23,7 @@ struct tms320c54x_bsp_state
 	std::uint8_t transmit_bits_left = 0;
 	bool transmit_clock_level = false, transmit_sync_active = false;
 	bool transmit_suppressed = false;
+	bool transmit_continuous = false;
 
 	void reset() { *this = {}; }
 	void reset_receive_shift()
@@ -76,6 +77,7 @@ struct tms320c54x_bsp_state
 		transmit_shift = 0;
 		transmit_bits_left = 0;
 		transmit_suppressed = false;
+		transmit_continuous = false;
 	}
 	struct transmit_clock_result
 	{
@@ -84,28 +86,32 @@ struct tms320c54x_bsp_state
 	transmit_clock_result transmit_clock(bool clock, bool sync,
 			std::uint16_t extension = 0)
 	{
-		// Explicit external CLKX/FSX, standard burst mode, no DLB/ABU.
-		const bool supported = (control & 0x003a) == 0x0008 && !(extension & 0xfc00);
+		// External CLKX/FSX only; continuous mode currently requires FIG=0.
+		const bool supported = !(control & 0x0032) && !(extension & 0xfc00) &&
+				((control & 0x0008) || !(extension & 0x0100));
 		const bool edge = clock != transmit_clock_level && clock != bool(extension & 0x0040);
 		transmit_clock_level = clock;
 		const bool active = sync != bool(extension & 0x0020);
 		const bool previous_sync = transmit_sync_active;
 		if (edge) transmit_sync_active = active;
 		bool ready_edge = false;
+		const auto load_word = [&]() {
+			std::uint16_t word;
+			if (!start_transmit(word, &ready_edge, extension))
+			{
+				reset_transmit_shift();
+				return;
+			}
+			transmit_bits_left = word_bits(extension);
+			transmit_shift = word << (16 - transmit_bits_left);
+			transmit_suppressed = (extension & 0x0200) && (transmit & 0x8000);
+			transmit_continuous = !(control & 0x0008);
+		};
 		if (!supported || !(control & 0x0040)) reset_transmit_shift();
 		else if (edge)
 		{
 			if (active && !previous_sync)
-			{
-				std::uint16_t word;
-				if (start_transmit(word, &ready_edge, extension))
-				{
-					transmit_bits_left = word_bits(extension);
-					transmit_shift = word << (16 - transmit_bits_left);
-					transmit_suppressed = (extension & 0x0200) && (transmit & 0x8000);
-				}
-				else reset_transmit_shift();
-			}
+				load_word();
 			else if (!active && transmit_bits_left)
 			{
 				// MSB is driven during FSX; long FSX holds it. The remaining
@@ -113,8 +119,12 @@ struct tms320c54x_bsp_state
 				if (--transmit_bits_left) transmit_shift <<= 1;
 				else
 				{
+					const bool continue_stream = transmit_continuous && transmit_pending;
 					finish_transmit();
 					reset_transmit_shift();
+					// SPRU131G 9.2.5: queued DXR transfers without another FSX;
+					// underrun halts instead of inventing repeated word clocks.
+					if (continue_stream) load_word();
 				}
 			}
 		}

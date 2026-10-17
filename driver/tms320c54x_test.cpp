@@ -47873,6 +47873,100 @@ private:
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !(data.read_word(0x22) & 0x2400),
 				"RRST cancels partial and continuous state without manufacturing a new FSR");
 			osd_printf_info("C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n");
+			m_stage = 50; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
+	void continuous_transmit_suffix()
+	{
+		unsigned tail = 0;
+		for (unsigned i = 0; i < 8; ++i)
+		{
+			const auto pin = transmit_pin_edge(false);
+			expect(pin.driven && !pin.transmit_ready_edge, "continuous first-word suffix retains its own shifter");
+			tail = (tail << 1) | unsigned(pin.data);
+		}
+		expect(tail == 0x78, "queued successor cannot overwrite the active continuous word");
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			const auto pin = transmit_pin_edge(false);
+			expect(pin.driven && pin.data == bool((0x9abc >> (15 - i)) & 1) && pin.transmit_ready_edge == !i,
+				"queued word starts on the next bit edge without a second FSX and raises load-time XRDY");
+		}
+		const auto halted = transmit_pin_edge(false);
+		expect(!halted.driven && !halted.transmit_ready_edge && !(m_cpu->space(AS_DATA).read_word(0x22) & 0x1000),
+			"continuous underrun releases DX and asserts XSREMPTY without a ready edge");
+	}
+	void check_continuous_transmit()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 50)
+		{
+			data.write_word(0x22, 0); data.write_word(0x23, 0); data.write_word(0x22, 0x40);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x21, 0x5678);
+			unsigned prefix = 0;
+			for (unsigned i = 0; i < 8; ++i)
+			{
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(pin.driven && pin.transmit_ready_edge == !i, "continuous TX starts with one external frame sync");
+				prefix = (prefix << 1) | unsigned(pin.data);
+				if (i == 3) data.write_word(0x21, 0x9abc);
+			}
+			expect(prefix == 0x56, "continuous prefix preserves queued-word separation");
+		}
+		else if (m_stage == 51)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "initial continuous load reaches source 5");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save continuous TX partial word and queued successor");
+			continuous_transmit_suffix();
+		}
+		else if (m_stage == 52)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "queued continuous load independently reaches source 5");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x22, 0); // Displace continuous mode before restoration.
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE, "restore continuous TX after the live source settled");
+			m_stage = 52; continuous_transmit_suffix();
+		}
+		else if (m_stage == 53)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "restored queued load repeats source 5");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x21, 0x1357);
+			for (unsigned i = 0; i < 32; ++i)
+			{
+				const auto pin = transmit_pin_edge(false);
+				expect(!pin.driven && !pin.transmit_ready_edge, "a late DXR write cannot manufacture an external restart sync");
+			}
+			transmit_pin_word(0x1357, true);
+		}
+		else if (m_stage == 54)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "fresh external restart load reaches source 5");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			transmit_pin_word(0x1357, false); // Retained word on FSX, no new DXR or XINT.
+			data.write_word(0x21, 0x2468);
+			for (unsigned i = 0; i < 4; ++i)
+			{
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(pin.driven && pin.transmit_ready_edge == !i, "continuous reset-abort word starts normally");
+			}
+			data.write_word(0x22, 0); data.write_word(0x22, 0x40);
+			for (unsigned i = 0; i < 32; ++i) expect(!transmit_pin_edge(false).driven, "XRST cancels continuous output");
+		}
+		else if (m_stage == 55)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "only the reset-abort word's initial load remains pending");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		}
+		else if (m_stage == 56)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "halted/reset continuous output produces no late source");
+			osd_printf_info("C54x native backend BSP continuous TX: PASS completed_words=6 load_irqs=5 partial_restore=1 queued_boundary=1 underrun_halt=1 external_restart=1 reset_abort=1 source=5 handset_clock_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend BSP tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
@@ -48008,6 +48102,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 50) { check_continuous_transmit(); return; }
 		if (m_stage >= 40) { check_continuous_receive(); return; }
 		if (m_stage >= 18) { check_transmit_pins(); return; }
 		if (m_stage >= 8) { check_receive_pins(); return; }

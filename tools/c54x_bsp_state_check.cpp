@@ -292,9 +292,75 @@ static void check_transmit_pins()
 	{
 		port.reset(); port.control_w(mode == 0 ? 0x40 : mode == 1 ? 0x58 : mode == 2 ? 0x68 : mode == 3 ? 0x4a : 0x48);
 		port.transmit_w(0x1234);
-		const auto pin = transmit_edge(port, mode == 4 ? 0x400 : 0, true);
+		const auto pin = transmit_edge(port, mode == 0 ? 0x100 : mode == 4 ? 0x400 : 0, true);
 		assert(!pin.supported && !pin.driven && !pin.transmit_ready_edge && !port.transmit_ready);
 	}
+}
+
+static void check_continuous_transmit()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+		{
+			const unsigned width = widths[format];
+			const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+			const bool active = !(extension & 0x20);
+			tms320c54x_bsp_state port;
+			port.control_w(0x40 | (format & 1 ? 4 : 0));
+			port.transmit_w(0);
+			for (unsigned word = 0; word <= 0xffff; ++word)
+				for (unsigned bit = 0; bit < width; ++bit)
+				{
+					const auto pin = transmit_edge(port, extension, !word && !bit ? active : !active);
+					assert(pin.supported && pin.driven && pin.data == bool((word >> (width - 1 - bit)) & 1));
+					assert(pin.transmit_ready_edge == !bit && (port.control_r() & 0x1000));
+					if (bit == width / 2 && word != 0xffff) port.transmit_w(word + 1);
+				}
+			assert(!transmit_edge(port, extension, !active).driven && !(port.control_r() & 0x1000));
+			// Underrun halts: a later DXR write alone supplies no replacement FSX.
+			port.transmit_w(0x1357);
+			for (unsigned i = 0; i < width * 2; ++i)
+			{
+				const auto pin = transmit_edge(port, extension, !active);
+				assert(!pin.driven && !pin.transmit_ready_edge && !port.transmit_ready);
+			}
+			transmit_word(port, extension, width, 0x1357, true, 3);
+			transmit_word(port, extension, width, 0x1357, false); // Fresh FSX can repeat retained data.
+			for (unsigned checkpoint = 1; checkpoint < width; ++checkpoint)
+			{
+				port.reset(); port.control_w(0x40 | (format & 1 ? 4 : 0));
+				port.transmit_w(0x5678);
+				assert(transmit_edge(port, extension, active).transmit_ready_edge);
+				port.transmit_w(0x9abc);
+				for (unsigned i = 1; i < checkpoint; ++i) transmit_edge(port, extension, !active);
+				auto replay = port;
+				for (unsigned i = checkpoint; i < 2 * width; ++i)
+				{
+					const auto a = transmit_edge(port, extension, !active), b = transmit_edge(replay, extension, !active);
+					const unsigned expected = i < width ? 0x5678 : 0x9abc;
+					assert(a.driven && b.driven && a.data == bool((expected >> (width - 1 - i % width)) & 1) && a.data == b.data);
+					assert(a.transmit_ready_edge == (i == width) && a.transmit_ready_edge == b.transmit_ready_edge);
+					assert(port.control_r() == replay.control_r());
+				}
+				assert(!transmit_edge(port, extension, !active).driven && !transmit_edge(replay, extension, !active).driven);
+			}
+			// Extra FSX aborts the current word and starts the queued replacement.
+			port.reset(); port.control_w(0x40 | (format & 1 ? 4 : 0)); port.transmit_w(0xffff);
+			assert(transmit_edge(port, extension, active).transmit_ready_edge);
+			transmit_edge(port, extension, !active); port.transmit_w(0x1234);
+			transmit_word(port, extension, width, 0x1234, true);
+			port.transmit_w(0xffff); transmit_edge(port, extension, active);
+			port.control_w(0); port.control_w(0x40 | (format & 1 ? 4 : 0));
+			for (unsigned i = 0; i < width; ++i) assert(!transmit_edge(port, extension, !active).driven);
+			// PCM suppression applies per word, not to the following queued word.
+			port.transmit_w(0x8000);
+			assert(!transmit_edge(port, extension | 0x200, active).driven);
+			port.transmit_w(0x1234);
+			for (unsigned i = 1; i < width; ++i) assert(!transmit_edge(port, extension | 0x200, !active).driven);
+			const auto next = transmit_edge(port, extension | 0x200, !active);
+			assert(next.driven && next.transmit_ready_edge && next.data == bool((0x1234 >> (width - 1)) & 1));
+		}
 }
 
 int main()
@@ -303,6 +369,7 @@ int main()
 	check_receive_pins();
 	check_continuous_receive();
 	check_transmit_pins();
+	check_continuous_transmit();
 	tms320c54x_bsp_state port;
 	std::uint16_t duplex_output = 0xaaaa;
 	port.control_w(0x00c2);
