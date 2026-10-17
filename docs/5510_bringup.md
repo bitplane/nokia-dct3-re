@@ -8624,12 +8624,24 @@ modeled. The mapped AA99 image has three literal `aa1a` references, including
 an immediate-one store pattern at `027887`; this is not an indirect-writer
 closure. Local-frame roles beyond the shown copies remain unassigned.
 
-This is a candidate message/lifecycle entrance, not proof that a decoder
-loop returns an error at block 375. Next observe the actual `aa1a` writes,
-input `17` dispatch and `029500` branch outcome near the final block, then
-follow the selected producer. Runtime passage through those exact sites,
-message ownership and the meaning of value 1 still need evidence; no stop
-word or input selector should be forced to extend playback.
+The passive `mu4_cleanup_control_observe.lua` bus taps now cover a complete
+ten-second run. `aa1a` is written zero at 0.007246732 seconds, then one at
+0.823387403 (context PC `02788a`). Its only read is one at 9.700790847
+(context PC `029503`). The terminal accounts for both writes and the one
+read, with no cap and `illegal=0`. Check using
+`python3 tools/mu4_cleanup_control_check.py RUN/error.log`; the checker
+requires complete full-word writes, chronological matching reads, explicit
+passive scope and a non-capped terminal. All 925 output artifacts (918
+snapshots, six transport streams and decoded returns) match the previous
+ten-second capture exactly; the gate checker still passes.
+
+Thus a late change to `aa1a` is not the trigger on this observed bus path.
+The one-valued control was present before decoding began. The next target
+is the input-`11` transaction reaching the check: its producer, local-frame
+length/cursor fields and the intervening paths that reach `0294fd`. This is
+not proof of EOF, a decoder error, absence of indirect writers, or Execute
+ownership at the context PCs. No control word or input selector should be
+forced to extend playback.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
