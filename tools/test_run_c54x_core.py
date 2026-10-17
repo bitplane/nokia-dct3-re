@@ -14,6 +14,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_mvdp_interrupt_scope_is_required(self):
+        marker, ending = EXTRA_PROFILES['rpt-mvdp-irq']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='rpt-mvdp-irq')
+        for field in ('cases=288', 'restore=288', 'sources=IRQ,NMI',
+                      'counts=0,1,7,255', 'count_forms=2', 'pages=2',
+                      'arrivals=3', 'snapshots=3', 'deferred_until_final_write=1',
+                      'balanced_stack=1', 'duplicate_transfers=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='rpt-mvdp-irq')
+
     def test_repeated_mvdp_requires_count_plus_one_and_replay(self):
         marker, ending = EXTRA_PROFILES['rpt-mvdp']
         text = marker + '\n' + ending + '\n'

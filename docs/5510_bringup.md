@@ -180,12 +180,28 @@ states, and three snapshots. Read/write taps require exactly count+1
 ordered transfers and one-clock accelerated retirement. The preceding core
 fails the fixture at the repeated opcode's admission boundary.
 
-This does not establish physical bus phase, interrupt/NMI composition,
-memory-sourced counts, all circular modes, count values outside the tested
+This does not establish physical bus phase, memory-sourced counts, all
+circular modes, count values outside the tested
 domain, or self-modifying-code coherence. Absolute and long-offset Smem
 remain forbidden in single-instruction repeat by the independent addressing
 guard; standalone support must not weaken that guard. Repeat inside a block
 or control-delay/XC composition remains outside this implementation.
+
+`rpt-mvdp-irq` separately validates 288 cases/restores with IRQ and NMI,
+counts 0/1/7/255, both immediate-count forms, two pages, three request times
+and three snapshots. SPRU172C section 2.6 specifies that repeat Decode
+disables all interrupts, including NMI but excluding reset, until completion.
+The fixture requires every program write before acknowledgment, the exact
+unexecuted continuation in RTN, a real PSHM/RETE ISR, a balanced stack, and
+no duplicate transfers after restoration. The existing core satisfies this
+contract without another timing adjustment or CPU change. Standalone MVDP
+interrupt interaction and reset/HOLD during repeat remain separate questions.
+
+Input pulses enter through MAME's scheduled `set_input_line` path. Raw
+`write_stream` checkpoints must occur after the input synchronization has
+reached the CPU, not inside the callback that merely enqueues the edge.
+The fixture snapshots avoid those enqueue ticks; an undelivered scheduler
+event is not evidence that the CPU failed to save a pending interrupt.
 
 ### MMR long-form boundary
 

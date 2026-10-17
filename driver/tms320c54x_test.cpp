@@ -14529,6 +14529,35 @@ private:
 			});
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 259940;
 	}
+	void start_repeat_mvdp_irq(unsigned variant = 0)
+	{
+		unsigned const index = variant % 4, count_index = std::array<unsigned, 4>{0, 1, 3, 4}[index];
+		unsigned const count = std::array<unsigned, 4>{0, 1, 7, 255}[index];
+		bool const nmi = (variant / 16) % 2, long_count = (variant / 8) % 2;
+		u32 const base = (variant / 4) % 2 ? 0x20000 : 0;
+		start_repeat_mvdp(13 + count_index * 40 + (base ? 200 : 0) + (long_count ? 400 : 0));
+		m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove();
+		// Interrupt return legitimately reads the stack; isolate copy-source
+		// observations from those independent data transactions.
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1230, 0x132f, "repeat_mvdp_irq_source",
+			[this, count](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_pipeline_operand_reads <= count && at == 0x1230 + m_pipeline_operand_reads && word == 0x2468 + m_pipeline_operand_reads, "Interrupted repeated MVDP reads each source once");
+				++m_pipeline_operand_reads;
+			});
+		{ auto const disable = machine().disable_side_effects();
+			u32 const vector = nmi ? 4 : base + 0x40;
+			auto &program = m_cpu->space(AS_PROGRAM);
+			program.write_word(vector, 0x4a1e); // PSHM RTN
+			program.write_word(vector + 1, 0xe955); // LD #55,B
+			program.write_word(vector + 2, 0xf4e5); // RETE
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, nmi ? 0x800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, nmi ? 0 : 1);
+		m_vector_acks = 0; m_phase = 259960;
+	}
 	void start_mvdp_pair(unsigned variant = 0)
 	{
 		start_mvdp(16 + (variant / 6) * 56);
@@ -15976,6 +16005,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvdp")) { start_mvdp(); return; }
 		if (!strcmp(machine().options().bios(), "mvdp-pair")) { start_mvdp_pair(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-mvdp")) { start_repeat_mvdp(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-mvdp-irq")) { start_repeat_mvdp_irq(); return; }
 		if (!strcmp(machine().options().bios(), "banzd-long")) { start_pipeline_extended_banz(); return; }
 		if (!strcmp(machine().options().bios(), "ret-load")) { start_return_load(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
@@ -44412,6 +44442,49 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254830) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254820; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 259960)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const count = std::array<unsigned, 4>{0, 1, 7, 255}[variant % 4];
+			unsigned const arrival = std::array<unsigned, 3>{3, 6, count >= 7 ? 12U : 8U}[(variant / 32) % 3];
+			// set_input_line queues a scheduler synchronization. Snapshot after
+			// that edge has reached the CPU, not inside its enqueue callback.
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 9, 14}[variant / 96];
+			bool const nmi = (variant / 16) % 2;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Interrupted repeated MVDP remains admitted");
+			if (tick == arrival)
+			{
+				int const line = nmi ? INPUT_LINE_NMI : 0;
+				m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE);
+			}
+			if (m_pipeline_store_writes <= count) expect(!m_vector_acks, "Repeated MVDP does not acknowledge during an unfinished copy");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, unsigned(m_first_port_cycle), m_vector_acks};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated MVDP with pending IRQ or NMI");
+			}
+			if (tick == count + 100)
+			{
+				if (m_pipeline_operand_reads != count + 1 || m_pipeline_store_writes != count + 1 || m_vector_acks != 1 || !m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_AR2) != 0x1230 + count + 1 || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || m_cpu->state_int(tms320c54x_device::STATE_B) != 0x55)
+					osd_printf_info("MVDP interrupt mismatch: case=%u replay=%u reads=%u writes=%u acks=%u idle=%u AR2=%04x SP=%04x B=%llx PC=%06x IFR=%04x\n", variant, unsigned(m_pipeline_replay), m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks, unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
+				expect(m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1230 + count + 1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55, "Repeated MVDP retires completely before one balanced ISR and continuation");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_first_port_cycle = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated MVDP and its original pending interrupt");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 259970; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 287) { start_repeat_mvdp_irq(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged repeated MVDP interrupts: PASS cases=288 restore=288 sources=IRQ,NMI counts=0,1,7,255 count_forms=2 pages=2 arrivals=3 snapshots=3 deferred_until_final_write=1 balanced_stack=1 duplicate_transfers=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated MVDP interrupts complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 259970) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259960; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 259940)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -47809,6 +47882,14 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 259960)
+		{
+			unsigned const variant = m_pipeline_peripheral_case;
+			unsigned const count = std::array<unsigned, 4>{0, 1, 7, 255}[variant % 4];
+			bool const nmi = (variant / 16) % 2, long_count = (variant / 8) % 2;
+			expect(line == (nmi ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (long_count ? 0x604 : 0x603), "Repeated MVDP acknowledges the pending source only after all writes with the unexecuted continuation");
+			++m_vector_acks;
+		}
 		if (m_phase == 310560)
 		{
 			auto const f = extended_push_case(m_pipeline_peripheral_case);
@@ -49580,6 +49661,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(12, "mvdp", "Staged standalone data-to-program transfers")
 	ROM_SYSTEM_BIOS(13, "mvdp-pair", "Adjacent retained data-to-program transfers")
 	ROM_SYSTEM_BIOS(14, "rpt-mvdp", "Repeated retained data-to-program transfers")
+	ROM_SYSTEM_BIOS(15, "rpt-mvdp-irq", "Repeated program copies with deferred IRQ and NMI")
 ROM_END
 
 ROM_START(tms54rom4)
