@@ -6025,26 +6025,35 @@ match the prior baseline byte-for-byte. Its 6,852 early observation records
 also match the two-second proof run. This establishes non-interference,
 not decoded-audio acceptance.
 
-The raw-word writer trace further excludes two final copy endpoints. During
-processing call 2, the `024af1/024af2` DLD/DST loop copies `f300/f301 =
-ffbd/0b70` to `eb80/eb81` at 1.022890 s. Later `02488d/02488e` copies
-`7b80/7b81 = fff5/9b08` to `f380/f381` at 1.022905 s. Both source reads
-and destination writes are observed; the source contract pins all 22 words
-of the two loop setups/bodies. Live GENPC is context, not instruction
-ownership: the store taps show the following `024af3` and `02488f`.
+The bounded raw-word probe follows seven transfers, including each source's
+preceding writes, actual reads and matching destination writes:
 
-The channel-0 value had already reached `7b80/7b81` at 1.020880 s from
-`f300/f301`; the latter buffer is reused for channel 1 at 1.022823 s.
-The earlier stores into `f300/f301` have context `024ace`, immediately
-following the source-pinned `024acc/024acd` DLD/DST loop. Its observed AR1
-values advance past `7800/7801` and `e800/e801` respectively. These are the
-next candidate source pairs to observe, not yet an owned arithmetic
-producer or a diagnosis of the transform. Do not confuse the reused
-`f300/f301` buffer across the two channel lifetimes.
-Reproduce this bounded chronology with `tools/mu4_raw_output_observe.lua`
-as the two-second run's autoboot script. It observes only the four selected
-word pairs during call 2, removes its taps afterwards and reports truncation;
-it does not establish upstream arithmetic correctness.
+| Channel | Word pair chain | Unchanged raw value |
+| --- | --- | --- |
+| 0 | `787e -> 7800 -> f300 -> 7b80 -> f380` | `fff59b08` |
+| 1 | `e87e -> e800 -> f300 -> eb80` | `ffbd0b70` |
+
+Each address names the high word and the following low word. Channel 0
+uses `f300` before channel 1 overwrites it; `7b80` retains channel 0 until
+the final copy. The source contract pins 42 words covering three DLD/DST
+copy loops and the `025c0d..025c14` rearrangement body. The rearrangement's
+single-word MVDD reads/writes interleave; DLD/DST reads both words first.
+Neither sequence introduces these particular bad values. This is not a
+proof of the complete permutation or every output sample.
+
+The values already appear at `787e/787f` at 1.019126398/407 s and
+`e87e/e87f` at 1.021159587/595 s, both at live context `025bf7`, following
+the helper `025bb3`'s `025bf6` DST. The next target is the helper's owned
+arithmetic/scratch-input chain, not conversion or the downstream copies.
+Live GENPC remains context rather than retained instruction ownership.
+
+Reproduce with `tools/mu4_raw_output_observe.lua` as the two-second run's
+autoboot script, then run `python3 tools/mu4_raw_output_check.py RUN_DIR/error.log`.
+The probe observes eight word pairs during call 2 and removes its taps
+afterwards. The fresh run has 597 records, no partial masks or truncation;
+the checker validates all seven transfers and rejects missing material,
+incorrect channel lifetimes, partial buses and incomplete captures. It does
+not establish upstream arithmetic correctness or native audio acceptance.
 
 Use the same passive two-second run and independently regenerated reference:
 

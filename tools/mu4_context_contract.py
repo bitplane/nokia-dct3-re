@@ -20,6 +20,7 @@ RAW_OUTPUT_COPY_WITNESSES = {
     0x24885: (0x7110,0x0011,0x7212,0xaae9,0x771a,0x03ff,0xf072,0x488e,0x5692,0x4e91),
     0x24ac4: (0x1004,0x8811,0x1009,0x8812,0x771a,0x007f,0xf072,0x4acd,0x5691,0x4e92),
     0x24ae7: (0x1004,0xf000,0x0380,0x8811,0x1009,0x8812,0x771a,0x007f,0xf072,0x4af2,0x5692,0x4e91),
+    0x25c0b: (0xf072,0x5c14,0x5682,0x5784,0xe598,0xe5ba,0xe558,0xe57a,0x4e8b,0x4f8d),
 }
 
 
@@ -27,7 +28,7 @@ def decode_raw_output_copies(words):
     for base, witness in RAW_OUTPUT_COPY_WITNESSES.items():
         if any(words.get(base + i) != word for i, word in enumerate(witness)):
             raise ValueError('raw output copy source changed or absent')
-    return {'pinned_words': 32,
+    return {'pinned_words': 42,
             'copies': [{'load': '02488d', 'store': '02488e', 'pairs': 1024,
                         'source': 'AR2 from data[aae9]', 'destination': 'AR1 from direct operand $10 under current CPL'},
                        {'load': '024acc', 'store': '024acd', 'pairs': 128,
@@ -35,7 +36,10 @@ def decode_raw_output_copies(words):
                         'destination': 'AR2 from direct operand $09 under current CPL'},
                        {'load': '024af1', 'store': '024af2', 'pairs': 128,
                         'source': 'AR2 from data[SP:09]', 'destination': 'AR1 from data[SP:04] + 0x380'}],
-            'scope': 'Double-word copy grammar only; live GENPC is not retained instruction ownership, and upstream sample arithmetic is unvalidated'}
+            'permutation': {'first_word': '025c0b', 'last_word': '025c14',
+                            'body': 'DLD AR2/A; DLD AR4/B; four single-word MVDD transfers; DST A/AR3; DST B/AR5',
+                            'scope': 'Body only; pointer setup, iteration count and complete in-place permutation not validated'},
+            'scope': 'Copy grammar only; live GENPC is not retained instruction ownership, and upstream sample arithmetic is unvalidated'}
 
 
 BIT_WINDOW_BASE = 0x2510C
