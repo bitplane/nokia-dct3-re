@@ -237,6 +237,13 @@ private:
 	bool m_delayed_far = false;
 	u8 m_delayed_words = 0;
 	u8 m_xc_guard = 0;
+	std::array<u64, 2> m_atomic_xc_a{}, m_atomic_xc_b{};
+	std::array<u16, 2> m_atomic_xc_st0{};
+	u8 m_atomic_xc_valid = 0;
+	u8 m_atomic_condition_words = 0;
+	bool m_atomic_condition_redirect = false;
+	u64 m_atomic_condition_before_a = 0, m_atomic_condition_before_b = 0;
+	u16 m_atomic_condition_before_st0 = 0;
 	bool m_pipeline_xc_active = false;
 	u32 m_pipeline_xc_end = 0;
 	u8 m_pipeline_xc_skip_words = 0;

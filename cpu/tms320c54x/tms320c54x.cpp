@@ -460,7 +460,7 @@ constexpr bool staged_offset_load(u16 word)
 constexpr bool staged_xc(u16 word)
 {
 	u16 const form = word & ~u16(0x0200);
-	return form == 0xfd00 || form == 0xfd20 || form == 0xfd30 ||
+	return form == 0xfd00 || form == 0xfd08 || form == 0xfd0c || form == 0xfd20 || form == 0xfd30 ||
 		(form >= 0xfd42 && form <= 0xfd47) || (form >= 0xfd4a && form <= 0xfd4f);
 }
 
@@ -1219,6 +1219,15 @@ void tms320c54x_device::device_start()
 
 	save_item(NAME(m_pc));
 	save_item(NAME(m_atomic_io_pending));
+	save_item(NAME(m_atomic_xc_a));
+	save_item(NAME(m_atomic_xc_b));
+	save_item(NAME(m_atomic_xc_st0));
+	save_item(NAME(m_atomic_xc_valid));
+	save_item(NAME(m_atomic_condition_words));
+	save_item(NAME(m_atomic_condition_redirect));
+	save_item(NAME(m_atomic_condition_before_a));
+	save_item(NAME(m_atomic_condition_before_b));
+	save_item(NAME(m_atomic_condition_before_st0));
 	save_item(NAME(m_atomic_io_write));
 	save_item(NAME(m_atomic_io_ready_required));
 	save_item(NAME(m_atomic_io_wait_remaining));
@@ -1697,6 +1706,7 @@ void tms320c54x_device::device_clock_changed()
 
 u16 tms320c54x_device::fetch()
 {
+	if (!m_pipeline_frontend) ++m_atomic_condition_words;
 	u16 value;
 	if (m_vector_prefetch_valid)
 	{
@@ -1790,6 +1800,7 @@ void tms320c54x_device::far_transfer(u32 address, bool delayed)
 	{
 		m_pc = u16(address);
 		m_xpc = (address >> 16) & 0x7f;
+		m_atomic_condition_redirect = true;
 	}
 }
 
@@ -2507,12 +2518,18 @@ bool tms320c54x_device::accept_interrupt()
 	m_interrupt_vector_pc = (m_pmst & 0xff80) | (vector << 2);
 	m_interrupt_ack_source = acknowledged_source;
 	m_interrupt_entry_stage = 1;
+	m_atomic_xc_valid = 0;
 	leave_idle();
 	return true;
 }
 
 void tms320c54x_device::reset_pipeline()
 {
+	m_atomic_xc_a = {}; m_atomic_xc_b = {}; m_atomic_xc_st0 = {};
+	m_atomic_xc_valid = m_atomic_condition_words = 0;
+	m_atomic_condition_redirect = false;
+	m_atomic_condition_before_a = m_atomic_condition_before_b = 0;
+	m_atomic_condition_before_st0 = 0;
 	m_pipeline_block_first_final.fill(false);
 	m_pipeline_block_end.fill(false);
 	m_pipeline_block_body.fill(false);
@@ -2963,7 +2980,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		u16 const word = m_pipeline_word[3];
 		bool const execute = BIT(word, 6) ? staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
-			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : true;
+			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : BIT(word, 3) ? BIT(m_st0, 11) == BIT(word, 2) : true;
 		m_pipeline_operand[3] = execute;
 		if (!execute) m_pipeline_xc_skip_words = BIT(m_pipeline_word[3], 9) ? 2 : 1;
 	}
@@ -4978,6 +4995,7 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
 	// These scalar arithmetic, multiply, load, repeat and test families read Smem.
 	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
 	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf000) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfc00) == 0x4800 || (op & 0xf000) == 0x5000 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400 || (op & 0xff00) == 0x7100 || (op & 0xff00) == 0x7300 || (op & 0xff00) == 0x7500 || (op & 0xff00) == 0x7f00))
@@ -4988,7 +5006,7 @@ void tms320c54x_device::execute_one(u16 op)
 	if ((op & 0xffe0) == 0xf4c0) // TRAP K (SPRU172C 4-195): no status changes.
 	{
 		push(m_pc);
-		m_pc = (m_pmst & 0xff80) | ((op & 31) << 2);
+		transfer_pc((m_pmst & 0xff80) | ((op & 31) << 2));
 		m_icount -= 2;
 		return;
 	}
@@ -4999,7 +5017,7 @@ void tms320c54x_device::execute_one(u16 op)
 		push(m_pc);
 		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
 		m_st1 |= 0x0800;
-		m_pc = (m_pmst & 0xff80) | (vector << 2);
+		transfer_pc((m_pmst & 0xff80) | (vector << 2));
 		m_icount -= 2;
 		return;
 	}
@@ -5042,11 +5060,11 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= delayed ? 3 : 5;
 		return;
 	}
-	const auto branch_if = [this](bool condition)
+	const auto branch_if = [this, &transfer_pc](bool condition)
 	{
 		const u16 destination = fetch();
 		if (condition)
-			m_pc = destination;
+			transfer_pc(destination);
 		m_icount -= condition ? 4 : 2;
 	};
 	if ((op & 0xfdfe) == 0xf802) // BC[D] pmad, BIO/NBIO (SPRU172C).
@@ -5061,7 +5079,7 @@ void tms320c54x_device::execute_one(u16 op)
 				m_delayed_words = 2;
 			}
 			else
-				m_pc = destination;
+				transfer_pc(destination);
 		}
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
@@ -5090,7 +5108,7 @@ void tms320c54x_device::execute_one(u16 op)
 				m_delayed_words = 2;
 			}
 			else
-				m_pc = destination;
+				transfer_pc(destination);
 		}
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
@@ -5110,7 +5128,7 @@ void tms320c54x_device::execute_one(u16 op)
 				m_delayed_words = 2;
 			}
 			else
-				m_pc = destination;
+				transfer_pc(destination);
 		}
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
@@ -5161,11 +5179,18 @@ void tms320c54x_device::execute_one(u16 op)
 	if ((op & 0xfd00) == 0xfd00) // XC n, condition
 	{
 		const unsigned words = BIT(op, 9) ? 2 : 1;
+		// SPRU131G 7.1.4: Access evaluates XC before either preceding
+		// program word's Execute publication. Keep the sampled view separate
+		// from live registers; later instructions still observe real writes.
+		unsigned const sample = m_atomic_xc_valid ? m_atomic_xc_valid - 1 : 0;
+		const u64 a = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_a[sample] : m_a;
+		const u64 b_value = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_b[sample] : m_b;
+		const u16 status = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_st0[sample] : m_st0;
 		bool execute = false;
 		if (BIT(low, 6))
 		{
 			const bool b = BIT(low, 3);
-			const u64 value = accumulator(b);
+			const u64 value = b ? b_value : a;
 			const s64 signed_value = s64(value << 24) >> 24;
 			execute = true;
 			switch (low & 7)
@@ -5181,7 +5206,7 @@ void tms320c54x_device::execute_one(u16 op)
 			}
 			if (BIT(low, 5))
 			{
-				const bool overflow = BIT(m_st0, b ? 9 : 10);
+				const bool overflow = BIT(status, b ? 9 : 10);
 				execute = execute && (BIT(low, 4) ? overflow : !overflow);
 			}
 		}
@@ -5190,10 +5215,10 @@ void tms320c54x_device::execute_one(u16 op)
 			execute = true;
 			if (low & 0x30)
 				execute = execute && ((low & 0x30) == 0x30
-						? BIT(m_st0, 12) : !BIT(m_st0, 12));
+						? BIT(status, 12) : !BIT(status, 12));
 			if (low & 0x0c)
 				execute = execute && ((low & 0x0c) == 0x0c
-						? BIT(m_st0, 11) : !BIT(m_st0, 11));
+						? BIT(status, 11) : !BIT(status, 11));
 			if (low & 0x03)
 			{
 				execute = execute && ((low & 3) == 3 ? !m_bio_in_cb() : (low & 3) == 2 && m_bio_in_cb());
@@ -5202,6 +5227,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (!execute)
 		{
 			m_pc += words;
+			if (!m_pipeline_frontend) m_atomic_condition_words += words;
 			m_icount -= words; // Rejected slots execute as NOPs.
 			m_xc_guard = 2 - words;
 		}
@@ -5983,7 +6009,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (!extended) indirect_modify(low);
 		const u16 destination = fetch();
 		if (branch)
-			m_pc = destination;
+			transfer_pc(destination);
 		m_icount -= (branch ? 3 : 1) + unsigned(extended);
 		return;
 	}
@@ -6639,18 +6665,20 @@ void tms320c54x_device::execute_one(u16 op)
 			}
 			else
 			{
-				m_pc = destination;
+				transfer_pc(destination);
 				m_icount -= 2;
 			}
 		}
 		return;
 	}
 
-	const auto return_if = [this](bool take)
+	const auto return_if = [this, &transfer_pc](bool take)
 	{
+		// Non-delayed RC drains the older condition pipeline even when untaken.
+		m_atomic_condition_redirect = true;
 		if (take)
 		{
-			m_pc = pop();
+			transfer_pc(pop());
 			m_icount -= 4;
 		}
 		else
@@ -6702,16 +6730,16 @@ void tms320c54x_device::execute_one(u16 op)
 	switch (op)
 	{
 	case 0xfc00: // RET
-		m_pc = pop();
+		transfer_pc(pop());
 		m_icount -= 4;
 		return;
 	case 0xf4eb: // RETE
-		m_pc = pop();
+		transfer_pc(pop());
 		m_st1 &= ~0x0800;
 		m_icount -= 4;
 		return;
 	case 0xf49b: // RETF
-		m_pc = m_rtn;
+		transfer_pc(m_rtn);
 		++m_sp; // SPRU172C: RTN supplies PC; no stack-memory read occurs.
 		m_st1 &= ~0x0800;
 		m_icount -= 2;
@@ -6757,24 +6785,24 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		m_rtn = m_pc; // SPRU131G 7.1.2: CALL loads RTN before stacking it.
 		push(m_pc);
-		m_pc = destination;
+		transfer_pc(destination);
 		m_icount -= 3;
 		return;
 	}
 	case 0xf073: // B pmad
-		m_pc = fetch();
+		transfer_pc(fetch());
 		m_icount -= 3;
 		return;
 	case 0xf4e2: // BACC A
 	case 0xf5e2: // BACC B
-		m_pc = u16(accumulator(BIT(op, 8)));
+		transfer_pc(u16(accumulator(BIT(op, 8))));
 		m_icount -= 5;
 		return;
 	case 0xf4e3: // CALA A
 	case 0xf5e3: // CALA B
 		m_rtn = m_pc;
 		push(m_pc);
-		m_pc = u16(accumulator(BIT(op, 8)));
+		transfer_pc(u16(accumulator(BIT(op, 8))));
 		m_icount -= 5;
 		return;
 	case 0xf6e3: // CALAD A
@@ -7027,6 +7055,17 @@ void tms320c54x_device::retire_atomic_instruction(u16 instruction_pc, u16 previo
 		((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
 	if (m_sp_address_pending) m_sp_address_base = previous_sp;
 	if (m_illegal) return;
+	if (m_idle || m_atomic_condition_redirect || m_pc != u16(instruction_pc + m_atomic_condition_words))
+		m_atomic_xc_valid = 0; // Immediate redirects and idle drain the older pipeline.
+	else
+		for (unsigned word = 0; word < std::min<unsigned>(m_atomic_condition_words, 2); ++word)
+		{
+			m_atomic_xc_a[1] = m_atomic_xc_a[0]; m_atomic_xc_b[1] = m_atomic_xc_b[0]; m_atomic_xc_st0[1] = m_atomic_xc_st0[0];
+			m_atomic_xc_a[0] = m_atomic_condition_before_a;
+			m_atomic_xc_b[0] = m_atomic_condition_before_b;
+			m_atomic_xc_st0[0] = m_atomic_condition_before_st0;
+			m_atomic_xc_valid = std::min<unsigned>(m_atomic_xc_valid + 1, 2);
+		}
 	if (m_intm_guard) --m_intm_guard;
 	// Count executed words before repeat redirection changes the continuation.
 	const unsigned words = u16(m_pc - instruction_pc);
@@ -7105,6 +7144,9 @@ void tms320c54x_device::execute_run()
 		const u32 instruction_address = logical_program_address(instruction_pc);
 		const u16 previous_sp = m_sp;
 		const bool repeat_was_armed = m_rpt_armed;
+		m_atomic_condition_before_a = m_a; m_atomic_condition_before_b = m_b; m_atomic_condition_before_st0 = m_st0;
+		m_atomic_condition_words = 0;
+		m_atomic_condition_redirect = false;
 		m_op = fetch();
 		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(instruction_address, m_op);
 		m_capture_extensions = (m_op & 0xff00) == 0x6f00 && machine().options().verbose();

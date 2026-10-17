@@ -1835,12 +1835,9 @@ end-to-end call. Those transport and physical boundaries remain separate.
 
 ### Native EFR DTX conversation
 
-**Current frontier:** the nonzero-background target is not accepted. Native
-encoding matches frames 0--96, then diverges at speech-resumption frame 97,
-starting at pitch parameter 5 while the five LSF parameters still match.
-Native decoding matches frames 0--50, then differs at the first SID frame 51.
-The gates below intentionally reject these results; ordinary installation
-encoder/decoder acceptance remains independent.
+**Accepted boundary:** native encoding and decoding reproduce the complete
+518-frame nonzero-background conversation, including SID updates and two
+resumptions of speech. This is isolated codec acceptance, not handset audio.
 
 `make check-c54x-rom4-efr-dtx-encoder` and
 `make check-c54x-rom4-efr-dtx-decoder` use a generated reference conversation:
@@ -1866,9 +1863,10 @@ The native gates retain histories and require the following complete result:
 - The encoder uses the same native call order as the ordinary encoder gate,
   with `0bac` bit 2 selecting DTX. All 29,526 parameters, 1,036 VAD/SP values
   and 8,806 native packed words must match the external reference and normative
-  packing model; this remains unachieved.
+  packing model; all match.
 - The unchanged `c941` reset and `c8dc` decoder must reproduce all 82,880 PCM
-  samples exactly, including nonzero PCM in 46 inactive frames and return to speech.
+  samples exactly, including nonzero PCM in 46 inactive frames and return to speech;
+  all match.
   Both reference generation and native acceptance require this nondegenerate
   comfort-noise coverage; matching zero PCM alone is not sufficient. Each native encoder
   and decoder frame is restored at its input boundary and re-executed,
@@ -1885,19 +1883,29 @@ the single read/write transaction. Decoder text also checks literal/address
 ordering. This adds atomic execution, not staged timing, peripheral ownership,
 repeat legality or interrupt composition for the instruction.
 
-The next discriminating boundary is the shared native pseudonoise helper
-`cbc5..cbe2`. A passive program-read observer captures its first decoder call
-with seed `70816958`, two requested bits and seed pointer `09c4`. Native
-execution stores `1c205a56`, whereas the reference polynomial
-`x^31+x^3+1` requires `7c205a56`. Returned noise bits initially agree, but the
-seed already differs. At `cbd2` TC is zero; after the conditional SSBX, `cbd4`
-sees TC one and clears it again. The native paired XC/SSBX/XC/RSBX sequence
-requires the XC predicates' Access-stage view, before the older Execute
-publication (SPRU131G example 7-13); the atomic executor currently samples
-live TC in program order. Validate this with an isolated producer/consumer
-fixture and the staged core before changing atomic visibility. A correction
-must then pass both full conversation gates; explaining the first seed
-difference does not yet prove either complete codec result.
+The load-bearing CPU contract is XC's Access-stage predicate visibility
+([SPRU131G 7.1.4, example 7-13](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)):
+neither of the preceding two one-word instructions, nor the preceding two-word
+instruction, has published its Execute result when XC tests its condition.
+Atomic execution retains a saved two-word condition history without delaying
+ordinary register writes. Immediate transfers, interrupt entry and idle discard
+older history; a non-delayed conditional return drains it even when untaken.
+BIO remains an external callback, not a delayed register sample.
+
+This matters to the unchanged `cbc5..cbe2` pseudonoise helper: sampling live TC
+in its paired XC/SSBX/XC/RSBX sequence incorrectly cleared feedback, turning
+seed `70816958` into `1c205a56` instead of polynomial-required `7c205a56`.
+Matching initial noise bits or zero-background PCM did not expose that error.
+The correction is generic CPU behavior, with no codec-PC special case.
+
+Focused `xc-status`, `xc-latency` and `xc-barrier` profiles compare atomic and
+staged execution independently. Per frontend they cover 64 status cases,
+384 TC/C/A/B producer-consumer cases and 12 return-barrier cases, replaying
+every case across save/restore. Coverage includes one/two-word producers,
+zero through three intervening NOPs, XC controlling one/two words and a taken
+return whose target equals the sequential address. These are bounded visibility
+tests, not physical pipeline timing validation or exhaustive compositions with
+I/O stalls, interrupts, repeats and delayed transfers.
 
 These gates target this software conversation only. The unusable frames
 occur during comfort-noise intervals; active-speech erasure bursts, invalid SID

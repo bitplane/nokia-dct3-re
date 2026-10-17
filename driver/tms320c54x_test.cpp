@@ -15775,6 +15775,9 @@ private:
 		if (!strcmp(machine().options().bios(), "cond-reg-store")) { check_control_disassembler(); start_conditional_register_store(0); return; }
 		if (!strcmp(machine().options().bios(), "atomic-ret")) { start_atomic_conditional_return(0); return; }
 		if (!strcmp(machine().options().bios(), "xorm")) { check_control_disassembler(); start_atomic_xorm(0); return; }
+		if (!strcmp(machine().options().bios(), "xc-status")) { start_xc_status(0); return; }
+		if (!strcmp(machine().options().bios(), "xc-latency")) { start_xc_latency(0); return; }
+		if (!strcmp(machine().options().bios(), "xc-barrier")) { start_xc_barrier(0); return; }
 		if (!strcmp(machine().options().bios(), "saccd")) { start_saccd_case(0); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-long")) { start_extended_push(); return; }
@@ -16650,6 +16653,124 @@ private:
 			m_recurring_irq_snapshot = {0, 0};
 			m_saved_pipeline.str({}); m_saved_pipeline.clear();
 			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save conditional register store before its read/write pair");
+			m_rom4_codec_replays = 1;
+		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
+	void start_xc_barrier(unsigned index)
+	{
+		unsigned const kind = index % 3;
+		bool const initial = (index / 3) % 2;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x600, initial ? 0xf4bc : 0xf5bc);
+		program.write_word(0x601, kind == 0 ? 0xfc00 : kind == 1 ? 0xfc45 : 0xfc44);
+		program.write_word(0x602, initial ? 0xfd20 : 0xfd30);
+		program.write_word(0x603, 0xe933); program.write_word(0x604, 0xf495); program.write_word(0x605, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x602);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xe05 | (initial ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(index < 12);
+		m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
+		m_phase = 524000 + index;
+		if (!((index / 6) % 2))
+		{
+			m_saved_pipeline.str({}); m_saved_pipeline.clear();
+			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save status producer and sequential-target return barrier");
+			m_rom4_codec_replays = 1;
+		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
+	struct xc_latency_fixture
+	{
+		unsigned gap, kind, slots, prefix;
+		bool initial, polarity, staged, snapshot;
+		bool take() const { return (gap < 2 ? initial : !initial) == polarity; }
+		bool source() const { return slots == 2 && take() ? !polarity : !initial; }
+		u16 status(bool after) const { return 0x605 | (kind < 2 ? (after ? source() : initial) << (kind ? 11 : 12) : 0); }
+	};
+	static xc_latency_fixture xc_latency_case(unsigned index)
+	{
+		unsigned const kind = (index / 16) % 6;
+		return {index % 4, kind, 1 + (index / 96) % 2, kind >= 4 ? 2U : 1U,
+			bool((index / 8) % 2), bool((index / 4) % 2), index < 384, bool((index / 192) % 2)};
+	}
+	void start_xc_latency(unsigned index)
+	{
+		auto const f = xc_latency_case(index);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
+		unsigned pc = 0x600;
+		if (f.kind < 2) program.write_word(pc++, (f.initial ? 0xf4b0 : 0xf5b0) | (f.kind ? 11 : 12));
+		else if (f.kind < 4) program.write_word(pc++, 0xe800 | ((f.kind & 1) << 8) | !f.initial);
+		else { program.write_word(pc++, 0xf020 | ((f.kind & 1) << 8)); program.write_word(pc++, !f.initial); }
+		pc += f.gap;
+		u16 const predicate = f.kind == 0 ? (f.polarity ? 0x30 : 0x20) : f.kind == 1 ? (f.polarity ? 0x0c : 8) :
+			0x40 | ((f.kind & 1) << 3) | (f.polarity ? 4 : 5);
+		program.write_word(pc++, (f.slots == 2 ? 0xff00 : 0xfd00) | predicate);
+		if (f.slots == 2)
+			program.write_word(pc++, f.kind < 2 ? ((f.polarity ? 0xf4b0 : 0xf5b0) | (f.kind ? 11 : 12)) :
+				0xe800 | ((f.kind & 1) << 8) | !f.polarity);
+		program.write_word(pc++, f.kind >= 2 && !(f.kind & 1) ? 0xe933 : 0xe833);
+		program.write_word(pc + 1, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.kind >= 2 && !(f.kind & 1) ? f.initial : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.kind >= 2 && (f.kind & 1) ? f.initial : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.status(false));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(f.staged);
+		m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
+		m_phase = 523000 + index;
+		if (!f.snapshot)
+		{
+			m_saved_pipeline.str({}); m_saved_pipeline.clear();
+			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC condition source before its producer");
+			m_rom4_codec_replays = 1;
+		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
+	void start_xc_status(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned const mode = index % 32, gap = mode % 4;
+		bool const set = (mode / 4) & 1, initial = (mode / 8) & 1, tc = (mode / 16) & 1;
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, set ? 0xf5bc : 0xf4bc);
+		program.write_word(0x601 + gap, tc ? 0xfd30 : 0xfd20);
+		program.write_word(0x602 + gap, 0xe833);
+		program.write_word(0x604 + gap, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xe05 | (initial ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(index < 64);
+		m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
+		m_phase = 522000 + index;
+		if (!(index & 32))
+		{
+			m_saved_pipeline.str({}); m_saved_pipeline.clear();
+			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC/status producer before Access sampling or Execute publication");
 			m_rom4_codec_replays = 1;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -46227,6 +46348,104 @@ private:
 			osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
 			start_rom4_efr_decoder(0, true); return;
 		}
+		if (m_phase >= 524000 && m_phase < 524024)
+		{
+			unsigned const index = m_phase - 524000;
+			bool const initial = (index / 3) % 2, taken = index % 3 != 2;
+			if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save return barrier after its optional stack read");
+				m_rom4_codec_replays = 1;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Return barrier and XC remain admitted");
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			if (m_cpu->state_int(tms320c54x_device::STATE_B) != 0x33)
+				osd_printf_info("XC return barrier divergence: case=%u staged=%u kind=%u initial_tc=%u B=%04x expected_B=0033\n", index, index < 12, index % 3, initial,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_B)));
+			expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x33 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x606 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(taken) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xe05 | (!initial ? 0x1000 : 0)),
+				"Return pipeline drain makes preceding status visible even at a sequential target or untaken conditional return");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore return drain and selected XC without reusing stale history");
+				m_phase = 524000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index == 11) osd_printf_info("TMS320C54x staged XC return barriers: PASS cases=12 restore=12 forms=RET,RC_taken,RC_untaken sequential_target=1 snapshots=2 physical_phase_claim=0\n");
+			if (index < 23) { start_xc_barrier(index + 1); return; }
+			osd_printf_info("TMS320C54x atomic XC return barriers: PASS cases=12 restore=12 forms=RET,RC_taken,RC_untaken sequential_target=1 snapshots=2 physical_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated XC return barriers complete");
+		}
+		if (m_phase >= 523000 && m_phase < 523768)
+		{
+			unsigned const index = m_phase - 523000;
+			auto const f = xc_latency_case(index);
+			if (!m_rom4_codec_replays && (f.staged ? m_cpu->pipeline_cycles() == 5 + f.prefix : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x600 + f.prefix))
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC after its producer without replacing the retained Access condition");
+				m_rom4_codec_replays = 1;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC producer and single predicate remain admitted");
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			u64 const a = f.kind >= 2 && !(f.kind & 1) ? f.source() : f.take() ? 0x33 : 0;
+			u64 const b = f.kind >= 2 && (f.kind & 1) ? f.source() : f.kind >= 2 && f.take() ? 0x33 : 0;
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b || m_cpu->state_int(tms320c54x_device::STATE_ST0) != f.status(true))
+				osd_printf_info("XC condition divergence: case=%u staged=%u kind=%u gap=%u slots=%u initial=%u polarity=%u A=%04x expectedA=%04x B=%04x expectedB=%04x ST0=%04x expectedST0=%04x\n",
+					index, f.staged, f.kind, f.gap, f.slots, f.initial, f.polarity, unsigned(m_cpu->state_int(tms320c54x_device::STATE_A)), unsigned(a),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_B)), unsigned(b), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), f.status(true));
+			expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.status(true) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x603 + f.prefix + f.gap + f.slots && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+				"XC retains old or settled TC/C/A/B once for all controlled words across one/two-word producers");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC condition history and selected/annulled words");
+				m_phase = 523000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index == 383) osd_printf_info("TMS320C54x staged XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n");
+			if (index < 767) { start_xc_latency(index + 1); return; }
+			osd_printf_info("TMS320C54x atomic XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated XC conditions complete");
+		}
+		if (m_phase >= 522000 && m_phase < 522128)
+		{
+			unsigned const index = m_phase - 522000, mode = index % 32, gap = mode % 4;
+			bool const staged = index < 64, set = (mode / 4) & 1, initial = (mode / 8) & 1, tc = (mode / 16) & 1;
+			if (!m_rom4_codec_replays && (staged ? m_cpu->pipeline_cycles() == 6 : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601))
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC/status after publication with an older retained predicate");
+				m_rom4_codec_replays = 1;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC and status producers remain admitted");
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			bool const take = (gap < 2 ? initial : set) == tc;
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != (take ? 0x33 : 0))
+				osd_printf_info("XC/status divergence: staged=%u case=%u gap=%u initial_tc=%u producer_tc=%u predicate_tc=%u actual_A=%04x expected_A=%04x\n", staged, index, gap, initial, set, tc,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_A)), take ? 0x33 : 0);
+			expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (take ? 0x33 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x605 + gap &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xe05 | (set ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+				"XC tests its Access-stage status rather than either preceding Execute publication");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC/status with the original retained predicate");
+				m_phase = 522000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index == 63) osd_printf_info("TMS320C54x staged XC/status: PASS cases=64 restore=64 producers=SSBX,RSBX gaps=0,1,2,3 old_condition_words=2 snapshots=2 physical_phase_claim=0\n");
+			if (index < 127) { start_xc_status(index + 1); return; }
+			osd_printf_info("TMS320C54x atomic XC/status: PASS cases=64 restore=64 producers=SSBX,RSBX gaps=0,1,2,3 old_condition_words=2 snapshots=2 physical_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated XC/status complete");
+		}
 		if (m_phase >= 520000 && m_phase < 521024)
 		{
 			unsigned const index = m_phase - 520000;
@@ -48226,6 +48445,9 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(3, "saccd", "Existing conditional accumulator-store regression banks")
 	ROM_SYSTEM_BIOS(4, "atomic-ret", "Atomic signed conditional returns and stack ownership")
 	ROM_SYSTEM_BIOS(5, "xorm", "Atomic memory XOR addressing, flags and transaction replay")
+	ROM_SYSTEM_BIOS(6, "xc-status", "Access-owned conditional execution after status producers")
+	ROM_SYSTEM_BIOS(7, "xc-latency", "Access-owned TC/carry/accumulator conditions across variable producer lengths")
+	ROM_SYSTEM_BIOS(8, "xc-barrier", "Conditional-execute status after sequential-target return barriers")
 ROM_END
 
 ROM_START(tms54rom4)

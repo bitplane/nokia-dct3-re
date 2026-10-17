@@ -14,6 +14,20 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_xc_condition_profiles_require_both_frontends_and_replay(self):
+        for name in ('xc-status', 'xc-latency', 'xc-barrier'):
+            markers, ending = EXTRA_PROFILES[name]
+            text = '\n'.join((*markers, ending)) + '\n'
+            check_result(text, 3, profile=name)
+            for marker in markers:
+                with self.subTest(profile=name, marker=marker), self.assertRaises(ValueError):
+                    check_result(text.replace(marker, ''), 3, profile=name)
+            for old, new in (('restore=64', 'restore=0'), ('restore=384', 'restore=0'),
+                             ('restore=12', 'restore=0')):
+                if old in text:
+                    with self.subTest(profile=name, mutation=old), self.assertRaises(ValueError):
+                        check_result(text.replace(old, new), 3, profile=name)
+
     def test_atomic_xorm_scope(self):
         marker, ending = EXTRA_PROFILES['xorm']
         text = marker + '\n' + ending + '\n'

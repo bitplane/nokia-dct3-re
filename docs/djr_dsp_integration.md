@@ -173,8 +173,9 @@ EFR reference, entry order and replay scope are maintained in
 [COBBA control boundary](cobba_control_boundary.md#native-efr-encoder-acceptance).
 The separate [DTX conversation probes](cobba_control_boundary.md#native-efr-dtx-conversation)
 target nonzero background/SID/unusable-frame intervals and speech resumption.
-They currently expose a native pseudonoise/conditional-status visibility gap,
-not accepted DTX, active-speech error policy or handset audio transport.
+They reproduce the complete 518-frame nonzero-background conversation after
+correcting generic XC Access-stage condition visibility. Active-speech error
+policy and handset audio transport remain outside that acceptance.
 
 The remaining NSE-1 boundaries are RF sample ownership/encoding and SCU
 tuning, and an organic DSP-to-PCM speech lifecycle. Matching internal images
