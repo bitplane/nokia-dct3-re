@@ -7583,6 +7583,23 @@ frontend mode. Repeated NEG and measured silicon pipeline phases remain
 outside this acceptance scope. The instruction contract is TI SPRU172C
 pages 4-119/4-120.
 
+The recorder's original `03bdb6..03bdc2` escape prefix also requires
+pending double-store forwarding: `DST A,*SP(a)` followed by `DLD *SP(a),A`
+must consume the retained pair, not old RAM. A passive native trace read
+old low word `0088` immediately before the actual store of `0007`, causing
+the bit writer to receive `0088` at width three. Mapped AL/BL reads already
+returned seven; changing accumulator latency would address the wrong cause.
+The staged bypass now forwards both retained DST words while preserving
+the two real EB writes and their order. The exact original prefix passes
+128 cases with save/replay; an independent 4,608-case matrix covers A/B,
+word/pair consumers, three store addressing forms, saturation, sign extension,
+aliases, gaps, pages and two save points. Physical bank timing is unvalidated.
+A fresh two-second native recorder observation contains 1,010 bit-writer
+inputs with zero overwide values (previously two); the first corrupt escape
+is now `0007` at width three. Changed downstream field ordering means later
+ordinal numbers are not identities. Full saved-media and native audio
+validation remain separate requirements.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a

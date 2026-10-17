@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_original_escape_double_store_dependency",
+      "owner": "c54x_cpu",
+      "status": "satisfied",
+      "predicate": "The original AA88 escape prefix consumes its pending DST pair instead of stale backing RAM without suppressing real writes",
+      "current": "The pinned 13-word 03bdb6..03bdc2 prefix reproduces a stale low word 0088 instead of 0007 before correction. Native data-bus observations show AL and BL already equal seven, so mapped-accumulator latency is not the cause. Both DST words are now forwarded from retained operands under the existing on-chip approximation; the two real writes remain ordered. The exact prefix passes 128 cases/restores and an independent DST matrix passes 4608 cases/restores over both accumulators, three consumers, three store addressing forms, four source patterns, gaps, aliases, SXM, saturation, pages and two save points. Existing store-bypass and indirect-DLD profiles pass. A fresh bounded native recording captures 1010 bit-writer inputs with zero overwide values, versus two before correction; the first failing field is now seven at width three. Later field ordinals change and must not be equated. This establishes the bounded instruction dependency and observed encoder-field improvement, not measured silicon phases, complete media validity, native PCM or speech.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_recorder_bits_observe.lua"]
+    },
+    {
       "id": "mu4_original_byte_count_mapped_dependency",
       "owner": "c54x_cpu",
       "status": "satisfied",

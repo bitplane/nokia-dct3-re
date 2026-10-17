@@ -19,6 +19,8 @@ BASE = 0x23D73
 BIT_WINDOW_BASE = 0x2510C
 NIBBLE_BASE = 0x2C62B
 BYTE_COUNT_BASE = 0x2AB09
+ESCAPE_STORE_BASE = 0x3BDB6
+ESCAPE_STORE_WITNESS = (0x1106,0x08f8,0x000b,0xf843,0xbdd2,0xf640,0x10f8,0x0008,0x4e0a,0x560a,0x7002,0x0011,0x4e00)
 BYTE_COUNT_WITNESS = (0x10e1,5,0xf010,1,0x7102,0x0011,0x4808,0xf47d,0xf000,1,0x4808,0x4ee1,6)
 SERVICE_GATE_BASE = 0x204C1
 SERVICE_GATE_WITNESS = (0x10e1,6,0xf845,0x04d2,0x44f8,0x15d9,0x3ce1,0x16,
@@ -185,6 +187,14 @@ def decode_byte_count_prefix(words):
             'dependency': 'f000 0001 ADD followed by 4808 LDM AL,A',
             'destination': 'double word at AR1+6; low count at AR1+7',
             'scope': 'Original scalar prefix, not all constructor branches or initializer argument ownership'}
+
+
+def decode_escape_store_prefix(words):
+    if any(words.get(ESCAPE_STORE_BASE + offset) != word for offset, word in enumerate(ESCAPE_STORE_WITNESS)):
+        raise ValueError('AA88 escape store/load prefix changed or absent')
+    return {'entry': '03bdb6', 'last_word': '03bdc2', 'pinned_words': 13,
+            'dependency': 'DST A,*SP(a) followed by DLD *SP(a),A',
+            'scope': 'Original source prefix; execution and pending-write bypass require the isolated CPU fixture'}
 
 
 def reference_byte_count(bits):
@@ -1160,6 +1170,7 @@ def contract(source):
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
+    result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
     result['recording_header_writer'] = decode_recording_header_writer(recorder_words)
     result['recording_window_arguments'] = decode_recording_window_arguments(recorder_words)

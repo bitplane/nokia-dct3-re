@@ -10545,6 +10545,100 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 399920;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_long_mapped_original(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case = variant;
+		unsigned v = variant;
+		u16 const length = std::array<u16,8>{12,0,6,7,8,13,21,143}[v % 8]; v /= 8;
+		u16 const stale = std::array<u16,4>{0xff84,0,7,0xffff}[v % 4]; v /= 4;
+		bool const sxm = !(v % 2); v /= 2;
+		u32 const base = v % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		// Unchanged AA88 03:bdb6..bdc2, including the dependent double load.
+		std::array<u16,13> const source{0x1106,0x08f8,0x000b,0xf843,0xbdd2,0xf640,0x10f8,0x0008,0x4e0a,0x560a,0x7002,0x0011,0x4e00};
+		for (unsigned i=0; i<source.size(); ++i) program.write_word(base+0xbdb6+i,source[i]);
+		program.write_word(base+0xbdc3,0xf4e1); program.write_word(base+0xbdd2,0xf4e1);
+		data.write_word(0x1406,7); data.write_word(0x140a,variant?0x7777:0); data.write_word(0x140b,variant?0x8888:0x88);
+		data.write_word(0x1400,0xaaaa); data.write_word(0x1401,0xbbbb); data.write_word(0x1402,0xcccc);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x4800 | (sxm ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_A,length); m_cpu->set_state_int(tms320c54x_device::STATE_B,stale);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1,3);
+		m_pipeline_operand_reads=m_pipeline_extensions_reads=m_pipeline_register_writes=m_pipeline_store_writes=m_pipeline_drained_fetches=0;
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"long_mapped_original_read",[this](offs_t at,u16 &value,u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at==0x1406) { expect(value==7 && !m_pipeline_extensions_reads++,"Original escape reads its threshold once"); return; }
+			if (at==0x11) { expect(value==3 && m_pipeline_extensions_reads==1,"Original escape copies its width once"); ++m_pipeline_extensions_reads; return; }
+			if (at==0x140a || at==0x140b) { ++m_pipeline_drained_fetches; osd_printf_info("long_mapped_original_backing_read: address=%04x value=%04x\n",unsigned(at),value); return; }
+			expect(at==8 || at==0x0b,"Original escape reads only mapped AL/BL after its threshold");
+			if (at==8) ++m_pipeline_register_writes; else ++m_pipeline_operand_reads;
+			if (value!=7) { ++m_pipeline_drained_fetches; osd_printf_info("long_mapped_original_read: case=%u address=%04x actual=%04x expected=0007\n",m_pipeline_peripheral_case,unsigned(at),value); }
+		});
+		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"long_mapped_original_write",[this](offs_t at,u16 &,u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(at==0x140a || at==0x140b || (at>=0x1400 && at<=0x1402),"Original escape publishes only its local value and outgoing arguments"); ++m_pipeline_store_writes;
+		});
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=399940;
+		m_cpu->set_state_int(STATE_GENPC,base+0xbdb6); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
+	struct dst_bypass_fixture
+	{
+		bool producer_b, sxm, sst, same;
+		unsigned kind, mode, gap, checkpoint;
+		u32 base, stored;
+		u64 source, loaded;
+	};
+	static dst_bypass_fixture dst_bypass_case(unsigned variant)
+	{
+		unsigned v=variant, kind=v%3; v/=3; bool const b=v%2; v/=2;
+		unsigned const pattern=v%4; v/=4; unsigned const mode=v%3; v/=3;
+		unsigned const gap=v%2; v/=2; bool const same=v%2; v/=2;
+		bool const sxm=v%2; v/=2; bool const sst=v%2; v/=2;
+		u32 const base=v%2?0x20000:0; v/=2; unsigned const checkpoint=v%2?10:6;
+		u64 const source=std::array<u64,4>{0x0012345678ULL,0xff87654321ULL,0x0080000000ULL,0xff00000000ULL}[pattern];
+		s64 const signed_source=s64(source<<24)>>24;
+		u32 const stored=!sst?u32(source):!sxm?u32(std::min<u64>(source,0xffffffffULL)):
+			u32(std::clamp(signed_source,s64(-0x80000000LL),s64(0x7fffffffLL)));
+		u32 const memory=same?stored:0x13579bdf;
+		u16 const selected=kind==1?u16(memory):u16(memory>>16);
+		u64 const loaded=kind==2?(sxm&&BIT(memory,31)?u64(memory)|0xff00000000ULL:memory):
+			(sxm&&BIT(selected,15)?u64(selected)|0xffffff0000ULL:selected);
+		return {b,sxm,sst,same,kind,mode,gap,checkpoint,base,stored,source,loaded};
+	}
+	void start_dst_bypass(unsigned variant=0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case=variant;
+		auto const f=dst_bypass_case(variant); auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
+		for (unsigned i=0;i<16;++i) program.write_word(f.base+0x700+i,0xf495);
+		unsigned cursor=0;
+		program.write_word(f.base+0x700+cursor++,0x4e00|(f.producer_b?0x100:0)|(f.mode==0?4:f.mode==1?0x81:0xf8));
+		if (f.mode==2) program.write_word(f.base+0x700+cursor++,0x1800);
+		if (f.gap) ++cursor;
+		program.write_word(f.base+0x700+cursor++,(f.kind==2?0x5600:0x1000)|(f.producer_b?0:0x100)|0x82);
+		program.write_word(f.base+0x700+cursor,0xf4e1);
+		data.write_word(0x1800,0x2468); data.write_word(0x1801,0xace0); data.write_word(0x1900,0x1357); data.write_word(0x1901,0x9bdf);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.sst?1:0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x4800|(f.sxm?0x100:0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x17fc); m_cpu->set_state_int(tms320c54x_device::STATE_AR1,0x1800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2,(f.same?0x1800:0x1900)+(f.kind==1?1:0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.producer_b?0x5555:f.source); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.producer_b?f.source:0x5555);
+		m_pipeline_operand_reads=m_pipeline_store_writes=0;
+		m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"dst_bypass_read",[this,f](offs_t at,u16 &value,u16) {
+			if (machine().side_effects_disabled()) return;
+			u16 const first=(f.same?0x1800:0x1900)+(f.kind==1?1:0); u32 const memory=f.same?f.stored:0x13579bdf;
+			expect(at==first || (f.kind==2 && at==(first^1)),"DST consumer reads only its selected word/pair");
+			expect(value==(BIT(at,0)?u16(memory):u16(memory>>16)),"Non-bypassed DST consumer sees the stored or independent pair"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap=data.install_write_tap(0,0xffff,"dst_bypass_write",[this,f](offs_t at,u16 &value,u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(m_pipeline_store_writes<2 && at==0x1800+m_pipeline_store_writes && value==(m_pipeline_store_writes?u16(f.stored):u16(f.stored>>16)),"DST preserves both ordered physical writes and saturated payload"); ++m_pipeline_store_writes;
+		});
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=399960;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x700); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -42437,12 +42531,72 @@ private:
 				if (variant == 15) osd_printf_info("TMS320C54x original byte-count prefix: PASS cases=16 restore=16 words=13 sizes=8 pages=2 mapped_reads=2 data_writes=3 silicon_phase_claim=0\n");
 				if (variant < 975) { start_immediate_mapped(variant+1); return; }
 				osd_printf_info("TMS320C54x immediate ALU mapped consumer: PASS cases=960 restore=960 operations=ADD,SUB,AND,OR,XOR accumulators=2 parts=3 patterns=4 gaps=0,1 sxm=2 pages=2 reads=1 writes=0 silicon_phase_claim=0\n");
-				if (!strcmp(machine().options().bios(), "mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
-				start_timer_boundary_probe(0,true); return;
+				start_long_mapped_original(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
 		}
 		if (m_phase == 399930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
+		if (m_phase == 399940)
+		{
+			unsigned const tick=++m_idle_fixture_tick, variant=m_pipeline_peripheral_case;
+			u16 const length=std::array<u16,8>{12,0,6,7,8,13,21,143}[variant%8]; bool const emits=length>=7;
+			if (tick==6 && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_extensions_reads,m_pipeline_register_writes,m_pipeline_store_writes,m_pipeline_drained_fetches};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save original long-mapped escape prefix");
+			}
+			if (tick==48)
+			{
+				u16 high,low,width,local_high,local_low;
+				{ auto const disable=machine().disable_side_effects(); auto &data=m_cpu->space(AS_DATA); high=data.read_word(0x1400); low=data.read_word(0x1401); width=data.read_word(0x1402); local_high=data.read_word(0x140a); local_low=data.read_word(0x140b); }
+				if (m_pipeline_drained_fetches) osd_printf_info("long_mapped_original_result: case=%u low=%04x expected=%04x\n",variant,low,emits?7:0x8888);
+				expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Original escape prefix completes cleanly");
+				expect(!m_pipeline_drained_fetches && m_pipeline_operand_reads==1 && m_pipeline_extensions_reads==unsigned(emits?2:1) && m_pipeline_register_writes==unsigned(emits) && m_pipeline_store_writes==unsigned(emits?5:0),"Original escape forwards its pending double store to the same-address load");
+				expect(high==(emits?0:0xaaaa) && low==(emits?7:0xbbbb) && width==(emits?3:0xcccc) && local_high==(emits?0:0x7777) && local_low==(emits?7:0x8888) && m_cpu->state_int(tms320c54x_device::STATE_B)==7,"Original escape emits the threshold and preserves real local writes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay=true; m_idle_fixture_tick=6;
+					m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads=m_recurring_irq_snapshot[1]; m_pipeline_register_writes=m_recurring_irq_snapshot[2]; m_pipeline_store_writes=m_recurring_irq_snapshot[3]; m_pipeline_drained_fetches=m_recurring_irq_snapshot[4];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore original long-mapped escape prefix");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=399950; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant<127) { start_long_mapped_original(variant+1); return; }
+				osd_printf_info("TMS320C54x original escape store/load: PASS cases=128 restore=128 lengths=8 stale_values=4 sxm=2 pages=2 mapped_reads=BL,AL writes=0,5 backing_reload_reads=0 silicon_phase_claim=0\n");
+				start_dst_bypass(); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if (m_phase==399950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
+		if (m_phase==399960)
+		{
+			unsigned const tick=++m_idle_fixture_tick, variant=m_pipeline_peripheral_case; auto const f=dst_bypass_case(variant);
+			if (tick==f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save DST forwarding dependency at selected checkpoint");
+			}
+			if (tick==48)
+			{
+				expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"DST dependency completes cleanly");
+				expect(m_cpu->state_int(f.producer_b?tms320c54x_device::STATE_A:tms320c54x_device::STATE_B)==f.loaded && m_cpu->state_int(f.producer_b?tms320c54x_device::STATE_B:tms320c54x_device::STATE_A)==f.source,"DST consumers match independent word/pair and saturation oracle");
+				unsigned const reads=f.kind==2?2:1;
+				expect(m_pipeline_store_writes==2 && m_pipeline_operand_reads<=reads && ((f.same&&!f.gap)||m_pipeline_operand_reads==reads),"DST bypass suppresses only aliased pending reads, never real writes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint; m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore DST dependency without duplicate reads or writes");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=399970; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant<4607) { start_dst_bypass(variant+1); return; }
+				osd_printf_info("TMS320C54x DST read bypass: PASS cases=4608 restore=4608 accumulators=2 consumers=high,low,pair modes=3 patterns=4 gaps=0,1 aliases=2 sxm=2 sst=2 pages=2 save_points=2 writes_each=2 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(),"mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
+				start_timer_boundary_probe(0,true); return;
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if (m_phase==399970) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399960; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == 253490)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

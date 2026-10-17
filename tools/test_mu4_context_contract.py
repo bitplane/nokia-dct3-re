@@ -30,6 +30,7 @@ from tools.mu4_context_contract import decode_prefix_transform, reference_transf
 from tools.mu4_context_contract import decode_recording_prefix_transform
 from tools.mu4_context_contract import decode_transform_copy
 from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, decode_byte_count_prefix, reference_byte_count
+from tools.mu4_context_contract import ESCAPE_STORE_BASE, ESCAPE_STORE_WITNESS, decode_escape_store_prefix
 from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
 from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
 from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
@@ -189,6 +190,15 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_byte_count_prefix(changed)
+
+    def test_original_escape_store_prefix_source_is_pinned(self):
+        words = dict(enumerate(ESCAPE_STORE_WITNESS, ESCAPE_STORE_BASE))
+        self.assertEqual(decode_escape_store_prefix(words)['pinned_words'], 13)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_escape_store_prefix(changed)
 
     def test_byte_count_reference_counts_groups_independently(self):
         for bits in range(1, 65536):

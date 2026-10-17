@@ -4837,8 +4837,15 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
-	// This partial model covers retained copies, RMW, ordinary and immediate stores,
+	// This partial model covers retained copies, RMW, ordinary and double stores,
 	// not bank contention or stack instructions' separate read ordering.
+	if (address >= 0x60 && m_pipeline_valid[5] && staged_dst(m_pipeline_word[5]))
+	{
+		// Both DST words were retained in Read. The real EB writes still
+		// occupy Execute and its following hold clock; do not reread live A/B.
+		if (address == m_pipeline_operand_address[5]) return m_pipeline_operand[5];
+		if (address == (m_pipeline_operand_address[5] ^ 1)) return m_pipeline_immediate[5];
+	}
 	if (address >= 0x60 && m_pipeline_valid[5] && staged_data_copy(m_pipeline_word[5]) &&
 		address == m_pipeline_operand_address[5])
 		// MVKD/MVDM have already captured their source in Read. Forward that
