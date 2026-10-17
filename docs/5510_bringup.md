@@ -8557,12 +8557,32 @@ a whole-ROM absence proof. Tests mutate every pinned word, retain additional
 candidate references, and distinguish threshold equality, unsigned high-bit
 values, cursor wrap and the separate activity condition.
 
-Next observe the executed caller paths around the final successful block:
-`0293ae`, `0293b5`, `0293cd` and `02940b`, alongside the actual input-object
-fields and activity words. Determine which branch changes, or whether this
-caller stops being scheduled altogether. Static gates identify where to
-look; they do not yet establish why the session ends at 375 calls, and no
-gate, input count or lifecycle flag should be forced to extend it.
+The bounded Execute observer now covers these caller paths from 9.64 to
+9.86 seconds in the first verified AA99 session. A fresh ten-second run
+produces 170 events, zero opcode mismatches and no trace cap. Check with
+`python3 tools/mu4_decoder_gate_check.py RUN/error.log`. The checker requires
+an uncensored window, verified parent terminal, resident-entry bounds and
+known executed branch successors; live registers/RAM remain context only.
+The `call` field counts underlying processing entries, not virtual-method
+attempts. This short run does not replace the finalized twenty-second
+capture-integrity or audio checks.
+
+All 18 observed availability branches pass. Activity skips occur seven times
+after processing count 373, seven after 374 and twice after 375; the first
+two groups each subsequently reach another processing call. Thus inactivity
+is normal between blocks, not evidence by itself of a missing event. The
+last successful processing return is at 9.700534036 seconds. Two later
+evaluations pass availability but skip for inactivity; the last selected
+caller event is at 9.700780776. Original loader entry `002080` follows at
+9.701774207. No further selected caller events occur through 9.86; the next
+resident entry is at 9.868868536.
+
+All 918 detailed snapshots and the complete 375-block return stream remain
+byte-identical to the prior capture; all six transport streams match its
+prefixes. The next question is the original cleanup/lifecycle decision
+(`02956f`, state `373e`, control `3742`) leading to loader re-entry, not
+how to force an inactive decoder to run. Neither these observations nor
+the pinned cleanup route establish EOF or why only 375 blocks are decoded.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

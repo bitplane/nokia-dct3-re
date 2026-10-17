@@ -86,6 +86,8 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 && address >= 0x2936d && address <= 0x2940d)
+						observe_decoder_gate(address,opcode);
 					// Whole-session counters must not widen the eight-call arithmetic snapshot budget.
 					bool const detailed = m_playback_execute_entries[1] == 1 && m_playback_processing[0] <= 8;
 					if (detailed && (address == 0x24a7e || address == 0x24af3))
@@ -470,6 +472,7 @@ private:
 	u32 m_playback_dxr_hash = 2166136261U, m_playback_dxr_writes = 0;
 	std::ofstream m_playback_decoded_capture;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
+	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -1248,6 +1251,30 @@ private:
 			vector_base = 0;
 		}
 	}
+	void observe_decoder_gate(offs_t address, u16 opcode)
+	{
+		double const time = machine().time().as_double();
+		if (time < 9.64 || time > 9.86) return;
+		std::array<u32,12> const sites{0x2936d,0x293a2,0x293a8,0x293aa,0x293ad,0x293ae,
+			0x293b0,0x293b5,0x293b7,0x293cd,0x293cf,0x2940b};
+		std::array<u16,12> const words{0x10f8,0x10f8,0xf982,0x8812,0xf5aa,0xf830,
+			0x7211,0xf845,0x10f8,0xf982,0x8811,0x10f8};
+		auto const found = std::find(sites.begin(),sites.end(),address);
+		if (found == sites.end()) return;
+		if (opcode != words[found-sites.begin()]) ++m_decoder_gate_bad;
+		if (++m_decoder_gate_events > 512) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		u16 const object = data.read_word(0x15e9), context = m_cpu->state_int(tms320c54x_device::STATE_AR6);
+		std::string input = "unobserved", activity = "unobserved";
+		if (object >= 0x60 && object <= 0xfffe) input = util::string_format("%04x,%04x",data.read_word(object),data.read_word(object+1));
+		if (context >= 0x60 && context <= 0xffe9) activity = util::string_format("%04x",data.read_word(context+0x16));
+		logerror("mu4_decoder_gate: ordinal=%u address=%06x opcode=%04x call=%u a=%010llx ar0=%04x ar1=%04x ar2=%04x tc=%u object=%04x input=%s threshold_flag=%04x activity=%04x context=%04x context_activity=%s t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
+			m_decoder_gate_events,unsigned(address),opcode,m_playback_processing[0],
+			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A)&0xffffffffffULL,
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),unsigned(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0),12)),
+			object,input.c_str(),data.read_word(0x1310),data.read_word(0x15d9),context,activity.c_str(),time);
+	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
@@ -1377,6 +1404,8 @@ private:
 	}
 	void report_playback_parent()
 	{
+		logerror("mu4_decoder_gate_terminal: events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
+			m_decoder_gate_events,m_decoder_gate_bad,unsigned(m_decoder_gate_events>512),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
 			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
@@ -2873,6 +2902,7 @@ private:
 		m_playback_tx_time_hash = 2166136261U;
 		m_playback_dxr_hash = 2166136261U; m_playback_dxr_writes = 0;
 		m_playback_decoded_hash = 2166136261U; m_playback_decoded_words = 0;
+		m_decoder_gate_events = m_decoder_gate_bad = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
