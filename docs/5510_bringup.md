@@ -10,53 +10,42 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
-storage and metadata transactions. Native playback reaches digital output,
-but the strict audio-completion gate remains rejecting. A shifted-store
-DAGEN ordering defect corrupted younger doubleword loads; an isolated
-red/green CPU fixture now protects the correction. All 30 transforms in the
-first eight packet-bound calls match source-derived integer arithmetic at
-every captured stage, including fourteen 512-point transforms.
-All completed TX callbacks in the twenty-second capture pair exactly with
-the next codec DIN sample by timestamp. Every observed channel-3 source read
-also binds to an actual owned DXR write. DXR buffering-to-TX provenance,
-unmatched DIN interval ownership and native audio conformance remain
-unvalidated.
+storage and metadata transactions. It captures 375 successful native AAC
+processing calls and 768,000 converter-return words. All 30 transforms in
+the first eight packet-bound calls match source-derived integer arithmetic;
+their conversions match later RAM. Whole-session chronological comparison
+against a host-decoded projection has maximum sample difference 13 and RMS
+1.24083, without fitted gain or alignment. These are measurements, not a
+codec tolerance. Detailed arithmetic and packet/store binding remain
+bounded to eight calls; other media and independent conformance criteria
+remain open. See [processing contracts](#processing-and-conversion) and
+[reference comparison](#independent-reference-comparison).
 
-Corrected pending-double-store forwarding removes the observed overwide
-encoder fields. Fresh transform observations account for 3,072 saved bytes;
-their first eight packets host-decode as eight frames with zero errors.
-This is captured native encoder output, not validation of native decoder PCM.
-See [recorded payload contracts](#recording-header-and-selected-windows).
-Checked T-input dependency banks cover each admitted multiplier family within
-the domains below. Codec callback
-metadata establishes uninterrupted slot pairs and cadence across CPU clock
-changes. The first eight independently decoded AAC packets are bound to
-native processing calls and output blocks, not aligned by fitting a lag.
-The first eight processing calls now have complete consumed-byte coverage
-against the reference packets and matching output-loop/block identities.
-All 16,384 conversions in the eight checked blocks follow the source-derived
-rounded-shift/clamp model and match later RAM. After the DAGEN correction,
-the first nonzero block's maximum sample error falls from 43,740 to 7
-(RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
-13 and RMS 1.1492 against the independent decoder. These are measurements,
-not an established codec tolerance. Pre-transform, bit reversal and
-post-transform rotation/permutation match for all 30 vectors too. Published
-window coefficients match their original descriptor recurrences. Next
-cross-check the remaining decoder paths and establish independent acceptance
-criteria for the small residual. Other media remain unvalidated.
-A host-only complete-window projection supplies a strictly decoded
-383-packet reference prefix; its final, 384th header-delimited packet is
-rejected. Whole-session observation captures 375 successful native decoder
-calls and 768,000 converter-return words. Their chronological host comparison
-has maximum difference 13 and RMS 1.24083, without fitted gain or alignment.
-The eight additional reference frames and the native termination decision
-remain unresolved. Detailed source arithmetic and packet/store binding stay
-bounded to eight calls; later return-word agreement is not codec conformance
-or evidence of later native recording-transform state.
-Do not change the converter, fit a lag, or substitute reference samples.
-Continue without forcing counters,
-keys, lengths or file offsets. These bench results do not establish whole-handset
-boot, decoded music, analog audio or native speech.
+Every captured channel-3 source read binds to an owned DXR bus write, and
+every completed TX callback pairs with the next codec DIN sample. Reset-aware
+sequence accounting distinguishes fresh-write completions, retained-word
+repetition, reset discards and an unattributed pre-reset prefix. Actual
+internal DXR-to-XSR loads and physical ownership of unmatched DIN intervals
+remain unvalidated. See [transport provenance](#dma-source-to-dxr-ownership).
+
+The observed termination is a firmware file-length path, not an established
+missing DSP event: 375 refill completions supply 71,834 words; the next
+186-word request crosses the 71,840-word file boundary. Original code
+enters cleanup before publishing that request's completion. A passive RAM
+snapshot still contains a tail matching the host projection at fixed packet
+ordinal 375, including eight reference-valid packets and its known-rejected
+final packet. The default control is one; the identified input-17 sender
+cannot clear it with a zero payload, and the alternate path includes a
+seek/read rather than a proven drain-only operation. See
+[refill and tail contracts](#refill-control-and-buffered-tail).
+
+The intended product cleanup/drain policy and independent waveform acceptance
+remain unresolved; the strict audio-completion gate stays rejecting. The
+host's 383-packet valid prefix is not proof of native decoding beyond 375
+calls or validity of its final, 384th packet. Do not force counters, keys,
+lengths, file offsets or completions, replay RAM, fit a lag, change the
+converter or substitute reference samples. These results establish neither
+whole-handset boot, complete music playback, analog audio nor native speech.
 
 CPU admission remains fail-closed. In particular, short Smem MOD=3
 preincrement is write-only (SPRU131G table 5-4). The
@@ -8788,6 +8777,25 @@ rather than extending decoding with invented completions. The current
 one-pass path is explained, but its early cleanup is not yet classified
 as an emulation defect or correct handset behavior. Preserve the strict
 audio-completion failure and never replay this RAM snapshot.
+
+The `playback_refill_policy_literals` census makes the policy's source
+coverage explicit: AA55 has 10,760 mapped words and zero `aa1a/12fc`
+literals; AA22 has 51,921 and zero; AA99 has 49,843 and eight. AA99 includes
+five immediate-store patterns, one MVDK destination pattern, one compare
+and one unclassified literal. Its sole immediate `aa1a` store writes one
+at `027887`; its other store is frame-word payload at `02944b`. The known
+`12fc` immediate stores write zero or one. The census preserves MVDK and
+unknown references rather than silently counting only literal stores.
+These are raw mapped-word patterns, not a code/data split or closure over
+indirect, bulk-initialization, table-driven or other-image writers.
+
+Together with the two-write/one-read runtime control capture, this classifies
+the observed branch as the uploaded controller's default one-pass cleanup
+path. It does not establish that this is the complete product playback
+lifecycle or justify changing hardware timing to force eight more calls.
+The remaining policy question needs the legitimate producer/consumer
+contract or an independent handset playback reference, not another guessed
+peripheral response.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

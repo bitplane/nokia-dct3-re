@@ -51,6 +51,18 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_literal_census_can_target_policy_fields_without_hiding_dynamic_store_patterns(self):
+        words = {0x100: 0x7105, 0x101: 0xaa1a, 0x102: 0x76f8, 0x103: 0x12fc, 0x104: 1}
+        self.assertEqual(playback_lifecycle_literal_census(words)['literal_references'], 0)
+        report = playback_lifecycle_literal_census(words, fields=(0xaa1a, 0x12fc))
+        self.assertEqual(report['classes'], {'mvdk_absolute_destination_pattern': 1,
+                                            'absolute_immediate_store_pattern': 1})
+        self.assertEqual(report['references'][0]['source_smem'], '05')
+        self.assertEqual(report['references'][1]['immediate'], '0001')
+        for fields in ((), (-1,), (0x10000,)):
+            with self.assertRaises(ValueError):
+                playback_lifecycle_literal_census(words, fields=fields)
+
     def test_refill_completion_only_advances_with_a_pending_request(self):
         self.assertEqual(reference_refill_completion(0, 186, 0x1d50),
                          {'handled': False, 'field6': 0x1d50, 'pending': 0, 'reply': 0x8000})

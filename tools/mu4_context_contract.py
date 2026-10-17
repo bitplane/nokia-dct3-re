@@ -1546,11 +1546,14 @@ def rel_cleanup_route(lifecycle, control):
             'extra_call': None if branch_to_state5 else '039005', 'loader_index': 0}
 
 
-def playback_lifecycle_literal_census(words):
+def playback_lifecycle_literal_census(words, fields=(0x373e, 0x3742)):
     """Enumerate raw references; instruction-shaped words are not code ownership."""
+    targets = set(fields)
+    if not targets or any(not 0 <= value <= 0xffff for value in targets):
+        raise ValueError('literal census targets must be nonempty 16-bit fields')
     references = []
     for address, value in sorted(words.items()):
-        if value not in (0x373e, 0x3742):
+        if value not in targets:
             continue
         opcode = words.get(address - 1)
         row = {'operand_address': f'{address:06x}', 'field': f'{value:04x}',
@@ -1565,11 +1568,14 @@ def playback_lifecycle_literal_census(words):
                        immediate=f'{words[address+1]:04x}')
         elif opcode == 0x10f8:
             row['classification'] = 'absolute_load_a_pattern'
+        elif opcode is not None and opcode & 0xff00 == 0x7100:
+            row.update(classification='mvdk_absolute_destination_pattern',
+                       instruction_address=f'{address-1:06x}', source_smem=f'{opcode&0xff:02x}')
         references.append(row)
     return {'mapped_words': len(words), 'literal_references': len(references),
             'classes': dict(Counter(row['classification'] for row in references)),
             'references': references,
-            'scope': 'All mapped literal occurrences of 373e/3742; raw patterns only, '
+            'scope': 'All mapped literal occurrences of '+ '/'.join(f'{value:04x}' for value in sorted(targets)) + '; raw patterns only, '
                      'not instruction-boundary validation, runtime writers, indirect stores '
                      'or an all-alias ownership/absence proof'}
 
@@ -1624,6 +1630,10 @@ def contract(source):
     result['playback_lifecycle_literals'] = {
         'aa55': playback_lifecycle_literal_census(bootstrap_words),
         'aa99': playback_lifecycle_literal_census(rel_words),
+    }
+    result['playback_refill_policy_literals'] = {
+        marker: playback_lifecycle_literal_census(image, fields=(0xaa1a, 0x12fc))
+        for marker, image in (('aa55', bootstrap_words), ('aa22', words), ('aa99', rel_words))
     }
     result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
     result['playback_input_units'] = decode_playback_input_units(rel_words, bootstrap_words)
