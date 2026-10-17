@@ -26,6 +26,7 @@ end
 -- ARM program-space taps cover a complete 32-bit bus word; keep raw masks so
 -- the two shared halfwords are not conflated by an assumed byte lane.
 watch(mcu, 'program', 0x100ac, 'mcu', 0x100af)
+watch(mcu, 'program', 0x100b0, 'mcu_frequency', 0x100b3)
 watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')

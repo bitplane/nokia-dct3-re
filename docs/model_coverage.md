@@ -19,6 +19,11 @@ The older 594-word closure is historical; the current exact
 fingerprint is deliberately rebanked with a negative control rejecting the
 old set. See the current audit boundary in
 `rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.
+The separate `nse1pcm` external-frame laboratory fixture additionally proves
+native runtime key-2 DTMF synthesis, with paired unclocked control and complete
+sample accounting. It is not another supported product and does not attach
+clocks or promote call media on the ordinary 5110 machine; see
+`cobba_control_boundary.md`.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

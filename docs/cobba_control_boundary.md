@@ -23,6 +23,10 @@ Current native scope is split deliberately:
   externally clocked burst and continuous FIG=0/1 reception/transmission,
   ready/status interrupts and saved state. No production handset clock is
   attached by those tests.
+- The [external-frame native DTMF fixture](#externally-clocked-native-dtmf)
+  additionally validates runtime ROM synthesis of physical key 2's two
+  frequency components. Its supplied clock is laboratory input, not recovered
+  handset enable wiring or native call speech.
 - The native request/acknowledgement alias can still destroy shared command
   payloads; its electrical ownership is unresolved. RF sample encoding,
   production/consumption timing and SCU serialization are also open. None of
@@ -1339,14 +1343,61 @@ boot initializer as evidence of a key response. These observations rule out
 missing MCU tone delivery for this fixture, not missing serial clocks on real
 hardware or tone support in other images.
 
-The next native implementation boundary is therefore serial enable/readiness
-and externally clocked word delivery, not a synthesized tone command. TI's
+The unclocked production profile's remaining boundary is clock attachment and
+its enable contract, not a synthesized tone command. TI's
 [C54x Applications Guide, BSPC configuration example](https://www.ti.com/lit/ug/spru173/spru173.pdf)
 (section 3, p. 3-38) defines receiver/transmitter reset bits and receive/transmit
 ready flags separately. That primary reference supplies generic peripheral
 semantics; it does not establish the MAD2/COBBA frame-clock rate, pin mapping,
 or whether every native data `0022` write is the generic BSPC interface.
 Keep those product attachments explicit before promoting operational audio.
+
+### Externally clocked native DTMF
+
+`make check-c54x-rom4-pcm-clock` runs the same own-NSE-1 provisioning and
+physical key-2 press/release on the normal `noki5110` machine and the separate
+`nse1pcm` laboratory machine. The latter adds only an external 8 kHz
+completed-frame source through the backend's existing BSP interface, supplying
+zero-valued microphone words. It does not write CPU registers, firmware RAM,
+mailboxes or interrupt flags. The established untimed self-test echo retains
+exclusive ownership while COBBA is in its observed echo mode. The normal
+machine receives no external frame source and still has only two boot BSP
+transfers. The fixture is not a new product or a claim about clock-enable bits.
+
+The input harness explicitly gives this research clone the NSE-1 serial-LCD
+and physical-key profile. A requested key name alone does not establish which
+matrix field a previously unknown machine used. The acceptance checker requires
+physical 2 at 8.000 s and release at 8.220 s, followed by the original MCU's
+`00e1` command, high-frequency input `14e0` and low-frequency input `0ae4`
+on the correct ARM halfword lanes. These frequency inputs correspond to
+1336 and 697 Hz at four units per Hz, matching key 2 in
+[ITU-T Q.23 figure 1](https://search.itu.int/history/HistoryDigitalCollectionDocLibrary/4.256.43.en.1010.pdf).
+
+The resident initializer's original words at `a5c7..a5ce` load T=`20c5`,
+read from `0857` and shift each unsigned product right by 12; `a668..a66c`
+publishes the accumulating phase's low word. Both sequences are byte-pinned
+by the codec contract. The two inputs give integer steps 10945 and 5710;
+at 8 kHz on a 16-bit phase cycle those are 1336.0596 and 697.0215 Hz.
+This is numerical consistency with the captured tone, not a full independent
+bit-exact model of its lookup table, envelopes or gain.
+
+The paired cold capture observes 78,845 native BDXR writes and BDRR reads,
+with 78,837 transmitted words captured explicitly, including zero words.
+The checker requires a valid 8 kHz output grid, complete before/active/after
+intervals, silent before/after samples and both sinusoidal components in
+480 active samples. The measured 697/1336 Hz projection ratios are
+approximately 0.2033/0.8019; finite-window projections are not orthogonal and
+must not be summed as an exact energy partition. The engineering thresholds
+reject missing, single-frequency or discontinuous output; they are not a full
+Q.23 distortion, level, twist or analogue compliance test.
+
+The runner records actual binary/ROM/observer/input hashes, fresh generated
+storage, invocations and separate results in ignored disk-backed `tmp/`.
+This establishes native runtime DTMF synthesis when supplied external frames,
+not production clock gating, the 1 MHz bit-clock waveform, physical COBBA
+gain/routing, analogue output, RF acquisition or native call speech. No HLE
+tone generator supplies these words. The laboratory subclass is removable
+when an independently evidenced production serial attachment replaces it.
 
 ### NSE-1 physical clock contract
 

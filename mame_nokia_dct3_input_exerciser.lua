@@ -24,7 +24,8 @@ local is_3610 = machine.system.name == "noki3610"
 local is_5210 = machine.system.name == "noki5210"
 local is_6210 = machine.system.name == "noki6210"
 local is_7110 = machine.system.name == "noki7110"
-local is_early_serial = machine.system.name == "noki5110" or
+local is_5110 = machine.system.name == "noki5110" or machine.system.name == "nse1pcm"
+local is_early_serial = is_5110 or
 		machine.system.name == "noki6110"
 local dsp_cpu = machine.devices[":dsp_c54x:cpu"]
 local lcd_controller_width = is_3410 and 102 or ((is_2100 or is_3610 or is_6210) and 96 or 84)
@@ -181,7 +182,7 @@ end
 local is_five_row_product = machine.system.name == "noki2100" or
 		machine.system.name == "noki3310" or machine.system.name == "noki3330" or is_3410
 local key_fields
-if machine.system.name == "noki5110" then
+if is_5110 then
 	key_fields = {
 		enter = field_by_name("COL.1", "Menu"),
 		up = field_by_name("COL.1", "Scroll Up"),

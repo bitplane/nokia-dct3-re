@@ -23,6 +23,7 @@
 #include "cpu/arm7/arm7.h"
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "machine/i2cmem.h"
+#include "machine/clock.h"
 #include "machine/intelfsh.h"
 #include "sound/beep.h"
 #include "speaker.h"
@@ -4646,12 +4647,49 @@ ROM_START( nsb6hle )
 	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
 ROM_END
 
+// Explicit laboratory attachment, not recovered COBBA clock-enable wiring.
+// Keeping it in a separate machine leaves ordinary NSE-1 execution unchanged.
+class nse1_pcm_fixture_state : public nokia_dct3_state
+{
+public:
+	using nokia_dct3_state::nokia_dct3_state;
+	void nse1pcm(machine_config &config)
+	{
+		noki5110(config);
+		CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::frame_w));
+	}
+private:
+	void frame_w(int state)
+	{
+		if (!state) return;
+		auto &backend = *subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+		auto &codec = *subdevice<nokia_cobba_device>("cobba");
+		// The established untimed boot echo already owns this test-mode frame.
+		if (codec.codec_serial_loopback()) return;
+		u16 output = 0;
+		const bool sent = backend.codec_transmit_frame(output);
+		const bool received = backend.codec_receive_frame(0);
+		if (sent)
+		{
+			codec.codec_serial_transmit(output);
+			logerror("native_pcm_fixture_word: value=%04x t=%.9f\n", output, machine().time().as_double());
+		}
+		const u64 tick = machine().time().as_ticks(8'000);
+		if (!(tick % 800))
+			logerror("native_pcm_fixture_frame: tick=%llu sent=%u received=%u handset_clock_claim=0 t=%.9f\n",
+				tick, sent, received, machine().time().as_double());
+	}
+};
+
+#define rom_nse1pcm rom_noki5110
+
 } // anonymous namespace
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
 SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
+SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
