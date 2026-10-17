@@ -124,11 +124,57 @@ static void check_receive_pins()
 	{
 		port.reset();
 		port.control_w(mode == 0 ? 0x80 : mode == 1 ? 0x8a : 0x88);
-		const std::uint16_t extension = mode == 2 ? 0x400 : 0;
+		const std::uint16_t extension = mode == 0 ? 0x100 : mode == 2 ? 0x400 : 0;
 		assert(!receive_edge(port, extension, true, false).supported);
 		assert(!receive_edge(port, extension, false, true).supported);
 		assert(!port.receive_ready);
 	}
+}
+
+static void check_continuous_receive()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+		{
+			const unsigned width = widths[format], mask = (1U << width) - 1;
+			const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+			tms320c54x_bsp_state port;
+			port.control_w(0x80 | (format & 1 ? 4 : 0));
+			receive_bits(port, extension, 0, width, 0, width, false);
+			receive_sync(port, extension, 3);
+			// One FSR supplies the entire stream. Save both mid-word and at
+			// every word boundary; copied state must retain continuous arming.
+			for (unsigned word = 0; word <= 0xffff; ++word)
+			{
+				const unsigned checkpoint = word % width;
+				receive_bits(port, extension, word, width, 0, checkpoint, false);
+				auto restored = port;
+				receive_bits(port, extension, word, width, checkpoint, width, true);
+				receive_bits(restored, extension, word, width, checkpoint, width, true);
+				const unsigned payload = word & mask;
+				const std::uint16_t expected = payload & (1U << (width - 1)) ? payload | ~mask : payload;
+				assert(port.receive == expected && restored.receive_r() == expected);
+				assert(port.receive_r() == expected && port.receive_continuous && port.receive_bits_left == width);
+			}
+			receive_bits(port, extension, 0x1234, width, 0, width, true);
+			receive_bits(port, extension, 0x5678, width, 0, width, false);
+			assert(port.receive_overrun && !port.receive_continuous && !port.receive_bits_left);
+			const auto unread = port.receive;
+			assert(port.receive_r() == unread && !port.receive_overrun);
+			receive_bits(port, extension, 0x5678, width, 0, width, false);
+			assert(!port.receive_ready); // Read alone cannot restart a BSP stream.
+			receive_sync(port, extension);
+			receive_bits(port, extension, 0x5678, width, 0, width, true);
+			port.receive_r();
+			receive_bits(port, extension, 0xffff, width, 0, width / 2, false);
+			receive_sync(port, extension); // Restart discards the incomplete word.
+			receive_bits(port, extension, 0x1234, width, 0, width, true);
+			port.receive_r();
+			port.control_w(0); port.control_w(0x80 | (format & 1 ? 4 : 0));
+			receive_bits(port, extension, 0x1234, width, 0, width, false);
+			assert(!port.receive_ready && !port.receive_continuous);
+		}
 }
 
 static auto transmit_edge(tms320c54x_bsp_state &port, std::uint16_t extension, bool sync)
@@ -255,6 +301,7 @@ int main()
 {
 	check_clock_inputs();
 	check_receive_pins();
+	check_continuous_receive();
 	check_transmit_pins();
 	tms320c54x_bsp_state port;
 	std::uint16_t duplex_output = 0xaaaa;

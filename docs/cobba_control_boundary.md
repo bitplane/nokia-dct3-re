@@ -1519,12 +1519,13 @@ marker with those exact counts, independently of the original vector/reset
 result. Debugger inspection must not consume a firmware-owned sample.
 The backend additionally accepts explicit external receive pin levels through
 `codec_receive_clock_w(clock, sync, data)`. Its bounded subset is standard
-burst reception (FSM=1), DLB off, and autobuffering off. CLKP selects the
+burst reception (FSM=1), or continuous reception (FSM=0, FIG=0), with DLB
+and autobuffering off. CLKP selects the
 sampling edge, FSP selects sync polarity, and FO/FE select 16/8/10/12-bit
 words. A qualified sync pulse precedes MSB-first shifting; holding sync
 active delays shifting, repeated clock levels do nothing, and a new sync
 aborts an incomplete word. The final bit alone can publish BDRR/RRDY and
-source 4. RRST cancels a partial word. Unsupported continuous/DLB/autobuffer
+source 4. RRST cancels a partial word. Unsupported FIG=1 continuous/DLB/autobuffer
 pin configurations return false rather than supplying a completed word.
 These rules derive from TI SPRU131G sections 9.2.4/9.2.6 and table 9-9;
 dynamic format/polarity changes during a word remain outside acceptance.
@@ -1544,6 +1545,21 @@ fresh frame after an RRST-aborted partial word. Its mandatory result is
 saved backend state. This is caller-driven conformance: no handset config
 or production clock source calls this interface, and no physical edge
 alignment, PCM waveform or native call is promoted.
+
+Continuous receive derives from SPRU131G section 9.2.5 and table 9-8.
+After one qualified FSR, each word boundary arms the next word without another
+sync. An unread BDRR is retained when its successor overruns; BSP then requires
+both a BDRR read and a fresh FSR to restart. RRST clears continuous arming.
+FIG=1 frame-ignore behavior, mode changes without reset and continuous TX
+remain outside this pin subset. The helper checks 1,048,576 continuous
+word/format/polarity combinations with partial-state copies, plus overrun,
+restart and reset controls. The actual-backend gate separately requires
+`C54x native backend BSP continuous RX: PASS` with five successful word
+completions, source 4, sync-free continuation, overrun restart and reset abort.
+Its partial-word checkpoint is restored after resetting the live receiver,
+requiring the saved continuous flag as well as shift bits and pin phase.
+These tests supply external clocks explicitly; no production clock or
+handset PCM attachment is added.
 Completed-word calls and pin-edge calls are alternative attachments to the
 same receiver, not independent channels to drive simultaneously. The backend
 pin gate, native tone-control and exact 5110 save/load gates pass; native FR

@@ -1,10 +1,20 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, COMPLETION)) + '\n'
+
+    def test_continuous_receive_is_mandatory_and_exact(self):
+        alternatives = ['', CONTINUOUS_RX + '\n' + CONTINUOUS_RX]
+        for field in ('words=5', 'partial_restore=1', 'single_sync_continuation=1',
+                      'overrun_restart=1', 'reset_abort=1', 'source=4'):
+            alternatives.append(CONTINUOUS_RX.replace(field, field.split('=')[0] + '=0'))
+        alternatives.append(CONTINUOUS_RX.replace('handset_clock_claim=0', 'handset_clock_claim=1'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'continuous-RX'):
+                check_result(self.output().replace(CONTINUOUS_RX, alternative), 3)
 
     def test_clock_inputs_are_mandatory_and_exact(self):
         alternatives = ['', CLOCK_INPUTS + '\n' + CLOCK_INPUTS]

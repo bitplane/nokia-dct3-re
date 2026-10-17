@@ -18,6 +18,7 @@ struct tms320c54x_bsp_state
 	std::uint16_t receive_shift = 0;
 	std::uint8_t receive_bits_left = 0, receive_width = 0;
 	bool receive_clock_level = false, receive_sync_active = false;
+	bool receive_continuous = false;
 	std::uint16_t transmit_shift = 0;
 	std::uint8_t transmit_bits_left = 0;
 	bool transmit_clock_level = false, transmit_sync_active = false;
@@ -28,6 +29,7 @@ struct tms320c54x_bsp_state
 	{
 		receive_shift = 0;
 		receive_bits_left = receive_width = 0;
+		receive_continuous = false;
 	}
 	void control_w(std::uint16_t value)
 	{
@@ -180,9 +182,10 @@ struct tms320c54x_bsp_state
 	clock_result receive_clock(bool clock, bool sync, bool bit,
 			std::uint16_t extension = 0)
 	{
-		// External burst receive only. Continuous mode, DLB and autobuffering
-		// require additional clock/transfer owners, not inferred completions.
-		const bool supported = (control & 0x0008) && !(control & 0x0002) && !(extension & 0xfc00);
+		// External standard receive. Continuous FIG=0 needs one initial FSR;
+		// FIG=1, DLB and autobuffering have separate ownership contracts.
+		const bool supported = !(control & 0x0002) && !(extension & 0xfc00) &&
+				((control & 0x0008) || !(extension & 0x0100));
 		const bool edge = clock != receive_clock_level && clock == bool(extension & 0x0040);
 		receive_clock_level = clock;
 		if (!edge) return {supported, false};
@@ -202,14 +205,24 @@ struct tms320c54x_bsp_state
 			{
 				receive_shift = 0;
 				receive_bits_left = receive_width = word_bits(extension);
+				receive_continuous = !(control & 0x0008);
 			}
 			return {true, false};
 		}
 		if (!receive_bits_left) return {true, false};
 		receive_shift = (receive_shift << 1) | unsigned(bit);
 		if (--receive_bits_left) return {true, false};
-		const bool ready = receive_word(receive_shift, receive_width);
+		const unsigned width = receive_width;
+		const bool continuous = receive_continuous;
+		const bool ready = receive_word(receive_shift, width);
 		reset_receive_shift();
+		// SPRU131G 9.2.5: BSP overrun requires DRR read AND a fresh FSR.
+		// An ordinary acknowledged word continues on the very next sample edge.
+		if (continuous && !receive_overrun)
+		{
+			receive_continuous = true;
+			receive_bits_left = receive_width = width;
+		}
 		return {true, ready};
 	}
 	std::uint16_t receive_r()

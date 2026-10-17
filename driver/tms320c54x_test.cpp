@@ -47797,7 +47797,7 @@ private:
 			osd_printf_info("C54x native backend BSP transmit pins: PASS words=5 partial_restore=1 queued_word=1 underrun_no_irq=1 shift_status=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
-			throw emu_fatalerror(0, "C54x backend BSP tests complete");
+			m_stage = 40; m_timer->adjust(attotime::from_usec(100)); return;
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
 	}
@@ -47805,6 +47805,77 @@ private:
 	{
 		expect(m_backend->codec_receive_clock_w(true, sync, bit) &&
 			m_backend->codec_receive_clock_w(false, sync, bit), "external burst receive pins supported");
+	}
+	void continuous_receive_bits(u16 word, unsigned begin = 0, unsigned end = 16)
+	{
+		for (unsigned i = begin; i < end; ++i)
+			receive_pin_cycle(false, (word >> (15 - i)) & 1);
+	}
+	void check_continuous_receive()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 40)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			data.write_word(0x22, 0); data.write_word(0x23, 0); data.write_word(0x22, 0x80);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			receive_pin_cycle(true, false);
+			continuous_receive_bits(0x1234);
+		}
+		else if (m_stage == 41)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && data.read_word(0x20) == 0x1234,
+				"continuous receiver publishes its initial word through source 4");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			continuous_receive_bits(0x5678, 0, 8);
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save continuous receive mode and partial successor");
+			continuous_receive_bits(0x5678, 8, 16);
+		}
+		else if (m_stage == 42)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && data.read_word(0x20) == 0x5678,
+				"continuous successor needs no second frame sync");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x22, 0); // Displace live continuous arming before load.
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE, "restore continuous receive after the live edge settled");
+			m_stage = 42;
+			continuous_receive_bits(0x5678, 8, 16);
+		}
+		else if (m_stage == 43)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && data.read_word(0x20) == 0x5678,
+				"restored continuous receiver completes the same successor");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			continuous_receive_bits(0x9abc); continuous_receive_bits(0xdef0);
+		}
+		else if (m_stage == 44)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && (data.read_word(0x22) & 0x2400) == 0x2400 &&
+				data.read_word(0x20) == 0x9abc, "continuous overrun preserves unread BDRR and adds no completion");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			continuous_receive_bits(0xffff);
+			expect(!(data.read_word(0x22) & 0x2400), "BDRR read alone does not resume an overrun BSP stream");
+			receive_pin_cycle(true, false); continuous_receive_bits(0x1357);
+		}
+		else if (m_stage == 45)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && data.read_word(0x20) == 0x1357,
+				"fresh FSR restarts the acknowledged continuous receiver");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			continuous_receive_bits(0xffff, 0, 8);
+			data.write_word(0x22, 0); data.write_word(0x22, 0x80);
+			continuous_receive_bits(0x1234);
+		}
+		else if (m_stage == 46)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !(data.read_word(0x22) & 0x2400),
+				"RRST cancels partial and continuous state without manufacturing a new FSR");
+			osd_printf_info("C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n");
+			throw emu_fatalerror(0, "C54x backend BSP tests complete");
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
 	}
 	void receive_pin_bits(unsigned begin, unsigned end, bool ready)
 	{
@@ -47937,6 +48008,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 40) { check_continuous_receive(); return; }
 		if (m_stage >= 18) { check_transmit_pins(); return; }
 		if (m_stage >= 8) { check_receive_pins(); return; }
 		if (m_stage == 0)

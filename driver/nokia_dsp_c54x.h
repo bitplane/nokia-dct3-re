@@ -25,7 +25,8 @@ public:
 	// Explicit completion of a frame whose TX/RX clock relationship is known.
 	bool codec_duplex_frame(u16 input, u16 &output);
 	// Explicit external receive pins; no clock is generated here. False means
-	// the configured mode is outside the non-DLB, non-autobuffer burst subset.
+	// the configured mode is outside the non-DLB, non-autobuffer receive subset
+	// (burst, or continuous with FIG=0).
 	bool codec_receive_clock_w(bool clock, bool sync, bool data);
 	// External CLKX/FSX output state; driven=false represents high impedance.
 	tms320c54x_bsp_state::transmit_clock_result codec_transmit_clock_w(bool clock, bool sync);
