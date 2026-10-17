@@ -2,6 +2,7 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local taps, counts, emitted = {}, {}, {}
+local boot_echo_seen = false
 for _, kind in ipairs({'data', 'io'}) do
     local space = assert(cpu.spaces[kind])
     for _, address in ipairs({0x0d, 0x0e, 0x0f, 0x20, 0x21, 0x22, 0x23,
@@ -12,6 +13,14 @@ for _, kind in ipairs({'data', 'io'}) do
             local install = direction == 'read' and space.install_read_tap or space.install_write_tap
             taps[#taps + 1] = install(space, address, address, key, function(_, value, mask)
                 counts[key] = counts[key] + 1
+                -- Clocked boot may poll zero beyond the generic trace cap.
+                -- Preserve its first successful consumption without logging
+                -- every poll or performing an extra BDRR read.
+                if not boot_echo_seen and kind == 'data' and direction == 'read' and
+                    address == 0x20 and value == 0x0aaa and cpu.state['PC'].value == 0x0e5d then
+                    boot_echo_seen = true
+                    machine:logerror(string.format('rom4_codec_boot_echo: value=0aaa pc=0e5d t=%.9f\n', machine.time:as_double()))
+                end
                 local phase = machine.time:as_double() >= 7 and 'interactive' or 'boot'
                 local output_key = key .. '_' .. phase
                 emitted[output_key] = (emitted[output_key] or 0) + 1

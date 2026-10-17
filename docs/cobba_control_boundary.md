@@ -1440,10 +1440,32 @@ timestamps at printed 1 ns resolution. The fixture's partial capture and
 clock-device state are saved alongside the BSP shifters. This demonstrates
 native edge-driven synthesis and partial-word replay, not electrical pulse
 shape, production enable semantics, analogue output or native call speech.
-The input bits in this handset fixture are all zero. Its output waveform
-therefore does not validate nonzero RX alignment against TX on a common wire;
-that requires an independently specified sync/clock phase and nonzero input
-words, not an inferred loopback from the tone alone.
+The input bits in `nse1bit` are all zero. Its output waveform alone therefore
+does not validate nonzero RX alignment against TX on a common wire. The
+joined-pin controller tests below and the separate clocked-boot configuration
+provide their own nonzero-input evidence.
+
+`nse1pin` additionally gives the external clock ownership of boot loopback.
+The backend's `set_external_codec_clock(true)` disables synchronous
+BDXR-to-completed-frame handling; the laboratory connects held TX bits to RX
+only while the observed COBBA register-8 test mode is selected. Other input
+bits remain zero. The normal machine and both older laboratory controls are
+unchanged. No firmware RAM, mailbox or interrupt flag is injected.
+
+The native self-test writes `0aaa` at 0.133882038 s, the pin capture completes
+at 0.134016000 s, and the firmware consumes the matching word at
+0.134016173 s: 134.135 us after its first write. The old word-loopback counter
+is zero. A separate uncapped first-success observation retains this read
+after the generic poll trace cap; it performs no additional BDRR read.
+Native DTMF, all 480 active samples and silent pre/post windows pass. The
+partial-word checkpoint exactly replays 400 words and timestamps. Decoded
+84x48 screen pixels match the paired original wire fixture, rather than
+comparing PNG metadata. Reproduce all seven isolated controls and replay
+cases with `make check-c54x-rom4-clocked-boot`.
+
+This retires the untimed echo only in that declared clock-owned composition.
+The real clock-enable/mux contract, physical sync timing, microphone data and
+native call speech remain unresolved.
 
 For instruction-level auditing, add `--coverage` to
 `python -m tools.run_c54x_rom4_pcm_clock --mame mame/mame --rompath mame/roms --wire`.
@@ -1485,6 +1507,19 @@ python tools/c54x_opcode_coverage.py WIRE/error.log \
 
 Each assertion must have execution evidence in its own fixture log; execution
 in another profile cannot legitimize an orphan assertion.
+
+Clocked boot adds `7721` at `0e61`, executed 626 times while retrying the
+test-word store. Its inventory is 643 forms in 111 groups, SHA-256
+`5cb892b2da30d8489a37d0c6a403c4ead9976b0d5ee1aa5765f869ca567a26fd`.
+The native backend conformance fixture executes `STM #0aaa, BDXR` itself,
+requires pending TX with no RX readiness or interrupt before clocks, then
+returns the literal through real pin methods and checks both CPU sources
+and preserved accumulators/status. Its mandatory `clocked store: PASS`
+marker and `[opassert] op=7721` follow those checks, not just execution.
+Run `python -m tools.run_c54x_backend_bsp --mame mame/mame --coverage` and
+include its completed `error.log` with another `--additional-fixture-log`
+in the strict comparison above. All 643 forms then have assertion records;
+the original 642-form controls retain their separate fingerprint.
 
 The external emulator at commit `2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd`
 does not independently settle this attachment. Its
@@ -1980,7 +2015,9 @@ This remains partial hardware: clock-input synchronization latency,
 autobuffering, reset-time transmit preloading and physical frame/bit timing
 are not established. Only the separately evidenced external boot echo
 provides an untimed transfer; ordinary pending samples do not acquire a
-fabricated frame or interrupt. No production-clocked PCM is claimed.
+fabricated frame or interrupt. The separate clock-owned `nse1pin` laboratory
+replaces its own untimed boot echo as described above, not the normal
+machine's unresolved clock attachment. No production-clocked PCM is claimed.
 
 The coherent gate now checks real serial reset/release and echo observations
 instead of expecting synthetic COBBA parallel register-C logs. Data `0032`

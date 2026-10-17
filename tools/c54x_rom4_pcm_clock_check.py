@@ -7,6 +7,28 @@ WORDS = re.compile(r'native_pcm_fixture_word: value=([0-9a-f]{4}) t=([0-9.]+)')
 SUMMARY = re.compile(r'rom4_tone_summary: tx_words=(\d+) rx_reads=(\d+) tone_reads=(\d+) tone_copies=(\d+) t=([0-9.]+)')
 
 
+def check_clocked_boot(text):
+    """Require a pin-completed native self-test, not the untimed word echo."""
+    summaries = re.findall(r'native_pcm_fixture_echo_summary: words=(\d+) untimed=(\d+) handset_clock_claim=0', text)
+    echoes = re.findall(r'native_pcm_fixture_echo_word: value=([0-9a-f]{4}) t=([0-9.]+)', text)
+    if len(summaries) != 1 or not echoes or tuple(map(int, summaries[0])) != (len(echoes), 0):
+        raise ValueError('missing clocked boot echo or nonzero untimed loopback')
+    events = re.compile(r'rom4_serial_audit: space=data direction=(write|read) address=(0021|0020) value=0aaa mask=ffff pc=([0-9a-f]{4}) t=([0-9.]+)')
+    writes = [float(time) for direction, address, pc, time in events.findall(text)
+              if (direction, address, pc) == ('write', '0021', '0e31')]
+    reads = [float(time) for time in re.findall(r'rom4_codec_boot_echo: value=0aaa pc=0e5d t=([0-9.]+)', text)]
+    completed = [float(time) for value, time in echoes if value == '0aaa']
+    if not writes or len(reads) != 1 or not completed or not writes[0] < completed[0] <= reads[0] or reads[0] - writes[0] < 16e-6 - 2e-9:
+        raise ValueError('native self-test did not consume a delayed pin-completed 0aaa word')
+    for _, time in echoes:
+        clocks = float(time) * 1_000_000
+        if abs(clocks - round(clocks)) > 0.002 or round(clocks) % 125 != 16:
+            raise ValueError('clocked boot echo is outside the supplied wire phase')
+    return dict(clocked_echo_words=len(echoes), untimed_loopbacks=0,
+                first_echo_latency_us=(reads[0] - writes[0]) * 1_000_000,
+                handset_clock_claim=False)
+
+
 def demand_transitions(text):
     entries = re.compile(r'rom4_codec_demand_entry: hit=(\d+) operation=(acquire|release) mask=([0-9a-f]{4}) previous=([0-9a-f]{4}) t=([0-9.]+)')
     writes = re.compile(r'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=([0-9a-f]{4}) mask=ffff pc=(00a4c4|00a4e0) t=([0-9.]+)')

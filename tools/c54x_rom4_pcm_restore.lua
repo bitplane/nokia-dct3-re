@@ -2,7 +2,7 @@
 local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
 dofile(directory .. 'c54x_rom4_tone_observe.lua')
 local machine = manager.machine
-local wire = machine.system.name == 'nse1bit'
+local wire = machine.system.name == 'nse1bit' or machine.system.name == 'nse1pin'
 assert(machine.system.name == 'nse1pcm' or wire)
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
 local mcu = assert(machine.devices[':maincpu'])

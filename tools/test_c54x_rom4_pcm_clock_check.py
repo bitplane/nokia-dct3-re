@@ -2,7 +2,7 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, control_timeline, demand_transitions, tone_fraction, WORDS
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, control_timeline, demand_transitions, tone_fraction, WORDS
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'
@@ -42,6 +42,22 @@ def restore_log():
 
 
 class NativeClockTests(unittest.TestCase):
+    def test_clocked_boot_requires_real_delayed_self_test_consumption(self):
+        text = ('rom4_serial_audit: space=data direction=write address=0021 value=0aaa mask=ffff pc=0e31 t=0.100000000\n'
+                'native_pcm_fixture_echo_word: value=0aaa t=0.100016000\n'
+                'rom4_codec_boot_echo: value=0aaa pc=0e5d t=0.100017000\n'
+                'native_pcm_fixture_echo_summary: words=1 untimed=0 handset_clock_claim=0\n')
+        result = check_clocked_boot(text)
+        self.assertEqual(result['clocked_echo_words'], 1)
+        self.assertEqual(result['untimed_loopbacks'], 0)
+        self.assertAlmostEqual(result['first_echo_latency_us'], 17)
+        for bad in ('', text + text, text.replace('untimed=0', 'untimed=1'),
+                    text.replace('words=1', 'words=2'), text.replace('value=0aaa', 'value=0555'),
+                    text.replace('pc=0e5d', 'pc=3464'), text.replace('t=0.100017000', 't=0.100015000'),
+                    text.replace('t=0.100016000', 't=0.100016500')):
+            with self.subTest(text=bad), self.assertRaises(ValueError):
+                check_clocked_boot(bad)
+
     def test_wire_phase_is_not_only_a_sample_rate_check(self):
         text = WORDS.sub(lambda match: f'native_pcm_fixture_word: value={match[1]} t={round((float(match[2]) - 0.000016) * 8000) / 8000 + 0.000016:.9f}', clock_log())
         self.assertEqual(check_wire(text)['frame_clocks'], 125)

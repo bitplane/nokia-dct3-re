@@ -26,10 +26,15 @@ inputs at 1 MHz with an assumed sync pulse/fan-out and exact active partial-word
 save/load replay. Neither is another supported product, and neither attaches
 clocks or promotes call media on the ordinary 5110 machine; see
 `cobba_control_boundary.md`.
-The clocked tone inventory is separately reconciled: all 642 observed forms
+The original `nse1pcm`/`nse1bit` tone inventory is separately reconciled: all 642 observed forms
 have exact-opcode executable assertions across completed default, `mac-smem`
 and `xc-signed` CPU fixtures. This extends instruction-evidence coverage, not
 the cold-idle fingerprint, physical clock ownership or native speech support.
+The separate `nse1pin` laboratory also clocks the native boot loopback without
+the untimed word echo. Its 643-form inventory includes the retry-store path,
+independently checked by the backend controller fixture. Graphical/key-tone
+continuation and active replay pass against paired controls; ordinary handset
+clock-enable wiring remains unproved.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

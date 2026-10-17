@@ -1,10 +1,26 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION)) + '\n'
+
+    def test_clocked_store_is_mandatory_and_exact(self):
+        alternatives = ['', CLOCKED_STORE + '\n' + CLOCKED_STORE]
+        for field in ('opcode=7721', 'pending_without_clocks=1', 'echo=0aaa', 'untimed=0', 'sources=4,5', 'handset_clock_claim=0'):
+            alternatives.append(CLOCKED_STORE.replace(field, field.split('=')[0] + '=9'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'clocked-store'):
+                check_result(self.output().replace(CLOCKED_STORE, alternative), 3)
+
+    def test_only_explicit_verbose_teardown_is_accepted(self):
+        text = self.output() + 'Enter sdlwindow_exit\nLeave sdlwindow_exit\n'
+        check_result(text, 3, verbose_teardown=True)
+        with self.assertRaisesRegex(ValueError, 'terminal'):
+            check_result(text, 3)
+        with self.assertRaisesRegex(ValueError, 'terminal'):
+            check_result(text + 'unexpected\n', 3, verbose_teardown=True)
 
     def test_joined_pins_are_mandatory_and_exact(self):
         alternatives = ['', JOINED_PINS + '\n' + JOINED_PINS]

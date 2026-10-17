@@ -47639,6 +47639,7 @@ public:
 		m_cobba->rf_receive_cb().set(FUNC(c54x_backend_bsp_test_state::rf_sample));
 		NOKIA_CCONT(config, "ccont", 0);
 		NOKIA_DSP_C54X(config, m_backend, 13'000'000);
+		m_backend->set_external_codec_clock(true);
 	}
 protected:
 	virtual void machine_start() override
@@ -48161,9 +48162,60 @@ private:
 			if (++m_case == 128)
 			{
 				osd_printf_info("C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0\n");
-				throw emu_fatalerror(0, "C54x backend BSP tests complete");
+				m_stage = 80; m_timer->adjust(attotime::from_usec(100)); return;
 			}
 			m_stage = 70; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
+	void check_clocked_store()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 80)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			data.write_word(0x22, 0); data.write_word(0x23, 0);
+			joined_edge(false, false);
+			m_cobba->control_data_w(0x0610); m_cobba->control_select_w(8);
+			expect(m_cobba->codec_serial_loopback(), "Clocked store fixture enables the documented codec test mode");
+			data.write_word(0x0800, 0x7721); // STM #0aaa, BDXR
+			data.write_word(0x0801, 0x0aaa); data.write_word(0x0802, 0xf4e1);
+			data.write_word(0x22, 0xc8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+			m_cpu->set_state_int(STATE_GENPC, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 81)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x0803 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				data.read_word(0x21) == 0x0aaa && !(data.read_word(0x22) & 0xc00) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !m_cobba->codec_serial_loopbacks(),
+				"Native STM loads BDXR but cannot create ready edges or an untimed codec echo");
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			expect(joined_edge(true, true).transmit_ready_edge, "An external FSX transfers the native STM's pending word");
+			joined_edge(false, true); joined_edge(true, true); joined_edge(true, false);
+			for (unsigned bit = 0; bit < 16; ++bit)
+			{
+				if (bit) joined_edge(true, false);
+				const auto pin = joined_edge(false, false);
+				expect(pin.driven && pin.data == bool((0x0aaa >> (15 - bit)) & 1), "Clocked STM emits its original immediate literal");
+			}
+		}
+		else
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30 && data.read_word(0x20) == 0x0aaa &&
+				!m_cobba->codec_serial_loopbacks() && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+				"Clocked native STM preserves accumulators/status and completes only through independent TX/RX sources");
+			logerror("[opassert] op=7721\n");
+			osd_printf_info("C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n");
+			throw emu_fatalerror(0, "C54x backend BSP tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
 	}
@@ -48298,6 +48350,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 80) { check_clocked_store(); return; }
 		if (m_stage >= 70) { check_joined_pins(); return; }
 		if (m_stage >= 60) { check_frame_ignore(); return; }
 		if (m_stage >= 50) { check_continuous_transmit(); return; }

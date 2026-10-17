@@ -2021,11 +2021,15 @@ with no execution-only or absent words. The reviewed fingerprint deliberately
 replaces the former 594-word expectation after those gaps were closed; a unit
 negative control rejects the previous fingerprint and a wrong current hash.
 
-Externally clocked native DTMF has a separate 642-form inventory, jointly
+The original `nse1pcm`/`nse1bit` native DTMF tests have a separate 642-form inventory, jointly
 covered by executable assertions in completed default, `mac-smem` and
 `xc-signed` CPU fixtures. Its fingerprint, strict comparison and scope limits
 are maintained in `cobba_control_boundary.md`; it does not change the cold-idle
 fingerprint or establish native call speech.
+The clock-owned boot-loopback configuration `nse1pin` additionally executes
+retry-store `7721`; its 643-form inventory is covered when the native backend
+controller fixture is included. The ordinary handset still has no evidenced
+production audio-clock attachment.
 
 With verbose logging, the core emits `[opdecode]` alongside `[opcov]`, using
 the actual debugger decoder and synthetic zero extensions without target

@@ -1,5 +1,6 @@
-"""Paired native key-tone experiment with explicit external completed frames."""
+"""Native key-tone and boot-loopback experiments with explicit laboratory clocks."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -7,11 +8,23 @@ import subprocess
 import sys
 import tempfile
 
-from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, demand_transitions
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, demand_transitions
 from tools.c54x_opcode_coverage import summarize, require_extension_capture, require_extension_decoding, decoded_boundaries
 from tools.c54x_rom4_codec_contract import check as check_codec, check_mcu_speech_field
 from tools.c54x_rom4_rf_delivery_check import check_observer_health
 from tools.run_c54x_rom4_rf_delivery import input_provenance
+
+
+def paired_screen(first, reference):
+    from PIL import Image
+    with Image.open(first) as first_image, Image.open(reference) as reference_image:
+        actual, expected = first_image.convert('RGB'), reference_image.convert('RGB')
+    if actual.size != (84, 48) or expected.size != actual.size or all(low == high for low, high in actual.getextrema()):
+        raise ValueError('missing nonblank 84x48 native handset screen')
+    if actual.tobytes() != expected.tobytes():
+        raise ValueError('clocked boot screen differs from its paired serial control')
+    return dict(width=84, height=48, paired_pixels_equal=True,
+                rgb_sha256=hashlib.sha256(actual.tobytes()).hexdigest())
 
 
 def instruction_report(text):
@@ -32,6 +45,7 @@ def main():
     parser.add_argument('--restore', action='store_true', help='also compare an active native tone suffix after save/load')
     parser.add_argument('--wire', action='store_true', help='also test explicit 1 MHz edges with assumed one-clock sync and RX/TX fan-out')
     parser.add_argument('--coverage', action='store_true', help='retain native opcode/extension observations using MAME verbose teardown')
+    parser.add_argument('--clocked-loopback', action='store_true', help='also test pin-clocked boot loopback with the untimed word path disabled')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -39,6 +53,7 @@ def main():
     observer = repo / 'tools/c54x_rom4_tone_observe.lua'
     generator = repo / 'tools/make_5110_eeprom_profile.py'
     inputs = dict(binary=args.mame, observer=observer, generator=generator,
+                  codec_observer=repo / 'tools/c54x_rom4_codec_observe.lua',
                   input_fixture=repo / 'mame_nokia_dct3_input_exerciser.lua')
     restore_observer = repo / 'tools/c54x_rom4_pcm_restore.lua'
     if args.restore:
@@ -53,10 +68,14 @@ def main():
     cases = [('control', False, 'noki5110'), ('clock', True, 'nse1pcm')]
     if args.wire:
         cases.append(('wire', True, 'nse1bit'))
+    if args.clocked_loopback:
+        cases.append(('pin_boot', True, 'nse1pin'))
     if args.restore:
         cases.append(('restore', True, 'nse1pcm'))
         if args.wire:
             cases.append(('wire_restore', True, 'nse1bit'))
+        if args.clocked_loopback:
+            cases.append(('pin_restore', True, 'nse1pin'))
     for label, clock, machine in cases:
         restoring = label.endswith('restore')
         case = root / label
@@ -85,9 +104,15 @@ def main():
             check_observer_health((case / 'console.log').read_text())
             text = (case / 'error.log').read_text()
             if restoring:
-                result = check_restore(text, wire=machine == 'nse1bit')
+                result = check_restore(text, wire=machine in ('nse1bit', 'nse1pin'))
             else:
-                result = check_wire(text) if machine == 'nse1bit' else check(text, clock=clock)
+                result = check_wire(text) if machine in ('nse1bit', 'nse1pin') else check(text, clock=clock)
+            if machine == 'nse1pin':
+                result['clocked_boot'] = check_clocked_boot(text)
+                reference_machine = 'nse1bit' if args.wire else 'nse1pcm'
+                reference_case = ('wire_restore' if args.wire else 'restore') if restoring else ('wire' if args.wire else 'clock')
+                result['screen'] = paired_screen(case / 'snap' / machine / '0000.png',
+                    root / reference_case / 'snap' / reference_machine / '0000.png')
             result['codec_demand'] = demand_transitions(text)
             if args.coverage:
                 result['instruction_observations'] = instruction_report(text)
@@ -98,7 +123,7 @@ def main():
         result['case'] = label
         (root / 'summary.json').write_text(json.dumps(dict(schema=1, cases=results,
             handset_clock_claim=False, native_call_speech_claim=False), indent=2) + '\n')
-        print(f"Native completed-frame {label}: {result['status']}", flush=True)
+        print(f"Native serial {label}: {result['status']}", flush=True)
     return 0 if all(result['status'] == 'pass' for result in results) else 1
 
 

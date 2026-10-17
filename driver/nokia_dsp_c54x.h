@@ -19,6 +19,9 @@ public:
 	nokia_dsp_c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 	void set_overlay_end(u16 end) { m_overlay_end = end; }
+	// An attached clock owns every codec transfer, including boot loopback;
+	// do not also complete a word synchronously from the BDXR write.
+	void set_external_codec_clock(bool enabled) { m_external_codec_clock = enabled; }
 	// Completed external serial frames; these methods do not supply clocks.
 	bool codec_transmit_frame(u16 &word);
 	bool codec_receive_frame(u16 word);
@@ -89,6 +92,7 @@ private:
 	bool m_host_command_line = false;
 	bool m_reset_released = false;
 	u16 m_overlay_end = 0x2800;
+	bool m_external_codec_clock = false;
 	u16 m_host_command_vector = 0;
 	emu_timer *m_slot_timer = nullptr;
 	emu_timer *m_frame_timer = nullptr;

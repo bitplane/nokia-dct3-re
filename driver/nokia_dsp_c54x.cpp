@@ -358,7 +358,7 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		// Preserve the existing untimed external boot echo only. Ordinary
 		// pending samples need a real external frame attachment, not this path.
 		u16 word;
-		if (m_cobba->codec_serial_loopback() && codec_transmit_frame(word))
+		if (!m_external_codec_clock && m_cobba->codec_serial_loopback() && codec_transmit_frame(word))
 		{
 			m_cobba->codec_serial_transmit(word);
 			if (m_cobba->codec_serial_receive_ready())

@@ -15,11 +15,14 @@ CONTINUOUS_RX = 'C54x native backend BSP continuous RX: PASS words=5 partial_res
 CONTINUOUS_TX = 'C54x native backend BSP continuous TX: PASS completed_words=6 load_irqs=5 partial_restore=1 queued_boundary=1 underrun_halt=1 external_restart=1 reset_abort=1 source=5 handset_clock_claim=0'
 FRAME_IGNORE = 'C54x native backend BSP frame ignore: PASS directions=2 words=4 partial_restore=1 ignored_sync=1 reset_abort=1 sources=4,5 handset_clock_claim=0'
 JOINED_PINS = 'C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0'
+CLOCKED_STORE = 'C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 
 
-def check_result(text, returncode):
+def check_result(text, returncode, *, verbose_teardown=False):
     lines = text.splitlines()
+    if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:
+        lines = lines[:-2]
     if returncode != 3 or lines.count(MARKER) != 1:
         raise ValueError('missing unique successful backend BSP completion')
     if lines.count(OBSERVATION) != 1:
@@ -40,6 +43,8 @@ def check_result(text, returncode):
         raise ValueError('missing unique native frame-ignore/restoration result')
     if lines.count(JOINED_PINS) != 1:
         raise ValueError('missing unique native joined-pin/restoration result')
+    if lines.count(CLOCKED_STORE) != 1:
+        raise ValueError('missing unique native clocked-store result')
     if not lines or lines[-1] != COMPLETION:
         raise ValueError('missing terminal backend BSP completion')
     if any(line.startswith('Fatal error:') and line != COMPLETION for line in lines):
@@ -50,19 +55,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mame', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
+    parser.add_argument('--coverage', action='store_true', help='retain native opcode/decoder records with verbose teardown')
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix='c54x-backend-bsp-', dir=args.output_root.resolve()))
     command = [str(args.mame.resolve()), 'tms54bsp', '-video', 'none',
                '-sound', 'none', '-nothrottle', '-noreadconfig', '-log',
                '-seconds_to_run', '1']
+    if args.coverage:
+        command.append('-verbose')
     print(f'Native backend BSP evidence: {run}', flush=True)
     with (run / 'console.log').open('w') as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / 'console.log').read_text()
     print(text, end='')
     try:
-        check_result(text, result.returncode)
+        check_result(text, result.returncode, verbose_teardown=args.coverage)
     except ValueError as error:
         print(f'Native backend BSP: FAIL: {error}', file=sys.stderr)
         return 1

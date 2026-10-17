@@ -4664,36 +4664,54 @@ public:
 		noki5110(config);
 		CLOCK(config, "external_pcm_bit", 1'000'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::bit_w));
 	}
+	void nse1pin(machine_config &config)
+	{
+		nse1bit(config);
+		subdevice<nokia_dsp_c54x_device>("dsp_c54x")->set_external_codec_clock(true);
+		m_clocked_loopback = true;
+	}
 protected:
 	virtual void machine_start() override
 	{
 		nokia_dct3_state::machine_start();
 		save_item(NAME(m_wire_word));
 		save_item(NAME(m_wire_bits));
+		save_item(NAME(m_clocked_echo_words));
 	}
 	virtual void machine_reset() override
 	{
 		nokia_dct3_state::machine_reset();
 		m_wire_word = 0;
 		m_wire_bits = 0;
+		m_clocked_echo_words = 0;
+	}
+	virtual void device_stop() override
+	{
+		if (m_clocked_loopback)
+			logerror("native_pcm_fixture_echo_summary: words=%llu untimed=%llu handset_clock_claim=0\n",
+				m_clocked_echo_words, subdevice<nokia_cobba_device>("cobba")->codec_serial_loopbacks());
 	}
 private:
 	u16 m_wire_word = 0;
 	u8 m_wire_bits = 0;
+	bool m_clocked_loopback = false;
+	u64 m_clocked_echo_words = 0;
 	void bit_w(int state)
 	{
 		auto &backend = *subdevice<nokia_dsp_c54x_device>("dsp_c54x");
 		auto &codec = *subdevice<nokia_cobba_device>("cobba");
 		// Explicit lab fan-out and one-clock active-high sync assumption.
-		// Ordinary machines do not attach this source. Untimed echo stays exclusive.
-		if (codec.codec_serial_loopback())
+		// Ordinary machines do not attach this source. Only nse1pin owns
+		// boot loopback clocks; the older fixture leaves untimed echo exclusive.
+		const bool loopback = codec.codec_serial_loopback();
+		if (loopback && !m_clocked_loopback)
 		{
 			m_wire_bits = 0;
 			return;
 		}
 		const bool sync = !(machine().time().as_ticks(1'000'000) % 125);
 		const auto output = backend.codec_transmit_clock_w(bool(state), sync);
-		backend.codec_receive_clock_w(bool(state), sync, false);
+		backend.codec_receive_clock_w(bool(state), sync, m_clocked_loopback && loopback && output.driven && output.data);
 		if (state)
 		{
 			if (sync)
@@ -4706,7 +4724,15 @@ private:
 		if (!output.supported || !output.driven || m_wire_bits >= 16) return;
 		m_wire_word = (m_wire_word << 1) | output.data;
 		if (++m_wire_bits == 16)
-			logerror("native_pcm_fixture_word: value=%04x t=%.9f\n", m_wire_word, machine().time().as_double());
+		{
+			if (m_clocked_loopback && loopback)
+			{
+				++m_clocked_echo_words;
+				logerror("native_pcm_fixture_echo_word: value=%04x t=%.9f\n", m_wire_word, machine().time().as_double());
+			}
+			else
+				logerror("native_pcm_fixture_word: value=%04x t=%.9f\n", m_wire_word, machine().time().as_double());
+		}
 	}
 	void frame_w(int state)
 	{
@@ -4732,6 +4758,7 @@ private:
 
 #define rom_nse1pcm rom_noki5110
 #define rom_nse1bit rom_noki5110
+#define rom_nse1pin rom_noki5110
 
 } // anonymous namespace
 
@@ -4741,6 +4768,7 @@ SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empt
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
