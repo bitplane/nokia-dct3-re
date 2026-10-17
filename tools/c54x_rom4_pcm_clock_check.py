@@ -124,7 +124,20 @@ def check(text, *, clock):
                 handset_clock_claim=False, native_call_speech_claim=False)
 
 
-def check_restore(text):
+def check_wire(text):
+    result = check(text, clock=True)
+    # This laboratory source has a fixed phase: the 16th sampled bit is at
+    # +16 us in each 125-us frame. It is not a measured NSE-1 pulse shape.
+    for _, time in WORDS.findall(text):
+        cycles = float(time) * 1_000_000
+        if abs(cycles - round(cycles)) > 0.002 or round(cycles) % 125 != 16:
+            raise ValueError('wire output does not complete on the assumed 1 MHz/125-clock phase')
+    result.update(bit_clock_hz=1_000_000, frame_clocks=125,
+                  assumed_sync_clocks=1, assumed_receive_transmit_fanout=True)
+    return result
+
+
+def check_restore(text, *, wire=False):
     marker = re.compile(r'native_pcm_restore: phase=(saved|restored|complete) ([^\n]+)')
     markers = list(marker.finditer(text))
     if [match[1] for match in markers] != ['saved', 'restored', 'complete']:
@@ -144,6 +157,8 @@ def check_restore(text):
     if saved[2] != restored[2]:
         raise ValueError('native PCM checkpoint snapshot differs after restoration')
     saved_time = float(fields['t'])
+    if wire and abs(saved_time - 8.150008) > 1e-9:
+        raise ValueError('wire checkpoint does not capture the selected partial word')
     ending = re.fullmatch(r't=([0-9]+\.[0-9]{9}) physical_release_replayed=0', complete[2])
     if not ending:
         raise ValueError('malformed native PCM completion boundary')
@@ -162,7 +177,7 @@ def check_restore(text):
     # Remove only the replay leg when checking the ordinary complete run;
     # that checker must still reject duplicate/missing samples on one timeline.
     canonical = text[:restored.start()] + text[complete.end():]
-    result = check(canonical, clock=True)
+    result = check_wire(canonical) if wire else check(canonical, clock=True)
     result['canonical_captured_words'] = result['captured_words']
     result['captured_words'] = len(WORDS.findall(text))
     result.update(replayed_words=len(reference), snapshot_equal=True,

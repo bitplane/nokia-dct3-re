@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "native_nse1_bit_clock_dtmf", "owner": "native_dsp_serial", "status": "satisfied",
+      "predicate": "Native NSE-1 synthesizes physical key-2 DTMF through externally supplied bit-clock transitions and exactly restores an active partial word",
+      "current": "Separate nse1bit supplies 1 MHz RX/TX edges, a sync every 125 clocks and zero microphone bits through clock-input methods, not completed-frame methods. One-clock active-high sync and shared RX/TX fan-out remain explicit laboratory assumptions. Untimed self-test echo stays exclusive. Native firmware writes/reads 78908 serial words and the fixture assembles 78901 complete 16-bit outputs; all completions lie at +16 us on its 125 us grid. Complete silent pre/post intervals and 480 active samples pass 697/1336 Hz projection checks. Save at 8.150008 s inside a word restores the checked CPU/peripheral snapshot and exactly replays 400 output words and absolute timestamps at 1 ns printed resolution. The normal 5110 remains unclocked. This does not establish production gating, physical sync shape, analogue routing, RF acquisition or native call speech.",
+      "evidence": ["docs/cobba_control_boundary.md", "docs/model_coverage.md", "driver/nokia_dct3.cpp", "patches/mame-nse1-external-pcm-fixture.patch", "tools/run_c54x_rom4_pcm_clock.py", "tools/c54x_rom4_pcm_clock_check.py", "tools/c54x_rom4_pcm_restore.lua", "tools/test_c54x_rom4_pcm_clock_check.py"]
+    },
+    {
       "id": "native_nse1_codec_demand_bitmap", "owner": "native_dsp_serial", "status": "satisfied",
       "predicate": "Original NSE-1 demand helpers acquire and release software client masks at data 00ef with complete observed entry-to-store agreement",
       "current": "Exact resident words pin acquire OR/store at a4c1..a4c3 and release load/complement/AND/store at a4d9..a4df. Read-only entry and data taps reconcile all 19 unclocked versus 21 externally clocked transitions, including store PCs and values. Both acquire 0001 and release 0002/0004; only the external-frame run additionally releases 0001 before reacquiring it. The bitmap and register-8 value 0626 persist through both active DTMF and silence. This is a software demand lifecycle, not a clock-enable register map or permission to gate hardware on firmware RAM. Existing native waveform and active replay gates remain independently required.",

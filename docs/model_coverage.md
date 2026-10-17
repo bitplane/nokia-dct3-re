@@ -21,8 +21,10 @@ old set. See the current audit boundary in
 `rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.
 The separate `nse1pcm` external-frame laboratory fixture additionally proves
 native runtime key-2 DTMF synthesis, with paired unclocked control and complete
-sample accounting. It is not another supported product and does not attach
-clocks or promote call media on the ordinary 5110 machine; see
+sample accounting. `nse1bit` independently exercises native RX/TX bit-clock
+inputs at 1 MHz with an assumed sync pulse/fan-out and exact active partial-word
+save/load replay. Neither is another supported product, and neither attaches
+clocks or promotes call media on the ordinary 5110 machine; see
 `cobba_control_boundary.md`.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |

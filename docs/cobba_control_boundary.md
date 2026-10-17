@@ -1414,6 +1414,30 @@ when an independently evidenced production serial attachment replaces it.
 
 ### NSE-1 physical clock contract
 
+`make check-c54x-rom4-pcm-wire` adds a distinct `nse1bit` laboratory case
+to the unclocked/completed-frame controls and their active restoration tests.
+It supplies actual 1 MHz clock transitions to the backend's RX/TX clock-input
+methods, with a sync every 125 clocks and zero microphone data. No completed
+frame method supplies the wire case. The native BSP shifts the transmitted
+bits; the fixture assembles exactly 16 driven bits into each captured word.
+Its active-high one-clock sync and RX/TX clock fan-out are explicit test
+assumptions, not recovered product wiring. The untimed self-test echo remains
+exclusive, and ordinary `noki5110` still has no attached audio clock.
+
+The wire run observes 78,908 native writes/reads and 78,901 captured words.
+All captured completions lie at the fixture's +16 us phase on its 125 us
+grid; the checker rejects a half-microsecond phase shift even if the sample
+rate and waveform still pass. Silent pre/post intervals and the complete
+480-sample DTMF window pass independently (697/1336 Hz projections about
+0.2007/0.8008). These counts differ from the completed-frame shortcut:
+interrupt and reset timing are not asserted to be interchangeable.
+Saving at 8.150008 s, inside the word, and restoring reproduces all checked
+CPU/peripheral snapshot fields plus 400 subsequent words and their absolute
+timestamps at printed 1 ns resolution. The fixture's partial capture and
+clock-device state are saved alongside the BSP shifters. This demonstrates
+native edge-driven synthesis and partial-word replay, not electrical pulse
+shape, production enable semantics, analogue output or native call speech.
+
 The external emulator at commit `2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd`
 does not independently settle this attachment. Its
 `third_party/c54x/mad2_dsp_c54x.c` frame source tests DSP RAM `00fe` bit 0

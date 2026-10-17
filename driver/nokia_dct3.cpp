@@ -1324,9 +1324,10 @@ public:
 	DECLARE_INPUT_CHANGED_MEMBER(sms_config_changed);
 	DECLARE_INPUT_CHANGED_MEMBER(sim_removed_changed);
 
-private:
+protected:
 	virtual void machine_start() override ATTR_COLD;
 	virtual void machine_reset() override ATTR_COLD;
+private:
 	void post_load();
 	void apply_product_config(nokia_product_config const &product);
 	void apply_sms_config();
@@ -4658,7 +4659,55 @@ public:
 		noki5110(config);
 		CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::frame_w));
 	}
+	void nse1bit(machine_config &config)
+	{
+		noki5110(config);
+		CLOCK(config, "external_pcm_bit", 1'000'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::bit_w));
+	}
+protected:
+	virtual void machine_start() override
+	{
+		nokia_dct3_state::machine_start();
+		save_item(NAME(m_wire_word));
+		save_item(NAME(m_wire_bits));
+	}
+	virtual void machine_reset() override
+	{
+		nokia_dct3_state::machine_reset();
+		m_wire_word = 0;
+		m_wire_bits = 0;
+	}
 private:
+	u16 m_wire_word = 0;
+	u8 m_wire_bits = 0;
+	void bit_w(int state)
+	{
+		auto &backend = *subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+		auto &codec = *subdevice<nokia_cobba_device>("cobba");
+		// Explicit lab fan-out and one-clock active-high sync assumption.
+		// Ordinary machines do not attach this source. Untimed echo stays exclusive.
+		if (codec.codec_serial_loopback())
+		{
+			m_wire_bits = 0;
+			return;
+		}
+		const bool sync = !(machine().time().as_ticks(1'000'000) % 125);
+		const auto output = backend.codec_transmit_clock_w(bool(state), sync);
+		backend.codec_receive_clock_w(bool(state), sync, false);
+		if (state)
+		{
+			if (sync)
+			{
+				m_wire_word = 0;
+				m_wire_bits = 0;
+			}
+			return;
+		}
+		if (!output.supported || !output.driven || m_wire_bits >= 16) return;
+		m_wire_word = (m_wire_word << 1) | output.data;
+		if (++m_wire_bits == 16)
+			logerror("native_pcm_fixture_word: value=%04x t=%.9f\n", m_wire_word, machine().time().as_double());
+	}
 	void frame_w(int state)
 	{
 		if (!state) return;
@@ -4682,6 +4731,7 @@ private:
 };
 
 #define rom_nse1pcm rom_noki5110
+#define rom_nse1bit rom_noki5110
 
 } // anonymous namespace
 
@@ -4690,6 +4740,7 @@ SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empt
 SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

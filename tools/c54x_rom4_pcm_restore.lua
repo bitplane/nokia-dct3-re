@@ -2,11 +2,24 @@
 local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
 dofile(directory .. 'c54x_rom4_tone_observe.lua')
 local machine = manager.machine
-assert(machine.system.name == 'nse1pcm')
+local wire = machine.system.name == 'nse1bit'
+assert(machine.system.name == 'nse1pcm' or wire)
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
 local mcu = assert(machine.devices[':maincpu'])
 local key = assert(machine.ioport.ports[':COL.3'].fields['Keypad 2'])
 local saved, restored, stage = nil, false, 0
+local checkpoint = coroutine.create(function()
+    if not wire then return end
+    -- Eight microseconds into a frame: preserve a partial native shift, not
+    -- only a word boundary. Save scheduling remains owned by MAME.
+    local deadline = 8.150008
+    while machine.time:as_double() + 1e-12 < deadline do
+        emu.wait(deadline - machine.time:as_double())
+    end
+    stage = 1
+    machine:save('native_pcm_active')
+end)
+assert(coroutine.resume(checkpoint))
 -- A load can resume emu.wait early. Recheck absolute time rather than letting
 -- that wakeup turn into an unintended physical release during the replay.
 local keyboard = coroutine.create(function()
@@ -55,7 +68,7 @@ local after = emu.add_machine_post_load_notifier(function()
 end)
 local frames = emu.register_frame_done(function()
     local now = machine.time:as_double()
-    if stage == 0 and now >= 8.15 then
+    if not wire and stage == 0 and now >= 8.15 then
         stage = 1
         machine:save('native_pcm_active')
     elseif stage == 1 and saved and now >= 8.20 then
@@ -69,4 +82,4 @@ end)
 local stop = emu.add_machine_stop_notifier(function()
     assert(stage == 3, 'native serial replay did not complete')
 end)
-_G.native_pcm_restore = {before, after, frames, stop, keyboard}
+_G.native_pcm_restore = {before, after, frames, stop, keyboard, checkpoint}

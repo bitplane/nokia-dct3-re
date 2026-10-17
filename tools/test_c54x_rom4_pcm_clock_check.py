@@ -2,7 +2,7 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, check_restore, control_timeline, demand_transitions, tone_fraction, WORDS
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, control_timeline, demand_transitions, tone_fraction, WORDS
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'
@@ -42,6 +42,16 @@ def restore_log():
 
 
 class NativeClockTests(unittest.TestCase):
+    def test_wire_phase_is_not_only_a_sample_rate_check(self):
+        text = WORDS.sub(lambda match: f'native_pcm_fixture_word: value={match[1]} t={round((float(match[2]) - 0.000016) * 8000) / 8000 + 0.000016:.9f}', clock_log())
+        self.assertEqual(check_wire(text)['frame_clocks'], 125)
+        shifted = WORDS.sub(lambda match: f'native_pcm_fixture_word: value={match[1]} t={float(match[2]) + 0.0000005:.9f}', text)
+        self.assertTrue(check(shifted, clock=True)['clock'])
+        with self.assertRaisesRegex(ValueError, 'phase'):
+            check_wire(shifted)
+        with self.assertRaisesRegex(ValueError, 'partial word'):
+            check_restore(restore_log(), wire=True)
+
     def test_demand_bitmap_acquire_release_and_complete_commits(self):
         text = ('rom4_codec_demand_entry: hit=1 operation=acquire mask=0001 previous=0002 t=1.0\n'
                 'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=0003 mask=ffff pc=00a4c4 t=1.1\n'

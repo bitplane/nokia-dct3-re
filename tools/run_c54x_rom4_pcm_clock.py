@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from tools.c54x_rom4_pcm_clock_check import check, check_restore, demand_transitions
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, demand_transitions
 from tools.c54x_rom4_codec_contract import check as check_codec, check_mcu_speech_field
 from tools.c54x_rom4_rf_delivery_check import check_observer_health
 from tools.run_c54x_rom4_rf_delivery import input_provenance
@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--rompath', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
     parser.add_argument('--restore', action='store_true', help='also compare an active native tone suffix after save/load')
+    parser.add_argument('--wire', action='store_true', help='also test explicit 1 MHz edges with assumed one-clock sync and RX/TX fan-out')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -38,9 +39,14 @@ def main():
     print(f'Native external-frame evidence: {root}', flush=True)
     results = []
     cases = [('control', False, 'noki5110'), ('clock', True, 'nse1pcm')]
+    if args.wire:
+        cases.append(('wire', True, 'nse1bit'))
     if args.restore:
         cases.append(('restore', True, 'nse1pcm'))
+        if args.wire:
+            cases.append(('wire_restore', True, 'nse1bit'))
     for label, clock, machine in cases:
+        restoring = label.endswith('restore')
         case = root / label
         nvram = case / 'nvram' / machine
         nvram.mkdir(parents=True)
@@ -48,12 +54,12 @@ def main():
         subprocess.run([sys.executable, str(generator), '--eeprom', str(inputs['nse-1.bin']),
                         '--flash', str(inputs['5110f530.fls']), '--output', str(nvram / 'eeprom')], check=True)
         env = {key: value for key, value in os.environ.items() if not key.startswith('NOKIA_DCT3_')}
-        env.update(NOKIA_DCT3_POST_READY_KEYS='' if label == 'restore' else '2', NOKIA_DCT3_POST_READY_KEY_DELAY_MS='8000',
+        env.update(NOKIA_DCT3_POST_READY_KEYS='' if restoring else '2', NOKIA_DCT3_POST_READY_KEY_DELAY_MS='8000',
                    NOKIA_DCT3_POST_READY_KEY_DURATION_MS='220')
         command = [str(args.mame.resolve()), machine, '-rompath', str(args.rompath.resolve()),
                    '-nvram_directory', str(case / 'nvram'), '-noreadconfig', '-video', 'none',
                    '-sound', 'none', '-log', '-skip_gameinfo', '-nothrottle', '-seconds_to_run', '12',
-                   '-autoboot_script', str(restore_observer if label == 'restore' else observer)]
+                   '-autoboot_script', str(restore_observer if restoring else observer)]
         (case / 'invocation.json').write_text(json.dumps(dict(command=command, cwd=str(case),
             fixture_env={key: value for key, value in env.items() if key.startswith('NOKIA_DCT3_')},
             generated_storage=input_provenance({'eeprom': nvram / 'eeprom'})), indent=2) + '\n')
@@ -64,7 +70,10 @@ def main():
                 raise ValueError(f'MAME exit status {completed.returncode}')
             check_observer_health((case / 'console.log').read_text())
             text = (case / 'error.log').read_text()
-            result = check_restore(text) if label == 'restore' else check(text, clock=clock)
+            if restoring:
+                result = check_restore(text, wire=machine == 'nse1bit')
+            else:
+                result = check_wire(text) if machine == 'nse1bit' else check(text, clock=clock)
             result['codec_demand'] = demand_transitions(text)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
