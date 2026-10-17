@@ -1296,7 +1296,7 @@ post-key caller independently of the shared tone-cell writes. The constant
 setup at `b8a2` is not observed in this fixture. This confirms execution of
 the known activation path, not its clock-field meanings. Program-tap PC
 must be `45c3` because fetch increments PC; the captured return address is
-read from ordinary stack RAM. Output is capped at 64 entries with an
+read from ordinary stack RAM. Output is capped at 256 entries with an
 uncapped total, so a longer capture must check its truncation explicitly.
 
 Run `make check-c54x-rom4-codec-tone RUN_DIR=run_native_codec` for the
@@ -1308,6 +1308,33 @@ delivery and register-8 activation caller, and rejects new data-`0032`
 traffic or reset/illegal failures. This is a native serial/control gate,
 not a waveform or speech gate; save/load remains independently tested by
 `verify-5110-save-state`.
+
+`make check-c54x-rom4-tone-levels RUN_DIR=tmp/native-tone-levels` runs four
+isolated native 5110 cold boots with own-profile EEPROMs. The physical
+sequence is `Menu,9,5,option,Clear,Clear,Clear,2`, with options 1--4.
+The [5110 user's guide](https://altehandys.de/downloads/man-no-5110.pdf)
+(printed pp. 25 and 44) identifies menu 9-5 as keypad-tone Off/three levels.
+Each run retains its console, trace, NVRAM and final digit-2 frame.
+The 84x48 grayscale pixel SHA-256 must be
+`cf44d8d2cf6398d7d69aa5cb9b766d3b8a2905169c6edda6e313b4fc2d6b8cd6`
+in every setting, independently proving the final key reached the UI even
+when the tone command is absent.
+
+| Selected option | Final key's observed control behavior |
+| --- | --- |
+| Off (1) | No new `00e1` tone copy to DSP `00fe` and no register-8 `0626` activation during the remaining capture. Earlier menu keys supply the positive control. |
+| Level 1 (2) | Tone copy and register-8 `0626` activation occur; no new level-dependent shared control is required. |
+| Level 2 (3) | MCU publishes packed `920c` before the tone copy; register-8 activation is still `0626`. |
+| Level 3 (4) | MCU publishes packed `9209` before the tone copy; register-8 activation is still `0626`. |
+
+The checker requires all eight physical press/release pairs, complete
+helper-call and tone-copy observations, ordered level controls and the
+unchanged two boot serial transfers. Per-access trace caps are 64 per
+owner/direction/phase. The Off absence claim is rejected if tone-copy
+counts do not cover the complete trace. These observations separate the
+level-dependent packed control from the common activation write; they do
+not establish the analog gain law, register-9 wire transformation, clock
+enable bits, additional PCM samples or audible/native speech output.
 
 The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 (03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA

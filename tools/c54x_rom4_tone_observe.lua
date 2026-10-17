@@ -14,7 +14,7 @@ local function watch(cpu, kind, address, owner, last)
             local phase = machine.time:as_double() >= 7 and 'interactive' or 'boot'
             local output_key = key .. '_' .. phase
             emitted[output_key] = (emitted[output_key] or 0) + 1
-            if emitted[output_key] <= 16 then
+            if emitted[output_key] <= 64 then
                 machine:logerror(string.format(
                     'rom4_tone_access: owner=%s direction=%s address=%06x value=%04x mask=%04x pc=%06x t=%.9f\n',
                     owner, direction, address, value, mask,
@@ -106,7 +106,7 @@ taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
     0x45c2, 0x45c2, 'codec_control_call', function()
         if dsp.state['PC'].value ~= 0x45c3 then return end
         control_calls = control_calls + 1
-        if control_calls <= 64 then
+        if control_calls <= 256 then
             local sp = dsp.state['SP'].value
             machine:logerror(string.format(
                 'rom4_codec_control_call: hit=%d a=%010x b=%010x sp=%04x return=%04x t=%.9f\n',

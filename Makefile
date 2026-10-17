@@ -364,6 +364,7 @@ help:
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
 	@echo "make check-c54x-rom4-codec-tone verify native boot serial and physical tone-control boundaries; retains isolated evidence under RUN_DIR"
+	@echo "make check-c54x-rom4-tone-levels verify physical Off/three-level native tone controls (no audio claim)"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
@@ -1354,6 +1355,10 @@ check-c54x-rom4-compare: build
 		grep -q '^ROM4 compare model conformance: PASS ' output.log
 
 .PHONY: check-c54x-rom4-codec-tone
+.PHONY: check-c54x-rom4-tone-levels
+check-c54x-rom4-tone-levels: build
+	$(PYTHON) tools/run_c54x_rom4_tone_levels.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root $(RUN_DIR)
+
 check-c54x-rom4-codec-tone: build
 	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \
 		tmp="$$(mktemp -d "$(abspath $(RUN_DIR))/rom4-codec-tone.XXXXXX")"; \
