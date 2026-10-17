@@ -113,6 +113,13 @@ these placeholders in a test baseline.
 
 ### External EFR reference input
 
+The optional `--encoder-homing-fixture` generates locally pinned
+`homing_enc.inp`/`homing_enc.cod` from a 46-frame EHF/repeated-speech input.
+The installation-verified reference encoder runs twice from fresh process
+state; steady EHF and repeated post-reset speech must reproduce. Files remain
+private research inputs. See
+`docs/cobba_control_boundary.md#native-efr-encoder-homing`.
+
 The optional `--homing-fixture` derives a canonical DHF from the unmodified
 reference encoder's second EHF input frame. It generates a locally pinned
 46-frame decoder conversation with repeated speech between DHF pairs;

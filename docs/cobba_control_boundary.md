@@ -1980,7 +1980,7 @@ whether frame 9 can be matched by changing expected output or forcing state.
 all 46 frames and 7,360 PCM samples of a generated external-reference homing
 conversation. Each frame replays all 65,440 ordinary RAM words after restore.
 This is clean decoder-homing acceptance, not error/homing combinations,
-encoder-homing acceptance or handset speech transport.
+the separate encoder-homing result below or handset speech transport.
 
 After verifying the original installation vectors, the unmodified reference
 encoder processes two frames of the EHF sample pattern (`0008`). Its second
@@ -2005,4 +2005,31 @@ that as a fixture-ABI error, not missing hardware or a reason to synthesize
 a reset flag. Clean speech and nonzero DTX results remain separately gated;
 active-speech erasure precision remains the distinct unresolved comparison
 above.
+
+### Native EFR encoder homing
+
+**Accepted boundary:** `make check-c54x-rom4-efr-homing-encoder` reproduces
+46 frames, all 2,622 parameters, 92 VAD/SP flags and 782 packed words.
+Every frame replays all 65,440 ordinary RAM words from its pre-preprocessing
+checkpoint. This is isolated encoder reset/restart coverage, not handset
+speech, DTX/homing combinations or a physical microphone calibration.
+
+The generated PCM conversation contains two EHF frames (`0008` samples),
+the first 20 complete installation speech frames, two EHF frames, the same
+speech segment, and two final EHF frames. The independently installation-verified
+reference encoder runs twice in fresh processes without DTX, requiring exact
+replay and local input/output SHA-256 pins. Steady EHF frames 0, 1, 23 and 45
+encode identically; the two nontrivial 20-frame speech segments also encode
+identically after homing. These are generated research vectors, not published
+conformance vectors, and remain outside Git and the MAME overlay.
+
+The native fixture keeps the existing `cf9a` preprocessing, `bed6/befa/bf20/bf92`
+preparation, four `c093` subframes and `c273` packing sequence. It initializes
+with `cc0e` once; subsequent reset decisions belong to the original routine.
+In particular, `c287..c28b` tests `0bac` bit 1 after packing and calls `cc0e`
+when the EHF path requests reset. No homing flag or inter-frame reset is
+injected by the fixture. Exact parameters/flags are checked independently of
+normative packing, so a matching packed frame alone cannot hide a reset or
+parameter-history discrepancy. Ordinary speech, nonzero DTX and decoder
+homing remain independent preservation gates.
 

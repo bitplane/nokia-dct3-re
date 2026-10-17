@@ -35,6 +35,53 @@ HOMING_EXPECTED = {
     "dec": "0ca6dbc6caff2cf556aa6f7458dc4d8c3044750af1ad977a2af6edc6920d1fc1",
     "out": "7dad66375d871bb518cd00bac53e57b698a6fee1e1b3555cea0e06109a022205",
 }
+ENCODER_HOMING_EXPECTED = {
+    "inp": "a443d4341b71c17f42610d5e873016e3da89b9b02c2bb01874840a144c35ca55",
+    "cod": "b10eeee611bf9e8b77f8a8dd3f184d02731433d494ffec03017ede4b49a7bafd",
+}
+
+
+def encoder_homing_input(speech):
+    if len(speech) != 52352:
+        raise ValueError("encoder homing requires the complete installation input")
+    pattern = struct.pack('<320h', *([8] * 320))
+    segment = speech[:20 * 320]
+    return pattern + segment + pattern + segment + pattern
+
+
+def inspect_encoder_homing(coded):
+    if len(coded) != HOMING_FRAMES * 492:
+        raise ValueError("encoder homing frame count differs")
+    for frame in struct.iter_unpack('<246H', coded):
+        if any(bit > 1 for bit in frame) or frame[245] != 1:
+            raise ValueError("encoder homing requires binary active-speech output")
+    canonical = coded[492:984]
+    if any(coded[frame * 492:(frame + 1) * 492] != canonical for frame in (0, 23, 45)):
+        raise ValueError("steady encoder homing differs from reset output")
+    first, second = coded[2 * 492:22 * 492], coded[24 * 492:44 * 492]
+    if first == canonical * 20 or first != second:
+        raise ValueError("encoder speech after homing does not reproduce from reset")
+    return {"frames": HOMING_FRAMES, "homing_frames": [0, 1, 22, 23, 44, 45],
+            "repeated_speech_frames": 20}
+
+
+def generate_encoder_homing(source, commands, log):
+    (source / "homing_enc.inp").write_bytes(encoder_homing_input((source / "spch_dos.inp").read_bytes()))
+    for name in ("homing_enc.cod", "homing_enc_replay.cod"):
+        command = ["./coder", "homing_enc.inp", name]
+        commands.append(command)
+        subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    coded = (source / "homing_enc.cod").read_bytes()
+    if coded != (source / "homing_enc_replay.cod").read_bytes():
+        raise ValueError("encoder homing differs across fresh processes")
+    outputs = {}
+    for suffix in ("inp", "cod"):
+        data = (source / f"homing_enc.{suffix}").read_bytes()
+        if digest(data) != ENCODER_HOMING_EXPECTED[suffix]:
+            raise ValueError("encoder homing reference differs from its local reproducibility pin")
+        outputs[suffix] = {"bytes": len(data), "sha256": digest(data)}
+    return {"coverage": inspect_encoder_homing(coded), "outputs": outputs,
+            "fresh_process_replay": True, "published_expected_vector_claim": False}
 DTX_EXPECTED = {
     "inp": "f7c76955e1f79777b6a67eab3c6cc346d13351974b40817a6765acc89739ba1d",
     "cod": "b06b7dd60d251b6fa48931ecb3e313f7b03a754bb0a0b3807be1781cd73e590b",
@@ -257,6 +304,8 @@ def main():
                         help="generate fixed active-speech BFI bursts after installation verification")
     parser.add_argument("--homing-fixture", action="store_true",
                         help="generate a repeated-speech decoder homing conversation")
+    parser.add_argument("--encoder-homing-fixture", action="store_true",
+                        help="generate repeated speech and EHF inputs for encoder reset coverage")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -299,6 +348,9 @@ def main():
         if args.homing_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["homing"] = generate_homing(source, commands, log)
+        if args.encoder_homing_fixture:
+            with (run / "build-and-run.log").open("a") as log:
+                evidence["encoder_homing"] = generate_encoder_homing(source, commands, log)
         evidence["frames"] = evidence["outputs"]["out"]["bytes"] // 320
         evidence["unused_input_samples"] = len((source / "spch_dos.inp").read_bytes()) // 2 - evidence["frames"] * 160
         evidence["executables"] = {name: digest((source / name).read_bytes())
@@ -321,6 +373,10 @@ def main():
                 for suffix in ("dec", "out"):
                     name = f"homing.{suffix}"
                     (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+            if args.encoder_homing_fixture:
+                for suffix in ("inp", "cod"):
+                    name = f"homing_enc.{suffix}"
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
     except (OSError, ValueError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
         if evidence_path is not None:
@@ -335,6 +391,8 @@ def main():
         print("ETSI EFR erasure reference: PASS frames=163 erased=28 bursts=1,3,8,16 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     if args.homing_fixture:
         print("ETSI EFR homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
+    if args.encoder_homing_fixture:
+        print("ETSI EFR encoder homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     return 0
 
 

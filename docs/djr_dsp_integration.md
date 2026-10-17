@@ -180,6 +180,10 @@ The separate [decoder homing gate](cobba_control_boundary.md#native-efr-decoder-
 also reproduces a 46-frame reset/repeated-speech conversation with full RAM
 replay. It models the original caller's parameter-pointer convention, not an
 extra reset between frames. Error/homing combinations remain unproved.
+The [encoder homing gate](cobba_control_boundary.md#native-efr-encoder-homing)
+separately matches all parameters, VAD/SP and native packed words for a
+46-frame EHF/repeated-speech input with full RAM replay; reset decisions stay
+inside the unchanged encoder routine. Neither gate attaches handset audio.
 
 The remaining NSE-1 boundaries are RF sample ownership/encoding and SCU
 tuning, and an organic DSP-to-PCM speech lifecycle. Matching internal images

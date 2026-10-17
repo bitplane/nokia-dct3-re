@@ -15938,7 +15938,8 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-dtx-encoder")))
+				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-dtx-encoder") ||
+				 !strcmp(machine().options().bios(), "efr-enc-homing")))
 		{
 			start_rom4_efr_encoder(0, true);
 			return;
@@ -16950,6 +16951,7 @@ private:
 	{
 		auto &data = m_cpu->space(AS_DATA);
 		bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
+		bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
 		u16 *const program = &memregion("dspprg")->as_u16();
 		if (initialize)
 		{
@@ -16970,7 +16972,7 @@ private:
 		}
 		else
 		{
-			u8 const *const input = memregion(dtx ? "efr_dtx_encoder_pcm" : "efr_encoder_pcm")->base() + frame * 320;
+			u8 const *const input = memregion(dtx ? "efr_dtx_encoder_pcm" : homing ? "efr_homing_encoder_pcm" : "efr_encoder_pcm")->base() + frame * 320;
 			for (unsigned i = 0; i < 160; ++i)
 				data.write_word(0x0cf4 + i, input[i * 2] | (input[i * 2 + 1] << 8));
 		}
@@ -46673,7 +46675,8 @@ private:
 		if (m_phase >= 304000 && m_phase < 304519)
 		{
 			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
-			unsigned const frames = dtx ? 518 : 163;
+			bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
+			unsigned const frames = dtx ? 518 : homing ? 46 : 163;
 			expect(m_phase <= 304000 + frames, "EFR encoder phase stays within the selected reference input");
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 				osd_printf_info("ROM4 EFR encoder stop: phase=%u pc=%04x sp=%04x illegal=%u\n", m_phase,
@@ -46685,7 +46688,7 @@ private:
 			if (m_phase == 304000) { start_rom4_efr_encoder(0, false); return; }
 			unsigned const frame = m_phase - 304001;
 			if (replay_rom4_codec_frame(304001 + frame, 20)) return;
-			u8 const *const reference = memregion(dtx ? "efr_dtx_encoder_serial" : "efr_encoder_serial")->base() + frame * 492;
+			u8 const *const reference = memregion(dtx ? "efr_dtx_encoder_serial" : homing ? "efr_homing_encoder_serial" : "efr_encoder_serial")->base() + frame * 492;
 			auto word = [&](unsigned index) { return u16(reference[index * 2] | (reference[index * 2 + 1] << 8)); };
 			unsigned bit = 0, mismatches = 0;
 			for (unsigned p = 0; p < 57; ++p)
@@ -46706,11 +46709,17 @@ private:
 			auto const packed = rom4_efr_packed(speech);
 			for (unsigned i = 0; i < packed.size(); ++i)
 				if (data.read_word(0x1897 + i) != packed[i]) ++mismatches;
-			osd_printf_info("ROM4 EFR%s encoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : "", frame, mismatches);
+			osd_printf_info("ROM4 EFR%s encoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : homing ? " homing" : "", frame, mismatches);
 			m_rom4_pcm_mismatches += mismatches;
 			expect(!mismatches, "Native EFR encoder parameters and VAD/SP match independent ETSI output");
 			if (frame + 1 < frames) { start_rom4_efr_encoder(frame + 1, false); return; }
 			expect(m_rom4_codec_replays == frames, "EFR encoder replays every frame with its existing histories");
+			if (homing)
+			{
+				osd_printf_info("TMS320C54x ROM4 EFR homing encoder replay: PASS frames=46 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0\n");
+				osd_printf_info("TMS320C54x ROM4 EFR homing encoder: PASS frames=46 parameters=2622 flags=92 packed_words=782 homing=6 repeated_speech=20 mismatches=0 handset_audio_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x ROM4 EFR homing encoder complete");
+			}
 			if (dtx)
 			{
 				osd_printf_info("TMS320C54x ROM4 EFR DTX encoder replay: PASS frames=518 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0\n");
@@ -48582,6 +48591,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(12, "efr-dtx-encoder", "Isolated acquired ROM EFR silence and speech encoder")
 	ROM_SYSTEM_BIOS(13, "efr-erasure", "Isolated acquired ROM EFR active-speech erasure decoder")
 	ROM_SYSTEM_BIOS(14, "efr-homing", "Isolated acquired ROM EFR decoder homing and speech restart")
+	ROM_SYSTEM_BIOS(15, "efr-enc-homing", "Isolated acquired ROM EFR encoder homing and speech restart")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -48628,6 +48638,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(14))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(15))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -48674,6 +48687,13 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(14))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(15))
+	ROM_REGION(14720, "efr_homing_encoder_pcm", 0)
+	ROMX_LOAD("homing_enc.inp", 0, 14720, CRC(b1c8352b) SHA1(2aef5f790d2fad7ee3acd529bfca4656b44d9165), ROM_BIOS(15))
+	ROM_REGION(22632, "efr_homing_encoder_serial", 0)
+	ROMX_LOAD("homing_enc.cod", 0, 22632, CRC(7457992e) SHA1(10aee87b5da40ac216c96306fa7ad7616e2cceda), ROM_BIOS(15))
 	ROM_REGION(22724, "efr_homing_input", 0)
 	ROMX_LOAD("homing.dec", 0, 22724, CRC(7935ce74) SHA1(8d28790270a6897f04f9ac4bf19d8c5c0aeaf170), ROM_BIOS(14))
 	ROM_REGION(14720, "efr_homing_pcm", 0)

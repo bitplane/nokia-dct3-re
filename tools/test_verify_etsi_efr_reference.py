@@ -8,9 +8,33 @@ from tools.verify_etsi_efr_reference import check_vectors, digest, validate_memb
 from tools.verify_etsi_efr_reference import dtx_input, inspect_dtx, DTX_FRAMES
 from tools.verify_etsi_efr_reference import erasure_input, inspect_erasures, ERASURE_BURSTS
 from tools.verify_etsi_efr_reference import homing_conversation, inspect_homing, HOMING_FRAMES
+from tools.verify_etsi_efr_reference import encoder_homing_input, inspect_encoder_homing
 
 
 class EtsiEfrReferenceTest(unittest.TestCase):
+    def test_encoder_homing_input_preserves_repeated_speech(self):
+        speech = bytes(i % 251 for i in range(52352))
+        result = encoder_homing_input(speech)
+        self.assertEqual(len(result), 46 * 320)
+        for start in (0, 22, 44):
+            self.assertEqual(result[start * 320:(start + 2) * 320], b'\x08\x00' * 320)
+        for start in (2, 24):
+            self.assertEqual(result[start * 320:(start + 20) * 320], speech[:20 * 320])
+        with self.assertRaises(ValueError):
+            encoder_homing_input(speech[:-1])
+
+    def test_encoder_homing_requires_reproducible_nondegenerate_speech(self):
+        canonical = struct.pack('<246H', *([0] * 244 + [1, 1]))
+        speech = struct.pack('<246H', *([1] * 246)) * 163
+        result = homing_conversation(canonical, speech)
+        self.assertEqual(inspect_encoder_homing(result)['repeated_speech_frames'], 20)
+        mutated = bytearray(result)
+        mutated[24 * 492] = 0
+        for data in (result[:-1], b'\x02\x00' + result[2:], mutated,
+                     canonical * 46, result[:23 * 492] + speech[:492] + result[24 * 492:]):
+            with self.assertRaises(ValueError):
+                inspect_encoder_homing(data)
+
     def test_homing_conversation_preserves_encoded_speech(self):
         canonical = struct.pack('<246H', *([0] * 244 + [1, 1]))
         speech = bytes(i % 251 for i in range(80196))
