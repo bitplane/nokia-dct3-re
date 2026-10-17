@@ -13893,9 +13893,22 @@ private:
 		u64 a, b;
 		u32 base;
 		unsigned mode, checkpoint;
+		bool smem = false, mapped_t = false;
 	};
 	static register_product_fixture register_product_case(unsigned variant)
 	{
+		if (variant >= 69120)
+		{
+			unsigned v = variant - 69120, operation = v % 14; v /= 14;
+			unsigned const pattern = v % 8; v /= 8; unsigned const flags = v % 16; v /= 16;
+			unsigned const mode = v % 5; v /= 5; unsigned const page = v % 2; v /= 2;
+			unsigned const snapshot = v % 3; v /= 3;
+			auto f = register_product_case(18 * (pattern + 8 * (flags + 16 * (mode + 5 * (page + 2 * snapshot)))));
+			f.smem = true; f.mapped_t = v;
+			f.opcode = std::array<u16,14>{0x2000,0x2100,0x2200,0x2300,0x2400,0x2500,0x2800,0x2900,0x2a00,0x2b00,0x2c00,0x2d00,0x2e00,0x2f00}[operation] | (f.mapped_t ? 0x0e : 0x81);
+			if (f.mapped_t) f.st0 &= ~0x1ff;
+			return f;
+		}
 		unsigned v = variant, operation = v % 18; v /= 18;
 		unsigned const pattern = v % 8; v /= 8; unsigned const flags = v % 16; v /= 16;
 		unsigned const mode = v % 5; v /= 5; u32 const base = v % 2 ? 0x20000 : 0; v /= 2;
@@ -13910,13 +13923,15 @@ private:
 		u64 const a = f.mode == 3 ? 1 : f.a;
 		u16 const t = f.mode == 1 || f.mode == 2 ? u16(f.b) : f.t;
 		s64 high = (a >> 16) & 0x1ffff; if (high & 0x10000) high -= 0x20000;
-		s64 product = high * s16(t) * (BIT(f.st1,6) ? 2 : 1);
-		bool const multiply = (f.opcode & 0xfeff) == 0xf48c;
+		unsigned const family = (f.opcode >> 8) & 0x0e;
+		u16 const memory = f.mapped_t ? t : 0x8001;
+		s64 product = (f.smem ? family == 4 ? s64(t) * memory : s64(s16(t)) * s16(memory) : high * s16(t)) * (BIT(f.st1,6) ? 2 : 1);
+		bool const multiply = f.smem ? family <= 4 : (f.opcode & 0xfeff) == 0xf48c;
 		if (!multiply && (f.pmst&2) && (f.st1&0x240)==0x240) product = std::clamp(product,s64(-0x80000000LL),s64(0x7fffffffLL));
-		u64 const source = BIT(f.opcode,9) ? f.b : a;
+		u64 const source = BIT(f.opcode,f.smem ? 8 : 9) ? f.b : a;
 		s64 signed_source = source; if (source & 0x8000000000ULL) signed_source -= 0x10000000000LL;
-		s64 result = multiply ? product : signed_source + (BIT(f.opcode,1) ? -product : product);
-		if (!multiply && BIT(f.opcode,0)) result = ((result+0x8000)>>16)*0x10000;
+		s64 result = multiply ? product : signed_source + ((f.smem ? family >= 12 : BIT(f.opcode,1)) ? -product : product);
+		if (f.smem ? family == 2 || family == 10 || family == 14 : !multiply && BIT(f.opcode,0)) result = ((result+0x8000)>>16)*0x10000;
 		u16 st0 = f.st0;
 		if (result < -0x80000000LL || result > 0x7fffffffLL)
 		{
@@ -13938,10 +13953,15 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T,f.t);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1,0x1800); data.write_word(0x1800,0x8001);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0);
 		m_cpu->set_input_line(0,CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI,CLEAR_LINE);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"register_product_no_read",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false,"Register product must not read data memory"); } });
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"product_source",[this,f](offs_t at,u16 &word,u16) {
+			if (machine().side_effects_disabled()) return;
+			u16 const t = f.mode==1 || f.mode==2 ? u16(f.b) : f.t;
+			expect(f.smem && !m_pipeline_operand_reads && at==(f.mapped_t ? 0x0e : 0x1800) && word==(f.mapped_t ? t : 0x8001) && m_cpu->pipeline_cycles()==7,"Smem product reads its RAM or zero-latency mapped T source once in Read"); ++m_pipeline_operand_reads;
+		});
 		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"register_product_t_producer",[this,f](offs_t at,u16 &word,u16)
 		{ if (machine().side_effects_disabled()) return; expect((f.mode==1 || f.mode==2 || f.mode==4) && !m_pipeline_store_writes && at==0x0e && word==(f.mode==4 ? 0xbeef : u16(f.b)),"Only the fixture's STLM or following STM may write T"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base+0x602,f.base+0x602,"register_product_fetch",[this,f](offs_t,u16 &word,u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads && word==f.opcode,"Register product owns one opcode fetch"); ++m_pipeline_extensions_reads; } });
@@ -43479,7 +43499,11 @@ private:
 		{
 			unsigned const variant=m_pipeline_peripheral_case, tick=++m_idle_fixture_tick; auto const f=register_product_case(variant);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Register MPYA/MACA/MASA are admitted by the staged frontend");
-			if (tick==7) m_cpu->set_state_int(tms320c54x_device::STATE_T,0xdead);
+			if (tick==7)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_T,0xdead);
+				if (f.smem && !f.mapped_t) { auto const disable=machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1800,0xdead); }
+			}
 			if (tick==f.checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -43492,7 +43516,7 @@ private:
 					osd_printf_info("register_product_failure: case=%u opcode=%04x layout=%u replay=%u a=%010llx b=%010llx expected_a=%010llx expected_b=%010llx\n",variant,f.opcode,f.mode,unsigned(m_pipeline_replay),(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),(unsigned long long)result[0],(unsigned long long)result[1]);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A)==result[0] && m_cpu->state_int(tms320c54x_device::STATE_B)==result[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0)==result[2],"Register products sample A/source in Execute and apply signed high17, rounding and saturation");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_T)==(f.mode==4 ? 0xbeef : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1)==f.st1,"Register products consume retained T without publishing it or changing ST1");
-				expect(!m_pipeline_operand_reads && m_pipeline_store_writes==unsigned(f.mode==1 || f.mode==2 || f.mode==4) && m_pipeline_extensions_reads==1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Register products have no data transactions and reach the following IDLE");
+				expect(m_pipeline_operand_reads==unsigned(f.smem) && m_pipeline_store_writes==unsigned(f.mode==1 || f.mode==2 || f.mode==4) && m_pipeline_extensions_reads==1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Products own only their source and producer transactions and reach the following IDLE");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint; m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads=m_recurring_irq_snapshot[2];
@@ -43500,8 +43524,14 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant<69119) { start_register_product(variant+1); return; }
+				if (variant>=69120)
+				{
+					if (variant<176639) { start_register_product(variant+1); return; }
+					osd_printf_info("TMS320C54x staged Smem T dependencies: PASS cases=107520 restore=107520 opcodes=14 patterns=8 flags=16 layouts=5 sources=RAM,mapped_T pages=2 snapshots=3 source_reads=1 t_sample=Read repeat_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
+					throw emu_fatalerror(0,"TMS320C54x isolated MAC/MAS complete");
+				}
 				osd_printf_info("TMS320C54x staged accumulator T products: PASS cases=69120 restore=69120 opcodes=18 patterns=8 flags=16 layouts=none,STLM_zero_gap,STLM_one_gap,A_producer,T_successor pages=2 snapshots=3 t_sample=Read accumulator_sample=Execute overflow_initial=clear,sticky data_reads=0 producer_writes=0,1 opcode_fetches=1 repeat_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
-				throw emu_fatalerror(0,"TMS320C54x isolated MAC/MAS complete");
+				start_register_product(69120); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
 		}

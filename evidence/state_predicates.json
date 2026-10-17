@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_short_smem_t_product_dependencies",
+      "owner": "c54x_cpu",
+      "status": "satisfied",
+      "predicate": "Short Smem T-input products consume an older T publication without consuming a younger one or repeating their memory read",
+      "current": "An executable regression against the unchanged core fails adjacent STLM-to-T followed by 2081: T=1234 and memory=8001 should produce fff6e61234, but early T capture produces zero. SPRU131G 7.5.6 gives multiplication zero T-producer latency. Dedicated T is now retained after older Execute and before younger Read publication; mapped-T memory operands defer their single read to the older-write boundary. All 107520 cases and save-state replays pass fourteen opcodes, eight patterns, sixteen control settings, five layouts, short indirect RAM/direct mapped T, two pages and three snapshots. Scalar arithmetic checks include signed/unsigned products, rounding, FRCT/SMUL/OVM and clear/sticky overflow. Later T/RAM replacement and a following STM protect retention. Existing MAC/MAS, SQURA/SQURS, POLY and register-product banks pass, as do TS load/arithmetic producer, EXP-to-NORM and invalid MOD=3 profiles. A fresh twenty-second native playback produces complete DMA/TX/DIN captures byte-identical to the preserved baseline; DMA/source-range checks pass. This fix is not an observed waveform improvement in that workload. Extended forms, EXP producers, repeats/IRQs, physical phases and native audio quality remain unvalidated.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "mu4_playback_word_capture_integrity",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
@@ -23,7 +31,7 @@
       "owner": "c54x_cpu",
       "status": "unresolved",
       "predicate": "Every admitted T-input multiply family follows its consumer-specific producer latency without consuming a younger T publication",
-      "current": "The new register-product bank covers older STLM at zero/one gap and a younger STM, with retained T after older Execute. The legacy Smem T-input group (MPY/MPYR/MPYU/MAC/MACR/MAS/MASR, fourteen destination opcodes) and POLY still retain T before older Execute. Their generic table-7-3 explanation is not a category proof under SPRU131G 7.5.6/table 7-13. The six immediate-T MPY/MAC forms also require producer/successor composition coverage, although their extension clocks may already separate older stores. Audit these explicit source classes with independent consumer-category expectations; do not move Category-I TS, NORM or bit-test sampling wholesale. Dual-memory products and memory/immediate products publish T but do not consume old T. Existing arithmetic-only tests and native callers with intervening words do not close this dependency contract. No firmware compensation or silicon-phase claim.",
+      "current": "Register and short Smem product banks cover older STLM at zero/one gap and a younger STM, with retained T after older Execute. The fourteen Smem destination opcodes additionally cover one RAM/mapped-T memory read; this does not close extended-form or EXP-producer dependencies. POLY still retains T before older Execute and needs a consumer-category audit. The six immediate-T MPY/MAC forms also require producer/successor composition coverage, although their extension clocks may already separate older stores. Audit these explicit source classes under SPRU131G 7.5.6/table 7-13; do not move Category-I TS, NORM or bit-test sampling wholesale. Dual-memory products and memory/immediate products publish T but do not consume old T. Existing arithmetic-only tests and native callers with intervening words do not close this dependency contract. No firmware compensation or silicon-phase claim.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "docs/research_cleanup.md"]
     },
     {

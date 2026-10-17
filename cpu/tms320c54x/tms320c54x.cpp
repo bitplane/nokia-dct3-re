@@ -3815,7 +3815,13 @@ void tms320c54x_device::pipeline_step()
 		(staged_immediate_multiply(m_pipeline_word[5]) || staged_immediate_alu(m_pipeline_word[5])) &&
 		m_pipeline_operand_address[4] >= 0x08 && m_pipeline_operand_address[4] <= 0x0d &&
 		(m_pipeline_operand_address[4] >= 0x0b) == bool(BIT(m_pipeline_word[5], 8));
-	if (read_memory_operand && !late_mapped_accumulator_read)
+	bool const smem_t_product_read = m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) &&
+		(m_pipeline_word[4] & 0xf000) == 0x2000;
+	// Multiplication has zero T-producer latency (SPRU131G 7.5.6).
+	// A mapped T operand must see the same older publication as dedicated T,
+	// while retaining exactly one bus read and excluding Category-I consumers.
+	bool const late_mapped_t_read = read_memory_operand && smem_t_product_read && m_pipeline_operand_address[4] == 0x0e;
+	if (read_memory_operand && !late_mapped_accumulator_read && !late_mapped_t_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
@@ -3848,9 +3854,8 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged TS arithmetic shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) && ((m_pipeline_word[4] & 0xf000) == 0x2000 || staged_poly(m_pipeline_word[4])))
-		// Legacy pre-Execute projection for Smem multiplier/POLY T inputs:
-		// table 7-13 category coverage is pending, unlike the register bank below.
+	if (m_pipeline_valid[4] && staged_poly(m_pipeline_word[4]))
+		// POLY producer/successor category coverage remains a separate audit.
 		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfeff) == 0xf066 || (m_pipeline_word[4] & 0xfcff) == 0xf067))
 		m_pipeline_operand[4] = m_t;
@@ -4532,7 +4537,7 @@ void tms320c54x_device::pipeline_step()
 			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
 		}
 	}
-	if (late_mapped_accumulator_read)
+	if (late_mapped_accumulator_read || late_mapped_t_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
@@ -4651,6 +4656,8 @@ void tms320c54x_device::pipeline_step()
 		// Retain T after older Execute but before younger Read publications;
 		// sampling live T in Execute could instead consume a following STM.
 		m_pipeline_operand[4] = m_t;
+	if (smem_t_product_read)
+		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && staged_dual_multiply(m_pipeline_word[4]))
 		// MPY/MAC/MACSU load T in Read (SPRU172C 4-101/4-82/4-91). An older
 		// Execute write must not overwrite this younger publication.
@@ -4658,7 +4665,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
 	{
 		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
-		// T-based Smem MPY/MAC/MAS input latency still needs a category audit.
+		// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
 		if ((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]))
 			m_t = m_pipeline_operand[4];
 	}

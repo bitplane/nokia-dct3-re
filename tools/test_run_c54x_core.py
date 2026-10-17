@@ -2129,8 +2129,8 @@ class CoreResultTests(unittest.TestCase):
             check_result(output, 3)
 
     def test_mac_profile_is_separate(self):
-        (marker, square, poly, register), ending = EXTRA_PROFILES['mac-smem']
-        output = '\n'.join((marker, square, poly, register, ending)) + '\n'
+        (marker, square, poly, register, dependencies), ending = EXTRA_PROFILES['mac-smem']
+        output = '\n'.join((marker, square, poly, register, dependencies, ending)) + '\n'
         check_result(output, 3, profile='mac-smem')
         for bad in (output.replace('restore=73728', 'restore=0'),
                     output.replace('flags=16', 'flags=8'),
@@ -2138,6 +2138,9 @@ class CoreResultTests(unittest.TestCase):
                     output.replace(poly + '\n', ''),
                     output.replace(square + '\n', ''),
                     output.replace(register + '\n', ''),
+                    output.replace(dependencies + '\n', ''),
+                    output.replace('restore=107520','restore=0'),
+                    output.replace('sources=RAM,mapped_T','sources=RAM'),
                     output.replace('restore=69120','restore=0'),
                     output.replace('accumulator_sample=Execute','accumulator_sample=Read'),
                     output.replace('overflow_initial=clear,sticky','overflow_initial=sticky'),

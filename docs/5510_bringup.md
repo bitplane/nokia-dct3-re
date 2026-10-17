@@ -7692,10 +7692,34 @@ preservation of later T. Repeat/interrupt composition and physical phases
 are unvalidated. Nine AA99 words at `025b0d..025b15` pin the original
 T-producing caller and `025b14: MPYA A`, with per-word mutation tests.
 
-This closes the checked register bank, not every T consumer. The existing
-Smem MPY/MPYR/MPYU/MAC/MACR/MAS/MASR and POLY paths still need a
-consumer-category producer/successor audit. Immediate-T products also need
-that composition check; extension clocks alone are not a blanket proof.
+The same zero-latency contract now covers short Smem
+MPY/MPYR/MPYU/MAC/MACR/MAS/MASR, fourteen destination opcodes. Before
+correction, adjacent STLM-to-T followed by `2081` consumes zero rather than
+`1234`, producing zero instead of `fff6e61234` with memory `8001`.
+Retain dedicated T after older Execute, before younger Read publications.
+For a mapped-T source, defer its one memory read to that same older-write
+boundary; other memory sources keep their existing read ownership.
+
+The additional `mac-smem` bank passes 107,520 cases and save-state replays:
+fourteen opcodes, eight patterns, sixteen control settings, five dependency
+layouts, short indirect RAM and direct mapped T, two pages and three
+snapshots. An independent scalar model checks signed/unsigned products,
+FRCT, SMUL, OVM, rounding and fresh/sticky overflow. Adversarial T and RAM
+replacement after Read checks retained inputs; a following STM-to-T checks
+that Execute does not consume a younger publication. Exactly one source
+read and only the fixture's expected T write are permitted. This is not
+extended-form, EXP-producer, repeat/interrupt or measured-phase acceptance.
+TS load/arithmetic producer, EXP-to-NORM and invalid MOD=3 profiles remain
+green. Replaying the preserved native recording after this correction
+produces byte-identical complete DMA/TX/DIN captures to the baseline below;
+DMA/source-range checks also pass. This dependency defect is real in the
+executable fixture, but is not an observed cause of this workload's
+unvalidated waveform quality.
+
+This closes these short Smem and register banks, not every T consumer.
+POLY still needs its consumer-category producer/successor audit.
+Immediate-T products also need that composition check; extension clocks
+alone are not a blanket proof. Extended Smem dependencies remain untested.
 Keep the intentional short TS/NORM/bit-test restrictions separate rather
 than moving all T sampling to one common point. The unresolved predicate
 `c54x_remaining_t_multiplier_category_audit` names that bounded follow-up.
