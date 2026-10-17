@@ -258,8 +258,47 @@ execution, just as the transform-entry fixture initializes its data snapshot.
 This gate establishes the reset-vector branch to the absent loader only,
 not native RF, speech, or a completed MCU/DSP upload exchange.
 
-`tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
+`tools/dsp_rom4_upload_trace_check.py` verifies upload ordering and rejects an
 observed input length absent from the recovered catalogue.
+
+### Staged frontend integration boundary
+
+The separate `tms54rom4 -bios cold-pipeline` fixture uses the same acquired
+mask ROM and cold data, without register seeding. It reaches the empty
+`000f00` loader fetch with PC `0f01`, SP `0000` and PMST `ffa8` after 12
+staged clocks. `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms
+--profile cold-pipeline` requires that exact boundary; this does not supply
+or execute a loader.
+
+`nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,
+DSPIF, native backend and product inputs. Only the C54x frontend selection
+differs from `noki5110`. The MCU organically uploads loader1; staged
+execution stops at `000f05`, instruction `7728`, operand `2000`, with
+PC `0f07`, PMST `ffa8` and ILLEGAL set. The live `0f00..0f0f` words bind
+uniquely to the 5110 v5.30 MCU image at file offset `0x99704`. The backend
+reports two bootstrap mailbox writes and no completion strobe. Neither
+upload completion nor handset boot is accepted for this machine.
+
+In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
+register admission currently belongs to the explicit C5416-compatible bus
+profile. `nse1pipe` does not select that dialect. The next contract is the
+legacy/Lead-side register and external-wait behavior; enabling the C5416
+profile merely to advance this loader would not establish that contract.
+The distinct 5510/MU4 request `7728 7fff` must not replace this handset's
+observed `7728 2000` operand.
+
+For a bounded reproduction, seed `nvram/nse1pipe/eeprom` with
+`tools/make_5110_eeprom_profile.py` using the NSE-1's own `nse-1.bin` and
+`5110f530.fls`. Run `nse1pipe` for three emulated seconds in an isolated
+directory, with `-noreadconfig -video none -sound none -log -nothrottle`
+and `-autoboot_delay 0 -autoboot_script` pointing to the absolute path of
+`tools/c54x_rom4_staged_observe.lua`. The observer reads ordinary uploaded
+program RAM, never status or I/O. Then run
+`python3 tools/c54x_rom4_staged_check.py CASE/error.log roms/noki5110/5110f530.fls`.
+Its result classifies an unsupported boundary, binds all 16 observed words
+to the source image, and explicitly declines boot, complete-upload and
+fitted-bus-dialect claims. The normal atomic and clocked native fixtures
+retain their existing acceptance contracts.
 
 The local MAME tree contains a selectable `nokia_dsp_c54x_device` backend. It
 maps DSP data addresses `0x0800..0x0fff`

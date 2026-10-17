@@ -14,6 +14,14 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_staged_cold_requires_exact_reset_frontier(self):
+        marker, ending = EXTRA_PROFILES['cold-pipeline']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='cold-pipeline')
+        for field in ('fetch=000f00', 'pc=0f01', 'sp=0000', 'pmst=ffa8', 'cycles=12'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=ffff'), 3, profile='cold-pipeline')
+
     def test_repeated_mvdp_interrupt_scope_is_required(self):
         marker, ending = EXTRA_PROFILES['rpt-mvdp-irq']
         text = marker + '\n' + ending + '\n'

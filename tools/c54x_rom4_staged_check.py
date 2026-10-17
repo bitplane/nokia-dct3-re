@@ -1,0 +1,53 @@
+"""Pin the NSE-1 staged-frontend stop; this is not a boot acceptance gate."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import struct
+import sys
+
+
+SOURCE_OFFSET = 0x99704
+STOP = 'unsupported staged C54x form 7728 at 000f05'
+ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
+                 r'illegal=([01]) pmst=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
+
+
+def check(text, firmware):
+    rows = ROW.findall(text)
+    if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
+        raise ValueError('missing, malformed or duplicate staged frontier observation')
+    pc, xpc, illegal, pmst, encoded, timestamp = rows[0]
+    if (pc, xpc, illegal, pmst) != ('0f07', '00', '1', 'ffa8') or not 0.5 <= float(timestamp) <= 1:
+        raise ValueError('staged CPU stop changed; reassess the actual frontier')
+    if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
+        raise ValueError('missing or ambiguous unsupported instruction')
+    words = [int(word, 16) for word in encoded.split(',')]
+    if len(words) != 16 or words[5:7] != [0x7728, 0x2000]:
+        raise ValueError('uploaded instruction or operand changed')
+    packed = struct.pack('>16H', *words)
+    if firmware.find(packed) != SOURCE_OFFSET or firmware.find(packed, SOURCE_OFFSET + 1) != -1:
+        raise ValueError('observed upload does not bind uniquely to the reviewed NSE-1 MCU source')
+    return dict(status='unsupported_legacy_bus_control', source_offset=SOURCE_OFFSET,
+                observed_words=16, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
+                instruction=0x7728, operand=0x2000, boot_claim=False,
+                upload_complete_claim=False, fitted_bus_dialect_claim=False)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('log', type=Path)
+    parser.add_argument('firmware', type=Path)
+    args = parser.parse_args()
+    try:
+        result = check(args.log.read_text(errors='replace'), args.firmware.read_bytes())
+    except (OSError, ValueError, struct.error) as error:
+        print(f'Staged ROM4 observation: FAIL: {error}', file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

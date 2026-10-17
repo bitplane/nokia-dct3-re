@@ -16180,9 +16180,11 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "cold"))
+				(!strcmp(machine().options().bios(), "cold") || !strcmp(machine().options().bios(), "cold-pipeline")))
 		{
-			m_phase = 4;
+			bool const staged = !strcmp(machine().options().bios(), "cold-pipeline");
+			m_phase = staged ? rom4_staged_cold_phase : 4;
+			if (staged) m_cpu->set_pipeline_frontend(true);
 			m_rom4_checks = 0;
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
@@ -17709,6 +17711,14 @@ private:
 	u16 rom4_loader_entry_r()
 	{
 		const u16 word = memregion("dspprg")->as_u16(0x0f00);
+		if (m_phase == rom4_staged_cold_phase && !machine().side_effects_disabled())
+		{
+			expect(word == 0, "Staged ROM4 cold execution reaches the unpopulated loader fetch");
+			osd_printf_info("TMS320C54x ROM4 staged cold frontier: fetch=000f00 pc=%04x sp=%04x pmst=%04x cycles=%llu\n",
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)), (unsigned long long)m_cpu->pipeline_cycles());
+			throw emu_fatalerror(0, "TMS320C54x ROM4 staged cold frontier complete");
+		}
 		if (m_phase == 4 && !machine().side_effects_disabled())
 		{
 			// Stop at the absent loader's fetch, not at an unsupported opcode:
@@ -47517,6 +47527,19 @@ private:
 			osd_printf_info("TMS320C54x ROM4 CRC helper: PASS cases=512 gsm_packing_claim=0 speech_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 CRC helper complete");
 		}
+		if (m_phase == rom4_staged_cold_phase)
+		{
+			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || m_cpu->state_int(tms320c54x_device::STATE_IDLE))
+			{
+				osd_printf_info("TMS320C54x ROM4 staged cold stop: pc=%04x sp=%04x pmst=%04x idle=%u illegal=%u cycles=%llu\n",
+					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), (unsigned long long)m_cpu->pipeline_cycles());
+				expect(false, "Staged ROM4 cold execution stopped before the loader fetch");
+			}
+			expect(++m_rom4_checks < 10000, "Staged ROM4 cold execution timeout");
+			m_check_timer->adjust(attotime::from_usec(100)); return;
+		}
 		if (m_phase == 4)
 		{
 			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -47808,6 +47831,7 @@ private:
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
+	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
@@ -49684,7 +49708,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(16, "efr-loss-observe", "Characterize native EFR loss differences without conformance promotion")
 	ROM_SYSTEM_BIOS(17, "efr-invalid-sid", "Isolated acquired ROM EFR invalid SID and bad SID decoder")
 	ROM_SYSTEM_BIOS(18, "efr-home-errors", "Characterize original EFR homing/error reset and PCM differences")
+	ROM_SYSTEM_BIOS(19, "cold-pipeline", "Cold mask ROM execution with the staged CPU frontend")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(19))
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(0))
@@ -49743,6 +49771,9 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(19))
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(0))

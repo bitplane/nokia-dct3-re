@@ -1,7 +1,7 @@
 diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -36156,6 +36156,11 @@
+@@ -36156,6 +36156,12 @@
  @source:nokia/dbox.cpp
  dbox
  
@@ -9,6 +9,7 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 +nse1bit
 +nse1pcm
 +nse1pin
++nse1pipe
 +
  @source:nokia/mikromik.cpp
  mm1m4
