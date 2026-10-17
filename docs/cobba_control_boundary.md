@@ -1439,6 +1439,23 @@ that no other transport writes the register, nor a disproof of a persistent
 converter/clock-enable interpretation. The checker reports observed values
 without assigning bit meanings and rejects truncated or unordered captures.
 
+The resident helpers `a484`/`a4cb` maintain a software client-demand bitmap,
+not a hardware register: the checked acquire tail `a4c1..a4c3` ORs A into B
+and stores B at data `00ef`; release `a4d9..a4df` loads that word, complements
+the input B mask with `ffff`, ANDs it with A and stores A back. Their control
+paths retain the paired register-8 `0600` activation/deactivation operations.
+Exact-word fixtures protect both commits; the passive observer records entry
+mask/old value and the subsequent store without modifying either.
+The PCM runner reconciles every entry, store PC/value and uncapped count.
+Fresh unclocked/clocked runs observe 19/21 transitions respectively. Both
+acquire mask `0001` and release masks `0002`/`0004`; only the clocked run
+additionally releases `0001` (8.261 s), then reacquires it (8.318 s).
+This demonstrates a frame-dependent software lifecycle difference, not a
+physical enable-bit assignment. In the clocked run `00ef=0001` persists
+across both DTMF and later silence, so neither this bitmap nor register 8
+alone identifies a nonzero audio waveform. No production clock is gated on
+these firmware addresses.
+
 The control-write helper at `45c2` has 27 raw direct CALL/CALLD candidates
 in the resident image. Reproduce their operand windows with
 `c54x_rom4_port_census.py IMAGE --call-target 0x45c2 --context 10`.

@@ -30,6 +30,8 @@ watch(mcu, 'program', 0x100b0, 'mcu_frequency', 0x100b3)
 watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
+watch(dsp, 'data', 0x00ef, 'codec_demand')
+watch(dsp, 'program', 0x00ef, 'codec_demand_overlay')
 watch(mcu, 'program', 0x100a8, 'codec_shared_mcu', 0x100ab)
 watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
 watch(dsp, 'program', 0x0854, 'codec_shared_overlay')
@@ -126,6 +128,21 @@ watch(dsp, 'io', 0x002d, 'cobba_data')
 -- Fetch increments PC before the program tap. Restrict this to actual helper
 -- entry, not a data read of its opcode; the stack read is ordinary RAM.
 local control_calls = 0
+local demand_entries = 0
+for _, address in ipairs({0xa484, 0xa4cb}) do
+    taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
+        address, address, 'codec_demand_entry_' .. address, function()
+            if dsp.state['PC'].value ~= address + 1 then return end
+            demand_entries = demand_entries + 1
+            if demand_entries <= 128 then
+                machine:logerror(string.format(
+                    'rom4_codec_demand_entry: hit=%d operation=%s mask=%04x previous=%04x t=%.9f\n',
+                    demand_entries, address == 0xa484 and 'acquire' or 'release',
+                    dsp.state['B'].value & 0xffff,
+                    dsp.spaces['data']:read_u16(0x00ef), machine.time:as_double()))
+            end
+        end)
+end
 local request_reads, request_accepts, pending_request = 0, 0, nil
 taps[#taps + 1] = dsp.spaces['io']:install_read_tap(1, 1, 'codec_host_request', function(_, value)
     if value & 0x8000 == 0 then return end
@@ -163,6 +180,8 @@ local stop = emu.add_machine_stop_notifier(function()
     local serial = assert(_G.rom4_codec_observe[2])
     machine:logerror(string.format('rom4_codec_control_summary: calls=%d t=%.9f\n',
         control_calls, machine.time:as_double()))
+    machine:logerror(string.format('rom4_codec_demand_summary: entries=%d t=%.9f\n',
+        demand_entries, machine.time:as_double()))
     machine:logerror(string.format('rom4_codec_host_summary: requests=%d accepts=%d t=%.9f\n',
         request_reads, request_accepts, machine.time:as_double()))
     machine:logerror(string.format('rom4_codec_parameter_summary: boot=%d interactive=%d t=%.9f\n',

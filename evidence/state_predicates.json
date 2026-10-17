@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "native_nse1_codec_demand_bitmap", "owner": "native_dsp_serial", "status": "satisfied",
+      "predicate": "Original NSE-1 demand helpers acquire and release software client masks at data 00ef with complete observed entry-to-store agreement",
+      "current": "Exact resident words pin acquire OR/store at a4c1..a4c3 and release load/complement/AND/store at a4d9..a4df. Read-only entry and data taps reconcile all 19 unclocked versus 21 externally clocked transitions, including store PCs and values. Both acquire 0001 and release 0002/0004; only the external-frame run additionally releases 0001 before reacquiring it. The bitmap and register-8 value 0626 persist through both active DTMF and silence. This is a software demand lifecycle, not a clock-enable register map or permission to gate hardware on firmware RAM. Existing native waveform and active replay gates remain independently required.",
+      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_tone_observe.lua", "tools/c54x_rom4_codec_contract.py", "tools/test_c54x_rom4_codec_contract.py", "tools/c54x_rom4_pcm_clock_check.py", "tools/test_c54x_rom4_pcm_clock_check.py", "tools/run_c54x_rom4_pcm_clock.py"]
+    },
+    {
       "id": "native_nse1_active_pcm_replay", "owner": "native_dsp_serial", "status": "satisfied",
       "predicate": "Active externally clocked native DTMF restores its checked CPU/peripheral snapshot and exactly replays 400 output words and captured absolute timestamps",
       "current": "The isolated nse1pcm fixture saves at 8.150 s and replays through 8.200 s before physical key release at 8.220 s. MCU R0..R15/CPSR/PC, DSP PC/SP/ST0/ST1/A/B/T/AR0..7/IFR/IMR and data 0021..0023/00f0..00fe match exactly; destructive BDRR is not inspected. All 400 words and timestamps match at 1 ns printed resolution. Absolute input deadlines prevent load from releasing the key early. A generic ARM7 export fix keeps named PC equal to GENPC. Raw counters include the replay while the canonical waveform excludes only the duplicated leg. This is not production clock-enable wiring, all-memory equivalence, physical clock phase, RF acquisition or native call speech.",

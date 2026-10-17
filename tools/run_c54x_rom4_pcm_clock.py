@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from tools.c54x_rom4_pcm_clock_check import check, check_restore
+from tools.c54x_rom4_pcm_clock_check import check, check_restore, demand_transitions
 from tools.c54x_rom4_codec_contract import check as check_codec, check_mcu_speech_field
 from tools.c54x_rom4_rf_delivery_check import check_observer_health
 from tools.run_c54x_rom4_rf_delivery import input_provenance
@@ -65,6 +65,7 @@ def main():
             check_observer_health((case / 'console.log').read_text())
             text = (case / 'error.log').read_text()
             result = check_restore(text) if label == 'restore' else check(text, clock=clock)
+            result['codec_demand'] = demand_transitions(text)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
             result = dict(clock=clock, status='failed', error=str(error))

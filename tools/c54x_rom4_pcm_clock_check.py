@@ -7,6 +7,37 @@ WORDS = re.compile(r'native_pcm_fixture_word: value=([0-9a-f]{4}) t=([0-9.]+)')
 SUMMARY = re.compile(r'rom4_tone_summary: tx_words=(\d+) rx_reads=(\d+) tone_reads=(\d+) tone_copies=(\d+) t=([0-9.]+)')
 
 
+def demand_transitions(text):
+    entries = re.compile(r'rom4_codec_demand_entry: hit=(\d+) operation=(acquire|release) mask=([0-9a-f]{4}) previous=([0-9a-f]{4}) t=([0-9.]+)')
+    writes = re.compile(r'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=([0-9a-f]{4}) mask=ffff pc=(00a4c4|00a4e0) t=([0-9.]+)')
+    totals = re.findall(r'rom4_codec_demand_summary: entries=(\d+) t=([0-9.]+)', text)
+    events = sorted([(match.start(), 'entry', match) for match in entries.finditer(text)] +
+                    [(match.start(), 'write', match) for match in writes.finditer(text)])
+    pending, count, previous_time = None, 0, -1.0
+    masks = {'acquire': set(), 'release': set()}
+    for _, kind, event in events:
+        time = float(event[5] if kind == 'entry' else event[3])
+        if time < previous_time:
+            raise ValueError('unordered codec demand events')
+        previous_time = time
+        if kind == 'entry':
+            count += 1
+            if pending or int(event[1]) != count:
+                raise ValueError('missing codec demand commit or nonsequential entry')
+            operation, mask, old = event[2], int(event[3], 16), int(event[4], 16)
+            masks[operation].add(mask)
+            pending = ((old | mask) if operation == 'acquire' else (old & ~mask),
+                       '00a4c4' if operation == 'acquire' else '00a4e0')
+        else:
+            if pending != (int(event[1], 16), event[2]):
+                raise ValueError('codec demand write does not match entry bitmap operation')
+            pending = None
+    if pending or not count or len(totals) != 1 or int(totals[0][0]) != count or float(totals[0][1]) < previous_time:
+        raise ValueError('missing or truncated codec demand observations')
+    return dict(transitions=count, masks={key: sorted(values) for key, values in masks.items()},
+                physical_clock_enable_claim=False)
+
+
 def control_timeline(text):
     """Recover complete helper-entry observations, not physical bit meanings."""
     calls = re.findall(r'rom4_codec_control_call: hit=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) sp=[0-9a-f]{4} return=[0-9a-f]{4} t=([0-9.]+)', text)

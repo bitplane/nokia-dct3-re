@@ -2,7 +2,7 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, check_restore, control_timeline, tone_fraction, WORDS
+from tools.c54x_rom4_pcm_clock_check import check, check_restore, control_timeline, demand_transitions, tone_fraction, WORDS
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'
@@ -42,6 +42,22 @@ def restore_log():
 
 
 class NativeClockTests(unittest.TestCase):
+    def test_demand_bitmap_acquire_release_and_complete_commits(self):
+        text = ('rom4_codec_demand_entry: hit=1 operation=acquire mask=0001 previous=0002 t=1.0\n'
+                'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=0003 mask=ffff pc=00a4c4 t=1.1\n'
+                'rom4_codec_demand_entry: hit=2 operation=release mask=0001 previous=0003 t=1.2\n'
+                'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=0002 mask=ffff pc=00a4e0 t=1.3\n'
+                'rom4_codec_demand_summary: entries=2 t=2.0\n')
+        self.assertEqual(demand_transitions(text)['transitions'], 2)
+        for bad in (text.replace('value=0003', 'value=0001'),
+                    text.replace('value=0002', 'value=0000'),
+                    text.replace('pc=00a4e0', 'pc=00a4c4'),
+                    text.replace('entries=2', 'entries=3'),
+                    text.replace('hit=2', 'hit=3'),
+                    text.replace('t=1.3', 't=1.0')):
+            with self.assertRaises(ValueError):
+                demand_transitions(bad)
+
     def test_complete_control_timeline_without_bit_semantics(self):
         result = control_timeline(HELPERS)
         self.assertEqual(result['register8_values'], dict(before=[0x626], active=[0x626], after=[0x626]))
