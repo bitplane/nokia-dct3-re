@@ -6084,12 +6084,41 @@ All 1,152 composition cases/restores now pass, followed by 23,040 indirect
 DLD cases. Explicit mapped-AR writes, delayed repeats and paired arithmetic
 retain their separate regression gates and partial timing claims.
 
+The shared core also passes `make verify-5110-menu` after this correction:
+the native NSE-1 ROM4 handset reaches its exact Phone book menu oracle through
+physical input, without a DSP reset request or illegal instruction. This is
+a cross-consumer regression, not validation of MU4 audio or ROM4 speech.
+
 The same change removes the 31/29 mismatched components in the selected
 third-stage vectors. The first nonzero PCM block's maximum host-reference
 error drops from 43,740 to 7 sample units, RMS from 11,553.09 to 0.8426.
 Across the eight packet-bound source-block pairs, maximum error is 13 and
 RMS 1.1492 over 16,384 signed samples. These comparisons use neither fitted
 alignment nor gain. They do not define a codec-conformance tolerance.
+
+#### Audio acceptance prerequisites
+
+Keep the captured-recording comparison distinct from a normative decoder
+test. [ISO/IEC 14496-26:2024](https://www.iso.org/standard/86376.html)
+describes audio-conformance tests with compressed examples and reference
+waveforms in an electronic annex. Its MPEG-4 scope must not silently be
+assigned to this older decoder: first establish the captured stream's
+MPEG version, profile and supported tools, then select the applicable suite.
+The present eight packets and FFmpeg output are not that official suite.
+
+[ETSI TS 126 406, section 5.1](https://www.etsi.org/deliver/etsi_ts/126400_126499/126406/19.00.00_60/ts_126406v190000p.pdf)
+requires at least accuracy K=15 for its AAC-LC RMS/LSB criterion and refers
+to ISO conformance procedures. This is an enhanced-aacPlus conformance
+specification, not proof that the MU4 implements that target. Neither the
+observed maximum of 13 signed sample units nor RMS 1.1492 can be substituted
+for its criterion without the specified reference precision, normalization,
+evaluation intervals and test sequences.
+
+Before adding an audio-acceptance threshold, obtain the applicable procedure
+and reference vectors, pin their identities and decoder configuration, and
+implement their comparison rules independently. Broader original-media
+coverage and exact DMA/TX/DIN epoch pairing remain separate requirements;
+passing an arithmetic snapshot or this handset regression closes neither.
 
 The passive `--inventory` report observes 30 wrapper entries
 across the eight packet-bound processing calls: call 2 has sixteen 64-point
