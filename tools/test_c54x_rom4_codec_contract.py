@@ -8,9 +8,33 @@ from tools.c54x_rom4_codec_contract import MCU_SPEECH_FIELD_BYTES, check_mcu_spe
 from tools.c54x_rom4_codec_contract import decode_mcu_speech_descriptor
 from tools.c54x_rom4_codec_contract import decode_host_dispatch_mask
 from tools.c54x_rom4_codec_contract import census_mcu_host_interface
+from tools.c54x_rom4_codec_contract import check_live_serial_helpers
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_live_serial_helpers_require_complete_original_words(self):
+        rows = []
+        for name in ('serial_prepare_hook_defaults', 'serial_prepare_state'):
+            address, words = SEQUENCES[name]
+            rows.append(f"rom4_serial_live_code: address={address:04x} words=" +
+                        ','.join(f'{word:04x}' for word in words))
+        text = '\n'.join(rows)
+        self.assertEqual(check_live_serial_helpers(text), 2)
+        for changed in (rows[0], text + '\n' + rows[0], text + '\nrom4_serial_live_code: broken',
+                        text.replace('address=9009', 'address=900a'),
+                        text.replace('fc00', 'f495'), text.replace('f7bb', 'f6bb')):
+            with self.assertRaises(ValueError):
+                check_live_serial_helpers(changed)
+        for name in ('serial_prepare_hook_defaults', 'serial_prepare_state'):
+            address, words = SEQUENCES[name]
+            for index in range(len(words)):
+                changed = list(words)
+                changed[index] ^= 1
+                source = ','.join(f'{word:04x}' for word in words)
+                target = ','.join(f'{word:04x}' for word in changed)
+                with self.subTest(name=name, index=index), self.assertRaises(ValueError):
+                    check_live_serial_helpers(text.replace(source, target))
+
     def test_host_mmio_census_byte_lanes_and_scope(self):
         with patch('tools.mad2_static_census.analyze_image', return_value=([{'pc': 0x272048}], {'literal_seeds': 1})) as analyze:
             result = census_mcu_host_interface(bytes.fromhex('1234abcd'))

@@ -64,6 +64,27 @@ portable passive comparison instrument. Complete ownership of the port's
 fields remains a software-research target; this negative control alone does
 not establish a hardware-only blocker.
 
+Current fresh compatibility execution still reaches this wait after native
+parameter/request separation and queued-transfer modeling. Live readback at
+`9129` verifies both the four words at `23e4` and all 59 words at
+`9009..9043` against the checked resident image. The former contains the
+return/NOP hooks at `23e4/23e6`, not an uploaded clock/completion routine.
+The latter calls `23e4`, sets INTM, initializes internal serial pointers,
+counters and state, and consults port-36 bit `0080`; it does not write
+the peripheral or publish bit `4000`. The surrounding restart request,
+port-0 writeback and completion loop are separately byte-pinned.
+These observations exclude a hidden replacement of those helpers in this
+execution, not every possible peripheral producer or the unknown fitted mask.
+They supply no baud divisor, physical clock-enable identity or completion
+latency. Keep the status input unresolved rather than substituting a
+ready constant or a reset delay chosen to make this compatibility test pass.
+
+The portable observer retains live-helper readback and bounded entry counters.
+Validate it with `tools/c54x_rom4_codec_contract.py <program-image>
+--serial-helper-trace <error.log>`. That optional check requires both complete
+unmodified helper ranges; its result explicitly denies a peripheral-completion
+claim. The standalone NSE-1 boot still does not exercise this restart.
+
 ### Native port-34/35/36 contract
 
 The static port census finds five writes to `0x34` and two reads from

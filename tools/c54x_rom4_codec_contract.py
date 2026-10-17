@@ -53,6 +53,22 @@ SEQUENCES = {
     "queued_transfer_request_ack": (0x369a, (
         0xf074,0x2418,0x7682,0x1000,0xf495,0x7582,0x0001,0xec01,
         0xf495,0x7712,0x195c)),
+    "serial_prepare_hook_defaults": (0x23e4, (
+        0xfc00,0xf495,0xfc00,0xf495)),
+    "serial_prepare_state": (0x9009, (
+        0xf074,0x23e4,0xf7bb,0xf020,0x0100,0x7712,0x06bf,0x8092,
+        0x8092,0xf020,0x0700,0x8092,0x8082,0x7712,0x06b2,0xf071,
+        0x0004,0x8092,0x7712,0x06c3,0xec03,0x8092,0x7712,0x06f3,
+        0x6882,0x0fff,0x6182,0x0200,0xf830,0x903d,0x6182,0x0100,
+        0xf830,0x903d,0x74f8,0x000b,0x0036,0xf330,0x0080,0xe800,
+        0x6182,0x0002,0xfd4d,0xe802,0x80f8,0x06b4,0xe801,0xfd30,
+        0xe800,0xfe00,0x80f8,0x06c6,0x76f8,0x06b4,0x0006,0xe803,
+        0xfe00,0x80f8,0x06c6)),
+    "serial_restart_request_and_poll": (0x9129, (
+        0x7482,0x0036,0x6882,0xffe1,0x6982,0x801c,0xf495,0x7582,
+        0x0036,0xf495,0x7482,0x0000,0x6982,0x0010,0xf495,0x7582,
+        0x0000,0xf074,0x9009,0x7712,0x0060,0x7482,0x0036,0x6182,
+        0x4000,0xf820,0x913e,0x6882,0x7fff,0xf495,0x7582,0x0036)),
     "rf_port30_scan_control": (0x0a90, (
         0xec0d, 0xf495, 0xe800, 0xf495, 0x7583, 0x0030)),
     "rf_port30_resident_control": (0x30b3, (
@@ -467,6 +483,19 @@ def check(image: bytes) -> list[str]:
     return results
 
 
+def check_live_serial_helpers(text):
+    """Exclude an uploaded helper replacement, not infer reset completion."""
+    rows = re.findall(r'rom4_serial_live_code: address=([0-9a-f]{4}) words=([0-9a-f,]+)', text)
+    expected = {SEQUENCES[name][0]: SEQUENCES[name][1]
+                for name in ('serial_prepare_hook_defaults', 'serial_prepare_state')}
+    if text.count('rom4_serial_live_code:') != len(rows) or len(rows) != 2 or len({address for address, _ in rows}) != 2:
+        raise ValueError('missing or duplicate live serial helpers')
+    for address, raw in rows:
+        if tuple(int(word, 16) for word in raw.split(',')) != expected.get(int(address, 16)):
+            raise ValueError('live serial helper differs from checked resident code')
+    return len(rows)
+
+
 SCHEDULE_LISTS = {
     0xedf4: (0x99aa, 0x99c6, 0x99b3, 0x9a56, 0x9a7a, 0x9a71,
              0x9b15, 0x9be0, 0x9bee, 0x9d20, 0x9d3d, 0x00ff),
@@ -737,6 +766,8 @@ def main() -> int:
                         help="check exact native I/O-word restoration snapshots")
     parser.add_argument("--tone-log", type=Path,
                         help="check physical numeric-key tone delivery and serial totals")
+    parser.add_argument('--serial-helper-trace', type=Path,
+                        help='check live helper readback at the serial restart; not a completion test')
     args = parser.parse_args()
     try:
         image = args.image.read_bytes()
@@ -756,6 +787,8 @@ def main() -> int:
             check_restore(args.restore_log.read_text(errors="replace"))
         if args.tone_log is not None:
             check_tone(args.tone_log.read_text(errors="replace"))
+        if args.serial_helper_trace is not None:
+            check_live_serial_helpers(args.serial_helper_trace.read_text(errors='replace'))
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
@@ -772,6 +805,8 @@ def main() -> int:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
     if args.tone_log is not None:
         print("Organic tone initialization: PASS; operational_serial_samples=0 native_audio_claim=0")
+    if args.serial_helper_trace is not None:
+        print('Live serial helper readback: 2/2 PASS; peripheral_completion_claim=0')
     print("Bounded ROM sequences only; physical port ownership and serial clock attachment remain unresolved.")
     return 0
 

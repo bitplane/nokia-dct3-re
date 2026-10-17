@@ -27,12 +27,24 @@ for _, direction in ipairs({'read', 'write'}) do
         end)
   end
 end
-for _, site in ipairs({0x3bcd, 0x9232, 0x9129, 0x9140}) do
+for _, site in ipairs({0x3bcd, 0x9232, 0x9129, 0x9140, 0x9009, 0x23e4, 0x23e6, 0x9144}) do
     counts[site] = 0
     handles[#handles + 1] = cpu.spaces['program']:install_read_tap(site, site,
         'rom4_port36_site_' .. site, function()
             if cpu.state['PC'].value == site + 1 then
                 counts[site] = counts[site] + 1
+                if site == 0x9129 and counts[site] == 1 then
+                    -- Uploads can replace these hooks. Read back the live
+                    -- program before attributing the wait to a peripheral.
+                    for _, range in ipairs({{0x23e4, 4}, {0x9009, 0x3b}}) do
+                        local words = {}
+                        for i = 0, range[2] - 1 do
+                            words[#words + 1] = string.format('%04x', cpu.spaces.program:read_u16(range[1] + i))
+                        end
+                        machine:logerror(string.format('rom4_serial_live_code: address=%04x words=%s\n',
+                            range[1], table.concat(words, ',')))
+                    end
+                end
             end
         end)
 end
