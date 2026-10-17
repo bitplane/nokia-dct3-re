@@ -14,6 +14,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_mvdp_requires_count_plus_one_and_replay(self):
+        marker, ending = EXTRA_PROFILES['rpt-mvdp']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='rpt-mvdp')
+        for field in ('cases=9600', 'restore=9600', 'forms=5', 'registers=8',
+                      'counts=0,1,2,7,255', 'count_forms=2', 'pages=2', 'snapshots=3',
+                      'destinations=ordinary,wrap', 'ovly=2', 'stream_clocks=1',
+                      'source_reads=count+1', 'program_writes=count+1', 'silicon_phase_claim=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='rpt-mvdp')
+
     def test_mvdp_pair_requires_both_transfers_and_replay(self):
         marker, ending = EXTRA_PROFILES['mvdp-pair']
         text = marker + '\n' + ending + '\n'

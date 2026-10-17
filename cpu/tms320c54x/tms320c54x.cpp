@@ -2717,6 +2717,17 @@ void tms320c54x_device::pipeline_step()
 			unsigned const code = (m_pipeline_repeat_word & 0xfcff) == 0xf482 ? m_st1 & 31 : m_pipeline_repeat_word & 31;
 			accumulator(BIT(m_pipeline_repeat_word, 8)) = shifted_load(accumulator(BIT(m_pipeline_repeat_word, 9)), code >= 16 ? int(code) - 32 : int(code), BIT(m_pipeline_repeat_word, 8));
 		}
+		else if (staged_data_to_program(m_pipeline_repeat_word))
+		{
+			u8 const mode = m_pipeline_repeat_word;
+			u16 const source = BIT(mode, 7) ? short_smem_address(mode) : BIT(m_pipeline_repeat_status, 14)
+				? u16(m_pipeline_repeat_sp + mode) : u16((m_pipeline_repeat_status & 0x1ff) << 7) | mode;
+			if (source < 0x60) { logerror("%s: repeated MVDP register/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+			u16 const value = data_read(source);
+			if (BIT(mode, 7)) indirect_modify(mode);
+			u32 const destination = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_source + m_rpt_iteration);
+			m_program.write_word(physical_program_address(destination), value);
+		}
 		else if (m_pipeline_repeat_word != 0xf495)
 		{
 			u8 const mode = m_pipeline_repeat_word;
@@ -3193,7 +3204,7 @@ void tms320c54x_device::pipeline_step()
 		bool const data_copy = staged_data_copy(word);
 		bool const program_move = staged_program_move(word);
 		bool const read_a = staged_read_a(word) || staged_write_a(word) || staged_data_to_program(word);
-		if (staged_data_to_program(word) && (m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		if (staged_data_to_program(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged MVDP repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
@@ -4330,6 +4341,13 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_program.write_word((u32(m_pipeline_immediate[5]) << 16) | m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+			{
+				pipeline_begin_repeat_stream();
+				// Read reused the immediate field for the physical target's page;
+				// the low word still holds pmad, the repeat's incrementing base.
+				m_pipeline_repeat_source = m_pipeline_operand_address[5];
+			}
 		}
 		else if (staged_program_move(m_op))
 		{

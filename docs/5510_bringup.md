@@ -155,10 +155,37 @@ regression, not a source-string invariant.
 
 These fixtures do not establish every legal operand, external wait states,
 mapped CPU/peripheral sources, self-modifying-code prefetch coherency, or
-repeat/control-delay/XC/block-repeat composition. The latter compositions
+control-delay/XC/block-repeat composition. The latter compositions
 remain explicitly unsupported; no atomic fallback is used. Native handset
 speech and the unresolved serial-status input are not promoted by these
 instruction fixtures.
+
+### Repeated staged MVDP
+
+Single-instruction repeat uses the same separate data-to-program direction:
+the first transfer captures its source in the ordinary staged slot, then
+the retained repeat stream reads a fresh data word for each later iteration.
+The source's indirect modification occurs once per transfer. The explicit
+`pmad` increments with 16-bit wrap in the instruction's logical program page;
+OVLY translation applies to each resulting program address. The initial
+instruction retains its standalone hold clocks and later iterations retire
+one transfer per stream clock. No instruction-extension refetch or atomic
+fallback is introduced.
+
+`tms54xtra -bios rpt-mvdp` checks 9,600 cases/restores: five source forms
+(DP, SP-relative, unmodified AR, postincrement, postdecrement), all eight
+AR selections, counts 0/1/2/7/255, short and long immediate counts, two
+instruction pages, ordinary and wrapping program destinations, both OVLY
+states, and three snapshots. Read/write taps require exactly count+1
+ordered transfers and one-clock accelerated retirement. The preceding core
+fails the fixture at the repeated opcode's admission boundary.
+
+This does not establish physical bus phase, interrupt/NMI composition,
+memory-sourced counts, all circular modes, count values outside the tested
+domain, or self-modifying-code coherence. Absolute and long-offset Smem
+remain forbidden in single-instruction repeat by the independent addressing
+guard; standalone support must not weaken that guard. Repeat inside a block
+or control-delay/XC composition remains outside this implementation.
 
 ### MMR long-form boundary
 

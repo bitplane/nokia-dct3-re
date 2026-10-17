@@ -14477,6 +14477,58 @@ private:
 		m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_repeat_mvdp(unsigned variant = 0)
+	{
+		unsigned const form = variant % 5, reg = (variant / 5) % 8;
+		unsigned const count = std::array<unsigned, 5>{0, 1, 2, 7, 255}[(variant / 40) % 5];
+		bool const long_count = (variant / 400) % 2;
+		u32 const base = (variant / 200) % 2 ? 0x20000 : 0;
+		bool const mapped = (variant / 1600) % 2;
+		u16 const destination = (variant / 800) % 2 ? 0xfffc : 0x2e00;
+		start_mvdp((form == 1 ? 1 : 0) + reg * 7 + (base ? 56 : 0));
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned const prefix = long_count ? 2 : 1;
+		u8 const mode = form < 2 ? 3 : (form == 2 ? 0x80 : form == 3 ? 0x90 : 0x88) + reg;
+		// OVLY maps the executing code too, not just the copy destination.
+		auto emit = [&program, mapped](u32 at, u16 word) { program.write_word(mapped && u16(at) < 0x8000 ? u16(at) : at, word); };
+		emit(base + 0x600, long_count ? 0xf070 : 0xec00 | count);
+		if (long_count) emit(base + 0x601, count);
+		emit(base + 0x600 + prefix, 0x7d00 | mode);
+		emit(base + 0x601 + prefix, destination);
+		emit(base + 0x602 + prefix, 0xf4e1);
+		for (unsigned i = 0; i <= count; ++i)
+		{
+			u16 const source = form < 2 ? 0x1203 : form == 3 ? 0x1230 + i : form == 4 ? 0x1230 - i : 0x1230;
+			m_cpu->space(AS_DATA).write_word(source, 0x2468 + (form >= 3 ? i : 0));
+			u32 const logical = base | u16(destination + i);
+			program.write_word(mapped && u16(logical) < 0x8000 ? u16(logical) : logical, 0xbeef);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0x20 : 0);
+		m_first_port_cycle = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_mvdp_source",
+			[this, form, count](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const i = m_pipeline_operand_reads;
+				u16 const source = form < 2 ? 0x1203 : form == 3 ? 0x1230 + i : form == 4 ? 0x1230 - i : 0x1230;
+				if (i > count || at != source || word != 0x2468 + (form >= 3 ? i : 0))
+					osd_printf_info("MVDP repeat source mismatch: case=%u iteration=%u at=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu\n", m_pipeline_peripheral_case, i, unsigned(at), source, word, unsigned(0x2468 + (form >= 3 ? i : 0)), (unsigned long long)m_cpu->pipeline_cycles());
+				expect(i <= count && at == source && word == 0x2468 + (form >= 3 ? i : 0), "Repeated MVDP samples each iteration's source in order");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = program.install_write_tap(0, 0x7fffff, "repeat_mvdp_destination",
+			[this, form, count, base, destination, mapped](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const i = m_pipeline_store_writes;
+				u32 const logical = base | u16(destination + i);
+				u32 const physical = mapped && u16(logical) < 0x8000 ? u16(logical) : logical;
+				if (!i) m_first_port_cycle = m_cpu->pipeline_cycles();
+				expect(i <= count && at == physical && word == 0x2468 + (form >= 3 ? i : 0) && m_cpu->pipeline_cycles() == m_first_port_cycle + i, "Repeated MVDP wraps pmad and retires one word per accelerated clock");
+				++m_pipeline_store_writes;
+			});
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 259940;
+	}
 	void start_mvdp_pair(unsigned variant = 0)
 	{
 		start_mvdp(16 + (variant / 6) * 56);
@@ -15923,6 +15975,7 @@ private:
 		if (!strcmp(machine().options().bios(), "write-a")) { start_write_a(); return; }
 		if (!strcmp(machine().options().bios(), "mvdp")) { start_mvdp(); return; }
 		if (!strcmp(machine().options().bios(), "mvdp-pair")) { start_mvdp_pair(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-mvdp")) { start_repeat_mvdp(); return; }
 		if (!strcmp(machine().options().bios(), "banzd-long")) { start_pipeline_extended_banz(); return; }
 		if (!strcmp(machine().options().bios(), "ret-load")) { start_return_load(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-ret")) { start_conditional_call(); return; }
@@ -44359,6 +44412,39 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254830) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254820; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 259940)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const form = variant % 5, reg = (variant / 5) % 8;
+			unsigned const count = std::array<unsigned, 5>{0, 1, 2, 7, 255}[(variant / 40) % 5];
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 8, 12}[variant / 3200];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Legal short-source repeated MVDP is admitted");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, unsigned(m_first_port_cycle)};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated MVDP before and during the stream");
+			}
+			if (tick == count + 64)
+			{
+				u16 const next = form == 3 ? 0x1230 + count + 1 : form == 4 ? 0x1230 - count - 1 : 0x1230;
+				expect(m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == next, "Repeated MVDP retires count plus one transfers and resumes after pmad");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_first_port_cycle = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated MVDP without duplicate transfers");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 259950; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 9599) { start_repeat_mvdp(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged repeated MVDP: PASS cases=9600 restore=9600 forms=5 registers=8 counts=0,1,2,7,255 count_forms=2 pages=2 destinations=ordinary,wrap ovly=2 snapshots=3 source_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated MVDP complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 259950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 259920)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -49493,6 +49579,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(11, "rpt-xfer-edge", "Forbidden single-repeat absolute and offset transfer operands")
 	ROM_SYSTEM_BIOS(12, "mvdp", "Staged standalone data-to-program transfers")
 	ROM_SYSTEM_BIOS(13, "mvdp-pair", "Adjacent retained data-to-program transfers")
+	ROM_SYSTEM_BIOS(14, "rpt-mvdp", "Repeated retained data-to-program transfers")
 ROM_END
 
 ROM_START(tms54rom4)
