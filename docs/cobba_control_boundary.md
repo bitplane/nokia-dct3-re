@@ -2344,11 +2344,11 @@ Every burst produces nonzero concealment differing from the clean reference;
 83 output frames differ overall, including subsequent recovery effects.
 No external reference code or vectors enter Git or the MAME overlay.
 
-The native gate uses unchanged `c941` reset and `c8dc` decoding, retains
+The strict native gate uses unchanged `c941` reset and `c8dc` decoding, retains
 histories between frames, and requires every PCM sample plus full ordinary-RAM
 save/replay for every frame. It rejects the partial result rather than
-rebasing expected output on native execution. The longer bursts remain
-unexecuted because the strict gate stops at the first mismatch. Invalid SID,
+rebasing expected output on native execution. A separate observation fixture
+below characterizes every burst without weakening this gate. Invalid SID,
 homing/error combinations, RF scheduling and handset speech transport remain
 separate boundaries.
 
@@ -2384,6 +2384,46 @@ case or proof of physical DSP output. Do not truncate the CPU's accumulator
 to make the reference comparison pass. The remaining question is the extent
 of the recovered implementation's precision differences under errors, not
 whether frame 9 can be matched by changing expected output or forcing state.
+
+#### Complete loss/recovery characterization
+
+`make observe-c54x-rom4-efr-loss` uses the same hash-pinned inputs, original
+reset/decoder routines and per-frame ordinary-RAM replay, but selects the
+separate `efr-loss-observe` bench. It captures all 160 native PCM words per
+frame and continues after a reference difference. Its terminal record says
+`COMPLETE`, not conformance `PASS`. The independent checker recomputes every
+frame's mismatch count and signed PCM errors from the reference file, verifies
+the fixed loss schedule and ordered complete capture, and writes
+`characterization.json` plus native-only `native.pcm` under ignored scratch.
+The strict decoder checker rejects an observation result.
+
+Two fresh processes reproduce all 163 frames and identical PCM/report bytes.
+All 28 erased frames match reference PCM exactly. Only recovery differs:
+
+| Erased interval (zero-based) | Differing recovery frames | First subsequent exact frame |
+| --- | --- | --- |
+| 8 | 9--12 | 13 |
+| 32--34 | 35--48 | 49 |
+| 80--87 | 88--91 | 92 |
+| 120--135 | 136--139 | 140 |
+
+The 26 differing frames contain 2,874 differing samples out of 26,080.
+Maximum absolute signed-PCM difference is 1,480; whole-sequence RMS is
+98.62506307975 integer PCM units. These are observations, not an acceptance
+tolerance. Native PCM SHA-256 is
+`a3d282aa7387a59283a9b82cea688e43b7e17b45eba603e1fdd8d626b5025515`;
+the reference remains
+`1c05e9951ffbe91fb25e2ddd4b349f4e563a021ebd5ad7d1e3115881ce326fc9`.
+Each frame independently restores and reproduces all 65,440 ordinary RAM
+words. The strict gate still fails at frame 9 with 127 differences; clean
+speech, decoder homing and DTX comparisons remain independently bit-exact.
+
+This narrows the unresolved comparison to recovery state, not missing execution
+of the longer concealment bursts. The frame-8 residual arithmetic above
+explains the first divergence; it is not proof that every later difference has
+the same cause. Following recovery-state producers against the independent
+reference is the next discriminator. No ROM arithmetic, expected samples,
+codec state or conformance criterion is altered by the observation mode.
 
 ### Native EFR decoder homing
 

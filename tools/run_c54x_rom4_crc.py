@@ -163,6 +163,7 @@ def main():
     mode.add_argument("--efr-dtx-decoder", action="store_true", help="compare native EFR silence/SID/unusable-frame decoding with the external reference")
     mode.add_argument("--efr-dtx-encoder", action="store_true", help="compare native EFR VAD/DTX encoding with the external reference")
     mode.add_argument("--efr-erasure-decoder", action="store_true", help="compare native EFR active-speech erasure concealment with the external reference")
+    mode.add_argument("--efr-erasure-observe", action="store_true", help="characterize all native EFR loss frames without claiming reference conformance")
     mode.add_argument("--efr-homing-decoder", action="store_true", help="compare native EFR homing and repeated speech with the external reference")
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     args = parser.parse_args()
@@ -183,6 +184,8 @@ def main():
         bios = "efr-dtx-encoder"
     if args.efr_erasure_decoder:
         bios = "efr-erasure"
+    if args.efr_erasure_observe:
+        bios = "efr-loss-observe"
     if args.efr_homing_decoder:
         bios = "efr-homing"
     if args.efr_homing_encoder:
@@ -190,7 +193,7 @@ def main():
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_homing_decoder or args.efr_homing_encoder else "2"]
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder else "2"]
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
@@ -209,7 +212,7 @@ def main():
     if args.efr_dtx_encoder:
         for name in ("dtx.inp", "dtx.cod"):
             inputs.append(args.rompath / "tms54rom4" / name)
-    if args.efr_erasure_decoder:
+    if args.efr_erasure_decoder or args.efr_erasure_observe:
         for name in ("erasure.dec", "erasure.out"):
             inputs.append(args.rompath / "tms54rom4" / name)
     if args.efr_homing_decoder:
@@ -228,7 +231,19 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder)
+        if args.efr_erasure_observe:
+            try:
+                from tools.c54x_rom4_efr_loss_check import characterize
+            except ModuleNotFoundError:
+                from c54x_rom4_efr_loss_check import characterize
+            report, pcm = characterize(text, result.returncode,
+                (args.rompath / 'tms54rom4/erasure.out').read_bytes(),
+                (args.rompath / 'tms54rom4/erasure.dec').read_bytes())
+            (run / 'characterization.json').write_text(json.dumps(report, indent=2) + '\n')
+            (run / 'native.pcm').write_bytes(pcm)
+            print(f"ROM4 EFR loss characterized: frames={report['frames']} differing_frames={report['differing_frames']} mismatches={report['mismatches']} conformance_claim=0")
+        else:
+            check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1
