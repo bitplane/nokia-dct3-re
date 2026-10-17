@@ -135,6 +135,24 @@ to opcode words, not immediate extensions or annulled words. The old core
 fails this fixture with an operand transaction. The corrected behavior is
 unsupported-form rejection, not a hardware exception specification.
 
+### Single-repeat transfer boundary
+
+SPRU131G sections 5.2.4 and 5.5.3.2 exclude absolute and long-offset
+Smem operands from single-instruction repeats. This restricts the repeated
+body, not an absolute-memory count operand of the repeat instruction itself.
+It also does not prohibit a standalone extended transfer or a transfer in a
+block repeat.
+
+The six MVKD/MVDK, MVPD/MVDP and READA/WRITA classes reject operand bytes
+`e0..f8` under an active single repeat before operand effects. The
+`rpt-xfer-edge` profile checks 9,600 cases/restores: six classes, all 25
+offset/absolute bytes, short and long immediate RPT counts 0 and 2, CMPT,
+two program pages, both frontends and two checkpoints. It requires no data
+or stack access, AR update/truncation, or accumulator/T/SP/status effect.
+The old core fails with an operand transaction. This is fail-closed emulator
+admission, not a silicon-trap claim. Other repeated operand families and
+RPTZ setup/operand combinations remain outside this fixture's closure.
+
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data
 words exactly, emits the original pin-decoded acknowledgement

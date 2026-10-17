@@ -312,6 +312,22 @@ constexpr bool invalid_mmr_long_form(u16 word)
 	}
 }
 
+constexpr bool extended_repeat_transfer(u16 word)
+{
+	if (u8(word) < 0xe0 || u8(word) > 0xf8)
+		return false;
+	// SPRU131G 5.2.4/5.5.3.2 exclude absolute and long-offset Smem
+	// operands from a single-instruction repeat, in either transfer direction.
+	switch (word & 0xff00)
+	{
+	case 0x7000: case 0x7100: case 0x7c00:
+	case 0x7d00: case 0x7e00: case 0x7f00:
+		return true;
+	default:
+		return false;
+	}
+}
+
 constexpr bool staged_memory_repeat(u16 word)
 {
 	// SPRU131G table 5-4: short MOD=3 preincrement is write-only.
@@ -3013,9 +3029,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_decode_remaining == 1 && staged_move(m_pipeline_decode_word);
 	if (m_pipeline_valid[2])
 	{
-		if (!m_pipeline_decode_remaining && invalid_mmr_long_form(m_pipeline_word[2]))
+		if (!m_pipeline_decode_remaining && (invalid_mmr_long_form(m_pipeline_word[2]) ||
+			(m_pipeline_repeat_active && extended_repeat_transfer(m_pipeline_word[2]))))
 		{
-			logerror("%s: staged long-offset MMR addressing is unsupported\n", machine().describe_context());
+			logerror("%s: unsupported staged MMR or repeated transfer addressing\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		if (m_pipeline_delay_decode_words)
@@ -5018,7 +5035,7 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
-	if (invalid_mmr_long_form(op))
+	if (invalid_mmr_long_form(op) || ((m_rpt_armed || m_rpt_end != REPEAT_END_UNSET) && extended_repeat_transfer(op)))
 	{
 		m_illegal = true;
 		return;

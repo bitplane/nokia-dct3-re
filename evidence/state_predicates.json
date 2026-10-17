@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_single_repeat_extended_transfer_exclusion", "owner": "native_dsp_cpu", "status": "satisfied",
+      "predicate": "Six memory/program transfer families reject absolute and long-offset Smem body operands under single repeat before operand effects",
+      "current": "TI SPRU131G 5.2.4 and 5.5.3.2 prohibit these repeated addressing forms. rpt-xfer-edge passes 9600 cases/restores across MVKD/MVDK, MVPD/MVDP and READA/WRITA, all 25 e0..f8 operand bytes, short/long immediate RPT counts 0/2, CMPT settings, two pages, both frontends and two checkpoints. Data/stack transactions, pointer changes and accumulator/T/SP/status changes are forbidden. The old core fails with an operand transaction. The restriction concerns the repeated body, not an absolute-memory RPT count operand or block repeats. This is fail-closed admission, not a silicon-trap claim; other operand families and RPTZ combinations are not closed by this fixture.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "c54x_mmr_long_operand_exclusion", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "Forbidden long-offset/absolute and reserved MMR operand bytes fail closed before operand effects in both execution frontends",
       "current": "TI SPRU131G 5.6 excludes the 25 e0..f8 indirect long/absolute forms from MMR addressing; f9..ff remain reserved. The nine encoded LDM A/B, PSHM, MVDM, MVMD, STM, STLM A/B and POPM classes reject these bytes before a data/stack access or AR modification/truncation. A dedicated mmr-long-edge fixture passes 4608 cases/restores across all 32 bytes, CMPT settings, two pages, both frontends and two checkpoints; it independently checks accumulators, T, SP and status. The old core fails with an operand transaction. Nine valid MMR, stack and ordinary Smem long-offset neighboring profiles pass, including the seven-bank long-mvkd composition. Valid short MMR upper-bit semantics are retained. The staged guard distinguishes opcode words from extensions and annulled words. This is unsupported-form admission, not a silicon trap specification; compact MVMM, implicit-copy/RMW classifications and unenumerated operand domains are not closed.",

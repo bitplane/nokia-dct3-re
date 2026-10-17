@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_transfer_rejection_requires_full_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-xfer-edge']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='rpt-xfer-edge')
+        for field in ('cases=9600', 'restore=9600', 'opcode_classes=6', 'forbidden_modes=25',
+                      'repeat_counts=0,2', 'count_forms=short,long', 'cmpt=2', 'pages=2',
+                      'frontends=2', 'snapshots=2', 'data_reads=0', 'data_writes=0',
+                      'pointer_changes=0', 'stack_changes=0', 'silicon_trap_claim=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='rpt-xfer-edge')
+        with self.assertRaises(ValueError):
+            check_result(marker + '\n' + text, 3, profile='rpt-xfer-edge')
+
     def test_mmr_long_rejection_requires_full_domain_and_no_effects(self):
         marker, ending = EXTRA_PROFILES['mmr-long-edge']
         text = marker + '\n' + ending + '\n'

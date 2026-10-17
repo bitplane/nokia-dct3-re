@@ -9891,15 +9891,31 @@ private:
 	}
 	void start_mmr_long_edge(unsigned variant = 0)
 	{
+		bool const repeated = !strcmp(machine().options().bios(), "rpt-xfer-edge");
 		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
-		u32 const base = (variant / 576) % 2 ? 0x20000 : 0;
-		u16 const family = std::array<u16, 9>{0x4800,0x4900,0x4a00,0x7200,0x7300,0x7700,0x8800,0x8900,0x8a00}[(variant / 32) % 9];
+		u32 const base = (variant / (repeated ? 1200 : 576)) % 2 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(base + 0x600, family | (0xe0 + variant % 32));
-		program.write_word(base + 0x601, 0x0900); program.write_word(base + 0x602, 0xf4e1);
+		if (repeated)
+		{
+			unsigned const count = (variant / 150) % 2 ? 2 : 0;
+			bool const long_count = (variant / 300) % 2;
+			program.write_word(base + 0x600, long_count ? 0xf070 : 0xec00 | count);
+			unsigned body = 0x601;
+			if (long_count) program.write_word(base + body++, count);
+			u16 const family = std::array<u16, 6>{0x7000,0x7100,0x7c00,0x7d00,0x7e00,0x7f00}[(variant / 25) % 6];
+			program.write_word(base + body++, family | (0xe0 + variant % 25));
+			program.write_word(base + body++, 0x0900); program.write_word(base + body++, 0x0a00);
+			program.write_word(base + body, 0xf4e1);
+		}
+		else
+		{
+			u16 const family = std::array<u16, 9>{0x4800,0x4900,0x4a00,0x7200,0x7300,0x7700,0x8800,0x8900,0x8a00}[(variant / 32) % 9];
+			program.write_word(base + 0x600, family | (0xe0 + variant % 32));
+			program.write_word(base + 0x601, 0x0900); program.write_word(base + 0x602, 0xf4e1);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 288) % 2 ? 0x4000 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / (repeated ? 600 : 288)) % 2 ? 0x4000 : 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1400);
@@ -9910,7 +9926,7 @@ private:
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mmr_long_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mmr_long_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-		m_cpu->set_pipeline_frontend(!((variant / 1152) % 2));
+		m_cpu->set_pipeline_frontend(!((variant / (repeated ? 2400 : 1152)) % 2));
 		m_phase = mmr_long_phase; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -15745,6 +15761,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }
 		if (!strcmp(machine().options().bios(), "subc-mod3-edge")) { start_short_read_mod3_edge(256); return; }
 		if (!strcmp(machine().options().bios(), "load-mod3-edge")) { start_short_read_mod3_edge(768); return; }
 		if (!strcmp(machine().options().bios(), "bitf-mod3-edge")) { start_short_read_mod3_edge(10496); return; }
@@ -17534,32 +17551,38 @@ private:
 	{
 		if (m_phase == mmr_long_phase)
 		{
+			bool const repeated = !strcmp(machine().options().bios(), "rpt-xfer-edge");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			unsigned const checkpoint = variant / 2304 ? 12 : 1;
-			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Forbidden MMR long forms perform no data or stack transaction");
+			unsigned const checkpoint = variant / (repeated ? 4800 : 2304) ? 12 : 1;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Rejected addressing performs no data or stack transaction");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1400 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-				"Rejected MMR form preserves accumulators, T, stack and flags");
+				"Rejected addressing preserves accumulators, T, stack and flags");
 			for (unsigned ar = 0; ar < 8; ++ar)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0xf040 + ar, "Rejected MMR form cannot modify or truncate AR upper bits");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0xf040 + ar, "Rejected addressing cannot modify or truncate AR upper bits");
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
-				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save forbidden MMR form at an early or rejected boundary");
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save rejected addressing at an early or rejected boundary");
 			}
 			if (tick == 20)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends fail closed on forbidden MMR long forms");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends fail closed on forbidden addressing");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore forbidden MMR form without operand effects");
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rejected addressing without operand effects");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = mmr_long_phase + 1; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < 4608) { start_mmr_long_edge(variant + 1); return; }
+				if (variant + 1 < (repeated ? 9600 : 4608)) { start_mmr_long_edge(variant + 1); return; }
+				if (repeated)
+				{
+					osd_printf_info("TMS320C54x repeated transfer exclusions: PASS cases=9600 restore=9600 opcode_classes=6 forbidden_modes=25 repeat_counts=0,2 count_forms=short,long cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated repeated transfer exclusions complete");
+				}
 				osd_printf_info("TMS320C54x MMR long exclusions: PASS cases=4608 restore=4608 opcode_classes=9 forbidden_modes=25 reserved_modes=7 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated MMR long exclusions complete");
 			}
@@ -49057,6 +49080,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(8, "xc-barrier", "Conditional-execute status after sequential-target return barriers")
 	ROM_SYSTEM_BIOS(9, "parallel-sub", "Atomic parallel subtraction preserves fractional accumulator bits")
 	ROM_SYSTEM_BIOS(10, "mmr-long-edge", "Forbidden long-offset and reserved MMR operand forms")
+	ROM_SYSTEM_BIOS(11, "rpt-xfer-edge", "Forbidden single-repeat absolute and offset transfer operands")
 ROM_END
 
 ROM_START(tms54rom4)
