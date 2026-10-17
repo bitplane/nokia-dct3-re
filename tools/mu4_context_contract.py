@@ -824,6 +824,54 @@ def decode_playback_cleanup_ingress(words):
                      'all-writer closure, EOF meaning or decoder failure claim'}
 
 
+PLAYBACK_INPUT_UNITS_AA55 = {
+    0x2086: (0xF880,0x32D3), 0x2090: (0xF880,0x32FA),
+    0x2ED8: (0x880E,0xF495,0xF066,0x002C,0xF000,0x36B0,0x8811,
+             0xF495,0xF495,0x56E1,0x0012,0x4E0A),
+    0x32EE: (0xF072,0x32F4,0x1386,0xF678,0xF3E8,0xF1A0,0x8196),
+    0x3349: (0x1102,0x7001,0x0016,0x6F00,0x0D81,0xF980,0x208A,
+             0x1103,0x0104,0x8912,0xF495,0xF495,0x8082,0x6B02,
+             0x0001,0x10E1,0x0015,0xF000,0x0001,0x8812,0x80E1,
+             0x0015,0x1004,0xF000,0x0001,0x8004,0x6CEF,0xFFFF,0x3321),
+}
+PLAYBACK_INPUT_UNITS_AA99 = {
+    0x2788A: (0xE800,0x4EF8,0xA9F6),
+    0x292CC: (0x4A11,0xEEFD,0xF540,0x7107,0x0011,0x1006,0x7108,
+             0x0012,0x7001,0x0012,0x7000,0x0011,0xF5E7,0xEE03,0x8A11,0xF4E4),
+    0x29473: (0x7107,0x0011,0x7108,0x0016),
+    0x294A7: (0x56F8,0x371A,0x4E6A,0xF0FF,0x4E6C,0x4EF8,0xAA22),
+    0x295CD: (0x4A11,0xEEFB,0xF495,0x7109,0x0011,0x1108,0x8000,
+             0x7002,0x0011,0x8101,0xF020,0x3708,0xF980,0x2090,
+             0xEE05,0x8A11,0xF4E4,0x4A11,0xEEFB,0xF495,0x7109,
+             0x0011,0x1108,0x8000,0x7002,0x0011,0x8101,0xF020,
+             0x3708,0xF980,0x2086,0xEE05,0x8A11,0xF4E4),
+}
+
+
+def decode_playback_input_units(words, bootstrap_words):
+    for image, spans in ((words, PLAYBACK_INPUT_UNITS_AA99),
+                         (bootstrap_words, PLAYBACK_INPUT_UNITS_AA55)):
+        for base, witness in spans.items():
+            for offset, expected in enumerate(witness):
+                if image.get(base+offset) != expected:
+                    raise ValueError(f'input units witness changed at {base+offset:06x}')
+    descriptor = 0x36b0 + 2*0x2c
+    return {'pinned_words': sum(len(witness) for spans in
+                (PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99) for witness in spans.values()),
+            'descriptor': {'base': '36b0', 'stride_words': 0x2c, 'index': 2,
+                           'address': f'{descriptor:04x}', 'size_pair': f'{descriptor+0x12:04x}'},
+            'input11': {'count': 'local frame word 7 -> AR1 -> callback word-count argument',
+                        'adapter': '0292cc', 'callbacks': ['0295cd', '0295de'],
+                        'reader_apis': ['002090', '002086']},
+            'reader': {'loop': '003349..003365', 'destination_stride_words': 1,
+                       'byte_offset_scale': 2, 'swapping_api': '002086'},
+            'limit': {'source': '371a descriptor size pair', 'operation': 'logical shift right 1',
+                      'units': '16-bit file words for an even byte extent'},
+            'counter_initialization': '02788a: zero -> a9f6 doubleword',
+            'scope': 'Pinned source argument flow and descriptor arithmetic; not every runtime '
+                     'read/seek retirement, all counter writers, odd-byte tails or decoder drain correctness'}
+
+
 MASK = 0xC004
 WITNESS = (
     0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
@@ -1473,6 +1521,7 @@ def contract(source):
         'aa99': playback_lifecycle_literal_census(rel_words),
     }
     result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
+    result['playback_input_units'] = decode_playback_input_units(rel_words, bootstrap_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)

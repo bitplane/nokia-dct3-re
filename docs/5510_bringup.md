@@ -8668,12 +8668,37 @@ and takes `0294ea` on BGEQ. That path computes a low-word remainder into AR1,
 sets `aa1c=1`, replaces the counter with the local full value, and joins
 the `aa1a` test. These source operations and the observed successors locate
 the immediate stop in input-length handling, not a decoder-return failure.
-Units, the producer's field contract, and whether this represents intended
-end-of-input or an emulation defect remain unresolved. Next follow the
-source/meaning of `371a`, `a9f6` and frame word 7, including how buffered
-decoder input is meant to drain at this boundary. Do not force a larger
+The complete producer contract and whether this represents intended
+end-of-input or an emulation defect remain unresolved. The input-word
+units are established below; the next question is how buffered decoder
+input is meant to drain at this boundary. Do not force a larger
 length or suppress cleanup. All 925 output artifacts remain byte-identical
 to the earlier ten-second capture, with `illegal=0` and the gate check green.
+
+`playback_input_units` pins 116 source words across AA55/AA99.
+Descriptor arithmetic is `36b0 + index*002c`; index 2 is `3708`, and its
+size pair at offset `0012` is `371a`. The local logical right shift by one
+converts an even byte extent to file words. Frame word 7 flows through AR1
+and adapter `0292cc` to the count argument of callbacks `0295cd/0295de`,
+then APIs `2090/2086`. Their common reader advances the destination by one
+16-bit word per iteration and doubles its cursor for the underlying byte
+read; `2086` additionally swaps each returned word's byte order. The source
+also pins the zero initializer of `a9f6` at `02788a`. This is source argument
+flow, not an independent capture of every read/seek or all counter writes.
+
+For an independent file-extent comparison, add
+`--input-file tmp/mu4-dst-bypass-recorder/TEST` to the ingress checker.
+The extracted file is 143,680 bytes, SHA-256
+`4ba59580f8bf50b8d45d7a62d8ddf42ea94dfb7d884ff05b5092e7c13141470d`.
+With a zero initial counter, the captured first 375 positive requests total
+71,834 words against a limit of 71,840. Six words remain; request 376 asks
+for 186, crossing by 180. This source model agrees with all 376 executed
+length successors, without fitting a length or changing media. Equality
+also selects the boundary. Tests reject odd/zero/oversized extents,
+nonpositive/signed-high requests, missing boundaries and requests continuing
+after the modeled cleanup. This establishes consistency of the word-count
+interpretation, not correctness of decoder draining, the final packet,
+waveform conformance or native handset audio completion.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

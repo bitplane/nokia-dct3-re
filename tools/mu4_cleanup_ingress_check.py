@@ -1,6 +1,7 @@
 """Check bounded debugger Execute-hook cleanup paths; operands remain context."""
 import argparse
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -15,7 +16,28 @@ SITES = {0x29438: 0x1004, 0x2944b: 0x7105, 0x29471: 0x1005,
          0x294fd: 0x60f8, 0x29500: 0xf830, 0x29502: 0xf7b8, 0x2956f: 0x60f8}
 
 
-def check(text):
+def reference_input_extent(byte_length, requests):
+    """Source-model arithmetic for an even file, zero initial counter and positive requests."""
+    if byte_length <= 0 or byte_length % 2 or byte_length > 0xffffffff:
+        raise ValueError('input extent model requires a positive even 32-bit byte length')
+    limit, consumed = byte_length // 2, 0
+    records = []
+    for index, request in enumerate(requests, 1):
+        if records and records[-1]['crosses']:
+            raise ValueError('requests continue after modeled cleanup boundary')
+        if not 0 < request < 0x8000:
+            raise ValueError('input extent model requires positive signed-word requests')
+        crosses = consumed + request >= limit
+        records.append({'input': index, 'prior_words': consumed, 'request_words': request,
+                        'remaining_words': limit-consumed, 'crosses': crosses,
+                        'expected_successor': '0294fd' if crosses else '0294ca'})
+        consumed += request
+    if not records or not records[-1]['crosses']:
+        raise ValueError('input extent model never reaches the boundary')
+    return records
+
+
+def check(text, media=None):
     events = rows(text, 'mu4_cleanup_ingress')
     scopes = rows(text, 'mu4_cleanup_ingress_scope')
     ends = rows(text, 'mu4_cleanup_ingress_terminal')
@@ -76,20 +98,38 @@ def check(text):
                                 'f7_context': event['f7']})
     if not cleanup:
         raise ValueError('no observed cleanup successor')
-    return {'events': len(events), 'input_counts': dict(Counter(row['f4'] for row in inputs)),
+    result = {'events': len(events), 'input_counts': dict(Counter(row['f4'] for row in inputs)),
             'last_inputs': inputs[-3:], 'cleanup_successors': dict(paths),
             'length_successors': dict(length_paths),
             'cleanup': cleanup, 'scope': 'Debugger hook at staged Execute entry; '
             'live snapshots/annulment are unclaimed, no retained operand, EOF, '
             'message producer ownership or audio acceptance proof'}
+    if media is not None:
+        if any(row['f4'] != '0011' for row in inputs):
+            raise ValueError('extent model does not cover other input selectors')
+        model = reference_input_extent(len(media), [int(row['f7'], 16) for row in inputs])
+        observed = []
+        for index, event in enumerate(events):
+            if event['address'] == '0294c3':
+                observed.append(events[index+1]['address'])
+        if observed != [row['expected_successor'] for row in model]:
+            raise ValueError('length successors disagree with the input extent model')
+        result['input_extent_model'] = {
+            'file_bytes': len(media), 'file_sha256': hashlib.sha256(media).hexdigest(),
+            'limit_words': len(media)//2, 'requests': len(model), 'final': model[-1],
+            'scope': 'Zero-initial-counter/even-file source model matches executed successors; '
+                     'not an independent bus capture of every counter or file-read retirement'}
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--input-file', type=Path,
+                        help='Compare the bounded source model with an independently extracted input file')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text()), indent=2))
+        print(json.dumps(check(args.log.read_text(), args.input_file.read_bytes() if args.input_file else None), indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'cleanup ingress check: {error}', file=sys.stderr)
         return 1

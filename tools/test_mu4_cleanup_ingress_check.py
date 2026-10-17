@@ -1,11 +1,11 @@
 import unittest
 
-from tools.mu4_cleanup_ingress_check import check
+from tools.mu4_cleanup_ingress_check import check, reference_input_extent
 
 
-def fixture():
+def fixture(sites=None):
     events = []
-    for ordinal, (address, opcode) in enumerate(((0x29438, 0x1004), (0x29500, 0xf830), (0x2956f, 0x60f8)), 1):
+    for ordinal, (address, opcode) in enumerate(sites or ((0x29438, 0x1004), (0x29500, 0xf830), (0x2956f, 0x60f8)), 1):
         events.append(f'mu4_cleanup_ingress: ordinal={ordinal} address={address:06x} opcode={opcode:04x} '
                       f'cycles={100+ordinal} sp=d6f4 f4=0011 f5=162e f6=0000 f7=0000 f8=0000 f9=0000 '
                       'control=0001 ar1=0000 ar2=0000 identity=debugger_Execute_hook operands=context_only observer_writes=0')
@@ -16,13 +16,37 @@ def fixture():
         'mu4_native_playback_overlay: PASS marker=aa99 records=3127 words=49843 checked_ram_words=49839 excluded_register_words=4 before_execution=1',
         *events,
         'mu4_playback_execute_entry: address=026d62 opcode=fd00 t=9.86',
-        'mu4_cleanup_ingress_terminal: events=3 cap=4096 observer_writes=0 audio_acceptance=0',
+        f'mu4_cleanup_ingress_terminal: events={len(events)} cap=4096 observer_writes=0 audio_acceptance=0',
         'mu4_cleanup_ingress_stop: t=10 illegal=0 observer_writes=0 audio_acceptance=0',
         'mu4_playback_parent_terminal: first_session_complete=1 overlay_verified=1 illegal=0 '
         'opcode_mismatch=0 selection=first_verified_aa99_session observer_writes=0'])
 
 
 class CleanupIngressTest(unittest.TestCase):
+    def test_media_extent_must_agree_with_executed_length_successors(self):
+        text = fixture(((0x29438, 0x1004), (0x294c3, 0xf84a), (0x294fd, 0x60f8),
+                        (0x29500, 0xf830), (0x2956f, 0x60f8))).replace('f7=0000', 'f7=0006')
+        result = check(text, bytes(12))['input_extent_model']
+        self.assertEqual(result['limit_words'], 6)
+        self.assertEqual(result['final']['request_words'], 6)
+        with self.assertRaises(ValueError):
+            check(text, bytes(14))
+
+    def test_even_file_extent_distinguishes_equality_and_overshoot(self):
+        equal = reference_input_extent(12, [4, 2])
+        self.assertEqual([row['crosses'] for row in equal], [False, True])
+        self.assertEqual(equal[-1]['remaining_words'], 2)
+        over = reference_input_extent(12, [4, 3])
+        self.assertEqual(over[-1]['remaining_words'], 2)
+        self.assertEqual(over[-1]['prior_words'], 4)
+        self.assertEqual(over[-1]['request_words'], 3)
+
+    def test_extent_model_refuses_uncovered_regimes_and_missing_end(self):
+        for size, requests in ((11, [6]), (0, [1]), (12, []), (12, [4]),
+                               (12, [0x8000]), (12, [0]), (12, [6, 1]), (1<<32, [1])):
+            with self.subTest(size=size, requests=requests), self.assertRaises(ValueError):
+                reference_input_extent(size, requests)
+
     def test_successor_defines_cleanup_without_operand_claim(self):
         result = check(fixture())
         self.assertEqual(result['cleanup_successors'], {'02956f': 1})

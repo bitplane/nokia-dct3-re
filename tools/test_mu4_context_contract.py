@@ -18,6 +18,7 @@ from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPEND
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
+from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
@@ -48,6 +49,22 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_input_units_pins_descriptor_and_word_reader_argument_flow(self):
+        images = [{base+i: value for base, witness in spans.items()
+                   for i, value in enumerate(witness)}
+                  for spans in (PLAYBACK_INPUT_UNITS_AA99, PLAYBACK_INPUT_UNITS_AA55)]
+        result = decode_playback_input_units(*images)
+        self.assertEqual(result['descriptor']['address'], '3708')
+        self.assertEqual(result['descriptor']['size_pair'], '371a')
+        self.assertEqual(result['reader']['byte_offset_scale'], 2)
+        self.assertEqual(result['pinned_words'], sum(map(len, images)))
+        for index, words in enumerate(images):
+            for address in words:
+                changed = [dict(image) for image in images]
+                changed[index][address] ^= 1
+                with self.subTest(image=index, address=address), self.assertRaises(ValueError):
+                    decode_playback_input_units(*changed)
+
     def test_cleanup_ingress_pins_message_gate_without_declaring_eof(self):
         words = {base+index: value for base, witness in PLAYBACK_CLEANUP_INGRESS.items()
                  for index, value in enumerate(witness)}
