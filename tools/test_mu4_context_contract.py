@@ -1,4 +1,34 @@
 import unittest
+from tools.mu4_context_contract import RAW_PRODUCT_BASE, RAW_PRODUCT_WITNESS, decode_raw_product, reference_raw_product
+
+
+class RawProductTests(unittest.TestCase):
+    def test_every_prefix_word_is_pinned(self):
+        words = {RAW_PRODUCT_BASE+i: w for i,w in enumerate(RAW_PRODUCT_WITNESS)}
+        self.assertEqual(decode_raw_product(words)['pinned_words'], 15)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_raw_product(changed)
+
+    def test_observed_channel_results(self):
+        for value, expected in ((0x069e0c00, 0xfffff59b08), (0x2aa01960, 0xffffbd0b70)):
+            self.assertEqual(reference_raw_product(value,0,0x003243e1,0x1fffd885)[0x25bdf]['b'], expected)
+
+    def test_signed_cross_terms_against_full_product_bound(self):
+        values = (0, 1, 0xffff, 0x10000, 0x7fffffff, 0x80000000, 0xffffffff, 0xabcd1234)
+        def signed(word):
+            return word-(1<<32) if word & (1<<31) else word
+        for value in values:
+            for coefficient in values:
+                calculated = reference_raw_product(value,0,coefficient,0)[0x25bd8]['a']
+                calculated = calculated-(1<<40) if calculated & (1<<39) else calculated
+                # The omitted low*low term can change the rounded-down high product by one.
+                exact = (signed(value)*signed(coefficient) >> 32) << 3
+                self.assertIn(exact-calculated, (0,8))
+        with self.assertRaises(ValueError):
+            reference_raw_product(-1,0,0,0)
 from tools.mu4_context_contract import RAW_OUTPUT_COPY_WITNESSES, decode_raw_output_copies
 
 

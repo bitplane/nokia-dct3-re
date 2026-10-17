@@ -87,7 +87,8 @@ public:
 				{
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 &&
-						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1))
+						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1 ||
+						 (address >= 0x25bd2 && address <= 0x25bf7)))
 						observe_playback_processing(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && opcode == 0x62e6 &&
 						(address == 0x2433a || address == 0x24340 || address == 0x24346))
@@ -973,6 +974,20 @@ private:
 	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
+		if (address >= 0x25bd2 && address <= 0x25bf7 && m_playback_processing_pending && m_playback_processing[0] == 2)
+		{
+			double const time = machine().time().as_double();
+			// Select only the two evidenced raw-word producer iterations.
+			// Register context is not a substitute for retained Read operands.
+			if ((time >= 1.0191258 && time <= 1.01912643) || (time >= 1.0211590 && time <= 1.02115962))
+				logerror("mu4_raw_execute: address=%06x opcode=%04x a=%010llx b=%010llx ar2=%04x ar3=%04x ar4=%04x ar5=%04x st0=%04x st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+					unsigned(address), opcode,
+					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), time);
+		}
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
 			address != 0x23e21 && address != 0x23e23 && address != 0x23e2c && address != 0x248b1) return;
 		if (m_playback_processing[0] >= 8 && !m_playback_processing_pending && !m_playback_conversion_active) return;

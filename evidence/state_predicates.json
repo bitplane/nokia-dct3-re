@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_selected_raw_partial_products",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "The two selected first-output prefixes in helper 025bb3 agree with the source-derived partial-product arithmetic on their actual operand reads",
+      "current": "A 15-word witness pins 025bd2..025be0. Forty-eight actual operand reads and retained Execute identities support 28 checked intermediate register values in ST1=6100. Inputs 069e0c00 and 2aa01960, other input zero, coefficients 003243e1 and 1fffd885 correctly produce fff59b08 and ffbd0b70, which match the later seven-transfer copy chain. The source deliberately omits the low*low term. This excludes an arithmetic discrepancy in these two prefixes only; input correctness, other iterations, the second helper output, decoded audio and speech remain unvalidated. The observed DMA/TX/DIN and slot files remain exact baseline prefixes.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_raw_product_observe.lua", "tools/mu4_raw_product_check.py", "tools/test_mu4_raw_product_check.py"]
+    },
+    {
       "id": "mu4_native_argument14_conversion",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
@@ -15,7 +23,7 @@
       "owner": "mu4_native_dsp",
       "status": "unresolved",
       "predicate": "Packet-bound native processing output agrees with independently decoded samples before claiming native audio",
-      "current": "Eight processing calls consume the exact host-valid AAC packets, return zero and produce corresponding output loops. Conversion and RAM correspondence are exact for the first two blocks, but reference samples first differ at packet 1/sample 448. A bounded 597-record probe validates seven value-preserving transfers: channel 0 follows 787e->7800->f300->7b80->f380; channel 1 follows e87e->e800->f300->eb80, each address naming a two-word pair. Both values are written at live context 025bf7 inside helper 025bb3 before the rearrangement. Trace that helper's arithmetic/scratch-input chain next; do not retune conversion, packets or samples, conflate reused f300 lifetimes, or infer arithmetic ownership from live GENPC. Native waveform, analog audio and speech remain unvalidated.",
+      "current": "Eight processing calls consume the exact host-valid AAC packets, return zero and produce corresponding output loops. Conversion and RAM correspondence are exact for the first two blocks, but reference samples first differ at packet 1/sample 448. Seven value-preserving transfers lead back to helper 025bb3; its two selected first-output partial-product prefixes are independently validated. Trace the producer/value chain of inputs 7880/7881 and e880/e881 next, including coefficient provenance where needed. Do not retune conversion, packets or samples, conflate reused f300 lifetimes, or infer arithmetic ownership from live GENPC. Native waveform, analog audio and speech remain unvalidated.",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_processing_check.py", "tools/test_mu4_processing_check.py", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_raw_output_observe.lua", "tools/mu4_raw_output_check.py", "tools/test_mu4_raw_output_check.py"]
     },
     {

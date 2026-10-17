@@ -6043,8 +6043,8 @@ proof of the complete permutation or every output sample.
 
 The values already appear at `787e/787f` at 1.019126398/407 s and
 `e87e/e87f` at 1.021159587/595 s, both at live context `025bf7`, following
-the helper `025bb3`'s `025bf6` DST. The next target is the helper's owned
-arithmetic/scratch-input chain, not conversion or the downstream copies.
+the helper `025bb3`'s `025bf6` DST. Its selected first-output arithmetic
+is checked separately below; the next inputs are `7880/7881` and `e880/e881`.
 Live GENPC remains context rather than retained instruction ownership.
 
 Reproduce with `tools/mu4_raw_output_observe.lua` as the two-second run's
@@ -6068,6 +6068,49 @@ identity, complete packet-byte coverage, conversion-loop extents, buffer
 lifetimes, all sampled conversion values and later RAM correspondence.
 This proves the bounded eight-packet binding and first-two-block conversion,
 not correct decoded audio, all media, analog output or native speech.
+
+### Selected Raw Partial Products
+
+The retained Execute trace and actual operand reads identify the first
+`025bd2..025bdf` arithmetic prefix for each channel. A 15-word source
+witness pins two unsigned-low/signed-high MACSU cross terms, signed-high
+MAC, shifts, subtraction and the scratch destination `aadc/aadd`.
+SPRU172C's MACSU contract is unsigned Xmem times signed Ymem; do not infer
+signedness from the mnemonic's informal ordering. The observed status is
+`ST1=6100` (SXM enabled; FRCT and OVM disabled).
+
+For a 32-bit word `v`, let `hi(v)` be its signed high half and `lo(v)` its
+unsigned low half. The source computes:
+
+```text
+r(v,c) = (((lo(c)*hi(v) + lo(v)*hi(c)) >> 16) + hi(v)*hi(c)) << 3
+scratch = r(y,d) - r(x,c)
+```
+
+The right shift is arithmetic. This deliberately omits the low*low product;
+it is not a claim that the routine performs exact full-width multiplication.
+Both selected prefixes read `y=0`, `c=003243e1`, `d=1fffd885`. Channel 0
+reads `x=069e0c00`; channel 1 reads `x=2aa01960`. The scalar model produces
+`fff59b08` and `ffbd0b70`, respectively, and every checked intermediate
+accumulator agrees with native Execute context. The later seven-transfer
+chain preserves these results. Thus these two prefixes correctly compute
+their already-wrong samples from their inputs; this does not validate every
+iteration, the helper's second output or the full decoder.
+
+Use the absolute path to `tools/mu4_raw_product_observe.lua` as the isolated
+two-second run's autoboot script, then:
+
+```sh
+python3 tools/mu4_raw_product_check.py RUN_DIR/error.log \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+The observer's time windows select measured iterations, not hardware timing
+parameters. The checker requires retained instruction identities, opcode
+witnesses, the status regime, unchanged actual operand reads, intermediate
+values and matching subsequent copy material. The next target is the
+producer/value chain of `7880/7881` and `e880/e881`, including coefficient
+provenance where needed; do not alter MACSU semantics to fit the waveform.
 
 ### Resident reload contract
 

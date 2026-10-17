@@ -16,6 +16,45 @@ else:
 
 
 BASE = 0x23D73
+RAW_PRODUCT_BASE = 0x25bd2
+RAW_PRODUCT_WITNESS = (0xe800,0xa669,0xa652,0xf450,0xb01a,0xf443,0xe900,
+                       0xa778,0xa743,0xf750,0xb30b,0xf743,0xf520,0x4ff8,0xaadc)
+
+
+def decode_raw_product(words):
+    if any(words.get(RAW_PRODUCT_BASE + i) != word for i, word in enumerate(RAW_PRODUCT_WITNESS)):
+        raise ValueError('raw partial-product prefix changed or absent')
+    return {'first_word': '025bd2', 'last_word': '025be0', 'pinned_words': 15,
+            'operation': 'two unsigned-low/signed-high cross products, arithmetic right 16, signed-high product, left 3; subtract first result from second',
+            'store': '025bdf DST B to aadc/aadd',
+            'domain': 'SXM=1, FRCT=OVM=0; two signed32 inputs and coefficients; no saturation',
+            'scope': 'First difference output only, not complete complex helper or correct decoder input'}
+
+
+def reference_raw_product(x, y, c, d):
+    """Instruction-derived partial products; deliberately omit low*low as source does."""
+    if any(not 0 <= word <= 0xffffffff for word in (x,y,c,d)):
+        raise ValueError('raw product requires four 32-bit words')
+    mask = (1 << 40) - 1
+    def high(word):
+        half = word >> 16
+        return half - 0x10000 if half & 0x8000 else half
+    def stages(value, coefficient):
+        first = (coefficient & 0xffff) * high(value)
+        second = first + (value & 0xffff) * high(coefficient)
+        shifted = second >> 16
+        product = shifted + high(value) * high(coefficient)
+        return first, second, shifted, product, product << 3
+    a, b = stages(x,c), stages(y,d)
+    result = {0x25bd3: {'a': 0}, 0x25bd9: {'b': 0}}
+    for i, value in enumerate(a):
+        result[0x25bd4+i] = {'a': value & mask}
+    for i, value in enumerate(b):
+        result[0x25bda+i] = {'b': value & mask}
+    result[0x25bdf] = {'a': a[-1] & mask, 'b': (b[-1]-a[-1]) & mask}
+    return result
+
+
 RAW_OUTPUT_COPY_WITNESSES = {
     0x24885: (0x7110,0x0011,0x7212,0xaae9,0x771a,0x03ff,0xf072,0x488e,0x5692,0x4e91),
     0x24ac4: (0x1004,0x8811,0x1009,0x8812,0x771a,0x007f,0xf072,0x4acd,0x5691,0x4e92),
@@ -1367,6 +1406,7 @@ def contract(source):
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
     result['boot_block_repeat'] = decode_boot_block_repeat(bootstrap_words)
     rel_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
+    result['raw_product'] = decode_raw_product(rel_words)
     result['raw_output_copies'] = decode_raw_output_copies(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
