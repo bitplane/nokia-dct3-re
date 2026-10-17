@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_clear_adts_chain_is_plaintext_recording_oracle",
+      "status": "disproven",
+      "hypothesis": "The saved REL recording can be treated as plaintext AAC from its first clear ADTS sync, so the changed header at 1739 proves malformed native header packing",
+      "conclusion": "Source-derived fields from 120 bounded first-eight-header caller-frame records predict fff950802ea600 then seven fff950802e8600 headers. Native header 1 is at the known transformed block 622; the first clear sync at 995 is native header 2. The anomalous fourth-header suffix at 1742, 4fcdd201, is exactly the forward transform of source-predicted 802e8600 under the captured recording state. Eight native block input/output pairs also match the scalar model; wrapper snapshots show 32-byte chunks and parameters 28/4. A bounded inverse-first-four/preserve-28 host model restores all eight source-framed headers, after which FFmpeg accepts one frame and rejects seven. Raw-header or raw-payload rejection alone therefore does not identify an encoder or packing defect. Complete REL phase/tail behavior, the remaining payload errors and native PCM remain unresolved; no derived data is fed to MAME.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_recorder_header_observe.lua", "tools/mu4_recorder_transform_observe.lua"]
+    },
+    {
       "id": "mu4_metadata_update_is_sole_cause_of_silent_playback",
       "status": "disproven",
       "hypothesis": "The native parameter-7 metadata rewrite removes the POCP marker or changes the recorded payload, and this update alone explains silent playback",

@@ -13,33 +13,44 @@ handles[#handles + 1] = data:install_read_tap(0xfc6c, 0xfc6c, 'mu4_record_transf
     local sp = cpu.state.SP.value
     local page, caller = data:read_u16((sp + 8) & 0xffff), data:read_u16((sp + 9) & 0xffff)
     -- These are reviewed delayed-call return addresses, not key-expansion calls.
-    if page ~= 3 or (caller ~= 0xedae and caller ~= 0xee95) or seen[caller] then sampling = false; return end
-    seen[caller] = true
+    if page ~= 3 or (caller ~= 0xedae and caller ~= 0xee95) or (seen[caller] or 0) >= 8 then sampling = false; return end
+    seen[caller] = (seen[caller] or 0) + 1
+    local ordinal = seen[caller]
     local target = data:read_u16((sp + 2) & 0xffff)
     local left, right = data:read_u16((sp + 3) & 0xffff), data:read_u16((sp + 4) & 0xffff)
     local state = {}
     for address = 0xfc6c, 0xfcbd do state[#state + 1] = string.format('%04x', data:read_u16(address)) end
+    -- The recovered inner prologue places its far return at SP+8. The
+    -- calling wrapper's SP is therefore SP+10; these remain frame snapshots.
+    local outer = (sp + 10) & 0xffff
+    local arguments = {}
+    for offset = 0x16, 0x1b do arguments[#arguments + 1] = string.format('%04x', data:read_u16((outer + offset) & 0xffff)) end
+    local source = data:read_u16((outer + 2) & 0xffff)
+    local position_hi, position_lo = data:read_u16((outer + 4) & 0xffff), data:read_u16((outer + 5) & 0xffff)
     sampling = false
     machine:logerror(string.format(
-        'mu4_record_transform_input: caller=%06x target=%04x left=%04x right=%04x state_base=fc6c state=%s sp=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0\n',
-        0x30000 + caller, target, left, right, table.concat(state, ','), sp, time, pc))
+        'mu4_record_transform_input: caller=%06x target=%04x left=%04x right=%04x state_base=fc6c state=%s sp=%04x t=%.9f context_pc=%06x ownership=unvalidated observer_writes=0 sample=%u\n',
+        0x30000 + caller, target, left, right, table.concat(state, ','), sp, time, pc, ordinal))
+    machine:logerror(string.format(
+        'mu4_record_transform_outer: caller=%06x sample=%u candidate_sp=%04x source=%04x position=%04x%04x words_16_1b=%s t=%.9f context_only=1 observer_writes=0\n',
+        0x30000 + caller, ordinal, outer, source, position_hi, position_lo, table.concat(arguments, ','), time))
     if target < 0x80 or target >= 0xffff then
         machine:logerror('mu4_record_transform_unobserved: target_outside_ram=1 observer_writes=0\n')
         return
     end
     local output, reported = {}, false
-    handles[#handles + 1] = data:install_write_tap(target, target + 1, 'mu4_record_transform_output_' .. caller,
+    handles[#handles + 1] = data:install_write_tap(target, target + 1, 'mu4_record_transform_output_' .. caller .. '_' .. ordinal,
         function(address, value, mask)
             if sampling or machine:side_effects_disabled() or reported or closed then return end
             output[address] = value
             machine:logerror(string.format(
-                'mu4_record_transform_write: caller=%06x address=%04x value=%04x mask=%04x t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0\n',
-                0x30000 + caller, address, value, mask, machine.time:as_double(), cpu.state.GENPC.value))
+                'mu4_record_transform_write: caller=%06x address=%04x value=%04x mask=%04x t=%.9f context_pc=%06x writer_identity=unvalidated observer_writes=0 sample=%u\n',
+                0x30000 + caller, address, value, mask, machine.time:as_double(), cpu.state.GENPC.value, ordinal))
             if output[target] and output[target + 1] then
                 reported = true
                 machine:logerror(string.format(
-                    'mu4_record_transform_output: caller=%06x target=%04x left=%04x right=%04x t=%.9f ownership=unvalidated observer_writes=0 audio_acceptance=0\n',
-                    0x30000 + caller, target, output[target], output[target + 1], machine.time:as_double()))
+                    'mu4_record_transform_output: caller=%06x target=%04x left=%04x right=%04x t=%.9f ownership=unvalidated observer_writes=0 audio_acceptance=0 sample=%u\n',
+                    0x30000 + caller, target, output[target], output[target + 1], machine.time:as_double(), ordinal))
             end
         end)
 end)

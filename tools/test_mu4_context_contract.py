@@ -33,9 +33,109 @@ from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, deco
 from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
 from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
 from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
+from tools.mu4_context_contract import RECORD_HEADER_BASE, RECORD_HEADER_WIDTHS, decode_recording_header_writer, reference_recording_header
+from tools.mu4_context_contract import recording_header_observations
+from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS, decode_recording_window_arguments, reference_recording_windows
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_recording_window_prefix_pins_parameter_roles(self):
+        words = dict(enumerate(RECORD_WINDOW_WITNESS, RECORD_WINDOW_BASE))
+        self.assertEqual(decode_recording_window_arguments(words)['pinned_words'], 16)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_recording_window_arguments(changed)
+
+    def test_recording_window_model_preserves_clear_bytes_and_rejects_partial_chunks(self):
+        source, state = bytes(range(64)), list(range(82))
+        encoded = reference_recording_windows(source, state, reverse=False)
+        self.assertEqual(reference_recording_windows(encoded, state), source)
+        for offset in (0,32):
+            self.assertEqual(encoded[offset+4:offset+32], source[offset+4:offset+32])
+            expected = reference_transform_block(int.from_bytes(source[offset:offset+2],'little'),
+                                                 int.from_bytes(source[offset+2:offset+4],'little'), state, reverse=False)
+            self.assertEqual(encoded[offset:offset+4], b''.join(word.to_bytes(2,'little') for word in expected))
+        for data, key in ((b'1',state),(bytes(31),state),(source,state[:-1]),(source,[-1]+state[1:])):
+            with self.assertRaises(ValueError):
+                reference_recording_windows(data, key)
+
+    @staticmethod
+    def header_observation_fixture():
+        lines = ['mu4_native_recorder_overlay: PASS marker=aa88 records=4622 words=73766 '
+                 'checked_ram_words=73762 excluded_register_words=4 before_execution=1']
+        for frame in range(8):
+            values = [4095,1,0,1,1,4,0,2,0,0,0,0,373 if frame == 0 else 372,384,0]
+            for field, (value, width) in enumerate(zip(values, RECORD_HEADER_WIDTHS)):
+                lines.append(f'mu4_record_header_argument: field={field} ordinal={frame+1} caller={0x3a93a+10*field:06x} '
+                             f'high=0000 low={value:04x} width={width} receiver=efc2 sp=6678 '
+                             f't={1+(frame*15+field)/1000:.9f} context_pc=03accc '
+                             'boundary=data_read ownership=unvalidated observer_writes=0')
+        return '\n'.join(lines + ['mu4_record_header_taps_closed: t=2.016666667 observer_writes=0'])
+
+    def test_header_observations_pack_eight_complete_ordered_frames(self):
+        result = recording_header_observations(self.header_observation_fixture())
+        self.assertEqual(result['argument_records'], 120)
+        self.assertEqual(result['frames'][0]['header_hex'], 'fff950802ea600')
+        self.assertEqual(result['frames'][7]['header_hex'], 'fff950802e8600')
+
+    def test_header_observations_reject_missing_malformed_and_wrong_scope(self):
+        text = self.header_observation_fixture()
+        lines = text.splitlines()
+        invalid = [
+            '\n'.join(lines[1:]), text+'\n'+lines[0], text+'\n'+lines[-1],
+            '\n'.join([lines[1],lines[0]]+lines[2:]),
+            text+'\n'+lines[1], '\n'.join(lines[:2]+lines[3:]),
+            '\n'.join([lines[0],lines[2],lines[1]]+lines[3:]),
+            text.replace('ordinal=1', 'ordinal=2', 1),
+            text+'\nmu4_record_header_taps_closed: malformed',
+            text.replace('width=12', 'width=11', 1),
+            text.replace('caller=03a93a', 'caller=03a93b', 1),
+            text.replace('receiver=efc2', 'receiver=efc3', 1),
+            text.replace('t=1.000000000', 't=0.100000000', 1),
+            text.replace('high=0000', 'high=0001', 1),
+            text.replace('ownership=unvalidated', 'ownership=claimed', 1),
+            text.replace('context_pc=03accc', 'context_pc=03a000', 1),
+            text.replace('t=2.016666667', 't=1.900000000'),
+        ]
+        for index, bad in enumerate(invalid):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                recording_header_observations(bad)
+        for count in (0, 9):
+            with self.assertRaises(ValueError):
+                recording_header_observations(text, count)
+
+    def test_recording_header_writer_recovers_all_fields(self):
+        words = {}
+        for index, width in enumerate(RECORD_HEADER_WIDTHS):
+            block = (0xf7b8,0x10e6,0x227+index,0x7602,width,0x4e00,0xfb83,0xacc5,0xf495,0x4811)
+            words.update(dict(enumerate(block, RECORD_HEADER_BASE + 10*index)))
+        self.assertEqual(decode_recording_header_writer(words)['total_bits'], 56)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_recording_header_writer(changed)
+
+    def test_recording_header_model_matches_independent_candidate_reader(self):
+        from tools.mu4_recorder_media_inventory import adts_header
+        values = [4095,1,0,1,1,4,0,2,0,0,0,0,372,384,0]
+        self.assertEqual(reference_recording_header(values).hex(), 'fff950802e8600')
+        for size in range(7,8192):
+            values[12] = size
+            header = adts_header(reference_recording_header(values), 0)
+            self.assertEqual(header['frame_bytes'], size)
+            self.assertEqual(header['channel_configuration'], 2)
+        for index, width in enumerate(RECORD_HEADER_WIDTHS):
+            bad = list(values)
+            bad[index] = 1 << width
+            with self.assertRaises(ValueError):
+                reference_recording_header(bad)
+        for bad in ([], values[:-1], values+[0], [-1]+values[1:]):
+            with self.assertRaises(ValueError):
+                reference_recording_header(bad)
+
     def test_flag_context_helper_source_is_pinned(self):
         words = dict(enumerate(FLAG_CONTEXT_WITNESS, FLAG_CONTEXT_BASE))
         self.assertEqual(decode_flag_context(words)['pinned_words'], 45)
@@ -125,6 +225,12 @@ class ContextContractTest(unittest.TestCase):
         self.assertEqual(encoded, (0x2ee7, 0xdcc0))
         self.assertEqual(b''.join(word.to_bytes(2, 'little') for word in encoded), bytes.fromhex('e72ec0dc'))
         self.assertEqual(reference_transform_block(*encoded, state), (0xf9ff, 0x8050))
+        # The fourth source header predicts suffix 80 2e 86 00. Its saved
+        # 4f cd d2 01 bytes are explained by the transform, not a bad length.
+        for plain, wire in (((0x2e80,0x0086), '4fcdd201'), ((0,0), '90fe56b1')):
+            encoded = reference_transform_block(*plain, state, reverse=False)
+            self.assertEqual(b''.join(word.to_bytes(2,'little') for word in encoded), bytes.fromhex(wire))
+            self.assertEqual(reference_transform_block(*encoded, state), plain)
         with self.assertRaises(ValueError):
             decode_recording_prefix_transform({})
 

@@ -11,11 +11,12 @@ streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
-The current software frontier is the [post-publication input branch](#post-publication-input-branch):
-after one longer-body result publication, the next transaction consumes a
-saved-data bit and restores context through `02533b`. Its local predicate
-and selector writer are mapped. An independent host decoder also rejects
-the nearby two candidate frames, without establishing the REL framing contract.
+The current software frontier is [recorded payload generation](#recording-header-and-selected-windows):
+source-derived headers match the first eight saved frames after selected-block
+inverse processing. The host decoder accepts one frame and rejects seven;
+native playback remains silent. Verify transform phase/state across those
+packets before attributing their errors to payload packing. Do not treat raw
+transformed bytes as plain AAC or force decoder success.
 The earlier seven-word initializer discrepancy is corrected and fresh
 recording remains byte-identical. Continue without forcing counters, keys,
 lengths or file offsets. These bench results do not establish whole-handset
@@ -5006,6 +5007,61 @@ lines exactly and closes the taps at 2.416666667 seconds. That is observer
 equivalence over the stated window, not a shorter substitute for the complete
 20-second playback observation or decoded-audio acceptance.
 
+#### Recording Header and Selected Windows
+
+**Open question:** why do seven of the first eight source-framed packets
+remain rejected after the bounded inverse-window model? First verify the
+transform phase/state across those packets, then recover remaining payload
+field/packing behavior rather than altering headers or forcing decoder results.
+Partial tails, global phase ownership and complete REL framing remain open.
+
+AA88 `03a930..03a9c5` contains fifteen ten-word field blocks. Each loads
+AR6-relative source offsets `0227..0235`, places a 32-bit value and bit width in its
+caller frame, then calls `03acc5`. The widths are
+`12,1,2,1,2,4,1,3,1,1,1,1,13,11,2`, totaling 56 bits. The source tool
+checks all 150 words through their field grammar. The passive observer
+selects each frame on an actual high-word argument read; low word, width,
+receiver and return address are caller-frame snapshots, not retained CPU
+operand ownership. Its first eight headers supply 120 ordered records;
+missing/duplicate fields, wrong calls/widths, order, scope and closure fail.
+
+Independent MSB field concatenation produces `fff950802ea600` for the
+first header (373 bytes), and `fff950802e8600` for each of the next seven
+(372 bytes). The corresponding projected file positions are
+`622,995,1367,1739,2111,2483,2855,3227`. Positions 995 and 1367 match
+the saved seven-byte headers directly; the first header begins at the
+previously observed transformed block. Do not confuse native header 2 at
+995 with header 1 merely because it is the first clear sync candidate.
+
+The apparent header-length anomaly at 1739 is explained by the transform:
+source fields predict suffix `802e8600`, while saved bytes at 1742 are
+`4fcdd201`. The independently captured recording state maps little-endian
+words `2e80,0086` to `cd4f,01d2`, and the inverse recovers them exactly.
+It is not evidence of a malformed header field or bad bit packing.
+
+Eight consecutive native transform calls at `03ee95` also match the scalar
+block model. The first input is `f9ff,8050`; the next seven are zero pairs,
+producing `fe90,b156`. Saved bytes `90fe56b1` occur at 32-byte intervals
+after the first block. The inner frame places its far return at SP+8;
+candidate wrapper SP is SP+10. All eight wrapper snapshots show source
+`fd4e`, local position zero and words `16..1b` equal to
+`0000,0020,ffa0,0000,001c,0004`. The pinned wrapper prefix sums arguments
+`1a/1b` and calls `03e69b` with the retained span and cursor. These facts
+support a bounded aligned-chunk model: process the first four bytes of
+each 32-byte chunk and preserve the following 28. They do not establish
+the complete modulo helper, arbitrary starting phases or partial-tail rules.
+
+In a host-only experiment, this inverse model processes bytes
+`[622,3630)` in memory and supplies only the first 2,977 bytes to FFmpeg
+8.0.1-3ubuntu2. All eight resulting headers match the source-derived values
+at their declared boundaries. FFmpeg reads eight packets and decodes one
+frame/1,024 samples at 44,100 Hz stereo, but rejects seven packets with
+band-count errors. Exit zero is therefore not whole-stream acceptance.
+No derived bytes are fed to MAME. This is partial host validation of
+native-produced media, not native decoded PCM, analog audio or speech.
+The earlier host test on raw bytes omitted this transform layer and cannot
+by itself establish encoder failure.
+
 #### Post-Publication Input Branch
 
 **Open question:** how does the original recorder produce the fields of the
@@ -5189,8 +5245,8 @@ one longer-body/result publication through `0293ed`. Previously the varying
 control had no such publication. The observed longer body writes `ac44`
 at `15f5`, `0002` at `15f6` and `0ba0` at `15f7`; entering and publishing
 this result does not validate AAC syntax, sample meaning or decoded output.
-The next question is what the downstream consumer does with that publication,
-and whether its source region/lifecycle is correct. Do not reopen the resolved
+The downstream consumer and input branch above map that publication.
+Do not reopen the resolved
 six-word-copy premise or compensate with file trimming, key edits or seeks.
 
 The reviewed initializer wrapper at `02b25c` has an immediate call at

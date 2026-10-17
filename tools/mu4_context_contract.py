@@ -4,6 +4,7 @@ from collections import Counter
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 
 if __package__:
@@ -33,6 +34,97 @@ FLAG_CONTEXT_WITNESS = (
     0x7681,0,0x76e1,4,8,0x10e2,4,0x80e1,6,0x10e2,5,0x80e1,7,0xf073,0x5fbe,
     0x7681,1,0x76e1,4,1,0x10e2,2,0x80e1,6,0x10e2,3,0x80e1,7,0x76e1,9,1,
     0xee01,0x8a11,0xf4e4)
+RECORD_HEADER_BASE = 0x3A930
+RECORD_HEADER_WIDTHS = (12,1,2,1,2,4,1,3,1,1,1,1,13,11,2)
+RECORD_WINDOW_BASE = 0x3EE2B
+RECORD_WINDOW_WITNESS = (0x4a11,0xeeed,0xf495,0x8002,0x101b,0x001a,0x7118,0x0011,
+                         0x4808,0x4e0a,0x4e00,0x5681,0xf983,0xe69b,0xf6b8,0x4e04)
+
+
+def decode_recording_window_arguments(words):
+    if any(words.get(RECORD_WINDOW_BASE + offset) != word for offset, word in enumerate(RECORD_WINDOW_WITNESS)):
+        raise ValueError('AA88 recording-window prefix changed or absent')
+    return {'entry': '03ee2b', 'last_word': '03ee3a', 'pinned_words': 16,
+            'span': 'LD SP(1b),A; ADD SP(1a),A; retain low word and pass as double word',
+            'cursor': 'MVDK SP(18),AR1; DLD *AR1,A; FCALL 03e69b',
+            'observed_frame_words_16_1b': ['0000','0020','ffa0','0000','001c','0004'],
+            'scope': 'Prefix and observed caller frame; not complete modulo helper, partial-tail or offset-ownership acceptance'}
+
+
+def reference_recording_windows(source, state, *, reverse=True):
+    """Bounded host model: aligned 32-byte chunks, selected first four bytes."""
+    if len(source) % 32 or len(state) != 82 or any(not 0 <= word <= 0xffff for word in state):
+        raise ValueError('recording-window model needs complete aligned chunks and word state')
+    result = bytearray(source)
+    for offset in range(0, len(result), 32):
+        words = [int.from_bytes(result[offset+i:offset+i+2], 'little') for i in (0,2)]
+        decoded = reference_transform_block(*words, state, reverse=reverse)
+        result[offset:offset+4] = b''.join(word.to_bytes(2,'little') for word in decoded)
+    return bytes(result)
+
+
+def decode_recording_header_writer(words):
+    fields = []
+    for index, width in enumerate(RECORD_HEADER_WIDTHS):
+        address = RECORD_HEADER_BASE + 10 * index
+        block = tuple(words.get(address + offset) for offset in range(10))
+        if (block[:3] != (0xf7b8,0x10e6,0x227 + index) or
+                block[3:6] not in ((0x7602,width,0x4e00), (0x4e00,0x7602,width)) or
+                block[6:] != (0xfb83,0xacc5,0xf495,0x4811)):
+            raise ValueError(f'AA88 header-writer field {index} changed or absent')
+        fields.append({'field': index, 'source_offset': f'{0x227 + index:04x}',
+                       'width': width, 'call': f'{address + 6:06x}'})
+    return {'entry': '03a930', 'last_word': '03a9c5', 'pinned_words': 150,
+            'fields': fields, 'total_bits': sum(RECORD_HEADER_WIDTHS),
+            'writer': '03acc5', 'arguments': '32-bit value at caller SP(0..1), width at SP(2), receiver A',
+            'scope': 'Header field/call grammar only; not CPU packing, file offsets or AAC payload validity'}
+
+
+def reference_recording_header(values):
+    if len(values) != len(RECORD_HEADER_WIDTHS):
+        raise ValueError('recording header requires fifteen fields')
+    bits = ''
+    for value, width in zip(values, RECORD_HEADER_WIDTHS):
+        if not 0 <= value < 1 << width:
+            raise ValueError('recording header field outside its width')
+        bits += f'{value:0{width}b}'
+    return int(bits, 2).to_bytes(7, 'big')
+
+
+def recording_header_observations(text, frames=8):
+    if frames not in range(1, 9):
+        raise ValueError('header observation requires one to eight bounded frames')
+    overlay = ('mu4_native_recorder_overlay: PASS marker=aa88 records=4622 words=73766 '
+               'checked_ram_words=73762 excluded_register_words=4 before_execution=1')
+    if text.count(overlay) != 1 or text.find('mu4_record_header_argument:') < text.index(overlay):
+        raise ValueError('header observation lacks its preceding verified AA88 upload')
+    pattern = (r'mu4_record_header_argument: field=(\d+) ordinal=(\d+) caller=([0-9a-f]{6}) '
+               r'high=([0-9a-f]{4}) low=([0-9a-f]{4}) width=(\d+) receiver=([0-9a-f]{4}) '
+               r'sp=([0-9a-f]{4}) t=([0-9.]+) context_pc=([0-9a-f]{6}) '
+               r'boundary=data_read ownership=unvalidated observer_writes=0')
+    rows = re.findall(pattern, text)
+    if len(rows) != 15 * frames or text.count('mu4_record_header_argument:') != len(rows):
+        raise ValueError('incomplete, duplicate or malformed header arguments')
+    result, previous = [], 0.0
+    for frame in range(frames):
+        values, receiver = [], None
+        for field, row in enumerate(rows[frame*15:(frame+1)*15]):
+            index, ordinal, caller, high, low, width, pointer, sp, time, pc = row
+            when = float(time)
+            if (int(index) != field or int(ordinal) != frame + 1 or
+                    int(caller,16) != 0x3a93a + 10*field or int(width) != RECORD_HEADER_WIDTHS[field] or
+                    not 0x3acc8 <= int(pc,16) <= 0x3accf or not 0.8 <= when <= 2 or when <= previous or
+                    (receiver is not None and receiver != pointer)):
+                raise ValueError('header argument identity, order, receiver or scope mismatch')
+            receiver, previous = pointer, when
+            values.append((int(high,16) << 16) | int(low,16))
+        result.append({'ordinal': frame+1, 'values': values,
+                       'header_hex': reference_recording_header(values).hex(), 'receiver': receiver})
+    closed = re.findall(r'mu4_record_header_taps_closed: t=([0-9.]+) observer_writes=0', text)
+    if len(closed) != 1 or text.count('mu4_record_header_taps_closed:') != 1 or not 2 < float(closed[0]) < 3:
+        raise ValueError('missing or invalid header observation closure')
+    return {'frames': result, 'argument_records': len(rows),
+            'scope': 'Data-read-selected caller contexts and scalar header model; not retained CPU arguments, encoded payload or native audio'}
 
 
 def decode_flag_context(words):
@@ -1069,6 +1161,8 @@ def contract(source):
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
+    result['recording_header_writer'] = decode_recording_header_writer(recorder_words)
+    result['recording_window_arguments'] = decode_recording_window_arguments(recorder_words)
     result['recording_transform_copy'] = decode_transform_copy(recorder_words, 'aa88')
     result['recorder_memory_mac'] = decode_recorder_memory_mac(recorder_words)
     result['dma_pause'] = decode_dma_pause(words, rel_words)
@@ -1082,9 +1176,13 @@ def contract(source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
+    parser.add_argument('--recording-header-log', type=Path,
+                        help='check the bounded first-eight-header argument observation')
     args = parser.parse_args()
     try:
         result = contract(args.source.read_bytes())
+        if args.recording_header_log:
+            result['recording_header_observation'] = recording_header_observations(args.recording_header_log.read_text())
     except (OSError, ValueError) as error:
         print(f'MU4 context contract: {error}', file=sys.stderr)
         return 1
