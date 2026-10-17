@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify, invocation_inventory, posttransform, verify_post
+from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify, invocation_inventory, posttransform, verify_post, pretransform, bit_reverse_complex, verify_pre
 
 
 def coefficients():
@@ -80,6 +80,73 @@ def complete_fixture(directory):
 
 
 class TransformTests(unittest.TestCase):
+    def test_pre_half_shift_and_bit_reversal_against_independent_bounds(self):
+        for size in (128,1024):
+            values=[((i*1103515245+12345)>>5)%80000-40000 for i in range(size)]
+            cs=[round(math.cos(i*math.pi/size)*(1<<29)) for i in range(size)]
+            output=pretransform(values,cs)
+            count=size//2
+            for i in range(count):
+                x,y=values[2*i],values[-1-2*i]
+                c,d=cs[i],cs[count+i]
+                real=((-((x*c)>>32))>>1)-(((y*d)>>32)>>1)
+                imag=(((y*c)>>32)>>1)-(((x*d)>>32)>>1)
+                self.assertIn(output[2*i]-(real<<3),(0,8,16))
+                self.assertIn(output[2*i+1]-(imag<<3),(-8,0,8))
+            self.assertEqual(bit_reverse_complex(bit_reverse_complex(values)),values)
+            reverse=bit_reverse_complex(list(range(size)))
+            self.assertEqual(reverse[2:4],[size//2,size//2+1])
+        with self.assertRaises(ValueError):
+            pretransform([0],[0])
+        with self.assertRaises(ValueError):
+            bit_reverse_complex([0])
+
+    def test_pre_capture_continuity_and_rehashed_corruption(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            words={site:0xf982 for site in (0x2490f,0x24934,0x24914,0x24939)}
+            lines=[]
+            for call,parameter in ((1,128),(2,1024)):
+                entry=0x2490f if parameter==128 else 0x24934
+                returned=0x24914 if parameter==128 else 0x24939
+                lines.extend((f'mu4_processing_entry: call={call} t={call} observer_writes=0',
+                              f'mu4_processing_return: call={call} t={call+0.9} observer_writes=0',
+                              f'mu4_fft_invocation: call={call} parameter={parameter:04x} base=7000 t={call+0.5} observer_writes=0',
+                              'mu4_fft_vector_snapshot: observer_writes=0'))
+                values=[((i*1103515245+12345)>>5)%80000-40000 for i in range(parameter)]
+                cs=[round(math.cos(i*math.pi/parameter)*(1<<29)) for i in range(parameter)]
+                output=pretransform(values,cs)
+                (directory/f'mu4_fft_{call:03d}_stage0.be16').write_bytes(struct.pack(f'>{parameter}i',*bit_reverse_complex(output)))
+                for stage,data in enumerate((values,cs,output)):
+                    blob=struct.pack(f'>{parameter}i',*data)
+                    name=f'mu4_pre_{call:03d}_stage{stage}.be16'
+                    (directory/name).write_bytes(blob)
+                    base=(0xf200 if parameter==128 else 0xf000) if stage==1 else 0x7000
+                    lines.append(f'mu4_pre_snapshot: invocation={call} call={call} stage={stage} '
+                                 f'address={returned if stage==2 else entry:06x} opcode=f982 base={base:04x} '
+                                 f'words={2*parameter} parameter={parameter:04x} hash={fnv(blob):08x} '
+                                 f'file={name} t={call+0.1+stage*0.01} identity=Execute_entry '
+                                 'context_only=1 observer_writes=0 audio_acceptance=0')
+            text='\n'.join(lines)
+            (directory/'error.log').write_text(text)
+            with patch('tools.mu4_transform_check.source_contract',return_value=words),patch('tools.mu4_transform_check.pin_block'),patch('tools.mu4_transform_check.verify_post',return_value={'selected_transform_validated':True,'post_transform_validated':True}):
+                self.assertTrue(verify_pre(directory,b'source')['pre_transform_validated'])
+                path=directory/'mu4_fft_001_stage0.be16'
+                original=path.read_bytes()
+                path.write_bytes(bytes([original[0]^1])+original[1:])
+                report=verify_pre(directory,b'source')
+                self.assertFalse(report['pre_transform_validated'])
+                self.assertEqual(report['pre_transforms'][0]['bit_reversal_mismatches'],1)
+                path.write_bytes(original)
+                path=directory/'mu4_pre_001_stage2.be16'
+                blob=path.read_bytes()
+                changed=bytes([blob[0]^1])+blob[1:]
+                path.write_bytes(changed)
+                with self.assertRaises(ValueError):
+                    verify_pre(directory,b'source')
+                (directory/'error.log').write_text(text.replace(f'hash={fnv(blob):08x}',f'hash={fnv(changed):08x}',1))
+                self.assertFalse(verify_pre(directory,b'source')['pre_transform_validated'])
+
     def test_post_rotation_against_full_precision_product_bound(self):
         for size in (128,1024):
             values=[((i*1103515245+12345)>>5)%80000-40000 for i in range(size)]

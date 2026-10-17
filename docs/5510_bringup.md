@@ -36,9 +36,9 @@ rounded-shift/clamp model and match later RAM. After the DAGEN correction,
 the first nonzero block's maximum sample error falls from 43,740 to 7
 (RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
 13 and RMS 1.1492 against the independent decoder. These are measurements,
-not an established codec tolerance. Post-transform rotation/permutation now
-matches for all 30 vectors too. Next audit pre-transform and overlap/window
-processing and establish the cause and independent acceptance
+not an established codec tolerance. Pre-transform, bit reversal and
+post-transform rotation/permutation match for all 30 vectors too. Next audit
+overlap/window processing and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6108,7 +6108,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is pre-transform and overlap/window arithmetic,
+Remaining work is overlap/window arithmetic,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6152,7 +6152,39 @@ all post snapshots and their geometry, hashes and chronology. Tests include
 rehashing a wrong output and comparing split products against independent
 full-precision bounds; neither supplies a PCM tolerance. Pre-transform,
 window/overlap processing, other media, waveform conformance, analog output
-and native speech remain unvalidated.
+and native speech remain outside this mode's acceptance.
+
+#### Pre-Transform And Bit Reversal
+
+The original `023f05..023f67` routine consumes alternating components from
+the front and back of the input. Its split-word products have the same
+omitted low*low terms, but it negates the first product before an arithmetic
+half-shift. The other three products are half-shifted individually; only
+then are the stored values shifted left three. Moving a half-shift after
+the store, or negating an already rounded product, changes low bits.
+The routine's final imaginary reversal restores the paired output order.
+
+The passive observer captures all 30 inputs, coefficient tables and outputs,
+using a shared pre/post snapshot implementation. The source-derived model
+matches all 16,384 pre-transform output components. An independent complex
+index bit reversal then matches every component of the captured FFT inputs.
+These are separate checks: consistently rehashing a wrong arithmetic output
+or changing only the permutation still fails. The extra 90 snapshots leave
+the four native word/slot streams and all 402 FFT/post snapshots unchanged.
+Packet binding and the first 4,096 conversions continue to pass.
+
+```sh
+python3 tools/mu4_transform_check.py RUN_DIR --pre \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+This mode pins 837 original source words and requires pre-transform,
+bit-reversal, complete FFT and post-transform acceptance together. Scalar
+tests independently bound the omitted low*low error against full signed
+products, including the negative half-shift, at both supported sizes.
+The result validates these 30 arithmetic invocations, not spectral input
+correctness, window/overlap processing, all media, waveform conformance,
+analog output or native speech.
 
 ### Resident reload contract
 

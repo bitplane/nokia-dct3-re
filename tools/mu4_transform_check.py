@@ -24,6 +24,7 @@ BLOCKS = ((0x248fd,88,'fa9f2a488a08609c99f5d36fc503479e9dbd22f369328ea1ac96ac024
 BLOCKS += ((0x2419d,85,'5d370d4c811616cfa8f212069536645325982ee85040f3fc9f87171ee9af56ba'),)
 SITES = {0:0x24919,1:0x2400a,2:0x2401e,3:0x24036,4:0x24051,5:0x2406c,6:0x2491e,7:0x24919,8:0x24919}
 POST_BLOCK=(0x23f68,93,'b481f810dfbae5f64bd1451bbda611b53b6bff1ecad1592e16662f1a877f2073')
+PRE_BLOCK=(0x23f05,99,'44516e2ca4157842fa2e9318ddfd4cc3efe7c8aa61f93f2184650de2964d72a2')
 
 
 def pin_block(words,base,count,digest):
@@ -144,13 +145,49 @@ def posttransform(values, coefficients):
     return [component for pair in zip(real,reversed(imag)) for component in pair]
 
 
+def pretransform(values, coefficients):
+    if len(values) not in (128,1024) or len(coefficients)!=len(values):
+        raise ValueError('pre-transform requires complete short/long vector and coefficient halves')
+    count=len(values)//2
+    result=[]
+    for i in range(count):
+        x,y=values[2*i],values[-1-2*i]
+        c,d=coefficients[i],coefficients[count+i]
+        # Half-shifts happen before the left-three store. In particular,
+        # floor(-product/2) is not necessarily -floor(product/2).
+        real=((-(partial_product(x,c)>>3))>>1)-((partial_product(y,d)>>3)>>1)
+        imag=((partial_product(y,c)>>3)>>1)-((partial_product(x,d)>>3)>>1)
+        result.extend((wrap32(real<<3),wrap32(imag<<3)))
+    return result
+
+
+def bit_reverse_complex(values):
+    if len(values) not in (128,1024):
+        raise ValueError('bit reversal requires a complete supported complex vector')
+    bits=(len(values)//2).bit_length()-1
+    result=[]
+    for i in range(len(values)//2):
+        reverse=sum(((i>>b)&1)<<(bits-1-b) for b in range(bits))
+        result.extend(values[2*reverse:2*reverse+2])
+    return result
+
+
 def verify_post(directory,source):
+    return verify_rotation(directory,source,pre=False)
+
+
+def verify_pre(directory,source):
+    return verify_rotation(directory,source,pre=True)
+
+
+def verify_rotation(directory,source,*,pre):
     words=source_contract(source)
-    pin_block(words,*POST_BLOCK)
-    transform=verify(directory,source)
+    pin_block(words,*(PRE_BLOCK if pre else POST_BLOCK))
+    transform=verify_post(directory,source) if pre else verify(directory,source)
     text=(directory/'error.log').read_text()
     invocations=rows(text,'mu4_fft_invocation')
-    snapshots=rows(text,'mu4_post_snapshot')
+    prefix='mu4_pre' if pre else 'mu4_post'
+    snapshots=rows(text,prefix+'_snapshot')
     if not invocations or 'mu4_fft_vector_snapshot:' not in text or len(snapshots)!=3*len(invocations):
         raise ValueError('expected complete post-transform snapshots for every invocation')
     result=[]
@@ -160,12 +197,15 @@ def verify_post(directory,source):
         if [int(r['stage']) for r in selected]!=[0,1,2]:
             raise ValueError('post-transform stage order changed')
         data={}
-        previous=float(entry['t'])
+        enclosing=next(r for r in rows(text,'mu4_processing_entry') if r['call']==entry['call'])
+        previous=float(enclosing['t']) if pre else float(entry['t'])
         returned=next(r for r in rows(text,'mu4_processing_return') if r['call']==entry['call'])
         for stage,row in enumerate(selected):
-            address=0x24950 if stage==2 else 0x2491e if parameter==128 else 0x2494e
+            address=((0x24914 if parameter==128 else 0x24939) if stage==2 else
+                     (0x2490f if parameter==128 else 0x24934)) if pre else (
+                     0x24950 if stage==2 else 0x2491e if parameter==128 else 0x2494e)
             base=(0xf200 if parameter==128 else 0xf000) if stage==1 else int(entry['base'],16)
-            name=f'mu4_post_{ordinal:03d}_stage{stage}.be16'
+            name=f'{prefix}_{ordinal:03d}_stage{stage}.be16'
             time=float(row['t'])
             if (int(row['invocation'])!=ordinal or row['call']!=entry['call'] or
                     int(row['parameter'],16)!=parameter or int(row['address'],16)!=address or
@@ -181,18 +221,28 @@ def verify_post(directory,source):
             data[stage]=blob
         if ordinal<len(invocations) and previous>float(invocations[ordinal]['t']):
             raise ValueError('post-transform overlaps next invocation')
-        if data[0]!=(directory/f'mu4_fft_{ordinal:03d}_stage9.be16').read_bytes():
+        if pre and previous>=float(entry['t']):
+            raise ValueError('pre-transform does not precede its FFT invocation')
+        if not pre and data[0]!=(directory/f'mu4_fft_{ordinal:03d}_stage9.be16').read_bytes():
             raise ValueError('post-transform input differs from checked transform return')
         values={stage:struct.unpack(f'>{parameter}i',blob) for stage,blob in data.items()}
-        expected=posttransform(values[0],values[1])
+        expected=(pretransform if pre else posttransform)(values[0],values[1])
         differences=[{'component':i,'native':a,'expected':b} for i,(a,b) in enumerate(zip(values[2],expected)) if a!=b]
+        reversal=0
+        if pre:
+            fft=struct.unpack(f'>{parameter}i',(directory/f'mu4_fft_{ordinal:03d}_stage0.be16').read_bytes())
+            reversal=sum(a!=b for a,b in zip(fft,bit_reverse_complex(values[2])))
         result.append({'invocation':ordinal,'call':int(entry['call']),'complex_points':parameter//2,
-                       'mismatched_components':len(differences),'first_differences':differences[:8]})
-    return {'post_transforms':result,'post_transform_validated':not any(r['mismatched_components'] for r in result),
+                       'mismatched_components':len(differences),'first_differences':differences[:8],
+                       **({'bit_reversal_mismatches':reversal} if pre else {})})
+    return {('pre_transforms' if pre else 'post_transforms'):result,
+            ('pre_transform_validated' if pre else 'post_transform_validated'):not any(r['mismatched_components'] or r.get('bit_reversal_mismatches',0) for r in result),
+            **({'post_transform_validated':transform['post_transform_validated']} if pre else {}),
             'selected_transform_validated':transform['selected_transform_validated'],
-            'source_words_pinned':sum(n for _,n,_ in BLOCKS)+POST_BLOCK[1],
+            'source_words_pinned':sum(n for _,n,_ in BLOCKS)+POST_BLOCK[1]+(PRE_BLOCK[1] if pre else 0),
             'native_audio_validated':False,
-            'scope':'Captured transform returns and post-rotation/permutation only; no pre-transform, window/overlap, all-media, PCM, analog or speech acceptance'}
+            'scope':('Captured pre-rotation, bit reversal, FFT and post-rotation' if pre else 'Captured FFT and post-rotation')+
+                    '; no window/overlap, all-media, PCM, analog or speech acceptance'}
 
 
 def invocation_inventory(text, words):
@@ -376,6 +426,7 @@ def main():
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument('--inventory',action='store_true',help='report observed short/long wrapper entries, not arithmetic acceptance')
     mode.add_argument('--post',action='store_true',help='require complete post-transform rotation/permutation acceptance as well')
+    mode.add_argument('--pre',action='store_true',help='require pre-transform, bit reversal, FFT and post-transform acceptance')
     args=parser.parse_args()
     try:
         source=args.source_a00.read_bytes()
@@ -383,9 +434,9 @@ def main():
             result=invocation_inventory((args.directory/'error.log').read_text(),source_contract(source))
             print(json.dumps(result,indent=2))
             return 0
-        result=verify_post(args.directory,source) if args.post else verify(args.directory,source)
+        result=verify_pre(args.directory,source) if args.pre else verify_post(args.directory,source) if args.post else verify(args.directory,source)
         print(json.dumps(result,indent=2))
-        return 0 if result['selected_transform_validated'] and result.get('post_transform_validated',True) else 1
+        return 0 if result['selected_transform_validated'] and result.get('post_transform_validated',True) and result.get('pre_transform_validated',True) else 1
     except (ValueError,KeyError,OSError) as error:
         print(f'FAIL: {error}',file=sys.stderr)
         return 1
