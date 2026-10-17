@@ -6,9 +6,38 @@ from unittest.mock import patch
 
 from tools.verify_etsi_efr_reference import check_vectors, digest, validate_members
 from tools.verify_etsi_efr_reference import dtx_input, inspect_dtx, DTX_FRAMES
+from tools.verify_etsi_efr_reference import erasure_input, inspect_erasures, ERASURE_BURSTS
 
 
 class EtsiEfrReferenceTest(unittest.TestCase):
+    def test_erasure_input_changes_only_scheduled_bfi(self):
+        original = b''.join(struct.pack('<247H', *([0] + [i % 2] * 244 + [0, i % 2]))
+                            for i in range(163))
+        generated = erasure_input(original)
+        expected = {f for start, count in ERASURE_BURSTS for f in range(start, start + count)}
+        self.assertEqual(len(expected), 28)
+        for i in range(163):
+            self.assertEqual(generated[i * 494], int(i in expected))
+            self.assertEqual(generated[i * 494 + 1:(i + 1) * 494], original[i * 494 + 1:(i + 1) * 494])
+        for bad in (original[:-1], b'\x01\x00' + original[2:],
+                    original[:490] + b'\x02\x00' + original[492:]):
+            with self.assertRaises(ValueError):
+                erasure_input(bad)
+
+    def test_erasure_coverage_requires_nontrivial_concealment(self):
+        source = struct.pack('<247H', *([0] * 247)) * 163
+        decoder = erasure_input(source)
+        clean = bytes(163 * 320)
+        pcm = bytearray(clean)
+        for start, count in ERASURE_BURSTS:
+            pcm[start * 320] = 1
+        self.assertEqual(inspect_erasures(decoder, pcm, clean)['changed_frames'], 4)
+        for values in ((source, pcm, clean), (decoder, clean, clean),
+                       (decoder, pcm[:-1], clean), (decoder[:-1], pcm, clean),
+                       (b'\x02\x00' + decoder[2:], pcm, clean)):
+            with self.assertRaises(ValueError):
+                inspect_erasures(*values)
+
     def test_dtx_input_preserves_speech_and_uses_deterministic_quiet_noise(self):
         speech = bytes((i % 251 for i in range(163 * 320)))
         generated = dtx_input(speech + bytes(192))

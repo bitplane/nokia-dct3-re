@@ -113,6 +113,14 @@ these placeholders in a test baseline.
 
 ### External EFR reference input
 
+The optional `--erasure-fixture` generates fixed active-speech BFI bursts
+of 1, 3, 8 and 16 frames from the verified installation decoder input.
+Payload and TAF are unchanged; two fresh decoder processes must reproduce
+the locally pinned `erasure.dec` and `erasure.out`. These generated files
+remain private research fixtures, not distributable MAME ROMs or published
+conformance vectors. Native recovery currently fails at frame 9; see
+`docs/cobba_control_boundary.md#native-efr-active-speech-erasures`.
+
 The ETSI EFR ANSI-C reference and installation vectors are separate research
 inputs, not MAME runtime code or handset ROMs. The locally acquired mirrored
 archive is retained at

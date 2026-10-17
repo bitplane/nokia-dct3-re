@@ -16,9 +16,24 @@ from tools.run_c54x_rom4_crc import EFR_DECODER_REPLAY
 from tools.run_c54x_rom4_crc import EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE, EFR_ENCODER_REPLAY
 from tools.run_c54x_rom4_crc import EFR_DTX_DECODER_PASS, EFR_DTX_DECODER_COMPLETE, EFR_DTX_DECODER_REPLAY
 from tools.run_c54x_rom4_crc import EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLETE, EFR_DTX_ENCODER_REPLAY
+from tools.run_c54x_rom4_crc import EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE, EFR_ERASURE_REPLAY
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_erasure_decoder_completion(self):
+        frames = "\n".join(f"ROM4 EFR erasure decoder comparison: frame={frame} mismatches=0" for frame in range(163))
+        text = "\n".join((frames, EFR_ERASURE_REPLAY, EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE))
+        check_result(text, 3, efr_erasure_decoder=True)
+        check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_erasure_decoder=True)
+        for invalid in (text.replace("frame=9 mismatches=0", "frame=9 mismatches=127"),
+                        text.replace("frame=162 mismatches=0", "frame=0 mismatches=0"),
+                        text.replace(EFR_ERASURE_REPLAY, ""), text.replace("erased=28", "erased=0"),
+                        text.replace("bursts=1,3,8,16", "bursts=1"),
+                        text.replace("ram_words=65440", "ram_words=160"),
+                        text + "\nunexpected trailer"):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_erasure_decoder=True)
+
     def test_efr_dtx_encoder_completion(self):
         frames = "\n".join(f"ROM4 EFR DTX encoder comparison: frame={frame} mismatches=0" for frame in range(518))
         text = "\n".join((frames, EFR_DTX_ENCODER_REPLAY, EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLETE))

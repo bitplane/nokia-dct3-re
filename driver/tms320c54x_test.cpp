@@ -15930,7 +15930,7 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "efr-dtx-decoder"))
+				(!strcmp(machine().options().bios(), "efr-dtx-decoder") || !strcmp(machine().options().bios(), "efr-erasure")))
 		{
 			start_rom4_efr_decoder(0, true);
 			return;
@@ -16950,6 +16950,7 @@ private:
 	{
 		auto &data = m_cpu->space(AS_DATA);
 		bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-decoder");
+		bool const erasure = !strcmp(machine().options().bios(), "efr-erasure");
 		if (initialize)
 		{
 			data.write_word(0x0ac8, 0);
@@ -16958,7 +16959,7 @@ private:
 		}
 		else
 		{
-			u8 const *const input = memregion(dtx ? "efr_dtx_input" : "efr_reference_input")->base() + frame * 494;
+			u8 const *const input = memregion(dtx ? "efr_dtx_input" : erasure ? "efr_erasure_input" : "efr_reference_input")->base() + frame * 494;
 			auto word = [&](unsigned index) { return u16(input[index * 2] | (input[index * 2 + 1] << 8)); };
 			data.write_word(0x1343, word(0));
 			unsigned bit = 1;
@@ -46636,6 +46637,7 @@ private:
 		if (m_phase >= 302000 && m_phase < 302519)
 		{
 			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-decoder");
+			bool const erasure = !strcmp(machine().options().bios(), "efr-erasure");
 			unsigned const frames = dtx ? 518 : 163;
 			expect(m_phase <= 302000 + frames, "EFR decoder phase stays within the selected reference input");
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
@@ -46650,7 +46652,7 @@ private:
 			if (m_phase == 302000) { start_rom4_efr_decoder(0, false); return; }
 			unsigned const frame = m_phase - 302001;
 			if (replay_rom4_codec_frame(302001 + frame, 20)) return;
-			u8 const *const reference = memregion(dtx ? "efr_dtx_pcm" : "efr_reference_pcm")->base() + frame * 320;
+			u8 const *const reference = memregion(dtx ? "efr_dtx_pcm" : erasure ? "efr_erasure_pcm" : "efr_reference_pcm")->base() + frame * 320;
 			unsigned mismatches = 0;
 			bool nonzero = false;
 			for (unsigned i = 0; i < 160; ++i)
@@ -46664,7 +46666,7 @@ private:
 					++mismatches;
 				}
 			}
-			osd_printf_info("ROM4 EFR%s decoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : "", frame, mismatches);
+			osd_printf_info("ROM4 EFR%s decoder comparison: frame=%u mismatches=%u\n", dtx ? " DTX" : erasure ? " erasure" : "", frame, mismatches);
 			m_rom4_pcm_mismatches += mismatches;
 			expect(!mismatches, "native EFR decoder matches independent ETSI PCM");
 			if (dtx)
@@ -46674,6 +46676,22 @@ private:
 			}
 			if (frame + 1 < frames) { start_rom4_efr_decoder(frame + 1, false); return; }
 			expect(m_rom4_codec_replays == frames, "EFR replays every frame with its original codec histories");
+			if (erasure)
+			{
+				u8 const *const input = memregion("efr_erasure_input")->base();
+				unsigned erased = 0;
+				for (unsigned f = 0; f < frames; ++f)
+				{
+					bool const lost = f == 8 || (f >= 32 && f < 35) || (f >= 80 && f < 88) || (f >= 120 && f < 136);
+					expect(input[f * 494] == unsigned(lost) && input[f * 494 + 1] == 0 && input[f * 494 + 490] == 0,
+						"active speech erasures follow the fixed BFI schedule without SID frames");
+					erased += lost;
+				}
+				expect(erased == 28, "all four active-speech erasure bursts were exercised");
+				osd_printf_info("TMS320C54x ROM4 EFR erasure decoder replay: PASS frames=163 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
+				osd_printf_info("TMS320C54x ROM4 EFR erasure decoder: PASS frames=163 samples=26080 erased=28 bursts=1,3,8,16 mismatches=0 handset_audio_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x ROM4 EFR erasure decoder complete");
+			}
 			if (dtx)
 			{
 				u8 const *const input = memregion("efr_dtx_input")->base();
@@ -48464,6 +48482,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(10, "efr-encoder", "Isolated acquired ROM EFR speech encoder")
 	ROM_SYSTEM_BIOS(11, "efr-dtx-decoder", "Isolated acquired ROM EFR silence and speech decoder")
 	ROM_SYSTEM_BIOS(12, "efr-dtx-encoder", "Isolated acquired ROM EFR silence and speech encoder")
+	ROM_SYSTEM_BIOS(13, "efr-erasure", "Isolated acquired ROM EFR active-speech erasure decoder")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -48504,6 +48523,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(12))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(13))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -48544,6 +48566,13 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(12))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(13))
+	ROM_REGION(80522, "efr_erasure_input", 0)
+	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(13))
+	ROM_REGION(52160, "efr_erasure_pcm", 0)
+	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(13))
 	ROM_REGION(165760, "efr_dtx_encoder_pcm", 0)
 	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(12))
 	ROM_REGION(254856, "efr_dtx_encoder_serial", 0)

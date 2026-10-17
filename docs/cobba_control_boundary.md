@@ -1913,3 +1913,32 @@ classification and homing/error combinations remain separate acceptance work.
 No RF scheduling, handset PCM clock, organic native speech transport or
 end-to-end calling follows from the result.
 
+### Native EFR active-speech erasures
+
+**Current frontier:** `make check-c54x-rom4-efr-erasure-decoder` deliberately
+fails at recovery frame 9 (zero-based), with 127 of 160 PCM samples different.
+Frames 0--8 match exactly, including the first erased frame. This localizes
+the first observable error to recovery after a single loss, not ordinary
+speech or initial concealment; it does not identify the faulty instruction
+or distinguish hidden codec-state divergence from recovery arithmetic.
+
+The external reference first passes its original installation checks. A
+generated input preserves every speech payload bit, SID=0 and original TAF,
+changing only BFI for four fixed bursts: frame 8 (one frame), 32--34 (three),
+80--87 (eight), and 120--135 (sixteen). All 163 frames are decoded twice in
+fresh processes. Local SHA-256 pins cover the generated input and output;
+these are research reproducibility pins, not published conformance vectors.
+Every burst produces nonzero concealment differing from the clean reference;
+83 output frames differ overall, including subsequent recovery effects.
+No external reference code or vectors enter Git or the MAME overlay.
+
+The native gate uses unchanged `c941` reset and `c8dc` decoding, retains
+histories between frames, and requires every PCM sample plus full ordinary-RAM
+save/replay for every frame. It rejects the partial result rather than
+rebasing expected output on native execution. The next discriminator is the
+state carried from erased frame 8 into frame 9, followed by the earliest
+recovery calculation that disagrees with the independent reference. The
+longer bursts remain unexecuted because the strict gate stops at the first
+mismatch. Invalid SID, homing/error combinations, RF scheduling and handset
+speech transport remain separate boundaries.
+

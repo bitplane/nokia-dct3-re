@@ -25,6 +25,11 @@ EXPECTED = {
     "out": (52160, "738af1ead354b8960504bd7d9656d53c1a11880051d01e79b97c276f739c187a"),
 }
 DTX_FRAMES = 518
+ERASURE_BURSTS = ((8, 1), (32, 3), (80, 8), (120, 16))
+ERASURE_EXPECTED = {
+    "dec": "ec37dbbd0f498b5e19b6e549b80687acafe03859c68ff5f337940a25dfb370d5",
+    "out": "1c05e9951ffbe91fb25e2ddd4b349f4e563a021ebd5ad7d1e3115881ce326fc9",
+}
 DTX_EXPECTED = {
     "inp": "f7c76955e1f79777b6a67eab3c6cc346d13351974b40817a6765acc89739ba1d",
     "cod": "b06b7dd60d251b6fa48931ecb3e313f7b03a754bb0a0b3807be1781cd73e590b",
@@ -96,6 +101,63 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def erasure_input(decoder):
+    """Retain the installation payload/TAF and mark fixed active-speech losses."""
+    if len(decoder) != 163 * 494:
+        raise ValueError("erasure source requires 163 complete decoder frames")
+    for frame in struct.iter_unpack('<247H', decoder):
+        if frame[0] or frame[245] or frame[246] > 1 or any(bit > 1 for bit in frame[1:245]):
+            raise ValueError("erasure source requires clean active speech")
+    result = bytearray(decoder)
+    for start, count in ERASURE_BURSTS:
+        for frame in range(start, start + count):
+            struct.pack_into('<H', result, frame * 494, 1)
+    return bytes(result)
+
+
+def inspect_erasures(decoder, pcm, clean_pcm):
+    if len(pcm) != 163 * 320 or len(clean_pcm) != len(pcm):
+        raise ValueError("erasure PCM requires 163 complete frames")
+    if len(decoder) != 163 * 494:
+        raise ValueError("erasure input requires 163 complete frames")
+    expected = {f for start, count in ERASURE_BURSTS for f in range(start, start + count)}
+    actual = set()
+    for i, frame in enumerate(struct.iter_unpack('<247H', decoder)):
+        if frame[0] > 1 or frame[245] or frame[246] > 1 or any(bit > 1 for bit in frame[1:245]):
+            raise ValueError("erasure input has invalid active-speech flags or bits")
+        if frame[0]:
+            actual.add(i)
+    if actual != expected:
+        raise ValueError("erasure schedule differs")
+    for start, count in ERASURE_BURSTS:
+        begin, end = start * 320, (start + count) * 320
+        if pcm[begin:end] == clean_pcm[begin:end] or not any(pcm[begin:end]):
+            raise ValueError("erasure burst lacks nonzero concealment differing from clean speech")
+    return {"frames": 163, "erased_frames": len(actual),
+            "bursts": [{"start": start, "frames": count} for start, count in ERASURE_BURSTS],
+            "changed_frames": sum(pcm[i:i + 320] != clean_pcm[i:i + 320]
+                                  for i in range(0, len(pcm), 320))}
+
+
+def generate_erasures(source, commands, log):
+    (source / "erasure.dec").write_bytes(erasure_input((source / "verified.dec").read_bytes()))
+    for name in ("erasure.out", "erasure_replay.out"):
+        command = ["./decoder", "erasure.dec", name]
+        commands.append(command)
+        subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    pcm = (source / "erasure.out").read_bytes()
+    if pcm != (source / "erasure_replay.out").read_bytes():
+        raise ValueError("erasure decoding differs across fresh processes")
+    decoder = (source / "erasure.dec").read_bytes()
+    coverage = inspect_erasures(decoder, pcm, (source / "verified.out").read_bytes())
+    if any(digest(data) != ERASURE_EXPECTED[suffix] for suffix, data in (("dec", decoder), ("out", pcm))):
+        raise ValueError("erasure reference differs from its local reproducibility pin")
+    return {"coverage": coverage, "fresh_process_replay": True,
+            "outputs": {suffix: {"bytes": len(data), "sha256": digest(data)}
+                        for suffix, data in (("dec", decoder), ("out", pcm))},
+            "published_expected_vector_claim": False}
+
+
 def validate_members(names):
     """This specific archive is flat; reject paths and lowercase collisions."""
     seen = set()
@@ -131,6 +193,8 @@ def main():
                         help="export verified codec inputs/outputs to isolated MAME fixture ROM storage")
     parser.add_argument("--dtx-fixture", action="store_true",
                         help="generate a deterministic DTX conversation after installation verification")
+    parser.add_argument("--erasure-fixture", action="store_true",
+                        help="generate fixed active-speech BFI bursts after installation verification")
     args = parser.parse_args()
     evidence_path = None
     evidence = {}
@@ -167,6 +231,9 @@ def main():
         if args.dtx_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["dtx"] = generate_dtx(source, commands, log)
+        if args.erasure_fixture:
+            with (run / "build-and-run.log").open("a") as log:
+                evidence["erasures"] = generate_erasures(source, commands, log)
         evidence["frames"] = evidence["outputs"]["out"]["bytes"] // 320
         evidence["unused_input_samples"] = len((source / "spch_dos.inp").read_bytes()) // 2 - evidence["frames"] * 160
         evidence["executables"] = {name: digest((source / name).read_bytes())
@@ -181,6 +248,10 @@ def main():
                     name = f"dtx.{suffix}"
                     (args.fixture_dir / name).write_bytes((source / name).read_bytes())
             evidence["fixture_directory"] = str(args.fixture_dir.resolve())
+            if args.erasure_fixture:
+                for suffix in ("dec", "out"):
+                    name = f"erasure.{suffix}"
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
     except (OSError, ValueError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
         if evidence_path is not None:
@@ -191,6 +262,8 @@ def main():
     print("ETSI EFR reference: PASS frames=163 encoder=exact interface=exact decoder=exact native_dsp_claim=0")
     if args.dtx_fixture:
         print("ETSI EFR DTX reference: PASS frames=518 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
+    if args.erasure_fixture:
+        print("ETSI EFR erasure reference: PASS frames=163 erased=28 bursts=1,3,8,16 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     return 0
 
 
