@@ -777,6 +777,40 @@ REL_CLEANUP_WITNESS = (
     0x3AEA, 0xF980, 0x2082, 0xE800, 0xF980, 0x2080,
 )
 REL_RELOAD_API = (0xF880, 0x3538)
+PLAYBACK_CLEANUP_INGRESS = {
+    0x27887: (0x76F8, 0xAA1A, 0x0001),
+    0x29438: (0x1004,0x11F8,0x0008,0xF310,0x0011,0xF84D,0x9471,
+              0x11F8,0x0008,0xF310,0x0016,0xF84D,0x9458,0x10F8,
+              0x0008,0xF010,0x0017,0xF844,0x95AF,0x7105,0xAA1A,
+              0x7604,0x8017,0x4818,0x7600,0x0001,0xF000,0x0004,
+              0xF982,0x929C,0xF073,0x95AF),
+    0x29471: (0x1005,0x8066,0x7107,0x0011,0x7108,0x0016,0x7604,
+              0x8011,0x7109,0xAA1E,0x7600,0x0001,0x4818,0xF000,
+              0x0004,0xF982,0x929C,0x76F8,0xAA1B,0x0000),
+    0x294FD: (0x60F8,0xAA1A,0x0001,0xF830,0x956F),
+}
+
+
+def decode_playback_cleanup_ingress(words):
+    for base, witness in PLAYBACK_CLEANUP_INGRESS.items():
+        for offset, expected in enumerate(witness):
+            if words.get(base+offset) != expected:
+                raise ValueError(f'cleanup ingress witness changed at {base+offset:06x}')
+    references = [f'{address:06x}' for address, value in sorted(words.items()) if value == 0xaa1a]
+    return {'pinned_words': sum(map(len, PLAYBACK_CLEANUP_INGRESS.values())),
+            'field': 'aa1a', 'mapped_literal_references': references,
+            'initial_store_pattern': {'address': '027887', 'value': 1},
+            'input17': {'dispatch': '029445', 'store': '02944b',
+                        'operation': 'MVDK local-frame word 5 -> aa1a',
+                        'reply_word': '8017', 'continuation': '0295af'},
+            'input11': {'entry': '029471', 'reply_word': '8011',
+                        'gate': '0294fd', 'predicate': 'aa1a == 1',
+                        'taken_target': '02956f',
+                        'scope': 'intervening processing paths are not modeled'},
+            'scope': 'Pinned dispatch/store/compare patterns; no runtime message ownership, '
+                     'all-writer closure, EOF meaning or decoder failure claim'}
+
+
 MASK = 0xC004
 WITNESS = (
     0xEEFF, 0x4A06, 0x4A07, 0xF6BE, 0xF6B9,
@@ -1425,6 +1459,7 @@ def contract(source):
         'aa55': playback_lifecycle_literal_census(bootstrap_words),
         'aa99': playback_lifecycle_literal_census(rel_words),
     }
+    result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)

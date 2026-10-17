@@ -17,6 +17,7 @@ from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNE
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 from tools.mu4_context_contract import playback_lifecycle_literal_census
+from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
@@ -47,6 +48,21 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_cleanup_ingress_pins_message_gate_without_declaring_eof(self):
+        words = {base+index: value for base, witness in PLAYBACK_CLEANUP_INGRESS.items()
+                 for index, value in enumerate(witness)}
+        result = decode_playback_cleanup_ingress(words)
+        self.assertEqual(result['input11']['taken_target'], '02956f')
+        self.assertEqual(result['mapped_literal_references'], ['027888', '02944c', '0294fe'])
+        self.assertEqual(result['pinned_words'], len(words))
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_playback_cleanup_ingress(changed)
+        words[0x30000] = 0xaa1a
+        self.assertIn('030000', decode_playback_cleanup_ingress(words)['mapped_literal_references'])
+
     def test_lifecycle_census_keeps_unknowns_and_distinguishes_store_from_compare(self):
         words = dict(enumerate((0x76f8, 0x373e, 4, 0x60f8, 0x373e, 4,
                                 0x10f8, 0x3742, 0xffff, 0x3742), 0x20000))

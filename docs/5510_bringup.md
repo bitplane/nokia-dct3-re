@@ -8613,6 +8613,24 @@ as well as cleanup. This ten-second recording ends before that re-entry,
 so it does not pass that separate contract; do not weaken the checker or
 claim the complete repeating lifecycle from this shorter observation.
 
+The next static boundary is now pinned as `playback_cleanup_ingress` in
+the context tool (60 AA99 words). Routine `029422` fills a local frame via
+`029264`; the selector at frame word 4 dispatches inputs `11`, `16`, `17`.
+Input `17` copies frame word 5 to `aa1a` at `02944b`, writes reply selector
+`8017` and takes the ordinary tail. Input `11` enters at `029471`, writes
+reply selector `8011`, and has a later compare at `0294fd`: `aa1a == 1`
+branches to cleanup `02956f`. Intervening processing paths are not yet
+modeled. The mapped AA99 image has three literal `aa1a` references, including
+an immediate-one store pattern at `027887`; this is not an indirect-writer
+closure. Local-frame roles beyond the shown copies remain unassigned.
+
+This is a candidate message/lifecycle entrance, not proof that a decoder
+loop returns an error at block 375. Next observe the actual `aa1a` writes,
+input `17` dispatch and `029500` branch outcome near the final block, then
+follow the selected producer. Runtime passage through those exact sites,
+message ownership and the meaning of value 1 still need evidence; no stop
+word or input selector should be forced to extend playback.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a
