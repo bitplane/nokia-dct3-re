@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_argument14_conversion",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "The first two packet-bound native output blocks follow the independent argument-14 rounded-shift/clamp contract and reach later source RAM unchanged",
+      "current": "A 152-word AA99 witness pins converter 0248a6, shift composition 024e38/024d43 and its selected arithmetic-right-shift helper. For signed DLD32 input, the observed argument 14 computes (signed32(raw)+8192)>>14 (ties toward positive infinity), then clamps to -32767..32767. All 4096 native conversions in the first two successful blocks match the intermediate shift, full accumulator result and later pre-copy RAM word. Zero-extended negative raw values are valid because the source helper normalizes to signed32. At packet 1/sample 448, raw source f380/f381 is 00fff59b08 and correctly converts to -42 versus reference -27; eb80/eb81 is ffffbd0b70 and correctly converts to -268 versus reference 14. The differing values already exist upstream of the converter; no CPU arithmetic correction or reference substitution was made. Other helper arguments, all media, decoded waveform quality, analog output and speech remain outside acceptance.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_processing_check.py", "tools/test_mu4_processing_check.py", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_playback_frame_check.py"]
+    },
+    {
+      "id": "mu4_native_processing_output_quality",
+      "owner": "mu4_native_dsp",
+      "status": "unresolved",
+      "predicate": "Packet-bound native processing output agrees with independently decoded samples before claiming native audio",
+      "current": "Eight processing calls consume the exact host-valid AAC packets, return zero and produce the corresponding output loops. The first-two-block converter and RAM correspondence is exact under its source-derived scalar contract, but the reference comparison first differs in packet 1/sample 448 on both channels. Trace producers of raw words f380/f381 and eb80/eb81 during the second 024610 call; the measured processing interval is 1.016836666..1.022919732 seconds. Do not retune conversion, framing, source packets or output samples, and do not infer a particular transform stage or opcode from a contemporaneous PC. An owned producer/value chain is needed before changing core arithmetic. Native waveform, analog audio and speech remain unvalidated.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_processing_check.py", "tools/test_mu4_processing_check.py", "tools/mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_pre_copy_material_chronology",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
@@ -21,10 +37,10 @@
     {
       "id": "mu4_native_decoded_frame_binding",
       "owner": "mu4_native_dsp",
-      "status": "unresolved",
-      "predicate": "Native decoder output blocks are bound to independently decoded source AAC packets before waveform acceptance",
-      "current": "The captured eight-packet AAC prefix independently decodes to 8192 stereo sample frames. Actual codec slot metadata establishes complete DIN pairs, but the fixed first-signal anchor does not match that reference. The pre-copy probe now binds all 2977 reference AAC bytes to the initial input RAM and records chronological channel-block rollovers. Block zero is zero; block one preserves the reference's 448-sample zero prefix but first differs at sample 448 (-42 versus -27, and -268 versus 14), while samples 449/450 match exactly. The unfitted comparison therefore already differs before DMA under that block chronology. A separate 59-word original-source witness identifies input setup at 023d73, processing call 023de5 -> 024610, its nonzero-result exit, and the following 1024-iteration two-channel conversion loop through 0248a6 with argument 14. Runtime processing-call-to-packet ownership and the first differing 32-bit value/conversion remain open. Do not infer arithmetic blame, fit a lag/channel swap, inject reference samples, or promote this material/block correspondence to complete decoded-audio acceptance.",
-      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py", "tools/mu4_playback_frame_check.py", "tools/mu4_playback_frame_observe.lua", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_recorder_transform_check.py", "driver/mu4_storage_test.cpp"]
+      "status": "satisfied",
+      "predicate": "The first eight native processing calls are bound to the captured reference AAC packets and their output loops",
+      "current": "The original Execute observer records eight 023de5 -> 024610 calls, zero results and eight complete two-channel 1024-sample conversion loops. Net consumption is 373 bytes then seven packets of 372 bytes, exactly the reference ADTS chain. Entry reservoirs and 186 actual in-call bit-reader word reads per call cover and match every one of the 2977 consumed bytes. The last three prefetched bytes are unconsumed lookahead outside the reference, not validated payload. Caller SP is observed SP+2 because FCALL has already reserved its frame by Execute; the A argument and restored SP validate that ABI. Returned output destinations match later copy snapshots before the next processing call that can reuse them. Complete conversion/value correspondence is additionally checked for the first two blocks, without lag fitting, scaling or channel selection. This closes the bounded eight-packet binding question, not all media, waveform quality, analog audio or speech; raw processing quality is tracked separately.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_processing_check.py", "tools/test_mu4_processing_check.py", "tools/mu4_playback_frame_check.py", "tools/mu4_playback_frame_observe.lua", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_recorder_transform_check.py", "driver/mu4_storage_test.cpp"]
     },
     {
       "id": "c54x_poly_immediate_extended_t_dependencies",

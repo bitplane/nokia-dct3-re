@@ -30,11 +30,13 @@ the domains below, without changing those native captures. Codec callback
 metadata establishes uninterrupted slot pairs and cadence across CPU clock
 changes. A first-signal comparison with eight independently decoded AAC
 packets does not match, but packet-to-PCM-frame ownership is not established.
-The pre-copy observation now matches all eight source packets in input RAM
-and records ordered 1,024-word channel blocks with differences already
-present before DMA. Next bind those blocks to the processing call `024610`
-and inspect conversion helper `0248a6` before diagnosing upstream arithmetic;
-do not choose a lag or channel swap to improve a fit.
+The first eight processing calls now have complete consumed-byte coverage
+against the reference packets and matching output-loop/block identities.
+All 4,096 conversions in the first two blocks follow the source-derived
+rounded-shift/clamp model and match later RAM. The first differences are
+already in the 32-bit processing results at `f380/f381` and `eb80/eb81`.
+Next trace their producers during the second `024610` call; do not change
+the converter, choose a fitted lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
@@ -5946,8 +5948,9 @@ samples in that pair, including large errors. Thus the unfitted chronological
 comparison already differs in pre-DMA RAM, not just the serial output.
 The instrumented DMA/TX/DIN word files and codec-slot file are exact prefixes
 of the uninstrumented run.
-This material/copy probe can retire once direct processing-call and output
-ownership capture supersedes these checkpoints.
+The bit-reader taps and RAM snapshots remain inputs to the processing
+checker. Retire this material/copy probe only when equivalent direct read
+and store captures replace those checkpoints.
 
 Use the canonical recorded NAND, `bootplaystage`, an isolated working
 directory and absolute paths as for playback, adding:
@@ -5961,11 +5964,80 @@ python3 tools/mu4_playback_frame_check.py RUN_DIR \
 
 A separate 59-word witness pins `023d73`'s input setup, the processing call
 `023de5 -> 024610`, its nonzero-result exit, and the following 1,024-iteration
-two-channel conversion loop through `0248a6` with argument 14. That is the
-next bounded runtime ownership target. With OVLY set, low logical addresses
+two-channel conversion loop through `0248a6` with argument 14. The bounded
+runtime proof follows below. With OVLY set, low logical addresses
 such as `02:3d73` execute from physical page zero; disassembling raw `02:3d73`
 can show unrelated zero backing RAM. Source and retained Execute identity,
 not such a raw debugger view, remain authoritative.
+
+### Processing And Conversion
+
+The first eight original `023de5 -> 024610` calls return zero and each
+completes a 1,024-sample, two-channel conversion loop. Their net consumption
+is 373 bytes followed by seven 372-byte packets: exactly the eight declared
+ADTS extents. Each consumed byte matches the independent reference through
+the entry reservoir or an actual in-call bit-reader bus read, not merely a
+header/payload-prefix comparison. There are 186 such word reads per call.
+The last three prefetched bytes lie outside the eight-packet reference;
+they remain unconsumed reservoir lookahead and are not validated content.
+
+Byte position is `2*B331 - remaining_bits/8`. The first call advances from
+512 to 885 in the initial buffer. Subsequent calls carry three header bytes
+in the reservoir and advance from -3 to 369 after compaction. This establishes
+packet boundaries without waveform alignment or a guessed file offset.
+Conversion destinations alternate `7000` and `7800`, with the second channel
+at destination+`0400`. Returned destinations match later copy snapshots,
+after the corresponding output loop and before the next processing call
+that can reuse the same buffers.
+
+FCALL has already reserved its two stack words at Execute entry. The observer
+therefore normalizes caller SP as observed SP+2; the processing A argument
+is caller SP+6. Sampling the unadjusted stack word would read the return page,
+not converter argument 14. This is a pipeline observation constraint, not a
+firmware ABI or scheduling correction.
+
+A 152-word witness pins `0248a6`, its `024e38`/`024d43` shift composition
+and the selected arithmetic-right-shift helper. For the observed argument
+14, the independent scalar contract is:
+
+```text
+rounded = (signed32(raw) + 8192) >> 14
+output = clamp(rounded, -32767, 32767)
+```
+
+Rounding ties go toward positive infinity. The source explicitly normalizes
+to signed 32-bit; zero-extended negative DLD inputs are valid even when the
+40-bit accumulator guard is zero. This is not a license to alter general
+accumulator signedness or other helper arguments.
+
+All 4,096 observed conversions in the first two successful blocks match both
+the intermediate rounded value and final clamp. Every returned low word
+also matches its later pre-copy source-buffer snapshot. At block 1/sample
+448, channel 0 reads raw `00fff59b08` from `f380/f381` and correctly yields
+-42, while the independent decoder yields -27. Channel 1 reads
+`ffffbd0b70` from `eb80/eb81` and correctly yields -268 rather than the
+reference's 14. The divergence is upstream of this converter and transport;
+no particular arithmetic instruction or transform stage is blamed yet.
+
+The bounded observer preserves the complete 20-second replay: DMA, TX and
+DIN word captures, codec slot timestamps and all six terminal summaries
+match the prior baseline byte-for-byte. Its 6,852 early observation records
+also match the two-second proof run. This establishes non-interference,
+not decoded-audio acceptance.
+
+Use the same passive two-second run and independently regenerated reference:
+
+```sh
+python3 tools/mu4_processing_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-aac captured-eight-packets.aac --reference-pcm host-eight-frames.s16le
+```
+
+The checker requires call/return order, zero results, original Execute
+identity, complete packet-byte coverage, conversion-loop extents, buffer
+lifetimes, all sampled conversion values and later RAM correspondence.
+This proves the bounded eight-packet binding and first-two-block conversion,
+not correct decoded audio, all media, analog output or native speech.
 
 ### Resident reload contract
 
@@ -7832,19 +7904,12 @@ python3 tools/mu4_playback_capture_check.py RUN_DIR --require-framing \
   --reference-pcm host-eight-frames.s16le --reference-rate 44100
 ```
 
-The fixed diagnostic anchor is the first nonzero complete frame on each
-side: reference frame 1,472 and native frame 10,725 (word 21,450).
-All 6,720 remaining reference frames compare without a cadence break.
-Direct slot/channel correlations are 0.032 and 0.017; error RMS is about
-8,052 and 6,146 respectively. Cross-channel correlations are also reported,
-not selected as a mapping (maximum 0.226). There is no fitted lag, scaling,
-permutation or acceptance threshold. This is not a native decode match,
-but the anchor does not establish AAC-packet/output-frame identity either.
-The [pre-copy observation](#output-copy-observation) narrows this to ordered
-source blocks with matching zero/transient extents and mixed exact/incorrect
-samples before DMA. Processing-call-to-packet ownership and the first
-32-bit input to 16-bit conversion still need direct observation; do not
-promote chronological agreement alone to a completed decoder validation.
+The capture checker's optional first-nonzero-frame comparison is diagnostic
+only: it does not establish source-packet/output identity and never selects
+a fitted lag, scaling or channel permutation. Use the stronger
+[processing proof](#processing-and-conversion) to bind the first eight input
+packets and locate the differing values before conversion. The remaining
+waveform question is their processing producer, not a guessed serial phase.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

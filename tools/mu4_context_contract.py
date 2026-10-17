@@ -566,6 +566,49 @@ DECODER_OUTPUT_WITNESSES = (
                0xF982,0x48A6,0x80E1,0x0400,0x7111,0x0012,0x6EEA,0xFFFF,0x3E14,0x7011,0x0012)),
 )
 
+PCM_CONVERSION_WITNESSES = (
+    (0x248A6, (0xEEFC,0xF495,0x1106,0x7600,0,0xF784,0x7602,0,0x8101,0xF982,0x4E38,
+               0xF7B8,0xF540,0xF768,0xF778,0xF84B,0x48C4,0xF540,0xF768,0xF778,0xF6B8,
+               0xF495,0xF310,0x8000,0xF84B,0x48CF,0xF020,0x7FFF,0xF073,0x48CF,
+               0xF540,0xF768,0xF778,0xF310,0x8001,0xF84A,0x48CF,0xF062,0xFFFF,
+               0xF040,0x8001,0xEE04,0xF495,0xF4E4)),
+    (0x24E38, (0x4A11,0xEEFD,0xF495,0x7107,0x0012,0x7106,0x0011,0x7108,0x0013,
+               0x4911,0x01F8,0x0012,0x7000,0x0011,0x8101,0xF982,0x4D43,0x7001,
+               0x0013,0x7000,0x0011,0xF982,0x4D43,0xEE03,0x8A11,0xF4E4)),
+    (0x24D43, (0x4A11,0xEEFD,0xF495,0x1106,0x8102,0x7107,0x0012,0x4912,0x0902,
+               0x8911,0x11F8,0x0012,0x7102,0x0012,0x09F8,0x0012,0xF84D,0x4D7F,
+               0xF7B8,0x11F8,0x0011,0xF84F,0x4D60,0x7000,0x0011,0xF982,0xA7FB,
+               0xF073,0x4D7F,0x6CE1,0x0001,0x4D6A,0xF000,1,0xF468,0xF478,
+               0xF47F,0xF073,0x4D7F,0x11F8,0x0011,0xF310,0xFFE2,0xF84F,0x4D7E,
+               0x4911,0xF793,0xF784,0x8100,0xF982,0xA807,0xF7B8,0xF000,1,
+               0xF468,0xF478,0xF47F,0xF073,0x4D7F,0xE800,0xEE03,0x8A11,0xF4E4)),
+    (0x2A807, (0xF7B8,0xF468,0xF478,0x6102,0x0010,0xFA30,0xA815,0x6002,0,
+               0xF830,0xA819,0xF470,0x6902,0x0010,0x3202,0xF6E4,0xF482,0xF495,0xF4E4)),
+)
+
+
+def reference_pcm_conversion(raw):
+    """Argument 14: signed DLD32, nearest rounding (ties +infinity), symmetric clamp."""
+    if not isinstance(raw,int) or not 0 <= raw < 1 << 40 or raw >> 32 not in (0,255) or (raw >> 32 == 255 and not raw & 0x80000000):
+        raise ValueError('expected a zero/sign-extended 32-bit DLD input')
+    value = raw & 0xffffffff
+    if value & 0x80000000:
+        value -= 1 << 32
+    shifted = (value+8192) >> 14
+    return {'shifted':shifted,'word':max(-32767,min(32767,shifted)) & 0xffff}
+
+
+def decode_pcm_conversion(words):
+    for base,witness in PCM_CONVERSION_WITNESSES:
+        for offset,expected in enumerate(witness):
+            if words.get(base+offset)!=expected:
+                raise ValueError(f'PCM conversion witness changed or absent at {base+offset:06x}')
+    return {'segment':'aa99','pinned_words':sum(len(witness) for _,witness in PCM_CONVERSION_WITNESSES),
+            'entry':'0248a6','argument':14,'shift_composition':'024e38 calls 024d43 for 0 to -14, then 0 to 0',
+            'rounded_right_shift':'024d43 uses signed32 shift by 13, adds one, then shifts by one',
+            'result':'clamp((signed32(raw)+8192)>>14, -32767, 32767)',
+            'scope':'Argument-14 source contract only, not other shift arguments, decoder sample correctness or native audio acceptance'}
+
 
 def decode_decoder_output(words):
     for base,witness in DECODER_OUTPUT_WITNESSES:
@@ -1313,6 +1356,7 @@ def contract(source):
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['decoder_output'] = decode_decoder_output(rel_words)
+    result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)

@@ -21,6 +21,7 @@ from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RE
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
+from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
@@ -502,6 +503,24 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address),self.assertRaises(ValueError):
                 decode_decoder_output(changed)
+
+    def test_pcm_conversion_pins_rounding_shift_and_symmetric_clamp(self):
+        words = {address:value for base,witness in PCM_CONVERSION_WITNESSES
+                 for address,value in enumerate(witness,base)}
+        self.assertEqual(decode_pcm_conversion(words)['pinned_words'],152)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_pcm_conversion(changed)
+        for raw,shifted,word in ((0,0,0),(8191,0,0),(8192,1,1),
+                                 (0xffffe000,0,0),(0xffffdfff,-1,65535),
+                                 (0x7fffffff,131072,32767),(0xff80000000,-131072,32769),
+                                 (0x00fff59b08,-42,65494),(0xffffbd0b70,-268,65268)):
+            self.assertEqual(reference_pcm_conversion(raw),{'shifted':shifted,'word':word})
+        for raw in (-1,1<<40,0x0100000000,0xff00000000):
+            with self.assertRaises(ValueError):
+                reference_pcm_conversion(raw)
 
     def test_dma_pause_sequences_require_separate_overlay_namespaces(self):
         sources = {segment: dict(enumerate(witness, base)) for segment, base, witness in DMA_PAUSE_WITNESSES}

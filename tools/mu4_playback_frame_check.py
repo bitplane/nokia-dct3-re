@@ -107,7 +107,7 @@ def verify(directory, source, aac, pcm):
         if (model['set_source_exhausted'] and fields[9]!=1) or (model['set_destination_full'] and fields[13]!=1):
             raise ValueError('copy completion flag changed')
         object_id = row['object']
-        state = objects.setdefault(object_id,{'cursor':1024,'blocks':[],'completed':0,'source':None})
+        state = objects.setdefault(object_id,{'cursor':1024,'blocks':[],'completed':0,'source':None,'snapshots':[]})
         if old_source==0:
             key = row['t'],fields[6]
             if state['cursor']!=1024 or key not in output_rows:
@@ -115,6 +115,7 @@ def verify(directory, source, aac, pcm):
             name,block = output_rows[key]
             used.add(name)
             state['blocks'].append(block)
+            state['snapshots'].append({'file':name,'base':fields[6],'time':row['t'],'sha256':hashlib.sha256(block).hexdigest()})
             state['source'] = fields[6]
         elif state['cursor']!=old_source or state['source']!=fields[6]:
             raise ValueError('source block order changed')
@@ -131,6 +132,7 @@ def verify(directory, source, aac, pcm):
             'copy_source_contract_words':source_contract['pinned_words'],
             'copies':len(copies),'actual_bit_reads':len(reads),
             'object_order':list(objects),'complete_blocks':[state['completed'] for state in ordered],
+            'source_blocks':[state['snapshots'] for state in ordered],
             'comparison':comparison,'packet_to_output_call_binding_validated':False,
             'native_audio_validated':False,
             'scope':'Exact input material and sampled pre-copy block chronology, not all copied words, decoder call-to-packet ownership, analog audio or speech'}

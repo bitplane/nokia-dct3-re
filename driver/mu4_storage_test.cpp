@@ -86,6 +86,9 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 &&
+						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1))
+						observe_playback_processing(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && opcode == 0x62e6 &&
 						(address == 0x2433a || address == 0x24340 || address == 0x24346))
 					{
@@ -457,6 +460,12 @@ private:
 	u16 m_playback_path_count = 0;
 	std::array<u32, 6> m_playback_method_entries{};
 	u32 m_playback_method_mismatch = 0;
+	std::array<u32,4> m_playback_processing{}; // calls, returns, successes, observation mismatches
+	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
+	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
+	u64 m_playback_conversion_raw = 0, m_playback_conversion_shifted = 0;
+	bool m_playback_processing_pending = false, m_playback_conversion_active = false;
+	bool m_playback_conversion_pending = false, m_playback_conversion_shift_seen = false;
 	u32 m_playback_restore_samples = 0;
 	std::array<u32, 2> m_playback_bit_samples{};
 	std::array<u16, 4> m_playback_bit_source_samples{};
@@ -960,6 +969,76 @@ private:
 			logerror("mu4_playback_selector_context: ordinal=%u receiver=%04x words=%s ar1=%04x a=%010llx t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
 				m_playback_parent[site], receiver, ram_words(receiver).c_str(), ar1,
 				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)), machine().time().as_double());
+		}
+	}
+	void observe_playback_processing(offs_t address, u16 opcode)
+	{
+		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
+			address != 0x23e21 && address != 0x23e23 && address != 0x23e2c && address != 0x248b1) return;
+		if (m_playback_processing[0] >= 8 && !m_playback_processing_pending && !m_playback_conversion_active) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+		u64 const a = m_cpu->state_int(tms320c54x_device::STATE_A) & 0xffffffffffULL;
+		if (address == 0x23de5)
+		{
+			if (m_playback_processing[0] >= 8) return;
+			if (opcode != 0xf982 || m_playback_processing_pending || m_playback_conversion_active) ++m_playback_processing[3];
+			// FCALL reserves its two stack words before this Execute entry.
+			++m_playback_processing[0]; m_playback_processing_pending = true; m_playback_processing_sp = sp+2;
+			u16 const base = data.read_word(0xb332), index = data.read_word(0xb331);
+			u16 const start = base + index - 8;
+			std::string window = "unobserved";
+			if (start >= 0x60 && start <= 0xfff4)
+			{
+				window.clear();
+				for (unsigned i=0;i<12;++i) window += util::string_format("%04x",data.read_word(start+i));
+			}
+			logerror("mu4_processing_entry: call=%u sp=%04x caller_sp=%04x a=%010llx base=%04x index=%04x remaining=%04x reservoir=%04x%04x window_start=%04x window=%s st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+				m_playback_processing[0],sp,m_playback_processing_sp,(unsigned long long)a,base,index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),start,window.c_str(),unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),machine().time().as_double());
+		}
+		else if (address == 0x23de7 && m_playback_processing_pending)
+		{
+			if (opcode != 0x800f || sp != m_playback_processing_sp) ++m_playback_processing[3];
+			++m_playback_processing[1]; m_playback_processing_pending = false;
+			m_playback_conversion_active = u16(a) == 0;
+			m_playback_conversion_pending = false; m_playback_conversion = {};
+			if (m_playback_conversion_active) ++m_playback_processing[2];
+			m_playback_processing_destination = data.read_word(sp+12);
+			logerror("mu4_processing_return: call=%u result=%010llx sp=%04x input0=%04x input1=%04x destination=%04x index=%04x remaining=%04x t=%.9f identity=Execute_entry observer_writes=0\n",
+				m_playback_processing[0],(unsigned long long)a,sp,data.read_word(sp+6),data.read_word(sp+5),m_playback_processing_destination,data.read_word(0xb331),data.read_word(0xa854),machine().time().as_double());
+		}
+		else if ((address == 0x23e1b || address == 0x23e21) && m_playback_conversion_active)
+		{
+			u16 const channel = address == 0x23e21;
+			if (opcode != 0xf982 || m_playback_conversion_pending || channel != m_playback_conversion[1]) ++m_playback_processing[3];
+			m_playback_conversion_pending = true; m_playback_conversion_shift_seen = false;
+			m_playback_conversion[2] = data.read_word(u16(sp+2)); m_playback_conversion[3] = sp+2;
+			m_playback_conversion_raw = a;
+		}
+		else if (address == 0x248b1 && m_playback_conversion_pending)
+		{
+			if (opcode != 0xf7b8 || m_playback_conversion_shift_seen) ++m_playback_processing[3];
+			m_playback_conversion_shifted = a; m_playback_conversion_shift_seen = true;
+		}
+		else if ((address == 0x23e1d || address == 0x23e23) && m_playback_conversion_active)
+		{
+			u16 const channel = address == 0x23e23;
+			if (opcode != (channel ? 0x80e1 : 0x8099) || !m_playback_conversion_pending || !m_playback_conversion_shift_seen ||
+				sp != m_playback_conversion[3] || channel != m_playback_conversion[1]) ++m_playback_processing[3];
+			if (m_playback_processing[2] <= 2)
+				logerror("mu4_conversion_value: call=%u frame=%u sample=%u channel=%u raw=%010llx shifted=%010llx result=%010llx argument=%u destination=%04x t=%.9f identity=Execute_entry observer_writes=0 retirement=unclaimed\n",
+					m_playback_processing[0],m_playback_processing[2]-1,m_playback_conversion[0],channel,(unsigned long long)m_playback_conversion_raw,
+					(unsigned long long)m_playback_conversion_shifted,(unsigned long long)a,m_playback_conversion[2],
+					u16(m_playback_processing_destination+m_playback_conversion[0]+channel*1024),machine().time().as_double());
+			m_playback_conversion_pending = false; m_playback_conversion[1] = 1-channel;
+			if (channel) ++m_playback_conversion[0];
+		}
+		else if (address == 0x23e2c && m_playback_conversion_active)
+		{
+			if (opcode != 0x10e6 || m_playback_conversion_pending || m_playback_conversion[0] != 1024) ++m_playback_processing[3];
+			logerror("mu4_conversion_block: call=%u frame=%u samples=%u destination=%04x bad=%u t=%.9f identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+				m_playback_processing[0],m_playback_processing[2]-1,m_playback_conversion[0],m_playback_processing_destination,m_playback_processing[3],machine().time().as_double());
+			m_playback_conversion_active = false;
 		}
 	}
 	void observe_playback_bits(offs_t address)
@@ -2233,6 +2312,10 @@ private:
 			save_item(NAME(m_playback_path_pc)); save_item(NAME(m_playback_path_word));
 			save_item(NAME(m_playback_path_next)); save_item(NAME(m_playback_path_count));
 			save_item(NAME(m_playback_method_entries)); save_item(NAME(m_playback_method_mismatch));
+			save_item(NAME(m_playback_processing)); save_item(NAME(m_playback_processing_sp)); save_item(NAME(m_playback_processing_destination));
+			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
+			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
+			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
 			save_item(NAME(m_playback_restore_samples));
 			save_item(NAME(m_playback_bit_samples));
 			save_item(NAME(m_playback_bit_source_samples));
@@ -2474,6 +2557,10 @@ private:
 		m_playback_notify_samples = 0;
 		m_playback_path_pc = {}; m_playback_path_word = {}; m_playback_path_next = 0; m_playback_path_count = 0;
 		m_playback_method_entries = {}; m_playback_method_mismatch = 0;
+		m_playback_processing = {}; m_playback_processing_sp = m_playback_processing_destination = 0;
+		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
+		m_playback_processing_pending = m_playback_conversion_active = false;
+		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;
 		m_playback_restore_samples = 0;
 		m_playback_bit_samples = {};
 		m_playback_bit_source_samples = {};
