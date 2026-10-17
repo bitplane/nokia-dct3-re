@@ -1,10 +1,19 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, COMPLETION)) + '\n'
+
+    def test_joined_pins_are_mandatory_and_exact(self):
+        alternatives = ['', JOINED_PINS + '\n' + JOINED_PINS]
+        for field in ('cases=128', 'formats=4', 'polarities=4', 'patterns=4', 'phases=2', 'partial_restore=128', 'sources=4,5'):
+            alternatives.append(JOINED_PINS.replace(field, field.split('=')[0] + '=0'))
+        alternatives.append(JOINED_PINS.replace('handset_clock_claim=0', 'handset_clock_claim=1'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'joined-pin'):
+                check_result(self.output().replace(JOINED_PINS, alternative), 3)
 
     def test_frame_ignore_is_mandatory_and_exact(self):
         alternatives = ['', FRAME_IGNORE + '\n' + FRAME_IGNORE]

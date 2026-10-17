@@ -297,6 +297,72 @@ static void check_transmit_pins()
 	}
 }
 
+static void check_joined_pins()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+			for (unsigned input = 0; input < 0x20000; ++input)
+			{
+				const unsigned word = input & 0xffff;
+				const bool long_sync = input & 0x10000;
+				tms320c54x_bsp_state tx, rx;
+				const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+				const unsigned width = widths[format], mask = (1U << width) - 1, payload = word & mask;
+				const std::uint16_t expected = payload & (1U << (width - 1)) ? payload | ~mask : payload;
+				const bool shift_level = !(extension & 0x40), active = !(extension & 0x20);
+				tx.control_w(0x48 | (format & 1 ? 4 : 0));
+				rx.control_w(0x88 | (format & 1 ? 4 : 0));
+				tx.transmit_w(word);
+				const auto edge = [extension](auto &source, auto &sink, bool clock, bool sync) {
+					const auto pin = source.transmit_clock(clock, sync, extension);
+					const auto received = sink.receive_clock(clock, sync, pin.driven && pin.data, extension);
+					assert(pin.supported && received.supported);
+					return pin;
+				};
+				edge(tx, rx, !shift_level, !active);
+				if (!long_sync)
+				{
+					// The lab CLOCK source presents active sync at the RX edge
+					// before the TX load edge, then releases it for the next RX.
+					edge(tx, rx, shift_level, !active);
+					edge(tx, rx, !shift_level, active);
+				}
+				assert(edge(tx, rx, shift_level, active).transmit_ready_edge);
+				// SPRU131G 9.2.4: a long sync holds TX's MSB. Release it
+				// between a TX edge and the opposite RX edge, never at either
+				// sampling edge. This is an explicit lab phase, not Nokia wiring.
+				for (unsigned hold = 0; long_sync && hold <= word % 4; ++hold)
+				{
+					edge(tx, rx, !shift_level, active);
+					const auto pin = edge(tx, rx, shift_level, active);
+					assert(pin.driven && pin.data == bool(payload & (1U << (width - 1))) && !pin.transmit_ready_edge);
+					assert(!rx.receive_ready);
+				}
+				edge(tx, rx, shift_level, !active); // Sync-only transition: no bit clock.
+				auto replay_tx = tx, replay_rx = rx;
+				for (unsigned bit = 0; bit < width; ++bit)
+				{
+					if (bit)
+					{
+						edge(tx, rx, shift_level, !active);
+						edge(replay_tx, replay_rx, shift_level, !active);
+					}
+					const auto pin = edge(tx, rx, !shift_level, !active);
+					const auto replay = edge(replay_tx, replay_rx, !shift_level, !active);
+					assert(pin.driven && pin.data == bool((payload >> (width - 1 - bit)) & 1));
+					assert(!pin.transmit_ready_edge && pin.data == replay.data && pin.driven == replay.driven);
+					assert(rx.receive_ready == (bit + 1 == width));
+					assert(rx.control_r() == replay_rx.control_r() && tx.control_r() == replay_tx.control_r());
+					// Also replay from a partially transmitted/received word.
+					if (bit == width / 2) { replay_tx = tx; replay_rx = rx; }
+				}
+				assert(rx.receive_r() == expected && replay_rx.receive_r() == expected);
+				assert(!rx.receive_overrun && !replay_rx.receive_overrun);
+				assert(!edge(tx, rx, shift_level, !active).driven);
+			}
+}
+
 static void check_continuous_transmit()
 {
 	const unsigned widths[] = {16, 8, 10, 12};
@@ -423,6 +489,7 @@ int main()
 	check_receive_pins();
 	check_continuous_receive();
 	check_transmit_pins();
+	check_joined_pins();
 	check_continuous_transmit();
 	check_frame_ignore();
 	tms320c54x_bsp_state port;

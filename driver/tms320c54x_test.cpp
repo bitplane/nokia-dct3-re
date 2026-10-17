@@ -48074,7 +48074,96 @@ private:
 		{
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "reset FIG streams produce no late completion");
 			osd_printf_info("C54x native backend BSP frame ignore: PASS directions=2 words=4 partial_restore=1 ignored_sync=1 reset_abort=1 sources=4,5 handset_clock_claim=0\n");
-			throw emu_fatalerror(0, "C54x backend BSP tests complete");
+			m_case = 0; m_stage = 70; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
+	auto joined_edge(bool clock, bool sync)
+	{
+		const auto pin = m_backend->codec_transmit_clock_w(clock, sync);
+		expect(pin.supported && m_backend->codec_receive_clock_w(clock, sync, pin.driven && pin.data),
+			"Joined external pins use supported TX and RX modes");
+		return pin;
+	}
+	void joined_bits(unsigned begin, unsigned end)
+	{
+		unsigned const width = std::array<unsigned, 4>{16, 8, 10, 12}[(m_case / 16) % 4];
+		u16 const word = std::array<u16, 4>{0, 0x8001, 0xa597, 0x7ffe}[m_case % 4];
+		bool const shift = !((m_case / 4) & 1), active = !((m_case / 4) & 2);
+		for (unsigned bit = begin; bit < end; ++bit)
+		{
+			if (bit) joined_edge(shift, !active);
+			const auto pin = joined_edge(!shift, !active);
+			expect(pin.driven && pin.data == bool((word >> (width - 1 - bit)) & 1) && !pin.transmit_ready_edge,
+				"Joined RX samples the actual held TX bit, MSB first");
+			expect(bool(m_cpu->space(AS_DATA).read_word(0x22) & 0x400) == (bit + 1 == width),
+				"Joined receiver becomes ready only after its last bit");
+		}
+	}
+	void check_joined_pins()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const format = (m_case / 16) % 4, polarity = (m_case / 4) % 4;
+		unsigned const width = std::array<unsigned, 4>{16, 8, 10, 12}[format], mask = (1U << width) - 1;
+		u16 const word = std::array<u16, 4>{0, 0x8001, 0xa597, 0x7ffe}[m_case % 4], payload = word & mask;
+		u16 const expected = payload & (1U << (width - 1)) ? payload | ~mask : payload;
+		bool const shift = !(polarity & 1), active = !(polarity & 2);
+		if (m_stage == 70)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			data.write_word(0x22, 0);
+			data.write_word(0x23, (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0));
+			joined_edge(!shift, !active);
+			data.write_word(0x22, 0xc8 | (format & 1 ? 4 : 0));
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x21, word);
+			if (m_case >= 64)
+			{
+				// Short pulse: RX qualifies sync before TX loads the MSB.
+				joined_edge(shift, !active);
+				joined_edge(!shift, active);
+			}
+			expect(joined_edge(shift, active).transmit_ready_edge, "Joined frame transfers the pending DXR once");
+			if (m_case < 64)
+			{
+				joined_edge(!shift, active);
+				joined_edge(shift, active);
+			}
+			// Long external sync releases strictly between the TX and RX
+			// sampling edges. No assumption about COBBA's fitted phase.
+			joined_edge(shift, !active);
+			joined_bits(0, width / 2);
+		}
+		else if (m_stage == 71)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "Only TX load is pending halfway through a joined word");
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save both joined shifters and clock levels mid-word");
+			joined_bits(width / 2, width);
+		}
+		else if (m_stage == 72)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30 && data.read_word(0x20) == expected,
+				"Joined word reaches BDRR and independent RX/TX CPU sources");
+			data.write_word(0x22, 0); joined_edge(shift, active);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20 && !(data.read_word(0x22) & 0x400),
+				"Restore partial joined word before receive completion, displacing live reset state");
+			joined_bits(width / 2, width);
+		}
+		else
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30 && data.read_word(0x20) == expected,
+				"Restored joined word reproduces payload and both pending sources");
+			expect(!joined_edge(shift, !active).driven, "Joined burst releases TX after the last sample");
+			if (++m_case == 128)
+			{
+				osd_printf_info("C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0\n");
+				throw emu_fatalerror(0, "C54x backend BSP tests complete");
+			}
+			m_stage = 70; m_timer->adjust(attotime::from_usec(100)); return;
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
 	}
@@ -48209,6 +48298,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 70) { check_joined_pins(); return; }
 		if (m_stage >= 60) { check_frame_ignore(); return; }
 		if (m_stage >= 50) { check_continuous_transmit(); return; }
 		if (m_stage >= 40) { check_continuous_receive(); return; }

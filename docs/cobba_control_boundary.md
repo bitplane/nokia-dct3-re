@@ -1948,21 +1948,39 @@ levels between save and restore, under the separate mandatory
 readback, not the 0.5--1.5 CLKOUT synchronization latency documented in
 SPRU131G table 9-5. A whole-device reset initializes unattached input levels
 low; attached sources must drive their own levels.
-This establishes completed-frame wiring, reset suppression and backend
-state restoration, not a production frame-clock caller, handset ISR,
-COBBA control interpretation or native audio. No physical clock is supplied
-by the fixture's explicit completions.
+
+The joined-pin fixture connects the backend's actual TX output to its RX
+input, using opposite shift/sample edges. External sync releases between
+those edges after holding the TX MSB in the long-pulse case. A separate
+short-pulse case qualifies RX sync before the TX load edge, as the laboratory
+CLOCK source does. Both follow the shift/sample relationship in SPRU131G
+section 9.2.4; neither establishes fitted Nokia timing. The standalone helper
+checks every 16-bit input across both phases, four formats and four polarity
+combinations. Backend acceptance additionally requires
+`C54x native backend BSP joined pins: PASS`: 128 cases spanning both phases,
+four formats, four polarities and four patterns. Each saves both partial
+shifters and clock levels halfway through the word, completes and acknowledges it, resets the
+live port, then restores and repeats the suffix. Received payloads include
+the format's sign extension; CPU source 5 is pending before the checkpoint
+and sources 4/5 after each completion. These are controller conformance tests,
+not handset firmware-state fixtures or physical clock measurements.
+
+Together these establish frame/pin interfaces, reset suppression and backend
+state restoration, not a production frame-clock caller, handset ISR or
+COBBA control interpretation. Completed-frame checks bypass bit clocks;
+pin checks supply every edge explicitly. Neither is measured handset timing.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
-tone run observes only the boot echo and its one receive ISR, not continuous
-or post-key operational samples.
+unclocked tone-command run observes only the boot echo and its one receive
+ISR, not continuous or post-key operational samples. The separate external
+clock laboratories above have their own waveform and replay acceptance.
 
 This remains partial hardware: clock-input synchronization latency,
 autobuffering, reset-time transmit preloading and physical frame/bit timing
 are not established. Only the separately evidenced external boot echo
 provides an untimed transfer; ordinary pending samples do not acquire a
-fabricated frame or interrupt. No operational PCM is claimed.
+fabricated frame or interrupt. No production-clocked PCM is claimed.
 
 The coherent gate now checks real serial reset/release and echo observations
 instead of expecting synthetic COBBA parallel register-C logs. Data `0032`
