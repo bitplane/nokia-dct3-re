@@ -1427,9 +1427,10 @@ results. Dynamic/table-driven sources and other MMIO windows are not closed.
 
 The isolated MCU poster audit (`tools.c54x_rom4_host_poster`) executes the
 original BE Thumb routine at `271d70` with Unicorn, stubbing only its paired
-scheduler-lock calls. All 47 dispatcher fields return successfully for four
-payload probes, both notification settings and two retained shared-word
-patterns: 752 cases. Fields `00..0f` write `(field << 12) | (payload & 0xfff)`
+scheduler-lock calls. The 2,352-case matrix covers 47 dispatcher fields, two
+out-of-range field probes (`2f/ffff`), four payload probes, both notification
+settings, two retained shared-word patterns and busy values `0/1/ffff`.
+The 752 valid-field/zero-busy cases succeed. Fields `00..0f` write `(field << 12) | (payload & 0xfff)`
 to `100a8`, independent of the retained word. Field `1b` writes the supplied
 halfword to `100aa`; fields `10..1a` use masked updates and later fields write
 other shared parameters. These are software field identities, not hardware
@@ -1437,6 +1438,12 @@ request-bit names. For every field, notification enabled produces the ordered
 external stores `100e0=1`, `30000=4` (halfwords), then `20008=2` (byte).
 Field `2e` emits that sequence even when notification is disabled, without
 storing a parameter. Other fields with notification disabled do not emit it.
+All 1,600 busy/invalid-field cases return zero with no external stores,
+including trigger-only `2e` while busy. They still enter and leave the paired
+scheduler lock. The MCU tests `100e0` before admitting the update; the mapped
+DSP HPINT tail clears the corresponding data word `0870`. This is an explicit
+software admission/completion handshake, distinct from the inferred port-1/2
+bitmap. It does not prove what signals originally invoked that DSP handler.
 
 Reproduce with:
 
@@ -1444,10 +1451,10 @@ Reproduce with:
 .venv/bin/python -m tools.c54x_rom4_host_poster roms/noki5110/5110f530.fls --output tmp/native-host-poster-audit.json
 ```
 The report records the original image hash, emulator version and per-case
-external stores. RAM inputs and a zero busy flag are isolated fixture inputs,
+external stores. RAM contents and busy values are isolated fixture inputs,
 not a handset boot or silicon experiment. The four payload/two retained-value
 probes are not exhaustive data coverage; private-RAM effects, scheduler lock
-semantics and busy handling are excluded. This enumerates the poster's dispatch
+semantics, live contention and caller retry behavior are excluded. This enumerates the poster's dispatch
 surface, not all MCU callers or the DSP port-1/2 alias. In particular,
 the trigger-only field does not identify which DSP request bits assert, and
 software stores to `100aa` do not prove that a DSP I/O acknowledgement clears

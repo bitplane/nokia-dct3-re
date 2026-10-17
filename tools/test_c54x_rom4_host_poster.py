@@ -13,6 +13,25 @@ def case(field, payload=0x9209, notify=1):
 
 
 class HostPosterTests(unittest.TestCase):
+    def test_busy_rejects_even_trigger_only_case_without_stores(self):
+        for field in range(47):
+            for busy in (1, 0xffff):
+                valid = dict(field=field, payload=0x9209, notify=1, busy=busy, result=0, writes=[])
+                check_case(valid)
+                with self.assertRaisesRegex(ValueError, 'reject'):
+                    check_case(dict(valid, result=1))
+                with self.assertRaisesRegex(ValueError, 'stores'):
+                    check_case(dict(valid, writes=case(0x2e)['writes']))
+
+    def test_invalid_field_rejects_without_stores(self):
+        for field in (0x2f, 0xffff):
+            valid = dict(field=field, payload=0xffff, notify=1, busy=0, result=0, writes=[])
+            check_case(valid)
+            with self.assertRaisesRegex(ValueError, 'reject'):
+                check_case(dict(valid, result=1))
+            with self.assertRaisesRegex(ValueError, 'stores'):
+                check_case(dict(valid, writes=case(0x2e)['writes']))
+
     def test_packed_selectors_preserve_payload_not_retained_word(self):
         for field in range(16):
             for payload in (0, 1, 0x9209, 0xffff):

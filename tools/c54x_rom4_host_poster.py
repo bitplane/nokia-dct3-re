@@ -13,6 +13,10 @@ LOCK_CALLS = (0x254780, 0x254848)
 def check_case(case):
     """Check recovered software relationships, not DSP electrical behavior."""
     field, payload, notify = case['field'], case['payload'], case['notify']
+    if case.get('busy', 0) or field > 0x2e:
+        if case['result'] != 0 or case['writes']:
+            raise ValueError('busy or invalid field must reject without external stores')
+        return
     if case['result'] != 1:
         raise ValueError('poster did not report success')
     writes = [(item['address'], item['size'], item['value']) for item in case['writes']]
@@ -33,14 +37,14 @@ def check_case(case):
         raise ValueError('trigger-only field unexpectedly stores a parameter')
 
 
-def execute(image, field, payload, notify, retained=0xa55a):
+def execute(image, field, payload, notify, retained=0xa55a, busy=0):
     """Original BE Thumb routine, supplied RAM inputs, only lock calls stubbed."""
     from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_MODE_BIG_ENDIAN
     from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
     from unicorn.arm_const import (UC_ARM_REG_R0, UC_ARM_REG_R1,
                                    UC_ARM_REG_R2, UC_ARM_REG_SP,
                                    UC_ARM_REG_LR, UC_ARM_REG_PC)
-    if not 0 <= field <= 0x2e or not 0 <= payload <= 0xffff or notify not in (0, 1) or not 0 <= retained <= 0xffff:
+    if not 0 <= field <= 0xffff or not 0 <= payload <= 0xffff or notify not in (0, 1) or not 0 <= retained <= 0xffff or not 0 <= busy <= 0xffff:
         raise ValueError('field, payload or notification outside audited input domain')
     if len(image) != 0x100000:
         raise ValueError('expected original one-megabyte NSE-1 MCU image')
@@ -51,6 +55,7 @@ def execute(image, field, payload, notify, retained=0xa55a):
     cpu.mem_map(0x100000, 0x100000)
     for address in range(0x100a0, 0x100e0, 2):
         cpu.mem_write(address, retained.to_bytes(2, 'big'))
+    cpu.mem_write(0x100e0, busy.to_bytes(2, 'big'))
     writes, calls = [], []
     steps = 0
 
@@ -76,7 +81,7 @@ def execute(image, field, payload, notify, retained=0xa55a):
     cpu.emu_start(ENTRY | 1, RETURN, count=256)
     if cpu.reg_read(UC_ARM_REG_PC) != RETURN or calls != list(LOCK_CALLS):
         raise ValueError('poster failed bounded return or lock-call pairing')
-    return dict(field=field, payload=payload, notify=notify, retained=retained,
+    return dict(field=field, payload=payload, notify=notify, retained=retained, busy=busy,
                 steps=steps, result=cpu.reg_read(UC_ARM_REG_R0), writes=writes)
 
 
@@ -84,16 +89,19 @@ def audit(image):
     # Reject another firmware before executing address-specific instructions.
     from tools.c54x_rom4_codec_contract import check_mcu_speech_field
     check_mcu_speech_field(image)
-    cases = [execute(image, field, payload, notify, retained)
-             for field in range(47) for payload in (0, 1, 0x9209, 0xffff)
-             for notify in (0, 1) for retained in (0, 0xa55a)]
+    fields = [*range(47), 0x2f, 0xffff]
+    cases = [execute(image, field, payload, notify, retained, busy)
+             for field in fields for payload in (0, 1, 0x9209, 0xffff)
+             for notify in (0, 1) for retained in (0, 0xa55a)
+             for busy in (0, 1, 0xffff)]
     for case in cases:
         check_case(case)
     import unicorn
-    return dict(schema=1, image_sha256=hashlib.sha256(image).hexdigest(),
+    return dict(schema=2, image_sha256=hashlib.sha256(image).hexdigest(),
                 engine='Unicorn', engine_version=unicorn.__version__,
-                scope='isolated original MCU poster; zero busy flag; lock calls stubbed; no hardware semantics inferred',
+                scope='isolated original MCU poster; lock calls stubbed; no hardware semantics inferred',
                 fields=47, payloads=[0, 1, 0x9209, 0xffff], retained=[0, 0xa55a],
+                rejected_fields=[0x2f, 0xffff], busy_values=[0, 1, 0xffff],
                 cases=cases, hardware_request_latch_claim=False)
 
 
