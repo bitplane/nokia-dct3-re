@@ -36,8 +36,9 @@ rounded-shift/clamp model and match later RAM. After the DAGEN correction,
 the first nonzero block's maximum sample error falls from 43,740 to 7
 (RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
 13 and RMS 1.1492 against the independent decoder. These are measurements,
-not an established codec tolerance. Next audit the pre/post-transform and
-overlap/window processing and establish the cause and independent acceptance
+not an established codec tolerance. Post-transform rotation/permutation now
+matches for all 30 vectors too. Next audit pre-transform and overlap/window
+processing and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6107,7 +6108,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is pre/post-transform and overlap/window arithmetic,
+Remaining work is pre-transform and overlap/window arithmetic,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6121,6 +6122,37 @@ shape. Its scaling-flag descriptions on PDF pages 4 and 5 conflict; the
 firmware's own branches remain authoritative. The ignored local PDF is
 `roms/reference-docs/npm5/ti_spra554b_c54x_double_precision_fft.pdf`, SHA-256
 `0dafa8acb794d328a6835cb718f93d367884adf15bd3e540d9ecd7e7e6fba7a0`.
+
+#### Post-Transform Rotation And Permutation
+
+The original `023f68..023fc4` routine rotates each complex pair using two
+coefficient halves, then reverses the imaginary components in place. Its
+split-word products omit low*low terms. Unlike the weighted FFT kernel,
+each cross-product sum is shifted separately before the two products are
+combined. A full-precision complex multiply is therefore not bit-exact.
+
+The passive observer captures input, coefficients and output for every one
+of the same 30 transforms, using their existing invocation and packet-call
+identities. Short coefficients occupy `f200..f2ff`; long coefficients occupy
+`f000..f7ff`. These are observed operands, not fitted constants. Every input
+is byte-identical to the checked FFT return. Source-derived rotation and
+imaginary reversal reproduce all 16,384 output components across sixteen
+short and fourteen long vectors, with no mismatches. The extra 90 snapshots
+leave all four complete native word/slot files and all 312 FFT snapshots
+unchanged. Packet binding and the first 4,096 conversions still pass.
+
+```sh
+python3 tools/mu4_transform_check.py RUN_DIR --post \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+This mode pins 738 original source words, including the post-transform's
+93-word body. It requires complete FFT acceptance, exact input continuity,
+all post snapshots and their geometry, hashes and chronology. Tests include
+rehashing a wrong output and comparing split products against independent
+full-precision bounds; neither supplies a PCM tolerance. Pre-transform,
+window/overlap processing, other media, waveform conformance, analog output
+and native speech remain unvalidated.
 
 ### Resident reload contract
 

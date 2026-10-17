@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify, invocation_inventory
+from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify, invocation_inventory, posttransform, verify_post
 
 
 def coefficients():
@@ -42,7 +42,7 @@ def fixture(directory):
 
 
 def complete_fixture(directory):
-    words={site:0xf982 for site in (0x24919,0x24944,0x2491e,0x24946,
+    words={site:0xf982 for site in (0x24919,0x24944,0x2491e,0x24946,0x2494e,0x24950,
            0x2400a,0x2401e,0x24036,0x24051,0x2406c,0x2408b,0x240a6,0x240be)}
     words.update({0x117a:0x16a0,0x117b:0x9e66})
     lines=[]
@@ -80,6 +80,68 @@ def complete_fixture(directory):
 
 
 class TransformTests(unittest.TestCase):
+    def test_post_rotation_against_full_precision_product_bound(self):
+        for size in (128,1024):
+            values=[((i*1103515245+12345)>>5)%80000-40000 for i in range(size)]
+            cs=[round(math.cos(i*math.pi/size)*(1<<29)) for i in range(size)]
+            output=posttransform(values,cs)
+            count=size//2
+            imaginary=[]
+            for i in range(count):
+                x,y=values[2*i:2*i+2]
+                c,d=cs[i],cs[count+i]
+                # Each source product omits low*low; its scaled floor differs
+                # from a full signed product by zero or eight raw units.
+                real=((x*c>>32)-(y*d>>32))<<3
+                imag=((x*d>>32)+(y*c>>32))<<3
+                self.assertIn(output[2*i]-real,(-8,0,8))
+                imaginary.append(imag)
+            for i,expected in enumerate(reversed(imaginary)):
+                self.assertIn(output[2*i+1]-expected,(-16,-8,0))
+        with self.assertRaises(ValueError):
+            posttransform([0],[0])
+
+    def test_complete_post_capture_and_corruption(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            words=complete_fixture(directory)
+            text=(directory/'error.log').read_text()
+            lines=[]
+            for call in range(1,9):
+                parameter=0x80 if call%2 else 0x400
+                input_blob=(directory/f'mu4_fft_{call:03d}_stage9.be16').read_bytes()
+                values=struct.unpack(f'>{parameter}i',input_blob)
+                cs=[round(math.cos(i*math.pi/parameter)*(1<<29)) for i in range(parameter)]
+                blobs=[input_blob,struct.pack(f'>{parameter}i',*cs),struct.pack(f'>{parameter}i',*posttransform(values,cs))]
+                for stage,blob in enumerate(blobs):
+                    name=f'mu4_post_{call:03d}_stage{stage}.be16'
+                    (directory/name).write_bytes(blob)
+                    base=(0xf200 if parameter==128 else 0xf000) if stage==1 else 0x7000
+                    address=0x24950 if stage==2 else 0x2491e if parameter==128 else 0x2494e
+                    lines.append(f'mu4_post_snapshot: invocation={call} call={call} stage={stage} '
+                                 f'address={address:06x} opcode=f982 base={base:04x} words={parameter*2} '
+                                 f'parameter={parameter:04x} hash={fnv(blob):08x} file={name} t={call+0.5+0.01*stage} '
+                                 'identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0')
+            text+='\n'+'\n'.join(lines)
+            (directory/'error.log').write_text(text)
+            with patch('tools.mu4_transform_check.source_contract',return_value=words),patch('tools.mu4_transform_check.pin_block'):
+                self.assertTrue(verify_post(directory,b'source')['post_transform_validated'])
+                for before,after in [('mu4_post_snapshot: invocation=1','mu4_post_snapshot: invocation=2'),
+                                     ('stage=2 address=024950','stage=2 address=02491e'),
+                                     ('file=mu4_post_001_stage0.be16','file=../bad')]:
+                    (directory/'error.log').write_text(text.replace(before,after,1))
+                    with self.subTest(before=before),self.assertRaises(ValueError):
+                        verify_post(directory,b'source')
+                path=directory/'mu4_post_001_stage2.be16'
+                blob=path.read_bytes()
+                changed=bytes([blob[0]^1])+blob[1:]
+                path.write_bytes(changed)
+                (directory/'error.log').write_text(text)
+                with self.assertRaises(ValueError):
+                    verify_post(directory,b'source')
+                (directory/'error.log').write_text(text.replace(f'hash={fnv(blob):08x}',f'hash={fnv(changed):08x}',1))
+                self.assertFalse(verify_post(directory,b'source')['post_transform_validated'])
+
     def test_complete_short_and_long_snapshot_contract(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory=Path(temporary)

@@ -23,6 +23,7 @@ BLOCKS = ((0x248fd,88,'fa9f2a488a08609c99f5d36fc503479e9dbd22f369328ea1ac96ac024
           (0x2410c,145,'3b9fcca3c3b4fdbfd4252e27209d03279192df085bf607e121ac0136b62ae3d5'))
 BLOCKS += ((0x2419d,85,'5d370d4c811616cfa8f212069536645325982ee85040f3fc9f87171ee9af56ba'),)
 SITES = {0:0x24919,1:0x2400a,2:0x2401e,3:0x24036,4:0x24051,5:0x2406c,6:0x2491e,7:0x24919,8:0x24919}
+POST_BLOCK=(0x23f68,93,'b481f810dfbae5f64bd1451bbda611b53b6bff1ecad1592e16662f1a877f2073')
 
 
 def pin_block(words,base,count,digest):
@@ -128,6 +129,70 @@ def fnv(data):
     for byte in data:
         result=((result^byte)*16777619)&0xffffffff
     return result
+
+
+def posttransform(values, coefficients):
+    if len(values) not in (128,1024) or len(coefficients)!=len(values):
+        raise ValueError('post-transform requires complete short/long vector and coefficient halves')
+    count=len(values)//2
+    real,imag=[],[]
+    for i in range(count):
+        x,y=values[2*i:2*i+2]
+        c,d=coefficients[i],coefficients[count+i]
+        real.append(wrap32(partial_product(x,c)-partial_product(y,d)))
+        imag.append(wrap32(partial_product(x,d)+partial_product(y,c)))
+    return [component for pair in zip(real,reversed(imag)) for component in pair]
+
+
+def verify_post(directory,source):
+    words=source_contract(source)
+    pin_block(words,*POST_BLOCK)
+    transform=verify(directory,source)
+    text=(directory/'error.log').read_text()
+    invocations=rows(text,'mu4_fft_invocation')
+    snapshots=rows(text,'mu4_post_snapshot')
+    if not invocations or 'mu4_fft_vector_snapshot:' not in text or len(snapshots)!=3*len(invocations):
+        raise ValueError('expected complete post-transform snapshots for every invocation')
+    result=[]
+    for ordinal,entry in enumerate(invocations,1):
+        parameter=int(entry['parameter'],16)
+        selected=snapshots[3*(ordinal-1):3*ordinal]
+        if [int(r['stage']) for r in selected]!=[0,1,2]:
+            raise ValueError('post-transform stage order changed')
+        data={}
+        previous=float(entry['t'])
+        returned=next(r for r in rows(text,'mu4_processing_return') if r['call']==entry['call'])
+        for stage,row in enumerate(selected):
+            address=0x24950 if stage==2 else 0x2491e if parameter==128 else 0x2494e
+            base=(0xf200 if parameter==128 else 0xf000) if stage==1 else int(entry['base'],16)
+            name=f'mu4_post_{ordinal:03d}_stage{stage}.be16'
+            time=float(row['t'])
+            if (int(row['invocation'])!=ordinal or row['call']!=entry['call'] or
+                    int(row['parameter'],16)!=parameter or int(row['address'],16)!=address or
+                    int(row['opcode'],16)!=words[address] or int(row['base'],16)!=base or
+                    int(row['words'])!=2*parameter or row['file']!=name or
+                    row.get('identity')!='Execute_entry' or row.get('context_only')!='1' or
+                    row.get('audio_acceptance')!='0' or not previous<=time<float(returned['t'])):
+                raise ValueError('post-transform snapshot identity/geometry changed')
+            previous=time
+            blob=(directory/name).read_bytes()
+            if len(blob)!=4*parameter or fnv(blob)!=int(row['hash'],16):
+                raise ValueError('post-transform snapshot length/hash mismatch')
+            data[stage]=blob
+        if ordinal<len(invocations) and previous>float(invocations[ordinal]['t']):
+            raise ValueError('post-transform overlaps next invocation')
+        if data[0]!=(directory/f'mu4_fft_{ordinal:03d}_stage9.be16').read_bytes():
+            raise ValueError('post-transform input differs from checked transform return')
+        values={stage:struct.unpack(f'>{parameter}i',blob) for stage,blob in data.items()}
+        expected=posttransform(values[0],values[1])
+        differences=[{'component':i,'native':a,'expected':b} for i,(a,b) in enumerate(zip(values[2],expected)) if a!=b]
+        result.append({'invocation':ordinal,'call':int(entry['call']),'complex_points':parameter//2,
+                       'mismatched_components':len(differences),'first_differences':differences[:8]})
+    return {'post_transforms':result,'post_transform_validated':not any(r['mismatched_components'] for r in result),
+            'selected_transform_validated':transform['selected_transform_validated'],
+            'source_words_pinned':sum(n for _,n,_ in BLOCKS)+POST_BLOCK[1],
+            'native_audio_validated':False,
+            'scope':'Captured transform returns and post-rotation/permutation only; no pre-transform, window/overlap, all-media, PCM, analog or speech acceptance'}
 
 
 def invocation_inventory(text, words):
@@ -308,7 +373,9 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--source-a00',type=Path,required=True)
-    parser.add_argument('--inventory',action='store_true',help='report observed short/long wrapper entries, not arithmetic acceptance')
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument('--inventory',action='store_true',help='report observed short/long wrapper entries, not arithmetic acceptance')
+    mode.add_argument('--post',action='store_true',help='require complete post-transform rotation/permutation acceptance as well')
     args=parser.parse_args()
     try:
         source=args.source_a00.read_bytes()
@@ -316,9 +383,9 @@ def main():
             result=invocation_inventory((args.directory/'error.log').read_text(),source_contract(source))
             print(json.dumps(result,indent=2))
             return 0
-        result=verify(args.directory,source)
+        result=verify_post(args.directory,source) if args.post else verify(args.directory,source)
         print(json.dumps(result,indent=2))
-        return 0 if result['selected_transform_validated'] else 1
+        return 0 if result['selected_transform_validated'] and result.get('post_transform_validated',True) else 1
     except (ValueError,KeyError,OSError) as error:
         print(f'FAIL: {error}',file=sys.stderr)
         return 1

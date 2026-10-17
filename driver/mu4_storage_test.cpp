@@ -87,6 +87,9 @@ public:
 				{
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 &&
+						(address == 0x2491e || address == 0x2494e || address == 0x24950))
+						observe_playback_posttransform(address,opcode);
+					if (m_playback_execute_entries[1] == 1 &&
 						(address == 0x24919 || address == 0x24944 || address == 0x2491e || address == 0x24946 ||
 						 address == 0x2400a || address == 0x2401e || address == 0x24036 || address == 0x24051 ||
 						 address == 0x2406c || address == 0x2408b || address == 0x240a6 || address == 0x240be))
@@ -466,7 +469,7 @@ private:
 	std::array<u32, 6> m_playback_method_entries{};
 	u32 m_playback_method_mismatch = 0;
 	std::array<u32,4> m_playback_processing{}; // calls, returns, successes, observation mismatches
-	u16 m_playback_fft_base = 0, m_playback_fft_parameter = 0;
+	u16 m_playback_fft_base = 0, m_playback_fft_parameter = 0, m_playback_post_base = 0;
 	u32 m_playback_fft_invocation = 0;
 	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
 	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
@@ -1032,6 +1035,48 @@ private:
 			auto const found = std::find(sites.begin(),sites.end(),address);
 			if (found == sites.end()) return;
 			snapshot(1+unsigned(found-sites.begin()),m_playback_fft_base,2*m_playback_fft_parameter);
+		}
+	}
+	void observe_playback_posttransform(offs_t address, u16 opcode)
+	{
+		if (!m_playback_processing_pending) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		bool const entry = address != 0x24950;
+		if (entry)
+		{
+			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+			m_playback_post_base = data.read_word(u16(sp+2));
+			if (u16(m_cpu->state_int(tms320c54x_device::STATE_A)) != m_playback_fft_parameter ||
+				m_playback_post_base < 0x60 || unsigned(m_playback_post_base)+2*m_playback_fft_parameter > 0x10000)
+				fatalerror("MU4 post-transform observation geometry changed");
+		}
+		if (!m_playback_post_base) return;
+		auto const snapshot = [&](unsigned stage, u16 base, unsigned words) {
+			std::string const name = util::string_format("mu4_post_%03u_stage%u.be16",m_playback_fft_invocation,stage);
+			std::ofstream file(name,std::ios::binary | std::ios::trunc);
+			u32 hash = 2166136261U;
+			for (unsigned i=0;i<words;++i)
+			{
+				u16 const value = data.read_word(base+i);
+				char const bytes[2]{char(value>>8),char(value)};
+				file.write(bytes,2);
+				hash = ((hash ^ u8(value>>8))*16777619U ^ u8(value))*16777619U;
+			}
+			file.close();
+			if (!file) fatalerror("MU4 post-transform observation file incomplete");
+			logerror("mu4_post_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+				m_playback_fft_invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
+				m_playback_fft_parameter,hash,name.c_str(),machine().time().as_double());
+		};
+		if (entry)
+		{
+			snapshot(0,m_playback_post_base,2*m_playback_fft_parameter);
+			snapshot(1,m_playback_fft_parameter == 0x80 ? 0xf200 : 0xf000,2*m_playback_fft_parameter);
+		}
+		else
+		{
+			snapshot(2,m_playback_post_base,2*m_playback_fft_parameter);
+			m_playback_post_base = 0;
 		}
 	}
 	void observe_playback_processing(offs_t address, u16 opcode)
@@ -2377,6 +2422,7 @@ private:
 			save_item(NAME(m_playback_method_entries)); save_item(NAME(m_playback_method_mismatch));
 			save_item(NAME(m_playback_processing)); save_item(NAME(m_playback_processing_sp)); save_item(NAME(m_playback_processing_destination));
 			save_item(NAME(m_playback_fft_base)); save_item(NAME(m_playback_fft_parameter)); save_item(NAME(m_playback_fft_invocation));
+			save_item(NAME(m_playback_post_base));
 			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
 			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
 			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
@@ -2623,6 +2669,7 @@ private:
 		m_playback_method_entries = {}; m_playback_method_mismatch = 0;
 		m_playback_processing = {}; m_playback_processing_sp = m_playback_processing_destination = 0;
 		m_playback_fft_base = m_playback_fft_parameter = 0; m_playback_fft_invocation = 0;
+		m_playback_post_base = 0;
 		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
 		m_playback_processing_pending = m_playback_conversion_active = false;
 		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;
