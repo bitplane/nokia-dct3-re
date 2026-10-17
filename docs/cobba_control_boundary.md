@@ -881,12 +881,23 @@ not proof that the resident lifecycle is blocked there.
 
 The present port-`27` receive implementation calls
 `nokia_cobba_device::rf_receive_sample()` synchronously for every DSP
-read. COBBA increments a saved observation counter and invokes its
-external callback; there is no independently clocked RF receive FIFO,
+read with side effects enabled. COBBA increments a saved observation counter
+and invokes its external callback; there is no independently clocked RF receive FIFO,
 sample-ready transition or overrun behavior. Consequently, read counts
 per second measure this execution's consumption, not a recovered ADC
 sample rate. A waveform fixture indexed by reads alone cannot establish
 physical cadence, even when the filter arithmetic and score checks pass.
+Side-effect-disabled debugger reads instead return the saved last-consumed
+word (zero before the first sample or after reset), without calling the
+source, advancing its count or spending the backend's RF trace budget.
+This observation value is not a hardware sample-ready latch or FIFO.
+The actual-backend fixture checks eight peeks around three ordinary reads,
+save/load and reset against a counted source. The fixture source cursor is
+itself saved; this does not automatically serialize arbitrary external
+callback providers. Its separate mandatory result is
+`C54x native backend RF observation: PASS` with `physical_rf_claim=0`.
+The backend gate, native mixed/full-scale filter controls, native tone and
+save-state gates, and default 3210 structural gate pass with this behavior.
 The next timing audit must distinguish the firmware's frame/slot pacing
 from a peripheral sampling clock before adding either buffering or a
 GSM waveform adapter. Codec serial PCM timing is a separate bus contract

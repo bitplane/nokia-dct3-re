@@ -46368,11 +46368,12 @@ class c54x_backend_bsp_test_state : public driver_device
 public:
 	c54x_backend_bsp_test_state(const machine_config &config, device_type type,
 			const char *tag) : driver_device(config, type, tag),
-		m_backend(*this, "backend"), m_cpu(*this, "backend:cpu") { }
+		m_backend(*this, "backend"), m_cpu(*this, "backend:cpu"), m_cobba(*this, "cobba") { }
 	void test(machine_config &config)
 	{
 		NOKIA_DSPIF(config, "dspif", 0);
-		NOKIA_COBBA(config, "cobba", 0);
+		NOKIA_COBBA(config, m_cobba, 0);
+		m_cobba->rf_receive_cb().set(FUNC(c54x_backend_bsp_test_state::rf_sample));
 		NOKIA_CCONT(config, "ccont", 0);
 		NOKIA_DSP_C54X(config, m_backend, 13'000'000);
 	}
@@ -46380,14 +46381,47 @@ protected:
 	virtual void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_backend_bsp_test_state::check), this);
+		save_item(NAME(m_rf_source_reads));
 	}
 	virtual void machine_reset() override
 	{
 		m_stage = 0;
 		m_case = 0;
+		m_rf_source_reads = 0;
 		m_timer->adjust(attotime::from_usec(100));
 	}
 private:
+	u16 rf_sample() { return 0x1200 + (++m_rf_source_reads) * 0x111; }
+	void check_rf_observation()
+	{
+		auto &io = m_cpu->space(AS_IO);
+		auto peek = [this, &io](u16 expected) {
+			u64 const reads = m_cobba->rf_receive_samples();
+			u32 const source = m_rf_source_reads;
+			{
+				auto const disable = machine().disable_side_effects();
+				expect(io.read_word(0x27) == expected && io.read_word(0x27) == expected, "RF debugger reads retain the last acquired word");
+			}
+			expect(m_cobba->rf_receive_samples() == reads && m_rf_source_reads == source, "RF debugger reads never advance the external source");
+		};
+		peek(0);
+		expect(io.read_word(0x27) == 0x1311 && m_rf_source_reads == 1 && m_cobba->rf_receive_samples() == 1,
+			"ordinary RF read consumes exactly one source word");
+		peek(0x1311);
+		m_saved.str({}); m_saved.clear();
+		expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save RF observation latch and independent source cursor");
+		expect(io.read_word(0x27) == 0x1422 && m_rf_source_reads == 2, "RF next source word");
+		m_saved.clear(); m_saved.seekg(0);
+		expect(machine().save().read_stream(m_saved) == STATERR_NONE && m_rf_source_reads == 1 && m_cobba->rf_receive_samples() == 1,
+			"restore RF sample count and external fixture cursor");
+		peek(0x1311);
+		expect(io.read_word(0x27) == 0x1422 && m_rf_source_reads == 2 && m_cobba->rf_receive_samples() == 2,
+			"RF continuation after load consumes the same next source word");
+		m_cobba->reset();
+		peek(0);
+		expect(!m_cobba->rf_receive_samples() && m_rf_source_reads == 2, "RF reset clears observation state without clocking the source");
+		osd_printf_info("C54x native backend RF observation: PASS debugger_reads=8 ordinary_reads=3 source_restore=1 reset=1 physical_rf_claim=0\n");
+	}
 	void expect(bool condition, const char *message)
 	{
 		if (!condition) throw emu_fatalerror("C54x backend BSP: %s", message);
@@ -46497,6 +46531,7 @@ private:
 				"reset frame calls leave no asynchronously delivered source edges");
 			if (++m_case == 3)
 			{
+				check_rf_observation();
 				osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
 				osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
 				throw emu_fatalerror(0, "C54x backend BSP tests complete");
@@ -46510,6 +46545,8 @@ private:
 	}
 	required_device<nokia_dsp_c54x_device> m_backend;
 	required_device<tms320c54x_device> m_cpu;
+	required_device<nokia_cobba_device> m_cobba;
+	u32 m_rf_source_reads = 0;
 	emu_timer *m_timer = nullptr;
 	unsigned m_stage = 0, m_case = 0;
 	u16 m_reset_ifr = 0;

@@ -434,6 +434,8 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 	case 0x0d:
 		return frame_counter();
 	case 0x27:
+		if (machine().side_effects_disabled())
+			return m_cobba->rf_receive_sample();
 		if (m_rf_trace_count++ < 16)
 			machine().logerror("rom4_rf_read: sample=%u pc=%04x frame=%llu t=%.6f\n",
 					m_rf_trace_count,

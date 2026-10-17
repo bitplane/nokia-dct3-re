@@ -99,6 +99,8 @@ private:
 	devcb_write16 m_rf_transmit_cb;
 	u64 m_rf_receive_samples = 0;
 	u64 m_rf_transmit_samples = 0;
+	// Debugger view of the last consumed input, not a clocked RF buffer.
+	u16 m_rf_receive_observation = 0;
 	std::array<s16, queue_samples> m_earpiece_queue{};
 	std::array<s16, queue_samples> m_microphone_queue{};
 	u16 m_earpiece_head = 0;
