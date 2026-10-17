@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify
+from tools.mu4_transform_check import SITES, fnv, pin_block, radix4, stage3, weighted_stage, verify, invocation_inventory
 
 
 def coefficients():
@@ -42,6 +42,28 @@ def fixture(directory):
 
 
 class TransformTests(unittest.TestCase):
+    def test_invocation_inventory_bounds_and_identity(self):
+        words={0x24919:0xf982,0x24944:0xf982}
+        lines=[]
+        for call in range(1,9):
+            lines.extend((f'mu4_processing_entry: call={call} t={call} observer_writes=0',
+                          f'mu4_processing_return: call={call} t={call+0.9} observer_writes=0'))
+            for index,(address,parameter,base) in enumerate(((0x24919,0x80,0x7800),(0x24944,0x400,0xe800))):
+                lines.append(f'mu4_fft_invocation: call={call} address={address:06x} opcode=f982 '
+                             f'parameter={parameter:04x} base={base:04x} t={call+0.1+index*0.1} '
+                             'identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0')
+        text='\n'.join(lines)
+        report=invocation_inventory(text,words)
+        self.assertEqual(report['invocations'],16)
+        self.assertEqual(report['processing_calls'][0]['vectors'][1]['complex_points'],512)
+        self.assertFalse(report['native_audio_validated'])
+        for before,after in [('call=1 address','call=9 address'),('parameter=0400','parameter=0080'),
+                             ('base=e800','base=ff00'),('opcode=f982','opcode=0000'),
+                             ('identity=Execute_entry','identity=live_pc'),('observer_writes=0','observer_writes=1'),
+                             ('t=1.1','t=0.1'),('t=1.2','t=1.05')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                invocation_inventory(text.replace(before,after,1),words)
+
     def test_hashed_source_presence_and_each_word_mutation(self):
         words={0x100+i:i for i in range(64)}
         digest=hashlib.sha256(struct.pack('>64H',*range(64))).hexdigest()

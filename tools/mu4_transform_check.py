@@ -130,6 +130,48 @@ def fnv(data):
     return result
 
 
+def invocation_inventory(text, words):
+    """Enumerate observed wrapper calls, without claiming vector correctness."""
+    entries=rows(text,'mu4_processing_entry')
+    returns=rows(text,'mu4_processing_return')
+    invocations=rows(text,'mu4_fft_invocation')
+    if ([r['call'] for r in entries]!=list(map(str,range(1,9))) or
+            [r['call'] for r in returns]!=list(map(str,range(1,9))) or not invocations):
+        raise ValueError('transform inventory requires eight complete processing calls')
+    result=[]
+    previous=-1.0
+    for call,(entry,returned) in enumerate(zip(entries,returns),1):
+        selected=[r for r in invocations if r.get('call')==str(call)]
+        if not selected:
+            raise ValueError('processing call lacks observed transform invocations')
+        counts={}
+        for row in selected:
+            address=int(row['address'],16)
+            parameter=int(row['parameter'],16)
+            base=int(row['base'],16)
+            time=float(row['t'])
+            if (address not in (0x24919,0x24944) or
+                    parameter!=(0x80 if address==0x24919 else 0x400) or
+                    int(row['opcode'],16)!=words[address] or
+                    row.get('identity')!='Execute_entry' or row.get('context_only')!='1' or
+                    row.get('observer_writes')!='0' or row.get('audio_acceptance')!='0' or
+                    not 0x60<=base<=0x10000-2*parameter or
+                    not float(entry['t'])<time<float(returned['t']) or time<previous):
+                raise ValueError('transform invocation identity, bounds or chronology changed')
+            previous=time
+            key=(parameter,base)
+            counts[key]=counts.get(key,0)+1
+        result.append({'call':call,'invocations':len(selected),
+                       'vectors':[{'parameter':f'{p:04x}','complex_points':p//2,
+                                   'base':f'{b:04x}','count':n}
+                                  for (p,b),n in sorted(counts.items())]})
+    if sum(r['invocations'] for r in result)!=len(invocations):
+        raise ValueError('transform inventory includes unknown processing call')
+    return {'processing_calls':result,'invocations':len(invocations),
+            'native_audio_validated':False,
+            'scope':'Observed wrapper entries and geometry only; no additional vector arithmetic acceptance'}
+
+
 def verify(directory,source):
     words=source_contract(source)
     text=(directory/'error.log').read_text()
@@ -194,9 +236,15 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--source-a00',type=Path,required=True)
+    parser.add_argument('--inventory',action='store_true',help='report observed short/long wrapper entries, not arithmetic acceptance')
     args=parser.parse_args()
     try:
-        result=verify(args.directory,args.source_a00.read_bytes())
+        source=args.source_a00.read_bytes()
+        if args.inventory:
+            result=invocation_inventory((args.directory/'error.log').read_text(),source_contract(source))
+            print(json.dumps(result,indent=2))
+            return 0
+        result=verify(args.directory,source)
         print(json.dumps(result,indent=2))
         return 0 if result['selected_transform_validated'] else 1
     except (ValueError,KeyError,OSError) as error:

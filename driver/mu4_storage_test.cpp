@@ -87,7 +87,7 @@ public:
 				{
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 &&
-						(address == 0x24919 || address == 0x2491e || address == 0x2400a ||
+						(address == 0x24919 || address == 0x24944 || address == 0x2491e || address == 0x2400a ||
 						 address == 0x2401e || address == 0x24036 || address == 0x24051 || address == 0x2406c))
 						observe_playback_transform(address,opcode);
 					if (m_playback_execute_entries[1] == 1 &&
@@ -979,8 +979,16 @@ private:
 	}
 	void observe_playback_transform(offs_t address, u16 opcode)
 	{
-		if (!m_playback_processing_pending || m_playback_processing[0] != 2) return;
+		if (!m_playback_processing_pending) return;
 		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		if (address == 0x24919 || address == 0x24944)
+		{
+			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+			logerror("mu4_fft_invocation: call=%u address=%06x opcode=%04x parameter=%04x base=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+				m_playback_processing[0],unsigned(address),opcode,unsigned(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffff,
+				data.read_word(u16(sp+2)),machine().time().as_double());
+		}
+		if (m_playback_processing[0] != 2) return;
 		if (address == 0x24919)
 		{
 			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);

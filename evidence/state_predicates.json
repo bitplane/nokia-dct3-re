@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_transform_invocation_inventory",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "Passive source-pinned wrapper observations enumerate short and long transforms inside all eight packet-bound processing calls",
+      "current": "The fresh two-second replay observes 30 entries: sixteen parameter-0080 (64-complex) vectors in call 2 and two parameter-0400 (512-complex) vectors in each other call. The report verifies source opcodes, caller parameter, vector bounds, Execute identity, read-only scope and enclosing call chronology. The four complete word/slot outputs and all eighteen selected transform snapshots remain byte-identical to the pre-inventory proof. Packet binding and 4096 conversion checks still pass. This inventories executed shapes; only two selected short vectors have stage-level arithmetic acceptance. The remaining 28 vectors, waveform conformance, analog output and speech are not validated.",
+      "evidence": ["driver/mu4_storage_test.cpp", "tools/mu4_transform_check.py", "tools/test_mu4_transform_check.py", "docs/5510_bringup.md"]
+    },
+    {
       "id": "c54x_shifted_store_dagen_order",
       "owner": "native_c54x",
       "status": "satisfied",

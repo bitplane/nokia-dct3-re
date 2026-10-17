@@ -6080,7 +6080,22 @@ RMS 1.1492 over 16,384 signed samples. These comparisons use neither fitted
 alignment nor gain. They do not define a codec-conformance tolerance.
 
 Two 64-point transforms are validated, not every transform invocation or the
-512-point path. Remaining work is broader vector coverage, understanding the
+512-point path. The passive `--inventory` report observes 30 wrapper entries
+across the eight packet-bound processing calls: call 2 has sixteen 64-point
+vectors (`7800..7f00` and `e800..ef00`, step `0100`); each other call has two
+512-point vectors. The first long vector alternates between `7000` and
+`7800`; its companion is `e800`. Entry identity, source opcode, parameter,
+vector bounds and enclosing call times are checked. This is execution
+coverage, not arithmetic validation of the other 28 vectors. The long driver
+uses the same early kernels followed by additional weighted stages at
+return sites `02408b`, `0240a6` and `0240be`; its wrapper return is `024946`.
+
+```sh
+python3 tools/mu4_transform_check.py RUN_DIR --inventory \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+Remaining work is broader vector coverage, understanding the
 small PCM residual against a floating-point decoder, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
 The earlier per-word arithmetic exclusions were valid for corrupted inputs;
