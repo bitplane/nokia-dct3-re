@@ -24,9 +24,12 @@ encoder fields. Fresh transform observations account for 3,072 saved bytes;
 their first eight packets host-decode as eight frames with zero errors.
 This is captured native encoder output, not validation of native decoder PCM.
 See [recorded payload contracts](#recording-header-and-selected-windows).
-Complete observed word captures now preserve the digital baseline. Next audit
-the remaining T-input multiplier categories and compare framed output with
-independently decoded source. Continue without forcing counters,
+Complete observed word captures preserve the digital baseline. Checked
+T-input dependency banks now cover each admitted multiplier family within
+the domains below, without changing those native captures. Next preserve
+the codec DIN callback's existing channel metadata across clock/reset epochs
+before comparing framed output with independently decoded source; raw word
+index parity alone is not framing evidence. Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -7670,6 +7673,8 @@ Native playback advances past that boundary. The global playback frontier
 belongs in Current boundary above; source and dependency acceptance here
 must not be mistaken for complete decoder-output validation.
 
+### T-input Product Dependencies
+
 The register forms `MPYA A/B` and `MACA[R]/MASA[R] T,src,dst` use signed
 A(32..16) and signed T, with FRCT, final OVM saturation and sticky target
 overflow. MACA/MASA additionally use the source accumulator, SMUL product
@@ -7683,46 +7688,53 @@ recommendation must not be turned into an old-T multiplier oracle. The
 partial staged model retains T after older Execute and before younger Read
 publication, then samples A and the source accumulator in Execute. Reading
 live T in Execute would instead risk consuming a following STM-to-T.
-The `mac-smem` profile requires 69,120 register-product cases/restores:
-18 opcodes, eight numeric patterns, 16 control settings, no producer,
-adjacent/separated STLM-to-T, an A producer and a younger STM-to-T,
-two pages and three snapshots. Checks cover initially clear/sticky overflow,
-one opcode fetch, no data reads, only the expected producer write and
-preservation of later T. Repeat/interrupt composition and physical phases
-are unvalidated. Nine AA99 words at `025b0d..025b15` pin the original
-T-producing caller and `025b14: MPYA A`, with per-word mutation tests.
+Smem MPY/MPYR/MPYU/MAC/MACR/MAS/MASR and POLY retain dedicated T at the
+same older-write boundary. A mapped-T Smem operand defers its single
+memory read to that boundary too; other sources keep their existing read
+ownership. Immediate-T products retain their operand during the complete
+two-word Read, whose extension clocks already separate the tested older
+producers. They need no production change in this audit.
 
-The same zero-latency contract now covers short Smem
-MPY/MPYR/MPYU/MAC/MACR/MAS/MASR, fourteen destination opcodes. Before
-correction, adjacent STLM-to-T followed by `2081` consumes zero rather than
-`1234`, producing zero instead of `fff6e61234` with memory `8001`.
-Retain dedicated T after older Execute, before younger Read publications.
-For a mapped-T source, defer its one memory read to that same older-write
-boundary; other memory sources keep their existing read ownership.
+Two executable counterexamples establish why early capture is wrong.
+Adjacent STLM-to-T followed by `2081` consumes zero rather than `1234`,
+producing zero instead of `fff6e61234` with memory `8001`. Adjacent STLM
+followed by `3681` uses stale T=1 rather than `8000`: with A=`12340000`
+and B=`7fff8000`, it produces `0080000000` rather than `0076e60000`.
+Both fail before their capture-order correction and pass afterwards.
 
-The additional `mac-smem` bank passes 107,520 cases and save-state replays:
-fourteen opcodes, eight patterns, sixteen control settings, five dependency
-layouts, short indirect RAM and direct mapped T, two pages and three
-snapshots. An independent scalar model checks signed/unsigned products,
-FRCT, SMUL, OVM, rounding and fresh/sticky overflow. Adversarial T and RAM
-replacement after Read checks retained inputs; a following STM-to-T checks
-that Execute does not consume a younger publication. Exactly one source
-read and only the fixture's expected T write are permitted. This is not
-extended-form, EXP-producer, repeat/interrupt or measured-phase acceptance.
-TS load/arithmetic producer, EXP-to-NORM and invalid MOD=3 profiles remain
-green. Replaying the preserved native recording after this correction
-produces byte-identical complete DMA/TX/DIN captures to the baseline below;
-DMA/source-range checks also pass. This dependency defect is real in the
-executable fixture, but is not an observed cause of this workload's
-unvalidated waveform quality.
+The `mac-smem` profile requires these dependency banks, each with eight
+numeric patterns, two pages and three save-state snapshots:
 
-This closes these short Smem and register banks, not every T consumer.
-POLY still needs its consumer-category producer/successor audit.
-Immediate-T products also need that composition check; extension clocks
-alone are not a blanket proof. Extended Smem dependencies remain untested.
-Keep the intentional short TS/NORM/bit-test restrictions separate rather
-than moving all T sampling to one common point. The unresolved predicate
-`c54x_remaining_t_multiplier_category_audit` names that bounded follow-up.
+| Bank | Cases And Replays | Domain |
+| --- | ---: | --- |
+| Register products | 69,120 | 18 opcodes, 16 control settings, five layouts |
+| Short Smem products | 107,520 | 14 opcodes, RAM/mapped T, 16 settings, five layouts |
+| POLY dependencies | 2,304 | Indirect RAM, eight settings, six layouts, SMUL excluded |
+| Immediate-T products | 27,648 | Six opcodes, 16 settings, six layouts |
+| Absolute Smem products | 64,512 | 14 opcodes, RAM, 16 settings, six layouts |
+| EXP producers | 35,328 | 18 register and 28 short RAM/mapped-T forms, 16 settings |
+
+The first five layouts are no producer, adjacent/separated STLM-to-T,
+an A producer and a following STM-to-T. The sixth is adjacent EXP A.
+An independent scalar model checks signed/unsigned arithmetic, rounding,
+FRCT/OVM/SMUL, fresh/sticky overflow, and POLY coefficient extension.
+Adversarial T, RAM and extension replacement after Read checks retention.
+Each case requires exactly one opcode fetch, the expected zero/one source
+and literal reads, and only the expected producer write. The existing
+MAC/MAS, square and repeated-POLY arithmetic banks also pass.
+Nine AA99 words at `025b0d..025b15` pin the original T-producing caller
+and `025b14: MPYA A`, with per-word mutation tests.
+
+This is bounded family/dependency acceptance, not every producer/address
+combination: long-offset Smem, absolute mapped-T and other mapped producers,
+POLY with SMUL, dependency/repeat/interrupt composition and physical phases
+remain unvalidated. Keep Category-I TS/NORM/bit-test restrictions separate.
+`c54x_remaining_t_multiplier_category_audit` retains these residual limits.
+TS load/arithmetic producer, EXP-to-NORM, EXP-to-register and invalid MOD=3
+profiles pass. A fresh 20-second native playback after the POLY correction
+passes DMA/source-range and capture-integrity checks; all three complete
+captured streams are byte-identical to the preserved baseline. Neither
+dependency correction is an observed waveform improvement in this workload.
 
 With these register forms admitted, the preserved recording produces a
 complete 20-second legal run, not an unsupported-opcode stop. Observation

@@ -3854,9 +3854,6 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged TS arithmetic shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && staged_poly(m_pipeline_word[4]))
-		// POLY producer/successor category coverage remains a separate audit.
-		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfeff) == 0xf066 || (m_pipeline_word[4] & 0xfcff) == 0xf067))
 		m_pipeline_operand[4] = m_t;
 	if (m_pipeline_valid[4] && staged_port_read(m_pipeline_word[4]))
@@ -4656,7 +4653,7 @@ void tms320c54x_device::pipeline_step()
 		// Retain T after older Execute but before younger Read publications;
 		// sampling live T in Execute could instead consume a following STM.
 		m_pipeline_operand[4] = m_t;
-	if (smem_t_product_read)
+	if (smem_t_product_read || (m_pipeline_valid[4] && staged_poly(m_pipeline_word[4])))
 		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && staged_dual_multiply(m_pipeline_word[4]))
 		// MPY/MAC/MACSU load T in Read (SPRU172C 4-101/4-82/4-91). An older
