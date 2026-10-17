@@ -3,8 +3,114 @@
 #include "tms320c54x_bsp_state.h"
 #include <cassert>
 
+static auto receive_edge(tms320c54x_bsp_state &port, std::uint16_t extension, bool sync, bool bit)
+{
+	const bool sample_level = extension & 0x40;
+	const auto opposite = port.receive_clock(!sample_level, sync, bit, extension);
+	assert(!opposite.receive_ready_edge);
+	return port.receive_clock(sample_level, sync, bit, extension);
+}
+
+static void receive_sync(tms320c54x_bsp_state &port, std::uint16_t extension, unsigned clocks = 1)
+{
+	const bool active = !(extension & 0x20);
+	const bool ready = port.receive_ready;
+	for (unsigned i = 0; i < clocks; ++i)
+	{
+		const auto result = receive_edge(port, extension, active, i & 1);
+		assert(result.supported && !result.receive_ready_edge && port.receive_ready == ready);
+	}
+}
+
+static void receive_bits(tms320c54x_bsp_state &port, std::uint16_t extension,
+		std::uint16_t word, unsigned width, unsigned begin, unsigned end, bool accepted)
+{
+	const bool inactive = extension & 0x20;
+	const bool was_ready = port.receive_ready;
+	for (unsigned i = begin; i < end; ++i)
+	{
+		const auto result = receive_edge(port, extension, inactive, (word >> (width - 1 - i)) & 1);
+		assert(result.supported && result.receive_ready_edge == (accepted && i + 1 == width));
+		assert(port.receive_ready == (was_ready || (accepted && i + 1 == width)));
+	}
+}
+
+static void check_receive_pins()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+			for (unsigned word = 0; word <= 0xffff; ++word)
+			{
+				tms320c54x_bsp_state port;
+				const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+				const unsigned width = widths[format], mask = (1U << width) - 1, payload = word & mask;
+				port.control_w(0x88 | (format & 1 ? 4 : 0));
+				receive_sync(port, extension, 1 + word % 4);
+				receive_bits(port, extension, word, width, 0, width, true);
+				assert(port.receive_ready && !port.receive_overrun);
+				// Holding a clock pin is not another sampled bit or ready edge.
+				assert(!port.receive_clock(bool(extension & 0x40), bool(extension & 0x20), false, extension).receive_ready_edge);
+				const std::uint16_t expected = payload & (1U << (width - 1)) ? payload | ~mask : payload;
+				assert(port.receive_r() == expected && !port.receive_ready);
+			}
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+		{
+			const unsigned width = widths[format];
+			const std::uint16_t extension = (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+			for (unsigned checkpoint = 0; checkpoint < width; ++checkpoint)
+			{
+				tms320c54x_bsp_state port;
+				port.control_w(0x88 | (format & 1 ? 4 : 0));
+				receive_sync(port, extension, 3);
+				receive_bits(port, extension, 0xa597, width, 0, checkpoint, false);
+				auto restored = port;
+				receive_bits(port, extension, 0xa597, width, checkpoint, width, true);
+				receive_bits(restored, extension, 0xa597, width, checkpoint, width, true);
+				assert(port.control_r() == restored.control_r() && port.receive_r() == restored.receive_r());
+			}
+		}
+	tms320c54x_bsp_state port;
+	port.control_w(0x88);
+	// No FSR, or RRST during a partial word, cannot publish a sample.
+	receive_bits(port, 0, 0x1234, 16, 0, 16, false);
+	assert(!port.receive_ready);
+	receive_sync(port, 0);
+	receive_bits(port, 0, 0x1234, 16, 0, 8, false);
+	port.control_w(8); port.control_w(0x88);
+	receive_bits(port, 0, 0x1234, 16, 8, 16, false);
+	assert(!port.receive_ready);
+	// A new FSR aborts the incomplete word and starts the replacement.
+	receive_sync(port, 0);
+	receive_bits(port, 0, 0xffff, 16, 0, 8, false);
+	receive_sync(port, 0);
+	receive_bits(port, 0, 0x1234, 16, 0, 16, true);
+	assert(port.receive == 0x1234);
+	receive_sync(port, 0); // Unread DRR is preserved when the next word overruns.
+	receive_bits(port, 0, 0x5678, 16, 0, 16, false);
+	assert(port.receive_overrun && port.receive == 0x1234);
+	receive_sync(port, 0); // A sync while overrun is active cannot restart RX.
+	assert(port.receive_r() == 0x1234);
+	receive_bits(port, 0, 0x5678, 16, 0, 16, false);
+	assert(!port.receive_ready);
+	receive_sync(port, 0);
+	receive_bits(port, 0, 0x5678, 16, 0, 16, true);
+	assert(port.receive_r() == 0x5678);
+	for (unsigned mode = 0; mode < 3; ++mode)
+	{
+		port.reset();
+		port.control_w(mode == 0 ? 0x80 : mode == 1 ? 0x8a : 0x88);
+		const std::uint16_t extension = mode == 2 ? 0x400 : 0;
+		assert(!receive_edge(port, extension, true, false).supported);
+		assert(!receive_edge(port, extension, false, true).supported);
+		assert(!port.receive_ready);
+	}
+}
+
 int main()
 {
+	check_receive_pins();
 	tms320c54x_bsp_state port;
 	std::uint16_t duplex_output = 0xaaaa;
 	port.control_w(0x00c2);

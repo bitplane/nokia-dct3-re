@@ -364,7 +364,7 @@ help:
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
 	@echo "make check-c54x-rom4-codec-tone verify native boot serial and physical tone-control boundaries; retains isolated evidence under RUN_DIR"
-	@echo "make check-c54x-backend-bsp verify actual native backend completed-frame interrupts and save/load (no handset clock/audio claim)"
+	@echo "make check-c54x-backend-bsp verify native BSP frames, receive pins and save/load (no handset clock/audio claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
 	@echo "make verify-3310-radio-authentication-boundary reproduce organic 3310 authenticated registration"

@@ -1,4 +1,4 @@
-"""Run synthetic completed frames through the actual native DSP backend."""
+"""Run completed-word and explicit receive-pin tests through the native backend."""
 import argparse
 from pathlib import Path
 import subprocess
@@ -8,6 +8,7 @@ import tempfile
 MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0'
 OBSERVATION = 'C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0'
 RF_OBSERVATION = 'C54x native backend RF observation: PASS debugger_reads=8 ordinary_reads=3 source_restore=1 reset=1 physical_rf_claim=0'
+RECEIVE_PINS = 'C54x native backend BSP receive pins: PASS words=3 partial_restore=1 reset_abort=1 vectors=3 handset_audio_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 
 
@@ -19,6 +20,8 @@ def check_result(text, returncode):
         raise ValueError('missing unique nondestructive BDRR/overrun result')
     if lines.count(RF_OBSERVATION) != 1:
         raise ValueError('missing unique nondestructive RF input/restoration result')
+    if lines.count(RECEIVE_PINS) != 1:
+        raise ValueError('missing unique native receive-pin/partial-restore result')
     if not lines or lines[-1] != COMPLETION:
         raise ValueError('missing terminal backend BSP completion')
     if any(line.startswith('Fatal error:') and line != COMPLETION for line in lines):

@@ -24,6 +24,9 @@ public:
 	bool codec_receive_frame(u16 word);
 	// Explicit completion of a frame whose TX/RX clock relationship is known.
 	bool codec_duplex_frame(u16 input, u16 &output);
+	// Explicit external receive pins; no clock is generated here. False means
+	// the configured mode is outside the non-DLB, non-autobuffer burst subset.
+	bool codec_receive_clock_w(bool clock, bool sync, bool data);
 
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override { }

@@ -46392,6 +46392,108 @@ protected:
 	}
 private:
 	u16 rf_sample() { return 0x1200 + (++m_rf_source_reads) * 0x111; }
+	void receive_pin_cycle(bool sync, bool bit)
+	{
+		expect(m_backend->codec_receive_clock_w(true, sync, bit) &&
+			m_backend->codec_receive_clock_w(false, sync, bit), "external burst receive pins supported");
+	}
+	void receive_pin_bits(unsigned begin, unsigned end, bool ready)
+	{
+		for (unsigned i = begin; i < end; ++i)
+		{
+			receive_pin_cycle(false, (0x5678 >> (15 - i)) & 1);
+			expect(bool(m_cpu->space(AS_DATA).read_word(0x22) & 0x400) == (ready && i == 15),
+				"pin receiver publishes only at the final bit");
+		}
+	}
+	void receive_pin_suffix()
+	{
+		// The checkpoint holds CLK high before bit 9's falling sample edge.
+		expect(m_backend->codec_receive_clock_w(false, false, bool(0x5678 & 0x80)) &&
+			!(m_cpu->space(AS_DATA).read_word(0x22) & 0x400), "restored high clock admits the pending falling edge");
+		receive_pin_bits(9, 16, true);
+	}
+	void check_receive_pins()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 8)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			m_backend->reset_line_w(1);
+		}
+		else if (m_stage == 9)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x00a0);
+			data.write_word(0x0800, 0xf4e1); data.write_word(0x00d0, 0xf4e1);
+			data.write_word(0x0022, 0x0088); data.write_word(0x0023, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0010);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x0010);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+			m_cpu->set_state_int(STATE_GENPC, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 10)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x0801 && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "pin fixture starts from IDLE");
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			receive_pin_cycle(true, false);
+			receive_pin_bits(0, 8, false);
+			expect(m_backend->codec_receive_clock_w(true, false, bool(0x5678 & 0x80)), "hold receive clock before the next sample");
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save backend with half a serial word received");
+			receive_pin_suffix();
+		}
+		else if (m_stage == 11 || m_stage == 13 || m_stage == 16)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x10 && (data.read_word(0x22) & 0x400), "last receive bit reaches native CPU BRINT0");
+			if (m_stage == 11) expect(data.read_word(0x20) == 0x5678, "initial pin word");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 12 || m_stage == 14 || m_stage == 17)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x00d1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff && data.read_word(0x0fff) == 0x0801 &&
+				!m_cpu->state_int(tms320c54x_device::STATE_IFR), "serial pin completion dispatches vector 20 exactly once");
+			if (m_stage == 12)
+			{
+				m_saved.clear(); m_saved.seekg(0);
+				expect(machine().save().read_stream(m_saved) == STATERR_NONE, "restore partial serial shift and CPU");
+				expect(m_cpu->state_int(STATE_GENPC) == 0x0801 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					!(data.read_word(0x22) & 0x400), "partial restore precedes readiness and interrupt entry");
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+				receive_pin_suffix();
+			}
+			else
+			{
+				expect(data.read_word(0x20) == 0x5678, "replayed/fresh pin word preserves all bits");
+				if (m_stage == 17)
+				{
+					osd_printf_info("C54x native backend BSP receive pins: PASS words=3 partial_restore=1 reset_abort=1 vectors=3 handset_audio_claim=0\n");
+					osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
+					osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
+					throw emu_fatalerror(0, "C54x backend BSP tests complete");
+				}
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+				m_cpu->set_state_int(STATE_GENPC, 0x0801);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				receive_pin_cycle(true, false); receive_pin_bits(0, 8, false);
+				data.write_word(0x22, 8); data.write_word(0x22, 0x88);
+				receive_pin_bits(8, 16, false);
+			}
+		}
+		else if (m_stage == 15)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !(data.read_word(0x22) & 0x400), "RRST abort leaves no receive edge");
+			receive_pin_cycle(true, false); receive_pin_bits(0, 16, true);
+		}
+		++m_stage;
+		m_timer->adjust(attotime::from_usec(100));
+	}
 	void check_rf_observation()
 	{
 		auto &io = m_cpu->space(AS_IO);
@@ -46428,6 +46530,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 8) { check_receive_pins(); return; }
 		if (m_stage == 0)
 		{
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -46532,9 +46635,9 @@ private:
 			if (++m_case == 3)
 			{
 				check_rf_observation();
-				osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
-				osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");
-				throw emu_fatalerror(0, "C54x backend BSP tests complete");
+				m_stage = 8;
+				m_timer->adjust(attotime::from_usec(100));
+				return;
 			}
 			m_stage = 0;
 			m_timer->adjust(attotime::from_usec(100));

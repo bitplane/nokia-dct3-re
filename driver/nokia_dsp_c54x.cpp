@@ -51,6 +51,11 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_bsp.transmit_pending));
 	save_item(NAME(m_bsp.transmit_loaded));
 	save_item(NAME(m_bsp.receive_overrun));
+	save_item(NAME(m_bsp.receive_shift));
+	save_item(NAME(m_bsp.receive_bits_left));
+	save_item(NAME(m_bsp.receive_width));
+	save_item(NAME(m_bsp.receive_clock_level));
+	save_item(NAME(m_bsp.receive_sync_active));
 	save_item(NAME(m_host_command_line));
 	save_item(NAME(m_reset_released));
 	save_item(NAME(m_host_command_vector));
@@ -279,6 +284,14 @@ bool nokia_dsp_c54x_device::codec_receive_frame(u16 word)
 	if (accepted)
 		m_cpu->set_input_line(4, HOLD_LINE); // BRINT0, vector 20.
 	return accepted;
+}
+
+bool nokia_dsp_c54x_device::codec_receive_clock_w(bool clock, bool sync, bool data)
+{
+	const auto result = m_bsp.receive_clock(clock, sync, data, m_data[0x0023]);
+	if (result.receive_ready_edge)
+		m_cpu->set_input_line(4, HOLD_LINE);
+	return result.supported;
 }
 
 bool nokia_dsp_c54x_device::codec_duplex_frame(u16 input, u16 &output)

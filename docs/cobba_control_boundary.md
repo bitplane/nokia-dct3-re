@@ -1398,6 +1398,37 @@ four ordinary BDRR reads return that same word and clear ready/overrun.
 The runner requires the unique `C54x native backend BSP observation: PASS`
 marker with those exact counts, independently of the original vector/reset
 result. Debugger inspection must not consume a firmware-owned sample.
+The backend additionally accepts explicit external receive pin levels through
+`codec_receive_clock_w(clock, sync, data)`. Its bounded subset is standard
+burst reception (FSM=1), DLB off, and autobuffering off. CLKP selects the
+sampling edge, FSP selects sync polarity, and FO/FE select 16/8/10/12-bit
+words. A qualified sync pulse precedes MSB-first shifting; holding sync
+active delays shifting, repeated clock levels do nothing, and a new sync
+aborts an incomplete word. The final bit alone can publish BDRR/RRDY and
+source 4. RRST cancels a partial word. Unsupported continuous/DLB/autobuffer
+pin configurations return false rather than supplying a completed word.
+These rules derive from TI SPRU131G sections 9.2.4/9.2.6 and table 9-9;
+dynamic format/polarity changes during a word remain outside acceptance.
+
+The executable helper checks all 65,536 input words across four formats
+and four clock/sync-polarity combinations, plus 184 partial-state copies,
+long sync pulses, restart, reset and overrun controls. The actual-backend
+gate separately supplies a 16-bit word, saves after eight bits, and repeats
+its suffix after load. The snapshot holds the clock high before the ninth
+bit: replay begins directly with its falling edge, requiring the stored
+clock phase as well as the partial shift value. It checks readiness only at
+the last bit, exact
+`5678` reception, and three native BRINT0 vector/stack entries, including a
+fresh frame after an RRST-aborted partial word. Its mandatory result is
+`C54x native backend BSP receive pins: PASS` with `partial_restore=1` and
+`vectors=3`. The shift register, remaining width and sampled pin levels are
+saved backend state. This is caller-driven conformance: no handset config
+or production clock source calls this interface, and no physical edge
+alignment, PCM waveform or native call is promoted.
+Completed-word calls and pin-edge calls are alternative attachments to the
+same receiver, not independent channels to drive simultaneously. The backend
+pin gate, native tone-control and exact 5110 save/load gates pass; native FR
+encoder/decoder frame-history replay remains bit-exact.
 This establishes completed-frame wiring, reset suppression and backend
 state restoration, not a production frame-clock caller, handset ISR,
 COBBA control interpretation or native audio. No physical clock is supplied

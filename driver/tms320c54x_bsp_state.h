@@ -6,16 +6,24 @@
 
 #include <cstdint>
 
-// Standard-mode completed-word state. The attachment owns frame/bit clocks
-// and routes ready transitions to interrupts; autobuffering is not modeled.
+// Standard-mode completed-word state and external burst receiver. The
+// attachment owns clocks and interrupt routing; autobuffering is not modeled.
 struct tms320c54x_bsp_state
 {
 	std::uint16_t control = 0, receive = 0, transmit = 0;
 	bool receive_ready = false, transmit_ready = true;
 	bool transmit_pending = false, receive_overrun = false;
 	bool transmit_loaded = false;
+	std::uint16_t receive_shift = 0;
+	std::uint8_t receive_bits_left = 0, receive_width = 0;
+	bool receive_clock_level = false, receive_sync_active = false;
 
 	void reset() { *this = {}; }
+	void reset_receive_shift()
+	{
+		receive_shift = 0;
+		receive_bits_left = receive_width = 0;
+	}
 	void control_w(std::uint16_t value)
 	{
 		control = value & 0xc0ff; // Clock pins and status bits are read-only.
@@ -23,6 +31,7 @@ struct tms320c54x_bsp_state
 		{
 			receive_ready = false;
 			receive_overrun = false;
+			reset_receive_shift();
 		}
 		if (!(control & 0x0040))
 		{
@@ -69,6 +78,10 @@ struct tms320c54x_bsp_state
 	}
 	bool frame_receive(std::uint16_t value, std::uint16_t extension = 0)
 	{
+		return receive_word(value, word_bits(extension));
+	}
+	bool receive_word(std::uint16_t value, unsigned bits)
+	{
 		if (!(control & 0x0080) || receive_overrun)
 			return false;
 		if (receive_ready)
@@ -78,13 +91,51 @@ struct tms320c54x_bsp_state
 		}
 		// BSP sign-extends 8/10/12-bit receptions (SPRU131G table 9-9).
 		// DXR retains all bits even when only its low bits cross the wire.
-		const unsigned bits = word_bits(extension);
 		const unsigned mask = (1U << bits) - 1;
 		const unsigned payload = value & mask;
 		receive = std::uint16_t(payload & (1U << (bits - 1))
 				? payload | ~mask : payload);
 		receive_ready = true;
 		return true;
+	}
+	struct clock_result
+	{
+		bool supported, receive_ready_edge;
+	};
+	clock_result receive_clock(bool clock, bool sync, bool bit,
+			std::uint16_t extension = 0)
+	{
+		// External burst receive only. Continuous mode, DLB and autobuffering
+		// require additional clock/transfer owners, not inferred completions.
+		const bool supported = (control & 0x0008) && !(control & 0x0002) && !(extension & 0xfc00);
+		const bool edge = clock != receive_clock_level && clock == bool(extension & 0x0040);
+		receive_clock_level = clock;
+		if (!edge) return {supported, false};
+		const bool active = sync != bool(extension & 0x0020);
+		const bool previous_sync = receive_sync_active;
+		receive_sync_active = active;
+		if (!supported || !(control & 0x0080) || receive_overrun)
+		{
+			reset_receive_shift();
+			return {supported, false};
+		}
+		// SPRU131G 9.2.4/9.3: qualify the sync pulse at the selected clock
+		// edge; its inactive edge precedes the MSB. A long pulse holds shifting.
+		if (active)
+		{
+			if (!previous_sync)
+			{
+				receive_shift = 0;
+				receive_bits_left = receive_width = word_bits(extension);
+			}
+			return {true, false};
+		}
+		if (!receive_bits_left) return {true, false};
+		receive_shift = (receive_shift << 1) | unsigned(bit);
+		if (--receive_bits_left) return {true, false};
+		const bool ready = receive_word(receive_shift, receive_width);
+		reset_receive_shift();
+		return {true, ready};
 	}
 	std::uint16_t receive_r()
 	{
