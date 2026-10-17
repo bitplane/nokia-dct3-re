@@ -986,6 +986,12 @@
       "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     },
     {
+      "id": "native_rom4_ring_only_int2_completes_boot", "status": "disproven",
+      "hypothesis": "Removing the shared-0854 request alias and its acknowledgement clears, while retaining ring-driven INT2 and the existing HPINT doorbell, is sufficient to preserve native 5110 boot",
+      "conclusion": "The bounded candidate restores intact parameter delivery: shared 900f reaches the reader at PC 27f2, the control helper writes register 9/value 000f, and firmware clears busy 0870 at PC 37a1. Nevertheless the 11-second physical-key fixture captures a blank frame, only 18 control calls, BSPC c808 and no ordinary 8426 activation or key-tone copy. The exact masked-ready and graphical gates are not weakened. The behavioral candidate is removed and the prior driver restored. This falsifies sufficiency of the ring-only source set, not the observed parameter-clobber anomaly; the legitimate non-ring request producers and acceptance contract remain unresolved. No replacement request bitmap, guest state, completion or clock is injected.",
+      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_codec_contract.py", "tools/c54x_rom4_tone_observe.lua", "tools/run_c54x_rom4_tone_levels.py"]
+    },
+    {
       "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
       "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
       "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",

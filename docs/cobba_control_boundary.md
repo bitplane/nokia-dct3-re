@@ -1365,6 +1365,17 @@ proof that all bits of the packed parameter themselves assert INT2, nor
 does it identify the DSP-side request-latch register. Keep the API trigger,
 HPI DARAM payload and DSP port request/accept registers distinct during
 the next ownership audit.
+The native HPINT/vector-25 entry `3772` checks busy word `0870` and local
+state `00ef`; its admitted path calls `a51b` at `3796`, strobes data `0029`
+bit 3 and clears `0870` at `379e..37a0`. Both ranges are exact-word fixtures.
+Suppressing all non-ring INT2 requests while retaining HPINT and the ring
+comparator preserves parameter `900f`: it reaches `27f2`, writes register
+9/value `000f`, and clears busy at post-extension PC `37a1`. However that
+candidate makes only 18 control calls, never reaches the ordinary `8426`
+activation, and captures a blank final frame. It is not a complete fix and
+is not retained in the driver. This rules out simply deleting the inferred
+request sources; recover their legitimate producers rather than substituting
+the ring-only result or restoring a guessed bitmap with a new name.
 The tone-level fixture passively records capped request reads and their
 following accept writes, with uncapped totals; it does not require the
 current destructive behavior as an acceptance condition.

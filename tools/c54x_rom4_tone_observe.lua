@@ -32,6 +32,8 @@ watch(dsp, 'data', 0x06be, 'dsp')
 watch(mcu, 'program', 0x100a8, 'codec_shared_mcu', 0x100ab)
 watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
 watch(dsp, 'program', 0x0854, 'codec_shared_overlay')
+watch(dsp, 'data', 0x0870, 'codec_pending_dsp')
+watch(mcu, 'program', 0x100e0, 'codec_pending_mcu', 0x100e3)
 for _, address in ipairs({0x19a2, 0x19a4, 0x1f92}) do
     watch(dsp, 'data', address, 'codec_level_local')
     watch(dsp, 'program', address, 'codec_level_overlay')
