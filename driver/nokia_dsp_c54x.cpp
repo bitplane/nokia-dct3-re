@@ -58,12 +58,14 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_bsp.receive_clock_level));
 	save_item(NAME(m_bsp.receive_sync_active));
 	save_item(NAME(m_bsp.receive_continuous));
+	save_item(NAME(m_bsp.receive_sync_released));
 	save_item(NAME(m_bsp.transmit_shift));
 	save_item(NAME(m_bsp.transmit_bits_left));
 	save_item(NAME(m_bsp.transmit_clock_level));
 	save_item(NAME(m_bsp.transmit_sync_active));
 	save_item(NAME(m_bsp.transmit_suppressed));
 	save_item(NAME(m_bsp.transmit_continuous));
+	save_item(NAME(m_bsp.transmit_sync_released));
 	save_item(NAME(m_host_command_line));
 	save_item(NAME(m_reset_released));
 	save_item(NAME(m_host_command_vector));

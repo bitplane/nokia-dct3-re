@@ -20,7 +20,7 @@ Current native scope is split deliberately:
   homing coverage. The active-speech erasure precision difference remains a
   separate strict comparison, not a reason to alter CPU arithmetic.
 - [BSP ownership and pin gates](#serial-control-ownership-correction) cover
-  externally clocked burst and continuous FIG=0 reception/transmission,
+  externally clocked burst and continuous FIG=0/1 reception/transmission,
   ready/status interrupts and saved state. No production handset clock is
   attached by those tests.
 - The native request/acknowledgement alias can still destroy shared command
@@ -1557,13 +1557,13 @@ marker with those exact counts, independently of the original vector/reset
 result. Debugger inspection must not consume a firmware-owned sample.
 The backend additionally accepts explicit external receive pin levels through
 `codec_receive_clock_w(clock, sync, data)`. Its bounded subset is standard
-burst reception (FSM=1), or continuous reception (FSM=0, FIG=0), with DLB
+burst reception (FSM=1), or continuous reception (FSM=0), with DLB
 and autobuffering off. CLKP selects the
 sampling edge, FSP selects sync polarity, and FO/FE select 16/8/10/12-bit
 words. A qualified sync pulse precedes MSB-first shifting; holding sync
 active delays shifting, repeated clock levels do nothing, and a new sync
-aborts an incomplete word. The final bit alone can publish BDRR/RRDY and
-source 4. RRST cancels a partial word. Unsupported FIG=1 continuous/DLB/autobuffer
+aborts an incomplete word unless continuous FIG=1 ignores it. The final bit alone can publish BDRR/RRDY and
+source 4. RRST cancels a partial word. Unsupported DLB/autobuffer
 pin configurations return false rather than supplying a completed word.
 These rules derive from TI SPRU131G sections 9.2.4/9.2.6 and table 9-9;
 dynamic format/polarity changes during a word remain outside acceptance.
@@ -1588,8 +1588,7 @@ Continuous receive derives from SPRU131G section 9.2.5 and table 9-8.
 After one qualified FSR, each word boundary arms the next word without another
 sync. An unread BDRR is retained when its successor overruns; BSP then requires
 both a BDRR read and a fresh FSR to restart. RRST clears continuous arming.
-FIG=1 frame-ignore behavior and mode changes without reset remain outside
-this pin subset. The helper checks 1,048,576 continuous
+Mode changes without reset remain outside this pin subset. The helper checks 1,048,576 continuous FIG=0
 word/format/polarity combinations with partial-state copies, plus overrun,
 restart and reset controls. The actual-backend gate separately requires
 `C54x native backend BSP continuous RX: PASS` with five successful word
@@ -1604,7 +1603,7 @@ pin gate, native tone-control and exact 5110 save/load gates pass; native FR
 encoder/decoder frame-history replay remains bit-exact.
 
 The corresponding `codec_transmit_clock_w(clock, sync)` interface accepts
-external CLKX/FSX in standard burst or continuous FIG=0 mode (internal
+external CLKX/FSX in standard burst or continuous FIG=0/1 mode (internal
 clock/frame generation, DLB and autobuffering are not implemented by this
 pin interface). TI SPRU131G
 sections 9.2.4/9.2.6 define MSB-first output, long-sync MSB holding and
@@ -1634,7 +1633,7 @@ at the next word boundary without another FSX, raising XRDY/BXINT0 at that
 load. No queued word means underrun and high-impedance halt. This external-sync
 subset does not invent a restart pulse for a later BDXR write; a supplied FSX
 restarts it. Extra FSX aborts the active word just as in burst mode.
-FIG=1 and switching modes without reset remain outside acceptance.
+Switching modes without reset remains outside acceptance.
 An additional helper matrix checks 1,048,576 continuous word/format/polarity
 cases, 168 partial copies, suppression, restart and reset. The actual backend
 requires `C54x native backend BSP continuous TX: PASS`: six word completions
@@ -1644,6 +1643,19 @@ Its checkpoint is restored after resetting the live transmitter, requiring
 saved continuous arming as well as the queued and partial words. These are
 caller-clocked peripheral tests, not operational handset speech or a physical
 COBBA attachment.
+
+Continuous FIG=1 follows SPRU131G table 9-9 and figure 9-23: after the
+initial sync pulse releases, subsequent sync pulses are ignored without
+holding or restarting the shifter. The initial pulse still precedes the
+first word; FIG does not create clocks or bypass reset/underrun recovery.
+Burst mode remains sync-driven regardless of FIG. Two saved flags retain
+whether the initial pulse has released, independently of current pin levels.
+The helper checks 4,096 paired RX/TX pattern/width/polarity combinations,
+with multi-edge pulses across word boundaries, copied partial state and reset.
+The actual backend requires `C54x native backend BSP frame ignore: PASS`:
+two receive and two transmit words, partial save/load after live reset,
+ignored later pulses, sources 4/5 and reset abort. The attachment still
+supplies every clock edge; no handset PCM routing or native speech is implied.
 
 BSPC XSREMPTY (bit 12) is an active-low underrun indicator, not a direct
 "shifter currently idle" flag (SPRU131G section 9.2.3 and table 9-5).

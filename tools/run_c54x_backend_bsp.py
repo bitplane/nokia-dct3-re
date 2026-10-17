@@ -13,6 +13,7 @@ TRANSMIT_PINS = 'C54x native backend BSP transmit pins: PASS words=5 partial_res
 CLOCK_INPUTS = 'C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0'
 CONTINUOUS_RX = 'C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0'
 CONTINUOUS_TX = 'C54x native backend BSP continuous TX: PASS completed_words=6 load_irqs=5 partial_restore=1 queued_boundary=1 underrun_halt=1 external_restart=1 reset_abort=1 source=5 handset_clock_claim=0'
+FRAME_IGNORE = 'C54x native backend BSP frame ignore: PASS directions=2 words=4 partial_restore=1 ignored_sync=1 reset_abort=1 sources=4,5 handset_clock_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 
 
@@ -34,6 +35,8 @@ def check_result(text, returncode):
         raise ValueError('missing unique native continuous-RX/restoration result')
     if lines.count(CONTINUOUS_TX) != 1:
         raise ValueError('missing unique native continuous-TX/restoration result')
+    if lines.count(FRAME_IGNORE) != 1:
+        raise ValueError('missing unique native frame-ignore/restoration result')
     if not lines or lines[-1] != COMPLETION:
         raise ValueError('missing terminal backend BSP completion')
     if any(line.startswith('Fatal error:') and line != COMPLETION for line in lines):

@@ -47967,6 +47967,73 @@ private:
 		{
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "halted/reset continuous output produces no late source");
 			osd_printf_info("C54x native backend BSP continuous TX: PASS completed_words=6 load_irqs=5 partial_restore=1 queued_boundary=1 underrun_halt=1 external_restart=1 reset_abort=1 source=5 handset_clock_claim=0\n");
+			m_stage = 60; m_timer->adjust(attotime::from_usec(100)); return;
+		}
+		++m_stage; m_timer->adjust(attotime::from_usec(100));
+	}
+	void frame_ignore_suffix()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 8; i < 32; ++i)
+		{
+			const unsigned word = i < 16 ? 0x5678 : 0x9abc;
+			const bool bit = (word >> (15 - i % 16)) & 1;
+			const bool sync = i % 4 >= 2;
+			receive_pin_cycle(sync, bit);
+			expect(bool(data.read_word(0x22) & 0x400) == (i == 15 || i == 31), "FIG ignores later FSR pulses without dropping samples");
+			if (i == 15 || i == 31) expect(data.read_word(0x20) == word, "FIG preserves complete receive words");
+			const auto pin = transmit_pin_edge(sync);
+			expect(pin.driven && pin.data == bit && pin.transmit_ready_edge == (i == 16), "FIG ignores later FSX pulses across queued word boundaries");
+		}
+		expect(!transmit_pin_edge(false).driven, "FIG does not suppress continuous underrun");
+	}
+	void check_frame_ignore()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_stage == 60)
+		{
+			data.write_word(0x22, 0); data.write_word(0x23, 0x100); data.write_word(0x22, 0xc0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x21, 0x5678); receive_pin_cycle(true, false);
+			for (unsigned i = 0; i < 8; ++i)
+			{
+				receive_pin_cycle(false, (0x5678 >> (15 - i)) & 1);
+				const auto pin = transmit_pin_edge(i == 0);
+				expect(pin.driven && pin.data == bool((0x5678 >> (15 - i)) & 1) && pin.transmit_ready_edge == !i, "FIG still requires the initial frame sync");
+				if (i == 3) data.write_word(0x21, 0x9abc);
+			}
+		}
+		else if (m_stage == 61)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "FIG initial TX load raises source 5");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save FIG streams after initial sync release");
+			frame_ignore_suffix();
+		}
+		else if (m_stage == 62)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30, "FIG receive completion and queued transmit load raise sources 4/5");
+			data.write_word(0x22, 0);
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE, "restore FIG streams after live reset displaced their sync state");
+			m_stage = 62; frame_ignore_suffix();
+		}
+		else if (m_stage == 63)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30, "restored FIG streams reproduce both interrupt sources");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			data.write_word(0x22, 0); data.write_word(0x22, 0xc0);
+			for (unsigned i = 0; i < 32; ++i)
+			{
+				receive_pin_cycle(false, true);
+				expect(!transmit_pin_edge(false).driven && !(data.read_word(0x22) & 0x400), "reset FIG streams need fresh external sync");
+			}
+		}
+		else if (m_stage == 64)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "reset FIG streams produce no late completion");
+			osd_printf_info("C54x native backend BSP frame ignore: PASS directions=2 words=4 partial_restore=1 ignored_sync=1 reset_abort=1 sources=4,5 handset_clock_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend BSP tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
@@ -48102,6 +48169,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_stage >= 60) { check_frame_ignore(); return; }
 		if (m_stage >= 50) { check_continuous_transmit(); return; }
 		if (m_stage >= 40) { check_continuous_receive(); return; }
 		if (m_stage >= 18) { check_transmit_pins(); return; }

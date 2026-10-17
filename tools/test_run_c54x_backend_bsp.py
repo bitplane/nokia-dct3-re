@@ -1,10 +1,19 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, COMPLETION)) + '\n'
+
+    def test_frame_ignore_is_mandatory_and_exact(self):
+        alternatives = ['', FRAME_IGNORE + '\n' + FRAME_IGNORE]
+        for field in ('directions=2', 'words=4', 'partial_restore=1', 'ignored_sync=1', 'reset_abort=1', 'sources=4,5'):
+            alternatives.append(FRAME_IGNORE.replace(field, field.split('=')[0] + '=0'))
+        alternatives.append(FRAME_IGNORE.replace('handset_clock_claim=0', 'handset_clock_claim=1'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'frame-ignore'):
+                check_result(self.output().replace(FRAME_IGNORE, alternative), 3)
 
     def test_continuous_transmit_is_mandatory_and_exact(self):
         alternatives = ['', CONTINUOUS_TX + '\n' + CONTINUOUS_TX]

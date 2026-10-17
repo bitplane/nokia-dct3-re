@@ -120,7 +120,7 @@ static void check_receive_pins()
 	receive_sync(port, 0);
 	receive_bits(port, 0, 0x5678, 16, 0, 16, true);
 	assert(port.receive_r() == 0x5678);
-	for (unsigned mode = 0; mode < 3; ++mode)
+	for (unsigned mode = 1; mode < 3; ++mode)
 	{
 		port.reset();
 		port.control_w(mode == 0 ? 0x80 : mode == 1 ? 0x8a : 0x88);
@@ -288,7 +288,7 @@ static void check_transmit_pins()
 	assert(!transmit_edge(port, 0, true).driven); // Held sync is not a new FSX.
 	transmit_edge(port, 0, false);
 	transmit_word(port, 0, 16, 0x5678, true);
-	for (unsigned mode = 0; mode < 5; ++mode)
+	for (unsigned mode = 1; mode < 5; ++mode)
 	{
 		port.reset(); port.control_w(mode == 0 ? 0x40 : mode == 1 ? 0x58 : mode == 2 ? 0x68 : mode == 3 ? 0x4a : 0x48);
 		port.transmit_w(0x1234);
@@ -363,6 +363,60 @@ static void check_continuous_transmit()
 		}
 }
 
+static void check_frame_ignore()
+{
+	const unsigned widths[] = {16, 8, 10, 12};
+	for (unsigned format = 0; format < 4; ++format)
+		for (unsigned polarity = 0; polarity < 4; ++polarity)
+			for (unsigned pattern = 0; pattern < 256; ++pattern)
+			{
+				const unsigned width = widths[format], mask = (1U << width) - 1;
+				const std::uint16_t extension = 0x100 | (format & 2 ? 0x80 : 0) | (polarity & 1 ? 0x40 : 0) | (polarity & 2 ? 0x20 : 0);
+				const bool active = !(extension & 0x20);
+				const unsigned first = pattern * 257, second = first ^ 0xffff;
+				tms320c54x_bsp_state rx, tx;
+				rx.control_w(0x80 | (format & 1 ? 4 : 0));
+				tx.control_w(0x40 | (format & 1 ? 4 : 0));
+				// FIG does not supply the initial frame, or shorten its long pulse.
+				assert(!receive_edge(rx, extension, !active, true).receive_ready_edge && !rx.receive_bits_left);
+				receive_sync(rx, extension, 3);
+				tx.transmit_w(first);
+				assert(transmit_edge(tx, extension, active).transmit_ready_edge);
+				assert(transmit_edge(tx, extension, active).data == bool((first >> (width - 1)) & 1));
+				tx.transmit_w(second);
+				for (unsigned i = 0; i < width * 2; ++i)
+				{
+					const unsigned word = i < width ? first : second;
+					const bool bit = (word >> (width - 1 - i % width)) & 1;
+					// Later pulses span multiple bits, including word boundaries.
+					const bool sync = i && (i % 4 >= 2) ? active : !active;
+					auto rx_copy = rx, tx_copy = tx;
+					const auto received = receive_edge(rx, extension, sync, bit);
+					const auto replay = receive_edge(rx_copy, extension, sync, bit);
+					assert(received.supported && received.receive_ready_edge == (i % width == width - 1));
+					assert(received.receive_ready_edge == replay.receive_ready_edge && rx.receive == rx_copy.receive);
+					if (received.receive_ready_edge)
+					{
+						const unsigned value = word & mask;
+						const std::uint16_t expected = value & (1U << (width - 1)) ? value | ~mask : value;
+						assert(rx.receive_r() == expected);
+					}
+					if (i)
+					{
+						const auto sent = transmit_edge(tx, extension, sync);
+						const auto replay_tx = transmit_edge(tx_copy, extension, sync);
+						assert(sent.supported && sent.driven && sent.data == bit);
+						assert(sent.transmit_ready_edge == (i == width));
+						assert(sent.data == replay_tx.data && sent.transmit_ready_edge == replay_tx.transmit_ready_edge);
+					}
+				}
+				assert(!transmit_edge(tx, extension, !active).driven);
+				// FIG cannot keep a reset stream armed.
+				rx.control_w(0); tx.control_w(0);
+				assert(!rx.receive_sync_released && !tx.transmit_sync_released);
+			}
+}
+
 int main()
 {
 	check_clock_inputs();
@@ -370,6 +424,7 @@ int main()
 	check_continuous_receive();
 	check_transmit_pins();
 	check_continuous_transmit();
+	check_frame_ignore();
 	tms320c54x_bsp_state port;
 	std::uint16_t duplex_output = 0xaaaa;
 	port.control_w(0x00c2);

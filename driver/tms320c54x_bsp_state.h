@@ -19,11 +19,13 @@ struct tms320c54x_bsp_state
 	std::uint8_t receive_bits_left = 0, receive_width = 0;
 	bool receive_clock_level = false, receive_sync_active = false;
 	bool receive_continuous = false;
+	bool receive_sync_released = false;
 	std::uint16_t transmit_shift = 0;
 	std::uint8_t transmit_bits_left = 0;
 	bool transmit_clock_level = false, transmit_sync_active = false;
 	bool transmit_suppressed = false;
 	bool transmit_continuous = false;
+	bool transmit_sync_released = false;
 
 	void reset() { *this = {}; }
 	void reset_receive_shift()
@@ -31,6 +33,7 @@ struct tms320c54x_bsp_state
 		receive_shift = 0;
 		receive_bits_left = receive_width = 0;
 		receive_continuous = false;
+		receive_sync_released = false;
 	}
 	void control_w(std::uint16_t value)
 	{
@@ -78,6 +81,7 @@ struct tms320c54x_bsp_state
 		transmit_bits_left = 0;
 		transmit_suppressed = false;
 		transmit_continuous = false;
+		transmit_sync_released = false;
 	}
 	struct transmit_clock_result
 	{
@@ -86,13 +90,15 @@ struct tms320c54x_bsp_state
 	transmit_clock_result transmit_clock(bool clock, bool sync,
 			std::uint16_t extension = 0)
 	{
-		// External CLKX/FSX only; continuous mode currently requires FIG=0.
-		const bool supported = !(control & 0x0032) && !(extension & 0xfc00) &&
-				((control & 0x0008) || !(extension & 0x0100));
+		// External CLKX/FSX only; FIG affects continuous mode, not bursts.
+		const bool supported = !(control & 0x0032) && !(extension & 0xfc00);
 		const bool edge = clock != transmit_clock_level && clock != bool(extension & 0x0040);
 		transmit_clock_level = clock;
 		const bool active = sync != bool(extension & 0x0020);
 		const bool previous_sync = transmit_sync_active;
+		// FIG ignores whole later pulses, not just their active edge. The
+		// initial pulse must still release before serial shifting begins.
+		const bool ignore_sync = transmit_continuous && transmit_sync_released && (extension & 0x0100);
 		if (edge) transmit_sync_active = active;
 		bool ready_edge = false;
 		const auto load_word = [&]() {
@@ -110,10 +116,14 @@ struct tms320c54x_bsp_state
 		if (!supported || !(control & 0x0040)) reset_transmit_shift();
 		else if (edge)
 		{
-			if (active && !previous_sync)
-				load_word();
-			else if (!active && transmit_bits_left)
+			if (active && !previous_sync && !ignore_sync)
 			{
+				transmit_sync_released = false;
+				load_word();
+			}
+			else if ((!active || ignore_sync) && transmit_bits_left)
+			{
+				if (!active) transmit_sync_released = true;
 				// MSB is driven during FSX; long FSX holds it. The remaining
 				// bits advance after FSX deasserts (SPRU131G 9.2.4).
 				if (--transmit_bits_left) transmit_shift <<= 1;
@@ -124,7 +134,11 @@ struct tms320c54x_bsp_state
 					reset_transmit_shift();
 					// SPRU131G 9.2.5: queued DXR transfers without another FSX;
 					// underrun halts instead of inventing repeated word clocks.
-					if (continue_stream) load_word();
+					if (continue_stream)
+					{
+						load_word();
+						transmit_sync_released = true;
+					}
 				}
 			}
 		}
@@ -192,15 +206,14 @@ struct tms320c54x_bsp_state
 	clock_result receive_clock(bool clock, bool sync, bool bit,
 			std::uint16_t extension = 0)
 	{
-		// External standard receive. Continuous FIG=0 needs one initial FSR;
-		// FIG=1, DLB and autobuffering have separate ownership contracts.
-		const bool supported = !(control & 0x0002) && !(extension & 0xfc00) &&
-				((control & 0x0008) || !(extension & 0x0100));
+		// External standard receive; DLB and autobuffering remain separate.
+		const bool supported = !(control & 0x0002) && !(extension & 0xfc00);
 		const bool edge = clock != receive_clock_level && clock == bool(extension & 0x0040);
 		receive_clock_level = clock;
 		if (!edge) return {supported, false};
 		const bool active = sync != bool(extension & 0x0020);
 		const bool previous_sync = receive_sync_active;
+		const bool ignore_sync = receive_continuous && receive_sync_released && (extension & 0x0100);
 		receive_sync_active = active;
 		if (!supported || !(control & 0x0080) || receive_overrun)
 		{
@@ -209,17 +222,19 @@ struct tms320c54x_bsp_state
 		}
 		// SPRU131G 9.2.4/9.3: qualify the sync pulse at the selected clock
 		// edge; its inactive edge precedes the MSB. A long pulse holds shifting.
-		if (active)
+		if (active && !ignore_sync)
 		{
 			if (!previous_sync)
 			{
 				receive_shift = 0;
 				receive_bits_left = receive_width = word_bits(extension);
 				receive_continuous = !(control & 0x0008);
+				receive_sync_released = false;
 			}
 			return {true, false};
 		}
 		if (!receive_bits_left) return {true, false};
+		if (!active) receive_sync_released = true;
 		receive_shift = (receive_shift << 1) | unsigned(bit);
 		if (--receive_bits_left) return {true, false};
 		const unsigned width = receive_width;
@@ -231,6 +246,7 @@ struct tms320c54x_bsp_state
 		if (continuous && !receive_overrun)
 		{
 			receive_continuous = true;
+			receive_sync_released = true;
 			receive_bits_left = receive_width = width;
 		}
 		return {true, ready};
