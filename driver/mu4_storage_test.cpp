@@ -431,6 +431,9 @@ private:
 	std::array<u32, 3> m_playback_execute_entries{};
 	std::array<u32, 2> m_playback_audio_words{}, m_playback_audio_nonzero{};
 	std::array<u32, 2> m_playback_audio_hash{2166136261U, 2166136261U};
+	// Observation-only streams are deliberately not save-state outputs.
+	std::array<std::ofstream, 3> m_playback_word_capture;
+	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
 	std::array<u32, 3> m_playback_filter{};
 	u64 m_playback_execute_steps = 0;
@@ -873,9 +876,29 @@ private:
 		if (receive_status() & 6) fatalerror("MU4 McBSP receiver reset did not clear RFULL/RRDY");
 		logerror("mu4_mcbsp_overrun: PASS three_word_threshold=1 drr_retained=1 rbr_retained=1 rsr_loss=1 peek=1 read_clear=1 frame_recovery=1 reset=1\n");
 	}
+	static constexpr std::array<char const *,3> PLAYBACK_CAPTURE_FILES{
+		"mu4_playback_tx.le16", "mu4_playback_din.le16", "mu4_playback_dma.le16"};
+	void capture_playback_word(unsigned boundary, u16 value)
+	{
+		char const bytes[2]{char(value & 0xff), char(value >> 8)};
+		m_playback_word_capture[boundary].write(bytes, sizeof(bytes));
+	}
+	void finish_playback_capture()
+	{
+		std::array<u32,3> const counts{m_playback_audio_words[0],m_playback_audio_words[1],m_playback_dma_reads};
+		std::array<u32,3> const hashes{m_playback_audio_hash[0],m_playback_audio_hash[1],m_playback_dma_hash};
+		for (unsigned i=0;i<3;++i)
+		{
+			auto &stream=m_playback_word_capture[i]; stream.flush(); auto const bytes=stream.tellp(); stream.close();
+			if (!stream || bytes != std::streamoff(counts[i])*2) fatalerror("MU4 playback observation capture is incomplete");
+			logerror("mu4_playback_word_capture: boundary=%s words=%u bytes=%u hash=%08x encoding=le16 file=%s save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+				std::array<char const *,3>{"mcbsp_tx","codec_din","dma_source"}[i],counts[i],counts[i]*2,hashes[i],PLAYBACK_CAPTURE_FILES[i]);
+		}
+	}
 	void observe_playback_audio(u16 value, bool din)
 	{
 		unsigned const which = din ? 1 : 0;
+		capture_playback_word(which,value);
 		if (m_playback_audio_words[which]++ < 4)
 			logerror("mu4_playback_audio_word: boundary=%s word=%04x t=%.9f pc=%06x\n", din ? "codec_din" : "mcbsp_tx", value, machine().time().as_double(), unsigned(m_cpu->state_int(STATE_GENPC)));
 		if (value)
@@ -1907,6 +1930,9 @@ private:
 						if (!m_playback_overlay_checked || machine().side_effects_disabled() ||
 							!m_dma->source_read_matches(3, AS_DATA, address)) return;
 						++m_playback_dma_reads;
+						capture_playback_word(2,value);
+						m_playback_dma_hash = (m_playback_dma_hash ^ (value >> 8)) * 16777619U;
+						m_playback_dma_hash = (m_playback_dma_hash ^ (value & 0xff)) * 16777619U;
 						m_playback_dma_min = std::min(m_playback_dma_min, u16(address));
 						m_playback_dma_max = std::max(m_playback_dma_max, u16(address));
 						if (m_playback_dma_reads <= 8)
@@ -2176,7 +2202,7 @@ private:
 			save_item(NAME(m_playback_audio_words)); save_item(NAME(m_playback_audio_nonzero)); save_item(NAME(m_playback_audio_hash));
 			save_item(NAME(m_playback_audio_last_nonzero));
 			save_item(NAME(m_playback_audio_clocks)); save_item(NAME(m_playback_audio_frames));
-			save_item(NAME(m_playback_dma_reads)); save_item(NAME(m_playback_dma_nonzero));
+			save_item(NAME(m_playback_dma_reads)); save_item(NAME(m_playback_dma_nonzero)); save_item(NAME(m_playback_dma_hash));
 			save_item(NAME(m_playback_parent)); save_item(NAME(m_playback_parent_mismatch));
 			save_item(NAME(m_playback_switch_samples));
 			save_item(NAME(m_playback_enqueue_samples));
@@ -2401,6 +2427,16 @@ private:
 		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
+		m_playback_dma_hash = 2166136261U;
+		for (unsigned i=0;i<3;++i)
+		{
+			auto &stream=m_playback_word_capture[i];
+			if (stream.is_open()) stream.close();
+			stream.clear();
+			if (!playback_profile()) continue;
+			stream.open(PLAYBACK_CAPTURE_FILES[i],std::ios::binary|std::ios::trunc);
+			if (!stream) fatalerror("MU4 playback observation capture could not be opened");
+		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;
 		m_playback_enqueue_samples = 0;
@@ -2756,6 +2792,7 @@ private:
 	{
 		if (original_bootstrap_profile())
 		{
+			if (playback_profile()) finish_playback_capture();
 			if (recorder_ac_profile())
 				logerror("mu4_recorder_ac_input: generated=%u,%u,%u,%u received=%u,%u,%u,%u other=%u other_owner_reads=%u shape=square periods=64,32 amplitudes=8192,4096 ownership=actual_channel2_source_read analog_adc=0 decoded_audio=0\n",
 					m_ac_generated[0], m_ac_generated[1], m_ac_generated[2], m_ac_generated[3],

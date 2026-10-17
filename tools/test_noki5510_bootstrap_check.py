@@ -393,6 +393,8 @@ class BootstrapCheckTest(unittest.TestCase):
         self.assertEqual(result['bootstrap_execute'], 1)
         self.assertEqual(result['filter_iterations'], 640)
         self.assertEqual(result['entry_transfer_reports'], 11)
+        self.assertEqual(result['tx_hash'],'12345678')
+        self.assertEqual(result['din_hash'],'87654321')
         self.assertNotEqual(result['tx_words'], result['din_words'])
         self.assertNotIn('audio_acceptance', result)
 

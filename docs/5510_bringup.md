@@ -24,8 +24,9 @@ encoder fields. Fresh transform observations account for 3,072 saved bytes;
 their first eight packets host-decode as eight frames with zero errors.
 This is captured native encoder output, not validation of native decoder PCM.
 See [recorded payload contracts](#recording-header-and-selected-windows).
-Next audit the remaining T-input multiplier categories and capture complete
-digital output for independent comparison. Continue without forcing counters,
+Complete observed word captures now preserve the digital baseline. Next audit
+the remaining T-input multiplier categories and compare framed output with
+independently decoded source. Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
 
@@ -7709,10 +7710,37 @@ completes 11,956 wrapper/body/return paths and 5,978 dispatches. The selected
 AA99 range matches original source at 1,170 visited addresses and
 6,631,884 Execute entries, with no opcode changes. DMA and source-range
 checkers pass; the diagnostic still deliberately exits rejecting audio
-completion. These counters and four bounded nonzero words are not a
-waveform-quality or complete transport-pairing oracle. Capture a longer
-owned digital stream and compare independently decoded source before
-claiming native music; analog conversion and speech remain unproved.
+completion. Counters alone are not a waveform-quality or complete
+transport-pairing oracle; analog conversion and speech remain unproved.
+
+### Playback Word Capture
+
+The bench records complete words at the existing actual channel-3 source
+read, McBSP TX and codec DIN callbacks, without extra guest memory reads or
+feedback. Files are raw little-endian words, not a claim about stereo frame
+phase or analog audio. Output is fresh-run only: file handles are not
+save-state artifacts, and restored capture integrity is unsupported.
+`tools/mu4_playback_capture_check.py RUN_DIR` verifies byte/word counts,
+observed word hashes, nonzero counts and the existing strict DMA observation.
+
+The capture-enabled run reproduces all six previous execution/audio/DMA/
+method/parent summaries byte-for-byte. Its complete stream identities are:
+
+| Boundary | Words | SHA256 |
+| --- | ---: | --- |
+| DMA source | 1,631,772 | `8f5e1d8747255bb57e292a3ef94b8ed76f78edf78a3848cb0d8877c15c888f2d` |
+| McBSP TX | 1,661,065 | `94a5e4051568b835c517bb0afc18ea0a73d9fded2445f6cdf5913f8aafd69856` |
+| Codec DIN | 1,691,842 | `4920330a91055729cd37bcaa31abea23f8d1d78844c13aad874e19fe878b89df` |
+
+Chronological first-nonzero anchors, checked over 64 words, give initial
+DMA-to-TX offset 92 and TX-to-DIN offset 367. The first 783,116 and 783,208
+overlapping words respectively match exactly, including zero words.
+Thereafter a single-offset comparison diverges; reset/framing/direct-write
+epochs must be evidenced before interpreting that divergence as a transport
+defect. The checker reports the complete mismatch extent, not a best-fit
+realignment, and never promotes integrity or overlap to decoded-audio
+acceptance. Use these owned streams for numerical comparison and the pending
+T-input audit; nonzero output alone does not establish native music.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

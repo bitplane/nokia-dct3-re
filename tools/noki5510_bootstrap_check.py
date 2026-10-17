@@ -258,6 +258,7 @@ def verify_playback_observation(text):
             'filter_calls': calls, 'filter_iterations': iterations, 'filter_returns': returns,
             'entry_transfer_reports': len(trails),
             'tx_words': tx, 'din_words': din, 'tx_nonzero': tx_nonzero,
+            'tx_hash': audio[5], 'din_hash': audio[6],
             'din_nonzero': din_nonzero, 'tx_last_nonzero': audio['tx_last'],
             'din_last_nonzero': audio['din_last'], 'pc': playback[2]}
 
