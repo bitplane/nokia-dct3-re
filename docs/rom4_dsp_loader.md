@@ -273,9 +273,10 @@ or execute a loader.
 `nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,
 DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
-staged execution reaches the initialization call and stops at `000f1f`,
-instruction `6bf8 0013 0800` (ADDM of `0800` to AR3), with prefetched PC
-`0f23`, PMST `ffa8` and
+staged execution executes `000f1f`'s `6bf8 0013 0800` (ADDM of `0800`
+to AR3), enters the initialization routine, and stops at `008031`,
+instruction `f591` (ROL B through carry), with prefetched PC
+`8033`, PMST `ffa8` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x99704`. The backend
@@ -2609,8 +2610,9 @@ RF acquisition or handset speech.
 
 The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
 Access, Read and Execute slots inside the existing CPU, reusing its semantic
-backend and interrupt-source/entry operations. No handset or MU4 configuration
-enables it. The basic memory/ALU subset covers NOP, one-word immediate loads, two-word
+backend and interrupt-source/entry operations. The separate `nse1pipe`
+research machine enables it; ordinary handset and MU4 configurations do not.
+The basic memory/ALU subset covers NOP, one-word immediate loads, two-word
 shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
 pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
@@ -2627,9 +2629,20 @@ DP-relative, stationary/postincrement AR2 and absolute RAM addresses, eight
 value pairs and eight SXM/OVM/sticky-OVA combinations. They include TI's
 `8007 + fff8 -> 8000` saturation example, signed/unsigned boundaries and
 carry clearing. Source RAM changes after Read cannot alter the retained
-result. Accumulators remain unchanged. Register/peripheral destinations,
-long-offset addressing, repeats, compiler-mode direct sources and adjacent
-producer/consumer hazards remain excluded or unvalidated for staged ADDM.
+result. Accumulators remain unchanged. Absolute ADDM also admits AR0..AR7
+and SP destinations, but not other mapped registers. The `addm-ar` profile
+checks all eight ARs, four initial values, four immediates, all sixteen
+SXM/OVM/C/OVA combinations, both CMPT settings and two instruction pages,
+with save/load before Read, before Execute and after publication (24,576
+cases plus replay). Operand mutation after Decode/Read verifies retention;
+the result and C/OVA oracle is independent of the CPU helper. The
+`addm-ar-load` profile checks 768 cases plus replay with short and long-offset
+unshifted LD consumers, two or three separating NOPs, and one AR publication
+before the consumer's data read. Both LD forms are Category I under SPRU131G
+table 7-7; the address extension alone does not make the long-offset form a
+Category II consumer. Forbidden-gap behavior is not claimed. Other mapped
+destinations, long-offset ADDM addressing, repeats, compiler-mode direct
+sources and adjacent producer/consumer hazards remain excluded or unvalidated.
 The phase placement inherits the bounded RMW prototype, not measured silicon.
 
 Short RAM PSHD now retains its source address/value and stack destination.

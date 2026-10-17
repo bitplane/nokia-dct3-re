@@ -323,6 +323,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "addm-ar": (
+        "TMS320C54x mapped AR ADDM: PASS cases=24576 restore=24576 registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 accumulators_preserved=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped AR ADDM complete",
+    ),
+    "addm-ar-load": (
+        "TMS320C54x mapped AR ADDM consumers: PASS cases=768 restore=768 registers=8 patterns=4 consumers=short,long_offset legal_gaps=2_3,2_3 pages=2 snapshots=3 data_reads=2 ar_writes=1 forbidden_gap_claim=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped AR ADDM consumers complete",
+    ),
     "literal-guard": (
         "TMS320C54x opcode-shaped extensions: PASS cases=54 restore=54 literals=7cf8,7df8,7ff8 block_counts=0,1,2 pages=2 snapshots=3 instruction=ST_absolute writes=count+1 transfer_admission=0",
         "Fatal error: TMS320C54x isolated opcode-shaped extensions complete",
@@ -1552,7 +1560,7 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
+    machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the

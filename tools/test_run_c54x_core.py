@@ -14,6 +14,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mapped_ar_addm_requires_flags_retention_and_legal_consumers(self):
+        for profile in ('addm-ar', 'addm-ar-load'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' not in field:
+                    continue
+                with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_literal_guard_requires_all_aliases_and_block_restoration(self):
         marker, ending = EXTRA_PROFILES['literal-guard']
         text = marker + '\n' + ending + '\n'
