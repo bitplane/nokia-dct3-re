@@ -131,6 +131,35 @@ boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
 Other implicit-copy, read/modify/write and unenumerated read families
 remain open; the RMW operand role must not be guessed from this source rule.
 
+### Standalone staged MVDP
+
+The staged frontend now implements legal standalone data-to-program copies,
+separately from the opposite-direction MVPD path. Decode retains the explicit
+program destination and addressing extension in their architectural order:
+absolute source before `pmad`, but long-offset source after `pmad`. Access
+resolves the source once; Read captures its value and mapped program target;
+Execute writes the retained word. Destination fields travel with their
+instruction, rather than sharing an Access-written global latch. The two
+extra hold clocks reproduce the four/five-clock standalone instruction
+totals; their exact silicon bus placement remains partial.
+
+`tms54xtra -bios mvdp` covers 336 cases and restores: seven source forms
+(direct, SP-relative, postincrement, absolute, offset, preincrement-offset,
+circular), eight AR selections, two instruction pages and three snapshots.
+Changing the source and AR after their sampling points must not alter or
+duplicate the transfer. `mvdp-pair` adds 12 adjacent-transfer cases/restores
+across both pages and six checkpoints, requiring two ordered source reads
+and two distinct program writes. The unchanged staged core fails the first
+legal standalone case before a transfer, so this is an executable admission
+regression, not a source-string invariant.
+
+These fixtures do not establish every legal operand, external wait states,
+mapped CPU/peripheral sources, self-modifying-code prefetch coherency, or
+repeat/control-delay/XC/block-repeat composition. The latter compositions
+remain explicitly unsupported; no atomic fallback is used. Native handset
+speech and the unresolved serial-status input are not promoted by these
+instruction fixtures.
+
 ### MMR long-form boundary
 
 SPRU131G section 5.6 separately excludes `*ARx(lk)`, `*+ARx(lk)`,

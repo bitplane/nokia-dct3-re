@@ -14,6 +14,27 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mvdp_pair_requires_both_transfers_and_replay(self):
+        marker, ending = EXTRA_PROFILES['mvdp-pair']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mvdp-pair')
+        for field in ('cases=12', 'restore=12', 'pages=2', 'snapshots=6',
+                      'source_reads=2', 'program_writes=2'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='mvdp-pair')
+
+    def test_mvdp_requires_complete_standalone_scope(self):
+        marker, ending = EXTRA_PROFILES['mvdp']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mvdp')
+        for field in ('cases=336', 'restore=336', 'forms=7', 'registers=8', 'pages=2', 'snapshots=3',
+                      'source_reads=1', 'program_writes=1',
+                      'repeat=unvalidated', 'silicon_phase_claim=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=99'), 3, profile='mvdp')
+        with self.assertRaises(ValueError):
+            check_result(marker + '\n' + text, 3, profile='mvdp')
+
     def test_repeated_transfer_rejection_requires_full_scope(self):
         marker, ending = EXTRA_PROFILES['rpt-xfer-edge']
         text = marker + '\n' + ending + '\n'

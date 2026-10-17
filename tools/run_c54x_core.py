@@ -323,6 +323,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "mvdp-pair": (
+        "TMS320C54x staged adjacent MVDP: PASS cases=12 restore=12 pages=2 snapshots=6 source_reads=2 program_writes=2",
+        "Fatal error: TMS320C54x isolated adjacent MVDP complete",
+    ),
+    "mvdp": (
+        "TMS320C54x staged MVDP: PASS cases=336 restore=336 forms=7 registers=8 pages=2 snapshots=3 source_reads=1 program_writes=1 repeat=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDP complete",
+    ),
     "parallel-sub": (
         "TMS320C54x atomic ST||SUB fractions: PASS cases=128 restore=128 source_dest_pairs=4 fractional_patterns=8 memory_patterns=4 ordinary_ram=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated ST||SUB fractions complete",
@@ -1492,7 +1500,7 @@ def main():
         parser.error('choose one isolated bus profile')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
-    machine = "tms54xtra" if args.profile in ("stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
+    machine = "tms54xtra" if args.profile in ("mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the
