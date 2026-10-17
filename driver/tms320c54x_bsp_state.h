@@ -48,7 +48,8 @@ struct tms320c54x_bsp_state
 	std::uint16_t control_r() const
 	{
 		return control | (receive_ready ? 0x0400 : 0) |
-				(transmit_ready ? 0x0800 : 0) | (receive_overrun ? 0x2000 : 0);
+				(transmit_ready ? 0x0800 : 0) | (receive_overrun ? 0x2000 : 0) |
+				(receive_clock_level ? 0x0100 : 0) | (transmit_clock_level ? 0x0200 : 0);
 	}
 	void transmit_w(std::uint16_t value)
 	{

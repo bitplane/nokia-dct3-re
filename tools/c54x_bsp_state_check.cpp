@@ -12,6 +12,28 @@ static auto receive_edge(tms320c54x_bsp_state &port, std::uint16_t extension, bo
 	return port.receive_clock(sample_level, sync, bit, extension);
 }
 
+static void check_clock_inputs()
+{
+	for (unsigned value = 0; value <= 0xffff; ++value)
+		for (unsigned pins = 0; pins < 4; ++pins)
+		{
+			tms320c54x_bsp_state port;
+			port.control_w(value);
+			port.receive_clock(pins & 1, false, false);
+			port.transmit_clock(pins & 2, false);
+			assert((port.control_r() & 0x0300) == (pins << 8));
+			const auto saved = port;
+			// Read-only pin bits cannot be rewritten through BSPC, and engine
+			// reset cannot drive externally supplied clocks low.
+			port.control_w(0x0300);
+			assert((port.control_r() & 0x0300) == (pins << 8));
+			port = saved;
+			assert((port.control_r() & 0x0300) == (pins << 8));
+			port.reset();
+			assert(!(port.control_r() & 0x0300));
+		}
+}
+
 static void receive_sync(tms320c54x_bsp_state &port, std::uint16_t extension, unsigned clocks = 1)
 {
 	const bool active = !(extension & 0x20);
@@ -222,6 +244,7 @@ static void check_transmit_pins()
 
 int main()
 {
+	check_clock_inputs();
 	check_receive_pins();
 	check_transmit_pins();
 	tms320c54x_bsp_state port;

@@ -46441,6 +46441,28 @@ private:
 			m_cpu->space(AS_DATA).read_word(0x0fff) == 0x0801 &&
 			!m_cpu->state_int(tms320c54x_device::STATE_IFR), "TX source dispatches native vector 21 once");
 	}
+	void check_clock_inputs()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		data.write_word(0x22, 0);
+		for (unsigned pins = 0; pins < 4; ++pins)
+		{
+			m_backend->codec_receive_clock_w(pins & 1, false, false);
+			m_backend->codec_transmit_clock_w(pins & 2, false);
+			expect((data.read_word(0x22) & 0x300) == (pins << 8), "BSPC IN0/IN1 reflect external clocks while engines reset");
+			m_saved.str({}); m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save external serial clock levels");
+			m_backend->codec_receive_clock_w(!(pins & 1), false, false);
+			m_backend->codec_transmit_clock_w(!(pins & 2), false);
+			expect((data.read_word(0x22) & 0x300) == ((pins ^ 3) << 8), "clock changes are visible without enabling serial engines");
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved) == STATERR_NONE &&
+				(data.read_word(0x22) & 0x300) == (pins << 8), "restored external clocks are visible in BSPC");
+			data.write_word(0x22, 0x300);
+			expect((data.read_word(0x22) & 0x300) == (pins << 8), "BSPC cannot write input clock levels");
+		}
+		osd_printf_info("C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0\n");
+	}
 	void check_transmit_pins()
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -46534,6 +46556,7 @@ private:
 		else if (m_stage == 30)
 		{
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "empty frames do not create a late TX interrupt");
+			check_clock_inputs();
 			osd_printf_info("C54x native backend BSP transmit pins: PASS words=4 partial_restore=1 queued_word=1 underrun_no_irq=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
 			osd_printf_info("C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0\n");

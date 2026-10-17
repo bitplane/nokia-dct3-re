@@ -1,10 +1,19 @@
 import unittest
-from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, COMPLETION, check_result
+from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, COMPLETION, check_result
 
 
 class BackendBspResultTest(unittest.TestCase):
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, COMPLETION)) + '\n'
+
+    def test_clock_inputs_are_mandatory_and_exact(self):
+        alternatives = ['', CLOCK_INPUTS + '\n' + CLOCK_INPUTS]
+        for field in ('levels=4', 'save_replay=4', 'reset_inputs=1'):
+            alternatives.append(CLOCK_INPUTS.replace(field, field.split('=')[0] + '=0'))
+        alternatives.append(CLOCK_INPUTS.replace('handset_clock_claim=0', 'handset_clock_claim=1'))
+        for alternative in alternatives:
+            with self.subTest(marker=alternative), self.assertRaisesRegex(ValueError, 'clock-input'):
+                check_result(self.output().replace(CLOCK_INPUTS, alternative), 3)
 
     def test_transmit_pins_are_mandatory_and_exact(self):
         alternatives = ['', TRANSMIT_PINS + '\n' + TRANSMIT_PINS]

@@ -1453,6 +1453,16 @@ underrun suppression and reset abort/interrupt checks. Saved state includes
 the output shifter, remaining bits, clock/sync phase and PCM suppression.
 This interface supplies no production clock or handset audio; physical COBBA
 attachment and dynamic mid-word format changes remain unvalidated.
+
+BSPC IN0/IN1 (bits 8/9) reflect the supplied CLKR/CLKX levels, including
+while RRST/XRST hold the engines reset; control writes cannot change them.
+The helper checks all 65,536 control values against all four pin pairs.
+The backend requires four actual save/load round trips with opposing clock
+levels between save and restore, under the separate mandatory
+`C54x native backend BSP clock inputs: PASS` marker. This models level
+readback, not the 0.5--1.5 CLKOUT synchronization latency documented in
+SPRU131G table 9-5. A whole-device reset initializes unattached input levels
+low; attached sources must drive their own levels.
 This establishes completed-frame wiring, reset suppression and backend
 state restoration, not a production frame-clock caller, handset ISR,
 COBBA control interpretation or native audio. No physical clock is supplied
@@ -1463,7 +1473,7 @@ command delivery and exact idle save/load pass with this state model. The
 tone run observes only the boot echo and its one receive ISR, not continuous
 or post-key operational samples.
 
-This remains partial hardware: clock-pin status readback, transmit-shifter status readback,
+This remains partial hardware: clock-input synchronization latency, transmit-shifter status readback,
 autobuffering, reset-time transmit preloading and physical frame/bit timing
 are not established. Only the separately evidenced external boot echo
 provides an untimed transfer; ordinary pending samples do not acquire a
