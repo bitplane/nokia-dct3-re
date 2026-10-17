@@ -1668,10 +1668,15 @@ nibble uses TI BITT numbering (actual bit `15 - selector`).
 
 The 65 descriptors at `d9d2` match the standard's protected-input sequence,
 with its first eight entries reversed. This matches the routine's eight-bit
-seed followed by LSB-first processing; CRC arithmetic is not yet executed or
-validated by this checker. Packing-table coverage is checked as a multiset,
-not as a proof of the full channel-importance ordering. Neither result proves
-native EFR encode/decode, a running handset codec, or an attached audio clock.
+seed followed by LSB-first processing; CRC arithmetic is not executed by this
+static checker. All 272 packing descriptors also match the standard's complete
+channel-importance order through the recovered native storage permutation:
+182 class-1 bits occupy twelve words with ten padding positions, and 78 class-2
+bits occupy five words with two padding positions. Within those regions, the
+native even/odd class-1 and reversed-word class-2 layouts are checked separately
+from the normative ordering. An order-only mutation fails despite unchanged
+descriptor counts. These table facts do not prove native speech encode/decode,
+a running handset codec, or an attached audio clock.
 
 Normative references: [GSM 06.60, table 6](https://www.etsi.org/deliver/etsi_en/301200_301299/301245/04.01.01_60/en_301245v040101p.pdf)
 for the 57 parameter widths, and [TS 45.003, section 3.1.1 and table 6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145003/08.02.00_60/ts_145003v080200p.pdf)
@@ -1688,7 +1693,21 @@ source and input hashes in its isolated evidence directory.
 
 Acceptance also reruns FR packing, encoder and decoder with their complete
 frame-history replay checks. This proves the EFR CRC component, not EFR speech
-encoding/decoding, bad-frame policy, handset routing or audio. The next boundary
-is the acquired `c28f` packer / `c2b7` unpacker against an independent normative
-channel-order mapping; multiset descriptor coverage alone is insufficient.
+encoding/decoding, bad-frame policy, handset routing or audio.
+
+`make check-c54x-rom4-efr-packing` checks the complete static table and executes
+the unchanged `c28f` packer and `c2b7` unpacker. All 244 speech basis vectors,
+zero and 32 mixed patterns pass (277 vectors, three stages each). The packer
+matches seventeen independently constructed words, including the CRC and
+padding. Unpacking uses separately generated normative frames, not the native
+packer's output; it reconstructs all 57 speech parameters and returns zero.
+Flipping the packed MSB (`d30 = s24`, protected by CRC8) changes only its decoded
+parameter bit and returns one for every vector. All stages check CRC parameter
+representation, balanced return and adjacent memory guards.
+
+The fixture explicitly selects ordinary speech (`09ba` bit 0 set). SID/DTX
+transformation, repetition-error combining policy, native EFR speech encoding
+and synthesis remain outside this result. The next EFR boundary is independent
+speech-codec reference acquisition and parameter/PCM comparison, not attaching
+a handset clock on the strength of packing acceptance.
 

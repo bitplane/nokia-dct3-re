@@ -9,9 +9,19 @@ from tools.run_c54x_rom4_crc import PCM_MUTE_PASS
 from tools.run_c54x_rom4_crc import DECODER_REPLAY, ENCODER_REPLAY
 from tools.run_c54x_rom4_crc import file_identity
 from tools.run_c54x_rom4_crc import EFR_CRC_PASS, EFR_CRC_COMPLETE
+from tools.run_c54x_rom4_crc import EFR_PACKING_PASS, EFR_PACKING_COMPLETE
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_packing_completion(self):
+        text = EFR_PACKING_PASS + "\n" + EFR_PACKING_COMPLETE
+        check_result(text, 3, efr_packing=True)
+        for invalid in (text.replace("corrupt_frames=277", "corrupt_frames=0"),
+                        text.replace(EFR_PACKING_PASS, EFR_CRC_PASS),
+                        text.replace(EFR_PACKING_PASS, EFR_PACKING_PASS + "\n" + EFR_PACKING_PASS)):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_packing=True)
+
     def test_efr_crc_completion(self):
         text = EFR_CRC_PASS + "\n" + EFR_CRC_COMPLETE
         check_result(text, 3, efr_crc=True)

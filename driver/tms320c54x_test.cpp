@@ -15891,6 +15891,12 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "efr-packing"))
+		{
+			start_rom4_efr_packing(0, 0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "efr-crc"))
 		{
 			start_rom4_efr_crc(0);
@@ -16394,7 +16400,7 @@ private:
 		return serial;
 	}
 
-	static u8 rom4_efr_parameters(unsigned vector, u16 (&parameters)[57])
+	static u8 rom4_efr_parameters(unsigned vector, u16 (&parameters)[57], std::array<u8, 244> *speech = nullptr)
 	{
 		// GSM 06.60 parameter order, independent of the acquired descriptor tables.
 		static constexpr unsigned widths[] = {7,8,9,8,6,
@@ -16425,9 +16431,98 @@ private:
 			remainder = (remainder << 1) | (i < 65 ? serial[protected_bits[i] - 1] : 0);
 			if (remainder & 0x100) remainder ^= 0x11d;
 		}
+		if (speech) *speech = serial;
 		u8 result = 0;
 		for (unsigned bit = 0; bit < 8; ++bit) result = (result << 1) | BIT(remainder, bit);
 		return result;
+	}
+
+	static std::array<u16, 17> rom4_efr_packed(unsigned vector)
+	{
+		// TS 45.003 table 6, independently transcribed one-based w indices.
+		static constexpr unsigned importance[] = {
+			39,40,41,42,43,44,146,147,148,149,150,151,94,95,201,202,
+			48,89,100,141,45,152,96,203,2,3,8,10,18,19,24,46,47,153,154,
+			97,204,4,5,11,12,16,9,6,7,13,17,20,98,205,
+			1,14,15,21,25,26,28,155,207,196,248,90,142,197,249,
+			253,254,255,256,257,258,259,260,49,101,156,208,22,23,27,29,
+			52,56,60,64,68,104,108,112,116,120,159,163,167,171,175,
+			211,215,219,223,227,91,143,198,250,50,102,157,209,
+			30,31,32,33,34,35,36,99,206,53,57,
+			61,65,69,105,109,113,117,121,160,164,168,172,176,
+			212,216,220,224,228,54,58,62,66,106,110,114,118,
+			161,165,169,173,213,221,225,92,144,199,251,51,103,158,210,
+			93,145,200,252,55,59,63,67,107,111,115,119,162,166,170,
+			174,214,222,226,37,38,
+			70,72,73,122,124,125,177,179,180,229,231,232,217,218,
+			71,123,178,230,74,77,80,83,86,126,129,132,135,138,
+			181,184,187,190,193,233,236,239,242,245,
+			75,78,81,84,87,127,130,133,136,139,182,185,188,191,194,
+			234,237,240,243,246,
+			76,79,82,85,88,128,131,134,137,140,183,186,189,192,195,
+			235,238,241,244,247};
+		static_assert(std::size(importance) == 260);
+		u16 parameters[57];
+		std::array<u8, 244> speech;
+		u8 const crc = rom4_efr_parameters(vector, parameters, &speech);
+		std::array<u8, 260> preliminary{};
+		unsigned next = 0;
+		for (unsigned i = 0; i < speech.size(); ++i)
+		{
+			preliminary[next++] = speech[i];
+			if (i == 70 || i == 120 || i == 173 || i == 223)
+				for (unsigned copy = 0; copy < 2; ++copy) preliminary[next++] = speech[i - 1];
+		}
+		for (unsigned bit = 0; bit < 8; ++bit) preliminary[next++] = BIT(crc, bit);
+		std::array<u16, 17> packed{};
+		unsigned position = 0;
+		auto append = [&](int d) {
+			packed[position / 16] = (packed[position / 16] << 1) | (d < 0 ? 0 : preliminary[importance[d] - 1]);
+			++position;
+		};
+		// Native word layout, separately checked against all 272 ROM descriptors.
+		for (int word = 0; word < 5; ++word)
+			for (int d = word * 32 + 30; d >= word * 32; d -= 2) append(d);
+		append(179); append(181); append(-1); append(-1); append(-1);
+		for (int d = 180; d >= 160; d -= 2) append(d);
+		for (int start : {147, 115, 83, 51, 19})
+			for (int d = start; d < start + 32; d += 2) append(d);
+		for (unsigned i = 0; i < 7; ++i) append(-1);
+		for (int d = 1; d < 18; d += 2) append(d);
+		for (int start : {182, 198, 214, 230})
+			for (int d = start + 15; d >= start; --d) append(d);
+		append(-1); append(-1);
+		for (int d = 259; d >= 246; --d) append(d);
+		return packed;
+	}
+
+	void start_rom4_efr_packing(unsigned vector, unsigned stage)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const base = stage ? 0x1600 : 0x1400;
+		u16 parameters[57];
+		rom4_efr_parameters(vector, parameters);
+		for (unsigned i = 0; i < 58; ++i) data.write_word(base + i, stage ? 0xdead : i < 57 ? parameters[i] : 0xdead);
+		data.write_word(base - 1, 0x1357); data.write_word(base + 58, 0x2468);
+		auto const packed = rom4_efr_packed(vector);
+		for (unsigned i = 0; i < 17; ++i)
+			data.write_word(0x1500 + i, stage ? packed[i] ^ ((stage == 2 && !i) ? 0x8000 : 0) : 0xdead);
+		data.write_word(0x14ff, 0x89ab); data.write_word(0x1511, 0xcdef);
+		data.write_word(0x09ba, 1); // Ordinary speech fixture, not SID/DTX transformation.
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage ? 0xc2b7 : 0xc28f);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 301000 + vector * 3 + stage;
+		m_check_timer->adjust(attotime::from_msec(1));
 	}
 
 	void start_rom4_efr_crc(unsigned index)
@@ -45718,6 +45813,41 @@ private:
 			osd_printf_info("TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR encoder complete");
 		}
+		if (m_phase >= 301000 && m_phase < 301831)
+		{
+			unsigned const vector = (m_phase - 301000) / 3;
+			unsigned const stage = (m_phase - 301000) % 3;
+			u16 const base = stage ? 0x1600 : 0x1400;
+			u16 parameters[57];
+			u8 const crc = rom4_efr_parameters(vector, parameters);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native EFR packing/unpacking returns with balanced stack");
+			if (!stage)
+			{
+				auto const packed = rom4_efr_packed(vector);
+				for (unsigned word = 0; word < packed.size(); ++word)
+					expect(data.read_word(0x1500 + word) == packed[word], "native EFR packing matches normative ordering and independent CRC");
+			}
+			else
+			{
+				if (stage == 2) parameters[2] ^= 1; // Packed MSB is d30 = s24, protected by CRC8.
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (stage == 2 ? 1 : 0),
+					"EFR unpacker accepts clean frame and rejects protected-bit corruption");
+			}
+			for (unsigned p = 0; p < 57; ++p)
+				expect(data.read_word(base + p) == parameters[p], "native EFR decoded or preserved parameters");
+			expect(data.read_word(base + 57) == crc, "native EFR CRC parameter representation");
+			expect(data.read_word(base - 1) == 0x1357 && data.read_word(base + 58) == 0x2468 &&
+				data.read_word(0x14ff) == 0x89ab && data.read_word(0x1511) == 0xcdef,
+				"native EFR packed and parameter guards");
+			if (stage < 2) { start_rom4_efr_packing(vector, stage + 1); return; }
+			if (vector < 276) { start_rom4_efr_packing(vector + 1, 0); return; }
+			osd_printf_info("TMS320C54x ROM4 EFR packing: PASS vectors=277 basis_bits=244 corrupt_frames=277 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR packing complete");
+		}
 		if (m_phase >= 300000 && m_phase < 300554)
 		{
 			unsigned const index = m_phase - 300000;
@@ -47441,6 +47571,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(5, "fr-decoder", "Isolated acquired ROM FR decoder")
 	ROM_SYSTEM_BIOS(6, "fr-encoder", "Isolated acquired ROM FR encoder")
 	ROM_SYSTEM_BIOS(7, "efr-crc", "Isolated acquired ROM EFR CRC")
+	ROM_SYSTEM_BIOS(8, "efr-packing", "Isolated acquired ROM EFR packing and error detection")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -47466,6 +47597,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(7))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(8))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -47491,6 +47625,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(7))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(8))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
