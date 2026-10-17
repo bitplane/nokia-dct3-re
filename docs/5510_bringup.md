@@ -30,8 +30,11 @@ the domains below, without changing those native captures. Codec callback
 metadata establishes uninterrupted slot pairs and cadence across CPU clock
 changes. A first-signal comparison with eight independently decoded AAC
 packets does not match, but packet-to-PCM-frame ownership is not established.
-Next bind the decoder's output blocks to those source packets before
-diagnosing arithmetic; do not choose a lag or channel swap to improve a fit.
+The pre-copy observation now matches all eight source packets in input RAM
+and records ordered 1,024-word channel blocks with differences already
+present before DMA. Next bind those blocks to the processing call `024610`
+and inspect conversion helper `0248a6` before diagnosing upstream arithmetic;
+do not choose a lag or channel swap to improve a fit.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
@@ -5906,47 +5909,63 @@ python3 tools/noki5510_bootstrap_check.py --playback-dma RUN_DIR/error.log
 
 ### Output-copy observation
 
-`mu4_playback_banks_observe.lua` selects data-space writes during
-`1.0 <= t < 2.0` of the first processing session, not startup, cleanup or
-the later loader's stack use. It covers first DMA buffer `1000..107f`
-and candidate upstream window `7000..73ff`. The three-second run records
-276,352 full-word output writes, all zero, with four complete PC-context
-groups and no overflow: `028fda` (384), `029fee` (39,424), `02a2ea`
-(197,120) and `02a367` (39,424). These are data-write contexts, not retained
-writer-instruction identities or an all-alias writer census.
+The AA99 contract pins 74 words around `02:a31f`. When the double fields
+at offsets 2 and 4 are equal, the copy count is the minimum of remaining
+source extent (`[7]-[8]`) and destination extent (`[11]-[12]`). AR3 and AR2
+are formed from bases `[6]` and `[10]` plus the **old** cursors. Both object
+cursors advance before `02:a366: MVDD *AR3+,*AR2+`; consequently a snapshot
+in the copy body already contains end cursors. Exhaustion/full flags at
+offsets 9/13 are set for the limiting side, both on a tie. The reference
+model is restricted to nonnegative signed-word extents and bounded cursors;
+2,025 small cursor combinations plus boundary cases test its partition.
+The unequal-field helper and an all-alias writer census remain outside scope.
 
-The upstream window has 416,986 writes, including 966 nonzero values,
-distributed over 94 contexts with no partial masks or overflow. Nonzero
-working values therefore exist upstream; they do not establish that valid
-decoded PCM reaches the copy boundary. A broad `1000..137f` write watch
-would also include control/workspace addresses, and other lifecycle phases
-reuse these addresses. Neither address extrema nor nonzero writes alone
-identify an audio producer.
+`mu4_playback_frame_observe.lua` is a passive two-second instrument. It
+selects real bit-reader data reads and copy-context writes during bounded
+windows, captures RAM snapshots, then removes its taps. GENPC is a context
+selector, not a retained writer identity. It does not require the debugger
+or change guest state. The earlier all-zero bank statistics belonged to a
+superseded core/media pair and are not current audio evidence.
 
-The bounded copy contexts show AR4=`13e0`, paired 32-bit fields at offsets
-2 and 4 both `0000ac44` (44,100), source base/extent `7000/0400`, and
-destination base/extent `1000/0040`. Live AR3 snapshots are `7043..7046`;
-both inspected adjacent words are zero. These are live RAM snapshots, not
-the MVDD's retained source address. The observer deliberately leaves
-`source_identity=unvalidated`.
+The fresh run has 2,401 selected bit-reader reads and 310 sampled copy
+boundaries, with no cap or partial-word accesses. The initial `162e` RAM
+snapshot contains all 2,977 captured AAC bytes exactly at byte offset 512.
+Two objects (`13e0`, `1460`) supply chronological 1,024-word channel blocks
+from alternating pairs `7000/7400` and `7800/7c00`, copied in 64-word chunks.
+Nine complete blocks per object and a partial tenth are retained; the first
+eight pairs are compared with the independently decoded reference, without
+shifting, scaling or selecting channels. Every observed first copied word
+matches its source snapshot at the old cursor. This is sampled copy/material
+evidence, not proof of every MVDD read or decoder-call-to-packet ownership.
 
-The independent AA99 contract pins 37 words around `02:a31f`: it compares
-the two double fields, branches to a different helper when unequal, and
-on the equal-field path forms AR3 from object offsets 6+8 and AR2 from
-10+12. With positive count, `02:a366` copies using `MVDD *AR3+,*AR2+`.
-Rate/converter semantics, the complete unequal-field helper, and the
-ownership of every observed store are not established by this contract.
+The first block pair is zero on both sides. The second has the same
+448-sample zero prefix and 576 nonzero samples per channel. At sample 448,
+native/reference values are `-42/-27` and `-268/14`; samples 449 and 450
+match exactly (`-74,-113` and `47,85`). There are 434 and 400 differing
+samples in that pair, including large errors. Thus the unfitted chronological
+comparison already differs in pre-DMA RAM, not just the serial output.
+The instrumented DMA/TX/DIN word files and codec-slot file are exact prefixes
+of the uninstrumented run.
+This material/copy probe can retire once direct processing-call and output
+ownership capture supersedes these checkpoints.
 
-Use the same copied NAND, BIOS and isolated working directory as the
-playback lifecycle fixture, substituting the banks script and retaining
-`-seconds_to_run 3`. The checker requires the completed observation window,
-unique contexts, exact aggregate conservation, no partial masks/overflow
-and all four pointer snapshots; it does not accept audio:
+Use the canonical recorded NAND, `bootplaystage`, an isolated working
+directory and absolute paths as for playback, adding:
 
 ```sh
-python3 tools/noki5510_bootstrap_check.py --playback-banks RUN_DIR/error.log
-python3 tools/mu4_context_contract.py roms/5510-mu4-reference/InitData_R060.a00
+-autoboot_delay 0 -autoboot_script tools/mu4_playback_frame_observe.lua -seconds_to_run 2
+python3 tools/mu4_playback_frame_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-aac captured-eight-packets.aac --reference-pcm host-eight-frames.s16le
 ```
+
+A separate 59-word witness pins `023d73`'s input setup, the processing call
+`023de5 -> 024610`, its nonzero-result exit, and the following 1,024-iteration
+two-channel conversion loop through `0248a6` with argument 14. That is the
+next bounded runtime ownership target. With OVLY set, low logical addresses
+such as `02:3d73` execute from physical page zero; disassembling raw `02:3d73`
+can show unrelated zero backing RAM. Source and retained Execute identity,
+not such a raw debugger view, remain authoritative.
 
 ### Resident reload contract
 
@@ -7821,8 +7840,11 @@ Direct slot/channel correlations are 0.032 and 0.017; error RMS is about
 not selected as a mapping (maximum 0.226). There is no fitted lag, scaling,
 permutation or acceptance threshold. This is not a native decode match,
 but the anchor does not establish AAC-packet/output-frame identity either.
-The next question is which decoder output block belongs to the captured
-source packets, not another guessed serial phase or unsupported opcode.
+The [pre-copy observation](#output-copy-observation) narrows this to ordered
+source blocks with matching zero/transient extents and mixed exact/incorrect
+samples before DMA. Processing-call-to-packet ownership and the first
+32-bit input to 16-bit conversion still need direct observation; do not
+promote chronological agreement alone to a completed decoder validation.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

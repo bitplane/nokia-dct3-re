@@ -544,11 +544,56 @@ def decode_recorder_memory_mac(words):
 COPY_ADAPTER_WITNESSES = (
     (0x2A31F, (0x4A11, 0xEEFF, 0x8814, 0xF495, 0xF7B8, 0x56E4,
                0x0004, 0x54E4, 0x0002, 0xF844, 0xA369)),
+    (0x2A32A, (0x10E4,0x0007,0x08E4,0x0008,0x8812,0x10E4,0x000B,
+               0x08E4,0x000C,0x11F8,0x0012,0x09F8,0x0008,0xF84E,0xA33D,
+               0x76E4,0x0009,0x0001,0xE721,0x11F8,0x0008,0x09F8,0x0012,
+               0xF84E,0xA347,0x76E4,0x000D,0x0001,0x8811)),
     (0x2A347, (0x11E4, 0x0008, 0xF640, 0x00E4, 0x0006, 0x8813)),
+    (0x2A34D, (0x4811,0xF600,0x80E4,0x0008)),
     (0x2A351, (0x11E4, 0x000C, 0xF640, 0x00E4, 0x000A, 0x8812)),
+    (0x2A357, (0x4811,0xF600,0x80E4,0x000C)),
     (0x2A35B, (0x10F8, 0x0011, 0xF847, 0xA36D, 0x4811, 0xF010,
                0x0001, 0x881A, 0xF495, 0xF072, 0xA366, 0xE598, 0xF073, 0xA36D)),
 )
+
+DECODER_OUTPUT_WITNESSES = (
+    (0x23D73, (0x710D,0x0011,0x7181,0xB332,0x76F8,0xB331,0x0000)),
+    (0x23DE5, (0xF982,0x4610,0x800F,0xF073,0x3DEF,0xF7B8,0xF495,
+               0xF020,0xFFFF,0x800F,0x10F8,0xB331,0x8010,0x710F,0x0011,0x6C81,0x3E59)),
+    (0x23E09, (0x7105,0x0017,0x100C,0xF010,0x0001,0x8811,0x1006,0x800C,
+               0xF020,0x0400,0x8011,0x710C,0x0012,0x7600,0x000E,0x5692,
+               0x700C,0x0012,0xF982,0x48A6,0x8099,0x7600,0x000E,0x5697,
+               0xF982,0x48A6,0x80E1,0x0400,0x7111,0x0012,0x6EEA,0xFFFF,0x3E14,0x7011,0x0012)),
+)
+
+
+def decode_decoder_output(words):
+    for base,witness in DECODER_OUTPUT_WITNESSES:
+        for offset,expected in enumerate(witness):
+            if words.get(base+offset)!=expected:
+                raise ValueError(f'decoder output witness changed or absent at {base+offset:06x}')
+    return {'segment':'aa99','pinned_words':sum(len(witness) for _,witness in DECODER_OUTPUT_WITNESSES),
+            'input_setup':'023d73 initializes b332 from the receiver and resets b331',
+            'processing_call':'023de5 -> 024610','processing_result':'caller SP+0x0f',
+            'nonzero_result_exit':'023df4 -> 023e59',
+            'conversion_loop':{'first':'023e14','count':1024,'helper':'0248a6',
+                               'helper_stack0':14,'destinations':['*+AR1','*AR1(0x400)'],
+                               'source_reads':['DLD *AR2+','DLD *AR7+']},
+            'scope':'Pinned candidate processing/conversion boundary, not runtime call-to-packet ownership or correct decoder arithmetic'}
+
+
+def reference_copy_adapter(source_extent, source_cursor, destination_extent, destination_cursor):
+    """Equal-field branch in the nonnegative remaining-count domain only."""
+    if any(not isinstance(value,int) or not 0 <= value <= 0x7fff
+           for value in (source_extent,source_cursor,destination_extent,destination_cursor)) or source_cursor > source_extent or destination_cursor > destination_extent:
+        raise ValueError('copy adapter requires nonnegative signed-word extents and bounded cursors')
+    source_remaining = source_extent-source_cursor
+    destination_remaining = destination_extent-destination_cursor
+    count = min(source_remaining,destination_remaining)
+    return {'count':count,'source_cursor_after':source_cursor+count,
+            'destination_cursor_after':destination_cursor+count,
+            'set_source_exhausted':source_remaining <= destination_remaining,
+            'set_destination_full':destination_remaining <= source_remaining}
 
 
 def decode_copy_adapter(words):
@@ -560,11 +605,15 @@ def decode_copy_adapter(words):
         'segment': 'aa99', 'pinned_words': sum(len(w) for _, w in COPY_ADAPTER_WITNESSES),
         'entry': '02a31f', 'object_register': 'AR4',
         'double_fields_compared': [4, 2], 'unequal_branch': '02a369',
-        'equal_path': {'source': 'object[6] + object[8]', 'source_register': 'AR3',
-                       'destination': 'object[10] + object[12]', 'destination_register': 'AR2',
+        'equal_path': {'source': 'object[6] + old(object[8])', 'source_register': 'AR3',
+                       'destination': 'object[10] + old(object[12])', 'destination_register': 'AR2',
+                       'count': 'min(object[7]-old(object[8]), object[11]-old(object[12]))',
+                       'cursor_update': 'both cursors advance by count before MVDD',
+                       'source_exhausted': 'set object[9]=1 when source remaining <= destination remaining',
+                       'destination_full': 'set object[13]=1 when destination remaining <= source remaining',
                        'positive_count_required': True, 'body': '02a366',
                        'operation': 'MVDD *AR3+,*AR2+'},
-        'scope': 'Pinned field comparison, address formation and copy body only; no rate semantics, full callee ownership, all-alias writer closure or decoded audio',
+        'scope': 'Pinned equal-field count, old-cursor addressing and advance-before-copy in the nonnegative remaining-count domain; no rate semantics, unequal-field helper, all-alias writer closure or decoded audio',
     }
 
 
@@ -1263,6 +1312,7 @@ def contract(source):
     result['playback_transform_copy'] = decode_transform_copy(rel_words, 'aa99')
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
+    result['decoder_output'] = decode_decoder_output(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_pre_copy_material_chronology",
+      "owner": "mu4_native_dsp",
+      "status": "satisfied",
+      "predicate": "The passive first-session probe preserves observed input material and ordered pre-copy source blocks without changing the native stream prefix",
+      "current": "The debugger-free two-second run records 2401 selected real bit-reader bus reads, 310 copy-context boundaries and nine complete 1024-word blocks for each of objects 13e0/1460, plus a partial tenth. The initial RAM snapshot at 162e contains every one of the independently captured 2977 AAC bytes at byte offset 512. Source pairs alternate 7000/7400 and 7800/7c00. A 74-word AA99 witness and 2025 small cursor combinations establish the equal-field minimum count and advance-before-copy contract; all observed counts are 64, and the first copied word at each boundary agrees with the snapshot at the reconstructed old cursor. The first eight chronological block pairs are compared without a fitted offset or channel choice. Pair zero is all zero; pair one has the same 448 zero samples and 576 nonzero samples per channel as the reference, with both exact matches and large differences. The DMA/TX/DIN word files and codec-slot file are exact prefixes of the uninstrumented capture. This is input material and sampled copy/block chronology, not retained instruction ownership, all copied words, processing-call-to-packet binding, accepted PCM, analog audio or speech.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_frame_observe.lua", "tools/mu4_playback_frame_check.py", "tools/test_mu4_playback_frame_check.py", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_codec_slot_capture_integrity",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
@@ -15,8 +23,8 @@
       "owner": "mu4_native_dsp",
       "status": "unresolved",
       "predicate": "Native decoder output blocks are bound to independently decoded source AAC packets before waveform acceptance",
-      "current": "The first 2977 captured plaintext bytes, SHA256 3f0a2b7eafb22ede5b3e3f1bb54c83f2f959386bedd897ebebf218e6fb816ff4, host-decode without errors as eight AAC frames at 44100 Hz stereo. The regenerated 8192-frame signed LE16 reference has SHA256 440e479020b5e558b9aa792adc14af8bb4974f30898cba57f3189ac1434f8993. Actual codec slot metadata establishes complete native pairs. A fixed first-nonzero-frame anchor compares reference frame 1472 with native frame 10725 across 6720 frames without a cadence break; direct slot/channel correlations are 0.032/0.017 and error RMS about 8052/6146. Cross-channel correlations peak at 0.226 but are not selected as a permutation. There is no lag search, scaling, fitted mapping or audio acceptance. These results do not establish which source packet/native output block the anchor represents; map the actual decoder input/output ownership before attributing the mismatch to arithmetic or serial transport. Host reference bytes are analysis outputs, never emulated inputs.",
-      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py", "tools/mu4_recorder_transform_check.py", "driver/mu4_storage_test.cpp"]
+      "current": "The captured eight-packet AAC prefix independently decodes to 8192 stereo sample frames. Actual codec slot metadata establishes complete DIN pairs, but the fixed first-signal anchor does not match that reference. The pre-copy probe now binds all 2977 reference AAC bytes to the initial input RAM and records chronological channel-block rollovers. Block zero is zero; block one preserves the reference's 448-sample zero prefix but first differs at sample 448 (-42 versus -27, and -268 versus 14), while samples 449/450 match exactly. The unfitted comparison therefore already differs before DMA under that block chronology. A separate 59-word original-source witness identifies input setup at 023d73, processing call 023de5 -> 024610, its nonzero-result exit, and the following 1024-iteration two-channel conversion loop through 0248a6 with argument 14. Runtime processing-call-to-packet ownership and the first differing 32-bit value/conversion remain open. Do not infer arithmetic blame, fit a lag/channel swap, inject reference samples, or promote this material/block correspondence to complete decoded-audio acceptance.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_capture_check.py", "tools/test_mu4_playback_capture_check.py", "tools/mu4_playback_frame_check.py", "tools/mu4_playback_frame_observe.lua", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_recorder_transform_check.py", "driver/mu4_storage_test.cpp"]
     },
     {
       "id": "c54x_poly_immediate_extended_t_dependencies",

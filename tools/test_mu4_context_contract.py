@@ -19,7 +19,8 @@ from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPEND
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
-from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter
+from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
+from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
@@ -458,7 +459,7 @@ class ContextContractTest(unittest.TestCase):
         words = {address: value for base, witness in COPY_ADAPTER_WITNESSES
                  for address, value in enumerate(witness, base)}
         result = decode_copy_adapter(words)
-        self.assertEqual(result['pinned_words'], 37)
+        self.assertEqual(result['pinned_words'], 74)
         self.assertEqual(result['equal_path']['source_register'], 'AR3')
         self.assertEqual(result['equal_path']['destination_register'], 'AR2')
         self.assertEqual(result['double_fields_compared'], [4, 2])
@@ -469,6 +470,38 @@ class ContextContractTest(unittest.TestCase):
                 decode_copy_adapter(changed)
         with self.assertRaises(ValueError):
             decode_copy_adapter({address + 0x10000: value for address, value in words.items()})
+
+    def test_copy_adapter_minimum_and_advance_before_copy(self):
+        for source in range(9):
+            for destination in range(9):
+                for sc in range(source+1):
+                    for dc in range(destination+1):
+                        result = reference_copy_adapter(source,sc,destination,dc)
+                        used = 0
+                        while sc+used < source and dc+used < destination:
+                            used += 1
+                        self.assertEqual(result['count'],used)
+                        self.assertEqual(result['source_cursor_after'],sc+used)
+                        self.assertEqual(result['destination_cursor_after'],dc+used)
+                        self.assertEqual(result['set_source_exhausted'],sc+used==source)
+                        self.assertEqual(result['set_destination_full'],dc+used==destination)
+        self.assertEqual(reference_copy_adapter(1024,0,64,0)['source_cursor_after'],64)
+        self.assertEqual(reference_copy_adapter(32767,0,32767,0)['count'],32767)
+        for values in ((1,2,1,0),(-1,0,1,0),(32768,0,1,0),(1,0,1,2)):
+            with self.assertRaises(ValueError):
+                reference_copy_adapter(*values)
+
+    def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
+        words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES
+                 for address,value in enumerate(witness,base)}
+        result = decode_decoder_output(words)
+        self.assertEqual(result['pinned_words'],59)
+        self.assertEqual(result['conversion_loop']['count'],1024)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_decoder_output(changed)
 
     def test_dma_pause_sequences_require_separate_overlay_namespaces(self):
         sources = {segment: dict(enumerate(witness, base)) for segment, base, witness in DMA_PAUSE_WITNESSES}
