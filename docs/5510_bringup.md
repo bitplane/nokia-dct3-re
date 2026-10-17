@@ -38,8 +38,7 @@ the first nonzero block's maximum sample error falls from 43,740 to 7
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
 post-transform rotation/permutation match for all 30 vectors too. Next audit
-cross-call history ownership, coefficient-callback effects and final buffer movement
-and establish the cause and independent acceptance
+coefficient-callback effects and broader output binding, and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6109,7 +6108,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is cross-call history ownership, coefficient-callback effects and final buffer movement,
+Remaining work is coefficient-callback effects and broader output binding,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6247,8 +6246,8 @@ This combined mode pins 1,042 source words, checks each argument's identity
 and invocation, exact post-transform input continuity, and complete scale
 outputs before window processing. Tests cover zero/positive/negative shifts,
 signed arguments, 32-bit wrap, malformed metadata and consistently rehashed
-wrong outputs. Dispatch, overlap carry, final buffer movement, other media,
-decoded waveform conformance, analog output and speech remain unvalidated.
+wrong outputs. This mode alone does not establish callback or tail behavior,
+other media, decoded waveform conformance, analog output or speech.
 
 #### Window Callback Buffer Exchange
 
@@ -6284,9 +6283,46 @@ The combined checker pins 1,347 source words, verifies both dispatch targets
 against actual entry/return observations, and checks first-callback buffers.
 Tests cover all four modes, signed history, rounding boundaries, untouched
 regions, dispatch corruption and consistently rehashed wrong outputs.
-This does not yet validate second-callback memory effects, ownership of
-history between calls, final buffer rearrangement, other media, decoded
+This mode alone does not validate second-callback memory effects, complete
+writer ownership between calls, later output binding, other media, decoded
 waveform conformance, analog output or speech.
+
+#### Final Buffer Tails And History Continuity
+
+The mode-specific tail at `024a7e..024af7` runs once per channel object,
+sixteen times in the eight checked calls. Modes 0/1 leave these buffers
+unchanged. Mode 2 publishes 448 rounded raw values into the first part of
+the 16-bit history buffer, moves the old history into the raw prefix and
+repositions the remaining raw values through the 128-component saved buffer.
+Mode 3 swaps and shifts the saved/raw ranges, then reverses the moved range.
+The ordered moves matter because the source and destination ranges overlap.
+
+Ninety-six snapshots cover each tail's complete 1,024-component raw vector,
+512-word history and 128-component saved buffer before and after execution.
+All 26,624 output values match the source-derived buffer model. Together
+with the first-callback exchanges, these tails account for all 15,360 reads
+whose history words were previously observed: no differences remain. The
+first 1,024 history reads are initial-state observations, not a validated
+provisioning contract. This is continuity at captured boundaries, not proof
+that no writes occur between them.
+
+```sh
+python3 tools/mu4_overlap_check.py RUN_DIR --tail \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+This combined mode pins 1,469 source words. Tests compare the tail formulas
+against ordered overlapping copies, inject continuity breaks and reject
+consistently rehashed wrong outputs. All four native word/slot files and
+all 762 earlier snapshots remain unchanged. Packet binding and the first
+4,096 conversions still pass. The same 4,096 converter inputs match the
+first two final-tail vectors exactly at their 32-bit payload boundary.
+Valid zero/sign extension is checked separately; comparing signed 40-bit
+register values directly would invent differences on zero-extended DLDs.
+
+Second-callback memory effects, complete writer coverage, output binding
+beyond the first two blocks, other media, spectral input correctness,
+decoded waveform conformance, analog output and speech remain unvalidated.
 
 ### Resident reload contract
 

@@ -86,6 +86,8 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 && (address == 0x24a7e || address == 0x24af3))
+						observe_playback_tail(address,opcode);
 					if (m_playback_execute_entries[1] == 1 &&
 						((address >= 0x24a60 && address <= 0x24a64) || address == 0x24af8 || address == 0x24b13 ||
 						 address == 0x24b3e || address == 0x24b59 || address == 0x24955 || address == 0x2496e))
@@ -487,6 +489,8 @@ private:
 	u16 m_playback_callback_base = 0, m_playback_callback_history = 0, m_playback_callback_mode = 0;
 	u32 m_playback_callback_target = 0;
 	u8 m_playback_callback_site = 0;
+	u16 m_playback_tail_base = 0, m_playback_tail_history = 0, m_playback_tail_saved = 0;
+	u32 m_playback_tail_ordinal = 0;
 	u32 m_playback_fft_invocation = 0;
 	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
 	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
@@ -1017,6 +1021,33 @@ private:
 		logerror("%s_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
 			marker,invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
 			parameter,hash,name.c_str(),machine().time().as_double());
+	}
+	void observe_playback_tail(offs_t address, u16 opcode)
+	{
+		if (!m_playback_processing_pending) return;
+		bool const entry = address == 0x24a7e;
+		if (entry)
+		{
+			auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+			m_playback_tail_base = data.read_word(u16(sp+4));
+			m_playback_tail_history = data.read_word(u16(sp+8));
+			m_playback_tail_saved = data.read_word(u16(sp+9));
+			++m_playback_tail_ordinal;
+			if (m_playback_tail_base < 0x60 || unsigned(m_playback_tail_base)+2048 > 0x10000 ||
+				m_playback_tail_history < 0x60 || unsigned(m_playback_tail_history)+512 > 0x10000 ||
+				m_playback_tail_saved < 0x60 || unsigned(m_playback_tail_saved)+256 > 0x10000)
+				fatalerror("MU4 final-tail observation geometry changed");
+			logerror("mu4_tail_arguments: tail=%u invocation=%u call=%u mode=%04x base=%04x history=%04x saved=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+				m_playback_tail_ordinal,m_playback_fft_invocation,m_playback_processing[0],data.read_word(u16(sp+7)),
+				m_playback_tail_base,m_playback_tail_history,m_playback_tail_saved,machine().time().as_double());
+		}
+		if (!m_playback_tail_base) return;
+		unsigned const stage = entry ? 0 : 3;
+		write_playback_snapshot("mu4_tail","mu4_tail",m_playback_tail_ordinal,stage,address,opcode,m_playback_tail_base,2048,1024);
+		write_playback_snapshot("mu4_tail","mu4_tail",m_playback_tail_ordinal,stage+1,address,opcode,m_playback_tail_history,512,1024);
+		write_playback_snapshot("mu4_tail","mu4_tail",m_playback_tail_ordinal,stage+2,address,opcode,m_playback_tail_saved,256,1024);
+		if (!entry) m_playback_tail_base = 0;
 	}
 	void observe_playback_window_callback(offs_t address, u16 opcode)
 	{
@@ -2526,6 +2557,7 @@ private:
 			save_item(NAME(m_playback_scale_base)); save_item(NAME(m_playback_scale_parameter));
 			save_item(NAME(m_playback_callback_base)); save_item(NAME(m_playback_callback_history)); save_item(NAME(m_playback_callback_mode));
 			save_item(NAME(m_playback_callback_target)); save_item(NAME(m_playback_callback_site));
+			save_item(NAME(m_playback_tail_base)); save_item(NAME(m_playback_tail_history)); save_item(NAME(m_playback_tail_saved)); save_item(NAME(m_playback_tail_ordinal));
 			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
 			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
 			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
@@ -2778,6 +2810,7 @@ private:
 		m_playback_scale_base = m_playback_scale_parameter = 0;
 		m_playback_callback_base = m_playback_callback_history = m_playback_callback_mode = 0;
 		m_playback_callback_target = m_playback_callback_site = 0;
+		m_playback_tail_base = m_playback_tail_history = m_playback_tail_saved = 0; m_playback_tail_ordinal = 0;
 		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
 		m_playback_processing_pending = m_playback_conversion_active = false;
 		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;

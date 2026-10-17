@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.mu4_overlap_check import TARGETS, exchange, verify
+from tools.mu4_overlap_check import TARGETS, exchange, verify, final_tail, history_continuity, verify_tail, conversion_input_binding
 from tools.mu4_transform_check import fnv
 
 
@@ -42,6 +42,121 @@ def fixture(directory):
 
 
 class OverlapTests(unittest.TestCase):
+    def test_conversion_input_binding_accepts_zero_and_sign_extension(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            for i in range(1,5):
+                (directory/f'mu4_tail_{i:03d}_stage3.be16').write_bytes(struct.pack('>1024i',*([-1]*1024)))
+            lines=[]
+            for ordinal in range(4096):
+                frame,within=divmod(ordinal,2048)
+                sample,channel=divmod(within,2)
+                raw=0xffffffffff if ordinal%2 else 0x00ffffffff
+                lines.append(f'mu4_conversion_value: call={frame+1} sample={sample} channel={channel} raw={raw:010x} '
+                             'identity=Execute_entry observer_writes=0')
+            text='\n'.join(lines)
+            self.assertTrue(conversion_input_binding(directory,text)['conversion_input_binding_validated'])
+            self.assertFalse(conversion_input_binding(directory,text.replace('raw=00ffffffff','raw=00fffffffe',1))['conversion_input_binding_validated'])
+            with self.assertRaises(ValueError):
+                conversion_input_binding(directory,text.replace('raw=00ffffffff','raw=01ffffffff',1))
+
+    def test_final_tail_against_ordered_buffer_moves(self):
+        for mode in range(4):
+            raw=[i*12345-1000000 for i in range(1024)]
+            history=[(i*7919)&0xffff for i in range(512)]
+            saved=[-i*54321 for i in range(128)]
+            r,h,s=raw[:],history[:],saved[:]
+            if mode==2:
+                s[:]=r[:128]
+                for i in range(448):
+                    word=h[i]
+                    r[i]=(word-65536 if word&32768 else word)<<16
+                    h[i]=((r[i+576]//32768+1)//2)&0xffff
+                    r[i+576]=r[i+128]
+                r[448:576]=s
+            elif mode==3:
+                for i in range(128):
+                    r[896+i],s[i]=s[i],r[896+i]
+                for i in reversed(range(448)):
+                    r[576+i]=r[512+i]
+                for i in range(224):
+                    r[576+i],r[1023-i]=r[1023-i],r[576+i]
+                r[448:576]=s
+            self.assertEqual(final_tail(raw,history,saved,mode),(r,h,s))
+        with self.assertRaises(ValueError):
+            final_tail([],[],[],0)
+
+    def test_observed_history_continuity_detects_intervening_change(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            lines=[]
+            for ordinal,(marker,stage,values) in enumerate((('mu4_history',1,[0,1]),('mu4_history',3,[2,3]),
+                    ('mu4_tail',1,[2,3]),('mu4_tail',4,[4,5]),('mu4_history',1,[4,5]))):
+                name=f'event{ordinal}.be16'
+                (directory/name).write_bytes(struct.pack('>2H',*values))
+                lines.append(f'{marker}_snapshot: stage={stage} file={name} base=a000 t={ordinal} observer_writes=0')
+            report=history_continuity(directory,'\n'.join(lines))
+            self.assertEqual((report['initial_reads'],report['known_reads'],report['mismatched_words']),(2,4,0))
+            self.assertTrue(report['history_continuity_validated'])
+            (directory/'event4.be16').write_bytes(struct.pack('>2H',4,6))
+            report=history_continuity(directory,'\n'.join(lines))
+            self.assertEqual(report['mismatched_words'],1)
+            self.assertFalse(report['history_continuity_validated'])
+
+    def test_full_tail_capture_and_rehashed_wrong_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            lines=[]
+            callbacks=[]
+            ordinal=0
+            for call,mode in enumerate(range(4),1):
+                history=[(i*7919)&0xffff for i in range(512)]
+                for channel in range(2):
+                    ordinal+=1
+                    callbacks.append({'invocation':ordinal,'call':call,'mode':mode})
+                    start=call+0.2+channel*0.4
+                    lines.append(f'mu4_window_snapshot: invocation={ordinal} stage=2 t={start-0.1} observer_writes=0')
+                    lines.append(f'mu4_tail_arguments: tail={ordinal} invocation={ordinal} call={call} mode={mode:04x} '
+                                 f'base=7000 history={0xa000+call*512:04x} saved=c000 t={start:.3f} '
+                                 'identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0')
+                    raw=[i*12345-1000000 for i in range(1024)]
+                    saved=[-i*54321 for i in range(128)]
+                    output=final_tail(raw,history,saved,mode)
+                    for stage,data in enumerate((raw,history,saved,*output)):
+                        name=f'mu4_tail_{ordinal:03d}_stage{stage}.be16'
+                        kind=stage%3
+                        blob=struct.pack(f'>{len(data)}'+('H' if kind==1 else 'i'),*data)
+                        (directory/name).write_bytes(blob)
+                        base=(0x7000,0xa000+call*512,0xc000)[kind]
+                        address=0x24a7e if stage<3 else 0x24af3
+                        lines.append(f'mu4_tail_snapshot: invocation={ordinal} call={call} stage={stage} '
+                                     f'address={address:06x} opcode=7777 base={base:04x} words={len(blob)//2} '
+                                     f'parameter=0400 file={name} hash={fnv(blob):08x} t={start+(0.1 if stage>=3 else 0):.3f} '
+                                     'identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0')
+                    history=output[1]
+                lines.append(f'mu4_processing_return: call={call} t={call+0.99} observer_writes=0')
+            text='\n'.join(lines)
+            (directory/'error.log').write_text(text)
+            prerequisite=lambda *_:{'callbacks':callbacks,'source_words_pinned':1347}
+            with patch('tools.mu4_overlap_check.verify',side_effect=prerequisite),patch('tools.mu4_overlap_check.source_contract',return_value={0x24a7e:0x7777,0x24af3:0x7777}),patch('tools.mu4_overlap_check.pin_block'):
+                report=verify_tail(directory,b'source')
+                self.assertTrue(report['final_tails_validated'])
+                self.assertTrue(report['continuity']['history_continuity_validated'])
+                for before,after in [('tail=1 invocation=1','tail=1 invocation=0'),('words=2048','words=256'),
+                                     ('stage=5','stage=4')]:
+                    (directory/'error.log').write_text(text.replace(before,after,1))
+                    with self.subTest(before=before),self.assertRaises(ValueError):
+                        verify_tail(directory,b'source')
+                path=directory/'mu4_tail_005_stage3.be16'
+                blob=path.read_bytes()
+                changed=bytes([blob[0]^1])+blob[1:]
+                path.write_bytes(changed)
+                (directory/'error.log').write_text(text)
+                with self.assertRaises(ValueError):
+                    verify_tail(directory,b'source')
+                (directory/'error.log').write_text(text.replace(f'file={path.name} hash={fnv(blob):08x}',f'file={path.name} hash={fnv(changed):08x}'))
+                self.assertFalse(verify_tail(directory,b'source')['final_tails_validated'])
+
     def test_exchange_rounding_bounds_reversal_and_untouched_regions(self):
         for mode in range(4):
             size=128 if mode==2 else 1024
