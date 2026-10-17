@@ -8363,6 +8363,40 @@ accepted the write, preserved it through overwrite/reset, or generated exactly
 one TX callback. Keep `dxr_to_tx_validated` false until buffer loads,
 discarded writes and underflow repetition are causally accounted for.
 
+The optional reset-aware sequence check consumes the full passive indexed
+McBSP0 configuration observation from `mu4_transport_observe.lua`. It checks
+the observation's terminal count, register-index continuity and endpoint,
+then merges SPCR2 writes, owned DXR writes and completed-TX times in order.
+It does not search by sample value. A clear XRST discards pending words and
+clears retained DXR; writes while reset is asserted are ignored. Otherwise
+pending writes feed completions in order, and an empty queue predicts the
+retained word. More than two pending words stops as an unresolved overwrite
+case rather than silently dropping one. Timestamp ties between event kinds
+also stop rather than inventing their order.
+
+For the complete capture this model accounts for 1,631,766 fresh-write
+completions and 29,206 retained-word repetitions. The first 93 TX words
+precede a reset within the capture and remain unattributed: their equality
+to zero is not evidence of pre-capture write ownership. Together these
+account for all 1,661,065 TX callbacks. Source ordinals `1`, `783109`,
+`786383`, `1559251` and `1562525` are pending at resets; all five are zero.
+Ordinal `1631772` remains pending at the endpoint. No observed write falls
+inside asserted reset, and maximum pending depth is two. Thus all 1,631,772
+source writes are accounted for without a fitted offset or omitted zero
+samples.
+
+```sh
+python3 tools/mu4_playback_dxr_check.py RUN_DIR --check-buffer-sequence
+```
+
+This is reset-aware sequence agreement, not direct observation of internal
+DXR-to-XSR loads or proof that zero-valued writes cannot have ambiguous
+buffer histories. Keep that distinction from the actual bus-ownership and
+TX-to-DIN callback proofs above. Tests exercise nonzero reset discards,
+ignored writes, repetition, pending endpoints, wrong values, overfull queues,
+time ties and incomplete control metadata. A capture with no checked
+post-reset TX words fails instead of passing entirely as an unknown prefix.
+
 #### Independent Reference Comparison
 
 The first 2,977 captured plaintext bytes form eight host-valid AAC packets,

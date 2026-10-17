@@ -1,10 +1,58 @@
 import struct
 import unittest
 
-from tools.mu4_playback_dxr_check import FILE, check_writes, parse_row
+from tools.mu4_playback_dxr_check import (
+    FILE, check_buffer_sequence, check_writes, parse_controls, parse_row,
+)
 
 
 class DxrOwnershipTests(unittest.TestCase):
+    def test_buffer_model_accounts_for_reset_ignore_discard_repeat_and_endpoint(self):
+        controls = [(10,0),(20,1),(32,0),(40,1)]
+        writes = [(1,1,99,4,0),(21,2,7,4,0),(31,3,9,4,0),
+                  (33,4,10,4,0),(42,5,11,4,0),(44,6,12,4,0)]
+        result = check_buffer_sequence(controls,100,writes,[99,7,0,11],[5,30,41,43])
+        self.assertEqual(result['fresh_write_completions'],2)
+        self.assertEqual(result['retained_word_completions'],1)
+        self.assertEqual(result['pre_reset_tx_prefix_unattributed'],1)
+        self.assertEqual(result['pre_reset_writes_unattributed'],1)
+        self.assertEqual(result['reset_discarded_ordinals'],[3])
+        self.assertEqual(result['reset_ignored_ordinals'],[4])
+        self.assertEqual(result['endpoint_pending_ordinals'],[6])
+        self.assertFalse(result['internal_buffer_loads_observed'])
+        self.assertFalse(result['native_audio_validated'])
+
+    def test_buffer_model_rejects_mismatch_reset_completion_overflow_and_time_ties(self):
+        controls = [(10,0),(20,1)]
+        writes = [(21,1,7,4,0)]
+        for config,stop,records,tx,times in (
+                (controls,100,writes,[8],[30]),
+                (controls,100,writes,[7],[15]),
+                (controls,100,writes+[(22,2,8,4,0),(23,3,9,4,0)],[7],[30]),
+                (controls,100,[(20,1,7,4,0)],[7],[30]),
+                (controls,29,writes,[7],[30]),
+                (controls,100,[(21,1,7,0,0)],[7],[30])):
+            with self.subTest(records=records, times=times), self.assertRaises(ValueError):
+                check_buffer_sequence(config,stop,records,[0]+tx,[5]+times)
+        with self.assertRaises(ValueError):
+            check_buffer_sequence([],100,writes,[7],[30])
+
+    def test_indexed_control_observation_has_complete_count_and_selection(self):
+        lines = [
+            'mu4_transport_config: address=0038 index=01 value=0001 mask=ffff t=0.000000001 context_pc=000010 observer_writes=0',
+            'mu4_transport_config: address=0039 index=01 value=0000 mask=ffff t=0.000000002 context_pc=000011 observer_writes=0',
+            'mu4_transport_terminal: configs=2 dxr=0 first=0.000000003 last=0.000000004 t=0.000000100 observer_writes=0']
+        text = '\n'.join(lines)
+        self.assertEqual(parse_controls(text), ([(2,0)],100))
+        for bad in ('\n'.join(lines[1:]),text+'\n'+lines[-1],
+                    text.replace('configs=2','configs=3'),
+                    text.replace('index=01 value=0000','index=02 value=0000'),
+                    text.replace('t=0.000000002','t=0.000000000'),
+                    text.replace('mask=ffff','mask=00ff'),
+                    text.replace('last=0.000000004','last=0.000000101')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                parse_controls(bad)
+
     @staticmethod
     def fixture(records):
         data = b''.join(struct.pack('<QIHBB', *record) for record in records)
