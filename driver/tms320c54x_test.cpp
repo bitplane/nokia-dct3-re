@@ -7087,6 +7087,7 @@ private:
 		unsigned reg, selected, kind;
 		u16 offset, value, address, next_ar, st0;
 		bool compatibility;
+		u16 initial = 0x1007, bk = 16;
 	};
 	static long_store_fixture immediate_long_store_fixture(unsigned variant)
 	{
@@ -7094,10 +7095,10 @@ private:
 		bool const compatibility = (variant / 384) % 2;
 		s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[(variant / 24) % 4];
 		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(variant / 96) % 4];
-		int const index = (7 + offset) % 16;
-		u16 const address = kind == 2 ? 0x1000 + (index < 0 ? index + 16 : index) : u16(0x1007 + offset);
+		u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
+		u16 const address = kind == 2 ? circular_fixture_next(initial, offset, bk) : u16(initial + offset);
 		return {reg, compatibility && !reg ? 3U : reg, kind, u16(offset), value, address,
-			u16(kind ? address : 0x1007), u16(compatibility ? 0x6608 : 0x608), compatibility};
+			u16(kind ? address : initial), u16(compatibility ? 0x6608 : 0x608), compatibility, initial, bk};
 	}
 	static long_store_fixture peripheral_long_store_fixture(unsigned variant)
 	{
@@ -7124,8 +7125,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility << 5));
 		if (peripheral) for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5555);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.offset) : 0x1007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.offset) : f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
@@ -7412,6 +7413,7 @@ private:
 		unsigned reg, selected, kind, selector;
 		u16 opcode, literal, address, next_ar, st0, st1, pmst, value;
 		u64 source;
+		u16 initial = 0x1007, bk = 16;
 	};
 	static accumulator_store_fixture long_accumulator_store_fixture(unsigned variant)
 	{
@@ -7437,8 +7439,8 @@ private:
 		bool const compatibility = (variant / 6400) % 2;
 		s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[(variant / 25) % 4];
 		u64 const source = std::array<u64, 4>{0x12345678, 0x0180000000ULL, 0xff7fffffffULL, 0xffffffffffULL}[(variant / 1600) % 4];
-		int const index = (7 + offset) % 16;
-		u16 const address = kind == 3 ? u16(0x1500 + offset) : kind == 2 ? 0x1000 + (index < 0 ? index + 16 : index) : u16(0x1007 + offset);
+		u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
+		u16 const address = kind == 3 ? u16(0x1500 + offset) : kind == 2 ? circular_fixture_next(initial, offset, bk) : u16(initial + offset);
 		u32 result = u32(source);
 		if (flags & 1)
 		{
@@ -7452,9 +7454,9 @@ private:
 		}
 		return {reg, compatibility && !reg ? 3U : reg, kind, selector,
 			u16(0x8000 | (selector << 8) | (kind == 3 ? 0xf8 : 0xe0 | (kind << 3) | reg)),
-			u16(kind == 3 ? address : u16(offset)), address, u16(kind && kind != 3 ? address : 0x1007),
+			u16(kind == 3 ? address : u16(offset)), address, u16(kind && kind != 3 ? address : initial),
 			u16(compatibility ? 0x6608 : 0x608), u16(0x800 | ((flags & 2) ? 0x100 : 0) | (compatibility ? 0x20 : 0)),
-			u16(flags & 1), u16(result >> ((selector & 2) ? 16 : 0)), source};
+			u16(flags & 1), u16(result >> ((selector & 2) ? 16 : 0)), source, initial, bk};
 	}
 	struct long_mvkd_fixture
 	{
@@ -7480,8 +7482,9 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.address.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.address.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.address.bk);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address.selected, f.address.initial);
 		m_cpu->space(AS_DATA).write_word(f.address.address, 0xaaaa);
 		if (f.source != 0x10 + f.address.selected) m_cpu->space(AS_DATA).write_word(f.source, f.value);
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -7609,7 +7612,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11112222); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x33334444);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
@@ -7649,7 +7653,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, value);
@@ -7791,8 +7796,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, initial_st0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 | (BIT(arithmetic, 0) << 8) | (BIT(arithmetic, 1) << 9));
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, peripheral ? 0x5555 : 0x1007);
-		if (peripheral) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.address - f.literal);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.literal) : f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, input[0]);
@@ -15833,7 +15838,7 @@ private:
 		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "long-mvkd"))
 		{
-			start_pipeline_long_mvkd(); return;
+			start_pipeline_long_immediate_store(); return;
 		}
 		if (!strcmp(machine().system().name, "tms54test") && !strcmp(machine().options().bios(), "mpy-mapped"))
 		{
@@ -39877,6 +39882,7 @@ private:
 					throw emu_fatalerror(0, "TMS320C54x isolated long peripheral ST complete");
 				}
 				osd_printf_info("TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "long-mvkd")) { start_pipeline_long_accumulator_store(); return; }
 				start_pipeline_bio_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40312,7 +40318,7 @@ private:
 					expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 &&
 						m_cpu->space(AS_DATA).read_word(destination) == value && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 &&
 						m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == (destination_kind == 8 ? value : 0x1200) &&
-						m_cpu->state_int(tms320c54x_device::STATE_BK) == (destination_kind == 9 ? value : 16) &&
+						m_cpu->state_int(tms320c54x_device::STATE_BK) == (destination_kind == 9 ? value : f.bk) &&
 						m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
 						"MVDK preserves unsigned values and exposes early AR publication to the immediate CMPR consumer");
 				}
@@ -40365,6 +40371,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 7) { start_pipeline_original_long_move(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0\n");
+				if (!strcmp(machine().options().bios(), "long-mvkd")) { start_pipeline_long_rmw(); return; }
 				start_pipeline_tc_branch(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -40492,6 +40499,7 @@ private:
 					throw emu_fatalerror(0, "TMS320C54x isolated long peripheral RMW complete");
 				}
 				osd_printf_info("TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0\n");
+				if (!strcmp(machine().options().bios(), "long-mvkd")) { start_pipeline_long_mvkd(); return; }
 				start_pipeline_memory_arithmetic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -46684,7 +46692,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(7, "mapped-word", "Staged accumulator/T/TRN memory arithmetic")
 	ROM_SYSTEM_BIOS(8, "mapped-bitf", "Staged accumulator/T/TRN bitfield tests")
 	ROM_SYSTEM_BIOS(9, "mpy-mapped", "Staged two-word MPY mapped accumulator consumers")
-	ROM_SYSTEM_BIOS(10, "long-mvkd", "Staged long-offset MVKD conformance")
+	ROM_SYSTEM_BIOS(10, "long-mvkd", "Staged long stores, moves and RMW conformance")
 	ROM_SYSTEM_BIOS(11, "imr-store", "Staged immediate IMR write and pending interrupts")
 	ROM_SYSTEM_BIOS(12, "bus-registers", "C5416-compatible external-bus register conformance")
 	ROM_SYSTEM_BIOS(13, "bus-io", "Staged external I/O waits and READY conformance")

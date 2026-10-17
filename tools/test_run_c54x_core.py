@@ -14,6 +14,24 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_long_store_move_profile_requires_every_shared_address_consumer(self):
+        markers, ending = EXTRA_PROFILES['long-mvkd']
+        self.assertEqual(len(markers), 7)
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='long-mvkd')
+        for marker in markers:
+            self.assertIn(marker, REQUIRED)
+            for changed in (output.replace(marker, ''), marker + '\n' + output):
+                with self.subTest(marker=marker), self.assertRaises(ValueError):
+                    check_result(changed, 3, profile='long-mvkd')
+        for before, after in (('restore=6144', 'restore=0'),
+                              ('restore=172032', 'restore=0'),
+                              ('source_alias=1', 'source_alias=0'),
+                              ('zero_gap_cmpr=1', 'zero_gap_cmpr=0'),
+                              ('reads_each=1', 'reads_each=2')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(output.replace(before, after), 3, profile='long-mvkd')
+
     def test_paired_memory_profile_requires_store_load_and_domain_guard_evidence(self):
         markers, ending = EXTRA_PROFILES['indirect-dld']
         self.assertEqual(len(markers), 5)

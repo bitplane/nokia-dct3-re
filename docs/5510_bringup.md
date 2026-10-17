@@ -849,7 +849,7 @@ Executable acceptance passes with `run_c54x_core.py --profile` for
 `load-offset`, `ldu-shift16`, `load-variable`, `ld-ts`, `ld-ts-producer`,
 `mul-t-sources`, `t-load-control`, `ts-alu`, `ts-alu-producer` and
 `shifted-alu`. These retain the existing complete case counts, bus assertions
-and save/restore checks; the Python suite passes 3,106 tests with one skip.
+and save/restore checks; the Python suite passes 3,107 tests with one skip.
 
 Long BANZ/BANZD and repeat-block BANZ also carry BK through their shared
 fixture. Circular forms use BK=32768 with initial indices below that size;
@@ -866,9 +866,27 @@ markers. `rptb-banz` separately covers 768 cases at repeat counts 0/1/2/7.
 Both profiles pass, as do the neighboring `rptb-bcd` and `rptb-bd` controls.
 The runner rejects missing or duplicate ordinary/delayed completion markers.
 
-Remaining: apply the same domain discipline to other older generators,
-including immediate-long and accumulator-long stores. Their existing modulo
-results are not upgraded to hardware legality by these corrected fixtures.
+Immediate-long and accumulator-long store fixtures carry their selected
+initial pointer and BK too. Circular forms use `4007`, BK=8192 and base
+`4000`, preserving the signed `f495` literal as a legal negative wrap to
+`549c`. Noncircular forms retain `1007` and BK=16. Shifted stores, long
+MVDK/MVKD and long RMW inherit the same address contract; their initializers
+set only the selected pointer to the circular start, preserving unrelated
+AR values and alias checks. MVDK's retained-BK assertion uses the fixture's
+BK unless the instruction explicitly writes BK.
+
+The compatibility-named `long-mvkd` BIOS now isolates all seven shared
+consumers: immediate ST, ordinary and shifted STL/STH, MVDK, its original
+instruction-pair control, RMW and MVKD. Its runner requires every marker,
+covering 427,784 cases/restores without adding a BIOS slot or changing CPU
+emulation. The peripheral-only fixtures retain their separate register and
+latency contracts. `long-mvkd`, `st-long-periph`, `rmw-long-periph`,
+`preinc-store` and `preinc-st` all pass, including the unrelated short-store
+controls. The runner rejects missing or duplicate shared-consumer markers.
+
+These corrections do not constitute an exhaustive ISA or fixture-domain
+audit. Other older generators' modulo expectations remain insufficient
+evidence of documented input legality.
 
 ### Signed circular memory loads
 
