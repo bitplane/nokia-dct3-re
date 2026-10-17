@@ -72,9 +72,10 @@ def history_continuity(directory,text):
 
 def conversion_input_binding(directory,text):
     values=rows(text,'mu4_conversion_value')
-    if len(values)!=4096:
-        raise ValueError('conversion input binding requires two complete blocks')
-    vectors={i:struct.unpack('>1024i',(directory/f'mu4_tail_{i:03d}_stage3.be16').read_bytes()) for i in range(1,5)}
+    if len(values) not in (4096,16384):
+        raise ValueError('conversion input binding requires two or eight complete blocks')
+    blocks=len(values)//2048
+    vectors={i:struct.unpack('>1024i',(directory/f'mu4_tail_{i:03d}_stage3.be16').read_bytes()) for i in range(1,2*blocks+1)}
     mismatches=0
     for ordinal,row in enumerate(values):
         frame,within=divmod(ordinal,2048)
@@ -87,9 +88,9 @@ def conversion_input_binding(directory,text):
         # DLD may zero- or sign-extend the signed 32-bit payload. The existing
         # converter checker separately validates its signed interpretation.
         mismatches+=(raw&0xffffffff)!=(vectors[2*frame+channel+1][sample]&0xffffffff)
-    return {'components':4096,'mismatched_components':mismatches,
+    return {'components':len(values),'blocks':blocks,'mismatched_components':mismatches,
             'conversion_input_binding_validated':mismatches==0,
-            'scope':'First two final-tail vectors versus converter payloads; not a complete writer census or later blocks'}
+            'scope':f'{blocks} paired final-tail blocks versus converter payloads; not a complete writer census or other media'}
 
 
 def verify_tail(directory,source):

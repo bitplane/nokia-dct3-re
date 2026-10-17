@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import struct
 import sys
@@ -73,14 +74,17 @@ def match_packets(entries, returns, reads, aac):
     return proofs
 
 
-def verify(directory, source, aac, pcm):
+def verify(directory, source, aac, pcm, *, require_eight_blocks=False):
     material = verify_frames(directory,source,aac,pcm)
     source_contract = contract(source)['pcm_conversion']
     text = (directory/'error.log').read_text()
     entries,returns,blocks,values = [rows(text,name) for name in
         ('mu4_processing_entry','mu4_processing_return','mu4_conversion_block','mu4_conversion_value')]
-    if [len(entries),len(returns),len(blocks),len(values)]!=[8,8,8,4096]:
+    if [len(entries),len(returns),len(blocks)]!=[8,8,8] or len(values) not in (4096,16384):
         raise ValueError('missing or duplicated bounded processing/conversion records')
+    conversion_blocks=len(values)//2048
+    if require_eight_blocks and conversion_blocks!=8:
+        raise ValueError('eight complete conversion blocks required')
     if any(row.get('identity')!='Execute_entry' for row in entries+returns+blocks+values) or any(row.get('context_only')!='1' for row in entries):
         raise ValueError('processing observation identity changed')
     packets = match_packets(entries,returns,rows(text,'mu4_frame_bit_read'),aac)
@@ -106,8 +110,9 @@ def verify(directory, source, aac, pcm):
             if frame+2<len(entries) and float(snapshot['time'])>=float(entries[frame+2]['t']):
                 raise ValueError('snapshot follows the next processing call that can reuse its destination')
     captured = [[struct.unpack('>1024H',(directory/material['source_blocks'][c][f]['file']).read_bytes())
-                 for c in (0,1)] for f in (0,1)]
+                 for c in (0,1)] for f in range(conversion_blocks)]
     first_differences = []
+    reference_errors=[]
     reference = struct.unpack('<16384h',pcm)
     for ordinal,row in enumerate(values):
         frame,within = divmod(ordinal,2048)
@@ -126,17 +131,24 @@ def verify(directory, source, aac, pcm):
             raise ValueError('converted result differs from later source RAM')
         wanted = reference[2048*frame+2*sample+channel]
         actual = word-65536 if word&0x8000 else word
+        reference_errors.append(actual-wanted)
         if actual!=wanted and len(first_differences)<4:
             source_base = int(returns[frame]['input0' if channel==0 else 'input1'],16)
             first_differences.append({'frame':frame,'sample':sample,'channel':channel,
                                       'raw_source_word_address':f'{source_base+2*sample:04x}',
                                       'raw':row['raw'],'native':actual,'reference':wanted})
     return {'packets':packets,'processing_calls':8,'conversion_words':len(values),
+            'conversion_blocks':conversion_blocks,
             'conversion_source_words':source_contract['pinned_words'],
             'rounded_shift_mismatches':0,'clamp_mismatches':0,'stored_word_mismatches':0,
             'first_reference_differences':first_differences,
+            'reference_comparison_diagnostic':{'samples':len(reference_errors),
+                'mismatched_samples':sum(error!=0 for error in reference_errors),
+                'max_absolute_error':max(map(abs,reference_errors)),
+                'rms_error':math.sqrt(sum(error*error for error in reference_errors)/len(reference_errors)),
+                'fitted_alignment':False,'codec_tolerance_established':False},
             'packet_to_output_call_binding_validated':True,'native_audio_validated':False,
-            'scope':'Eight consumed packets and output loops; first two blocks have complete conversion/store correspondence. Final three lookahead bytes are unconsumed, not validated reference content. No decoded-waveform, analog or speech acceptance'}
+            'scope':f'Eight consumed packets and output loops; {conversion_blocks} blocks have complete conversion/store correspondence. Final three lookahead bytes are unconsumed, not validated reference content. No decoded-waveform, analog or speech acceptance'}
 
 
 def main():
@@ -145,9 +157,10 @@ def main():
     parser.add_argument('--source-a00',type=Path,required=True)
     parser.add_argument('--reference-aac',type=Path,required=True)
     parser.add_argument('--reference-pcm',type=Path,required=True)
+    parser.add_argument('--require-eight-blocks',action='store_true',help='reject legacy two-block conversion observations')
     args = parser.parse_args()
     try:
-        result = verify(args.directory,args.source_a00.read_bytes(),args.reference_aac.read_bytes(),args.reference_pcm.read_bytes())
+        result = verify(args.directory,args.source_a00.read_bytes(),args.reference_aac.read_bytes(),args.reference_pcm.read_bytes(),require_eight_blocks=args.require_eight_blocks)
     except (OSError,ValueError,KeyError) as error:
         print(f'MU4 processing observation: {error}',file=sys.stderr)
         return 1

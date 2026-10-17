@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.mu4_processing_check import match_packets, signed40, verify
+from tools.mu4_playback_frame_check import rows
 
 
 class ProcessingTests(unittest.TestCase):
@@ -73,7 +74,7 @@ class ProcessingTests(unittest.TestCase):
                     filename=f'{frame}_{channel}.be16'
                     (directory/filename).write_bytes(bytes(2048))
                     snapshots[channel].append({'file':filename,'base':destination+1024*channel,'time':str(start+1.1)})
-                if frame<2:
+                if frame<8:
                     for sample in range(1024):
                         for channel in (0,1):
                             text.append(line('mu4_conversion_value',{'call':frame+1,'frame':frame,'sample':sample,'channel':channel,
@@ -83,18 +84,27 @@ class ProcessingTests(unittest.TestCase):
             original='\n'.join(text)
             (directory/'error.log').write_text(original)
             with patch('tools.mu4_processing_check.verify_frames',return_value={'source_blocks':snapshots}),patch('tools.mu4_processing_check.contract',return_value={'pcm_conversion':{'pinned_words':152}}):
-                result=verify(directory,b'source',packet*8,bytes(32768))
+                result=verify(directory,b'source',packet*8,bytes(32768),require_eight_blocks=True)
                 self.assertTrue(result['packet_to_output_call_binding_validated'])
+                self.assertEqual((result['conversion_words'],result['conversion_blocks']),(16384,8))
+                self.assertEqual(result['reference_comparison_diagnostic']['samples'],16384)
+                self.assertFalse(result['reference_comparison_diagnostic']['codec_tolerance_established'])
                 self.assertFalse(result['native_audio_validated'])
+                legacy='\n'.join(line for line in text if not rows(line,'mu4_conversion_value') or int(rows(line,'mu4_conversion_value')[0]['call'])<=2)
+                (directory/'error.log').write_text(legacy)
+                self.assertEqual(verify(directory,b'source',packet*8,bytes(32768))['conversion_blocks'],2)
+                with self.assertRaises(ValueError):
+                    verify(directory,b'source',packet*8,bytes(32768),require_eight_blocks=True)
                 for bad in (original.replace('bad=0','bad=1',1),original.replace('argument=14','argument=15',1),
                             original.replace('raw=0000000000','raw=0000004000',1),
+                            'raw=0000004000'.join(original.rsplit('raw=0000000000',1)),
                             original.replace('identity=Execute_entry','identity=GENPC',1),
                             original.replace('caller_sp=1000','caller_sp=1001',1)):
                     (directory/'error.log').write_text(bad)
                     with self.assertRaises(ValueError):
                         verify(directory,b'source',packet*8,bytes(32768))
                 (directory/'error.log').write_text(original)
-                (directory/snapshots[0][0]['file']).write_bytes(b'\0\1'+bytes(2046))
+                (directory/snapshots[1][7]['file']).write_bytes(b'\0\1'+bytes(2046))
                 with self.assertRaises(ValueError):
                     verify(directory,b'source',packet*8,bytes(32768))
 

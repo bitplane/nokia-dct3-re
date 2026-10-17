@@ -45,18 +45,22 @@ class OverlapTests(unittest.TestCase):
     def test_conversion_input_binding_accepts_zero_and_sign_extension(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory=Path(temporary)
-            for i in range(1,5):
+            for i in range(1,17):
                 (directory/f'mu4_tail_{i:03d}_stage3.be16').write_bytes(struct.pack('>1024i',*([-1]*1024)))
             lines=[]
-            for ordinal in range(4096):
+            for ordinal in range(16384):
                 frame,within=divmod(ordinal,2048)
                 sample,channel=divmod(within,2)
                 raw=0xffffffffff if ordinal%2 else 0x00ffffffff
                 lines.append(f'mu4_conversion_value: call={frame+1} sample={sample} channel={channel} raw={raw:010x} '
                              'identity=Execute_entry observer_writes=0')
             text='\n'.join(lines)
-            self.assertTrue(conversion_input_binding(directory,text)['conversion_input_binding_validated'])
+            report=conversion_input_binding(directory,text)
+            self.assertTrue(report['conversion_input_binding_validated'])
+            self.assertEqual((report['components'],report['blocks']),(16384,8))
+            self.assertEqual(conversion_input_binding(directory,'\n'.join(lines[:4096]))['blocks'],2)
             self.assertFalse(conversion_input_binding(directory,text.replace('raw=00ffffffff','raw=00fffffffe',1))['conversion_input_binding_validated'])
+            self.assertFalse(conversion_input_binding(directory,'raw=fffffffffe'.join(text.rsplit('raw=ffffffffff',1)))['conversion_input_binding_validated'])
             with self.assertRaises(ValueError):
                 conversion_input_binding(directory,text.replace('raw=00ffffffff','raw=01ffffffff',1))
 

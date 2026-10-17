@@ -1261,7 +1261,7 @@ private:
 			u16 const channel = address == 0x23e23;
 			if (opcode != (channel ? 0x80e1 : 0x8099) || !m_playback_conversion_pending || !m_playback_conversion_shift_seen ||
 				sp != m_playback_conversion[3] || channel != m_playback_conversion[1]) ++m_playback_processing[3];
-			if (m_playback_processing[2] <= 2)
+			if (m_playback_processing[2] <= 8)
 				logerror("mu4_conversion_value: call=%u frame=%u sample=%u channel=%u raw=%010llx shifted=%010llx result=%010llx argument=%u destination=%04x t=%.9f identity=Execute_entry observer_writes=0 retirement=unclaimed\n",
 					m_playback_processing[0],m_playback_processing[2]-1,m_playback_conversion[0],channel,(unsigned long long)m_playback_conversion_raw,
 					(unsigned long long)m_playback_conversion_shifted,(unsigned long long)a,m_playback_conversion[2],

@@ -31,14 +31,14 @@ changes. The first eight independently decoded AAC packets are bound to
 native processing calls and output blocks, not aligned by fitting a lag.
 The first eight processing calls now have complete consumed-byte coverage
 against the reference packets and matching output-loop/block identities.
-All 4,096 conversions in the first two blocks follow the source-derived
+All 16,384 conversions in the eight checked blocks follow the source-derived
 rounded-shift/clamp model and match later RAM. After the DAGEN correction,
 the first nonzero block's maximum sample error falls from 43,740 to 7
 (RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
 post-transform rotation/permutation match for all 30 vectors too. Next audit
-coefficient-callback effects and broader output binding, and establish the cause and independent acceptance
+coefficient-callback effects and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6011,7 +6011,7 @@ to signed 32-bit; zero-extended negative DLD inputs are valid even when the
 40-bit accumulator guard is zero. This is not a license to alter general
 accumulator signedness or other helper arguments.
 
-All 4,096 observed conversions in the first two successful blocks follow
+All 16,384 observed conversions in the eight successful blocks follow
 the independent rounded-shift/clamp model and reach their later pre-copy
 source buffers unchanged. The large differences were upstream: shifted
 stores could resolve an implicit pointer update after a younger load had
@@ -6023,13 +6023,21 @@ Use the same passive two-second run and independently regenerated reference:
 ```sh
 python3 tools/mu4_processing_check.py RUN_DIR \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
-  --reference-aac captured-eight-packets.aac --reference-pcm host-eight-frames.s16le
+  --reference-aac captured-eight-packets.aac --reference-pcm host-eight-frames.s16le \
+  --require-eight-blocks
 ```
 
 The checker requires call/return order, zero results, original Execute
 identity, complete packet-byte coverage, conversion-loop extents, buffer
 lifetimes, all sampled conversion values and later RAM correspondence.
-This proves the bounded eight-packet binding and first-two-block conversion,
+The strict option rejects legacy two-block captures; those remain readable
+only with their smaller coverage explicitly reported. Tests include drift
+in the last conversion and the eighth block's later copy buffer.
+All 16,384 converter input payloads also match the final-tail vectors.
+The four native word/slot streams and all 858 existing arithmetic snapshots
+remain byte-identical to the smaller capture. The optional host-reference
+error statistics are diagnostic, with no fitted alignment or assumed codec
+tolerance. This proves bounded eight-packet binding and conversion,
 not correct decoded audio, all media, analog output or native speech.
 
 ### Native Transform Arithmetic
@@ -6108,7 +6116,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is coefficient-callback effects and broader output binding,
+Remaining work is coefficient-callback effects,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6137,9 +6145,7 @@ identities. Short coefficients occupy `f200..f2ff`; long coefficients occupy
 `f000..f7ff`. These are observed operands, not fitted constants. Every input
 is byte-identical to the checked FFT return. Source-derived rotation and
 imaginary reversal reproduce all 16,384 output components across sixteen
-short and fourteen long vectors, with no mismatches. The extra 90 snapshots
-leave all four complete native word/slot files and all 312 FFT snapshots
-unchanged. Packet binding and the first 4,096 conversions still pass.
+short and fourteen long vectors, with no mismatches.
 
 ```sh
 python3 tools/mu4_transform_check.py RUN_DIR --post \
@@ -6169,9 +6175,7 @@ using a shared pre/post snapshot implementation. The source-derived model
 matches all 16,384 pre-transform output components. An independent complex
 index bit reversal then matches every component of the captured FFT inputs.
 These are separate checks: consistently rehashing a wrong arithmetic output
-or changing only the permutation still fails. The extra 90 snapshots leave
-the four native word/slot streams and all 402 FFT/post snapshots unchanged.
-Packet binding and the first 4,096 conversions continue to pass.
+or changing only the permutation still fails.
 
 ```sh
 python3 tools/mu4_transform_check.py RUN_DIR --pre \
@@ -6205,10 +6209,7 @@ final buffer movement remain separate contracts to establish.
 
 All 30 captured helper operations match: eighteen 128-component windows and
 twelve 1,024-component windows, totaling 14,592 signed output components.
-Two short windows follow long FFTs. The full pre/FFT/post checks and packet
-binding pass; the first 4,096 conversions still agree. The four native
-word/slot streams and all 492 earlier transform/rotation snapshots remain
-byte-identical. The shared snapshot writer avoids duplicating file and hash
+Two short windows follow long FFTs. The shared snapshot writer avoids duplicating file and hash
 logic across these observer boundaries.
 
 ```sh
@@ -6234,8 +6235,7 @@ All 30 captured inputs are byte-identical to the checked post-transform
 outputs. Independent shift/store arithmetic matches all 16,384 resulting
 components. Observed argument pairs are `(10,14)` fourteen times, `(12,14)`
 eight times, `(7,14)` six times and `(27,14)` twice, covering both shift
-directions. The four native word/slot streams and all 582 earlier snapshots
-remain unchanged. Packet binding and the first 4,096 PCM conversions pass.
+directions.
 
 ```sh
 python3 tools/mu4_window_check.py RUN_DIR --scale \
@@ -6270,9 +6270,7 @@ copies 64 reversed old history words into raw component indices `896..959`
 and uses forward old-history order in the first 512 raw components.
 
 All 16,384 raw components and 8,192 history words match the independent
-buffer model, including unchanged regions. The 120 added snapshots leave
-all four native word/slot streams and all 642 earlier snapshots unchanged.
-Packet binding and the first 4,096 conversions still pass.
+buffer model, including unchanged regions.
 
 ```sh
 python3 tools/mu4_overlap_check.py RUN_DIR \
@@ -6313,15 +6311,13 @@ python3 tools/mu4_overlap_check.py RUN_DIR --tail \
 
 This combined mode pins 1,469 source words. Tests compare the tail formulas
 against ordered overlapping copies, inject continuity breaks and reject
-consistently rehashed wrong outputs. All four native word/slot files and
-all 762 earlier snapshots remain unchanged. Packet binding and the first
-4,096 conversions still pass. The same 4,096 converter inputs match the
-first two final-tail vectors exactly at their 32-bit payload boundary.
+consistently rehashed wrong outputs. All 16,384 converter inputs match the
+eight paired final-tail blocks exactly at their 32-bit payload boundary.
 Valid zero/sign extension is checked separately; comparing signed 40-bit
 register values directly would invent differences on zero-extended DLDs.
 
-Second-callback memory effects, complete writer coverage, output binding
-beyond the first two blocks, other media, spectral input correctness,
+Second-callback memory effects, complete writer coverage,
+other media, spectral input correctness,
 decoded waveform conformance, analog output and speech remain unvalidated.
 
 ### Resident reload contract
