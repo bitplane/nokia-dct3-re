@@ -88,15 +88,10 @@ public:
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 &&
 						(address == 0x24919 || address == 0x2491e || address == 0x2400a ||
-						 address == 0x2401e || address == 0x24036 || address == 0x24051 || address == 0x2406c ||
-						 (address >= 0x2410c && address <= 0x2419b)))
+						 address == 0x2401e || address == 0x24036 || address == 0x24051 || address == 0x2406c))
 						observe_playback_transform(address,opcode);
 					if (m_playback_execute_entries[1] == 1 &&
-						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1 ||
-						 (address >= 0x25bd2 && address <= 0x25bf7) ||
-						 (address >= 0x23f8a && address <= 0x23fad) ||
-						 (address >= 0x2419d && address <= 0x241bd) ||
-						 (address >= 0x25ce2 && address <= 0x25d0e)))
+						((address >= 0x23de5 && address <= 0x23e2c) || address == 0x248b1))
 						observe_playback_processing(address,opcode);
 					if (m_playback_execute_entries[1] == 1 && opcode == 0x62e6 &&
 						(address == 0x2433a || address == 0x24340 || address == 0x24346))
@@ -472,7 +467,6 @@ private:
 	std::array<u32,4> m_playback_processing{}; // calls, returns, successes, observation mismatches
 	u16 m_playback_fft_base = 0;
 	u8 m_playback_fft_seen = 0, m_playback_fft_channel = 0;
-	std::array<u8,2> m_playback_fft_group{};
 	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
 	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
 	u64 m_playback_conversion_raw = 0, m_playback_conversion_shifted = 0;
@@ -1000,20 +994,6 @@ private:
 			m_playback_fft_base = base; m_playback_fft_channel = channel;
 		}
 		if (!m_playback_fft_base) return;
-		if (address >= 0x2410c && address <= 0x2419b)
-		{
-			u8 &group = m_playback_fft_group[m_playback_fft_channel];
-			if (address == 0x2410e) ++group;
-			if (group > 1) return;
-			logerror("mu4_fft_stage3_execute: channel=%u group=%u address=%06x opcode=%04x a=%010llx b=%010llx ar0=%04x ar2=%04x ar3=%04x ar4=%04x ar5=%04x st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
-				m_playback_fft_channel,group,unsigned(address),opcode,
-				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
-				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)),unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),machine().time().as_double());
-			return;
-		}
 		auto const snapshot = [&](unsigned stage, u16 base, unsigned words) {
 			std::string const name = util::string_format("mu4_fft_ch%u_stage%u.be16",m_playback_fft_channel,stage);
 			std::ofstream file(name,std::ios::binary | std::ios::trunc);
@@ -1047,38 +1027,6 @@ private:
 	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
-		if (m_playback_processing_pending && m_playback_processing[0] == 2 &&
-			((address >= 0x23f8a && address <= 0x23fad) || (address >= 0x25ce2 && address <= 0x25d0e) ||
-			 (address >= 0x2419d && address <= 0x241bd)))
-		{
-			double const time = machine().time().as_double();
-			bool const selected = (time >= 1.0190183 && time <= 1.01901896) || (time >= 1.0210536 && time <= 1.02105428) ||
-				(time >= 1.0190675 && time <= 1.01906804) || (time >= 1.02110175 && time <= 1.02110228) ||
-				(time >= 1.01899595 && time <= 1.01899626) || (time >= 1.02103127 && time <= 1.02103158);
-			if (selected)
-				logerror("mu4_upstream_execute: address=%06x opcode=%04x a=%010llx b=%010llx sp=%04x ar2=%04x ar3=%04x ar4=%04x ar5=%04x st0=%04x st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
-					unsigned(address), opcode,
-					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
-					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), time);
-		}
-		if (address >= 0x25bd2 && address <= 0x25bf7 && m_playback_processing_pending && m_playback_processing[0] == 2)
-		{
-			double const time = machine().time().as_double();
-			// Select only the two evidenced raw-word producer iterations.
-			// Register context is not a substitute for retained Read operands.
-			if ((time >= 1.0191258 && time <= 1.01912643) || (time >= 1.0211590 && time <= 1.02115962))
-				logerror("mu4_raw_execute: address=%06x opcode=%04x a=%010llx b=%010llx ar2=%04x ar3=%04x ar4=%04x ar5=%04x st0=%04x st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
-					unsigned(address), opcode,
-					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
-					static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), time);
-		}
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
 			address != 0x23e21 && address != 0x23e23 && address != 0x23e2c && address != 0x248b1) return;
 		if (m_playback_processing[0] >= 8 && !m_playback_processing_pending && !m_playback_conversion_active) return;
@@ -2420,7 +2368,6 @@ private:
 			save_item(NAME(m_playback_method_entries)); save_item(NAME(m_playback_method_mismatch));
 			save_item(NAME(m_playback_processing)); save_item(NAME(m_playback_processing_sp)); save_item(NAME(m_playback_processing_destination));
 			save_item(NAME(m_playback_fft_base)); save_item(NAME(m_playback_fft_seen)); save_item(NAME(m_playback_fft_channel));
-			save_item(NAME(m_playback_fft_group));
 			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
 			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
 			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
@@ -2667,7 +2614,6 @@ private:
 		m_playback_method_entries = {}; m_playback_method_mismatch = 0;
 		m_playback_processing = {}; m_playback_processing_sp = m_playback_processing_destination = 0;
 		m_playback_fft_base = 0; m_playback_fft_seen = m_playback_fft_channel = 0;
-		m_playback_fft_group = {};
 		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
 		m_playback_processing_pending = m_playback_conversion_active = false;
 		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;
