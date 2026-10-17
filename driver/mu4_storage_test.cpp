@@ -86,23 +86,25 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
-					if (m_playback_execute_entries[1] == 1 && (address == 0x24a7e || address == 0x24af3))
+					// Whole-session counters must not widen the eight-call arithmetic snapshot budget.
+					bool const detailed = m_playback_execute_entries[1] == 1 && m_playback_processing[0] <= 8;
+					if (detailed && (address == 0x24a7e || address == 0x24af3))
 						observe_playback_tail(address,opcode);
-					if (m_playback_execute_entries[1] == 1 &&
+					if (detailed &&
 						((address >= 0x24a60 && address <= 0x24a64) || address == 0x24af8 || address == 0x24b13 ||
 						 address == 0x24b3e || address == 0x24b59 || address == 0x24955 || address == 0x2496e))
 						observe_playback_window_callback(address,opcode);
-					if (m_playback_execute_entries[1] == 1 && (address == 0x24a46 || address == 0x24a48))
+					if (detailed && (address == 0x24a46 || address == 0x24a48))
 						observe_playback_scale(address,opcode);
-					if (m_playback_execute_entries[1] == 1 && (address == 0x24a70 || address == 0x24a72))
+					if (detailed && (address == 0x24a70 || address == 0x24a72))
 						observe_playback_window(address,opcode);
-					if (m_playback_execute_entries[1] == 1 &&
+					if (detailed &&
 						(address == 0x2491e || address == 0x2494e || address == 0x24950))
 						observe_playback_rotation(address,opcode,false);
-					if (m_playback_execute_entries[1] == 1 &&
+					if (detailed &&
 						(address == 0x2490f || address == 0x24934 || address == 0x24914 || address == 0x24939))
 						observe_playback_rotation(address,opcode,true);
-					if (m_playback_execute_entries[1] == 1 &&
+					if (detailed &&
 						(address == 0x24919 || address == 0x24944 || address == 0x2491e || address == 0x24946 ||
 						 address == 0x2400a || address == 0x2401e || address == 0x24036 || address == 0x24051 ||
 						 address == 0x2406c || address == 0x2408b || address == 0x240a6 || address == 0x240be))
@@ -466,6 +468,8 @@ private:
 	u32 m_playback_tx_time_hash = 2166136261U;
 	std::ofstream m_playback_dxr_capture;
 	u32 m_playback_dxr_hash = 2166136261U, m_playback_dxr_writes = 0;
+	std::ofstream m_playback_decoded_capture;
+	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -967,6 +971,11 @@ private:
 		if (!m_playback_dxr_capture || dxr_bytes != std::streamoff(m_playback_dxr_writes)*16) fatalerror("MU4 playback DXR observation is incomplete");
 		logerror("mu4_playback_dxr_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u32ordinal_u16word_u8owner_u8reserved file=mu4_playback_dxr.writes save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			m_playback_dxr_writes,m_playback_dxr_writes*16,m_playback_dxr_hash);
+		m_playback_decoded_capture.flush(); auto const decoded_bytes=m_playback_decoded_capture.tellp(); m_playback_decoded_capture.close();
+		if (!m_playback_decoded_capture || decoded_bytes != std::streamoff(m_playback_decoded_words)*2) fatalerror("MU4 decoded-return observation is incomplete");
+		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+			m_playback_processing[0],m_playback_processing[1],m_playback_processing[2],m_playback_decoded_words,m_playback_decoded_words*2,m_playback_decoded_hash,m_playback_processing[3],
+			unsigned(m_playback_processing_pending || m_playback_conversion_active || m_playback_conversion_pending),unsigned(m_playback_processing[0]>=512));
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -1243,13 +1252,13 @@ private:
 	{
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
 			address != 0x23e21 && address != 0x23e23 && address != 0x23e2c && address != 0x248b1) return;
-		if (m_playback_processing[0] >= 8 && !m_playback_processing_pending && !m_playback_conversion_active) return;
+		if (m_playback_processing[0] >= 512 && !m_playback_processing_pending && !m_playback_conversion_active) return;
 		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
 		u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
 		u64 const a = m_cpu->state_int(tms320c54x_device::STATE_A) & 0xffffffffffULL;
 		if (address == 0x23de5)
 		{
-			if (m_playback_processing[0] >= 8) return;
+			if (m_playback_processing[0] >= 512) return;
 			if (opcode != 0xf982 || m_playback_processing_pending || m_playback_conversion_active) ++m_playback_processing[3];
 			// FCALL reserves its two stack words before this Execute entry.
 			++m_playback_processing[0]; m_playback_processing_pending = true; m_playback_processing_sp = sp+2;
@@ -1261,8 +1270,10 @@ private:
 				window.clear();
 				for (unsigned i=0;i<12;++i) window += util::string_format("%04x",data.read_word(start+i));
 			}
-			logerror("mu4_processing_entry: call=%u sp=%04x caller_sp=%04x a=%010llx base=%04x index=%04x remaining=%04x reservoir=%04x%04x window_start=%04x window=%s st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+			if (m_playback_processing[0] <= 8) logerror("mu4_processing_entry: call=%u sp=%04x caller_sp=%04x a=%010llx base=%04x index=%04x remaining=%04x reservoir=%04x%04x window_start=%04x window=%s st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
 				m_playback_processing[0],sp,m_playback_processing_sp,(unsigned long long)a,base,index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),start,window.c_str(),unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),machine().time().as_double());
+			logerror("mu4_decoder_call: call=%u phase=entry index=%04x remaining=%04x reservoir=%04x%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+				m_playback_processing[0],index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),machine().time().as_double());
 		}
 		else if (address == 0x23de7 && m_playback_processing_pending)
 		{
@@ -1272,8 +1283,10 @@ private:
 			m_playback_conversion_pending = false; m_playback_conversion = {};
 			if (m_playback_conversion_active) ++m_playback_processing[2];
 			m_playback_processing_destination = data.read_word(sp+12);
-			logerror("mu4_processing_return: call=%u result=%010llx sp=%04x input0=%04x input1=%04x destination=%04x index=%04x remaining=%04x t=%.9f identity=Execute_entry observer_writes=0\n",
+			if (m_playback_processing[0] <= 8) logerror("mu4_processing_return: call=%u result=%010llx sp=%04x input0=%04x input1=%04x destination=%04x index=%04x remaining=%04x t=%.9f identity=Execute_entry observer_writes=0\n",
 				m_playback_processing[0],(unsigned long long)a,sp,data.read_word(sp+6),data.read_word(sp+5),m_playback_processing_destination,data.read_word(0xb331),data.read_word(0xa854),machine().time().as_double());
+			logerror("mu4_decoder_call: call=%u phase=return result=%010llx index=%04x remaining=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+				m_playback_processing[0],(unsigned long long)a,data.read_word(0xb331),data.read_word(0xa854),machine().time().as_double());
 		}
 		else if ((address == 0x23e1b || address == 0x23e21) && m_playback_conversion_active)
 		{
@@ -1298,14 +1311,21 @@ private:
 					m_playback_processing[0],m_playback_processing[2]-1,m_playback_conversion[0],channel,(unsigned long long)m_playback_conversion_raw,
 					(unsigned long long)m_playback_conversion_shifted,(unsigned long long)a,m_playback_conversion[2],
 					u16(m_playback_processing_destination+m_playback_conversion[0]+channel*1024),machine().time().as_double());
+			u16 const word = u16(a);
+			char const bytes[2]{char(word),char(word >> 8)};
+			m_playback_decoded_capture.write(bytes,sizeof(bytes));
+			for (char byte : bytes) m_playback_decoded_hash = (m_playback_decoded_hash ^ u8(byte)) * 16777619U;
+			++m_playback_decoded_words;
 			m_playback_conversion_pending = false; m_playback_conversion[1] = 1-channel;
 			if (channel) ++m_playback_conversion[0];
 		}
 		else if (address == 0x23e2c && m_playback_conversion_active)
 		{
 			if (opcode != 0x10e6 || m_playback_conversion_pending || m_playback_conversion[0] != 1024) ++m_playback_processing[3];
-			logerror("mu4_conversion_block: call=%u frame=%u samples=%u destination=%04x bad=%u t=%.9f identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
+			if (m_playback_processing[0] <= 8) logerror("mu4_conversion_block: call=%u frame=%u samples=%u destination=%04x bad=%u t=%.9f identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 				m_playback_processing[0],m_playback_processing[2]-1,m_playback_conversion[0],m_playback_processing_destination,m_playback_processing[3],machine().time().as_double());
+			logerror("mu4_decoder_block: call=%u frame=%u words=%u bad=%u t=%.9f identity=Execute_entry retirement=unclaimed observer_writes=0\n",
+				m_playback_processing[0],m_playback_processing[2]-1,m_playback_decoded_words,m_playback_processing[3],machine().time().as_double());
 			m_playback_conversion_active = false;
 		}
 	}
@@ -2852,6 +2872,7 @@ private:
 		m_playback_slot_hash = 2166136261U;
 		m_playback_tx_time_hash = 2166136261U;
 		m_playback_dxr_hash = 2166136261U; m_playback_dxr_writes = 0;
+		m_playback_decoded_hash = 2166136261U; m_playback_decoded_words = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
@@ -2867,6 +2888,8 @@ private:
 		m_playback_tx_time_capture.clear();
 		if (m_playback_dxr_capture.is_open()) m_playback_dxr_capture.close();
 		m_playback_dxr_capture.clear();
+		if (m_playback_decoded_capture.is_open()) m_playback_decoded_capture.close();
+		m_playback_decoded_capture.clear();
 		if (playback_profile())
 		{
 			m_playback_slot_capture.open("mu4_playback_din.slots",std::ios::binary|std::ios::trunc);
@@ -2875,6 +2898,8 @@ private:
 			if (!m_playback_tx_time_capture) fatalerror("MU4 playback TX time observation could not be opened");
 			m_playback_dxr_capture.open("mu4_playback_dxr.writes",std::ios::binary|std::ios::trunc);
 			if (!m_playback_dxr_capture) fatalerror("MU4 playback DXR observation could not be opened");
+			m_playback_decoded_capture.open("mu4_decoded_returns.le16",std::ios::binary|std::ios::trunc);
+			if (!m_playback_decoded_capture) fatalerror("MU4 decoded-return observation could not be opened");
 		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;

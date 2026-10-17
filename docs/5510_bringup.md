@@ -44,10 +44,15 @@ post-transform rotation/permutation match for all 30 vectors too. Published
 window coefficients match their original descriptor recurrences. Next
 cross-check the remaining decoder paths and establish independent acceptance
 criteria for the small residual. Other media remain unvalidated.
-A host-only complete-window projection now supplies a strictly decoded
+A host-only complete-window projection supplies a strictly decoded
 383-packet reference prefix; its final, 384th header-delimited packet is
-rejected. This broadens reference material, not the eight-call native
-arithmetic acceptance or evidence of later native transform state.
+rejected. Whole-session observation captures 375 successful native decoder
+calls and 768,000 converter-return words. Their chronological host comparison
+has maximum difference 13 and RMS 1.24083, without fitted gain or alignment.
+The eight additional reference frames and the native termination decision
+remain unresolved. Detailed source arithmetic and packet/store binding stay
+bounded to eight calls; later return-word agreement is not codec conformance
+or evidence of later native recording-transform state.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
@@ -8453,10 +8458,10 @@ python3 tools/mu4_recorder_transform_check.py RECORDING_TRACE EXTRACTED_TEST \
 ffmpeg -v error -xerror -i NEW_PREFIX.aac -f s16le -acodec pcm_s16le NEW_REFERENCE.s16le
 ```
 
-Next extend native processing/output observation against the valid prefix
-and classify its actual termination. Do not infer a waveform offset or
-gain from first nonzero samples: guest post-conversion processing remains
-separate from the already checked decoder conversion blocks.
+Whole-session return observation below extends the chronological comparison;
+its termination decision still needs classification. Do not infer a waveform
+offset or gain from first nonzero samples: guest post-conversion processing
+remains separate from decoder conversion blocks.
 It is analysis output, never media supplied back to the emulation.
 
 ```sh
@@ -8474,6 +8479,52 @@ packets and locate the differing values before conversion. The large
 processing corruption is corrected; the remaining small fixed-point/float
 residual needs broader coverage and independent acceptance criteria, not
 a guessed serial phase.
+
+##### Native session return coverage
+
+The compact observation follows at most 512 processing calls in the first
+verified AA99 session, independently of the eight-call detailed arithmetic
+budget. It logs each entry/return and completed conversion block, and writes
+the returned converter low words as interleaved signed LE16. These are
+Execute-entry observations before the caller's store, not proof of retired
+stores beyond the separately verified eight-call prefix. The terminal record
+binds call/return/block counts, byte extent, raw-byte FNV hash, pending state,
+cap status and observed contract errors. Capture-file save/restore is unsupported.
+
+The completed twenty-second run records 375 calls, 375 zero-status returns
+and 375 complete 1,024-sample stereo blocks, with no bad/pending/capped state
+and illegal=0. `mu4_decoded_returns.le16` contains 768,000 signed words,
+1,536,000 bytes, SHA256
+`1871f924d9c12dca42bcced964dfe1ee0a42165574f5d4e424fbf284fdfb26dc`.
+It reproduces the shorter run exactly. The six existing word, slot, time
+and ownership captures remain byte-identical, as do all 918 detailed
+arithmetic snapshots; the bounded coefficient/transform checks still pass.
+
+Against the first 375 blocks of the 383-packet host reference, 391,341 of
+768,000 signed samples differ, maximum absolute difference 13 and RMS
+1.2408299054. These are unfitted ordinal diagnostics, not complete later
+packet binding or a chosen audio tolerance. No nonzero processing status
+occurs before termination, so the rejected host packet 384 does not directly
+explain this session ending at 375 calls. The host reference has eight
+additional blocks; do not silently truncate that discrepancy or call it a
+decoder failure. Next identify the original wrapper, stream-length or
+lifecycle decision that stops invoking the decoder after these successful
+blocks, then extend packet/store binding where it earns evidence.
+
+```sh
+python3 tools/mu4_decoder_session_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-pcm STRICT_HOST_PREFIX.s16le
+```
+
+The checker requires finalized capture integrity, the preserved eight-call
+arithmetic checks, ordered call/return/block identities and matching PCM
+extent/hash. Reference comparison stops at the first failed native call;
+later successes cannot collapse its missing position. Return status uses
+the caller's low word, retaining upper accumulator bits only as context.
+Tests reject partial/pending/capped captures, wrong ordering/times/scope,
+changed counts/hash and missing successful blocks. Waveform disagreement
+remains an explicit diagnostic, never fitted away or labeled conformance.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
