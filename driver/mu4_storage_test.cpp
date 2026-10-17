@@ -86,6 +86,8 @@ public:
 				if (m_playback_overlay_checked)
 				{
 					++m_playback_execute_steps;
+					if (m_playback_execute_entries[1] == 1 && (address == 0x24a70 || address == 0x24a72))
+						observe_playback_window(address,opcode);
 					if (m_playback_execute_entries[1] == 1 &&
 						(address == 0x2491e || address == 0x2494e || address == 0x24950))
 						observe_playback_rotation(address,opcode,false);
@@ -474,6 +476,7 @@ private:
 	std::array<u32,4> m_playback_processing{}; // calls, returns, successes, observation mismatches
 	u16 m_playback_fft_base = 0, m_playback_fft_parameter = 0, m_playback_post_base = 0;
 	u16 m_playback_pre_base = 0, m_playback_pre_parameter = 0;
+	u16 m_playback_window_base = 0, m_playback_window_parameter = 0;
 	u32 m_playback_fft_invocation = 0;
 	u16 m_playback_processing_sp = 0, m_playback_processing_destination = 0;
 	std::array<u16,4> m_playback_conversion{}; // sample, channel, argument, caller SP
@@ -985,6 +988,49 @@ private:
 				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)), machine().time().as_double());
 		}
 	}
+	void write_playback_snapshot(char const *prefix, char const *marker, u32 invocation, unsigned stage,
+		offs_t address, u16 opcode, u16 base, unsigned words, u16 parameter)
+	{
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		std::string const name = util::string_format("%s_%03u_stage%u.be16",prefix,invocation,stage);
+		std::ofstream file(name,std::ios::binary | std::ios::trunc);
+		u32 hash = 2166136261U;
+		for (unsigned i=0;i<words;++i)
+		{
+			u16 const value = data.read_word(base+i);
+			char const bytes[2]{char(value>>8),char(value)};
+			file.write(bytes,2);
+			hash = ((hash ^ u8(value>>8))*16777619U ^ u8(value))*16777619U;
+		}
+		file.close();
+		if (!file) fatalerror("MU4 playback observation file incomplete");
+		logerror("%s_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
+			marker,invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
+			parameter,hash,name.c_str(),machine().time().as_double());
+	}
+	void observe_playback_window(offs_t address, u16 opcode)
+	{
+		if (!m_playback_processing_pending) return;
+		if (address == 0x24a70)
+		{
+			auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+			u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+			u16 const parameter = 2*data.read_word(u16(sp+2));
+			u16 const coefficients = data.read_word(u16(sp+3));
+			m_playback_window_base = m_cpu->state_int(tms320c54x_device::STATE_A);
+			m_playback_window_parameter = parameter;
+			if ((parameter != 0x80 && parameter != 0x400) || m_playback_window_base < 0x60 || coefficients < 0x60 ||
+				unsigned(m_playback_window_base)+2*parameter > 0x10000 || unsigned(coefficients)+2*parameter > 0x10000)
+				fatalerror("MU4 window observation geometry changed");
+			write_playback_snapshot("mu4_window","mu4_window",m_playback_fft_invocation,0,address,opcode,m_playback_window_base,2*parameter,parameter);
+			write_playback_snapshot("mu4_window","mu4_window",m_playback_fft_invocation,1,address,opcode,coefficients,2*parameter,parameter);
+		}
+		else if (m_playback_window_base)
+		{
+			write_playback_snapshot("mu4_window","mu4_window",m_playback_fft_invocation,2,address,opcode,m_playback_window_base,2*m_playback_window_parameter,m_playback_window_parameter);
+			m_playback_window_base = 0;
+		}
+	}
 	void observe_playback_transform(offs_t address, u16 opcode)
 	{
 		if (!m_playback_processing_pending) return;
@@ -1006,21 +1052,7 @@ private:
 		}
 		if (!m_playback_fft_base) return;
 		auto const snapshot = [&](unsigned stage, u16 base, unsigned words) {
-			std::string const name = util::string_format("mu4_fft_%03u_stage%u.be16",m_playback_fft_invocation,stage);
-			std::ofstream file(name,std::ios::binary | std::ios::trunc);
-			u32 hash = 2166136261U;
-			for (unsigned i=0;i<words;++i)
-			{
-				u16 const value = data.read_word(base+i);
-				char const bytes[2]{char(value>>8),char(value)};
-				file.write(bytes,2);
-				hash = ((hash ^ u8(value>>8))*16777619U ^ u8(value))*16777619U;
-			}
-			file.close();
-			if (!file) fatalerror("MU4 transform observation file incomplete");
-			logerror("mu4_fft_vector_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
-				m_playback_fft_invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
-				m_playback_fft_parameter,hash,name.c_str(),machine().time().as_double());
+			write_playback_snapshot("mu4_fft","mu4_fft_vector",m_playback_fft_invocation,stage,address,opcode,base,words,m_playback_fft_parameter);
 		};
 		if (entry)
 		{
@@ -1062,21 +1094,7 @@ private:
 		}
 		if (!vector_base) return;
 		auto const snapshot = [&](unsigned stage, u16 base, unsigned words) {
-			std::string const name = util::string_format("%s_%03u_stage%u.be16",prefix,invocation,stage);
-			std::ofstream file(name,std::ios::binary | std::ios::trunc);
-			u32 hash = 2166136261U;
-			for (unsigned i=0;i<words;++i)
-			{
-				u16 const value = data.read_word(base+i);
-				char const bytes[2]{char(value>>8),char(value)};
-				file.write(bytes,2);
-				hash = ((hash ^ u8(value>>8))*16777619U ^ u8(value))*16777619U;
-			}
-			file.close();
-			if (!file) fatalerror("MU4 rotation observation file incomplete");
-			logerror("%s_snapshot: invocation=%u call=%u stage=%u address=%06x opcode=%04x base=%04x words=%u parameter=%04x hash=%08x file=%s t=%.9f identity=Execute_entry context_only=1 observer_writes=0 audio_acceptance=0\n",
-				prefix,invocation,m_playback_processing[0],stage,unsigned(address),opcode,base,words,
-				parameter,hash,name.c_str(),machine().time().as_double());
+			write_playback_snapshot(prefix,prefix,invocation,stage,address,opcode,base,words,parameter);
 		};
 		if (entry)
 		{
@@ -2434,6 +2452,8 @@ private:
 			save_item(NAME(m_playback_fft_base)); save_item(NAME(m_playback_fft_parameter)); save_item(NAME(m_playback_fft_invocation));
 			save_item(NAME(m_playback_post_base));
 			save_item(NAME(m_playback_pre_base)); save_item(NAME(m_playback_pre_parameter));
+			save_item(NAME(m_playback_window_base));
+			save_item(NAME(m_playback_window_parameter));
 			save_item(NAME(m_playback_conversion)); save_item(NAME(m_playback_conversion_raw)); save_item(NAME(m_playback_conversion_shifted));
 			save_item(NAME(m_playback_processing_pending)); save_item(NAME(m_playback_conversion_active));
 			save_item(NAME(m_playback_conversion_pending)); save_item(NAME(m_playback_conversion_shift_seen));
@@ -2682,6 +2702,7 @@ private:
 		m_playback_fft_base = m_playback_fft_parameter = 0; m_playback_fft_invocation = 0;
 		m_playback_post_base = 0;
 		m_playback_pre_base = m_playback_pre_parameter = 0;
+		m_playback_window_base = m_playback_window_parameter = 0;
 		m_playback_conversion = {}; m_playback_conversion_raw = m_playback_conversion_shifted = 0;
 		m_playback_processing_pending = m_playback_conversion_active = false;
 		m_playback_conversion_pending = m_playback_conversion_shift_seen = false;

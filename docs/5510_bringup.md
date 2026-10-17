@@ -38,7 +38,7 @@ the first nonzero block's maximum sample error falls from 43,740 to 7
 13 and RMS 1.1492 against the independent decoder. These are measurements,
 not an established codec tolerance. Pre-transform, bit reversal and
 post-transform rotation/permutation match for all 30 vectors too. Next audit
-overlap/window processing and establish the cause and independent acceptance
+scaling, overlap carry and final buffer movement and establish the cause and independent acceptance
 criteria for the remaining residual. Other media remain unvalidated.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
@@ -6108,7 +6108,7 @@ impulses sanity-check the model at both sizes without defining a codec
 tolerance. The four native word/slot streams and the original eighteen
 selected snapshots reproduce the smaller proof byte-for-byte.
 
-Remaining work is overlap/window arithmetic,
+Remaining work is scaling, overlap carry and final buffer movement,
 understanding the small PCM residual against a floating-point decoder,
 coverage beyond these eight calls, and complete digital
 transport alignment. Analog output and native speech remain unvalidated.
@@ -6185,6 +6185,42 @@ products, including the negative half-shift, at both supported sizes.
 The result validates these 30 arithmetic invocations, not spectral input
 correctness, window/overlap processing, all media, waveform conformance,
 analog output or native speech.
+
+#### Window-Product Helper
+
+The `024a70` call invokes `025bb3..025c19`. Its outgoing count and
+coefficient pointer are independent of the preceding FFT parameter. The
+helper rotates mirrored left/right sample pairs using forward/backward
+coefficient walks, then reverses each half-buffer in place. Each split-word
+product is truncated before the products are combined. Captures use the
+actual helper count; a long FFT does not imply a long window operation.
+
+`tools/mu4_window_check.py` pins this 103-word body and its 15-word caller
+setup in addition to the complete transform-chain witnesses. It checks
+input/coefficient/output geometry, hashes, chronological call identity and
+the full mirrored-product/permutation model. The helper's input is observed
+after scaling and branch-specific operations; it is not claimed identical
+to the post-transform output. Scale/dispatch behavior, overlap carry and
+final buffer movement remain separate contracts to establish.
+
+All 30 captured helper operations match: eighteen 128-component windows and
+twelve 1,024-component windows, totaling 14,592 signed output components.
+Two short windows follow long FFTs. The full pre/FFT/post checks and packet
+binding pass; the first 4,096 conversions still agree. The four native
+word/slot streams and all 492 earlier transform/rotation snapshots remain
+byte-identical. The shared snapshot writer avoids duplicating file and hash
+logic across these observer boundaries.
+
+```sh
+python3 tools/mu4_window_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+The combined checker pins 955 source words. Tests include both window sizes,
+mixed FFT/window geometry, full-product bounds, metadata corruption and
+consistently rehashed wrong arithmetic. This helper acceptance does not
+establish correct selection of its inputs, complete overlap-add behavior,
+decoded waveform conformance, analog output or native speech.
 
 ### Resident reload contract
 
