@@ -6,9 +6,11 @@ from pathlib import Path
 import sys
 
 if __package__:
-    from .mu4_context_contract import contract, reference_transform_block
+    from .mu4_context_contract import contract, reference_recording_windows, reference_transform_block
+    from .mu4_recorder_media_inventory import adts_header
 else:
-    from mu4_context_contract import contract, reference_transform_block
+    from mu4_context_contract import contract, reference_recording_windows, reference_transform_block
+    from mu4_recorder_media_inventory import adts_header
 
 
 def records(text, marker):
@@ -116,18 +118,74 @@ def verify(text, saved, samples=96):
     return report, bytes(plain)
 
 
+def project_complete_windows(text, saved, samples=96, packet_limit=None):
+    """Host-only extension of one captured state; later native state is unknown."""
+    proof, observed = verify(text,saved,samples)
+    if not proof['consistent'] or proof['state_variants'] != 1:
+        raise ValueError('host projection requires a consistent single-state native prefix')
+    state = word_list(records(text,'mu4_record_transform_input')[0]['state'],82)
+    origin = proof['file_origin']
+    extent = (len(saved)-origin)//32*32
+    projected = reference_recording_windows(saved[origin:origin+extent],state)
+    if projected[:len(observed)] != observed:
+        raise ValueError('host inverse projection disagrees with captured plaintext')
+    cursor, headers = 0, []
+    stop = 'exact_projection_end'
+    while cursor < len(projected):
+        header = adts_header(projected,cursor)
+        if header is None:
+            stop = 'non_header'
+            break
+        if not header['frame_within_file']:
+            stop = 'truncated_frame'
+            break
+        headers.append(header)
+        cursor += header['frame_bytes']
+    if not headers:
+        raise ValueError('host projection contains no complete initial ADTS packet')
+    fields = ('mpeg_version','profile_bits','sampling_index','channel_configuration','raw_data_blocks_minus_one')
+    configurations = sorted({tuple(header[key] for key in fields) for header in headers})
+    payload = projected[:cursor]
+    if packet_limit is not None and (not isinstance(packet_limit,int) or not 1 <= packet_limit <= len(headers)):
+        raise ValueError('projection packet limit exceeds the complete header chain')
+    selected = len(headers) if packet_limit is None else packet_limit
+    output = payload[:sum(header['frame_bytes'] for header in headers[:selected])]
+    return {'captured_prefix_bytes':len(observed), 'projected_window_bytes':extent,
+        'complete_packets':len(headers), 'packet_bytes':cursor,
+        'packet_sha256':hashlib.sha256(payload).hexdigest(),
+        'output_packets':selected, 'output_bytes':len(output),
+        'output_sha256':hashlib.sha256(output).hexdigest(),
+        'unparsed_projected_bytes':extent-cursor, 'unmodeled_tail_bytes':len(saved)-origin-extent,
+        'stop_reason':stop, 'configurations':[dict(zip(fields,values)) for values in configurations],
+        'state_sha256':hashlib.sha256(b''.join(word.to_bytes(2,'big') for word in state)).hexdigest(),
+        'native_beyond_prefix_validated':False, 'native_audio_validated':False,
+        'scope':'Host-only constant-state projection over complete 32-byte windows; headers are not payload/CRC or later native-state validation'}, output
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('extracted_file', type=Path)
     parser.add_argument('--source-a00', type=Path, required=True)
     parser.add_argument('--samples', type=int, default=96)
+    parser.add_argument('--output-projected-aac',type=Path,
+                        help='create a new host-only complete-packet projection; never an emulation input')
+    parser.add_argument('--project-packet-limit',type=int,help='explicit output prefix; report still inventories the complete header chain')
     args = parser.parse_args(argv)
     try:
+        if args.project_packet_limit is not None and args.output_projected_aac is None:
+            raise ValueError('projection packet limit requires an explicit output path')
         source = args.source_a00.read_bytes()
         contract(source)
         result, _ = verify(args.log.read_text(), args.extracted_file.read_bytes(), args.samples)
         result['source_a00_sha256'] = hashlib.sha256(source).hexdigest()
+        if args.output_projected_aac is not None:
+            if args.output_projected_aac.resolve() in (args.log.resolve(),args.extracted_file.resolve(),args.source_a00.resolve()):
+                raise ValueError('projection output must not replace input evidence')
+            projection,payload = project_complete_windows(args.log.read_text(),args.extracted_file.read_bytes(),args.samples,args.project_packet_limit)
+            with args.output_projected_aac.open('xb') as output:
+                output.write(payload)
+            result['host_projection'] = projection
     except (OSError, KeyError, ValueError) as error:
         print(f'MU4 recording transform observation: {error}', file=sys.stderr)
         return 1

@@ -7,11 +7,11 @@ import unittest
 from unittest.mock import patch
 
 from tools import mu4_recorder_transform_check as checker
-from tools.mu4_context_contract import reference_transform_block
+from tools.mu4_context_contract import reference_recording_windows, reference_transform_block
 
 
-def fixture(alternate_state=False):
-    plain = bytes((index*13) % 256 for index in range(64))
+def fixture(alternate_state=False, plaintext=None):
+    plain = bytes((index*13) % 256 for index in range(64)) if plaintext is None else plaintext
     lines = ['mu4_native_recorder_overlay: PASS marker=aa88 records=4622 words=73766 '
              'checked_ram_words=73762 excluded_register_words=4 before_execution=1']
     encoded = bytearray()
@@ -37,6 +37,41 @@ def fixture(alternate_state=False):
 
 
 class RecorderTransformCheckTest(unittest.TestCase):
+    def test_complete_window_projection_keeps_extrapolation_and_tail_explicit(self):
+        packet = lambda n: bytes.fromhex('fff95080041ffc')+bytes((n+i)%256 for i in range(25))
+        plain = b''.join(packet(n*25) for n in range(4))
+        text,saved,_ = fixture(plaintext=plain[:64])
+        saved = saved[:-4]+reference_recording_windows(plain[64:],list(range(82)),reverse=False)+saved[-4:]
+        report,payload = checker.project_complete_windows(text,saved,2)
+        self.assertEqual(payload,plain)
+        self.assertEqual(report['captured_prefix_bytes'],64)
+        self.assertEqual(report['complete_packets'],4)
+        self.assertEqual(report['projected_window_bytes'],128)
+        self.assertEqual(report['unmodeled_tail_bytes'],4)
+        self.assertEqual(report['stop_reason'],'exact_projection_end')
+        self.assertFalse(report['native_beyond_prefix_validated'])
+        self.assertFalse(report['native_audio_validated'])
+        limited,prefix = checker.project_complete_windows(text,saved,2,3)
+        self.assertEqual(prefix,plain[:96])
+        self.assertEqual(limited['complete_packets'],4)
+        self.assertEqual(limited['output_packets'],3)
+        self.assertEqual(limited['output_bytes'],96)
+        for limit in (0,-1,5):
+            with self.assertRaises(ValueError):
+                checker.project_complete_windows(text,saved,2,limit)
+
+    def test_projection_rejects_nonconstant_or_inconsistent_prefix_and_non_aac(self):
+        text,saved,_ = fixture(True)
+        with self.assertRaises(ValueError):
+            checker.project_complete_windows(text,saved,2)
+        text,saved,_ = fixture()
+        with self.assertRaises(ValueError):
+            checker.project_complete_windows(text,saved,2)
+        changed = bytearray(saved)
+        changed[6+32+12] ^= 1
+        with self.assertRaises(ValueError):
+            checker.project_complete_windows(text,changed,2)
+
     def test_chunks_match_file_without_assumed_origin(self):
         text, saved, expected = fixture()
         report, plain = checker.verify(text,saved,2)
@@ -119,6 +154,30 @@ class RecorderTransformCheckTest(unittest.TestCase):
             with contextlib.redirect_stderr(err):
                 self.assertEqual(checker.main(argv),1)
             self.assertIn('MU4 recording transform observation:',err.getvalue())
+
+    def test_projection_cli_creates_only_a_new_explicit_output(self):
+        packet = lambda n: bytes.fromhex('fff95080041ffc')+bytes((n+i)%256 for i in range(25))
+        plain = packet(0)+packet(25)
+        text,saved,_ = fixture(plaintext=plain)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log,media,source,output = (root/name for name in ('trace.log','TEST','source.a00','host.aac'))
+            log.write_text(text)
+            media.write_bytes(saved)
+            source.write_bytes(b'unit source')
+            argv = [str(log),str(media),'--source-a00',str(source),'--samples','2',
+                    '--output-projected-aac',str(output),'--project-packet-limit','1']
+            out,err = io.StringIO(),io.StringIO()
+            with patch.object(checker,'contract',return_value={}),contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+                self.assertEqual(checker.main(argv),0)
+                self.assertEqual(checker.main(argv),1)
+                argv[argv.index('--output-projected-aac')+1] = str(media)
+                self.assertEqual(checker.main(argv),1)
+            self.assertEqual(output.read_bytes(),packet(0))
+            self.assertEqual(media.read_bytes(),saved)
+            self.assertEqual(source.read_bytes(),b'unit source')
+            self.assertEqual(log.read_text(),text)
+            self.assertEqual(json.loads(out.getvalue())['host_projection']['complete_packets'],2)
 
 
 if __name__ == '__main__':

@@ -44,6 +44,10 @@ post-transform rotation/permutation match for all 30 vectors too. Published
 window coefficients match their original descriptor recurrences. Next
 cross-check the remaining decoder paths and establish independent acceptance
 criteria for the small residual. Other media remain unvalidated.
+A host-only complete-window projection now supplies a strictly decoded
+383-packet reference prefix; its final, 384th header-delimited packet is
+rejected. This broadens reference material, not the eight-call native
+arithmetic acceptance or evidence of later native transform state.
 Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
@@ -8405,6 +8409,54 @@ FFmpeg decodes eight AAC frames at 44.1 kHz without errors, producing
 8,192 signed stereo sample frames, SHA256
 `440e479020b5e558b9aa792adc14af8bb4974f30898cba57f3189ac1434f8993`.
 The regenerated host output matches the earlier reference byte-for-byte.
+
+##### Complete-window host reference
+
+`mu4_recorder_transform_check.py --output-projected-aac PATH` can explicitly
+extend the single state from a freshly verified recording prefix across
+complete 32-byte saved-file windows. It first requires all captured states
+to agree and the inverse to reproduce captured plaintext. It never models
+a partial final window or claims that later native state was observed.
+Output is a new host-only artifact, not an emulation input; existing files
+and input evidence cannot be overwritten. Without this option the checker
+remains read-only.
+
+For the post-DST recording identified above, the unique origin is 622.
+The projection covers 143,040 bytes, with 18 final bytes left unmodeled.
+It finds 384 consecutive complete ADTS header/length records totaling
+142,849 bytes, SHA256
+`812882ea5da3fb9051a04e421922694366e580e75ae98df469936426eef1a873`.
+All headers declare MPEG-2 LC, 44.1 kHz stereo and one raw-data block.
+Another 191 projected bytes follow that chain and are not accepted as AAC.
+Header syntax alone is not payload validity: FFmpeg decodes 383 frames,
+but rejects packet 384 at byte 142,477 (nominal extent 372) with an exhausted
+data-stream element. Its permissive whole-input exit zero is not a pass.
+Partial-final-packet/container handling and later native state remain
+unresolved; do not repair the payload or assume either explanation.
+
+The explicit `--project-packet-limit 383` output contains the first
+142,477 bytes, SHA256
+`0a3091469463f5937df4be728e6edc0af087c21a06a3f8097713522cc4cb2b8e`.
+Its report still inventories all 384 header-delimited packets and labels
+the selected output prefix separately. FFmpeg with `-xerror` decodes this
+isolated prefix with no diagnostics into 392,192 stereo sample frames
+(1,568,768 bytes of signed LE16), SHA256
+`000e716c4dbe30e78d137706be5621aefb271059d343bf5ab793f1406706dfab`.
+Its first eight frames are byte-identical to the earlier 32,768-byte host
+reference. These are independent host-decoder results for a declared model
+projection, not native output acceptance beyond the captured prefix.
+
+```sh
+python3 tools/mu4_recorder_transform_check.py RECORDING_TRACE EXTRACTED_TEST \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --output-projected-aac NEW_PREFIX.aac --project-packet-limit 383
+ffmpeg -v error -xerror -i NEW_PREFIX.aac -f s16le -acodec pcm_s16le NEW_REFERENCE.s16le
+```
+
+Next extend native processing/output observation against the valid prefix
+and classify its actual termination. Do not infer a waveform offset or
+gain from first nonzero samples: guest post-conversion processing remains
+separate from the already checked decoder conversion blocks.
 It is analysis output, never media supplied back to the emulation.
 
 ```sh
