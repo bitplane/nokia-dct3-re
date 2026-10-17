@@ -7,6 +7,7 @@ No reference implementation or speech vectors are imported into MAME sources.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import struct
@@ -25,6 +26,16 @@ EXPECTED = {
     "out": (52160, "738af1ead354b8960504bd7d9656d53c1a11880051d01e79b97c276f739c187a"),
 }
 DTX_FRAMES = 518
+DTX_SID_FRAMES = (51, 71, 95, 259, 263, 287, 311, 335)
+INVALID_SID_FRAMES = (51, 95, 259, 311)
+BAD_SID_FRAMES = (95, 263)
+# TS 46.062 table 1: LTP LAG 1 bits b0/b1. Five LSF fields occupy
+# 38 bits; the following nine-bit lag ends at serial bit 46 (zero based).
+INVALID_SID_BITS = (45, 46)
+INVALID_SID_EXPECTED = {
+    'dec': 'ea9ecb8fa25d734bdcd5744362264a0a51d489682ad5bd12c16f5e9bfa45cc69',
+    'out': '272757031568500197fe395934096dfd2f53a87f0af935a66de14e7ff7cc7d8d',
+}
 ERASURE_BURSTS = ((8, 1), (32, 3), (80, 8), (120, 16))
 ERASURE_EXPECTED = {
     "dec": "ec37dbbd0f498b5e19b6e549b80687acafe03859c68ff5f337940a25dfb370d5",
@@ -147,6 +158,83 @@ def generate_dtx(source, commands, log):
     return {"profile": "noise96-speech163-noise96-speech163",
             "outputs": outputs, "coverage": coverage, "fresh_process_replay": True,
             "published_expected_vector_claim": False}
+
+
+def invalid_sid_input(decoder):
+    if len(decoder) != DTX_FRAMES * 494:
+        raise ValueError('invalid-SID source requires the complete DTX conversation')
+    frames = list(struct.iter_unpack('<247H', decoder))
+    if tuple(i for i, frame in enumerate(frames) if frame[245] == 2) != DTX_SID_FRAMES:
+        raise ValueError('invalid-SID source differs from the known valid-SID schedule')
+    for frame in frames:
+        if frame[0] > 1 or frame[245] not in (0, 2) or frame[246] > 1 or any(bit > 1 for bit in frame[1:245]):
+            raise ValueError('invalid-SID source contains invalid flags or speech bits')
+    result = bytearray(decoder)
+    for index in INVALID_SID_FRAMES:
+        if frames[index][0] or any(frames[index][1 + bit] != 1 for bit in INVALID_SID_BITS):
+            raise ValueError('invalid-SID source must have clean one-valued selected codeword bits')
+        for bit in INVALID_SID_BITS:
+            struct.pack_into('<H', result, index * 494 + 2 * (1 + bit), 0)
+        struct.pack_into('<H', result, index * 494 + 490, 1)
+    for index in BAD_SID_FRAMES:
+        if frames[index][0]:
+            raise ValueError('selected bad SID is already marked bad')
+        struct.pack_into('<H', result, index * 494, 1)
+    return bytes(result)
+
+
+def check_sid_classes(text, decoder):
+    if len(decoder) != DTX_FRAMES * 494:
+        raise ValueError('SID classifier requires all 518 complete decoder frames')
+    frames = list(struct.iter_unpack('<247H', decoder))
+    rows = text.splitlines()
+    if len(rows) != len(frames):
+        raise ValueError('SID classifier did not cover every input frame')
+    for index, (row, frame) in enumerate(zip(rows, frames)):
+        match = re.fullmatch(r'EFRSID frame=(\d+) class=([012])', row)
+        if not match or int(match[1]) != index or int(match[2]) != frame[245]:
+            raise ValueError('payload-derived SID class disagrees with the decoder input')
+
+
+def generate_invalid_sid(source, commands, log):
+    decoder = invalid_sid_input((source / 'dtx.dec').read_bytes())
+    (source / 'invalid_sid.dec').write_bytes(decoder)
+    tools = Path(__file__).resolve().parent
+    observer, rules = tools / 'etsi_efr_sid_observer.c', tools / 'etsi_efr_state_observer.mk'
+    command = ['make', '-f', 'makefile.gcc', '-f', str(rules), f'CFLAGS={CFLAGS}',
+               f'SID_OBSERVER_SOURCE={observer}', 'sid_observed']
+    commands.append(command)
+    subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    command = ['./sid_observed', 'invalid_sid.dec']
+    commands.append(command)
+    with (source / 'invalid_sid_classes.log').open('w') as classes:
+        subprocess.run(command, cwd=source, stdout=classes, stderr=log, check=True)
+    check_sid_classes((source / 'invalid_sid_classes.log').read_text(), decoder)
+    for name in ('invalid_sid.out', 'invalid_sid_replay.out'):
+        command = ['./decoder', 'invalid_sid.dec', name]
+        commands.append(command)
+        subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    pcm = (source / 'invalid_sid.out').read_bytes()
+    if len(pcm) != DTX_FRAMES * 320 or pcm != (source / 'invalid_sid_replay.out').read_bytes():
+        raise ValueError('invalid-SID decoder lacks complete fresh-process replay')
+    frames = list(struct.iter_unpack('<247H', decoder))
+    if sum(frame[245] == 1 for frame in frames) != 4 or sum(bool(frame[0]) and frame[245] == 2 for frame in frames) != 1:
+        raise ValueError('invalid-SID classification coverage differs')
+    if any(digest(data) != INVALID_SID_EXPECTED[suffix] for suffix, data in (('dec', decoder), ('out', pcm))):
+        raise ValueError('invalid-SID reference differs from its local reproducibility pin')
+    baseline = (source / 'dtx.out').read_bytes()
+    changed = sum(pcm[i:i + 320] != baseline[i:i + 320] for i in range(0, len(pcm), 320))
+    if not changed:
+        raise ValueError('invalid-SID conversation has no output effect relative to clean DTX')
+    return dict(frames=DTX_FRAMES, invalid_codewords=4, bad_valid_codewords=1,
+                classifier_matches_input=True, fresh_process_replay=True,
+                changed_frames_vs_clean_dtx=changed,
+                published_expected_vector_claim=False, observer_sha256=digest(observer.read_bytes()),
+                classifier_sha256=digest((source / 'sid_observed').read_bytes()),
+                classifier_records_sha256=digest((source / 'invalid_sid_classes.log').read_bytes()),
+                rules_sha256=digest(rules.read_bytes()),
+                outputs={suffix: dict(bytes=len(data), sha256=digest(data))
+                         for suffix, data in (('dec', decoder), ('out', pcm))})
 
 
 def digest(data):
@@ -348,6 +436,8 @@ def main():
                         help="generate repeated speech and EHF inputs for encoder reset coverage")
     parser.add_argument('--erasure-state-observer', action='store_true',
                         help='also link output-preserving erasure-state observers; requires --erasure-fixture')
+    parser.add_argument('--invalid-sid-fixture', action='store_true',
+                        help='derive a payload-classified invalid-SID DTX conversation')
     args = parser.parse_args()
     if args.erasure_state_observer and not args.erasure_fixture:
         parser.error('--erasure-state-observer requires --erasure-fixture')
@@ -383,9 +473,12 @@ def main():
                 subprocess.run(command, cwd=source, stdout=log,
                                stderr=subprocess.STDOUT, check=True)
         evidence["outputs"] = check_vectors(source)
-        if args.dtx_fixture:
+        if args.dtx_fixture or args.invalid_sid_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["dtx"] = generate_dtx(source, commands, log)
+        if args.invalid_sid_fixture:
+            with (run / 'build-and-run.log').open('a') as log:
+                evidence['invalid_sid'] = generate_invalid_sid(source, commands, log)
         if args.erasure_fixture:
             with (run / "build-and-run.log").open("a") as log:
                 evidence["erasures"] = generate_erasures(source, commands, log)
@@ -415,6 +508,10 @@ def main():
                 for suffix in ("dec", "out"):
                     name = f"erasure.{suffix}"
                     (args.fixture_dir / name).write_bytes((source / name).read_bytes())
+            if args.invalid_sid_fixture:
+                for suffix in ('dec', 'out'):
+                    name = f'invalid_sid.{suffix}'
+                    (args.fixture_dir / name).write_bytes((source / name).read_bytes())
             if args.homing_fixture:
                 for suffix in ("dec", "out"):
                     name = f"homing.{suffix}"
@@ -435,6 +532,8 @@ def main():
         print("ETSI EFR DTX reference: PASS frames=518 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     if args.erasure_fixture:
         print("ETSI EFR erasure reference: PASS frames=163 erased=28 bursts=1,3,8,16 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
+    if args.invalid_sid_fixture:
+        print('ETSI EFR invalid-SID reference: PASS frames=518 invalid_codewords=4 bad_valid_codewords=1 payload_classification=1 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0')
     if args.homing_fixture:
         print("ETSI EFR homing reference: PASS frames=46 homing=6 repeated_speech=20 fresh_process_replay=1 published_vector_claim=0 native_dsp_claim=0")
     if args.encoder_homing_fixture:

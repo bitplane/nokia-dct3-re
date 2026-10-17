@@ -53,6 +53,22 @@ class Rom4HelperResultTest(unittest.TestCase):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
                 check_result(invalid, 3, efr_homing_decoder=True)
 
+    def test_efr_invalid_sid_requires_every_frame_control_scope_and_replay(self):
+        from tools.run_c54x_rom4_crc import EFR_INVALID_SID_PASS, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_COMPLETE
+        frames = '\n'.join(f'ROM4 EFR invalid SID decoder comparison: frame={frame} mismatches=0' for frame in range(518))
+        text = '\n'.join((frames, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE))
+        check_result(text, 3, efr_invalid_sid=True)
+        check_result(text + '\nAverage speed: 1234.56% (20 seconds)', 3, efr_invalid_sid=True)
+        for bad in (text.replace('frame=517 mismatches=0', 'frame=517 mismatches=1'),
+                    text.replace('frame=517 mismatches=0', 'frame=0 mismatches=0'),
+                    text.replace('control_checked=518', 'control_checked=0'),
+                    text.replace('invalid_codewords=4', 'invalid_codewords=0'),
+                    text.replace('bad_valid_codewords=1', 'bad_valid_codewords=0'),
+                    text.replace('ram_words=65440', 'ram_words=160'),
+                    text.replace(EFR_INVALID_SID_REPLAY, ''), text + '\ntrailer'):
+            with self.subTest(bad=bad[-200:]), self.assertRaises(ValueError):
+                check_result(bad, 3, efr_invalid_sid=True)
+
     def test_efr_erasure_decoder_completion(self):
         frames = "\n".join(f"ROM4 EFR erasure decoder comparison: frame={frame} mismatches=0" for frame in range(163))
         text = "\n".join((frames, EFR_ERASURE_REPLAY, EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE))

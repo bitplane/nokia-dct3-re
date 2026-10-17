@@ -17,7 +17,8 @@ Current native scope is split deliberately:
 
 - [Isolated codec gates](#independent-efr-speech-reference) establish FR/EFR
   algorithm results; EFR additionally has nonzero DTX and clean encoder/decoder
-  homing coverage. The active-speech recovery precision/policy difference remains a
+  homing coverage, plus a separately payload-classified invalid-SID conversation.
+  The active-speech recovery precision/policy difference remains a
   separate strict comparison, not a reason to alter CPU arithmetic.
 - [BSP ownership and pin gates](#serial-control-ownership-correction) cover
   externally clocked burst and continuous FIG=0/1 reception/transmission,
@@ -2319,10 +2320,50 @@ tests, not physical pipeline timing validation or exhaustive compositions with
 I/O stalls, interrupts, repeats and delayed transfers.
 
 These gates target this software conversation only. The unusable frames
-occur during comfort-noise intervals; active-speech erasure bursts, invalid SID
-classification and homing/error combinations remain separate acceptance work.
+occur during comfort-noise intervals; active-speech recovery equality and
+homing/error combinations remain separate. Invalid-SID decoder coverage is
+bounded by the additional fixture below, not inherited from this clean profile.
 No RF scheduling, handset PCM clock, organic native speech transport or
 end-to-end calling follows from the result.
+
+### Native EFR invalid SID input
+
+`make check-c54x-rom4-efr-invalid-sid` derives a fixed 518-frame conversation
+from the verified DTX profile. It corrupts just LTP LAG 1 bits b0/b1 at
+zero-based serial positions 45/46 in SID frames 51, 95, 259 and 311.
+Those positions belong to the SID codeword in
+[TS 46.062 table 1](https://www.etsi.org/deliver/etsi_ts/146000_146099/146062/19.00.00_60/ts_146062v190000p.pdf).
+Two codeword errors give SID=1 under the classification in
+[TS 46.081 section 6.1.1](https://www.etsi.org/deliver/etsi_ts/146000_146099/146081/19.00.00_60/ts_146081v190000p.pdf),
+also independently checked by the acquired reference's original classifier.
+No classifier implementation or 95-entry table is imported.
+
+The original TAF and all other payload bits remain unchanged. BFI is additionally
+set at 95 and 263, providing both a bad SID=1 codeword and an uncorrupted
+SID=2 codeword with a bad-frame indication. The latter is not a valid received
+SID frame. There are four SID=1 frames, one bad SID=2 frame, three good SID=2
+frames and 137 BFI-marked frames overall. The reference's usual `ed_iface`
+rejects SID=1 rather than modeling channel errors; the separate read-only
+classifier probe therefore validates every derived decoder-entry flag directly.
+
+The installation-verified reference reproduces the generated input/output in
+fresh decoder processes. Local research pins are:
+
+| Derived input | SHA-256 |
+| --- | --- |
+| `invalid_sid.dec` | `ea9ecb8fa25d734bdcd5744362264a0a51d489682ad5bd12c16f5e9bfa45cc69` |
+| `invalid_sid.out` | `272757031568500197fe395934096dfd2f53a87f0af935a66de14e7ff7cc7d8d` |
+
+Original native `c941`/`c8dc` match all 82,880 PCM samples and replay all
+65,440 ordinary RAM words per frame. Every frame independently checks the
+original RX-invalid-SID bit at `09c0`: it is set for the five invalid received
+SID events and clear elsewhere. Output differs from clean DTX in 101 frames,
+so the input changes are not merely accepted and ignored.
+
+This is bounded decoder-entry coverage with independently classified input,
+not native RF SID detection, all corruption patterns, homing/error combinations,
+published conformance vectors or handset speech transport. No CPU, codec state,
+production clock or reference PCM was altered to obtain agreement.
 
 ### Native EFR active-speech erasures
 
@@ -2348,8 +2389,8 @@ The strict native gate uses unchanged `c941` reset and `c8dc` decoding, retains
 histories between frames, and requires every PCM sample plus full ordinary-RAM
 save/replay for every frame. It rejects the partial result rather than
 rebasing expected output on native execution. A separate observation fixture
-below characterizes every burst without weakening this gate. Invalid SID,
-homing/error combinations, RF scheduling and handset speech transport remain
+below characterizes every burst without weakening this gate. Broader invalid-SID
+patterns, homing/error combinations, RF scheduling and handset speech transport remain
 separate boundaries.
 
 Passive native observations and external link-time observers separate this
