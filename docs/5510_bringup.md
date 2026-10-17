@@ -72,10 +72,10 @@ domains exclude short preincrement, without substituting duplicate legal cases:
 The LDU/shift-16/variable-load and DLD banks preserve raw case IDs and skip
 only the invalid form; their totals count admitted cases, not raw ID ranges.
 These totals certify removal of the forbidden read encoding, not every input
-domain: older nonzero-BK circular cases still need the documented buffer/step
-constraints audited independently. In particular, the shared arithmetic
-generator includes large signed offsets, and the DLD generator includes
-`f495` as a circular offset; modulo expectations alone are not silicon evidence.
+domain: the shared arithmetic generator still includes oversized signed/index
+steps with nonzero BK. The paired DST/DLD domains are now corrected and
+guarded as described [below](#paired-circular-fixture-domains); other families
+still need independent audit. Modulo expectations alone are not silicon evidence.
 The TS-load bank reindexes its 17-form Cartesian domain. Long MOD=13 remains
 admitted. Atomic `LD/LDU/LD TS/LDR/LD shift-16/DLD` reject short MOD=3 before
 operand access. Staged load classifiers reject it; `6fxx` LD rejects only after
@@ -793,6 +793,42 @@ that RCD is the next required instruction: the acquired aa88 record marks
 program spans. Debugger history records logical Execute PCs, but disassembles
 current raw program memory; apply the established OVLY projection separately
 for common-window instruction bytes.
+
+### Paired Circular Fixture Domains
+
+[SPRU131G section 5.5.3.4](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+printed page 5-16, requires a base aligned to the smallest `2^N` strictly
+larger than BK, an initial index inside the queue, and a step magnitude no
+greater than BK. The old paired generator used BK=16 with offset `f495`
+(-2923), and with AR0 self-index steps around 4103. Those inputs were
+modulo-model stress cases, not documented nonzero-BK hardware-domain cases.
+
+The paired generator now carries its initial pointer and BK explicitly.
+Long circular forms use initial `4007`, BK=8192 and aligned base `4000`;
+the same opcode-shaped negative offset exercises a legal wrap to `549c`.
+Short circular AR0 self-index forms use BK=8192 so the pointer-derived step
+fits the buffer; other short circular forms retain BK=16. An independent
+modulo oracle first checks the documented domain, stopping on invalid
+fixture inputs rather than asserting a silicon trap. Fourteen host-side
+guard controls cover invalid size/step/index combinations, signed wrap and
+power-of-two mask boundaries; they are not executed DSP instructions.
+BK=0 behavior and physical memory-bank/timing details are outside this pass.
+
+The existing `indirect-dld` profile now requires the guard, 3,072 extended
+DST cases, 9,216 short-indirect DST cases, 1,152 store/DLD composition cases
+and 23,040 DLD cases. Case IDs, instruction-shaped literals, save/restore
+and bus-access assertions are retained; no invalid case is replaced by a
+duplicate legal tuple. The full paired run passes, as does the neighboring
+9,728-case short-MOD3 load exclusion bank. CPU emulation code is unchanged.
+
+```sh
+python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --output-root tmp/c54x-paired-circular --profile indirect-dld
+```
+
+Remaining: apply the same domain discipline to shared arithmetic/load,
+multiply/T-load, long BANZ and other older generators. Their existing
+modulo results are not upgraded to hardware legality by this paired result.
 
 ### Signed circular memory loads
 

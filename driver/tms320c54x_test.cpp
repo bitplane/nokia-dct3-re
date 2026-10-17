@@ -6597,7 +6597,48 @@ private:
 		u16 literal, address, next_ar;
 		u64 value;
 		u32 stored;
+		u16 initial, bk;
 	};
+	static unsigned circular_fixture_mask(u16 bk)
+	{
+		unsigned mask = 1;
+		while (mask < bk) mask = (mask << 1) | 1;
+		return mask;
+	}
+	static bool circular_fixture_domain(u16 initial, int step, u16 bk)
+	{
+		return bk && (initial & circular_fixture_mask(bk)) < bk && step >= -int(bk) && step <= int(bk);
+	}
+	static u16 circular_fixture_next(u16 initial, int step, u16 bk)
+	{
+		// SPRU131G 5.5.3.4: modulo is an oracle only inside the documented nonzero-BK domain.
+		if (!circular_fixture_domain(initial, step, bk))
+			throw emu_fatalerror(1, "Circular fixture outside documented domain: AR=%04x step=%d BK=%u", initial, step, bk);
+		unsigned const mask = circular_fixture_mask(bk);
+		int const index = (int(initial & mask) + step) % int(bk);
+		return (initial & ~mask) | (index < 0 ? index + bk : index);
+	}
+	void verify_paired_circular_domain()
+	{
+		struct guard_case { u16 initial, bk; int step; bool legal; u16 next; };
+		static constexpr guard_case cases[] = {
+			{0x1007,16,-2923,false,0}, {0x4007,8192,-2923,true,0x549c},
+			{0x1007,16,4103,false,0}, {0x1007,8192,4103,true,0x000e},
+			{0x1007,8192,-4103,true,0}, {0x5007,16,32767,false,0},
+			{0x5007,32768,32767,true,0x5006}, {0x5007,32768,-32768,true,0x5007},
+			{0x0010,16,1,false,0}, {0x001f,31,-1,false,0},
+			{0x000f,16,1,true,0}, {0,16,-1,true,15},
+			{0x001e,31,1,true,0}, {0x1007,0,0,false,0},
+		};
+		for (auto const &f : cases)
+		{
+			expect(circular_fixture_domain(f.initial, f.step, f.bk) == f.legal,
+				"Circular fixture guard distinguishes legal steps/indices from modulo-only stress inputs");
+			if (f.legal) expect(circular_fixture_next(f.initial, f.step, f.bk) == f.next,
+				"Circular fixture oracle covers signed wrap and the strict power-of-two base mask");
+		}
+		osd_printf_info("TMS320C54x paired circular fixture guard: PASS cases=14 nonzero_bk_domain=SPRU131G_5.5.3.4 cpu_execution=0\n");
+	}
 	static dst_extended_fixture extended_dst_fixture(unsigned variant)
 	{
 		if (variant >= 3072)
@@ -6607,32 +6648,35 @@ private:
 			bool const compatibility = (v / 768) % 2, sst = (v / 1536) % 2;
 			unsigned const selected = compatibility && !reg ? 3 : reg;
 			u16 const initial = 0x1007 + (pattern & 1), index = selected ? 3 : initial;
+			u16 const bk = !selected && (mode == 9 || mode == 11) ? 8192 : 16;
 			auto reverse = [](u16 word) { u16 result = 0; for (unsigned i = 0; i < 16; ++i) result |= ((word >> i) & 1) << (15 - i); return result; };
 			int const delta = mode == 1 || mode == 8 ? -2 : mode == 2 || mode == 3 || mode == 10 ? 2 : mode == 5 || mode == 9 ? -int(index) : int(index);
 			u16 next = initial;
 			if (mode == 4 || mode == 7) next = reverse(u16(reverse(initial) + (mode == 4 ? -int(reverse(index)) : int(reverse(index)))));
-			else if (mode >= 8) { int const slot = (int(initial & 15) + delta) % 16; next = (initial & ~15) + (slot < 0 ? slot + 16 : slot); }
+			else if (mode >= 8) next = circular_fixture_next(initial, delta, bk);
 			else if (mode) next = initial + delta;
 			u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
 			s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
 			u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
-			return {reg, selected, source, 4 + mode, initial, u16(mode == 3 ? next : initial), next, value, stored};
+			return {reg, selected, source, 4 + mode, initial, u16(mode == 3 ? next : initial), next, value, stored, initial, bk};
 		}
 		unsigned const reg = variant % 8, source = (variant / 8) % 2, kind = (variant / 16) % 4, pattern = (variant / 64) % 4;
 		bool const compatibility = (variant / 256) % 2, sst = (variant / 512) % 2;
 		unsigned const selected = compatibility && !reg ? 3 : reg;
 		s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[pattern];
-		u16 const linear = u16(0x1007 + offset);
-		int const index = (7 + offset) % 16;
-		u16 const address = kind == 2 ? 0x1000 + (index < 0 ? index + 16 : index) : linear;
+		// Preserve the opcode-shaped offset with a legal negative wrap, not repeated BK=16 wrapping.
+		u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
+		u16 const linear = u16(initial + offset);
+		u16 const address = kind == 2 ? circular_fixture_next(initial, offset, bk) : linear;
 		u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
 		s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
 		u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
 		return {reg, selected, source, kind, kind == 3 ? address : u16(offset), address,
-			u16(kind == 1 || kind == 2 ? address : 0x1007), value, stored};
+			u16(kind == 1 || kind == 2 ? address : initial), value, stored, initial, bk};
 	}
 	void start_pipeline_extended_dst(unsigned variant = 0)
 	{
+		if (!variant) verify_paired_circular_domain();
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = extended_dst_fixture(variant);
 		bool const short_form = variant >= 3072;
@@ -6650,8 +6694,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : f.value);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? f.value : 0xdead);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, short_form ? f.literal : 0x1007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
@@ -8276,8 +8320,8 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6608);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5));
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, form < 12 ? f.literal : 0x1007);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1111222233ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x4444555566ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(f.address, f.stored >> 16); m_cpu->space(AS_DATA).write_word(f.address ^ 1, f.stored);
@@ -15641,7 +15685,7 @@ private:
 		if (!strcmp(machine().options().bios(), "shifted-alu")) { start_pipeline_shifted_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "indirect-load")) { start_pipeline_indirect_case(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-shift16")) { start_pipeline_offset_load(12672); return; }
-		if (!strcmp(machine().options().bios(), "indirect-dld")) { start_shifted_store_dld(); return; }
+		if (!strcmp(machine().options().bios(), "indirect-dld")) { start_pipeline_extended_dst(); return; }
 		if (!strcmp(machine().options().bios(), "load-variable")) { start_pipeline_offset_load(127872); return; }
 		if (!strcmp(machine().options().bios(), "rpt-subc-st")) { start_pipeline_memory_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-t-imm") || !strcmp(machine().options().bios(), "mac-t-imm")) { start_pipeline_immediate_multiply(); return; }
@@ -39555,6 +39599,7 @@ private:
 				if (variant < 12287) { start_pipeline_extended_dst(variant + 1); return; }
 				osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 				osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "indirect-dld")) { start_shifted_store_dld(); return; }
 				start_pipeline_accumulator_logic(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

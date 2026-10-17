@@ -14,6 +14,20 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_paired_memory_profile_requires_store_load_and_domain_guard_evidence(self):
+        markers, ending = EXTRA_PROFILES['indirect-dld']
+        self.assertEqual(len(markers), 5)
+        output = '\n'.join((*markers, ending)) + '\n'
+        check_result(output, 3, profile='indirect-dld')
+        for marker in markers:
+            for changed in (output.replace(marker, ''), marker+'\n'+output):
+                with self.subTest(marker=marker), self.assertRaises(ValueError):
+                    check_result(changed, 3, profile='indirect-dld')
+        for before, after in (('nonzero_bk_domain=SPRU131G_5.5.3.4', 'nonzero_bk_domain=unvalidated'),
+                              ('cases=23040', 'cases=24576'), ('restore=3072', 'restore=0')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(output.replace(before, after), 3, profile='indirect-dld')
+
     def test_mmr_push_mod3_scope(self):
         markers, ending = EXTRA_PROFILES['stack-mod3-edge']
         output = '\n'.join((*markers, ending)) + '\n'
