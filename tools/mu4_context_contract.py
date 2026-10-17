@@ -20,6 +20,8 @@ BIT_WINDOW_BASE = 0x2510C
 NIBBLE_BASE = 0x2C62B
 BYTE_COUNT_BASE = 0x2AB09
 ESCAPE_STORE_BASE = 0x3BDB6
+POLY_CALLER_BASE = 0x260B3
+POLY_CALLER_WITNESS = (0x30f8,0x1170,0x7712,0xc22a,0x4492,0x4592,0xec02,0x3692,0x4ef8,0x1174)
 ESCAPE_STORE_WITNESS = (0x1106,0x08f8,0x000b,0xf843,0xbdd2,0xf640,0x10f8,0x0008,0x4e0a,0x560a,0x7002,0x0011,0x4e00)
 BYTE_COUNT_WITNESS = (0x10e1,5,0xf010,1,0x7102,0x0011,0x4808,0xf47d,0xf000,1,0x4808,0x4ee1,6)
 SERVICE_GATE_BASE = 0x204C1
@@ -195,6 +197,75 @@ def decode_escape_store_prefix(words):
     return {'entry': '03bdb6', 'last_word': '03bdc2', 'pinned_words': 13,
             'dependency': 'DST A,*SP(a) followed by DLD *SP(a),A',
             'scope': 'Original source prefix; execution and pending-write bypass require the isolated CPU fixture'}
+
+
+def decode_poly_caller(words):
+    if any(words.get(POLY_CALLER_BASE + offset) != word for offset, word in enumerate(POLY_CALLER_WITNESS)):
+        raise ValueError('AA99 polynomial caller changed or absent')
+    return {'entry': '0260b3', 'last_word': '0260bc', 'pinned_words': 10,
+            'sequence': 'LD 1170,T; STM c22a,AR2; LD *AR2+,16,A; LD *AR2+,16,B; RPT #2; POLY *AR2+; DST A,1174',
+            'scope': 'Original sequential source, not proof of dynamic predecessor execution or complete decoder validity'}
+
+
+def reference_poly_step(a, b, t, coefficient, st1):
+    if not (0 <= a < 1 << 40 and 0 <= b < 1 << 40 and
+            all(0 <= value <= 0xffff for value in (t, coefficient, st1))):
+        raise ValueError('POLY operand outside word/accumulator domain')
+    high = (a >> 16) & 0x1ffff
+    if high & 0x10000:
+        high -= 0x20000
+    signed_t = t - 0x10000 if t & 0x8000 else t
+    signed_b = b - (1 << 40) if b & (1 << 39) else b
+    result = ((high * signed_t * (2 if st1 & 0x40 else 1) + signed_b + 0x8000) // 0x10000) * 0x10000
+    overflow = not -0x80000000 <= result <= 0x7fffffff
+    if overflow and st1 & 0x200:
+        result = max(-0x80000000, min(0x7fffffff, result))
+    if coefficient & 0x8000 and st1 & 0x100:
+        coefficient -= 0x10000
+    return result & ((1 << 40)-1), (coefficient * 0x10000) & ((1 << 40)-1), overflow
+
+
+def playback_poly_observation(text):
+    rows = []
+    for line in text.splitlines():
+        if 'mu4_playback_poly_bus:' not in line:
+            continue
+        pairs = [token.split('=',1) for token in line.split('mu4_playback_poly_bus:',1)[1].split()]
+        if any(len(pair) != 2 for pair in pairs) or len(dict(pairs)) != len(pairs):
+            raise ValueError('malformed polynomial bus record')
+        rows.append(dict(pairs))
+    keys = {'kind','address','value','ordinal','st0','st1','pmst','t','context_pc','boundary','ownership','observer_writes'}
+    if any(set(row) != keys for row in rows):
+        raise ValueError('polynomial bus record fields changed')
+    if len(rows) != 8 or [(r['kind'],r['address']) for r in rows] != (
+            [('read',f'{a:04x}') for a in (0x1170,0xc22a,0xc22b,0xc22c,0xc22d,0xc22e)] +
+            [('write','1174'),('write','1175')]):
+        raise ValueError('polynomial bus footprint incomplete or reordered')
+    if [row['ordinal'] for row in rows] != ['1','2','3','4','5','6','1','2']:
+        raise ValueError('polynomial bus ordinals changed')
+    words = [int(r['value'],16) for r in rows]
+    st1, pmst = int(rows[0]['st1'],16), int(rows[0]['pmst'],16)
+    if not 0 <= st1 <= 0xffff or not 0 <= pmst <= 0xffff or pmst & 2 or any(not 0 <= word <= 0xffff for word in words):
+        raise ValueError('polynomial observation outside admitted SMUL-clear/word domain')
+    times = [float(r['t']) for r in rows]
+    if times != sorted(set(times)) or not 0.9 <= times[0] < times[-1] <= 1.2:
+        raise ValueError('polynomial bus timestamps outside ordered scope')
+    for row in rows:
+        if (row['boundary'] != 'data_bus' or row['ownership'] != 'unvalidated' or row['observer_writes'] != '0' or
+                int(row['st1'],16) != st1 or int(row['pmst'],16) != pmst or
+                not 0x260a0 <= int(row['context_pc'],16) <= 0x260d0):
+            raise ValueError('polynomial observation identity/configuration changed')
+    def extended(word):
+        return ((word - 0x10000 if word & 0x8000 and st1 & 0x100 else word) * 0x10000) & ((1 << 40)-1)
+    a, b = extended(words[1]), extended(words[2])
+    for coefficient in words[3:6]:
+        a, b, _ = reference_poly_step(a,b,words[0],coefficient,st1)
+    actual = (words[6] << 16) | words[7]
+    if actual != a & 0xffffffff:
+        raise ValueError('native polynomial store disagrees with captured inputs')
+    return {'coefficient_reads':5, 'steps':3, 'result':f'{actual:08x}',
+            'scalar_match':True, 'native_audio_validated':False,
+            'scope':'Actual bus reads/stores and pinned caller; live PC is context, not retained ownership or retirement proof'}
 
 
 def reference_byte_count(bits):
@@ -1163,6 +1234,7 @@ def contract(source):
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)
     result['byte_count_prefix'] = decode_byte_count_prefix(rel_words)
+    result['playback_polynomial_caller'] = decode_poly_caller(rel_words)
     result['processing_latch_gate'] = decode_service_gate(rel_words)
     result['post_publication_flag_branch'] = decode_post_flag_branch(rel_words)
     result['post_flag_context'] = decode_flag_context(rel_words)
@@ -1189,11 +1261,15 @@ def main():
     parser.add_argument('source', type=Path)
     parser.add_argument('--recording-header-log', type=Path,
                         help='check the bounded first-eight-header argument observation')
+    parser.add_argument('--playback-poly-log', type=Path,
+                        help='check one bounded native three-step polynomial bus observation')
     args = parser.parse_args()
     try:
         result = contract(args.source.read_bytes())
         if args.recording_header_log:
             result['recording_header_observation'] = recording_header_observations(args.recording_header_log.read_text())
+        if args.playback_poly_log:
+            result['playback_polynomial_observation'] = playback_poly_observation(args.playback_poly_log.read_text())
     except (OSError, ValueError) as error:
         print(f'MU4 context contract: {error}', file=sys.stderr)
         return 1

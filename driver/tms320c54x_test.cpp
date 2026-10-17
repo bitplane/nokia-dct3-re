@@ -13821,6 +13821,72 @@ private:
 		f.base = bk && (variant / 16384) % 2 ? 0x20000 : 0;
 		return f;
 	}
+	struct poly_fixture
+	{
+		unsigned form, iterations, checkpoint;
+		u32 base;
+		u16 st0, st1, t;
+		u64 a, b;
+	};
+	static poly_fixture poly_case(unsigned variant)
+	{
+		unsigned const form = variant % 3, pattern = (variant / 3) % 8, flags = (variant / 24) % 8, repeat = (variant / 192) % 3;
+		return {form, repeat == 2 ? 3U : 1U, std::array<unsigned, 4>{4,6,8,12}[variant / 1152],
+			u32((variant / 576) % 2 ? 0x20000 : 0),
+			u16(0x1a30 | (pattern & 1 ? 0x0400 : 0)),
+			u16(0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0)),
+			std::array<u16,8>{0,1,0x5678,0x8000,0xffff,0x7fff,0x8000,0x1234}[pattern],
+			std::array<u64,8>{0,0x12340000,0x12340000,0x0080000000,0x0180000000,0xff80000000,0xff00000000,0x7fffffffff}[pattern],
+			std::array<u64,8>{0,0x8000,0x10000,0x7fffffff,0xff80000000,0x7fff8000,0xffffffffff,0x7fffffffff}[pattern]};
+	}
+	static u16 poly_memory(unsigned ordinal) { return std::array<u16,3>{0x8000,0xffff,0x1234}[ordinal]; }
+	static std::array<u64,3> poly_reference(poly_fixture const &f)
+	{
+		u64 a = f.a, b = f.b; u16 st0 = f.st0;
+		for (unsigned i = 0; i < f.iterations; ++i)
+		{
+			s64 high = (a >> 16) & 0x1ffff; if (high & 0x10000) high -= 0x20000;
+			s64 old_b = b; if (b & 0x8000000000ULL) old_b -= 0x10000000000LL;
+			s64 result = high * s16(f.t) * (BIT(f.st1,6) ? 2 : 1) + old_b + 0x8000;
+			result = (result >> 16) * 0x10000;
+			if (result < -0x80000000LL || result > 0x7fffffffLL)
+			{
+				st0 |= 0x400;
+				if (BIT(f.st1,9)) result = result < 0 ? -0x80000000LL : 0x7fffffffLL;
+			}
+			a = u64(result) & 0xffffffffffULL;
+			u16 const memory = poly_memory(f.form == 2 ? i : 0);
+			s64 const coefficient = BIT(f.st1,8) ? s16(memory) : s64(memory);
+			b = u64(coefficient * 0x10000) & 0xffffffffffULL;
+		}
+		return {a,b,st0};
+	}
+	void start_poly(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = poly_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 64; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		unsigned const repeat = (variant / 192) % 3;
+		program.write_word(f.base + 0x600, repeat ? 0xec00 | (f.iterations - 1) : 0xf495);
+		program.write_word(f.base + 0x601, 0x3600 | std::array<u16,3>{0,0x82,0x92}[f.form]);
+		program.write_word(f.base + 0x602, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T,f.t); m_cpu->set_state_int(tms320c54x_device::STATE_AR2,0x1800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0);
+		m_cpu->set_input_line(0,CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI,CLEAR_LINE);
+		for (unsigned i = 0; i < 3; ++i) data.write_word(0x1800+i,poly_memory(i));
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"poly_source",[this,f](offs_t at,u16 &word,u16)
+		{
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = f.form == 2 ? m_pipeline_operand_reads : 0;
+			expect(m_pipeline_operand_reads < f.iterations && at == 0x1800+i && word == poly_memory(i),"POLY owns one ordered coefficient read per iteration"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"poly_no_write",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false,"POLY must not write data memory"); } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 399980;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	void start_mac_smem(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -43319,6 +43385,34 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253720) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253710; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 399980)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = poly_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"POLY is admitted by the staged frontend");
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads,m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,"Save POLY operand and repeated arithmetic progress");
+			}
+			if (tick == 48)
+			{
+				auto const expected = poly_reference(f);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2],"POLY uses signed 17-bit A high, old B, rounding, saturation and coefficient extension");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1800+(f.form == 2 ? f.iterations : 0),"POLY preserves T/status and updates its coefficient pointer once");
+				expect(m_pipeline_operand_reads == f.iterations && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"POLY completes exact iterations and reaches the following IDLE");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE,"Replay POLY without duplicate coefficient reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase = 399990; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 4607) { start_poly(variant+1); return; }
+				osd_printf_info("TMS320C54x staged POLY: PASS cases=4608 restore=4608 forms=direct,indirect,postincrement patterns=8 flags=8 repeat=none,0,2 pages=2 snapshots=4 coefficient_reads=iterations data_writes=0 mapped_acceptance=0 extended_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
+				throw emu_fatalerror(0,"TMS320C54x isolated MAC/MAS complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if (m_phase == 399990) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 399980; m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == 253690)
 		{
 			bool const bk = !strcmp(machine().options().bios(), "mac-bk");
@@ -43347,7 +43441,7 @@ private:
 				if (variant < (bk ? 98303 : 73727)) { start_mac_smem(variant + 1); return; }
 				if (bk) { osd_printf_info("TMS320C54x staged BK MAC/MAS: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=direct,absolute pairs=64 flags=16 pages=2 snapshots=3 source_reads=1 data_writes=0 bk_retained=1 t_retained=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated BK MAC/MAS complete"); }
 				osd_printf_info("TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated MAC/MAS complete");
+				start_poly(); return;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}

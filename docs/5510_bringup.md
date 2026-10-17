@@ -11,17 +11,18 @@ streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions, but native playback remains silent.
-The current software frontier is [recorded payload generation](#recording-header-and-selected-windows):
-96 pre-transform chunks and native block outputs account for 3,072 saved
-bytes, with one state and a cursor advancing by 32. The host decoder accepts
-one frame and rejects seven directly from the captured plaintext, not just
-an inverse-model derivative. Compare bit-writer inputs with that plaintext
-to distinguish packing errors from incorrect encoder fields. Native playback
-remains silent; do not force decoder success.
-The earlier seven-word initializer discrepancy is corrected and fresh
-recording remains byte-identical. Continue without forcing counters, keys,
-lengths or file offsets. These bench results do not establish whole-handset
-boot, decoded music, analog audio or native speech.
+The current software frontier is native decoder instruction support:
+`3882` at `0260d8` stops the fail-closed staged core after the original
+three-step polynomial routine. Corrected pending-double-store forwarding
+removes the observed overwide encoder fields. Fresh transform observations
+account for 3,072 saved bytes; their first eight packets host-decode as
+eight frames with zero errors. This is captured native encoder output,
+not native decoder PCM. `POLY *AR2+` now executes three times and stores
+`68a90000`, independently reproduced from actual coefficient/T reads.
+See [recorded payload contracts](#recording-header-and-selected-windows).
+Continue without forcing counters, keys, lengths or file offsets. These
+bench results do not establish whole-handset boot, decoded music, analog
+audio or native speech.
 
 CPU admission remains fail-closed. In particular, short Smem MOD=3
 preincrement is write-only (SPRU131G table 5-4). The
@@ -7618,11 +7619,32 @@ FFmpeg decodes its first 2,977 bytes as eight packets/eight frames,
 the DST correction. This is host validation of captured native encoder
 output, not native decoder or analog audio acceptance. Reusing a prior
 run's transform state fails and is not a valid substitute for fresh capture.
-Native cold playback takes the processing body on its first invocation,
-then stops at unsupported staged word `3692` at `0260ba` (present in the
-original AA99 upload). Its 20-second terminal observation has illegal=1
-and zero nonzero DMA/TX/DIN samples; strict playback checks fail. Verify the
-preceding control transfer and instruction contract before extending support.
+Native cold playback takes the processing body on its first invocation.
+The original `0260b3..0260bc` caller loads T from `1170`, initializes A/B
+from the first two coefficients at `c22a`, repeats `POLY *AR2+` three times
+and stores A to `1174`. Ten source words are pinned by
+`mu4_context_contract.py`; mutation tests reject every changed source word.
+[TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), page 4-126,
+defines POLY: A receives rounded signed A(32..16) times T plus old B;
+B receives the coefficient shifted 16, with SXM extension. T is unchanged.
+The staged path captures memory/T in Read and shares arithmetic with the
+atomic path. Short direct/indirect forms and pipelined RPT are admitted;
+mapped/peripheral sources, extended forms and control-delay composition
+remain excluded. SMUL-set behavior and interrupt composition are unvalidated.
+The `mac-smem` profile now also requires 4,608 POLY cases/restores over
+three addressing forms, eight input patterns, FRCT/SXM/OVM combinations,
+no repeat/RPT #0/RPT #2, two pages and four snapshots. Tests preserve T,
+unrelated status and exact coefficient-read/pointer counts. POLY must remain
+excluded from generic Smem-special T publication: reading its coefficient
+does not write T.
+
+`mu4_playback_poly_observe.lua` captures actual reads of `1170=4600` and
+`c22a..c22e={1282,be62,76db,3842,0000}`, then actual stores
+`1174=68a9,1175=0000`. The source-contract tool independently computes
+all three steps and matches `68a90000`. Live PC is context only, not
+retained operand ownership or retirement proof. The 20-second playback
+observation now stops at unsupported `3882` at `0260d8`, still with illegal=1
+and zero nonzero DMA/TX/DIN samples; strict playback acceptance remains failing.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

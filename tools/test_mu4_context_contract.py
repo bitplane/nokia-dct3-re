@@ -31,6 +31,8 @@ from tools.mu4_context_contract import decode_recording_prefix_transform
 from tools.mu4_context_contract import decode_transform_copy
 from tools.mu4_context_contract import BYTE_COUNT_BASE, BYTE_COUNT_WITNESS, decode_byte_count_prefix, reference_byte_count
 from tools.mu4_context_contract import ESCAPE_STORE_BASE, ESCAPE_STORE_WITNESS, decode_escape_store_prefix
+from tools.mu4_context_contract import POLY_CALLER_BASE, POLY_CALLER_WITNESS, decode_poly_caller
+from tools.mu4_context_contract import reference_poly_step, playback_poly_observation
 from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, decode_service_gate
 from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
 from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
@@ -199,6 +201,51 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_escape_store_prefix(changed)
+
+    def test_original_poly_caller_source_is_pinned(self):
+        words = dict(enumerate(POLY_CALLER_WITNESS, POLY_CALLER_BASE))
+        self.assertEqual(decode_poly_caller(words)['pinned_words'], 10)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_poly_caller(changed)
+
+    def test_poly_manual_example_and_signed_high17(self):
+        self.assertEqual(reference_poly_step(0x12340000,0x10000,0x5678,0x2000,0), (0x06270000,0x20000000,False))
+        self.assertEqual(reference_poly_step(0x80000000,0,1,0xffff,0x100), (0x10000,0xffffff0000,False))
+        self.assertEqual(reference_poly_step(0x80000000,0,0x7fff,0x8000,0x340), (0x7fff0000,0xff80000000,False))
+        self.assertEqual(reference_poly_step(0x80000000,0x7fffffff,0x7fff,0,0x240)[0],0x7fffffff)
+        with self.assertRaises(ValueError):
+            reference_poly_step(1<<40,0,0,0,0)
+
+    @staticmethod
+    def poly_bus_fixture():
+        values = (0x4600,0x1282,0xbe62,0x76db,0x3842,0,0x68a9,0)
+        addresses = (0x1170,0xc22a,0xc22b,0xc22c,0xc22d,0xc22e,0x1174,0x1175)
+        return '\n'.join(f'mu4_playback_poly_bus: kind={"read" if i<6 else "write"} address={address:04x} value={value:04x} ordinal={i+1 if i<6 else i-5} st0=1f01 st1=6144 pmst=202c t={1.01+i*0.000001:.9f} context_pc=0260ba boundary=data_bus ownership=unvalidated observer_writes=0' for i,(address,value) in enumerate(zip(addresses,values)))
+
+    def test_native_poly_bus_matches_independent_three_step_model(self):
+        result = playback_poly_observation(self.poly_bus_fixture())
+        self.assertEqual(result['result'],'68a90000')
+        self.assertTrue(result['scalar_match'])
+        self.assertFalse(result['native_audio_validated'])
+
+    def test_native_poly_bus_rejects_incomplete_or_changed_evidence(self):
+        text = self.poly_bus_fixture()
+        for bad in (text.split('\n',1)[1], text+'\n'+text.splitlines()[0],
+                    text.replace('value=68a9','value=68a8'),
+                    text.replace('address=c22d','address=c22c'),
+                    text.replace('ordinal=4','ordinal=3'),
+                    text.replace('observer_writes=0','observer_writes=1'),
+                    text.replace('ownership=unvalidated','ownership=validated'),
+                    text.replace('pmst=202c','pmst=202e'),
+                    text.replace('st1=6144','st1=ffff',1),
+                    text.replace('context_pc=0260ba','context_pc=010000'),
+                    text.replace(' t=1.010000000',' t=1.500000000'),
+                    text.replace(' st0=1f01','')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                playback_poly_observation(bad)
 
     def test_byte_count_reference_counts_groups_independently(self):
         for bits in range(1, 65536):

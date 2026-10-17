@@ -1325,7 +1325,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated MVKD delay complete",
     ),
     "mac-smem": (
+        (
         "TMS320C54x staged MAC/MAS: PASS cases=73728 restore=73728 operations=MAC,MACR,MAS,MASR destinations=A,B forms=indirect_RAM,absolute_RAM,mapped_AR1 pairs=64 flags=16 source_reads=1 data_writes=0 t_retained=1 silicon_phase_claim=0",
+        "TMS320C54x staged POLY: PASS cases=4608 restore=4608 forms=direct,indirect,postincrement patterns=8 flags=8 repeat=none,0,2 pages=2 snapshots=4 coefficient_reads=iterations data_writes=0 mapped_acceptance=0 extended_acceptance=0 irq_acceptance=0 physical_phase_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated MAC/MAS complete",
     ),
     "far-call-delay": (

@@ -57,9 +57,14 @@ constexpr bool staged_mvdd(u16 word)
 	return (word & 0xff00) == 0xe500;
 }
 
+constexpr bool staged_poly(u16 word)
+{
+	return (word & 0xff00) == 0x3600 && u8(word) < 0x98;
+}
+
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -313,7 +318,7 @@ constexpr bool staged_extended_smem_arithmetic(u16 word)
 
 constexpr bool staged_smem_special(u16 word)
 {
-	return ((word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
+	return (staged_poly(word) || (word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_smem_special(u16 word)
@@ -802,6 +807,12 @@ public:
 			bool const extended = mode >= 0xe0;
 			char const *name = family == 0x3100 ? "MPYA" : family == 0x3300 ? "MASA" : family == 0x3500 ? "MACA" : "MACAR";
 			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
+		if (family == 0x3600)
+		{
+			bool const extended = mode >= 0xe0;
+			stream << "POLY    "; smem(extended ? next_word() : 0);
 			return (1 + extended) | SUPPORTED;
 		}
 		if (family == 0x3000 || family == 0x3200 || family == 0x4600)
@@ -2036,6 +2047,16 @@ void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
 		m_st0 = (m_st0 & ~u16(0x0800)) | (carry ? 0x0800 : 0);
 		destination = (u64(u32(result_high) & 0xffffff) << 16) | result_low;
 	}
+}
+
+void tms320c54x_device::polynomial_step(u16 memory, u16 t)
+{
+	// SPRU172C 4-126: both results use old A/B; T is unchanged.
+	s64 product = s64(accumulator_high17(m_a)) * s64(s16(t));
+	if (BIT(m_st1, 6)) product *= 2;
+	m_a = multiply_result((multiply_product(product) + (s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff), false);
+	s64 const coefficient = BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory);
+	m_b = u64(coefficient * 0x10000) & ACC_MASK;
 }
 
 void tms320c54x_device::accumulator_memory_multiply(u16 op, u16 memory)
@@ -3607,6 +3628,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3)) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if (staged_poly(m_pipeline_word[3]) && source < 0x60)
+		{
+			logerror("%s: staged POLY mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (staged_ts_arithmetic(m_pipeline_word[3]) && source < 0x60)
 		{
 			logerror("%s: staged TS arithmetic mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -3782,7 +3807,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged TS arithmetic shift outside documented -16..31 range\n", machine().describe_context()); m_illegal = true; return;
 		}
 	}
-	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xf000) == 0x2000)
+	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]) && ((m_pipeline_word[4] & 0xf000) == 0x2000 || staged_poly(m_pipeline_word[4])))
 		// SPRU131G table 7-3: STLM T has a one-word consumer restriction.
 		// Read owns this input before the older store publishes in Execute.
 		m_pipeline_immediate[4] = m_t;
@@ -4330,6 +4355,7 @@ void tms320c54x_device::pipeline_step()
 				u64 &destination = accumulator(BIT(m_op, 8));
 				destination = memory_t_multiply(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], destination);
 			}
+			else if (staged_poly(m_op)) polynomial_step(m_pipeline_operand[5], m_pipeline_immediate[5]);
 			else accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
 			if (staged_extended_smem_special(m_op)) ++m_pc;
 		}
@@ -4584,7 +4610,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
 		// T-based MPY/MAC/MAS retain their input before that older Execute.
-		if ((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200)
+		if ((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]))
 			m_t = m_pipeline_operand[4];
 	}
 	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
@@ -5498,13 +5524,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		if (family == 6)
 		{
-			s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
-			if (BIT(m_st1, 6))
-				product *= 2;
-			m_a = multiply_result((multiply_product(product) +
-					(s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff), false);
-			const s64 value = BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory);
-			m_b = u64(value * 0x10000) & ACC_MASK;
+			polynomial_step(memory, m_t);
 			return;
 		}
 		if (family >= 8 && family <= 0x0b)
