@@ -5,9 +5,21 @@ from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
                                           check_schedule_data, check_trace, check_restore, check_tone)
 from tools.c54x_rom4_codec_contract import MCU_SPEECH_FIELD_BYTES, check_mcu_speech_field
 from tools.c54x_rom4_codec_contract import decode_mcu_speech_descriptor
+from tools.c54x_rom4_codec_contract import decode_host_dispatch_mask
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_host_dispatch_mask_and_every_word_mutation(self):
+        image = self.image()
+        self.assertEqual(decode_host_dispatch_mask(image), 0x17ff)
+        address, words = SEQUENCES['host_command_dispatch']
+        for index in range(len(words)):
+            changed = bytearray(image)
+            changed[2 * (address + index)] ^= 1
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                decode_host_dispatch_mask(changed)
+        with self.assertRaises(ValueError):
+            decode_host_dispatch_mask(image[:address * 2])
     def test_speech_descriptor_metadata_and_bounds(self):
         image = bytearray(0xa6460)
         for address, data in MCU_SPEECH_FIELD_BYTES.items():

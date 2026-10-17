@@ -31,6 +31,11 @@ watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
 watch(mcu, 'program', 0x100a8, 'codec_shared_mcu', 0x100ab)
 watch(dsp, 'data', 0x0854, 'codec_shared_dsp')
+watch(dsp, 'program', 0x0854, 'codec_shared_overlay')
+for _, address in ipairs({0x19a2, 0x19a4, 0x1f92}) do
+    watch(dsp, 'data', address, 'codec_level_local')
+    watch(dsp, 'program', address, 'codec_level_overlay')
+end
 watch(mcu, 'program', 0x100bc, 'mcu', 0x100bf)
 -- The selector-0x28 source is the lower halfword of this ARM bus word.
 -- Preserve wide writes and masks to distinguish record initialization from
@@ -102,6 +107,25 @@ watch(dsp, 'io', 0x002d, 'cobba_data')
 -- Fetch increments PC before the program tap. Restrict this to actual helper
 -- entry, not a data read of its opcode; the stack read is ordinary RAM.
 local control_calls = 0
+local request_reads, request_accepts, pending_request = 0, 0, nil
+taps[#taps + 1] = dsp.spaces['io']:install_read_tap(1, 1, 'codec_host_request', function(_, value)
+    if value & 0x8000 == 0 then return end
+    pending_request = value
+    request_reads = request_reads + 1
+    if request_reads <= 64 then
+        machine:logerror(string.format('rom4_codec_host_request: value=%04x pc=%04x t=%.9f\n',
+            value, dsp.state['PC'].value, machine.time:as_double()))
+    end
+end)
+taps[#taps + 1] = dsp.spaces['io']:install_write_tap(2, 2, 'codec_host_accept', function(_, value)
+    if not pending_request then return end
+    request_accepts = request_accepts + 1
+    if request_accepts <= 64 then
+        machine:logerror(string.format('rom4_codec_host_accept: request=%04x mask=%04x pc=%04x t=%.9f\n',
+            pending_request, value, dsp.state['PC'].value, machine.time:as_double()))
+    end
+    pending_request = nil
+end)
 taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
     0x45c2, 0x45c2, 'codec_control_call', function()
         if dsp.state['PC'].value ~= 0x45c3 then return end
@@ -120,6 +144,8 @@ local stop = emu.add_machine_stop_notifier(function()
     local serial = assert(_G.rom4_codec_observe[2])
     machine:logerror(string.format('rom4_codec_control_summary: calls=%d t=%.9f\n',
         control_calls, machine.time:as_double()))
+    machine:logerror(string.format('rom4_codec_host_summary: requests=%d accepts=%d t=%.9f\n',
+        request_reads, request_accepts, machine.time:as_double()))
     machine:logerror(string.format(
         'rom4_tone_summary: tx_words=%d rx_reads=%d tone_reads=%d tone_copies=%d t=%.9f\n',
         serial['data_write_33'], serial['data_read_32'],

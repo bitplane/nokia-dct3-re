@@ -12,6 +12,15 @@ from tools.c54x_rom4_port_census import census
 
 
 SEQUENCES = {
+    "host_command_dispatch": (0x35c0, (
+        0xf130, 0x1000, 0xf84c, 0x369a, 0xf130, 0x001c, 0xf84c, 0x362f,
+        0x61f8, 0x06f3, 0x0400, 0xf830, 0x35d7,
+        0xf130, 0x0100, 0xf84c, 0x8ec5, 0xf130, 0x0200, 0xf84c, 0x8ed3,
+        0xf073, 0x35df, 0xf130, 0x0100, 0xf84c, 0xb7dc,
+        0xf130, 0x0200, 0xf84c, 0xb787, 0xf130, 0x0400, 0xf84c, 0x8e89,
+        0xf130, 0x0080, 0xf84c, 0x371d, 0xf130, 0x0002, 0xf84c, 0x3621,
+        0xf130, 0x0001, 0xf84c, 0x362d, 0xf130, 0x0020, 0xf84c, 0x3764,
+        0xf130, 0x0040, 0xf84c, 0x3764)),
     "rf_programming_table_pair": (0x36f7, (
         0x7593, 0x0031, 0xf495, 0xf495, 0x7593, 0x0032)),
     "rf_programming_uploaded_pair": (0xa23a, (
@@ -369,6 +378,19 @@ WRITE_SITES = [0x3225, 0x33fa, 0x3c77, 0x3c8c, 0x4239, 0x427d,
                0x43ca, 0x43f7, 0x4479, 0x4553, 0x4557, 0x455b]
 
 
+def decode_host_dispatch_mask(image):
+    """Union of checked ISR predicates, not a hardware acknowledgement mask."""
+    address, words = SEQUENCES['host_command_dispatch']
+    expected = b''.join(word.to_bytes(2, 'big') for word in words)
+    if image[address * 2:(address + len(words)) * 2] != expected:
+        raise ValueError('host command dispatcher differs from reviewed ROM')
+    mask = 0
+    for index in range(len(words) - 3):
+        if words[index] == 0xf130 and words[index + 2] == 0xf84c:
+            mask |= words[index + 1]
+    return mask
+
+
 def check(image: bytes) -> list[str]:
     if len(image) % 2:
         raise ValueError("C54x image must contain complete big-endian words")
@@ -596,6 +618,8 @@ MCU_SPEECH_FIELD_BYTES = {
     0x271e9a: bytes.fromhex("4adee7e6"),
     0x271e6c: bytes.fromhex("1c30e0d6"),
     0x27201e: bytes.fromhex("2c2ed00946612900d005881146664031430104080c008010"),
+    0x272036: bytes.fromhex("2d01d0012c2ed108200146415258498f20048008498f20027008"),
+    0x272284: bytes.fromhex("0003000000020008"),
     0x272214: bytes.fromhex("000100bc"),
 }
 
@@ -646,7 +670,9 @@ def main() -> int:
                         help="check physical numeric-key tone delivery and serial totals")
     args = parser.parse_args()
     try:
-        results = check(args.image.read_bytes())
+        image = args.image.read_bytes()
+        results = check(image)
+        dispatch_mask = decode_host_dispatch_mask(image)
         if args.mcu_image is not None:
             upload_locations = check_mcu_upload_counters(args.mcu_image.read_bytes())
             check_mcu_speech_field(args.mcu_image.read_bytes())
@@ -670,6 +696,7 @@ def main() -> int:
     if args.data_image is not None:
         print(f"DSP data-space receive scheduling lists: {len(SCHEDULE_LISTS)}/{len(SCHEDULE_LISTS)} PASS")
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
+    print(f"Reviewed host-dispatch predicate union: {dispatch_mask:04x}; not a hardware acknowledgement mask.")
     if args.trace is not None:
             print("Native echo, receive-ready ISR and three operational control readback cycles: PASS")
     if args.restore_log is not None:

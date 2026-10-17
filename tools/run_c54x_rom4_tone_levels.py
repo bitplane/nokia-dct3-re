@@ -9,8 +9,10 @@ import tempfile
 
 try:
     from .c54x_rom4_tone_levels_check import check_level, check_frame
+    from .c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask
 except ImportError:
     from c54x_rom4_tone_levels_check import check_level, check_frame
+    from c54x_rom4_codec_contract import check, check_mcu_speech_field, decode_host_dispatch_mask
 
 
 def main():
@@ -20,6 +22,10 @@ def main():
     parser.add_argument('--output-root', type=Path, default=Path('tmp'))
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
+    program = (args.rompath / 'noki5110/nse1_rom4_dsp_program.bin').read_bytes()
+    check(program)
+    check_mcu_speech_field((args.rompath / 'noki5110/5110f530.fls').read_bytes())
+    print(f'Reviewed ISR predicate union: {decode_host_dispatch_mask(program):04x}; hardware acknowledgement unresolved', flush=True)
     args.output_root.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix='rom4-tone-levels-', dir=args.output_root.resolve()))
     print(f'Native tone-level evidence: {root}', flush=True)

@@ -1336,6 +1336,39 @@ level-dependent packed control from the common activation write; they do
 not establish the analog gain law, register-9 wire transformation, clock
 enable bits, additional PCM samples or audible/native speech output.
 
+**Current transport caveat:** the native backend aliases DSP port-1 requests
+to shared `0854` (MCU `100a8`) and clears every acknowledged bit except the
+ring-comparator bit. In the high-level fixture, the final key publishes
+`9209`; the ISR reads `9209` at post-operand PC `35bf`, then writes port 2
+with `ffff` at PC `3602`. Backend acknowledgement clears the shared word
+before `27f2` reads it as zero. The later helper therefore writes register
+0 rather than proving delivery of the packed register-9 command. Local
+`19a2/19a4/1f92` taps see initialization, not a level-dependent update in
+this fixture. These observations invalidate using the current level traces
+as a COBBA gain-map oracle; they do not establish what real hardware clears.
+
+The exact checked ISR block `35c0..35f6` has predicate-mask union `17ff`:
+bits 0--10 and 12 are tested, not bits 11 or 13--15. This independently
+corroborates the external emulator's dispatch-mask hypothesis, but software
+dispatch coverage is not an electrical acknowledgement specification.
+Even restricting clears to `17ff & ~2` would turn `9209` into `8000`,
+still losing part of the packed register index. Do not transplant that
+mask as a complete fix. Recover which request signals are independently
+latched, how MCU control writes assert them, and whether port-1/2 acceptance
+can alter DARAM before reinterpreting COBBA bits or attaching its clock.
+The checked MCU continuation `272036..27204e` distinguishes parameter data
+from its explicit trigger: after the shared-field store at `272034`, the
+selected update path writes a pending flag, writes halfword `4` to DSPIF
+`30000`, then byte `2` to MAD2 FIQ acknowledgement `20008`. Literal words
+at `272284/272288` establish those destinations. That sequencing is not
+proof that all bits of the packed parameter themselves assert INT2, nor
+does it identify the DSP-side request-latch register. Keep the API trigger,
+HPI DARAM payload and DSP port request/accept registers distinct during
+the next ownership audit.
+The tone-level fixture passively records capped request reads and their
+following accept writes, with uncapped totals; it does not require the
+current destructive behavior as an acceptance condition.
+
 The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 (03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA
 divides the 13 MHz reference by 13 to generate a 1 MHz PCM data clock, then
