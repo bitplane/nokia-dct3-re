@@ -986,6 +986,12 @@
       "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     },
     {
+      "id": "mad2_fiq1_ack_is_a_second_dsp_doorbell", "status": "disproven",
+      "hypothesis": "The byte-2 write at MCU 0x20008 after DSPIF command 4 independently generates a second MCU-to-DSP interrupt",
+      "conclusion": "MAD2 offset 08 is the FIQ pending/acknowledgement register: writing mask 02 clears FIQ1, not a DSP request. Checked NSE-1 MCU literal destinations distinguish the command-4 halfword store at 30000 from this following acknowledgement. The retained MADos reference independently names offset 08 as the FIQ latch, FIQ1 as MDISND, and DSPIF mask 04 as the DSP interrupt trigger. Earlier doorbell wording in the DSP interface and hardware atlas is corrected. This excludes the acknowledgement as the missing non-ring INT2 producer; it does not identify port-1 request ownership or validate the existing DARAM alias.",
+      "evidence": ["docs/dsp_interface.md", "docs/hardware_atlas.md", "docs/cobba_control_boundary.md", "driver/nokia_mad2.cpp", "tools/c54x_rom4_codec_contract.py"]
+    },
+    {
       "id": "native_rom4_ring_only_int2_completes_boot", "status": "disproven",
       "hypothesis": "Removing the shared-0854 request alias and its acknowledgement clears, while retaining ring-driven INT2 and the existing HPINT doorbell, is sufficient to preserve native 5110 boot",
       "conclusion": "The bounded candidate restores intact parameter delivery: shared 900f reaches the reader at PC 27f2, the control helper writes register 9/value 000f, and firmware clears busy 0870 at PC 37a1. Nevertheless the 11-second physical-key fixture captures a blank frame, only 18 control calls, BSPC c808 and no ordinary 8426 activation or key-tone copy. The exact masked-ready and graphical gates are not weakened. The behavioral candidate is removed and the prior driver restored. This falsifies sufficiency of the ring-only source set, not the observed parameter-clobber anomaly; the legitimate non-ring request producers and acceptance contract remain unresolved. No replacement request bitmap, guest state, completion or clock is injected.",

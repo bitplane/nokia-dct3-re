@@ -1365,6 +1365,16 @@ proof that all bits of the packed parameter themselves assert INT2, nor
 does it identify the DSP-side request-latch register. Keep the API trigger,
 HPI DARAM payload and DSP port request/accept registers distinct during
 the next ownership audit.
+In particular, the byte-2 write at MAD2 `20008` is FIQ1 acknowledgement,
+not a second MCU-to-DSP doorbell or an independently recovered INT2 source.
+This follows the modeled MAD2 write/ack contract and is corroborated by the
+retained [MADos source reference](djr_dsp_integration.md#retained-mados-source-reference):
+`include/hw/ioports.h` names offset 8 as the FIQ latch, `include/hw/int.h`
+names FIQ1 as MDISND, and `hw/dsp.c` sets DSPIF `30000` mask `0x04` to generate
+the DSP interrupt. Those are cross-product corroboration, not a ROM4
+port-1 bit map. MADos calls shared `0a8/2` initialization data; it does not
+provide a request/acknowledgement alias for that payload. None of these
+references supplies the missing non-ring request sources.
 The tone-level runner also retains `host_mmio_census.json`, reusing the
 literal-seeded Thumb analyzer on a byte-lane-corrected view of the original
 MCU image. It resolves three seeds and three halfword writes to DSPIF

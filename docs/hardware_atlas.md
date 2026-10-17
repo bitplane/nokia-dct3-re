@@ -303,8 +303,9 @@ remain unmodeled.
 ## The DSP interface
 
 The MCU-to-DSP boundary is shared RAM at `0x10000` plus DSPIF at `0x30000`.
-The DSP core remains unemulated, but the shared-memory peer is no longer a
-phone-state constant shim:
+The research HLE composition supplies a shared-memory peer; the separate
+native NSE-1 configuration executes its recovered C54x image and uploads.
+The following publications describe the HLE boundary, not native execution:
 
 - **DSP shared RAM `0x10000–0x10fff`:** device-owned backing storage; the HLE
   peer publishes bootstrap-ready and busy transitions at `0x00..0x04`, `0xe0`,
@@ -312,7 +313,7 @@ phone-state constant shim:
   drains service pending word `0xe4`, raises IRQ4, and delivers inbound packets
   through FIQ0.
 - **DSPIF `0x30000`:** written at boot (`pc 0x2001a4`) and by the reachable service
-  command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
+  command path (`0x290cf4`; command 4 at `0x29103c`, followed by MAD2 FIQ1 acknowledgement). Stateful-SIM
   runs reach this path with service commands `0x30` and `0x32`; the peer retains the register,
   and service-transport ring/service completion now use independent timers. Their observed
 ring-producer and service-pending triggers remain distinct from command 4.
