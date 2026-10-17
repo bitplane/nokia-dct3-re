@@ -633,6 +633,26 @@ match the independent codec exactly. Filter histories are also compared:
 is preemphasis history mp. The reset includes the wrapper's additional state
 initializers, not just preprocessing reset `0x85d7`.
 
+Both fixtures also checkpoint every prepared frame using MAME save state.
+Decoder checkpoints precede decoder execution; encoder checkpoints precede
+preprocessing and cover both preprocessing and encoding on replay. The
+independent reference advances once only: its expected samples/parameters
+and the first native result remain outside the machine snapshot. After
+restoring the original CPU/RAM state, replay must reproduce all 65,440
+ordinary data-RAM words (`0060..ffff`), including histories and buffers,
+as well as the existing bit-exact reference comparison and balanced stack.
+Before re-execution, the fixture checks the live entry PC, non-IDLE CPU,
+input stack and every pre-frame RAM word; an unchanged completed result
+cannot stand in for restoration.
+The check excludes data MMRs from the RAM comparison; it is not a peripheral
+timing or in-flight interrupt test. Each direction requires 32 replayed
+frames, separately from the encoder's native mute controls. These are
+isolated algorithm save/load tests, not a handset speech stream or codec
+clock attachment.
+All 32 replays per direction pass: 5,120 decoded samples and 2,432 encoded
+parameters remain bit-exact. The 293-vector packing and eight native mute
+controls also pass with the replay fixtures enabled.
+
 `MAX` must select B and set carry on equality (SPRU172C pages 4-99/100).
 The encoder's predictor and RPE grid searches depend on retaining the earlier
 candidate when correlation/energy ties. Selecting A on equality changes

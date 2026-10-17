@@ -16414,6 +16414,46 @@ private:
 		m_check_timer->adjust(attotime::from_msec(1));
 	}
 
+	void save_rom4_codec_frame(unsigned frame)
+	{
+		m_rom4_codec_replay = false;
+		if (!frame) m_rom4_codec_replays = 0;
+		m_rom4_checkpoint_pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
+		m_rom4_checkpoint_data.resize(0x10000 - 0x60);
+		{
+			auto const disable = machine().disable_side_effects();
+			for (unsigned i = 0x60; i < 0x10000; ++i) m_rom4_checkpoint_data[i - 0x60] = m_cpu->space(AS_DATA).read_word(i);
+		}
+		m_saved_pipeline.str({}); m_saved_pipeline.clear();
+		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save native FR frame with its existing history and prepared input");
+	}
+	bool replay_rom4_codec_frame(unsigned phase)
+	{
+		// The reference codec and oracle remain outside the machine snapshot:
+		// replay must not advance the independent reference a second time.
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		if (!m_rom4_codec_replay)
+		{
+			m_rom4_replay_data.resize(0x10000 - 0x60);
+			for (unsigned i = 0x60; i < 0x10000; ++i) m_rom4_replay_data[i - 0x60] = data.read_word(i);
+			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore native FR frame without reconstructing its histories");
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == m_rom4_checkpoint_pc &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec3,
+				"FR restore returns to the live frame entry, not the completed IDLE result");
+			for (unsigned i = 0x60; i < 0x10000; ++i)
+				expect(data.read_word(i) == m_rom4_checkpoint_data[i - 0x60], "FR restore recovers every pre-frame RAM word before re-execution");
+			m_phase = phase; m_rom4_codec_replay = true;
+			m_check_timer->adjust(attotime::from_msec(5));
+			return true;
+		}
+		for (unsigned i = 0x60; i < 0x10000; ++i)
+			expect(data.read_word(i) == m_rom4_replay_data[i - 0x60], "Native FR replay reproduces every ordinary RAM word, including codec histories");
+		++m_rom4_codec_replays;
+		return false;
+	}
 	void start_rom4_fr_decoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -16463,6 +16503,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 72000 + frame * 2 + (initialize ? 0 : 1);
 		m_check_timer->adjust(attotime::from_msec(5));
+		if (!initialize) save_rom4_codec_frame(frame);
 	}
 
 	void start_rom4_fr_encoder(unsigned frame, unsigned stage)
@@ -16514,6 +16555,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 74000 + frame * 3 + stage;
 		m_check_timer->adjust(attotime::from_msec(5));
+		if (stage == 1) save_rom4_codec_frame(frame);
 	}
 
 	void start_bsp_interrupt_case(unsigned index)
@@ -45536,11 +45578,14 @@ private:
 					++differences;
 				}
 			}
+			if (replay_rom4_codec_frame(72000 + frame * 2 + 1)) return;
 			m_rom4_pcm_mismatches += differences;
 			osd_printf_info("ROM4 FR decoder comparison: frame=%u mismatches=%u\n", frame, differences);
 			if (frame < 31) { start_rom4_fr_decoder(frame + 1, (frame + 1) % 8 == 0); return; }
 			osd_printf_info("TMS320C54x ROM4 FR decoder comparison: frames=32 samples=5120 mismatches=%u\n", m_rom4_pcm_mismatches);
 			expect(!m_rom4_pcm_mismatches, "native FR decoder PCM matches independent codec");
+			expect(m_rom4_codec_replays == 32, "Every native FR decoder frame is replayed");
+			osd_printf_info("TMS320C54x ROM4 FR decoder replay: PASS frames=32 ram_words=65440 checkpoints=frame_input reference_advance=once handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x ROM4 FR decoder: PASS frames=32 samples=5120 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR decoder complete");
 		}
@@ -45572,11 +45617,14 @@ private:
 					++differences;
 				}
 			}
+			if (replay_rom4_codec_frame(74000 + frame * 3 + 1)) return;
 			m_rom4_pcm_mismatches += differences;
 			osd_printf_info("ROM4 FR encoder comparison: frame=%u mismatches=%u\n", frame, differences);
 			if (frame < 31) { start_rom4_fr_encoder(frame + 1, (frame + 1) % 8 == 0 ? 0 : 1); return; }
 			osd_printf_info("ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=%u\n", m_rom4_pcm_mismatches);
 			expect(!m_rom4_pcm_mismatches, "native FR encoder parameters match independent codec");
+			expect(m_rom4_codec_replays == 32, "Every native FR encoder frame is replayed");
+			osd_printf_info("TMS320C54x ROM4 FR encoder replay: PASS frames=32 ram_words=65440 checkpoints=before_preprocessing reference_advance=once handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0\n");
 			start_rom4_pcm_mute(0);
 			return;
@@ -45937,6 +45985,10 @@ private:
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
 	std::array<u16, 76> m_rom4_parameters{};
 	unsigned m_rom4_pcm_mismatches = 0;
+	bool m_rom4_codec_replay = false;
+	unsigned m_rom4_codec_replays = 0;
+	u32 m_rom4_checkpoint_pc = 0;
+	std::vector<u16> m_rom4_replay_data, m_rom4_checkpoint_data;
 	emu_timer *m_check_timer = nullptr;
 	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
 	memory_passthrough_handler m_vector_stack_tap;

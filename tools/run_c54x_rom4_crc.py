@@ -17,9 +17,11 @@ FR_COMPLETE = "Fatal error: TMS320C54x ROM4 FR packing complete"
 DECODER_PASS = "TMS320C54x ROM4 FR decoder: PASS frames=32 samples=5120 handset_audio_claim=0"
 DECODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR decoder complete"
 DECODER_COMPARISON = "TMS320C54x ROM4 FR decoder comparison: frames=32 samples=5120 mismatches=0"
+DECODER_REPLAY = "TMS320C54x ROM4 FR decoder replay: PASS frames=32 ram_words=65440 checkpoints=frame_input reference_advance=once handset_audio_claim=0"
 ENCODER_PASS = "TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0"
 ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR encoder complete"
 ENCODER_COMPARISON = "ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=0"
+ENCODER_REPLAY = "TMS320C54x ROM4 FR encoder replay: PASS frames=32 ram_words=65440 checkpoints=before_preprocessing reference_advance=once handset_audio_claim=0"
 PCM_MUTE_PASS = "TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0"
 
 
@@ -39,10 +41,14 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
         marker, complete = DECODER_PASS, DECODER_COMPLETE
         if lines.count(DECODER_COMPARISON) != 1:
             raise ValueError("missing unique bit-exact PCM comparison")
+        if lines.count(DECODER_REPLAY) != 1:
+            raise ValueError("missing unique native decoder frame/history replay")
     if fr_encoder:
         marker, complete = ENCODER_PASS, ENCODER_COMPLETE
         if lines.count(ENCODER_COMPARISON) != 1:
             raise ValueError("missing unique bit-exact parameter comparison")
+        if lines.count(ENCODER_REPLAY) != 1:
+            raise ValueError("missing unique native encoder frame/history replay")
         if lines.count(PCM_MUTE_PASS) != 1:
             raise ValueError("missing unique native PCM mute buffer-boundary result")
     if returncode != 3:
