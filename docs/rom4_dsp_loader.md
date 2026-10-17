@@ -273,12 +273,13 @@ or execute a loader.
 `nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,
 DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
-staged execution stops at `000f12`, instruction `7cf8 0802 ff87` (absolute
-MVPD from program `ff87` to data `0802`), with PC `0f14`, PMST `ffa8` and
+staged execution reaches the initialization call and stops at `000f1f`,
+instruction `6bf8 0013 0800` (ADDM of `0800` to AR3), with prefetched PC
+`0f23`, PMST `ffa8` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
-remain zero. The live `0f00..0f1f` words bind
+remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x99704`. The backend
-reports two bootstrap mailbox writes and no completion strobe. Neither
+reports four MCU bootstrap-mailbox writes and no completion strobe. Neither
 upload completion nor handset boot is accepted for this machine.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
@@ -309,6 +310,36 @@ latency or frequency. Unsupported younger Decode can halt before older
 slots retire: accepting an opcode alone is not evidence that its write
 occurred; the integration observer checks the actual SWWSR state.
 
+Standalone extended MVPD now retains its absolute or long-offset data
+destination separately from its program source. Absolute form consumes
+destination then `pmad`; long-offset forms consume `pmad` then offset.
+Read resolves the destination once, the held program-bus clock captures
+one source word, and Execute publishes that retained word. The three-word
+instruction has the documented four-clock total; exact silicon bus phase
+remains partial. This admits the loader's `7cf8 0802 ff87` transfer without
+an atomic fallback or any synthesized payload.
+
+`mvpd-extended` checks 6,144 cases/restores: absolute, offset,
+preincrement-offset and circular destinations, eight AR initializations,
+four values, two program pages/regions, both OVLY/CMPT states and three
+snapshots. Post-read source/mapping changes and late AR mutation must not
+retarget or repeat the transfer. `mvpd-ext-edge` adds 512 cases/restores
+requiring zero source reads, destination writes and AR/status changes for
+unsupported CPU/peripheral destinations, including rollback of a long
+address preview. These are emulator exclusions, not hardware traps.
+`mvpd-controls` reruns the existing short-transfer, repeat and deferred
+interrupt banks. Absolute/long-offset single-instruction repeats remain
+forbidden by the independent TI addressing guard; block/XC/control-delay
+composition and unenumerated destination forms remain outside acceptance.
+
+`literal-guard` independently checks 54 cases/restores of legal absolute
+ST inside RPTB, with destination literals `7cf8`, `7df8` and `7ff8`, three
+block counts, two pages and three snapshots. MVPD/MVDP/WRITA admission
+guards apply only to a completed valid opcode slot, not a pending
+instruction's first extension. The adversarial fixture rejects a core
+that classifies that extension as a transfer opcode. This does not admit
+the transfers themselves inside an otherwise unsupported composition.
+
 For a bounded reproduction, seed `nvram/nse1pipe/eeprom` with
 `tools/make_5110_eeprom_profile.py` using the NSE-1's own `nse-1.bin` and
 `5110f530.fls`. Run `nse1pipe` for three emulated seconds in an isolated
@@ -317,7 +348,7 @@ and `-autoboot_delay 0 -autoboot_script` pointing to the absolute path of
 `tools/c54x_rom4_staged_observe.lua`. The observer reads ordinary uploaded
 program RAM, never status or I/O. Then run
 `python3 tools/c54x_rom4_staged_check.py CASE/error.log roms/noki5110/5110f530.fls`.
-Its result classifies an unsupported boundary, binds all 32 observed words
+Its result classifies an unsupported boundary, binds all 40 observed words
 to the source image, and explicitly declines boot, complete-upload and
 fitted-bus-dialect claims. The normal atomic and clocked native fixtures
 retain their existing acceptance contracts.

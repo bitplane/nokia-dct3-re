@@ -14,6 +14,44 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_literal_guard_requires_all_aliases_and_block_restoration(self):
+        marker, ending = EXTRA_PROFILES['literal-guard']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='literal-guard')
+        for field in ('cases=54', 'restore=54', 'literals=7cf8,7df8,7ff8',
+                      'block_counts=0,1,2', 'pages=2', 'snapshots=3',
+                      'instruction=ST_absolute', 'writes=count+1', 'transfer_admission=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='literal-guard')
+
+    def test_mvpd_controls_require_all_existing_banks(self):
+        markers, ending = EXTRA_PROFILES['mvpd-controls']
+        text = '\n'.join((*markers, ending))
+        check_result(text, 3, profile='mvpd-controls')
+        for marker in markers:
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                check_result(text.replace(marker, ''), 3, profile='mvpd-controls')
+
+    def test_extended_mvpd_exclusions_require_zero_address_and_bus_effects(self):
+        marker, ending = EXTRA_PROFILES['mvpd-ext-edge']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mvpd-ext-edge')
+        for field in marker.split():
+            if '=' not in field:
+                continue
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-ext-edge')
+
+    def test_extended_mvpd_requires_address_mapping_and_replay_scope(self):
+        marker, ending = EXTRA_PROFILES['mvpd-extended']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mvpd-extended')
+        for field in marker.split():
+            if '=' not in field:
+                continue
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
+
     def test_clkmd_stm_does_not_promote_a_physical_pll_clock(self):
         marker, ending = EXTRA_PROFILES['clock-stm']
         text = marker + '\n' + ending + '\n'

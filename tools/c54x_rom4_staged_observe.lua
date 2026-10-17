@@ -6,7 +6,7 @@ emu.register_frame_done(function()
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
     local words = {}
-    for address = 0x0f00, 0x0f1f do
+    for address = 0x0f00, 0x0f27 do
         words[#words + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
     end
     machine:logerror(string.format(
