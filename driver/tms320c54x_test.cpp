@@ -15778,6 +15778,7 @@ private:
 		if (!strcmp(machine().options().bios(), "xc-status")) { start_xc_status(0); return; }
 		if (!strcmp(machine().options().bios(), "xc-latency")) { start_xc_latency(0); return; }
 		if (!strcmp(machine().options().bios(), "xc-barrier")) { start_xc_barrier(0); return; }
+		if (!strcmp(machine().options().bios(), "parallel-sub")) { start_parallel_sub_fraction(0); return; }
 		if (!strcmp(machine().options().bios(), "saccd")) { start_saccd_case(0); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
 		if (!strcmp(machine().options().bios(), "pshd-long")) { start_extended_push(); return; }
@@ -16655,6 +16656,47 @@ private:
 			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save conditional register store before its read/write pair");
 			m_rom4_codec_replays = 1;
 		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
+	struct parallel_sub_fraction_fixture
+	{
+		u64 a, b;
+		u16 x;
+		bool source_b, destination_b;
+	};
+	static parallel_sub_fraction_fixture parallel_sub_fraction_case(unsigned index)
+	{
+		static constexpr u64 values[] = { 1, 0x17fff, 0x18000, 0x1ffff,
+			0xffffff0001ULL, 0xffffff8000ULL, 0xffffff7fffULL, 0xffffffffffULL };
+		static constexpr u16 words[] = { 0, 1, 0x7fff, 0x8000 };
+		return { values[index % 8], values[(index + 3) % 8], words[(index / 8) % 4],
+			bool((index / 32) & 1), bool((index / 64) & 1) };
+	}
+	void start_parallel_sub_fraction(unsigned index)
+	{
+		auto const f = parallel_sub_fraction_case(index);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		program.write_word(0x600, 0xc401 | (f.source_b ? 0x200 : 0) | (f.destination_b ? 0x100 : 0));
+		program.write_word(0x601, 0xf4e1);
+		data.write_word(0x2000, f.x); data.write_word(0x2100, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x2100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); // SXM, INTM; ASM=0, OVM=0.
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(false);
+		m_rom4_codec_replay = false; m_phase = 525000 + index;
+		m_saved_pipeline.str({}); m_saved_pipeline.clear();
+		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save parallel subtraction with fractional accumulator bits");
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
@@ -46349,6 +46391,32 @@ private:
 			osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
 			start_rom4_efr_decoder(0, true); return;
 		}
+		if (m_phase >= 525000 && m_phase < 525128)
+		{
+			unsigned const index = m_phase - 525000;
+			auto const f = parallel_sub_fraction_case(index);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic ST||SUB is admitted");
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			// SPRU172C 4-185: subtract the whole opposite accumulator, not its stored high word.
+			u64 const other = f.destination_b ? f.a : f.b;
+			u64 const result = (u64(s64(s16(f.x)) * 65536) - other) & 0xffffffffffULL;
+			u16 const stored = u16((f.source_b ? f.b : f.a) >> 16);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination_b ? f.a : result) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination_b ? result : f.b) &&
+				data.read_word(0x2100) == stored && data.read_word(0x2000) == f.x &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+				"ST||SUB retains fractional borrow and stores the pre-instruction source even when source equals destination");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore fractional parallel subtraction");
+				m_phase = 525000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index < 127) { start_parallel_sub_fraction(index + 1); return; }
+			osd_printf_info("TMS320C54x atomic ST||SUB fractions: PASS cases=128 restore=128 source_dest_pairs=4 fractional_patterns=8 memory_patterns=4 ordinary_ram=1 physical_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated ST||SUB fractions complete");
+		}
 		if (m_phase >= 524000 && m_phase < 524024)
 		{
 			unsigned const index = m_phase - 524000;
@@ -48466,6 +48534,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(6, "xc-status", "Access-owned conditional execution after status producers")
 	ROM_SYSTEM_BIOS(7, "xc-latency", "Access-owned TC/carry/accumulator conditions across variable producer lengths")
 	ROM_SYSTEM_BIOS(8, "xc-barrier", "Conditional-execute status after sequential-target return barriers")
+	ROM_SYSTEM_BIOS(9, "parallel-sub", "Atomic parallel subtraction preserves fractional accumulator bits")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -1918,9 +1918,10 @@ end-to-end calling follows from the result.
 **Current frontier:** `make check-c54x-rom4-efr-erasure-decoder` deliberately
 fails at recovery frame 9 (zero-based), with 127 of 160 PCM samples different.
 Frames 0--8 match exactly, including the first erased frame. This localizes
-the first observable error to recovery after a single loss, not ordinary
-speech or initial concealment; it does not identify the faulty instruction
-or distinguish hidden codec-state divergence from recovery arithmetic.
+the first final-PCM difference to recovery after a single loss. The earlier
+hidden-state difference is now identified: frame 8's LSF prediction residual
+uses full-precision subtraction in the native routine, unlike the reference's
+truncated intermediate. A final-PCM mismatch alone is not evidence of a CPU bug.
 
 The external reference first passes its original installation checks. A
 generated input preserves every speech payload bit, SID=0 and original TAF,
@@ -1935,10 +1936,41 @@ No external reference code or vectors enter Git or the MAME overlay.
 The native gate uses unchanged `c941` reset and `c8dc` decoding, retains
 histories between frames, and requires every PCM sample plus full ordinary-RAM
 save/replay for every frame. It rejects the partial result rather than
-rebasing expected output on native execution. The next discriminator is the
-state carried from erased frame 8 into frame 9, followed by the earliest
-recovery calculation that disagrees with the independent reference. The
-longer bursts remain unexecuted because the strict gate stops at the first
-mismatch. Invalid SID, homing/error combinations, RF scheduling and handset
-speech transport remain separate boundaries.
+rebasing expected output on native execution. The longer bursts remain
+unexecuted because the strict gate stops at the first mismatch. Invalid SID,
+homing/error combinations, RF scheduling and handset speech transport remain
+separate boundaries.
+
+Passive native observations and external link-time observers separate this
+result from a gain-recovery hypothesis. The externally observed decoder's
+complete output remains byte-identical to the unmodified reference run.
+Frame 8's raw synthesis, all 44 LPC coefficients and saved LSFs match, but
+all ten saved prediction residuals differ:
+
+| Frame-8 residuals | Values (signed words) |
+| --- | --- |
+| Reference | 9, 155, -284, -547, -1174, -1385, -398, 249, -177, 149 |
+| Native | 8, 154, -285, -548, -1175, -1386, -399, 248, -178, 148 |
+
+For saved LSF `v`, ROM mean `m` and preceding residual `p`, the reference
+computes `v - m - floor(p * 21299 / 32768)`. The native `c69a..c69c`
+MAC/ST||SUB sequence instead retains the fractional prediction through
+subtraction: `floor(v - m - p * 21299 / 32768)`. These expressions independently
+reproduce every observed residual. At frame 9, three saved LSFs, 34 LPC
+coefficients and 149 raw synthesis samples differ before the final 127-sample
+PCM mismatch. Native frame-9 pitch/code gains match the observed reference;
+the uploaded `2870` recovery wrapper clamps parameter indices and clears
+`0ab9` before the ROM gain decoder, so that clear is not itself a lost-state
+CPU defect.
+
+[SPRU172C 4-185](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) specifies
+ST||SUB against the full opposite accumulator. The isolated `parallel-sub`
+profile passes 128 cases/restores covering all source/destination accumulator
+pairs, eight signed fractional patterns and four memory operands. It checks
+the old source store even when source equals destination. This is atomic
+ordinary-RAM arithmetic coverage, not staged timing, every flag/saturation
+case or proof of physical DSP output. Do not truncate the CPU's accumulator
+to make the reference comparison pass. The remaining question is the extent
+of the recovered implementation's precision differences under errors, not
+whether frame 9 can be matched by changing expected output or forcing state.
 

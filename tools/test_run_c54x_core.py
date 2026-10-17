@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_parallel_sub_fraction_scope_and_replay(self):
+        marker, ending = EXTRA_PROFILES['parallel-sub']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='parallel-sub')
+        for before, after in (('restore=128', 'restore=0'), ('source_dest_pairs=4', 'source_dest_pairs=1'),
+                              ('fractional_patterns=8', 'fractional_patterns=1'),
+                              ('ordinary_ram=1', 'ordinary_ram=0')):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_result(text.replace(before, after), 3, profile='parallel-sub')
+
     def test_xc_condition_profiles_require_both_frontends_and_replay(self):
         for name in ('xc-status', 'xc-latency', 'xc-barrier'):
             markers, ending = EXTRA_PROFILES[name]
