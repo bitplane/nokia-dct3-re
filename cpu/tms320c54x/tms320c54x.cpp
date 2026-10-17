@@ -3402,6 +3402,27 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (BIT(mode, 7) && !extended && !preincrement) indirect_modify(mode, false, 4);
 	}
+	if (m_pipeline_valid[4] && staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4]))
+	{
+		// As for ordinary stores, older Read-owned DAGEN precedes younger
+		// Access. Resolving this after Access can both retarget the store
+		// and make an adjacent DLD consume an odd/reversed word pair.
+		u8 const mode = m_pipeline_word[4];
+		bool const extended = mode >= 0xe0;
+		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (preincrement) indirect_modify(mode, false, 4);
+		u16 const literal = m_pipeline_operand_address[4];
+		m_pipeline_operand_address[4] = extended ? (mode == 0xf8 ? literal : long_offset_address(mode, indirect_ar(mode, 4), s16(literal), 4)) : basic_address(4, mode);
+		// SPRU131G tables 7-5/7-7: explicit ARx data publication stays in
+		// Execute; this ordering concerns only the implicit address update.
+		if (m_pipeline_operand_address[4] < 0x60 && (m_pipeline_operand_address[4] < 0x10 || m_pipeline_operand_address[4] > 0x17))
+		{
+			logerror("%s: staged shifted store register/peripheral destination is unsupported instruction=%06x word=%04x operation=%04x destination=%04x\n",
+				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_immediate[4], m_pipeline_operand_address[4]);
+			m_illegal = true; return;
+		}
+		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
+	}
 	if (m_pipeline_valid[3] && staged_write_a(m_pipeline_word[3]))
 	{
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous :
@@ -3956,25 +3977,6 @@ void tms320c54x_device::pipeline_step()
 		// producer. Decode stays flushed until the Read decision is known.
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | u16(m_pipeline_address[3] + 1);
 		m_pipeline_flush_front = false;
-	}
-	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
-	if (m_pipeline_valid[4] && staged_shifted_memory_store(m_pipeline_word[4], m_pipeline_immediate[4]))
-	{
-		u8 const mode = m_pipeline_word[4];
-		bool const extended = mode >= 0xe0;
-		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
-		if (preincrement) indirect_modify(mode, false, 4);
-		u16 const literal = m_pipeline_operand_address[4];
-		m_pipeline_operand_address[4] = extended ? (mode == 0xf8 ? literal : long_offset_address(mode, indirect_ar(mode, 4), s16(literal), 4)) : basic_address(4, mode);
-		// SPRU131G tables 7-5/7-7: shifted stores publish ARx in Execute;
-		// early DAGEN writers must arbitrate with the same register bank.
-		if (m_pipeline_operand_address[4] < 0x60 && (m_pipeline_operand_address[4] < 0x10 || m_pipeline_operand_address[4] > 0x17))
-		{
-			logerror("%s: staged shifted store register/peripheral destination is unsupported instruction=%06x word=%04x operation=%04x destination=%04x\n",
-				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], m_pipeline_immediate[4], m_pipeline_operand_address[4]);
-			m_illegal = true; return;
-		}
-		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 	}
 	if (m_pipeline_valid[4] && staged_memory_repeat(m_pipeline_word[4]))
 	{

@@ -10,33 +10,35 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
-storage and metadata transactions. Native playback now runs the full
-20-second observation with illegal=0, 375 first-session processing/publication
-calls and completed parent dispatch. It produces 1,597,627 nonzero words at
-both McBSP TX and codec DIN; actual DMA source reads remain in `1000..137f`.
-DMA/source-range checks pass, but numerical waveform agreement and exact
-DMA/TX/DIN pairing are unvalidated. The strict audio-completion gate remains
-rejecting. The frontier is candidate digital PCM validation, not a missing
-instruction observed within this run.
+storage and metadata transactions. Native playback reaches digital output,
+but the strict audio-completion gate remains rejecting. A shifted-store
+DAGEN ordering defect corrupted younger doubleword loads; an isolated
+red/green CPU fixture now protects the correction. Both selected complete
+64-complex transforms match source-derived integer arithmetic at every
+captured stage. Exact DMA/TX/DIN pairing and native audio conformance remain
+unvalidated.
 
 Corrected pending-double-store forwarding removes the observed overwide
 encoder fields. Fresh transform observations account for 3,072 saved bytes;
 their first eight packets host-decode as eight frames with zero errors.
 This is captured native encoder output, not validation of native decoder PCM.
 See [recorded payload contracts](#recording-header-and-selected-windows).
-Complete observed word captures preserve the digital baseline. Checked
-T-input dependency banks now cover each admitted multiplier family within
-the domains below, without changing those native captures. Codec callback
+Checked T-input dependency banks cover each admitted multiplier family within
+the domains below. Codec callback
 metadata establishes uninterrupted slot pairs and cadence across CPU clock
-changes. A first-signal comparison with eight independently decoded AAC
-packets does not match, but packet-to-PCM-frame ownership is not established.
+changes. The first eight independently decoded AAC packets are bound to
+native processing calls and output blocks, not aligned by fitting a lag.
 The first eight processing calls now have complete consumed-byte coverage
 against the reference packets and matching output-loop/block identities.
 All 4,096 conversions in the first two blocks follow the source-derived
-rounded-shift/clamp model and match later RAM. The first differences are
-already in the 32-bit processing results at `f380/f381` and `eb80/eb81`.
-Next trace their producers during the second `024610` call; do not change
-the converter, choose a fitted lag, or substitute reference samples.
+rounded-shift/clamp model and match later RAM. After the DAGEN correction,
+the first nonzero block's maximum sample error falls from 43,740 to 7
+(RMS 0.8426). Across eight blocks, 16,384 signed samples have maximum error
+13 and RMS 1.1492 against the independent decoder. These are measurements,
+not an established codec tolerance. Next broaden transform coverage beyond
+the two selected vectors, including the 512-point path, and establish the
+cause and independent acceptance criteria for the remaining residual.
+Do not change the converter, fit a lag, or substitute reference samples.
 Continue without forcing counters,
 keys, lengths or file offsets. These bench results do not establish whole-handset
 boot, decoded music, analog audio or native speech.
@@ -5940,14 +5942,11 @@ shifting, scaling or selecting channels. Every observed first copied word
 matches its source snapshot at the old cursor. This is sampled copy/material
 evidence, not proof of every MVDD read or decoder-call-to-packet ownership.
 
-The first block pair is zero on both sides. The second has the same
-448-sample zero prefix and 576 nonzero samples per channel. At sample 448,
-native/reference values are `-42/-27` and `-268/14`; samples 449 and 450
-match exactly (`-74,-113` and `47,85`). There are 434 and 400 differing
-samples in that pair, including large errors. Thus the unfitted chronological
-comparison already differs in pre-DMA RAM, not just the serial output.
-The instrumented DMA/TX/DIN word files and codec-slot file are exact prefixes
-of the uninstrumented run.
+The first block pair is zero on both sides. The next has the same
+448-sample zero prefix and 576 nonzero samples per channel. The corrected
+shifted-store DAGEN ordering removes the large pre-DMA differences; the
+remaining small numerical differences are described below. This comparison
+uses chronological source blocks, not a fitted serial-stream offset.
 The bit-reader taps and RAM snapshots remain inputs to the processing
 checker. Retire this material/copy probe only when equivalent direct read
 and store captures replace those checkpoints.
@@ -6010,51 +6009,12 @@ to signed 32-bit; zero-extended negative DLD inputs are valid even when the
 40-bit accumulator guard is zero. This is not a license to alter general
 accumulator signedness or other helper arguments.
 
-All 4,096 observed conversions in the first two successful blocks match both
-the intermediate rounded value and final clamp. Every returned low word
-also matches its later pre-copy source-buffer snapshot. At block 1/sample
-448, channel 0 reads raw `00fff59b08` from `f380/f381` and correctly yields
--42, while the independent decoder yields -27. Channel 1 reads
-`ffffbd0b70` from `eb80/eb81` and correctly yields -268 rather than the
-reference's 14. The divergence is upstream of this converter and transport;
-no particular arithmetic instruction or transform stage is blamed yet.
-
-The bounded observer preserves the complete 20-second replay: DMA, TX and
-DIN word captures, codec slot timestamps and all six terminal summaries
-match the prior baseline byte-for-byte. Its 6,852 early observation records
-also match the two-second proof run. This establishes non-interference,
-not decoded-audio acceptance.
-
-The bounded raw-word probe follows seven transfers, including each source's
-preceding writes, actual reads and matching destination writes:
-
-| Channel | Word pair chain | Unchanged raw value |
-| --- | --- | --- |
-| 0 | `787e -> 7800 -> f300 -> 7b80 -> f380` | `fff59b08` |
-| 1 | `e87e -> e800 -> f300 -> eb80` | `ffbd0b70` |
-
-Each address names the high word and the following low word. Channel 0
-uses `f300` before channel 1 overwrites it; `7b80` retains channel 0 until
-the final copy. The source contract pins 42 words covering three DLD/DST
-copy loops and the `025c0d..025c14` rearrangement body. The rearrangement's
-single-word MVDD reads/writes interleave; DLD/DST reads both words first.
-Neither sequence introduces these particular bad values. This is not a
-proof of the complete permutation or every output sample.
-
-The values already appear at `787e/787f` at 1.019126398/407 s and
-`e87e/e87f` at 1.021159587/595 s, both at live context `025bf7`, following
-the helper `025bb3`'s `025bf6` DST. Its selected first-output arithmetic
-is checked separately below, along with the selected preceding product and scale.
-Live GENPC remains context rather than retained instruction ownership.
-
-Reproduce with `tools/mu4_raw_output_observe.lua` as the two-second run's
-autoboot script, then run `python3 tools/mu4_raw_output_check.py RUN_DIR/error.log`.
-The probe observes fourteen word pairs during the relevant call-2 transform
-interval and removes its taps afterwards. The fresh run has 854 records,
-no partial masks or truncation;
-the checker validates all seven transfers and rejects missing material,
-incorrect channel lifetimes, partial buses and incomplete captures. It does
-not establish upstream arithmetic correctness or native audio acceptance.
+All 4,096 observed conversions in the first two successful blocks follow
+the independent rounded-shift/clamp model and reach their later pre-copy
+source buffers unchanged. The large differences were upstream: shifted
+stores could resolve an implicit pointer update after a younger load had
+already resolved its address. The converter, copied samples and input
+packets were not changed to fit the host reference.
 
 Use the same passive two-second run and independently regenerated reference:
 
@@ -6070,98 +6030,67 @@ lifetimes, all sampled conversion values and later RAM correspondence.
 This proves the bounded eight-packet binding and first-two-block conversion,
 not correct decoded audio, all media, analog output or native speech.
 
-### Selected Raw Partial Products
+### Native Transform Arithmetic
 
-The retained Execute trace and actual operand reads identify the first
-`025bd2..025bdf` arithmetic prefix for each channel. A 15-word source
-witness pins two unsigned-low/signed-high MACSU cross terms, signed-high
-MAC, shifts, subtraction and the scratch destination `aadc/aadd`.
-SPRU172C's MACSU contract is unsigned Xmem times signed Ymem; do not infer
-signedness from the mnemonic's informal ordering. The observed status is
-`ST1=6100` (SXM enabled; FRCT and OVM disabled).
+The selected short-block driver takes parameter `0080`: 128 real/imaginary
+32-bit components, or 64 complex points in 256 data words. This geometry
+comes from its source loop bounds, not an imported library prototype.
+The wrapper calls pre-transform `023f05`, bit reversal `023fc5`, transform
+driver `023fee`, then post-transform `023f68`.
 
-For a 32-bit word `v`, let `hi(v)` be its signed high half and `lo(v)` its
-unsigned low half. The source computes:
+The passive Execute observer selects the first `7800` and `e800` vectors
+in processing call 2. It captures full vectors after bit reversal, combined
+stages 1-2, stage 3, stages 4/5/6 and the driver return. Coefficients are
+captured separately at `f400..f7ff` and `117a/117b`. The `117b` pointer
+names the coefficient's low halfword; starting a pair there would capture
+the wrong constant.
 
-```text
-r(v,c) = (((lo(c)*hi(v) + lo(v)*hi(c)) >> 16) + hi(v)*hi(c)) << 3
-scratch = r(y,d) - r(x,c)
-```
-
-The right shift is arithmetic. This deliberately omits the low*low product;
-it is not a claim that the routine performs exact full-width multiplication.
-Both selected prefixes read `y=0`, `c=003243e1`, `d=1fffd885`. Channel 0
-reads `x=069e0c00`; channel 1 reads `x=2aa01960`. The scalar model produces
-`fff59b08` and `ffbd0b70`, respectively, and every checked intermediate
-accumulator agrees with native Execute context. The later seven-transfer
-chain preserves these results. Thus these two prefixes correctly compute
-their already-wrong samples from their inputs; this does not validate every
-iteration, the helper's second output or the full decoder.
-
-Use the absolute path to `tools/mu4_raw_product_observe.lua` as the isolated
-two-second run's autoboot script, then:
+`tools/mu4_transform_check.py` pins 645 source words across the wrapper,
+bit reversal, controller and three kernel bodies. It verifies snapshot
+identity, geometry, hashes, enclosing processing call and stage order.
+Independent integer formulas reproduce all 128 components at every stage
+for both selected vectors, including source truncation points and return
+preservation. The weighted real cross terms share a shift before high-half
+products are added; separately truncating them changes low bits. The source
+deliberately omits low*low products, so a full-precision multiply is not the
+bit-exact reference.
 
 ```sh
-python3 tools/mu4_raw_product_check.py RUN_DIR/error.log \
+python3 tools/mu4_transform_check.py RUN_DIR \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00
 ```
 
-The observer's time windows select measured iterations, not hardware timing
-parameters. The checker requires retained instruction identities, opcode
-witnesses, the status regime, unchanged actual operand reads, intermediate
-values and matching subsequent copy material; do not alter MACSU semantics
-to fit the waveform.
+The large discrepancy was a core address-ordering defect, not a missing
+DSP peer or fitted sample conversion. Shifted STL/STH resolved their
+Read-owned implicit DAGEN update after a younger load's Access. An adjacent
+DLD could therefore use the old pointer while the older store itself was
+retargeted by the younger update. The isolated `indirect-dld` profile first
+failed at shifted-store variant 96: address `1001` rather than `1002`.
+Ordinary-store controls passed. Resolving the older implicit update before
+younger Access fixes this while preserving Execute-owned data publication.
+All 1,152 composition cases/restores now pass, followed by 23,040 indirect
+DLD cases. Explicit mapped-AR writes, delayed repeats and paired arithmetic
+retain their separate regression gates and partial timing claims.
 
-The same checker follows the selected preceding complex-product difference
-at `023f8a..023f99` and scale helper `025ce2..025d0e`, plus the preceding
-sum/difference block `02419d..0241bd`. A further 95-word
-witness pins these paths; 154 additional actual operand reads support the
-selected intermediate arithmetic and scale arguments. Both complex
-prefixes use coefficients `168ed1ea` and `16b25ced`:
+The same change removes the 31/29 mismatched components in the selected
+third-stage vectors. The first nonzero PCM block's maximum host-reference
+error drops from 43,740 to 7 sample units, RMS from 11,553.09 to 0.8426.
+Across the eight packet-bound source-block pairs, maximum error is 13 and
+RMS 1.1492 over 16,384 signed samples. These comparisons use neither fitted
+alignment nor gain. They do not define a codec-conformance tolerance.
 
-| Channel | Complex input pair | Stored difference | Scale arguments | Left shifts | Product input |
-| --- | --- | --- | --- | --- | --- |
-| 0 | `e9e619d2`, `00025cf2` | `f069e0c0` | 10, 14 | 4 | `069e0c00` |
-| 1 | `0f2eb181`, `0010b0a5` | `0aa80658` | 12, 14 | 2 | `2aa01960` |
-
-The complex difference uses the same split-word products but subtracts the
-second from the first and stores with shift 3. The scale helper subtracts
-its two signed stack arguments; these negative differences select the
-left-shift branch with four or two actual one-bit repeat executions. Every
-selected intermediate and final value agrees. Channel 0's full scaled
-accumulator is `ff069e0c00`: the subsequent unsaturated double-word store
-keeps low 32 bits `069e0c00`. This sign change is source-consistent, not
-evidence to change global accumulator signedness or add saturation.
-
-The selected `02419d` blocks also match their complete first unweighted
-sum/difference calculations. For signed real inputs `x0,y0` and imaginary
-inputs `x1,y1`, the four stored outputs are `(x0+y0)>>1`, `(x0-y0)>>1`,
-`(x1+y1)>>1`, `(x1-y1)>>1`, in base-real, other-real, base-imaginary,
-other-imaginary order. All selected intermediate registers and all eight
-word writes per block agree. The difference outputs are precisely the
-later complex-product input pairs above.
-
-| Base pair | Real inputs | Imaginary inputs | Differences supplied to complex product |
-| --- | --- | --- | --- |
-| `7800`, `7880` | `0185edda`, `2db9ba35` | `0001432d`, `fffc8948` | `e9e619d2`, `00025cf2` |
-| `e800`, `e880` | `f4b3b77f`, `d656547d` | `001a5cc7`, `fff8fb7d` | `0f2eb181`, `0010b0a5` |
-
-These are bounded arithmetic exclusions, not full-transform validation.
-The unresolved inputs now precede these blocks at 1.018995996 s and
-1.021031319 s. Their preceding writers span earlier transform stages;
-the next instrument should compare complete stage inputs/outputs, rather
-than multiply single-word probes along the branching dependency tree.
-Numeric addresses are reused later: observations after these blocks cannot
-establish the earlier inputs.
+Two 64-point transforms are validated, not every transform invocation or the
+512-point path. Remaining work is broader vector coverage, understanding the
+small PCM residual against a floating-point decoder, and complete digital
+transport alignment. Analog output and native speech remain unvalidated.
+The earlier per-word arithmetic exclusions were valid for corrupted inputs;
+they are superseded by this stage-level contract, not current frontiers.
 
 TI's [SPRA554B double-precision C54x FFT report](https://www.ti.com/lit/an/spra554b/spra554b.pdf)
-is a candidate algorithm reference, not an identification of this binary.
-It describes 32-bit interleaved real/imaginary data, specialized combined
-early stages, and a general butterfly with separate unity-coefficient cases.
-Those features make a complete stage comparison worth investigating.
-Its scaling-flag descriptions on PDF pages 4 and 5 conflict; derive this
-firmware's flag and stage ordering from its own source instead of importing
-either description. The ignored local PDF is
+is an algorithm reference, not an identification of this binary. Its
+32-bit data layout and specialized early stages corroborate the recovered
+shape. Its scaling-flag descriptions on PDF pages 4 and 5 conflict; the
+firmware's own branches remain authoritative. The ignored local PDF is
 `roms/reference-docs/npm5/ti_spra554b_c54x_double_precision_fft.pdf`, SHA-256
 `0dafa8acb794d328a6835cb718f93d367884adf15bd3e540d9ecd7e7e6fba7a0`.
 
@@ -7986,17 +7915,21 @@ its terminal record, count and raw-byte FNV hash; legacy word-only captures
 remain explicitly identified as lacking slot evidence. File save/restore is
 unsupported for both outputs.
 
-The capture-enabled run reproduces all six previous execution/audio/DMA/
-method/parent summaries byte-for-byte. Its complete stream identities are:
+The post-DAGEN-correction twenty-second replay completes with illegal=0
+and completed parent dispatch. Its numerical streams are deliberately
+re-banked after the evidenced CPU fix; they are not the pre-fix oracle.
+All four word/slot files reproduce the shorter proof run as exact prefixes,
+and both selected complete transforms reproduce at every stage.
+Its complete stream identities are:
 
 | Boundary | Words | SHA256 |
 | --- | ---: | --- |
-| DMA source | 1,631,772 | `8f5e1d8747255bb57e292a3ef94b8ed76f78edf78a3848cb0d8877c15c888f2d` |
-| McBSP TX | 1,661,065 | `94a5e4051568b835c517bb0afc18ea0a73d9fded2445f6cdf5913f8aafd69856` |
-| Codec DIN | 1,691,842 | `4920330a91055729cd37bcaa31abea23f8d1d78844c13aad874e19fe878b89df` |
+| DMA source | 1,631,772 | `dc9662f5705b6ac7b1f16dadcab9587ef456e9e4de24a3be5abc48c0a03e43a0` |
+| McBSP TX | 1,661,065 | `4e6ddc62d886f62883211216425dc3ba7401b37d05ef0e5a19ff4b64ce0c63d8` |
+| Codec DIN | 1,691,842 | `cafaec6eefc94f7b4789db241470858b17209f20176ad8fe30fce81e2193b684` |
 
 Chronological first-nonzero anchors, checked over 64 words, give initial
-DMA-to-TX offset 92 and TX-to-DIN offset 367. The first 783,116 and 783,208
+DMA-to-TX offset 92 and TX-to-DIN offset 367. The first 783,108 and 783,200
 overlapping words respectively match exactly, including zero words.
 Thereafter a single-offset comparison diverges. The codec sidecar now rules
 out a DIN slot discontinuity during this window; source/TX reset and direct
@@ -8010,8 +7943,8 @@ The sidecar contains 1,691,842 records (15,226,578 bytes), SHA256
 It begins at slot 0, yields 845,921 complete pairs, and has zero orphan
 words or slot discontinuities. Pair spacing is 1,333/1,334 ns and frame
 spacing 22,675/22,676 ns, consistent with the modeled 44.1 kHz clock.
-CPU clock changes do not interrupt that cadence. All three word files and
-the six existing terminal summaries remain byte-identical to the baseline.
+CPU clock changes do not interrupt that cadence. Slot metadata remains
+byte-identical to the pre-fix baseline; numerical word hashes change as above.
 
 #### Independent Reference Comparison
 
@@ -8034,8 +7967,10 @@ The capture checker's optional first-nonzero-frame comparison is diagnostic
 only: it does not establish source-packet/output identity and never selects
 a fitted lag, scaling or channel permutation. Use the stronger
 [processing proof](#processing-and-conversion) to bind the first eight input
-packets and locate the differing values before conversion. The remaining
-waveform question is their processing producer, not a guessed serial phase.
+packets and locate the differing values before conversion. The large
+processing corruption is corrected; the remaining small fixed-point/float
+residual needs broader coverage and independent acceptance criteria, not
+a guessed serial phase.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

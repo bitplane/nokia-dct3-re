@@ -930,7 +930,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated bitfield MOD3 exclusions complete",
     ),
     "indirect-dld": (
-        "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        (
+            "TMS320C54x store/DLD address composition: PASS cases=1152 restore=1152 registers=8 patterns=4 gaps=0,1,2 forms=ordinary,shifted pages=2 snapshots=3 writes=2 reads=2 pointer_updates=once silicon_phase_claim=0",
+            "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated indirect double loads complete",
     ),
     "load-variable": (
