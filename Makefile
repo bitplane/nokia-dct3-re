@@ -373,6 +373,7 @@ help:
 	@echo "make check-c54x-rom4-pcm-restore verify exact active native DTMF word/time replay with external frames"
 	@echo "make check-c54x-rom4-pcm-wire verify native DTMF under explicit 1 MHz edges (assumed sync/fan-out)"
 	@echo "make check-c54x-rom4-clocked-boot verify pin-clocked native boot loopback, DTMF and replay"
+	@echo "make check-c54x-rom4-staged verify the reset-free ten-second staged DSP checkpoint"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
 	@echo "make check-c54x-backend-requests verify slot pending storage and save/load (no physical request-map claim)"
 	@echo "make check-c54x-rom4-transfers verify native timed descriptor consumption (no physical RF timing claim)"
@@ -1458,6 +1459,26 @@ check-c54x-rom4-pcm-wire: build
 check-c54x-rom4-clocked-boot: build
 	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp --wire --restore --clocked-loopback --coverage
 
+.PHONY: check-c54x-rom4-staged
+check-c54x-rom4-staged: build
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
+		tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-staged.XXXXXX")"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Staged checkpoint failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
+		mkdir -p "$$tmp/nvram/nse1pipe"; \
+		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
+			--eeprom $(abspath roms/noki5110/nse-1.bin) \
+			--flash $(abspath roms/noki5110/5110f530.fls) \
+			--output "$$tmp/nvram/nse1pipe/eeprom"; \
+		cd "$$tmp"; \
+		$(abspath $(MAME_DIR))/mame nse1pipe \
+			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
+			-video none -sound none -log -verbose -noreadconfig -skip_gameinfo -nothrottle \
+			-autoboot_delay 0 -seconds_to_run 10 \
+			-autoboot_script $(abspath tools/c54x_rom4_staged_observe.lua) >output.log 2>&1; \
+		$(PYTHON) $(abspath tools/c54x_rom4_staged_check.py) error.log \
+			$(abspath roms/noki5110/5110f530.fls); \
+		echo 'NSE-1 reset-free staged DSP checkpoint: PASS (no RF acquisition or speech claim)'
+
 check-c54x-rom4-codec-tone: build
 	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \
 		tmp="$$(mktemp -d "$(abspath $(RUN_DIR))/rom4-codec-tone.XXXXXX")"; \
@@ -1475,20 +1496,21 @@ check-c54x-rom4-codec-tone: build
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
 		$(abspath $(MAME_DIR))/mame noki5110 \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
-			-video none -sound none -log -skip_gameinfo -nothrottle \
+			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
 			-autoboot_script $(abspath tools/c54x_rom4_tone_observe.lua) >output.log 2>&1; \
 		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
 			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
 			--tone-log error.log; \
-		! grep -q 'rom4_reset_request' error.log; \
-		! grep -q 'TMS320C54x.*illegal' error.log; \
-		! grep -Eiq 'lua.*error|error.*lua' output.log; \
+		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
+			echo 'FAIL - native tone boot reset or DSP fault' >&2; exit 1; fi; \
+		if grep -Eiq 'lua.*error|error.*lua' output.log; then \
+			echo 'FAIL - native tone Lua error' >&2; exit 1; fi; \
 		echo 'NSE-1 native serial and physical tone-control boundary: PASS (no operational audio claim)'
 
 check-c54x-rom4-coherent: build
-	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-coherent.XXXXXX)"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-c54x-coherent.XXXXXX")"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native coherent boot failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
@@ -1498,8 +1520,7 @@ check-c54x-rom4-coherent: build
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log -verbose \
 			-skip_gameinfo -nothrottle -seconds_to_run 4 \
-			-autoboot_script $(abspath mame_noki5110_c54x_check.lua) 2>&1 | \
-			tee output.log; \
+			-autoboot_script $(abspath mame_noki5110_c54x_check.lua) >output.log 2>&1; \
 		grep -q "rom4_validator: event=continue r6=00000001" error.log; \
 		grep -q "rom4_port_write: port=21" error.log; \
 		grep -q "rom4_port_write: port=2c" error.log; \
@@ -1507,7 +1528,8 @@ check-c54x-rom4-coherent: build
 			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
 			--trace error.log; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --minimum-frames 800; \
-		! grep -q "rom4_reset_request: reason=00000004" error.log; \
+		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
+			echo 'FAIL - native coherent boot reset or DSP fault' >&2; exit 1; fi; \
 		grep -q "ROM4 DSP coherent execution: PASS completion=1074" output.log
 
 .PHONY: check-c54x-rom4-processing
@@ -1542,7 +1564,7 @@ check-c54x-rom4-rf-boundary: build
 		cd "$$tmp"; \
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
-			-skip_gameinfo -nothrottle -seconds_to_run 30 \
+			-verbose -skip_gameinfo -nothrottle -seconds_to_run 30 \
 			-autoboot_script $(abspath tools/c54x_rom4_codec_observe.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --scan-30s
 

@@ -808,10 +808,18 @@ isolated a frontend data hazard; changing SWWSR alone did not explain the
 missing RF controls. The clean trace includes first-header reads (`0a05` at
 contexts `3871/387f`). The passive tap counts twenty-two nonzero consumer
 advances but logs only the first eight. The eighth changes `0033` to `002f`;
-consumer advances are not independently counted packets. The old
-`c54x_rom4_staged_check.py` fingerprints the rejected reset lifecycle and must
-be re-banked before use as a current checkpoint gate. Current clean-boot
-acceptance is the four handset gates.
+consumer advances are not independently counted packets.
+`make check-c54x-rom4-staged` generates fresh own-model EEPROM/NVRAM and
+checks the reset-free ten-second capture against the reviewed structured
+fixture `fixtures/c54x_rom4_staged_checkpoint.json`. The fixture is a
+regression fingerprint, not a physical timing specification. The checker
+requires all 390 records in order, unchanged non-time fields, ordered bounded
+timestamps, the same half-second ownership epochs, MCU validator `r6=1`, no
+reset/fault, and unique binding of all four observed uploads to their MCU
+source offsets. It does not pin absolute sub-microsecond timestamps. The
+machine identity, clear ILLEGAL flags and accepted MCU challenge are enforced
+independently of the fingerprint, so re-banking data cannot promote a fault.
+The four handset gates independently test physical input and restoration.
 The first eighteen RF-control writes include the original six-write burst,
 a later five-write burst, `2813/0030` at `4026`, and another six-write
 burst. Transfer targets include `0884/08d4/0924/0974/0299`, then periodic
@@ -824,12 +832,19 @@ are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
 events, not RF acquisition.
 
+The four-second atomic coherent gate requires two full six-write descriptor
+bursts followed by `2813/0030` at PC context `4028` (thirteen controls total),
+plus the firmware queue producer. The five-write partial fingerprint is
+rejected, not retained as another accepted profile. Its minimum-frame bound
+is 800; the separate thirty-second scan check retains its exact longer-run
+counts and reload/selector requirements.
+
 ## Current result
 
 The current native boundary profiles are distinct: the four-second coherent
-boot observes five ordered RF control writes, including the firmware-owned
+boot observes thirteen ordered RF control writes, including the firmware-owned
 `0041/0040` queue item released by TX-completion FIQ1. The 30-second RF
-gate observes the later multi-entry scan in progress (1,519 writes); a
+gate observes the later multi-entry scan in progress; a
 60-second passive run proves its return at 36.156 seconds, frame-period
 restoration and ordinary receive/FIR queue consumption. Neither establishes
 RF acquisition or handset speech. See
@@ -1247,10 +1262,10 @@ ST1=`6103`, BK=`00fa`, AR0=1, AR1=`0332`, AR2=`0060`, AR3=`00ab`.
 This passive snapshot is not, on its own, proof of a healthy interactive UI.
 The ring-base tap's legacy `host_headers` name counts memory reads, not packet
 headers: reads include `7fff/0000/7fb2` at PC context `3f4a` and zero at
-`3da3`. The clean ten-second artifact is `tmp/st-mvmm-native-10/error.log`.
-It is intentionally not accepted by the obsolete reset-lifecycle fingerprint;
-re-banking that passive checker remains follow-up work. The reusable staged
-menu and lifecycle gates pass without firmware writes or baseband resets.
+`3da3`. The structured checkpoint fixture and checker reproduce this
+observation from fresh NVRAM; the rejected reset-lifecycle fingerprint is no
+longer accepted. The reusable staged menu and lifecycle gates pass without
+firmware writes or baseband resets.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR

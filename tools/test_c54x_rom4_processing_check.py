@@ -5,12 +5,18 @@ from tools.test_c54x_rom4_rf_boundary_check import summary
 from tools import test_c54x_rom4_rf_boundary_check as rf_fixtures
 
 
+def processing_rf_summary():
+    # This synthetic processing workload has its own sample/frame counts;
+    # do not inherit the shorter coherent-boot fixture's default duration.
+    return summary(frames=6499, reads=207040)
+
+
 def fixture():
     frames = 6033
     counts = {0x330a: frames * 8, 0x3347: frames - 2, 0x3357: frames - 2,
               0x3382: 3017, 0x3385: 3017, 0x33a1: 0, 0x33a4: 0, 0x33ac: 0}
     counts.update({address: frames for address in (0x3360, 0x3362, 0x336c, 0x336e, 0x2400, 0x2402)})
-    lines = [summary(), f"rom4_dispatch_count: address=32f4 count={frames}"]
+    lines = [processing_rf_summary(), f"rom4_dispatch_count: address=32f4 count={frames}"]
     lines += [f"rom4_comparison_count: address={address:04x} count={count}" for address, count in counts.items()]
     for output, history, input_history in (
             ("1a48", "0084", "0080"), ("1a4a", "0088", "0084"),
@@ -31,7 +37,7 @@ def fixture():
 
 
 def scan_fixture():
-    text = fixture().replace(summary(), rf_fixtures.C54xRom4RfBoundaryCheckTest().scan_summary())
+    text = fixture().replace(processing_rf_summary(), rf_fixtures.C54xRom4RfBoundaryCheckTest().scan_summary())
     for old, new in [('6033', '1024'), ('48264', '8192'), ('6031', '1004'),
                      ('3017', '512'), ('207040', '648032'), ('st1=e900', 'st1=c900'),
                      ('address=33ac count=0', 'address=33ac count=2')]:

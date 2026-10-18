@@ -782,11 +782,12 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   an internal lock-call return, not the original caller. The gate requires
   the entry observation before the shared publication and rejects that
   misattribution. A passive cold-boot RAM watch identifies the preceding
-  record write: reported PC `274cb8` stores `df29` into the lower bus
+  record write: PC context `274cba` accompanies `df29` in the lower bus
   halfword (`mask=0000ffff`) at `10b2b8`, i.e. field `10b2ba`, at
   0.158787846 s before shared publication. Instruction `274cb8` loads
-  `[R4+16]` and `274cba` stores it into `[R5+12]`; the reported tap PC
-  therefore must not be interpreted as the store instruction address.
+  `[R4+16]` and `274cba` stores it into `[R5+12]`. Instruction decoding,
+  rather than a tap PC alone, establishes the writer; attributing this
+  publication to the preceding `LDRH` is rejected by the checker.
   The same record refresh occurs after the physical keypress. Adjacent
   upper-halfword writes and later low-byte updates are distinct fields
   or partial updates, not full-word replacements. The next predecessor
@@ -843,34 +844,31 @@ ring cursors. A fresh four-second native NSE-1 boot initializes `0x6de=0x400`,
 input pointers remain zero. This is evidence that boot alone does not activate
 the speech wrappers, not proof that the runtime activation path is absent.
 
-The four-second fresh-profile RF observation contains five ordered pairs:
-`2a04/0006`, `0041/0040`, `2a04/0006`, `2813/0030`, then `0041/0040`.
+The four-second fresh-profile RF observation contains thirteen ordered pairs:
+two descriptor bursts of `2a04/0006`, `0041/0040`, `27a2/0030`, `0041/0020`,
+`0488/0010`, `0000/0050`, followed by `2813/0030`.
 The queue-owned `0041/0040` pair comes from request words
 copied by resident `0xa1ba` from `0x216d` into queue `0x1920`; runtime taps
 observe `0x1922=0x41` and `0x1923=0x40` at reported PC `0xa1bc`.
 The slot handler reads them through cursor `0x197d` at `0x370c/0x3710`, then
 advances the cursor. Both producer and consumer sequences are byte-checked.
 
-The earlier isolated A/B test established causality: suppressing native TX-completion
-FIQ1 reproduces the old three-pair oracle and terminal TX pointers `0038/0038`;
-restoring it yields four pairs and `0041/0041`. Reverting MAX equality or BK=0
-behavior individually, or removing all memory taps, does not remove the pair.
-The short-run checker includes the newly delivered firmware request and its
-queue producer; the obsolete three-pair sequence is rejected. This does not
+Native TX-completion FIQ1 releases this firmware request and advances the TX
+pointers to `0041/0041`; omitting it leaves them at `0038/0038`. MAX equality,
+BK=0 handling and passive taps do not own this request. The short-run checker
+requires the complete descriptor bursts and their queue producer, rejecting
+the obsolete three- and five-pair partial fingerprints. This does not
 assign physical tuning semantics to `0041/0040`.
 
 The 30-second acceptance profile captures a scan in progress: a fresh run
 receives another queue request at approximately 6.43 seconds, repeats `2a04/0006` twice,
 then writes `2727/0030`, `2728/0030` and subsequent values. Its terminal
-summary records 1,520 port-32 writes, 20,285 frame expiries and 648,192 RF
-reads with EF_SMSS correctly placed in DF_TELECOM. A reversible card-directory
-control explains the difference from the earlier BRAF-era snapshot; two isolated
-cold runs reproduce the current counts. See [the repeat-control acceptance contract](rom4_dsp_loader.md).
-The five-write short-run check rejects this
-run by design. The explicit `--scan-30s` profile instead requires these
-exact counts, all sixteen logged initial writes, the uploaded shorter-reload
+summary is checked against the exact longer-run counts in
+`c54x_rom4_rf_boundary_check.py` with EF_SMSS correctly placed in DF_TELECOM.
+The short-run check rejects this run by design. The explicit `--scan-30s`
+profile requires those counts, all thirty-two logged initial writes, the uploaded shorter-reload
 write and the later search-list selector. A fresh isolated rerun reproduces
-it. The re-bank retains the producer, loop-completion and
+it. Both profiles retain the producer, loop-completion and
 post-scan consumption checks below; neither profile claims acquisition
 or whole-boot completion.
 

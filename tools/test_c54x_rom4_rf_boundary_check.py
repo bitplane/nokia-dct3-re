@@ -3,17 +3,18 @@ import unittest
 from tools.c54x_rom4_rf_boundary_check import check
 
 
-def summary(*, frames=6499, reads=207040, first_frame=30, pairs=5,
+def summary(*, frames=865, reads=26752, first_frame=30, pairs=13,
             port38=0, port39=0, ifr="0000", imr="035f"):
+    burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
+             (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
+             (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
+    writes = "".join(f"rom4_rf_port32: sequence={i} port31={value:04x} port32={command:04x} pc={pc:04x}\n"
+                     for i, (value, command, pc) in enumerate(burst * 2 + [(0x2813, 0x30, 0x4028)], 1))
     return (
         f"rom4_rf_read: sample=1 pc=324b frame={first_frame} t=0.160944\n"
-        "rom4_rf_port32: sequence=1 port31=2a04 port32=0006 pc=a240\n"
-        "rom4_rf_port32: sequence=2 port31=0041 port32=0040 pc=3712\n"
+        + writes +
         "rom4_speech_state: address=1922 value=0041 mask=ffff pc=a1bc t=1.5\n"
         "rom4_speech_state: address=1923 value=0040 mask=ffff pc=a1bc t=1.5\n"
-        "rom4_rf_port32: sequence=3 port31=2a04 port32=0006 pc=a240\n"
-        "rom4_rf_port32: sequence=4 port31=2813 port32=0030 pc=4028\n"
-        "rom4_rf_port32: sequence=5 port31=0041 port32=0040 pc=3712\n"
         "rom4_interface_summary: completion_strobes=2 mailbox_writes=3 "
         f"slot_expiries=0 frame_expiries={frames} rf_reads={reads} "
         f"rf_port32_writes={pairs} rf_port38_reads={port38} "
@@ -31,13 +32,25 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
                  (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
         extra = "".join(
             f"rom4_rf_port32: sequence={n} port31={value:04x} port32={command:04x} pc={pc:04x}\n"
-            for n, (value, command, pc) in enumerate(burst * 2 + [(0x2813, 0x30, 0x4028)] + burst[:3], 1))
+            for n, (value, command, pc) in enumerate(
+                burst * 2 + [(0x2813, 0x30, 0x4028)] + burst * 2 +
+                [(value, 0x30, 0x4028) for value in range(0x2727, 0x272e)], 1))
         return text + extra + (
             "rom4_serial_audit: space=io direction=write address=000e value=0546 mask=ffff pc=0959 t=6.454\n"
             "rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f t=6.426\n")
 
     def test_accepts_exact_scan_snapshot(self):
         self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1537)
+
+    def test_requires_full_capped_scan_prefix(self):
+        text = self.scan_summary()
+        with self.assertRaises(ValueError):
+            check(text.replace("port31=272d", "port31=272e"), scan_30s=True)
+        truncated = "\n".join(line for line in text.splitlines()
+                              if not line.startswith("rom4_rf_port32:") or
+                              int(line.split("sequence=")[1].split()[0]) <= 16)
+        with self.assertRaises(ValueError):
+            check(truncated, scan_30s=True)
 
     def test_rejects_previous_private_latch_snapshot(self):
         with self.assertRaisesRegex(ValueError, "snapshot changed"):
@@ -63,14 +76,14 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
             self.assertIn(detail, str(caught.exception))
 
     def test_sequence_failure_distinguishes_count_from_prefix(self):
-        with self.assertRaisesRegex(ValueError, "count=3 expected=5; first_difference=None"):
+        with self.assertRaisesRegex(ValueError, "count=3 expected=13; first_difference=None"):
             check(summary(pairs=3))
         with self.assertRaisesRegex(ValueError, "first_difference=0; observed=\\[\\(1, 10756, 7, 41536\\)\\]"):
             check(summary().replace("port32=0006", "port32=0007"))
 
     def test_sequence_failure_reports_missing_record(self):
-        text = summary().replace("rom4_rf_port32: sequence=5 port31=0041 port32=0040 pc=3712\n", "")
-        with self.assertRaisesRegex(ValueError, "first_difference=4; observed=\\[\\]; expected=\\[\\(5,"):
+        text = summary().replace("rom4_rf_port32: sequence=13 port31=2813 port32=0030 pc=4028\n", "")
+        with self.assertRaisesRegex(ValueError, "first_difference=12; observed=\\[\\]; expected=\\[\\(13,"):
             check(text)
 
     def test_scan_requires_reload_selector_and_exact_sequence(self):
@@ -90,13 +103,13 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
             check(summary(pairs=3))
 
     def test_accepts_quantified_int0_receiver_activation(self):
-        self.assertEqual(check(summary())["frame_expiries"], 6499)
+        self.assertEqual(check(summary())["frame_expiries"], 865)
 
     def test_accepts_one_in_flight_frame_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=6500))["rf_reads"], 207040)
+        self.assertEqual(check(summary(frames=866))["rf_reads"], 26752)
 
     def test_accepts_two_in_flight_frames_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=6500, reads=207008))["rf_reads"], 207008)
+        self.assertEqual(check(summary(frames=866, reads=26720))["rf_reads"], 26720)
 
     def test_rejects_wrong_first_rf_frame(self):
         with self.assertRaisesRegex(ValueError, "started on frame 23"):
@@ -114,11 +127,20 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_rejects_changed_read_cadence(self):
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(reads=207007))
+            check(summary(reads=26719))
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(frames=6502))
+            check(summary(frames=868))
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(frames=6500, reads=206944))
+            check(summary(frames=866, reads=26656))
+
+    def test_rejects_reset_or_fault_with_otherwise_valid_evidence(self):
+        for fault in ("rom4_reset_request: reason=00000004", "TMS320C54x illegal instruction"):
+            with self.subTest(fault=fault), self.assertRaises(ValueError):
+                check(summary() + fault)
+
+    def test_rejects_old_five_write_snapshot(self):
+        with self.assertRaisesRegex(ValueError, "expected=13"):
+            check(summary(pairs=5))
 
     def test_rejects_unexpected_burst_port_activity(self):
         with self.assertRaisesRegex(ValueError, "parallel burst path"):

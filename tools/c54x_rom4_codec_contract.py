@@ -655,8 +655,10 @@ def check_tone(text: str) -> None:
                if 0x100000 <= int(source, 16) < 0x180000]
     if not entries:
         raise ValueError("missing original MCU speech-field caller")
+    # 274cb8 is LDRH r0,[r4,#0x16]; the following STRH at 274cba owns
+    # the lower-halfword publication at [r5,#0x12].
     record_writes = [float(t) for *fields, t in flag_events
-                     if tuple(fields) == ("speech_record", "write", "10b2b8", "df29", "ffff", "274cb8")
+                     if tuple(fields) == ("speech_record", "write", "10b2b8", "df29", "ffff", "274cba")
                      and float(t) <= entries[0][1]]
     if not record_writes:
         raise ValueError("missing preceding speech-record lower-halfword initialization")

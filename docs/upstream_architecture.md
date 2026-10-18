@@ -154,6 +154,11 @@ matrix protects that composition. The gates enable reset tracing and use
 explicit failure branches rather than ineffective shell-negation checks.
 The default 5110 still uses the atomic frontend. `NSE1_MACHINE=nse1pipe`
 selects staged execution for the four handset input/restoration gates.
+`make check-c54x-rom4-staged` separately checks the reset-free ten-second
+bus/upload checkpoint from fresh NVRAM. Its reviewed data fixture preserves
+the bounded event stream while the checker enforces fault rejection, accepted
+MCU challenge validation and unique MCU upload bindings. This is regression
+acceptance, not a measured physical bus-timing specification.
 Saves during calls/SMS,
 wider application coverage and the fitted bus dialect are not promoted.
 Its upload and

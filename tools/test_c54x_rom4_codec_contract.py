@@ -293,7 +293,7 @@ class NativeToneTests(unittest.TestCase):
             "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
             "input-release: t=8.22 name=1 port=1d",
             "rom4_speech_configuration_entry: selector=0210 destination=0010a6c4 length=0004 caller=002894fd t=0.156",
-            "rom4_tone_access: owner=speech_record direction=write address=10b2b8 value=df29 mask=ffff pc=274cb8 t=0.157",
+            "rom4_tone_access: owner=speech_record direction=write address=10b2b8 value=df29 mask=ffff pc=274cba t=0.157",
             "rom4_speech_field_entry: input=df29 parameter=0000 caller=00275445 pc=00271d70 source=0010b2b8 index=09 t=0.158",
             "rom4_tone_access: owner=mcu direction=write address=0100bc value=df290000 mask=ffff0000 pc=272034 t=0.159",
             "rom4_tone_access: owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ae t=0.160",
@@ -326,8 +326,9 @@ class NativeToneTests(unittest.TestCase):
             check_tone(self.trace().replace("caller=00275445", "caller=00271d83"))
 
     def test_speech_record_lane_and_order(self):
-        for old, new in (("value=df29 mask=ffff pc=274cb8", "value=df290000 mask=ffff0000 pc=274cb8"),
-                         ("pc=274cb8 t=0.157", "pc=274cb8 t=0.170")):
+        for old, new in (("value=df29 mask=ffff pc=274cba", "value=df290000 mask=ffff0000 pc=274cba"),
+                         ("pc=274cba t=0.157", "pc=274cba t=0.170"),
+                         ("pc=274cba t=0.157", "pc=274cb8 t=0.157")):
             with self.subTest(new=new), self.assertRaisesRegex(ValueError, "speech-record"):
                 check_tone(self.trace().replace(old, new))
 

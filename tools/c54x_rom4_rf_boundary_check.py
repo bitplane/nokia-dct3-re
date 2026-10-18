@@ -21,7 +21,9 @@ RF_WRITE_RE = re.compile(
     r"port32=([0-9a-fA-F]{4}) pc=([0-9a-fA-F]{4})")
 
 
-def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> dict[str, int]:
+def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> dict[str, int]:
+    if "rom4_reset_request" in text or re.search(r"TMS320C54x.*illegal", text):
+        raise ValueError("reset or DSP fault in RF boundary observation")
     matches = list(SUMMARY_RE.finditer(text))
     if not matches:
         raise ValueError("missing rom4_interface_summary")
@@ -58,10 +60,15 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
         )
     writes = [tuple(int(value, 16 if index else 10) for index, value in enumerate(row))
               for row in RF_WRITE_RE.findall(text)]
-    expected_writes = [(1, 0x2A04, 6, 0xA240), (2, 0x41, 0x40, 0x3712),
-                       (3, 0x2A04, 6, 0xA240), (4, 0x2813, 0x30, 0x4028),
-                       (5, 0x41, 0x40, 0x3712)]
-    expected_count = 5
+    # The four-second coherent boot drains two complete descriptor bursts,
+    # followed by the firmware's first operational control. The old five-write
+    # fingerprint omitted descriptor entries and is not accepted alongside it.
+    burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
+             (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
+             (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
+    prefix = burst * 2 + [(0x2813, 0x30, 0x4028)]
+    expected_writes = [(i, *row) for i, row in enumerate(prefix, 1)]
+    expected_count = 13
     if scan_30s:
         # EF_SMSS belongs to DF_TELECOM. Restoring its old incorrect GSM
         # placement alone restores the previous totals; see rom4_dsp_loader.md.
@@ -70,10 +77,9 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
         # descriptor bursts. This replaces, rather than accepts alongside,
         # the old payload-alias and ring-plus-slot snapshots.
         expected_count = 1537
-        burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
-                 (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
-                 (0x488, 0x10, 0x3712), (0, 0x50, 0x3712)]
-        prefix = burst * 2 + [(0x2813, 0x30, 0x4028)] + burst[:3]
+        # Logging is capped at 32, independently of the uncapped total.
+        prefix = burst * 2 + [(0x2813, 0x30, 0x4028)] + burst * 2
+        prefix += [(value, 0x30, 0x4028) for value in range(0x2727, 0x272e)]
         expected_writes = [(i, *row) for i, row in enumerate(prefix, 1)]
         if (result["frame_expiries"], result["rf_reads"]) != (20280, 648032):
             raise ValueError(
@@ -118,7 +124,7 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
-    parser.add_argument("--minimum-frames", type=int, default=6000)
+    parser.add_argument("--minimum-frames", type=int, default=800)
     parser.add_argument("--scan-30s", action="store_true",
                         help="check the fixed 30-second multi-entry scan snapshot, not acquisition")
     args = parser.parse_args()

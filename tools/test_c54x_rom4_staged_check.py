@@ -1,329 +1,151 @@
+import json
+from pathlib import Path
 import re
+import struct
 import unittest
+from unittest.mock import patch
 
-from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, REPEAT_SOURCE_OFFSET, DEMAND_SOURCE_OFFSET, check
+from tools.c54x_rom4_staged_check import (
+    SOURCE_OFFSET, TAIL_SOURCE_OFFSET, REPEAT_SOURCE_OFFSET, DEMAND_SOURCE_OFFSET,
+    REFERENCE, TIME, check,
+)
 
 
 class StagedFrontierTest(unittest.TestCase):
     def setUp(self):
-        self.words = ('7718,1ec6,7728,2000,f7be,7758,3146,7214,1f0e,7215,1f0f,7713,0060,f071,079f,8093,'
-                      '7713,1000,f071,1fff,8093,76f8,2290,0432,76f8,2291,3232,7314,1f0e,7315,1f0f,f020,'
-                      '252a,f010,23c4,8811,7712,0d00,47f8,0011')
-        self.payload = bytes.fromhex(self.words.replace(',', ''))
-        self.tail = '7683,0001,f020,0e05,7ef8,001a,0083,f072,0e1e,7ef8,0014,0093,7e8b,0093,e552,fc00,7722,c008,7722,c0c8,f7bb,e908,f074,4610'
-        self.tail_payload = bytes.fromhex(self.tail.replace(',', ''))
-        self.image = (bytes(SOURCE_OFFSET) + self.payload).ljust(TAIL_SOURCE_OFFSET, b'\0') + self.tail_payload
-        self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
-        self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
-        self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
-        self.demand = 'f073,0a2d,f120,0f0c,09f8,0012,f77f,891a,e900,f074,0a52,fc00,6bf8,001a,0001,f074,0a52,fc00,f072,0a5a,8092,8192,f000,0001,ff30,f010,0002,fc00,76f8,1251,1a80,e800'
-        self.demand_payload = bytes.fromhex(self.demand.replace(',', ''))
-        self.image = self.image[:DEMAND_SOURCE_OFFSET] + self.demand_payload + self.image[DEMAND_SOURCE_OFFSET + len(self.demand_payload):]
-        self.row = ('rom4_staged_frontier: pc=408d xpc=00 illegal=0 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
-                    f'words={self.words} t=0.500000000\n')
-        self.stop = 'staged ADDM register/peripheral destination is unsupported instruction=000a4c word=6bf8 destination=001a'
-        self.text = ('rom4_staged_profile: system=nse1pipe\n'
-                     + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
-                     'rom4_staged_dagen: bk=00fa ar0=0001 ar2=06e4 st0=081f st1=6103\n'
-                     'rom4_staged_accumulators: a=0000000000 b=0000000000 t=000b ar3=06e3 ar4=0000\n'
-                     'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
-                     'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
-                     'rom4_staged_bsp_write: value=c008 mask=ffff t=0.134188962\n'
-                     'rom4_staged_bsp_write: value=c008 mask=ffff t=0.134294769\n'
-                     'rom4_staged_bsp_write: value=c008 mask=ffff t=0.158807577\n'
-                     'rom4_staged_bsp_write: value=c008 mask=ffff t=0.159053500\n'
-                     'rom4_staged_bsp_tx: index=1 value=0aaa mask=ffff t=0.133893750\n'
-                     'rom4_staged_bsp_tx: index=2 value=ffd5 mask=ffff t=0.133940788\n'
-                     'rom4_staged_bsp_tx_count: count=4\n'
-                     'rom4_staged_bsp_rx: index=1 value=0aaa mask=ffff t=0.133909558\n'
-                     'rom4_staged_bsp_rx: index=2 value=0aaa mask=ffff t=0.133937654\n'
-                     'rom4_staged_bsp_rx_count: count=4\n'
-                     f'rom4_staged_repeat_tail: base=0e58 words={self.loop}\n'
-                     'rom4_staged_host_header: index=1 value=0a05 mask=ffff pc_context=3871 t=0.175897519\n'
-                     'rom4_staged_host_header: index=2 value=0a05 mask=ffff pc_context=387f t=0.175897808\n'
-                     'rom4_staged_host_header: index=3 value=0a05 mask=ffff pc_context=3871 t=0.515163904\n'
-                     'rom4_staged_host_header: index=4 value=0a05 mask=ffff pc_context=387f t=0.515164192\n'
-                     'rom4_staged_host_header: index=5 value=ff6e mask=ffff pc_context=3b0c t=0.649013558\n'
-                     'rom4_staged_host_header: index=6 value=0001 mask=ffff pc_context=3c63 t=0.995169346\n'
-                     'rom4_staged_host_header: index=7 value=354a mask=ffff pc_context=3c67 t=0.999785115\n'
-                     'rom4_staged_host_header: index=8 value=7fff mask=ffff pc_context=3f4a t=2.431870846\n'
-                     'rom4_staged_host_header: index=9 value=0000 mask=ffff pc_context=3f4a t=2.441101615\n'
-                     'rom4_staged_host_header: index=10 value=7fb2 mask=ffff pc_context=3f4a t=2.450332385\n'
-                     'rom4_staged_host_header: index=11 value=0000 mask=ffff pc_context=3da3 t=6.701103365\n'
-                     'rom4_staged_host_consume: index=1 previous=0000 next=0006 pc_context=3907 t=0.175900019\n'
-                     'rom4_staged_host_consume: index=2 previous=0006 next=000b pc_context=3907 t=0.175909212\n'
-                     'rom4_staged_host_consume: index=3 previous=000b next=000f pc_context=3907 t=0.258977019\n'
-                     'rom4_staged_host_consume: index=4 previous=000f next=0017 pc_context=3907 t=0.263592481\n'
-                     'rom4_staged_host_consume: index=5 previous=0017 next=0023 pc_context=3907 t=0.268207942\n'
-                     'rom4_staged_host_consume: index=6 previous=0023 next=0031 pc_context=3907 t=0.272823750\n'
-                     'rom4_staged_host_consume: index=7 previous=0031 next=0033 pc_context=3907 t=0.273096615\n'
-                     'rom4_staged_host_consume: index=8 previous=0000 next=0006 pc_context=3907 t=0.515166404\n'
-                     'rom4_staged_end: pc=09ac xpc=00 illegal=0 reads=18 writes=16 gap_reads=15 host_consumed=29 host_headers=11 t=10.016666667\n'
-                     'rom4_interface_summary: completion_strobes=1603 mailbox_writes=74 slot_expiries=1555 frame_expiries=4003 rf_reads=127232 rf_port32_writes=242 rf_port38_reads=0 rf_port39_reads=0 pc=09ac pmst=ffac ifr=0020 imr=035f mode_aa=0001 mode_ac=000c transfer_expiries=2663\n')
-        self.text += ''.join(f'rom4_rf_read: sample={i + 1} pc={pc} frame=30 t={0.162032 + i * 0.0000002:.6f}\n'
-                             for i, pc in enumerate(('324e', '3254', '325a', '3260') * 4))
-        self.text += ''.join(f'rom4_rf_read: sample={i + 1} pc={pc} frame=28 t={0.501299 + i * 0.0000002:.6f}\n'
-                             for i, pc in enumerate(('324e', '3254', '325a', '3260') * 4))
-        for row, timestamp in re.findall(r'^(rom4_staged_bsp_(?:write|tx|rx): .*?) t=([0-9.]+)$', self.text, re.M):
-            row = re.sub(r'index=(\d+)', lambda match: f'index={int(match[1]) + 2}', row)
-            self.text += f'{row} t={float(timestamp) + 0.33:.9f}\n'
-        self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=1.844339654\n'
-        self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=1.865369269\nrom4_staged_bsp_write: value=c008 mask=ffff t=1.865382385\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=1.865382442\n'
-        self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=1.989395461\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=1.989395519\n'
-        self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=2.108726788\nrom4_staged_bsp_write: value=c008 mask=ffff t=2.631936808\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=2.631936865\n'
-        self.terminal = 'rom4_staged_end_state: a=0000000000 b=0000000000 t=5555 st0=081f st1=6103 bk=00fa ar0=0001 ar1=0332 ar2=0060 ar3=00ab\n'
-        self.text += self.terminal
-        controls = [('2a04', '0006', 'a23f', '1.844394'), ('0041', '0040', '3711', '1.846390'),
-                    ('27a2', '0030', '3711', '1.846464'), ('0041', '0020', '3711', '1.846538'),
-                    ('0488', '0010', '3711', '1.846611'), ('0000', '0050', '3711', '1.849606'),
-                    ('2a04', '0006', 'a23f', '1.881319'), ('0041', '0040', '3711', '1.883314'),
-                    ('27a2', '0030', '3711', '1.883387'), ('0041', '0020', '3711', '1.883461'), ('0488', '0010', '3711', '1.883535'), ('2813', '0030', '4026', '1.984099')]
-        controls += [('2a04', '0006', 'a23f', '6.705713'), ('0041', '0040', '3711', '6.707709'), ('27a2', '0030', '3711', '6.707782'), ('0041', '0020', '3711', '6.707856'), ('0488', '0010', '3711', '6.707930'), ('0000', '0050', '3711', '6.710926')]
-        controls += [('2a04', '0006', 'a23f', '6.742638'), ('0041', '0040', '3711', '6.744632'), ('27a2', '0030', '3711', '6.744706'), ('0041', '0020', '3711', '6.744780'), ('0488', '0010', '3711', '6.744853')]
-        controls += [(f'{0x2727 + i:04x}', '0030', '4026', f'{6.749742 + i * 0.014965:.6f}') for i in range(9)]
-        self.text += ''.join(f'rom4_rf_port32: sequence={i + 1} port31={p31} port32={p32} pc={pc} t={timestamp}\n'
-                             for i, (p31, p32, pc, timestamp) in enumerate(controls))
-        transfers = [('0884', '2160', '1.846387692'), ('08d4', '77', '1.846461385'),
-                     ('0924', '77', '1.846535077'), ('0974', '77', '1.846608769'), ('0299', '3242', '1.849604000'),
-                     ('0884', '2158', '1.883311115'), ('08d4', '77', '1.883384808'), ('0924', '77', '1.883458500'), ('0974', '77', '1.883532192'), ('0032', '36', '1.885960846')]
-        self.transfer_rows = [f'rom4_transfer_timer: expiry={i + 1} target={target} counter={target} delay={delay} t={timestamp}\n' for i, (target, delay, timestamp) in enumerate(transfers)]
-        self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 1} target=0032 counter=0031 delay=35 t={1.887207250 + (i - 10) * 0.004615384615:.9f}\n' for i in range(10, 31)]
-        self.transfer_rows += ['rom4_transfer_timer: expiry=32 target=03e8 counter=03e8 delay=984 t=1.985007654\n']
-        self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 33} target={target} counter={target} delay={delay} t={timestamp}\n' for i, (target, delay, timestamp) in enumerate([('0884', '2159', '6.707706231'), ('08d4', '77', '6.707779923'), ('0924', '77', '6.707853615'), ('0974', '77', '6.707927307'), ('0299', '3243', '6.710923461')])]
-        self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 38} target={target} counter={target} delay={delay} t={timestamp}\n' for i, (target, delay, timestamp) in enumerate([('0884', '2158', '6.744629923'), ('08d4', '77', '6.744703615'), ('0924', '77', '6.744777307'), ('0974', '77', '6.744851000')])]
-        self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 42} target=0032 counter=0032 delay=36 t={6.747279654 + i * 0.001247076923:.9f}\n' for i in range(215)]
-        self.text += ''.join(self.transfer_rows)
-        observations = [
-            ('low_write', '00f1', '0000', '0f10', '0.133253635'),
-            ('low_write', '00f2', '0000', '0f10', '0.133253654'),
-            ('low_write', '00f2', '0003', 'a5e5', '0.158817750'),
-            ('low_read', '00f1', '0000', 'a5ed', '0.158817923'),
-            ('low_read', '00f2', '0003', 'a5ef', '0.158817962'),
-            ('gap_read', '0003', '0000', 'a5f4', '0.158818058'),
-            ('gap_read', '0003', '0000', 'a5f8', '0.158818135'),
-            ('gap_read', '0003', '0000', 'a601', '0.158818327'),
-            ('low_write', '00f2', '0003', 'a5e5', '0.159063481'),
-            ('low_read', '00f1', '0000', 'a5ed', '0.159063654'),
-            ('low_read', '00f2', '0003', 'a5ef', '0.159063692'),
-            ('gap_read', '0003', '0000', 'a5f4', '0.159063788'),
-            ('gap_read', '0003', '0000', 'a5f8', '0.159063865'),
-            ('gap_read', '0003', '0000', 'a601', '0.159064058'),
+        self.rows = json.loads(REFERENCE.read_text())["records"]
+        self.text = "\n".join(self.rows) + "\n"
+        self.uploads = [
+            ("rom4_staged_frontier:", SOURCE_OFFSET),
+            ("rom4_staged_uploaded_tail:", TAIL_SOURCE_OFFSET),
+            ("rom4_staged_repeat_tail:", REPEAT_SOURCE_OFFSET),
+            ("rom4_staged_demand_tail:", DEMAND_SOURCE_OFFSET),
         ]
-        observations += [(tag, address, value, pc, f'{float(timestamp) + 0.33:.9f}')
-                         for tag, address, value, pc, timestamp in observations]
-        observations += [('low_write', '00f2', '0003', 'a5e5', '1.844349711'),
-                         ('low_read', '00f1', '0000', 'a5ed', '1.844349885'),
-                         ('low_read', '00f2', '0003', 'a5ef', '1.844349923'),
-                         ('gap_read', '0003', '0000', 'a5f4', '1.844350019'),
-                         ('gap_read', '0003', '0000', 'a5f8', '1.844350096'),
-                         ('gap_read', '0003', '0000', 'a601', '1.844350288')]
-        self.text += ''.join(f'rom4_staged_{tag}: address={address} value={value} mask=ffff pc_context={pc} t={timestamp}\n'
-                             for tag, address, value, pc, timestamp in observations)
-        self.text += ('rom4_staged_low_write: address=00f2 value=0000 mask=ffff pc_context=a5b8 t=1.865379769\n'
-                      'rom4_staged_low_write: address=00f1 value=b736 mask=ffff pc_context=a5c4 t=1.865380000\n'
-                      'rom4_staged_low_read: address=00f1 value=b736 mask=ffff pc_context=a5ed t=1.865380173\n'
-                      'rom4_staged_low_read: address=00f2 value=0000 mask=ffff pc_context=a5ef t=1.865380211\n'
-                      'rom4_staged_low_write: address=00f2 value=0003 mask=ffff pc_context=a5e5 t=1.935037365\n'
-                      'rom4_staged_low_read: address=00f1 value=b736 mask=ffff pc_context=a5ed t=1.935037538\n'
-                      'rom4_staged_low_read: address=00f2 value=0003 mask=ffff pc_context=a5ef t=1.935037577\n'
-                      'rom4_staged_low_write: address=00f2 value=0000 mask=ffff pc_context=a5b8 t=1.989392846\n'
-                      'rom4_staged_low_write: address=00f1 value=b71a mask=ffff pc_context=a5c4 t=1.989393077\n'
-                      'rom4_staged_low_read: address=00f1 value=b71a mask=ffff pc_context=a5ed t=1.989393250\n'
-                      'rom4_staged_low_read: address=00f2 value=0000 mask=ffff pc_context=a5ef t=1.989393288\n'
-                      'rom4_staged_low_write: address=00f2 value=0000 mask=ffff pc_context=a5b8 t=2.631934192\n'
-                      'rom4_staged_low_write: address=00f1 value=b71a mask=ffff pc_context=a5c4 t=2.631934423\n'
-                      'rom4_staged_low_read: address=00f1 value=b71a mask=ffff pc_context=a5ed t=2.631934596\n'
-                      'rom4_staged_low_read: address=00f2 value=0000 mask=ffff pc_context=a5ef t=2.631934635\n')
-        self.text += 'rom4_staged_low_count: reads=8 writes=8\nrom4_staged_gap_count: reads=12\n'
-        self.text += f'rom4_staged_demand_tail: base=0a40 words={self.demand}\n'
+        self.image = bytearray(REPEAT_SOURCE_OFFSET + 48)
+        self.payloads = {}
+        for prefix, offset in self.uploads:
+            row = next(row for row in self.rows if row.startswith(prefix))
+            words = re.search(r"words=(\S+)", row).group(1).split(",")
+            payload = struct.pack(f">{len(words)}H", *(int(word, 16) for word in words))
+            self.payloads[offset] = payload
+            self.image[offset:offset + len(payload)] = payload
+        self.image = bytes(self.image)
 
-    def test_binds_observation_without_promoting_boot(self):
+    def test_binds_clean_observation_without_promoting_boot(self):
         result = check(self.text, self.image)
-        self.assertEqual(result['source_offset'], SOURCE_OFFSET)
-        self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['status'], 'live_staged_native_service_checkpoint')
-        self.assertEqual(result['checkpoint_pc'], 0x09ac)
-        self.assertFalse(result['terminal_illegal'])
-        self.assertEqual(result['demand_source_offset'], DEMAND_SOURCE_OFFSET)
-        self.assertEqual(result['observed_demand_words'], 32)
-        self.assertEqual(result['host_header_reads'], 11)
-        self.assertEqual(result['host_consumed'], 29)
-        self.assertEqual(result['rf_sample_blocks'], 3976)
-        self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
-        self.assertEqual(result['bsp_receive_words'], [0x0aaa] * 4)
-        self.assertEqual(result['bsp_transmit_words'], [0x0aaa, 0xffd5] * 2)
-        self.assertEqual(result['repeat_source_offset'], REPEAT_SOURCE_OFFSET)
-        self.assertEqual(result['bsp_control_writes'], ([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8, 0xc008, 0xc008, 0xc0c8])
-        self.assertEqual(result['completion_strobes'], 1603)
-        self.assertEqual(result['swwsr'], 0x2000)
-        self.assertEqual(result['low_gap_bus_reads'], 15)
-        self.assertEqual(result['rf_sample_reads'], 127232)
-        self.assertEqual(result['rf_sample_remainder'], 0)
-        self.assertEqual(result['rf_control_writes'], 242)
-        self.assertEqual(result['observed_rf_control_writes'], 32)
-        self.assertEqual(result['transfer_expiries'], 2663)
-        self.assertEqual(result['observed_transfer_expiries'], 256)
-        self.assertNotIn('transfer_expiries_before_stop', result)
-        self.assertFalse(result['parallel_store_carry_claim'])
-        self.assertNotIn('active_block', result)
-        for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim', 'physical_low_gap_identity_claim', 'rf_acquisition_claim', 'preceding_instruction_retirement_claim', 'checkpoint_illegal', 'uninterrupted_session_claim'):
-            self.assertFalse(result[field])
+        self.assertEqual(result["status"], "live_staged_native_service_checkpoint")
+        self.assertEqual(result["source_offset"], SOURCE_OFFSET)
+        self.assertEqual(result["tail_source_offset"], TAIL_SOURCE_OFFSET)
+        self.assertEqual(result["repeat_source_offset"], REPEAT_SOURCE_OFFSET)
+        self.assertEqual(result["demand_source_offset"], DEMAND_SOURCE_OFFSET)
+        self.assertEqual(result["checkpoint_pc"], 0x09ac)
+        self.assertEqual(result["host_header_reads"], 9)
+        self.assertEqual(result["host_consumed"], 22)
+        self.assertEqual(result["rf_sample_reads"], 134656)
+        self.assertEqual(result["rf_sample_blocks"], 4208)
+        self.assertEqual(result["rf_sample_remainder"], 0)
+        self.assertEqual(result["rf_control_writes"], 260)
+        self.assertEqual(result["observed_rf_control_writes"], 32)
+        self.assertEqual(result["transfer_expiries"], 2880)
+        self.assertEqual(result["observed_transfer_expiries"], 256)
+        self.assertEqual(result["bsp_transmit_words"], [0x0aaa, 0xffd5])
+        self.assertEqual(result["bsp_receive_words"], [0x0aaa, 0x0aaa])
+        self.assertEqual(result["completion_strobes"], 1639)
+        self.assertEqual(result["low_gap_bus_reads"], 9)
+        self.assertEqual(result["swwsr"], 0x2000)
+        self.assertEqual(result["clean_validator_continuations"], 1)
+        for name in ("boot_claim", "rf_acquisition_claim", "fitted_bus_dialect_claim",
+                     "physical_low_gap_identity_claim", "parallel_store_carry_claim",
+                     "upload_complete_claim", "preceding_instruction_retirement_claim",
+                     "uninterrupted_session_claim", "terminal_illegal",
+                     "checkpoint_illegal", "reset_request_observed"):
+            self.assertFalse(result[name], name)
 
-    def test_rejects_changed_or_duplicate_live_accumulators(self):
-        row = 'rom4_staged_accumulators: a=0000000000 b=0000000000 t=000b ar3=06e3 ar4=0000\n'
-        for text in (self.text.replace(row, ''), self.text + row,
-                     self.text.replace('t=000b', 't=000c'),
-                     self.text.replace('a=0000000000', 'a=0000000001'),
-                     self.text.replace('ar3=06e3', 'ar3=06e2'),
-                     self.text.replace('ar4=0000', 'ar4=0001')):
+    def test_rejects_each_missing_or_duplicate_record(self):
+        for index, row in enumerate(self.rows):
+            with self.subTest(index=index, kind="missing"), self.assertRaises(ValueError):
+                check("\n".join(self.rows[:index] + self.rows[index + 1:]), self.image)
+            with self.subTest(index=index, kind="duplicate"), self.assertRaises(ValueError):
+                check(self.text + row + "\n", self.image)
+
+    def test_rejects_changed_event_fields(self):
+        for row in self.rows:
+            match = re.search(r"\w+=(\S+)", row)
+            if not match:
+                continue
+            changed = row[:match.start(1)] + "invalid" + row[match.end(1):]
+            with self.subTest(row=row), self.assertRaises(ValueError):
+                check(self.text.replace(row, changed), self.image)
+
+    def test_rejects_faults_even_with_all_positive_records(self):
+        for fault in ("rom4_reset_request: reason=00000004",
+                      "unsupported staged C54x form", "unimplemented C54x instruction",
+                      "TMS320C54x illegal instruction"):
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, "reset or DSP fault"):
+                check(self.text + fault, self.image)
+
+    def test_rebank_cannot_promote_a_fault_or_rejected_challenge(self):
+        for original, bad in (("illegal=0", "illegal=1"),
+                              ("r6=00000001", "r6=00000000"),
+                              ("system=nse1pipe", "system=noki5110")):
+            rows = [row.replace(original, bad) for row in self.rows]
+            with self.subTest(bad=bad), patch("tools.c54x_rom4_staged_check.REFERENCE") as reference:
+                reference.read_text.return_value = json.dumps({"records": rows})
+                with self.assertRaises(ValueError):
+                    check("\n".join(rows), self.image)
+
+    def test_rejects_failed_or_duplicate_validator(self):
+        row = next(row for row in self.rows if row.startswith("rom4_validator:"))
+        for text in (self.text.replace("r6=00000001", "r6=00000000"),
+                     self.text + row, self.text.replace(row, "")):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check(text, self.image)
 
-    def test_rejects_missing_or_changed_native_rf_reads(self):
-        for text in (self.text.replace('rom4_rf_read:', 'missing_rf:'),
-                     self.text + 'rom4_rf_read: malformed\n',
-                     self.text.replace('rf_reads=127232', 'rf_reads=703'),
-                     self.text.replace('sample=4', 'sample=3'),
-                     self.text.replace('pc=3254', 'pc=3253'),
-                     self.text.replace('frame=30', 'frame=29'),
-                     self.text.replace('0.162032', '0.700000')):
+    def test_rejects_old_reset_lifecycle_counts(self):
+        for original, old in (("host_consumed=22", "host_consumed=29"),
+                              ("rf_port32_writes=260", "rf_port32_writes=242"),
+                              ("transfer_expiries=2880", "transfer_expiries=2663"),
+                              ("completion_strobes=1639", "completion_strobes=1603")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check(self.text.replace(original, old), self.image)
+
+    def test_rejects_changed_or_duplicate_mcu_uploads(self):
+        for offset, payload in self.payloads.items():
+            changed = bytearray(self.image)
+            changed[offset] ^= 1
+            with self.subTest(offset=offset, kind="changed"), self.assertRaises(ValueError):
+                check(self.text, bytes(changed))
+            with self.subTest(offset=offset, kind="duplicate"), self.assertRaises(ValueError):
+                check(self.text, self.image + payload)
+            with self.subTest(offset=offset, kind="truncated"), self.assertRaises(ValueError):
+                check(self.text, self.image[:offset + len(payload) - 1])
+
+    def test_rejects_out_of_order_or_out_of_bounds_time(self):
+        for before, after in (("t=0.175897519", "t=0.100000000"),
+                              ("t=10.016666667", "t=9.999999999"),
+                              ("t=10.016666667", "t=10.100000000"),
+                              ("t=0.500000000", "t=0.499999999"),
+                              ("t=0.133888808", "t=0.133888750")):
+            self.assertIn(before, self.text)
+            with self.subTest(after=after), self.assertRaises(ValueError):
+                check(self.text.replace(before, after), self.image)
+
+    def test_does_not_claim_absolute_submicrosecond_timing(self):
+        shifted = TIME.sub(lambda match: f"t={float(match.group(1)) + 1e-9:.9f}", self.text)
+        check(shifted, self.image)
+
+    def test_rejects_reordered_or_malformed_records(self):
+        swapped = self.rows[:]
+        swapped[1], swapped[2] = swapped[2], swapped[1]
+        for text in ("", "\n".join(swapped), self.text + "rom4_staged_end: malformed\n",
+                     self.text.replace("system=nse1pipe", "system=noki5110")):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check(text, self.image)
 
-    def test_rejects_changed_pointer_and_unowned_bus_evidence(self):
-        for text in (self.text.replace('rom4_staged_gap_read:', 'missing_gap:'),
-                     self.text + 'rom4_staged_low_read: malformed\n',
-                     self.text.replace('address=00f1 value=0000', 'address=00f1 value=0001'),
-                     self.text.replace('address=0003 value=0000', 'address=0003 value=0001'),
-                     self.text.replace('pc_context=a5f4', 'pc_context=a5f3'),
-                     self.text.replace('0.158818058', '0.158817961'),
-                     self.text.replace('gap_reads=15', 'gap_reads=5'),
-                     self.text + 'rom4_staged_low_count: reads=8 writes=8\n'):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
+    def test_accepts_mame_log_prefixes_and_unrelated_diagnostics(self):
+        prefixed = "\n".join("[luaengine] " + row for row in self.rows)
+        check("Soft reset\n" + prefixed + "\nunrelated diagnostic\n", self.image)
 
-    def test_rejects_missing_duplicate_or_changed_frontier(self):
-        for text in ('', self.text + self.row,
-                     self.text.replace('illegal=0', 'illegal=1'),
-                     self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=09ac', 'pc=0f1f'),
-                     self.text.replace('st0=081f', 'st0=001f'),
-                     self.text.replace('st1=6103', 'st1=4901'),
-                     self.text + 'rom4_staged_dagen: malformed\n',
-                     self.text + 'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d3 st0=081f st1=e900\n',
-                     self.text.replace('rom4_staged_bsp_rx_count: count=4', 'rom4_staged_bsp_rx_count: count=3'),
-                     self.text.replace('index=2 value=0aaa', 'index=2 value=0aab'),
-                     self.text.replace('0.133937654', '0.133909557'),
-                     self.text + 'rom4_staged_bsp_rx: malformed\n',
-                     self.text + 'unsupported alternate instruction\n',
-                     self.text.replace('value=0aaa', 'value=0aab'),
-                     self.text.replace('rom4_staged_bsp_tx_count: count=4', 'rom4_staged_bsp_tx_count: count=3'),
-                     self.text.replace('value=ffd5', 'value=ffd4'),
-                     self.text.replace('0.133940788', '0.133937653'),
-                     self.text.replace('base=0e58', 'base=0e59'),
-                     self.text.replace('f845,0e66', 'f845,0e65'),
-                     self.text + f'rom4_staged_repeat_tail: base=0e58 words={self.loop}\n',
-                     self.text.replace('value=c008', 'value=c009'),
-                     self.text.replace('mask=ffff', 'mask=00ff'),
-                     self.text + 'rom4_staged_bsp_write: malformed\n',
-                     self.text.replace('0.133888808', '0.133888749'),
-                     self.text.replace('base=0e10', 'base=0e11'),
-                     self.text.replace('7722,c008', '7722,c009'),
-                     self.text + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n',
-                     self.text.replace('completion_strobes=1603', 'completion_strobes=0'),
-                     self.text.replace('mailbox_writes=74', 'mailbox_writes=70'),
-                     self.text.replace('swwsr=2000', 'swwsr=0000'),
-                     self.text.replace('bscr=0000', 'bscr=f000'),
-                     self.text.replace('swcr=0000', 'swcr=0001'),
-                     self.text.replace('t=0.500000000', 't=0.100000000')):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
 
-    def test_requires_bounded_stop_endpoint_and_transport(self):
-        row = 'rom4_staged_end: pc=09ac xpc=00 illegal=0 reads=18 writes=16 gap_reads=15 host_consumed=29 host_headers=11 t=10.016666667\n'
-        for index, text in enumerate((self.text.replace(row, ''), self.text + row,
-                     self.text.replace('t=10.016666667', 't=0.516666667'),
-                     self.text.replace('slot_expiries=1555', 'slot_expiries=26'),
-                     self.text.replace('frame_expiries=4003', 'frame_expiries=647'),
-                     self.text.replace('rf_port32_writes=242', 'rf_port32_writes=32'),
-                     self.text.replace('ifr=0020', 'ifr=0021'),
-                     self.text.replace('0.175897519', '0.575897519'),
-                     self.text.replace('0.175897808', '0.175897518'),
-                     self.text + 'unimplemented arithmetic\n')):
-            with self.subTest(case=index), self.assertRaises(ValueError):
-                check(text, self.image)
-
-    def test_requires_live_cpu_and_complete_capped_timer_prefix(self):
-        cases = (
-            self.text + self.stop + '\n',
-            self.text.replace('illegal=0', 'illegal=1'),
-            self.text.replace(self.transfer_rows[-1], ''),
-            self.text.replace('counter=0031 delay=35', 'counter=0030 delay=35', 1),
-            self.text.replace('transfer_expiries=2663', 'transfer_expiries=256'),
-            self.text + self.transfer_rows[-1],
-        )
-        for index, text in enumerate(cases):
-            with self.subTest(case=index), self.assertRaises(ValueError):
-                check(text, self.image)
-
-    def test_requires_explicit_profile_and_organic_packet_entry(self):
-        row = 'rom4_staged_host_header: index=1 value=0a05 mask=ffff pc_context=3871 t=0.175897519\n'
-        for text in (self.text.replace('system=nse1pipe', 'system=nse1astd'),
-                     self.text.replace('rom4_staged_profile:', 'missing_profile:'),
-                     self.text.replace(row, ''), self.text + row,
-                     self.text.replace('value=0a05', 'value=0a04'),
-                     self.text.replace('pc_context=387f', 'pc_context=387e'),
-                     self.text.replace('host_headers=11', 'host_headers=0'),
-                     self.text.replace('host_consumed=29', 'host_consumed=2'),
-                     self.text.replace('previous=0006 next=000b', 'previous=0007 next=000b'),
-                     self.text.replace('pc_context=3907', 'pc_context=3906'),
-                     self.text.replace('0.258977019', '0.175899019'),
-                     self.text.replace('rom4_staged_host_consume:', 'missing_consume:'),
-                     self.text + 'rom4_staged_host_consume: unexpected\n',
-                     self.text + self.stop):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
-
-    def test_rejects_wrong_source_position_or_ambiguous_binding(self):
-        for image in (b'', self.image[2:], self.image + self.payload, self.image + self.tail_payload,
-                      self.image + self.loop_payload,
-                      self.image[:-2] + b'\x00\x00'):
-            with self.subTest(length=len(image)), self.assertRaises(ValueError):
-                check(self.text, image)
-
-    def test_distinguishes_live_checkpoint_and_reinitialized_ring(self):
-        for text in (self.text.replace(self.row, self.row.replace('illegal=0', 'illegal=1')),
-                     self.text.replace('index=8 previous=0000 next=0006', 'index=8 previous=0033 next=0039'),
-                     self.text.replace('host_consumed=29', 'host_consumed=8'),
-                     self.text.replace('frame=28', 'frame=30'),
-                     self.text.replace('0.501299', '0.401299'),
-                     self.text.replace('0.515164192', '0.175897700'),
-                     self.text.replace('value=354a', 'value=354b')):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
-
-    def test_requires_terminal_context_and_actual_rf_control_order(self):
-        for text in (self.text.replace(self.terminal, ''), self.text + self.terminal,
-                     self.text.replace('rom4_staged_end_state: a=0000000000', 'rom4_staged_end_state: a=0000000001'),
-                     self.text.replace('st1=6103 bk=00fa', 'st1=6102 bk=00fa'),
-                     self.text.replace('6bf8,001a,0001', '6af8,001a,0001'),
-                     self.text.replace('rom4_rf_port32:', 'missing_rf_control:'),
-                     self.text.replace('port31=27a2', 'port31=27a3'),
-                     self.text.replace('expiry=3', 'expiry=2'),
-                     self.text.replace('target=0924 counter=0924', 'target=0924 counter=0925'),
-                     self.text.replace('1.846461385', '1.846465000'),
-                     self.text + 'rom4_transfer_timer: malformed\n'):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
-
-    def test_requires_bound_demand_upload(self):
-        row = f'rom4_staged_demand_tail: base=0a40 words={self.demand}\n'
-        for text in (self.text.replace(row, ''), self.text + row,
-                     self.text.replace('base=0a40', 'base=0a41'),
-                     self.text.replace('6bf8,001a,0001', '6bf8,0019,0001'),
-                     self.text.replace('6bf8,001a,0001', '6bf8,001a,0002'),
-                     self.text.replace('f072,0a5a', 'f072,0a5b')):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                check(text, self.image)
-        with self.assertRaises(ValueError):
-            check(self.text, self.image + self.demand_payload)
+if __name__ == "__main__":
+    unittest.main()
