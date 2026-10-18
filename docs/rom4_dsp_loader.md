@@ -18,6 +18,23 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## BRC memory moves in ordinary delayed controls
+
+Complete two-word MVMD/MVDK-to-BRC forms may occupy ordinary delayed
+branch/call/return spans. Their existing source sample and zero-latency BRC
+publication remain owned by Access. RPTBD's delay span and active block-body
+BRC writes remain excluded; allowing an ordinary control delay does not
+license modification of a block owner's count.
+
+`move-brc-delay` passes 1,800 cases and save/load replays: BD, taken/untaken
+BCD, CALLD, FCALLD and RETD; DP/postincrement and mapped AR/AL source forms;
+counts 0/1/2/7/127; subsequent RPTB/RPTBD; two pages and three checkpoints.
+Source poisoning cannot change the retained count. The resulting loops copy
+exactly count+1 words, and call/return frames remain separately owned.
+SP-relative sources, extended addressing, interrupt composition and silicon
+pipeline timing are not qualified by this matrix. Existing ordinary-source
+and block-body/RPTBD-delay exclusion fixtures remain separate controls.
+
 ## XC protection across a selected near return
 
 TI [SPRU172C, XC description](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)

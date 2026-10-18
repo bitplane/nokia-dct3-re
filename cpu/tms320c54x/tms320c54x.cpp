@@ -3453,7 +3453,8 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_pipeline_immediate[2] == 7;
 		bool const brc_move = direct_move && m_pipeline_immediate[2] == 0x1a;
-		if (m_pipeline_valid[2] && brc_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_block_body[2]))
+		bool const ordinary_delay_brc_move = completing_move_delay && m_pipeline_control_word != 0xf272;
+		if (m_pipeline_valid[2] && brc_move && ((!ordinary_delay_brc_move && (completing_move_delay || m_pipeline_delay_decode_words)) || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

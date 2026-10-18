@@ -2478,9 +2478,13 @@ including its delayed-control composition. The ordinary ST1 write at `befe`
 was not XC-controlled: `XC 1,BEQ` at `d3f6` selected RET at `d3f7`, leaving
 the former sequential protection endpoint `d3f8` unreachable. The
 [near-return protection qualification](rom4_dsp_loader.md#xc-protection-across-a-selected-near-return)
-corrects that bookkeeping without relaxing the status guard. The current stop
-is a memory move involving BRC in a repeat/control-delay composition, with
-reported fetch PC `cedd`; recover its retained owner and operand span next.
+corrects that bookkeeping without relaxing the status guard. The `7168 001a`
+move to BRC at `ceda` is in the ordinary delayed conditional branch at `ced8`,
+not an RPTBD delay; it now executes under the
+[ordinary delayed-control BRC qualification](rom4_dsp_loader.md#brc-memory-moves-in-ordinary-delayed-controls).
+The current guard is word `3895` owned by `cf61`, in RPTBD `cf5f`'s delay
+span (reported fetch PC `cf63`). Recover its arithmetic, memory and block
+ownership before admitting that composition.
 No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
