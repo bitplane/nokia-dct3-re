@@ -3282,7 +3282,7 @@ void tms320c54x_device::pipeline_step()
 			bool delay_compare = false;
 			bool delay_bitt = false;
 			bool delay_arithmetic = false;
-			bool const delay_square = square_accumulate(word) && u8(word) < 0x98;
+			bool const delay_square = (square_accumulate(word) || (word & 0xfe00) == 0x2600) && u8(word) < 0x98;
 			bool const delay_t_load = (word & 0xff00) == 0x3000 && u8(word) < 0x98;
 			bool delay_repeat = false;
 			u32 delay_repeat_target = 0;

@@ -40,8 +40,9 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-The current staged EFR frame stops at memory SQUR `2692`, owner `bb07`,
-in RPTBD `bb05`'s delay span. No complete staged EFR frame has passed.
+The current staged EFR frame stops at short repeat `ec07`, owner `bdcc`,
+in conditional BCD `bdca` (`fa47`)'s delay span. No complete staged EFR
+frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -108,6 +109,26 @@ the accumulator changes before Execute and ASM changes after capture.
 `st-mpy-edge` retains 64 replayed mapped-X/Y rejections before reads,
 writes or pointer effects. Mapped/peripheral operands, arbitrary producer/
 interrupt/repeat composition and physical bus phases are not qualified.
+
+## Memory SQUR in delayed controls
+
+Short RAM SQUR Smem,A/B (`26xx/27xx`) may occupy ordinary control and
+RPTBD delay words. Read retains Smem and publishes it to T; Execute replaces
+the selected accumulator with the signed square. FRCT doubles the product,
+OVM clamps the result with sticky overflow, and SMUL does not clamp the
+product. This differs from SQURA/SQURS, which accumulate into the old value.
+
+`squr-delay` passes 27,648 cases and cleared-pipeline replays across BD,
+both BCD outcomes, CALLD, FCALLD and RETD; both destinations; DP/plain/
+postincrement RAM; eight patterns; FRCT/OVM/SMUL/SXM; two pages and three
+checkpoints. `rptbd-squr` passes 92,160 cases and cleared-pipeline replays:
+first/second/both-same/both-split layouts plus SQUR followed by MPYA,
+with the same addressing/pattern/mode dimensions, outer counts 0/1/7 and
+four checkpoints. The mixed case consumes the correct signed 17-bit A
+high word at MPYA Execute. Per-clock results/status, one read per source,
+pointer/opcode retention, Read-owned T followed by a newer T, and completed
+results observed by every outer-body copy are checked. Extended/mapped
+sources, arbitrary interrupts and physical bank phases remain unqualified.
 
 ## Square accumulation in ordinary delayed controls
 
