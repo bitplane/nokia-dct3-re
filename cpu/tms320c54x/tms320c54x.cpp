@@ -266,6 +266,16 @@ constexpr bool staged_direct_mvdm(u16 word)
 	return (word & 0xfff8) == 0x7210 || (word >= 0x7208 && word <= 0x720d);
 }
 
+constexpr bool staged_direct_push(u16 word)
+{
+	return (word & 0xffe0) == 0x4a00 || (word & 0xffe0) == 0x4a60;
+}
+
+constexpr bool staged_direct_pop(u16 word)
+{
+	return (word & 0xff00) == 0x8a00 && ((u8(word) >= 6 && u8(word) <= 0x1d) || (u8(word) >= 0x60 && u8(word) <= 0x7f));
+}
+
 constexpr bool staged_data_copy(u16 word)
 {
 	return staged_direct_mvdm(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8)));
@@ -2940,6 +2950,8 @@ void tms320c54x_device::pipeline_step()
 	bool prefetch_bubble = false;
 	bool late_popm_read = false;
 	u16 late_popm_address = 0;
+	bool late_pushm_read = false;
+	u16 late_pushm_address = 0;
 	for (unsigned stage = 5; stage; --stage)
 	{
 		m_pipeline_valid[stage] = m_pipeline_valid[stage - 1];
@@ -3381,14 +3393,14 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: unsupported staged Smem extension %04x/%04x instruction=%06x last_fetch_physical=%06x\n", machine().describe_context(), word, m_pipeline_immediate[2], unsigned(m_pipeline_address[2]), unsigned(m_pipeline_physical_address[2]));
 			m_illegal = true; return;
 		}
-		bool const direct_push = (word & 0xffe0) == 0x4a00;
+		bool const direct_push = staged_direct_push(word);
 		bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
 		if (m_pipeline_valid[2] && (staged_extended_push(word) || staged_extended_pop(word)) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
-		bool const direct_pop = (word & 0xff00) == 0x8a00 && u8(word) >= 6 && u8(word) <= 0x1d;
+		bool const direct_pop = staged_direct_pop(word);
 		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_pipeline_block_body[2])
 		{
 			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word);
@@ -4201,12 +4213,15 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_operand_address[4] ^ 1);
 	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xffe0) == 0x4a00)
+	if (m_pipeline_valid[4] && staged_direct_push(m_pipeline_word[4]))
 	{
 		// Class 16A: retain the source read and stack destination separately.
 		// Read-owned SP allocation is a declared partial stage model;
 		// indirect PSHM and stack/DAGEN conflicts are not enabled here.
-		m_pipeline_operand[4] = data_read(u8(m_pipeline_word[4]));
+		late_pushm_address = u8(m_pipeline_word[4]);
+		late_pushm_read = late_pushm_address >= 0x60 && m_pipeline_valid[5] &&
+			staged_direct_push(m_pipeline_word[5]) && m_pipeline_operand_address[5] == late_pushm_address;
+		if (!late_pushm_read) m_pipeline_operand[4] = data_read(late_pushm_address);
 		m_pipeline_operand_address[4] = --m_sp;
 	}
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xff00) == 0x8a00 || (m_pipeline_word[4] & 0xff00) == 0x8b00))
@@ -4228,7 +4243,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		late_popm_address = m_sp++;
 		late_popm_read = (m_pipeline_word[4] & 0xff00) == 0x8a00 && late_popm_address >= 0x60 && m_pipeline_valid[5] &&
-			(m_pipeline_word[5] & 0xffe0) == 0x4a00 && m_pipeline_operand_address[5] == late_popm_address;
+			staged_direct_push(m_pipeline_word[5]) && m_pipeline_operand_address[5] == late_popm_address;
 		if (!late_popm_read) m_pipeline_operand[4] = data_read(late_popm_address);
 		u16 const destination = (m_pipeline_word[4] & 0xff00) == 0x8a00 ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4];
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && destination == 0x1d && m_pipeline_block_active && m_pipeline_operand[4] != m_pmst)
@@ -4651,7 +4666,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_long_store_pending = true;
 			if (staged_extended_dst(m_op)) ++m_pc;
 		}
-		else if ((m_op & 0xffe0) == 0x4a00 || (m_op & 0xff00) == 0x4b00)
+		else if (staged_direct_push(m_op) || (m_op & 0xff00) == 0x4b00)
 		{
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			if (staged_extended_push(m_op)) ++m_pc;
@@ -4955,6 +4970,10 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G example 7-52: dedicated ASM loads forward with no gap;
 		// ordinary ST1 writes retain the pre-Execute Read sample (table 7-22).
 		m_pipeline_immediate[4] = m_st1 & 0x1f;
+	if (late_pushm_read)
+		// SPRU131G 7.3.2: as for PSHM->POPM, preserve the older EB
+		// publication and consume it once rather than sampling stale RAM.
+		m_pipeline_operand[4] = data_read(late_pushm_address);
 	if (late_popm_read)
 	{
 		// SPRU131G 7.3.2: a same-location on-chip read can consume a

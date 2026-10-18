@@ -15570,6 +15570,58 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253610;
 		m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct page_zero_stack_fixture
+	{
+		unsigned form, snapshot;
+		u16 address, value, sp, st1;
+		u32 base;
+	};
+	static page_zero_stack_fixture page_zero_stack_case(unsigned v, bool edge)
+	{
+		if (edge) { unsigned const index = v % 192; return {(v / 192) % 2, v / 768, u16(index < 64 ? 0x20 + index : 0x40 + index), 0x1357, 0x3000, 0x4900, (v / 384) % 2 ? 0x20000U : 0U}; }
+		u16 const address = 0x60 + v % 32;
+		return {(v / 12288) % 6, (v / 4096) % 3, address,
+			std::array<u16, 8>{0, 1, 0x7f, 0x80, 0xff, 0x7fff, 0x8000, 0xffff}[(v / 32) % 8],
+			std::array<u16, 4>{0x3000, 0x3001, u16(address + ((v / 12288) % 6 == 5 ? 2 : 1)), u16(address + ((v / 12288) % 6 == 5 ? 3 : 2))}[(v / 256) % 4],
+			u16((v / 1024) % 2 ? 0x4900 : 0x900), (v / 2048) % 2 ? 0x20000U : 0U};
+	}
+	void start_page_zero_stack(unsigned variant = 0)
+	{
+		bool const edge = !strcmp(machine().options().bios(), "stack-page0-edge"); auto const f = page_zero_stack_case(variant, edge);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, (f.form == 1 ? 0x8a00 : 0x4a00) | f.address);
+		unsigned const gap = f.form == 3 ? 1 : f.form == 4 ? 3 : 0;
+		if (!edge && f.form >= 2) program.write_word(f.base + 0x601 + gap, f.form == 5 ? 0x4a60 | ((f.address + 1) & 31) : 0x8a00 | f.address);
+		program.write_word(f.base + (f.form >= 2 ? 0x602 + gap : 0x601), 0xf4e1);
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		if (!edge) { data.write_word(f.address, f.value); data.write_word(0x60 | ((f.address + 1) & 31), f.value ^ 0x5aa5); if (f.form == 1) data.write_word(f.sp, f.value); }
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "page_zero_stack_read", [this, f, gap, edge](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_pipeline_operand_reads++;
+			u16 const address = !i ? f.form == 1 ? f.sp : f.address : f.form == 5 ? 0x60 | ((f.address + 1) & 31) : f.sp - 1;
+			u16 const value = i && f.form == 5 && f.sp - 1 != address ? f.value ^ 0x5aa5 : f.value;
+			if (edge || at != address || word != value || m_cpu->pipeline_cycles() != 5 + (i ? 1 + gap : 0)) osd_printf_info("Page-zero stack read mismatch: case=%u form=%u replay=%u read=%u address=%04x expected=%04x word=%04x expected=%04x clock=%llu\n", m_pipeline_peripheral_case, f.form, unsigned(m_pipeline_replay), i, unsigned(at), address, word, value, (unsigned long long)m_cpu->pipeline_cycles());
+			expect(!edge && i < (f.form >= 2 ? 2U : 1U) && at == address && word == value && m_cpu->pipeline_cycles() == 5 + (i ? 1 + gap : 0), "Page-zero stack instructions retain their source once in order");
+			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, word ^ 0xffff);
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "page_zero_stack_write", [this, f, gap, edge](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_pipeline_store_writes++;
+			u16 const address = !i ? f.form == 1 ? f.address : f.sp - 1 : f.form == 5 ? f.sp - 2 : f.address;
+			u16 const value = i && f.form == 5 && f.sp - 1 != (0x60 | ((f.address + 1) & 31)) ? f.value ^ 0x5aa5 : f.value;
+			expect(!edge && i < (f.form >= 2 ? 2U : 1U) && at == address && word == value && m_cpu->pipeline_cycles() == 6 + (i ? 1 + gap : 0), "Page-zero stack instructions publish the retained word once at the encoded destination");
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62162;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct mvdm_acc_fixture
 	{
 		unsigned reg, snapshot;
@@ -17931,6 +17983,7 @@ private:
 	virtual void machine_start() override
 	{
 		save_item(NAME(m_bus_ready));
+		save_item(NAME(m_stack_mmr));
 		save_item(NAME(m_bus_start_cycles));
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
 		save_item(NAME(m_idle_dma_start));
@@ -18200,6 +18253,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvdm-delay") || mvkd_delay()) { start_mvdm_delay(); return; }
 		if (!strcmp(machine().options().bios(), "mvdm-ar")) { start_mvdm_ar(); return; }
 		if (!strcmp(machine().options().bios(), "mvdm-acc") || !strcmp(machine().options().bios(), "mvdm-acc-edge")) { start_mvdm_acc(); return; }
+		if (!strcmp(machine().options().bios(), "stack-page0") || !strcmp(machine().options().bios(), "stack-page0-edge")) { start_page_zero_stack(); return; }
 		if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
 		if (!strcmp(machine().options().bios(), "read-a-mapped")) { start_mapped_read_a(); return; }
 		if (!strcmp(machine().options().bios(), "bus-stm")) { start_staged_bus_stm(); return; }
@@ -18679,7 +18733,7 @@ private:
 	}
 	u16 repeat_irq_r(offs_t offset)
 	{
-		if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210)
+		if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210 || m_phase == 62162 || m_phase == 62163)
 			return m_stack_mmr[offset];
 		if (m_phase == 784)
 		{
@@ -49353,6 +49407,29 @@ private:
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 62162)
+		{
+			bool const edge = !strcmp(machine().options().bios(), "stack-page0-edge");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = page_zero_stack_case(variant, edge);
+			unsigned const checkpoint = edge ? f.snapshot ? 7 : 4 : std::array<unsigned, 3>{4, 6, 9}[f.snapshot];
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 3), "Page-zero stack admission excludes peripherals and indirect encodings before source access");
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save page-zero stack source destination and pending publication"); }
+			if (tick == 16)
+			{
+				unsigned const transactions = edge ? 0 : f.form >= 2 ? 2 : 1;
+				u16 const sp = edge ? f.sp : f.form == 0 ? f.sp - 1 : f.form == 1 ? f.sp + 1 : f.form == 5 ? f.sp - 2 : f.sp;
+				expect(m_pipeline_operand_reads == transactions && m_pipeline_store_writes == transactions && m_cpu->state_int(tms320c54x_device::STATE_SP) == sp, "Every stack operation owns one source one destination and one SP update");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Direct page-zero stack addressing ignores DP and CPL and preserves unrelated registers");
+				if (!edge) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "All ordered stack publications drain before IDLE");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay stack slots without duplicate source reads writes or SP updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62163; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 1536U : 73728U)) { start_page_zero_stack(variant + 1); return; }
+				if (edge) { osd_printf_info("TMS320C54x page-zero stack exclusions: PASS cases=1536 restore=1536 forms=PSHM,POPM encodings=192 pages=2 snapshots=2 data_reads=0 data_writes=0 stack_allocation=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated page-zero stack exclusions complete"); }
+				osd_printf_info("TMS320C54x page-zero stack: PASS cases=73728 restore=73728 addresses=32 words=8 stacks=4 cpl=2 pages=2 snapshots=3 forms=push,pop,pair0,pair1,pair3,double_push source_retained=1 publications=once sp_updates=once status_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated page-zero stack complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62163) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62162; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62160)
 		{
 			bool const edge = !strcmp(machine().options().bios(), "mvdm-acc-edge");
@@ -53311,6 +53388,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(90, "repeat-stlm", "STLM suspension and restoration of an interrupted block repeat")
 	ROM_SYSTEM_BIOS(91, "mvdm-acc", "Absolute data-to-accumulator-slice MVDM")
 	ROM_SYSTEM_BIOS(92, "mvdm-acc-edge", "MVDM accumulator control-source exclusions")
+	ROM_SYSTEM_BIOS(93, "stack-page0", "Direct page-zero RAM PSHM and POPM")
+	ROM_SYSTEM_BIOS(94, "stack-page0-edge", "Direct page-zero stack peripheral and indirect exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
