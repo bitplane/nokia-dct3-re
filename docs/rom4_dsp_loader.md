@@ -277,9 +277,10 @@ staged execution executes its mapped-AR ADDM and the initialization routine's
 ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
 execute, and the backend observes completion strobes. Execution
 reaches resident code, executes the absolute BITT in RETD's delay span
-and RC TC, and passes short circular MAR and the delayed SUBS under BCD
-BEQ at `008e4f`. It stops at `008e67`, `f947` (CC ALEQ), with
-the exposed PC at `8e69`, PMST `ffac` and
+and RC TC, and passes short circular MAR, the delayed SUBS under BCD
+BEQ at `008e4f`, and CC ALEQ. It stops at `0031d6`, `7f92`
+(WRITA *AR2+) under an active single-instruction repeat, with
+the exposed PC at `31d8`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -2741,6 +2742,16 @@ ANEQ/BNEQ exclusions and rejecting a two-word operand starting in the final
 delay word before DAGEN or operand effects. The pre-existing absolute ADD
 admission for other owners is unchanged. Other new owner compositions and
 physical pipeline timing are not claimed.
+
+Nondelayed CC now admits all twelve signed A/B predicates, sharing CCD's
+existing signed-40-bit predicate decoder without changing frame ownership.
+The `signed-call` profile extends the existing CC/RC fixture to 768 replay
+cases: eight zero/sign/guard patterns, two pages and four save points.
+Changing the predicate after Read and the target literal after Decode
+cannot change the selected path. Taken calls publish one frame, fetch the
+target once and return with balanced SP; untaken calls never access stack
+memory. The original 64-case AEQ/BEQ and 768-case signed-return profiles
+remain unchanged. Compound/status-call predicates are not newly admitted.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;

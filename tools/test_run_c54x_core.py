@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_signed_calls_require_all_predicates_and_owned_frames(self):
+        marker, ending = EXTRA_PROFILES['signed-call']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='signed-call')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='signed-call')
+
     def test_bcd_arithmetic_requires_predicate_and_operand_retention(self):
         for profile in ('bcd-arithmetic', 'bcd-arith-edge'):
             marker, ending = EXTRA_PROFILES[profile]

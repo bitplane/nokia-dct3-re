@@ -110,11 +110,10 @@ constexpr bool staged_tc_branch(u16 word)
 
 constexpr bool staged_conditional_call(u16 word)
 {
-	// Preserve the existing nondelayed AEQ/BEQ surface. CCD additionally
-	// admits the six signed predicates for either 40-bit accumulator.
+	// CC and CCD admit the six signed predicates for either 40-bit accumulator.
 	u8 const condition = word;
-	return (word & 0xfff7) == 0xf945 || ((word & 0xff00) == 0xfb00 &&
-		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
+	return (word & 0xfd00) == 0xf900 &&
+		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f));
 }
 
 constexpr bool staged_conditional_return(u16 word)
@@ -3243,7 +3242,9 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && staged_write_a(word) && (m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
-			logerror("%s: staged WRITA repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged WRITA repeat/control-delay composition is unsupported instruction=%06x word=%04x repeat=%u delay=%u xc=%u block=%u\n",
+				machine().describe_context(), unsigned(m_pipeline_address[2]), word, unsigned(m_pipeline_repeat_active),
+				m_pipeline_delay_decode_words, unsigned(m_pipeline_xc_active), unsigned(m_pipeline_block_body[2])); m_illegal = true; return;
 		}
 		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_pipeline_immediate[2] == 7;
 		bool const brc_move = direct_move && m_pipeline_immediate[2] == 0x1a;
