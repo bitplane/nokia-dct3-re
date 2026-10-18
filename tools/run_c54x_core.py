@@ -1659,6 +1659,10 @@ EXTRA_PROFILES = {
         ),
         "Fatal error: TMS320C54x isolated long MVKD complete",
     ),
+    "mapped-load-age": (
+        "TMS320C54x staged mapped load age: PASS cases=18432 restore=18432 loads=LD,LDU forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped load age complete",
+    ),
     "ldm-ar-age": (
         "TMS320C54x staged LDM AR age: PASS cases=2304 restore=2304 registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 read=5 execute=6 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated LDM AR age complete",
@@ -1889,7 +1893,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge", "cmpm-map", "cmpm-map-edge"):
         machine = "tms54xtra"
-    if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age"):
+    if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

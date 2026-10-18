@@ -15,7 +15,7 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 class CoreResultTests(unittest.TestCase):
     def test_dagen_age_profiles_require_complete_matrix_and_replay(self):
-        for profile in ('st-mvmm', 'ldm-ar-age'):
+        for profile in ('st-mvmm', 'ldm-ar-age', 'mapped-load-age'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending + '\n'
             check_result(text, 3, profile=profile)

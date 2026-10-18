@@ -18,11 +18,13 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
-## LDM AR source age
+## Mapped-load AR source age
 
-LDM AR0..AR7 into A/B retains its Read operand before a younger instruction's
-same-clock Access update of that AR. Destination Execute and zero-extension
-are unchanged; SXM does not sign-extend LDM (SPRU172C 4-73, Class 3A).
+LDM and zero-shift LD/LDU from mapped AR0..AR7 retain their Read operand
+before a younger instruction's same-clock Access update of that AR. Source
+address selection, destination Execute and extension rules are unchanged:
+LDM/LDU zero-extend, while LD sign-extends only under SXM (SPRU172C 4-73
+for LDM; the retained LD/LDU contracts below apply to ordinary loads).
 This is an age-order correction within the prototype clock, not a new
 physical timing measurement. Other MMR sources retain their existing rules.
 
@@ -44,6 +46,24 @@ at 6, the younger update, other accumulator and status preservation, and no
 duplicate bus accesses after restore. The unmodified core fails the Read
 sample. General interrupt/stack/control-MMR compositions are not newly
 qualified.
+
+`mapped-load-age` adds 18,432 cases plus replay for LD/LDU through direct DP,
+plain indirect, absolute and ordinary offset addressing. It covers the same
+eight AR sources, A/B destinations, four values, three younger writers,
+SXM states, pages and snapshots as the LDM matrix. One-word loads retain
+Read/Execute at clocks 5/6; two-word forms retain 6/7. The unmodified ordinary
+load path fails the old-register sample despite LDM already being corrected.
+
+A literal adjacency scan of the 65,535 acquired ROM4 program words found no
+direct mapped LD/LDU followed immediately by MAR on the same AR. This is not
+a control-flow or indirect-source census and does not establish that the
+hazard is unreachable. The ordinary-load correction is ISA conformance, not
+an independently observed additional handset blocker.
+
+Read-age qualification is not inferred for RMW, arithmetic/logic, multiply,
+port-transfer or dual-read families. They retain their separate operand,
+forwarding and publication rules; their same-clock AR-age compositions need
+dedicated tests before a broader read-order change.
 
 ## ADDM BRC and interactive staged execution
 

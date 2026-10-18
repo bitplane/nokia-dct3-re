@@ -160,6 +160,10 @@ A 2,304-case replay matrix and the pinned native descriptor-producer loop
 protect it. Atomic and staged first RF-control prefixes now agree, but their
 cutoff counts and mode cells still differ; complete frontend or physical
 bus-timing parity is not claimed.
+The same AR-source Read ordering is separately qualified for zero-shift
+LD/LDU with 18,432 replay cases through DP, indirect, absolute and offset
+addressing. This is ISA coverage, not an additional observed boot blocker;
+other mapped-read families are not silently included.
 `make check-c54x-rom4-staged` separately checks the reset-free ten-second
 bus/upload checkpoint from fresh NVRAM. Its reviewed data fixture preserves
 the bounded event stream while the checker enforces fault rejection, accepted

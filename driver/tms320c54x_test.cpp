@@ -7987,17 +7987,23 @@ private:
 		m_phase = 252710; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	void start_pipeline_ldm_ar_age(unsigned variant = 0)
+	void start_pipeline_mapped_load_age(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		unsigned const ar = variant % 8, kind = (variant / 64) % 3;
-		bool const destination_b = (variant / 8) % 2, sxm = (variant / 192) % 2;
-		u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(variant / 16) % 4];
-		u32 const base = (variant / 384) % 2 ? 0x20000 : 0;
+		bool const mapped = !strcmp(machine().options().bios(), "mapped-load-age");
+		unsigned const fields = mapped ? variant / 8 : variant, form = mapped ? (variant / 2) % 4 : 0;
+		unsigned const ar = fields % 8, kind = (fields / 64) % 3, pointer = (ar + 2) % 8;
+		unsigned const words = mapped && form >= 2 ? 2 : 1, read_cycle = 4 + words;
+		bool const destination_b = (fields / 8) % 2, sxm = (fields / 192) % 2;
+		u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(fields / 16) % 4];
+		u32 const base = (fields / 384) % 2 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x600, 0x4800 | (destination_b ? 0x100 : 0) | (0x10 + ar));
-		program.write_word(base + 0x601, kind == 2 ? 0xe700 | (((ar + 1) % 8) << 4) | ar :
+		u16 const mode = form == 0 ? 0x10 + ar : form == 1 ? 0x80 + pointer : form == 2 ? 0xf8 : 0xe0 + pointer;
+		program.write_word(base + 0x600, (mapped ? 0x1000 | (variant % 2 ? 0x200 : 0) : 0x4800) |
+			(destination_b ? 0x100 : 0) | mode);
+		if (words == 2) program.write_word(base + 0x601, form == 2 ? 0x10 + ar : 0);
+		program.write_word(base + 0x600 + words, kind == 2 ? 0xe700 | (((ar + 1) % 8) << 4) | ar :
 			(kind ? 0x6d88 : 0x6d90) | ar);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -8008,30 +8014,31 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3333);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, value);
+		if (mapped && (form == 1 || form == 3)) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + pointer, 0x10 + ar);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_idle_fixture_tick = 0;
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ldm_ar_age_read",
-			[this, ar, kind, value](offs_t at, u16 &word, u16) {
+			[this, ar, kind, value, read_cycle](offs_t at, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				if (at == 0x10 + ar)
 				{
-					expect(word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5,
-						"Older LDM Read retains AR before a younger Access update"); ++m_pipeline_operand_reads;
+					expect(word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
+						"Older mapped load Read retains AR before a younger Access update"); ++m_pipeline_operand_reads;
 				}
 				else
 				{
 					expect(kind == 2 && at == 0x10 + (ar + 1) % 8 && word == 0x3333 &&
-						!m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 4, "Younger MVMM retains its own Decode source once");
+						!m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == read_cycle - 1, "Younger MVMM retains its own Decode source once");
 					++m_pipeline_extensions_reads;
 				}
 			});
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ldm_ar_age_write",
-			[this, ar, kind](offs_t at, u16 &word, u16) {
+			[this, ar, kind, read_cycle](offs_t at, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(kind == 2 && at == 0x10 + ar && word == 0x3333 && !m_pipeline_store_writes &&
-					m_cpu->pipeline_cycles() == 5, "Younger MVMM writes once without changing the older LDM sample");
+					m_cpu->pipeline_cycles() == read_cycle, "Younger MVMM writes once without changing the older load sample");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 600010; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -18367,7 +18374,8 @@ private:
 		if (!strcmp(machine().options().bios(), "rmw-long-periph")) { start_pipeline_long_rmw(); return; }
 		if (!strcmp(machine().options().bios(), "st-long-periph")) { start_pipeline_long_immediate_store(); return; }
 		if (!strcmp(machine().options().bios(), "st-mvmm")) { start_pipeline_store_mvmm(); return; }
-		if (!strcmp(machine().options().bios(), "ldm-ar-age")) { start_pipeline_ldm_ar_age(); return; }
+		if (!strcmp(machine().options().bios(), "ldm-ar-age")) { start_pipeline_mapped_load_age(); return; }
+		if (!strcmp(machine().options().bios(), "mapped-load-age")) { start_pipeline_mapped_load_age(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-st")) { start_preincrement_store(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc")) { start_move_brc(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc-edge")) { start_move_brc_edge(); return; }
@@ -44129,9 +44137,13 @@ private:
 		if (m_phase == 600010)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			unsigned const ar = variant % 8, kind = (variant / 64) % 3, checkpoint = 4 + variant / 768;
-			bool const destination_b = (variant / 8) % 2, sxm = (variant / 192) % 2;
-			u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(variant / 16) % 4];
+			bool const mapped = !strcmp(machine().options().bios(), "mapped-load-age");
+			unsigned const fields = mapped ? variant / 8 : variant, form = mapped ? (variant / 2) % 4 : 0;
+			unsigned const ar = fields % 8, kind = (fields / 64) % 3;
+			unsigned const checkpoint = 4 + unsigned(mapped && form >= 2) + fields / 768;
+			bool const destination_b = (fields / 8) % 2, sxm = (fields / 192) % 2;
+			u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(fields / 16) % 4];
+			u64 const loaded = mapped && !(variant % 2) && sxm ? u64(s64(s16(value))) & 0xffffffffffULL : value;
 			u16 const updated = kind == 2 ? 0x3333 : u16(value + (kind ? -1 : 1));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "LDM/younger DAGEN chain stays supported");
 			if (tick == checkpoint && !m_pipeline_replay)
@@ -44144,11 +44156,11 @@ private:
 			{
 				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(kind == 2) &&
 					m_pipeline_extensions_reads == unsigned(kind == 2) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == updated &&
-					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value &&
+					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == loaded &&
 					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x123456789aULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0)),
-					"LDM zero-extends the old AR once, preserves flags and retains the younger update through replay");
+					"Mapped load extends the old AR once, preserves flags and retains the younger update through replay");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
@@ -44159,7 +44171,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 600011; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 2303) { start_pipeline_ldm_ar_age(variant + 1); return; }
+				if (variant < (mapped ? 18431 : 2303)) { start_pipeline_mapped_load_age(variant + 1); return; }
+				if (mapped)
+				{
+					osd_printf_info("TMS320C54x staged mapped load age: PASS cases=18432 restore=18432 loads=LD,LDU forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated mapped load age complete");
+				}
 				osd_printf_info("TMS320C54x staged LDM AR age: PASS cases=2304 restore=2304 registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 read=5 execute=6 physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated LDM AR age complete");
 			}
@@ -53944,6 +53961,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(105, "addm-brc-loop", "ADDM BRC publication before separated RPTB and RPTBD consumers")
 	ROM_SYSTEM_BIOS(106, "st-mvmm", "Immediate-store postincrement visibility to MVMM")
 	ROM_SYSTEM_BIOS(107, "ldm-ar-age", "Older LDM source before younger DAGEN updates")
+	ROM_SYSTEM_BIOS(108, "mapped-load-age", "Mapped LD and LDU before younger DAGEN updates")
 ROM_END
 
 ROM_START(tms54rom4)
