@@ -716,6 +716,20 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_mapped_t_addm_scope(self):
+        marker, ending = EXTRA_PROFILES['addm-t']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='addm-t')
+        for old, new in (('restore=6144', 'restore=0'), ('retained_source=1', 'retained_source=0'),
+                         ('newer_t_overwritten=1', 'newer_t_overwritten=0'),
+                         ('duplicate_reads=0', 'duplicate_reads=1'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='addm-t')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='addm-t')
+
     def test_repeated_arithmetic_shift_scope(self):
         marker, ending = EXTRA_PROFILES['rpt-sfta']
         output = marker + '\n' + ending + '\n'

@@ -3423,7 +3423,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged ADDM BRC active-loop or delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		if (m_pipeline_valid[2] && word == 0x6bf8 && m_pipeline_operand_address[2] < 0x60 &&
-			(m_pipeline_operand_address[2] < 0x10 || m_pipeline_operand_address[2] > 0x18) && !addm_brc)
+			(m_pipeline_operand_address[2] < 0x10 || m_pipeline_operand_address[2] > 0x18) && m_pipeline_operand_address[2] != 0x0e && !addm_brc)
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_operand_address[2]);
 			m_illegal = true; return;
@@ -4036,7 +4036,8 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < (extended_rmw ? 0x20 : 0x60))
+		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < (extended_rmw ? 0x20 : 0x60) &&
+			m_pipeline_operand_address[3] != 0x0e)
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;

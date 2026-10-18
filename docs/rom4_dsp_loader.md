@@ -18,6 +18,23 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## ADDM publication to T
+
+Direct-DP and absolute `ADDM` can write mapped T (`000e`); unrelated low
+registers retain their guards. `addm-t` passes 6,144 cases plus save/load
+replay using the existing independent mapped-ADDM arithmetic matrix:
+four source words, four immediates, sixteen SXM/OVM/carry/OVA combinations,
+both CMPT modes, two program pages and three checkpoints. It checks one
+retained Read, one Execute publication, unchanged A/B and address registers,
+literal poisoning and a changed live T between Read and Execute.
+Direct forms read/write at clocks 6/7, absolute forms at 7/8.
+
+SPRU172C 4-9 specifies a non-repeatable instruction affecting C/OVA under
+SXM/OVM. SPRU131G 7.5.6 classifies it as a store-type T writer: short
+Category-I shift/bit-test consumers require a separating instruction;
+other consumers have zero latency. This gate establishes publication, not
+those consumer compositions, IRQ/delay interaction or physical bus phases.
+
 ## Repeated arithmetic accumulator shifts
 
 Single-repeat SFTA reuses the ordinary instruction's arithmetic on each
