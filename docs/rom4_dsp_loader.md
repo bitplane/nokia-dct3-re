@@ -18,6 +18,25 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Short repeat in RETD delay words
+
+A short immediate RPT in RETD's first delay word retains the return target
+already sampled by the return's stack Read. Its body drains before target
+execution. Repeating the body must neither pop another return word nor
+re-sample the stack location after it has changed. Existing return-prefetch
+ownership is retained; the repeat uses the same saved continuation mechanism
+as BD, not a new stack or firmware-specific target.
+
+`retd-rpt` passes 5,760 cases and cleared-pipeline replays across atomic/staged
+frontends, STL/MVDD/NOP bodies, counts 0/1/8/39/255, independent target counts
+0/2/7, both return directions, four patterns, two pages and four checkpoints.
+The original return word is read once, then poisoned; the target starts its
+own fresh repeat only after delay writes finish. Tests check balanced SP,
+ordered accesses, pointers, unrelated loop state, status and retained staged
+body opcodes. The shared delay exclusion test retains a negative RETD case
+with RPT in the second delay word. CALLD and other unqualified owners remain
+guarded. Interrupt and physical pipeline timing are not qualified here.
+
 ## Short repeat in RPTBD delay words
 
 The staged model admits a short immediate RPT in the first RPTBD delay word,
@@ -40,8 +59,8 @@ short-repeat pointer/counter updates. RPTBD's preceding setup is retained.
 TI SPRU131G sections 6.7/6.8 describe the two repeat controllers and RPTBD's
 two delay words. The acquired EFR reset supplies the concrete `f272 c9c9
 ec05 8392` composition. These bounded algorithm and restoration tests do not
-establish silicon pipeline timing or interrupt composition. RETD/CALLD and
-other delayed owners retain their separate exclusions.
+establish silicon pipeline timing or interrupt composition. RETD has the
+separate qualification above; CALLD and other delayed owners remain guarded.
 
 ## Mapped memory logic sources
 

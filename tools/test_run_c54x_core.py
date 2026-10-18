@@ -14,6 +14,18 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_retd_delay_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['retd-rpt']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='retd-rpt')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='retd-rpt')
+        for bad in (marker, text + '\n' + marker, text + '\nunexpected'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='retd-rpt')
+
     def test_rptbd_delay_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['rptbd-rpt']
         text = marker + '\n' + ending

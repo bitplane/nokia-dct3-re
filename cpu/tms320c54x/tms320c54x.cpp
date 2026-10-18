@@ -3258,7 +3258,7 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
-					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || delayed_block_owner) &&
+					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || m_pipeline_word[stage] == 0xfe00 || delayed_block_owner) &&
 						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active &&
 						(!m_pipeline_block_active || delayed_block_owner);
 					if (delay_repeat) delay_repeat_target = (m_pipeline_control_address & 0x7f0000) | m_pipeline_operand[stage];

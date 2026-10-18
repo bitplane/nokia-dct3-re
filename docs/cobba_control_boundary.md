@@ -2454,20 +2454,22 @@ encoder passes all 163 frames (9,291 parameters, 326 flags and 2,771 packed
 words), including full-RAM replay. The diagnostic
 `tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms
 --efr-encoder --staged` explicitly selects `efr-encoder-pipe` and retains
-those same strict comparison requirements, but currently fails before the
-first frame on an explicit staged composition guard. Reset's `RPTBD c9c9`
-with short-repeat delay words now executes under its
-[isolated qualification](rom4_dsp_loader.md#short-repeat-in-rptbd-delay-words).
-The next rejected composition is `RETD` at `c9ca`, with `RPT #27`
-(`ec1b`) at `c9cb` in its first delay word. This is a distinct return-target,
-stack and repeat-ownership contract, not permission to broaden all delayed
-owners based on the RPTBD result.
+those same strict comparison requirements, but currently fails before completing
+the first frame on an explicit staged guard. Reset now returns with balanced
+stack after separately qualified
+[RPTBD](rom4_dsp_loader.md#short-repeat-in-rptbd-delay-words) and
+[RETD](rom4_dsp_loader.md#short-repeat-in-retd-delay-words) short-repeat
+compositions. Both reset traces contain the same 732 executed address/opcode
+pairs; this is not register-state or physical-timing parity. The first frame
+reaches `7707` at `cf9f`, an immediate ST1
+write, which remains unqualified on this frontend. Recover its control/status
+semantics and qualify them independently before enabling the instruction;
+passing reset does not establish a passing EFR frame.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
 fixture BIOS must declare both program and data images. No staged EFR
-acceptance gate is promoted. Qualify the return/repeat composition in
-isolation before enabling it. This is independent of the handset's
+acceptance gate is promoted. This is independent of the handset's
 unresolved RF/traffic-channel activation boundary.
 
 The separately acquired ETSI source archive and its provenance live in
