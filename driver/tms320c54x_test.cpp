@@ -1716,7 +1716,7 @@ private:
 					}
 		osd_printf_info("TMS320C54x accumulator logical disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
-			for (u16 family : {0x2000, 0x2100, 0x2200, 0x2300, 0x2400, 0x2500, 0x3400})
+			for (u16 family : {0x2000, 0x2100, 0x2200, 0x2300, 0x2400, 0x2500, 0x2600, 0x2700, 0x3400})
 				for (unsigned mode = 0; mode < 256; ++mode)
 				{
 					words const buffer(pc, family | mode, 0x2345);
@@ -1732,6 +1732,8 @@ private:
 			{0x23e2, 2 | dasm::SUPPORTED, "MPYR    *AR2($2345), B"},
 			{0x2494, 1 | dasm::SUPPORTED, "MPYU    *AR4+, A"},
 			{0x2512, 1 | dasm::SUPPORTED, "MPYU    $12, B"},
+			{0x2692, 1 | dasm::SUPPORTED, "SQUR    *AR2+, A"},
+			{0x27f8, 2 | dasm::SUPPORTED, "SQUR    *($2345), B"},
 			{0x34f8, 2 | dasm::SUPPORTED, "BITT    *($2345)"},
 		};
 		for (auto const &test : multiply_bit_forms)
@@ -1741,7 +1743,7 @@ private:
 			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
 				"Memory multiply syntax retains signed/rounded/unsigned distinction and BITT has no accumulator selector");
 		}
-		osd_printf_info("TMS320C54x memory multiply/bit disassembler: PASS forms=1792 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		osd_printf_info("TMS320C54x memory multiply/bit disassembler: PASS forms=2304 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
 				for (unsigned shift = 0; shift < 32; ++shift)
@@ -9644,8 +9646,19 @@ private:
 		u64 a, b, result;
 		u16 result_st0, pmst, t = 0x9abc;
 	};
-	static memory_multiply_fixture memory_multiply_case(unsigned variant)
+	static memory_multiply_fixture memory_multiply_case(unsigned variant, bool square = false)
 	{
+		if (square)
+		{
+			auto f = memory_multiply_case(variant + 55296);
+			f.operand.opcode = 0x2600 | (f.operand.opcode & 0x1ff);
+			s64 const value = s16(f.operand.memory);
+			s64 const product = value * value * (BIT(f.operand.st1, 6) ? 2 : 1);
+			bool const overflow = product > 2147483647LL;
+			f.result = u64(overflow && BIT(f.operand.st1, 9) ? 2147483647LL : product);
+			f.result_st0 = f.operand.st0 | (overflow ? (BIT(f.operand.opcode, 8) ? 0x200 : 0x400) : 0);
+			return f;
+		}
 		if (variant >= 165888)
 		{
 			auto f = memory_multiply_case(variant - 165888);
@@ -9718,7 +9731,7 @@ private:
 		unsigned const raw = variant % 55296;
 		if (raw < 30720 && raw % 10 == 5) ++variant; // Omit write-only short MOD=3; keep mapped cases and raw IDs.
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = memory_multiply_case(variant); auto const &o = f.operand;
+		auto const f = memory_multiply_case(variant, !strcmp(machine().options().bios(), "squr-smem")); auto const &o = f.operand;
 		u32 const base = o.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -18573,6 +18586,7 @@ private:
 		if (!strcmp(machine().options().bios(), "arith-mod3-edge")) { start_short_read_mod3_edge(11008); return; }
 		if (!strcmp(machine().options().bios(), "mul-mod3-edge")) { start_short_read_mod3_edge(46848); return; }
 		if (!strcmp(machine().options().bios(), "mul-t-sources")) { start_pipeline_memory_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "memory-alu")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "shifted-alu")) { start_pipeline_shifted_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "indirect-load")) { start_pipeline_indirect_case(); return; }
@@ -18845,8 +18859,13 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "fr-encoder"))
+				(!strcmp(machine().options().bios(), "fr-encoder") || !strcmp(machine().options().bios(), "fr-encoder-pipe")))
 		{
+			if (!strcmp(machine().options().bios(), "fr-encoder-pipe"))
+			{
+				m_cpu->set_pipeline_frontend(true);
+				osd_printf_info("ROM4 FR encoder frontend: staged handset_audio_claim=0\n");
+			}
 			start_rom4_fr_encoder(0, 0);
 			return;
 		}
@@ -20202,6 +20221,8 @@ private:
 	void start_rom4_fr_encoder(unsigned frame, unsigned stage)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		expect(memregion("dspprg")->as_u16(0x8045) == 0xf074 && memregion("dspprg")->as_u16(0x8046) == 0x23c6,
+			"FR encoder fixture has the acquired program loaded, not an empty BIOS region");
 		if (!stage)
 		{
 			m_rom4_codec.reset();
@@ -45732,16 +45753,17 @@ private:
 		if (m_phase == 253150)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = memory_multiply_case(variant); auto const &o = f.operand;
+			bool const square = !strcmp(machine().options().bios(), "squr-smem");
+			auto const f = memory_multiply_case(variant, square); auto const &o = f.operand;
 			bool const load_t = variant >= 165888;
-			bool const unsigned_multiply = variant >= 55296 && !load_t;
+			bool const keeps_t = variant >= 55296 && !load_t && !square;
 			unsigned const v = variant % 55296;
 			unsigned const index = v < 30720 ? v / 10240 : (v - 30720) / 8192;
 			unsigned const checkpoint = std::array<unsigned, 3>{3, o.read_cycle - 1, o.read_cycle}[index];
-			bool const destination_b = !unsigned_multiply || BIT(o.opcode, 8);
+			bool const destination_b = (!keeps_t && !square) || BIT(o.opcode, 8);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (!load_t && !destination_b && tick > o.read_cycle ? f.result : f.a) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == (!load_t && destination_b && tick > o.read_cycle ? f.result : f.b) &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick < o.read_cycle ? f.t : tick == o.read_cycle ? unsigned_multiply ? f.t : o.memory : 0xbeef) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == (tick < o.read_cycle ? f.t : tick == o.read_cycle ? keeps_t ? f.t : o.memory : 0xbeef) &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > o.read_cycle ? f.result_st0 : o.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1,
 				"Memory multiply owns T in Read and B/OVB in Execute, without altering A/carry or overwriting a newer T");
 			if (o.form >= 14 && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead); }
@@ -45773,6 +45795,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253160; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (square)
+				{
+					if (variant < 55295) { start_pipeline_memory_multiply(variant + 1); return; }
+					osd_printf_info("TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated memory SQUR complete");
+				}
 				if (variant == 55295) osd_printf_info("TMS320C54x staged memory multiply: PASS ram_cases=27648 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=52224 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant == 110591) osd_printf_info("TMS320C54x staged MPYU: PASS ram_cases=27648 mapped_cases=24576 accumulators=2 t_values=2 patterns=8 flag_states=16 restore=52224 t_retained=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant == 165887) osd_printf_info("TMS320C54x staged MPY and MPYR: PASS cases=52224 accumulators=2 rounding=0,1 t_retained=1 restore=52224 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
@@ -51273,7 +51301,8 @@ private:
 		{
 			unsigned const frame = (m_phase - 74000) / 3;
 			unsigned const stage = (m_phase - 74000) % 3;
-			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) ||
+				m_cpu->state_int(tms320c54x_device::STATE_PC) != 0x0f01 || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1ec4)
 				osd_printf_info("ROM4 FR encoder stop: frame=%u stage=%u pc=%04x sp=%04x illegal=%u\n", frame, stage,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
@@ -54293,6 +54322,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(110, "rptbd-t-load", "Delay-owned T load consumed by the first RPTBD multiply")
 	ROM_SYSTEM_BIOS(111, "rptb-exit-delay", "Delayed forward block exits retain decision and delay ownership")
 	ROM_SYSTEM_BIOS(112, "mvmd-rptz", "RPTZ clear precedes the first fixed-accumulator MVMD sample")
+	ROM_SYSTEM_BIOS(113, "squr-smem", "Memory SQUR retains its signed operand and publishes T at Read")
 ROM_END
 
 ROM_START(tms54rom4)
@@ -54317,7 +54347,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(18, "efr-home-errors", "Characterize original EFR homing/error reset and PCM differences")
 	ROM_SYSTEM_BIOS(19, "cold-pipeline", "Cold mask ROM execution with the staged CPU frontend")
 	ROM_SYSTEM_BIOS(20, "fr-decoder-pipe", "Isolated acquired ROM FR decoder on staged CPU")
+	ROM_SYSTEM_BIOS(21, "fr-encoder-pipe", "Isolated acquired ROM FR encoder on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(21))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(20))
@@ -54382,6 +54416,9 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(21))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(20))

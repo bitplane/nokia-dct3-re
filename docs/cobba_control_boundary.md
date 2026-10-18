@@ -516,6 +516,16 @@ debugger peeks are excluded. Trace PC contexts are not operand-owner labels.
 Tracing preserves the same strict PCM/replay criteria and does not turn a
 diagnostic capture into acceptance.
 
+The paired transmit-side probe is
+`tools/run_c54x_rom4_crc.py --fr-encoder --staged` with the required MAME and
+ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
+encoder, verifies its entry words and retains exact parameter, preprocessing
+history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
+return, but frame 0's encoding stage remains **failing** at repeated `f77f`
+(`SFTA B,-1,B`) at `fb60`. Memory SQUR at `8643` now executes under its
+independent qualification. No staged parameter or speech acceptance follows
+from passing those preceding routines; the atomic encoder remains the control.
+
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
 `((n*7919+1237) mod 4096)-2048`, through port `27`, then zeros. The native

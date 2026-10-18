@@ -457,7 +457,7 @@ constexpr bool staged_bitt(u16 word)
 
 constexpr bool staged_smem_special(u16 word)
 {
-	return (staged_bitt(word) || square_accumulate(word) || staged_poly(word) || (word & 0xf900) == 0x3100 || ((word & 0xf000) == 0x2000 && (word & 0xfe00) != 0x2600) || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
+	return (staged_bitt(word) || square_accumulate(word) || staged_poly(word) || (word & 0xf900) == 0x3100 || (word & 0xf000) == 0x2000 || (word & 0xff00) == 0x3000 || (word & 0xff00) == 0x3200) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_smem_special(u16 word)
@@ -940,10 +940,10 @@ public:
 			if (load) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
-		if ((family >= 0x2000 && family <= 0x2500) || family == 0x3400)
+		if ((family >= 0x2000 && family <= 0x2700) || family == 0x3400)
 		{
 			bool const extended = mode >= 0xe0;
-			char const *name = family == 0x3400 ? "BITT" : family >= 0x2400 ? "MPYU" : family >= 0x2200 ? "MPYR" : "MPY";
+			char const *name = family == 0x3400 ? "BITT" : family >= 0x2600 ? "SQUR" : family >= 0x2400 ? "MPYU" : family >= 0x2200 ? "MPYR" : "MPY";
 			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
 			if (family != 0x3400) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
@@ -5218,9 +5218,10 @@ void tms320c54x_device::pipeline_step()
 		m_t = m_pipeline_operand[4];
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
 	{
-		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
+		// LD T, memory SQUR and MPYA/MACA/MASA publish T in Read after older Execute.
 		// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
-		if ((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]) && !staged_bitt(m_pipeline_word[4]))
+		if ((m_pipeline_word[4] & 0xfe00) == 0x2600 ||
+			((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]) && !staged_bitt(m_pipeline_word[4])))
 			m_t = m_pipeline_operand[4];
 	}
 	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))

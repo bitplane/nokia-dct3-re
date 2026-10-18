@@ -18,6 +18,27 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Memory SQUR
+
+`SQUR Smem,A/B` (`26xx/27xx`) squares the signed sixteen-bit memory word,
+publishes that original word into T at Read, and writes the retained square
+and overflow state at Execute (SPRU172C 4-161). FRCT doubles the product;
+OVM controls positive overflow saturation. It does not consume an unrelated
+old T or overwrite a newer T at retirement. The accumulator-A form remains
+a distinct seventeen-bit operation that leaves T unchanged.
+
+`squr-smem` passes 52,224 cases plus replay through the existing memory
+multiply operand matrix: RAM and CPU-mapped sources, both destinations,
+eight patterns and sixteen mode combinations. It checks one retained read,
+address/literal ownership, later T poisoning, unselected accumulator and carry
+state and no data writes. Program/memory are changed after capture.
+Peripheral electrical timing, single-repeat and delay-slot SQUR composition
+are not newly qualified. The original register-SQUR and multiply/T-source
+gates retain their independent results.
+The bounded memory multiply/bit disassembler matrix also covers both SQUR
+destinations (2,304 forms over two program pages), including indirect and
+extended-address syntax.
+
 ## Delayed forward block exits
 
 BD and the twelve signed-accumulator BCD predicates can exit forward beyond
