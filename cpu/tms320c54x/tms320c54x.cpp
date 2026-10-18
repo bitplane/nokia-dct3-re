@@ -3261,6 +3261,7 @@ void tms320c54x_device::pipeline_step()
 			bool delay_compare = false;
 			bool delay_bitt = false;
 			bool delay_arithmetic = false;
+			bool delay_square = false;
 			bool delay_t_load = false;
 			bool delay_repeat = false;
 			u32 delay_repeat_target = 0;
@@ -3269,6 +3270,7 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
+					delay_square = delayed_block_owner && square_accumulate(word) && u8(word) < 0x98;
 					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || m_pipeline_word[stage] == 0xfe00 || delayed_block_owner) &&
 						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active &&
 						(!m_pipeline_block_active || delayed_block_owner);
@@ -3298,7 +3300,7 @@ void tms320c54x_device::pipeline_step()
 			if (!m_pipeline_decode_remaining && staged_data_to_program(word)) { logerror("%s: staged MVDP inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && !delay_repeat && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_accumulator_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && !delay_repeat && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_accumulator_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && !delay_square && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
 					machine().describe_context(), word, m_pipeline_address[2], m_pipeline_delay_decode_words,
@@ -4143,7 +4145,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3)) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
-		if (m_pipeline_repeat_active && square_accumulate(m_pipeline_word[3]) && source < 0x60)
+		if ((m_pipeline_repeat_active || m_pipeline_control_words) && square_accumulate(m_pipeline_word[3]) && source < 0x60)
 		{
 			logerror("%s: repeated square mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

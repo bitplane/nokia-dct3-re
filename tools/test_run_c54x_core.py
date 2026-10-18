@@ -2221,6 +2221,19 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='shift-delay')
 
+    def test_rptbd_square_scope(self):
+        marker, ending = EXTRA_PROFILES['rptbd-square']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptbd-square')
+        for field in marker.split()[4:]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(output.replace(field, field + '_wrong', 1), 3,
+                             profile='rptbd-square')
+        for bad in (ending + '\n', marker + '\n' + output,
+                    output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptbd-square')
+
     def test_delayed_brc_move_scope(self):
         marker, ending = EXTRA_PROFILES['move-brc-delay']
         output = marker + '\n' + ending + '\n'

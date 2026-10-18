@@ -2482,9 +2482,13 @@ corrects that bookkeeping without relaxing the status guard. The `7168 001a`
 move to BRC at `ceda` is in the ordinary delayed conditional branch at `ced8`,
 not an RPTBD delay; it now executes under the
 [ordinary delayed-control BRC qualification](rom4_dsp_loader.md#brc-memory-moves-in-ordinary-delayed-controls).
-The current guard is word `3895` owned by `cf61`, in RPTBD `cf5f`'s delay
-span (reported fetch PC `cf63`). Recover its arithmetic, memory and block
-ownership before admitting that composition.
+The `3895` squares owned by `cf61` and `cf62`, in RPTBD `cf5f`'s delay
+span, execute under the
+[delayed-square qualification](rom4_dsp_loader.md#square-arithmetic-in-rptbd-delay-words).
+The current guard is dual ADD `a0b8` owned by `d45b`, with X=`0000` and
+Y=`111b` (reported fetch PC `d447`). Establish the low operand's pointer
+provenance before deciding whether this needs register-operand admission
+or correction of an earlier state error.
 No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and

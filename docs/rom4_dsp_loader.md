@@ -18,6 +18,25 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Square arithmetic in RPTBD delay words
+
+Short SQURA/SQURS RAM forms may occupy either or both RPTBD delay words.
+Each source address and pointer modifier is owned by Access, memory/T by
+Read, and the selected accumulator with sticky overflow by Execute. The
+second square sees the first square's result when they share a destination.
+FRCT/OVM apply; square products do not use the MAC-family SMUL product clamp.
+Mapped/peripheral sources, extended addressing, other control owners and
+interrupt composition remain outside this qualification.
+
+`rptbd-square` passes 147,456 cases and cleared-pipeline replays: SQURA/SQURS,
+A/B destinations, first-only/second-only/both-same/both-split layouts,
+DP/indirect/postincrement, eight patterns, FRCT/OVM/SMUL/SXM, counts 0/1/7,
+two pages and four checkpoints. Per-clock accumulator/flag checks cover
+sequential saturation. Retained opcode/source/address checks and a newer T
+value reject resampling or T republication. Both accumulator results are
+stored by every count+1 body iteration, while the delay work occurs once.
+This qualifies the declared staged ownership model, not physical bus phases.
+
 ## BRC memory moves in ordinary delayed controls
 
 Complete two-word MVMD/MVDK-to-BRC forms may occupy ordinary delayed
