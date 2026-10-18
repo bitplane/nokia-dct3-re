@@ -11,7 +11,7 @@ import sys
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a60
 REPEAT_SOURCE_OFFSET = 0x98af0
-STOP = 'unsupported staged C54x form b736 at 00325f'
+STOP = 'unsupported staged C54x form d6e1 at 003260'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -22,7 +22,7 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('3261', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('3262', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or text.count('unsupported') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
@@ -104,11 +104,11 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_dual_arithmetic', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_parallel_mac', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x325f, instruction=0xb736, low_gap_bus_reads=6, rf_sample_reads=4,
+                instruction_address=0x3260, instruction=0xd6e1, low_gap_bus_reads=6, rf_sample_reads=4,
                 bsp_transmit_words=[0x0aaa, 0xffd5],
                 bsp_receive_words=[0x0aaa, 0x0aaa],
                 bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 4, completion_strobes=4,

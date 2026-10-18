@@ -54,7 +54,7 @@ constexpr bool staged_minmax(u16 word)
 constexpr bool staged_dual_multiply(u16 word)
 {
 	return (word & 0xfc00) == 0xa400 ||
-		((word & 0xfc00) == 0xb000 && BIT(word, 9) == BIT(word, 8)); // MPY, MACSU, same-accumulator MAC.
+		(word & 0xf000) == 0xb000; // MPY, MACSU, MAC[R]/MAS[R].
 }
 
 constexpr bool staged_dual_arithmetic(u16 word)
@@ -4663,9 +4663,15 @@ void tms320c54x_device::pipeline_step()
 			bool const accumulate = signed_mac || BIT(m_op, 9), destination_b = BIT(m_op, 8);
 			s64 product = (accumulate && !signed_mac ? s64(m_pipeline_operand[5]) : s64(s16(m_pipeline_operand[5]))) * s64(s16(m_pipeline_immediate[5]));
 			if (BIT(m_st1, 6)) product *= 2;
-			// MAC/MACSU X/Y operands were retained in Read; the accumulator
-			// remains Execute-owned. SMUL clamps the product before addition.
-			if (accumulate) product = (s64(accumulator(destination_b) << 24) >> 24) + multiply_product(product);
+			// X/Y and T belong to Read; source selection and feedback belong to
+			// Execute. SMUL applies before accumulation, rounding afterwards.
+			if (accumulate)
+			{
+				product = multiply_product(product);
+				if (signed_mac && BIT(m_op, 11)) product = -product;
+				product += s64(accumulator(signed_mac ? BIT(m_op, 9) : destination_b) << 24) >> 24;
+			}
+			if (signed_mac && BIT(m_op, 10)) product = (product + 0x8000) & ~s64(0xffff);
 			accumulator(destination_b) = multiply_result(product, destination_b);
 		}
 		else if (staged_xmem_store(m_op))

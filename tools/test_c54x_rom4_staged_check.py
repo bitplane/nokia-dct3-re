@@ -15,7 +15,7 @@ class StagedFrontierTest(unittest.TestCase):
         self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
         self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
         self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
-        self.row = ('rom4_staged_frontier: pc=3261 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=3262 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
                      'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d2 st0=081f st1=e900\n'
@@ -61,8 +61,8 @@ class StagedFrontierTest(unittest.TestCase):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0xb736)
-        self.assertEqual(result['instruction_address'], 0x325f)
+        self.assertEqual(result['instruction'], 0xd6e1)
+        self.assertEqual(result['instruction_address'], 0x3260)
         self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
         self.assertEqual(result['bsp_receive_words'], [0x0aaa, 0x0aaa])
         self.assertEqual(result['bsp_transmit_words'], [0x0aaa, 0xffd5])
@@ -102,7 +102,7 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=3261', 'pc=0f1f'),
+                     self.text.replace('pc=3262', 'pc=0f1f'),
                      self.text.replace('st0=081f', 'st0=001f'),
                      self.text.replace('st1=e900', 'st1=4901'),
                      self.text + 'rom4_staged_dagen: malformed\n',

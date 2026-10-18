@@ -2,11 +2,31 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The prototype now reads the existing RF sample provider
-and stops on dual-arithmetic opcode `b736` at `325f`;
+and stops on parallel store/MAC opcode `d6e1` at `3260`;
 its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
+
+## Staged dual-memory MAC family
+
+MAC, MACR, MAS and MASR use the complete `Bxxx` encoding family, with
+independent source/destination accumulators. TI SPRU172C pages 4-82 and
+4-94 specify signed X/Y multiplication, Read-phase publication of X into T,
+and optional rounding by adding `0x8000` and clearing the low sixteen bits.
+The accumulator is sampled at Execute; SMUL product saturation precedes
+addition/subtraction, and rounding precedes destination overflow handling.
+
+The `mac-family` profile passes 1,720,320 cases and save-state replays,
+covering all 4,096 encodings, aliased/distinct pointers, circular and legacy
+BK=0 addressing, both program pages, all four source/destination pairs,
+eight accumulator seeds, 64 numerical operand pairs and status combinations.
+Its expected rounding uses signed floor division rather than the CPU's bit
+mask implementation. Address/operand mutation and snapshots around Access,
+Read and Execute verify retained operands and Execute-owned feedback.
+`mac-family-edge` adds 128 exclusion/replay cases with no mapped reads or
+register publication. Physical memory-bank timing and interrupt/repeat
+composition remain unvalidated; this is not native handset acceptance.
 
 ## Staged accumulator saturation
 
@@ -597,8 +617,9 @@ The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
 board map at `0003`, as described above. Circular-address PORTR `74d6`
 at `3249` reads port `0027`, the existing RF sample input. Four provider
 reads occur inside the block established by RPTBD at `3245` (end `3268`),
-before execution stops on dual-arithmetic opcode `b736` at `00325f`.
-The exposed PC is `3261`, BK `0010`, AR0 `0002`, AR2 `06d2`,
+before dual-memory MACR `b736` at `325f` executes and the parallel
+store/MAC opcode `d6e1` at `003260` stops the frontend.
+The exposed PC is `3262`, BK `0010`, AR0 `0002`, AR2 `06d2`,
 ST0 `081f`, ST1 `e900`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
