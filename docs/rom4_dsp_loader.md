@@ -43,10 +43,25 @@ Frame expiries advance from 573 to 6,423. The terminal T=`5555`, BK=`0048`,
 ST0/ST1=`081f/6103` and AR0..AR3=`126d/06b8/067a/0008` agree; A differs
 between `1a00` and zero. Artifacts are
 `tmp/cmpm-map-native{,-long}/error.log`.
-The surrounding mask-ROM loop reads `06b7`, subtracts an indirect operand
-and conditionally branches to `4717`; the exact wait predicate and
-its producer remain to be qualified. Timer advancement alone is not
-evidence of ongoing firmware service or a healthy wait.
+The surrounding mask-ROM loop reads `06b7`, subtracts `*AR1` (`06b8`)
+and branches to `4717` while equal. The delayed branch's two-word LD
+reloads `06b7`. A passive read/write probe observes both words initialized
+to `1a00` at PC contexts `4442/4443`, first at 1.853057865 s and again
+at 1.993330865 s. Between those initializations, the frame-ISR path's
+store at PC context `3363` advances `06b7` through `1a04/1a08/1a0c/1a10`
+on successive frame periods. After the second initialization both words
+remain `1a00` through three seconds, with no further writes. The loop is
+actively reading equal words, not CPU IDLE or an unsupported-opcode halt.
+Artifact: `tmp/cmpm-wait-native/error.log`, produced by the read-only
+`tmp/cmpm_wait_probe.lua`.
+
+The terminal IFR=`0225` and IMR=`035f` include enabled pending frame
+source 0; ST1=`6103` has INTM clear. Thus the next question is delivery
+through the short delayed-branch loop, not a fabricated peripheral reply.
+The staged acceptance path also protects delayed controls and pending
+operand transactions; which guard prevents delivery here remains to be
+proved with an executable interrupt/loop fixture. Timer advancement alone
+is not evidence of ongoing firmware service or a healthy wait.
 These captures supersede the old CMPM rejection as runtime observations,
 but the exact-stop checker below still describes the previous accepted
 checkpoint pending replacement with a qualified live-wait contract.
