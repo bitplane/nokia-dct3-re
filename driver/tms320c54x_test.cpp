@@ -15238,6 +15238,69 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253750;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct extended_t_store_fixture
+	{
+		unsigned form, reg, selected, snapshot, write;
+		bool trn, compatibility, excluded;
+		u16 mode, literal, destination, value, st0;
+		u32 base;
+		std::array<u16, 8> initial, final;
+	};
+	static extended_t_store_fixture extended_t_store_case(unsigned v, bool excluded)
+	{
+		extended_t_store_fixture f{}; f.excluded = excluded;
+		f.form = v % 4; f.reg = (v / 4) % 8; f.compatibility = (v / 32) % 2; f.trn = (v / 64) % 2;
+		f.selected = f.compatibility && !f.reg ? 4 : f.reg;
+		f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 128) % 4];
+		bool const peripheral = !excluded && (v / 512) % 2;
+		f.destination = excluded ? 0x0e : peripheral ? 0x48 + f.selected : 0x1201 + f.selected * 0x20;
+		f.mode = f.form ? (0xe0 + (f.form - 1) * 8) | f.reg : 0xf8;
+		f.literal = f.form == 0 ? f.destination : f.form == 1 ? 0xfff0 : 1;
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x2000 + i * 0x20;
+		f.initial[f.selected] = f.form == 1 ? f.destination + 16 : f.destination - 1;
+		f.final = f.initial;
+		if (!excluded && f.form >= 2) f.final[f.selected] = f.destination;
+		f.st0 = !excluded && f.compatibility && f.reg && f.form ? 0x608 | (f.reg << 13) : 0x8608;
+		f.base = (v / 1024) % 2 ? 0x20000 : 0; f.snapshot = v / 2048; f.write = 7 + unsigned(peripheral);
+		return f;
+	}
+	void start_extended_t_store(unsigned variant = 0)
+	{
+		bool const excluded = !strcmp(machine().options().bios(), "st-t-long-edge");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = extended_t_store_case(variant, excluded);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, (f.trn ? 0x8d00 : 0x8c00) | f.mode); program.write_word(f.base + 0x601, f.literal); program.write_word(f.base + 0x602, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.compatibility ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x5aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "extended_t_store_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "extended_t_store_write", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && !m_pipeline_store_writes && at == f.destination && value == f.value && m_cpu->pipeline_cycles() == f.write, "Extended ST T/TRN writes its retained destination and Execute-live source once"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62134;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_t_store_branch(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 8 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 20; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, variant & 1 ? 0xf830 : 0xf820); program.write_word(base + 0x601, 0x602);
+		program.write_word(base + 0x602, variant & 4 ? 0x8df8 : 0x8cf8); program.write_word(base + 0x603, 0x1200); program.write_word(base + 0x604, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (variant & 2 ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2468); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x3579);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "t_store_branch_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "t_store_branch_write", [this, variant](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == 0x1200 && value == (variant & 4 ? 0x3579 : 0x2468), "A nondelayed conditional branch reaches one ordinary T/TRN store on either outcome"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62136;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct t_peripheral_fixture
 	{
 		u16 source, destination, value;
@@ -17278,6 +17341,8 @@ private:
 		if (!strcmp(machine().options().bios(), "far-atomic")) { m_cpu->set_pipeline_frontend(false); start_far_case(0); return; }
 		if (!strcmp(machine().options().bios(), "bitf-peripheral")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "t-peripheral")) { start_t_peripheral(); return; }
+		if (!strcmp(machine().options().bios(), "st-t-long") || !strcmp(machine().options().bios(), "st-t-long-edge")) { start_extended_t_store(); return; }
+		if (!strcmp(machine().options().bios(), "st-t-branch")) { start_t_store_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -46811,6 +46876,47 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253800) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253790; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62134)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_t_store_case(variant, !strcmp(machine().options().bios(), "st-t-long-edge"));
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 6), "Extended T/TRN stores reject mapped destinations at Read without effects");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (!f.excluded && tick == f.write - 1) m_cpu->set_state_int(f.trn ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T, f.value);
+			if (!f.excluded && tick == 6)
+			{
+				for (unsigned i = 0; i < 8; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == f.final[i], "Long store address modifiers update once at Read"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); }
+			}
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 6, f.write}[f.snapshot];
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save long T/TRN store around address, wait and Execute publication"); }
+			if (tick == 16)
+			{
+				expect(!m_pipeline_operand_reads && m_pipeline_store_writes == unsigned(!f.excluded) && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.compatibility ? 0x20 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Long T/TRN store preserves status and accumulators, never reads destinations and has no duplicate writes");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (f.excluded ? f.initial[i] : 0x2200 + i), "Store retains its address after Read or rolls back an excluded long modifier");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore long T/TRN store without repeated modifications or writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62135; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 6143) { start_extended_t_store(variant + 1); return; }
+				if (f.excluded) { osd_printf_info("TMS320C54x extended T/TRN exclusions: PASS cases=6144 restore=6144 forms=4 registers=8 compatibility=2 sources=2 pages=2 snapshots=3 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended T/TRN exclusions complete"); }
+				osd_printf_info("TMS320C54x extended T/TRN stores: PASS cases=6144 restore=6144 forms=absolute,offset,premod,circular registers=8 compatibility=2 sources=T,TRN values=4 endpoints=RAM,peripheral pages=2 snapshots=3 destination=Read source=Execute literal_retained=1 pointer_updates=once destination_reads=0 writes=1 peripheral_extra_clock=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended T/TRN stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62135) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62134; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62136)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 16 ? 10 : 5;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Draining nondelayed BC bookkeeping is not a T/TRN delay-slot owner");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save conditional branch and ordinary long T/TRN store"); }
+			if (tick == 24)
+			{
+				expect(!m_pipeline_operand_reads && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (variant & 2 ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "TC/NTC taken and untaken paths preserve flags and publish exactly one store");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BC/store composition without duplicate writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62137; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 31) { start_t_store_branch(variant + 1); return; }
+				osd_printf_info("TMS320C54x BC T/TRN stores: PASS cases=32 restore=32 predicates=TC,NTC initial_tc=2 sources=T,TRN pages=2 snapshots=2 writes=1 reads=0 delayed_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated BC T/TRN stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62137) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62136; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253770)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -51973,6 +52079,9 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(62, "rpt-mvkd", "Repeated data-memory moves with retained source progression")
 	ROM_SYSTEM_BIOS(63, "rpt-mvkd-edge", "Excluded mapped and extended repeated data moves")
 	ROM_SYSTEM_BIOS(64, "stm-acc", "Immediate accumulator-field publication and mapped read ordering")
+	ROM_SYSTEM_BIOS(65, "st-t-long", "Long-address T/TRN stores with retained destinations")
+	ROM_SYSTEM_BIOS(66, "st-t-long-edge", "Rejected long-address T/TRN mapped destinations")
+	ROM_SYSTEM_BIOS(67, "st-t-branch", "Ordinary T/TRN stores after nondelayed conditional branches")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -1,8 +1,9 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype currently stops on absolute ST T `8cf8` at
-`a548`; its upload completion and handset boot remain unaccepted. The
+acceptance scopes. The prototype currently stops on shifted Smem `6f83 0c5f`
+at `a5ef`, resolving to unsupported low-page address `0003`;
+its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
@@ -109,6 +110,28 @@ write with a mapped MVDK read and RAM publication. Both writes and the
 single read must occur once at their declared stages; flags and modes
 are unchanged. The schedule remains a staged-core model, not a measured
 silicon-phase claim.
+
+## Long-address T/TRN stores
+
+ST T/TRN admits absolute, signed-offset, premodified and circular long
+Smem forms using the shared extended-store address path. SPRU172C page
+4-167 specifies the source and additional address word; the modeled
+destination is retained at Read while T/TRN remains Execute-live.
+`st-t-long` verifies 6,144 cases and replays across both sources, four
+values, all eight auxiliary registers, compatibility selection, RAM and
+peripheral endpoints, two program pages and three snapshots. It poisons
+the literal and changes auxiliary registers after address capture, and
+changes T/TRN immediately before Execute. No destination read occurs;
+peripheral writes retain the existing one-extra-clock model.
+
+`st-t-long-edge` verifies 6,144 cases and replays that reject mapped
+destinations before data effects, restoring any previewed long-address
+pointer/ARP modification. `st-t-branch` verifies 32 cases and replays of
+ordinary stores after both outcomes of nondelayed TC/NTC branches.
+A draining conditional-branch control counter is not evidence that the
+following instruction occupies a delay span. Actual delay spans, repeats,
+XC and block-body compositions remain unqualified and explicitly excluded
+for this new form. The schedule is not a measured silicon-phase claim.
 
 ## Current result
 
@@ -507,9 +530,12 @@ post-increment store `80d3` at `34d3`, then the TC conditional call `f930`
 at `354c`, followed by accumulator-lane CMPM at `0025fe`, `60f8`, whose
 source `000b` is BL. Repeated MVKD `7090` at `3053` copies three words
 from `b706` through post-incrementing AR0, and STM AL `7708` at `45b0`
-executes. The next stop is absolute ST T `8cf8` at `00a548`.
-The exposed PC is `a54a`, BK `00fa`, AR0 `1987`, AR2 `06e4`,
-ST0 `081f`, ST1 `6908`, PMST `ffac` and
+executes, as does absolute ST T `8cf8` at `a548` (destination `1f28`).
+The next stop is `6f83 0c5f` at `00a5ef`, a shifted load through AR3
+resolving to unsupported low-page address `0003`. This is not yet
+classified as a valid mapped source versus an earlier state error.
+The exposed PC is `a5f3`, BK `00fa`, AR0 `1987`, AR2 `00f3`,
+ST0 `101f`, ST1 `6908`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial

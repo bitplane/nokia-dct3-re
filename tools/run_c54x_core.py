@@ -1599,6 +1599,18 @@ EXTRA_PROFILES = {
         "TMS320C54x staged peripheral BITF: PASS cases=384 restore=384 forms=offset,absolute pages=2 conditions=TC,NTC source_read=8 tc_publish=9 target_fetch=11 reads=1 destination_writes=0 peripheral_extra_clock=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated peripheral BITF complete",
     ),
+    "st-t-branch": (
+        "TMS320C54x BC T/TRN stores: PASS cases=32 restore=32 predicates=TC,NTC initial_tc=2 sources=T,TRN pages=2 snapshots=2 writes=1 reads=0 delayed_acceptance=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated BC T/TRN stores complete",
+    ),
+    "st-t-long": (
+        "TMS320C54x extended T/TRN stores: PASS cases=6144 restore=6144 forms=absolute,offset,premod,circular registers=8 compatibility=2 sources=T,TRN values=4 endpoints=RAM,peripheral pages=2 snapshots=3 destination=Read source=Execute literal_retained=1 pointer_updates=once destination_reads=0 writes=1 peripheral_extra_clock=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated extended T/TRN stores complete",
+    ),
+    "st-t-long-edge": (
+        "TMS320C54x extended T/TRN exclusions: PASS cases=6144 restore=6144 forms=4 registers=8 compatibility=2 sources=2 pages=2 snapshots=3 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated extended T/TRN exclusions complete",
+    ),
     "t-peripheral": (
         "TMS320C54x staged peripheral T/TRN store: PASS cases=864 restore=864 sources=T,TRN producer=STLM gaps=0,1,2 forms=indirect,postincrement destinations=3b,48,49 pages=2 destination_reads=0 writes=1 peripheral_extra_clock=1 pointer_updates=once silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated peripheral T/TRN store complete",
@@ -1713,7 +1725,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
+    if args.profile in ("st-t-branch", "st-t-long", "st-t-long-edge", "stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
