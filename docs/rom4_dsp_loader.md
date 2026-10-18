@@ -18,6 +18,26 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Overflow-only conditional branches
+
+Staged BC/BCD admit AOV, ANOV, BOV and BNOV. Their predicate tests the
+selected accumulator's sticky overflow flag and consumes that flag whether
+or not the branch is taken (SPRU131G table 4-1). The other overflow flag,
+carry, TC and DP are preserved. Delayed execution retains the decision;
+subsequent flag writes must not cause another test or clear.
+SPRU172C's BOV example retains the flag, contrary to the CPU guide's explicit
+rule. This model follows the latter; these fixtures are not an independent
+silicon resolution of that documentation conflict.
+
+`ov-branch-pipe` passes 4,608 cases plus cleared-pipeline replay: both branch
+forms, four predicates, all initial overflow pairs, seeded/SSBX/RSBX producers,
+three gaps, two pages and four checkpoints. Post-Evaluate flag mutation and
+delay-word updates cannot change the selected path. Literal and target-fetch
+counters reject duplicate consumption, and no data writes or stack changes
+occur. Arithmetic-producer hazards, interrupt composition and physical
+pipeline phases remain unqualified. The existing atomic overflow, TC/carry,
+signed-branch/call and delayed-arithmetic controls remain separate gates.
+
 ## Mapped dual-memory arithmetic operands
 
 Dual ADD/SUB admit mapped sources `0008..0017` on either or both operand

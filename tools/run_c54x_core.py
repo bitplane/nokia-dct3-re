@@ -324,6 +324,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "ov-branch-pipe": (
+        "TMS320C54x staged overflow branches: PASS cases=4608 restore=4608 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 producers=seed,SSBX,RSBX gaps=0,1,2 pages=2 snapshots=4 selected_flag_clear=1 post_evaluate_mutation=2 literal_reads=1 target_fetches=once writes=0 reset_before_restore=1 arithmetic_producers=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated staged overflow branches complete",
+    ),
     "alu-map": (
         "TMS320C54x mapped dual ALU: PASS cases=147456 restore=147456 mapped_sources=16 lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 source_sample=Read address_update=Access post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped dual ALU complete",
@@ -2068,7 +2072,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular", "st-par-alu", "st-par-edge", "mvdk-index", "mvdk-index-edge", "mvdk-index-rpt", "mvdk-irpt-edge", "cond-store", "cond-store-edge", "shift16-map", "shift16-map-edge", "logic-map", "logic-map-edge"):
         machine = "tms54xtra"
-    if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge"):
+    if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "ov-branch-pipe"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

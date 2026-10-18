@@ -2465,9 +2465,12 @@ immediate ST1 write now executes under its
 [isolated qualification](rom4_dsp_loader.md#staged-immediate-status-publication).
 The `a20a` dual SUB at `cc02` reads mapped AR3 and PCM RAM under the
 [mapped dual-ALU qualification](rom4_dsp_loader.md#mapped-dual-memory-arithmetic-operands).
-The current guard is instruction `fa60` at `d253`; current fetch PC `d255`
-is not its owner. Recover its predicate and control-flow contract before
-admitting it. No complete staged EFR frame has passed yet.
+The `fa60` delayed ANOV branch at `d253` now has an
+[isolated predicate qualification](rom4_dsp_loader.md#overflow-only-conditional-branches).
+The current guard is the control-delay Smem extension at owner `d27d`, word
+`6f17`, extension operation `0e20`. The reported fetch PC `bee7` is not its
+owner. Recover that operation's operand and delay ownership before admitting
+it. No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
@@ -2568,7 +2571,7 @@ is restored before preprocessing and replayed, comparing all 65,440 ordinary
 data-space words, not just the output. The 96 trailing source samples are not
 a complete frame and are unused, as in the reference's loop.
 
-This path exposed three missing atomic instruction surfaces:
+Atomic instruction contracts supporting this gate:
 
 - Single-condition `BC/BCD AOV/ANOV/BOV/BNOV`: tests use the original flag,
   clear only the selected sticky flag, and retain the delayed decision across
