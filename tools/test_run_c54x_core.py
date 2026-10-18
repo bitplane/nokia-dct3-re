@@ -148,6 +148,15 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
+    def test_serial_stm_requires_retained_publication_without_endpoint_claim(self):
+        marker, ending = EXTRA_PROFILES['serial-stm']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='serial-stm')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='serial-stm')
+
     def test_clkmd_stm_does_not_promote_a_physical_pll_clock(self):
         marker, ending = EXTRA_PROFILES['clock-stm']
         text = marker + '\n' + ending + '\n'

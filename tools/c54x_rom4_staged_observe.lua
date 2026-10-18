@@ -2,7 +2,12 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local captured = false
+local bsp_tap = cpu.spaces.data:install_write_tap(0x22, 0x22, 'staged_bsp_control', function(_, value, mask)
+    machine:logerror(string.format('rom4_staged_bsp_write: value=%04x mask=%04x t=%.9f\n',
+        value, mask, machine.time:as_double()))
+end)
 emu.register_frame_done(function()
+    assert(bsp_tap)
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
     local words = {}

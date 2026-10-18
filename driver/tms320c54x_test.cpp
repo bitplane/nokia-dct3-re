@@ -14413,8 +14413,9 @@ private:
 		bool const timer = !strcmp(machine().options().bios(), "timer-stm");
 		bool const standard = !strcmp(machine().options().bios(), "std-stm");
 		bool const clock = !strcmp(machine().options().bios(), "clock-stm");
-		u16 const address = standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-		u16 const value = (clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
+		bool const serial = !strcmp(machine().options().bios(), "serial-stm");
+		u16 const address = serial ? 0x22 : standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
+		u16 const value = (serial ? std::array<u16, 4>{0xc008, 0xc0c8, 0, 0xffff} : clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
 		program.write_word(0x600, 0x7700 | address); program.write_word(0x601, value);
@@ -16456,6 +16457,7 @@ private:
 		if (standard_bus_io()) { start_bus_io_test(); return; }
 		if (!strcmp(machine().options().bios(), "std-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "clock-stm")) { start_staged_bus_stm(); return; }
+		if (!strcmp(machine().options().bios(), "serial-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
@@ -47788,8 +47790,9 @@ private:
 			bool const timer = !strcmp(machine().options().bios(), "timer-stm");
 			bool const standard = !strcmp(machine().options().bios(), "std-stm");
 			bool const clock = !strcmp(machine().options().bios(), "clock-stm");
-			u16 const address = standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-			u16 const value = (clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
+			bool const serial = !strcmp(machine().options().bios(), "serial-stm");
+			u16 const address = serial ? 0x22 : standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
+			u16 const value = (serial ? std::array<u16, 4>{0xc008, 0xc0c8, 0, 0xffff} : clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
 			unsigned const checkpoint = std::array<unsigned, 3>{6, 7, 9}[variant / 12];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Only configured bus STM forms execute");
 			if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, value ^ 0xffff); }
@@ -47819,7 +47822,12 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore bus STM without repeating the wait or write"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253600; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + (standard || clock ? 3 : 1) < 36) { start_staged_bus_stm(variant + (standard || clock ? 3 : 1)); return; }
+				if (variant + (standard || clock || serial ? 3 : 1) < 36) { start_staged_bus_stm(variant + (standard || clock || serial ? 3 : 1)); return; }
+				if (serial)
+				{
+					osd_printf_info("TMS320C54x staged BSP STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 endpoint_semantics=external silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated staged BSP STM complete");
+				}
 				if (clock)
 				{
 					osd_printf_info("TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0\n");
@@ -50887,6 +50895,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(37, "signed-call", "All signed A/B conditional calls with retained target and frame")
 	ROM_SYSTEM_BIOS(38, "rpt-writa", "Retained repeated WRITA with immediate and memory counts")
 	ROM_SYSTEM_BIOS(39, "rpt-writa16", "Repeated WRITA on the standard 16-bit program-address profile")
+	ROM_SYSTEM_BIOS(40, "serial-stm", "Retained immediate BSP control publication")
 ROM_END
 
 ROM_START(tms54rom4)

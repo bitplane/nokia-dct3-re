@@ -279,8 +279,12 @@ execute, and the backend observes completion strobes. Execution
 reaches resident code, executes the absolute BITT in RETD's delay span
 and RC TC, and passes short circular MAR, the delayed SUBS under BCD
 BEQ at `008e4f`, CC ALEQ and repeated `WRITA *AR2+` at `0031d6`.
-It stops at `000e20`, `7722 c008` (immediate STM to BSP control `0022`), with
-the exposed PC at `0e22`, PMST `ffac` and
+The uploaded immediate STM writes at `000e20` and `000e22` publish `c008`
+then `c0c8` to the existing BSP-control endpoint `0022`. A passive data-write
+tap observes both full-word writes in order, at 0.133888750 and 0.133888808 s.
+Execution stops at `004615`, absolute BITF `61f8 0007 0800` reading ST1's
+INTM bit, followed in the acquired program ROM by `f7bb` (set INTM).
+The exposed PC is `461a`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -290,6 +294,16 @@ writes `c008` and `c0c8`; these are uploaded instructions, not mask-ROM
 contents. The backend
 reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
 upload completion nor handset boot is accepted for this machine.
+
+Immediate STM `0022` retains its extension and publishes through the normal
+data bus in Execute, paying the modeled peripheral access clock; it does
+not use DAGEN's early-write path. `serial-stm` checks 12 cases plus replay
+with `c008`, `c0c8`, zero and all-one literals, mutated after fetch, and
+snapshots before/during the wait and after publication. It proves one
+literal fetch and one destination write without a destination read. The
+isolated endpoint is external RAM, not a second BSP implementation; the
+native uploaded-code observation supplies the backend-composition evidence.
+Neither fixture establishes silicon phase timing, serial traffic or speech.
 
 Repeated short-source WRITA uses a retained logical PAR stream, with each
 program destination translated independently for overlay and address-width

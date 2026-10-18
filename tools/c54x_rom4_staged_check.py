@@ -10,7 +10,8 @@ import sys
 
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a70
-STOP = 'unsupported staged C54x form 7722 at 000e20'
+STOP = ('staged BITF control/peripheral source is unsupported instruction=004615 '
+        'last_fetch_physical=004617 word=61f8 source=0007 pmst=ffac')
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -21,13 +22,18 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e22', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('461a', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
-    if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
+    if text.count(STOP) != 1 or 'unsupported staged C54x form' in text:
         raise ValueError('missing or ambiguous unsupported instruction')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('2', '71')]:
         raise ValueError('missing or changed bootstrap completion boundary')
+    bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
+    if text.count('rom4_staged_bsp_write:') != 2 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')]:
+        raise ValueError('missing, duplicate or changed native BSP reset/release writes')
+    if not 0 < float(bsp[0][2]) < float(bsp[1][2]) < float(timestamp):
+        raise ValueError('native BSP publication order changed')
     words = [int(word, 16) for word in encoded.split(',')]
     if (len(words) != 40 or words[:7] != [0x7718, 0x1ec6, 0x7728, 0x2000, 0xf7be, 0x7758, 0x3146]
             or words[13:16] != [0xf071, 0x079f, 0x8093]
@@ -45,11 +51,11 @@ def check(text, firmware):
     packed_tail = struct.pack('>16H', *tail)
     if firmware.find(packed_tail) != TAIL_SOURCE_OFFSET or firmware.find(packed_tail, TAIL_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded tail does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_bsp_control_stm', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_bitf_status_source', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=16,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x0e20, instruction=0x7722, destination=0x22,
-                immediate=0xc008, completion_strobes=2,
+                instruction_address=0x4615, instruction=0x61f8, source=0x07,
+                bsp_control_writes=[0xc008, 0xc0c8], completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)
 
