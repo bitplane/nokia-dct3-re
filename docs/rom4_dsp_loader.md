@@ -18,6 +18,22 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Repeated fixed-accumulator transfer
+
+`MVMD AL/BL, dmad` (`7308/730b`) can repeat into ordinary RAM. Each iteration
+samples the same mapped source, retains that word, and writes the next EAR
+destination. The original literal is fetched once, not incremented in program
+memory. This uses the existing pipelined move stages (Access sample, Read
+publication), not measured physical bus phases; other MMR sources and mapped
+destinations retain their guards (SPRU172C 4-115).
+
+`mvmd-repeat` passes 1,536 cases plus replay: counts 0/1/39/255, four source
+patterns, four SXM/OVM combinations, short/long RPT, two pages and three
+checkpoints. A deliberate source change halfway through the read sequence
+must affect only later copies; destination and source guards, untouched ARs,
+stack, T, other accumulator and status are checked. Post-fetch literal
+poisoning and save/load must not cause re-fetch or duplicated accesses.
+
 ## Mapped-load AR source age
 
 LDM and zero-shift LD/LDU from mapped AR0..AR7 retain their Read operand

@@ -492,14 +492,21 @@ The staged comparison is available through
 ROM paths. Its separate `fr-decoder-pipe` BIOS loads the same acquired
 program/DROM, checks the decoder entry words before execution, and retains
 the atomic fixture's exact PCM, balanced-return and per-frame replay
-requirements. It is currently **failing**: reset at `8449` returns correctly,
-but frame zero reaches the repeat-body exclusion for `7308` at `84d7`.
-This is `MVMD AH, dmad`, preceded by `RPT #0027`, with first destination
-`122e`. SPRU172C 4-115 specifies a fixed MMR source and incrementing EAR
-destination under repeat. Qualification must preserve that distinction from
-MVDK/MVKD, check original-literal retention and one source/read and write per
-iteration, and cover replay before admitting it. No CPU instruction or
-handset state has been forced to bypass the exclusion.
+requirements. Reset at `8449` returns correctly. The `7308` repeat at
+`84d7` now executes: `MVMD AL, dmad`, preceded by `RPTZ A, #0027`, fills
+40 words starting at `122e`. MMR `08` is AL, not AH; `0b` is BL.
+SPRU172C 4-115 specifies a fixed MMR source and incrementing EAR destination,
+distinct from MVDK/MVKD. The `mvmd-repeat` profile qualifies AL/BL to ordinary
+RAM with 1,536 cases plus replay, including changed source values mid-repeat
+and a poisoned fetched destination literal. Other MMR sources, mapped
+destinations and interrupt composition are not newly qualified.
+
+The staged decoder is still **failing** at frame zero: `302c` (`LD …,T`)
+at `8527` is excluded in the delay span of RPTBD at `8524`. The retained
+delay words are `4592,302c`; the next fetched word is `2b93`. Decode that
+specific T-load addressing and delay ownership before broadening admission.
+No PCM comparison or handset speech is established by passing the earlier
+repeat. No CPU instruction or handset state has been forced around a guard.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values

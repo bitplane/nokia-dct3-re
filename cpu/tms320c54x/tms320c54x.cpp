@@ -109,7 +109,10 @@ constexpr bool staged_repeat_data_copy(u16 word)
 
 constexpr bool staged_repeat_destination_copy(u16 word)
 {
-	return (word & 0xff00) == 0x7100 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xdf));
+	// MVMD AL/BL repeats a fixed MMR source into incrementing EAR
+	// destinations (SPRU172C 4-115), unlike MVDK's Smem source DAGEN.
+	return word == 0x7308 || word == 0x730b ||
+		((word & 0xff00) == 0x7100 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xdf)));
 }
 
 constexpr bool staged_accumulator_stm(u16 word)
@@ -3896,7 +3899,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		u16 const source = staged_direct_mvmd(m_pipeline_word[3]) ? mode : extended ? (mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3)) : basic_address(3, mode);
-		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && source < 0x60)
+		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && source < 0x60 && !staged_direct_mvmd(m_pipeline_word[3]))
 		{
 			logerror("%s: repeated MVDK mapped source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
