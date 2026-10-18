@@ -8045,6 +8045,74 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62138;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct portr_bypass_fixture
+	{
+		bool chain, other, destination, sxm;
+		unsigned operation, gap, snapshot;
+		u32 base;
+		u16 sample, request;
+		u64 a, b;
+	};
+	static portr_bypass_fixture portr_bypass_case(unsigned variant)
+	{
+		portr_bypass_fixture f{};
+		f.chain = variant >= 6144;
+		unsigned n = f.chain ? variant - 6144 : variant;
+		static constexpr std::array<u16, 8> words{0, 1, 0xffff, 0x8000, 0x7fff, 0xfde5, 0x0002, 0x000a};
+		f.sample = words[n % 8]; n /= 8;
+		f.a = 0x123456789aULL; f.b = 0xfeabcd9876ULL;
+		if (f.chain)
+		{
+			f.request = words[n % 8]; n /= 8;
+			f.a = u16(~f.sample) & f.request; f.b = f.a & 2;
+		}
+		else
+		{
+			f.gap = n % 3; n /= 3; f.other = n % 2; n /= 2;
+			f.destination = n % 2; n /= 2; f.sxm = n % 2; n /= 2;
+			f.operation = n % 4; n /= 4;
+			u16 const value = f.other ? 0x55aa : f.sample;
+			u64 &result = f.destination ? f.b : f.a;
+			if (!f.operation) result = u64(f.sxm ? s64(s16(value)) : s64(value)) & 0xffffffffffULL;
+			else if (f.operation == 1) result &= value;
+			else if (f.operation == 2) result |= value;
+			else result ^= value;
+		}
+		f.base = n % 2 ? 0x20000 : 0; n /= 2; f.snapshot = n;
+		return f;
+	}
+	void start_portr_bypass(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = portr_bypass_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x7482); program.write_word(f.base + 0x601, 0x125);
+		if (f.chain)
+		{
+			program.write_word(f.base + 0x602, 0x1082); program.write_word(f.base + 0x603, 0xf493);
+			program.write_word(f.base + 0x604, 0x7482); program.write_word(f.base + 0x605, 0x126);
+			program.write_word(f.base + 0x606, 0x1882); program.write_word(f.base + 0x607, 0xf130); program.write_word(f.base + 0x608, 2); program.write_word(f.base + 0x609, 0xf4e1);
+		}
+		else
+		{
+			program.write_word(f.base + 0x602 + f.gap, std::array<u16, 4>{0x1000, 0x1800, 0x1a00, 0x1c00}[f.operation] | (f.destination << 8) | (f.other ? 0x83 : 0x82));
+			program.write_word(f.base + 0x603 + f.gap, 0xf4e1);
+		}
+		data.write_word(0x1000, 0xa55a); data.write_word(0x1100, 0x55aa);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.sxm ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1100);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_port_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0, 0xffff, "portr_bypass_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_operand_reads++; expect(i < (f.chain ? 2U : 1U) && at == 0x125 + i && m_cpu->pipeline_cycles() == 6 + 4 * i, "PORTR retains each volatile I/O sample once in Read"); word = i ? f.request : f.sample; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "portr_bypass_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; expect(i < (f.chain ? 2U : 1U) && at == 0x1000 && word == (i ? f.request : f.sample) && m_cpu->pipeline_cycles() == 7 + 4 * i, "PORTR retains the real RAM write after bypass"); });
+		m_operand_data_tap = data.install_read_tap(0, 0xffff, "portr_bypass_ram_read", [this, f](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x1000 || (f.other && at == 0x1100), "PORTR consumers read only their selected RAM"); ++m_port_reads; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x609, "portr_bypass_literals", [this, f](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; if (at == f.base + 0x601 || (f.chain && at == f.base + 0x605)) ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62144;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct circular_portr_block_fixture
 	{
 		unsigned count, size, reg, selected, snapshot, index;
@@ -17503,6 +17571,7 @@ private:
 		if (!strcmp(machine().options().bios(), "portr-block")) { start_circular_portr_block(); return; }
 		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
+		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -48650,6 +48719,31 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62144)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = portr_bypass_case(variant);
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 7, 11}[f.snapshot];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "PORTR consumer sequence is admitted");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PORTR around sample, pending write and consumer");
+			}
+			if (tick == 24)
+			{
+				if (m_cpu->state_int(tms320c54x_device::STATE_A) != f.a || m_cpu->state_int(tms320c54x_device::STATE_B) != f.b) osd_printf_info("PORTR bypass mismatch: case=%u a=%010llx expected_a=%010llx b=%010llx expected_b=%010llx reads=%u\n", variant, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)f.a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)f.b, m_port_reads);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.sxm ? 0x100 : 0)) && m_pipeline_operand_reads == (f.chain ? 2U : 1U) && m_pipeline_store_writes == m_pipeline_operand_reads && m_pipeline_extensions_reads == m_pipeline_operand_reads && m_port_reads <= (f.chain ? 2U : 1U), "PORTR consumers use retained incoming data without duplicate I/O or RAM writes");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_port_reads = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore PORTR without replaying an I/O sample or publication"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62145; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 6655) { start_portr_bypass(variant + 1); return; }
+				osd_printf_info("TMS320C54x PORTR consumer bypass: PASS cases=6656 restore=6656 generic_cases=6144 dispatcher_cases=512 consumers=LD,AND,OR,XOR gaps=0,1,2 alias_controls=2 accumulators=2 sxm=2 patterns=8 pages=2 snapshots=4 volatile_io=1 real_writes=1 peripheral_bypass_claim=0 physical_banks=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated PORTR consumer bypass complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62145) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62144; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62142)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -52349,6 +52443,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(74, "stmac-edge", "Parallel MAC mapped operand exclusions")
 	ROM_SYSTEM_BIOS(75, "sqdst", "Square distance with retained operands and old accumulator feedback")
 	ROM_SYSTEM_BIOS(76, "sqdst-edge", "Square distance mapped operand exclusions")
+	ROM_SYSTEM_BIOS(77, "portr-bypass", "PORTR consumers and the native request-mask sequence")
 ROM_END
 
 ROM_START(tms54rom4)

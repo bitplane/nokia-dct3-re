@@ -1,4 +1,4 @@
-"""Pin bounded NSE-1 staged RF-loop execution, not handset boot or acquisition."""
+"""Pin organic NSE-1 host-packet entry and its staged instruction stop."""
 import argparse
 import hashlib
 import json
@@ -17,44 +17,53 @@ ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
 
 
 def check(text, firmware):
+    if (text.count('rom4_staged_profile:') != 1
+            or re.findall(r'rom4_staged_profile: system=(\w+)', text) != ['nse1pipe']):
+        raise ValueError('missing or wrong staged machine identity')
     rows = ROW.findall(text)
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('408d', '00', '0', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('3ef0', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    if 'unsupported' in text or 'unimplemented' in text:
-        raise ValueError('staged execution encountered an unsupported form')
-    ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) t=([0-9.]+)', text)
+    if (text.count('unsupported staged C54x form 71d2 at 003eee') != 1
+            or text.count('unsupported') != 1 or 'unimplemented' in text):
+        raise ValueError('missing or ambiguous staged host-packet instruction stop')
+    ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:6] != ('408d', '00', '0', '6', '5', '9')
-            or not 3 <= float(ends[0][6]) <= 3.05):
+            or ends[0][:8] != ('3ef0', '00', '1', '4', '4', '6', '0', '2')
+            or not 3 <= float(ends[0][8]) <= 3.05):
         raise ValueError('missing or changed bounded execution endpoint')
-    end_time = float(ends[0][6])
+    end_time = float(ends[0][8])
+    headers = re.findall(r'rom4_staged_host_header: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
+    if (text.count('rom4_staged_host_header:') != 2 or text.count('rom4_staged_host_consume:')
+            or [row[:4] for row in headers] != [('1', '0a05', 'ffff', '3871'), ('2', '0a05', 'ffff', '387f')]
+            or not 0.17 < float(headers[0][4]) < float(headers[1][4]) < float(timestamp)):
+        raise ValueError('missing or changed organic first host-packet header reads')
     if (text.count('rom4_staged_dagen:') != 1
-            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('00fa', '1987', '06e4', '081f', '6108')]):
+            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0052', '0001', '0801', '001f', '6103')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
     accumulators = re.findall(r'rom4_staged_accumulators: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) ar3=([0-9a-f]{4}) ar4=([0-9a-f]{4})', text)
     if (text.count('rom4_staged_accumulators:') != 1
-            or accumulators != [('0000000000', '0000000000', '000b', '06e3', '0000')]):
+            or accumulators != [('0000003ee7', '0000000003', '000b', '06e3', '000a')]):
         raise ValueError('missing, malformed or changed frozen accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
-    if summaries != [('623', '74')] or text.count('rom4_interface_summary:') != 1:
+    if summaries != [('12', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=623 mailbox_writes=74 slot_expiries=624 frame_expiries=648 rf_reads=19808 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=408d pmst=ffac ifr=0020 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=12 mailbox_writes=74 slot_expiries=9 frame_expiries=648 rf_reads=128 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=3ef0 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 16
             or [row[:3] for row in rf] != [(str(i + 1), ('324e', '3254', '325a', '3260')[i % 4], '30') for i in range(16)]
             or not all(0.15 < float(row[3]) < float(timestamp) for row in rf)
             or not all(float(before[3]) <= float(after[3]) for before, after in zip(rf, rf[1:]))
-            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['19808']):
+            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['128']):
         raise ValueError('missing, malformed or changed native RF provider reads')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
-    if text.count('rom4_staged_bsp_write:') != 7 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 5:
+    if text.count('rom4_staged_bsp_write:') != 6 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4:
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
     bsp_times = [float(row[2]) for row in bsp]
-    if not 0 < bsp_times[0] < float(timestamp) < bsp_times[-1] < end_time or not all(before < after for before, after in zip(bsp_times, bsp_times[1:])):
+    if not 0 < bsp_times[0] < bsp_times[-1] < float(timestamp) < end_time or not all(before < after for before, after in zip(bsp_times, bsp_times[1:])):
         raise ValueError('native BSP publication order changed')
     tx = re.findall(r'rom4_staged_bsp_tx: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_bsp_tx:') != 2 or len(tx) != 2
@@ -70,9 +79,9 @@ def check(text, firmware):
         raise ValueError('missing, duplicate or changed native BSP receive observations')
     expected_low = {
         'low_write': [('00f1', '0000', 'ffff', '0f10'), ('00f2', '0000', 'ffff', '0f10'),
-                      ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5')],
-        'low_read': [('00f1', '0000', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] * 3,
-        'gap_read': [('0003', '0000', 'ffff', pc) for pc in ('a5f4', 'a5f8', 'a601')] * 3,
+                      ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5')],
+        'low_read': [('00f1', '0000', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] * 2,
+        'gap_read': [('0003', '0000', 'ffff', pc) for pc in ('a5f4', 'a5f8', 'a601')] * 2,
     }
     low = {}
     for tag, expected in expected_low.items():
@@ -81,11 +90,9 @@ def check(text, firmware):
         if text.count(prefix) != len(expected) or [row[:4] for row in low[tag]] != expected:
             raise ValueError('missing, malformed or changed low-page bus observation')
     ordered = [*low['low_write'][:3], *low['low_read'][:2], *low['gap_read'][:3],
-               low['low_write'][3], *low['low_read'][2:4], *low['gap_read'][3:6],
-               low['low_write'][4], *low['low_read'][4:], *low['gap_read'][6:]]
+               low['low_write'][3], *low['low_read'][2:], *low['gap_read'][3:]]
     times = [float(row[4]) for row in ordered]
-    if (not all(0 < before < after < end_time for before, after in zip(times, times[1:]))
-            or not times[13] < float(timestamp) < times[14]
+    if (not all(0 < before < after < float(timestamp) for before, after in zip(times, times[1:]))
             or re.findall(r'rom4_staged_low_count: reads=(\d+) writes=(\d+)', text) != [('4', '4')]
             or re.findall(r'rom4_staged_gap_count: reads=(\d+)', text) != ['6']):
         raise ValueError('changed low-page observation ordering or counts')
@@ -117,14 +124,16 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='bounded_staged_rf_loop', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_host_ring_move', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                low_gap_bus_reads=9, rf_sample_reads=19808, rf_sample_blocks=619,
+                instruction_address=0x3eee, instruction=0x71d2,
+                host_header_reads=2, host_consumed=0,
+                low_gap_bus_reads=6, rf_sample_reads=128, rf_sample_blocks=4,
                 bsp_transmit_words=[0x0aaa, 0xffd5],
                 bsp_receive_words=[0x0aaa, 0x0aaa],
-                bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 5, completion_strobes=623,
+                bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 4, completion_strobes=12,
                 swwsr=0x2000, boot_claim=False,
                 preceding_instruction_retirement_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False,

@@ -1,12 +1,16 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype now sustains the resident RF loop through
-a bounded three-second run without an unsupported instruction. Its upload
-completion, RF acquisition and handset boot remain unaccepted. The
+acceptance scopes. The staged frontend now reaches the first organic
+host-packet decoder and stops on circular-source MVDK `71d2` at `3eee`.
+Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
+
+The current staged question is how to retain the circular Smem source and
+publish MVDK's mapped destination in the first packet's decode sequence,
+without bypassing the firmware parser or injecting ring state.
 
 ## Staged dual-memory MAC family
 
@@ -273,26 +277,55 @@ fixture checks two-word issue cadence, retained sample publication,
 ring wrap, final BRC and unchanged unrelated registers. It does not supply
 GSM packets or assert measured physical bus timing.
 
-The native probe's bounded run reaches 19,808 RF-provider reads and 623
-completion strobes by its endpoint at 3.016666667 s, without an illegal
-instruction. Only the first sixteen reads are logged individually, all at
-modeled frame 30, with observation-time PCs `324e/3254/325a/3260` repeated;
-these are not retirement addresses. The total corresponds to 619 blocks of
-32 samples, not an independent observation of each block's frame ownership.
-A further BSP/low-page exchange around 2.29175 s contributes a third
-`00f2=3` publication, two more low-page reads and three more gap reads.
-The checker requires these late events, seven BSP control writes, final
-low-page counts (6 reads/5 writes/9 gap reads), exact backend counters and
-a clean final CPU snapshot. RF acquisition and handset boot remain unclaimed.
+The native prefix records 128 RF-provider reads before the packet-decoder
+stop. Only the first sixteen reads are logged individually, all at modeled
+frame 30, with observation-time PCs `324e/3254/325a/3260` repeated; these
+are not retirement addresses. Their total is four 32-sample blocks, not an
+independent observation of each block's frame ownership. RF acquisition and
+handset boot remain unclaimed.
 
-An otherwise fresh ordinary `noki5110` atomic run at the same duration also
-waits at resident PC `408d`, but publishes 639 completion strobes, 19,840 RF
-reads, 13 RF-control port-32 writes and 33 transfer expiries, with `mode_ac=1`.
-The staged run instead has no port-32 writes or transfer expiries and
-`mode_ac=0`. This is an unresolved functional divergence, not parity. The
-comparison changes both frontend and SWWSR dialect (atomic legacy versus
-staged standard), so a controlled two-axis comparison is needed before
-assigning the difference to pipeline semantics, bus timing or interrupt delivery.
+## PORTR consumer forwarding
+
+SPRU131G 7.3.2's same-location pending-write bypass applies to an ordinary
+RAM destination populated by PORTR, not only to accumulator stores and memory
+copies. The staged Read/Execute model retains the I/O word and forwards it
+to an adjacent same-address consumer while preserving the real EB write.
+It must not reread the port, forward to a different address, or extend this
+rule to mapped/peripheral destinations without separate qualification.
+
+The ROM's request dispatcher makes this load-use contract observable:
+`35b9` reads the in-service mask into RAM, `35bb/35bc` loads and complements
+it, and `35bd/35bf` reads and ANDs the incoming request. A stale RAM read can
+cancel the request against its own mask and silently skip host commands.
+Consequently, a live RF loop without an illegal instruction is not sufficient
+evidence of functional boot or host delivery.
+
+The `portr-bypass` fixture failed on stale RAM (`a55a` instead of an I/O
+sample of zero) without forwarding. It passes 6,656 cases and replays:
+6,144 LD/AND/OR/XOR consumer cases covering both accumulators, SXM states,
+eight samples, zero/one/two gaps, aliased/non-aliased addresses, two program
+pages and four snapshots; plus 512 versions of the native request-mask
+sequence. The volatile endpoint is sampled once and the real memory write
+still occurs once per PORTR. This qualifies the logical on-chip RAM contract,
+not measured bank contention or peripheral forwarding.
+
+Fresh three-second controls separate frontend and SWWSR selection:
+
+| Machine | Frontend | SWWSR | Host packets committed | RF-control writes | Outcome |
+|---|---|---|---|---|---|
+| `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
+| `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
+| `nse1pipe` | staged | standard | 0 | 0 | First packet read; `71d2` at `3eee` is unimplemented. |
+| `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
+
+The atomic controls both publish 639 completion strobes, 19,840 RF reads
+and 33 transfer expiries, with `mode_ac=1`. Matching their counters does not
+prove either bus dialect is physically correct. The fixed-standard comparison
+isolated a frontend data hazard; changing SWWSR alone did not explain the
+missing RF controls. The staged checker now requires actual first-header
+reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
+It stops before the consumer index advances, so packet completion and RF
+parity remain open.
 
 ## Current result
 
@@ -697,11 +730,16 @@ board map at `0003`, as described above. Circular-address PORTR `74d6`
 at `3249` reads port `0027`, the existing RF sample input. The block
 established by RPTBD at `3245` (end `3268`), including MACR `b736`, parallel
 store/MAC `d6e1` and SQDST `e210`, no longer encounters an unsupported form
-in the bounded run. At 0.5 s the exposed PC is `408d`, BK `00fa`, AR0 `1987`,
-AR2 `06e4`, ST0 `081f`, ST1 `6108`, A=B=0, T=`000b`, AR3=`06e3`, AR4=0,
-PMST `ffac` and ILLEGAL clear. The final observation is also at `408d` with
-ILLEGAL clear; the RF-loop counters and unresolved atomic/staged difference
-are specified above. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
+in the observed prefix. The first incoming host packet is then read twice
+from `0800` as `0a05` at 0.175897519/0.175897808 s. Circular-source MVDK
+`71d2 0015` at `3eee` is rejected before the ring consumer advances.
+At 0.5 s the exposed PC is `3ef0`, BK `0052`, AR0=1, AR2=`0801`,
+ST0=`001f`, ST1=`6103`, A=`3ee7`, B=3, T=`000b`, AR3=`06e3`, AR4=`000a`,
+PMST `ffac` and ILLEGAL set. The final observation at 3.016666667 s pins
+the same stop, two header reads, no committed packet, 12 completion strobes,
+74 mailbox writes, 128 RF reads and no RF-control writes. Older pending
+slots need not retire after Decode rejection. SWWSR has actually retired
+to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
 loader1 image is at `0x99704`). The 24 uploaded words at `0e10..0e27`

@@ -1,10 +1,30 @@
--- Observe existing BSP transactions; extra reads touch only ordinary uploaded RAM.
+-- Observe existing bus transactions; extra reads touch only ordinary RAM.
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
+machine:logerror('rom4_staged_profile: system=' .. machine.system.name .. '\n')
 local captured = false
 local stop_notifier
 local low_reads, low_writes = 0, 0
 local gap_reads = 0
+local host_consumed = 0
+local host_headers = 0
+local header_tap = cpu.spaces.data:install_read_tap(0x0800, 0x0800, 'staged_host_header', function(address, value, mask)
+    host_headers = host_headers + 1
+    if host_headers <= 16 then
+        machine:logerror(string.format('rom4_staged_host_header: index=%d value=%04x mask=%04x pc_context=%04x t=%.9f\n',
+            host_headers, value, mask, cpu.state.PC.value, machine.time:as_double()))
+    end
+end)
+local host_tap = cpu.spaces.data:install_write_tap(0x0853, 0x0853, 'staged_host_consumer', function(address, value, mask)
+    local previous = cpu.spaces.data:read_u16(address)
+    local combined = (previous & ~mask) | (value & mask)
+    if combined == previous then return end
+    host_consumed = host_consumed + 1
+    if host_consumed <= 8 then
+        machine:logerror(string.format('rom4_staged_host_consume: index=%d previous=%04x next=%04x pc_context=%04x t=%.9f\n',
+            host_consumed, previous, combined, cpu.state.PC.value, machine.time:as_double()))
+    end
+end)
 local gap_read_tap = cpu.spaces.data:install_read_tap(0x0003, 0x0003, 'staged_unowned_low_read', function(address, value, mask)
     gap_reads = gap_reads + 1
     if gap_reads <= 64 then
@@ -47,7 +67,7 @@ local rx_tap = cpu.spaces.data:install_read_tap(0x20, 0x20, 'staged_bsp_receive'
     end
 end)
 emu.register_frame_done(function()
-    assert(bsp_tap and tx_tap and rx_tap and low_read_tap and low_write_tap and gap_read_tap and stop_notifier)
+    assert(bsp_tap and tx_tap and rx_tap and low_read_tap and low_write_tap and gap_read_tap and host_tap and header_tap and stop_notifier)
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
     machine:logerror(string.format('rom4_staged_low_count: reads=%d writes=%d\n', low_reads, low_writes))
@@ -86,7 +106,7 @@ emu.register_frame_done(function()
 end)
 stop_notifier = emu.add_machine_stop_notifier(function()
     machine:logerror(string.format(
-        'rom4_staged_end: pc=%04x xpc=%02x illegal=%d reads=%d writes=%d gap_reads=%d t=%.9f\n',
+        'rom4_staged_end: pc=%04x xpc=%02x illegal=%d reads=%d writes=%d gap_reads=%d host_consumed=%d host_headers=%d t=%.9f\n',
         cpu.state.PC.value, cpu.state.XPC.value, cpu.state.ILLEGAL.value,
-        low_reads, low_writes, gap_reads, machine.time:as_double()))
+        low_reads, low_writes, gap_reads, host_consumed, host_headers, machine.time:as_double()))
 end)
