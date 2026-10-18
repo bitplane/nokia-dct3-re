@@ -155,7 +155,9 @@ private:
 	bool staged_bus_control(u16 op) const { return (software_wait_enabled() && op == 0x7728) || (m_c5416_bus_profile && (op == 0x7729 || op == 0x772b)); }
 	bool staged_timer_control(u16 op) const { return op >= 0x7724 && op <= 0x7726; }
 	bool staged_clock_control(u16 op) const { return op == 0x7758; }
-	bool staged_serial_control(u16 op) const { return op == 0x7722; }
+	// BDXR retains its immediate until Execute, like BSPC. It must not use
+	// the address-generator STM early-write path. Peripheral phase is partial.
+	bool staged_serial_control(u16 op) const { return op == 0x7721 || op == 0x7722; }
 	void retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
 		bool repeat_was_armed, bool delayed, bool xc_guarded);
 	bool service_interrupt();

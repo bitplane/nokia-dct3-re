@@ -52925,7 +52925,7 @@ private:
 		}
 		else if (m_stage == 81)
 		{
-			expect(m_cpu->state_int(STATE_GENPC) == 0x0803 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(STATE_GENPC) == 0x0803 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				data.read_word(0x21) == 0x0aaa && !(data.read_word(0x22) & 0xc00) &&
 				!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !m_cobba->codec_serial_loopbacks(),
 				"Native STM loads BDXR but cannot create ready edges or an untimed codec echo");
@@ -52947,7 +52947,16 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
 				"Clocked native STM preserves accumulators/status and completes only through independent TX/RX sources");
 			logerror("[opassert] op=7721\n");
+			if (m_case == 128)
+			{
+				// Repeat the same pending-word/pin contract with staged execution;
+				// this does not assert the silicon's peripheral-write phase.
+				m_cpu->set_pipeline_frontend(true);
+				++m_case; m_stage = 80;
+				m_timer->adjust(attotime::from_usec(100)); return;
+			}
 			osd_printf_info("C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n");
+			osd_printf_info("C54x staged backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 physical_phase_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend BSP tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));

@@ -16,6 +16,7 @@ CONTINUOUS_TX = 'C54x native backend BSP continuous TX: PASS completed_words=6 l
 FRAME_IGNORE = 'C54x native backend BSP frame ignore: PASS directions=2 words=4 partial_restore=1 ignored_sync=1 reset_abort=1 sources=4,5 handset_clock_claim=0'
 JOINED_PINS = 'C54x native backend BSP joined pins: PASS cases=128 formats=4 polarities=4 patterns=4 phases=2 partial_restore=128 sources=4,5 handset_clock_claim=0'
 CLOCKED_STORE = 'C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0'
+STAGED_CLOCKED_STORE = 'C54x staged backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 physical_phase_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 REQUESTS = 'C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=16 mapping_claim=0'
 REQUEST_COMPLETION = 'Fatal error: C54x backend compare request tests complete'
@@ -54,6 +55,8 @@ def check_result(text, returncode, *, verbose_teardown=False, host_requests=Fals
         raise ValueError('missing unique native joined-pin/restoration result')
     if lines.count(CLOCKED_STORE) != 1:
         raise ValueError('missing unique native clocked-store result')
+    if lines.count(STAGED_CLOCKED_STORE) != 1:
+        raise ValueError('missing unique staged clocked-store result')
     if not lines or lines[-1] != COMPLETION:
         raise ValueError('missing terminal backend BSP completion')
     if any(line.startswith('Fatal error:') and line != COMPLETION for line in lines):

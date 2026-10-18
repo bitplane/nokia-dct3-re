@@ -179,10 +179,16 @@ not recovered production handset wiring. See the authoritative
 The paired `nse1aclk`/`nse1pclk` laboratory configurations hold standard
 SWWSR and pin clocks constant while changing atomic/staged CPU execution.
 Run `tools.run_c54x_rom4_pcm_clock --staged --coverage` with its required
-MAME/ROM paths: atomic pin-clocked boot and key-tone acceptance passes;
-staged execution currently stops at `7721` (`STM` to BDXR) at `0x0e61`.
-This is a staged mapped-peripheral-store boundary, not evidence of missing
-codec clock wiring. Neither profile is an ordinary handset configuration;
+MAME/ROM paths: atomic pin-clocked boot and key-tone acceptance passes.
+Staged `7721` (`STM` to BDXR) at `0x0e61` now retains its literal until
+Execute, using the existing partial peripheral-access model rather than
+DAGEN's early-write path. The backend pin test executes the same store on
+both frontends: no ready/echo without clocks, then the original `0x0aaa`
+word and independent RX/TX sources with accumulators/status preserved.
+The handset fixture next stops at the explicit simultaneous peripheral
+read/write arbitration guard near `0x0e5f`; overlapping accesses remain
+unsupported, and staged key-tone acceptance is not established.
+Neither profile is an ordinary handset configuration;
 atomic instruction fingerprints are not imposed on the staged observation.
 Isolated native FR and EFR
 encoder/decoder gates validate algorithm results, not handset speech. The
