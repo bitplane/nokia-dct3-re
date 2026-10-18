@@ -120,7 +120,7 @@ constexpr bool staged_conditional_call(u16 word)
 constexpr bool staged_conditional_return(u16 word)
 {
 	u8 const condition = word;
-	return (word & 0xff00) == 0xfc00 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f));
+	return word == 0xfc20 || word == 0xfc30 || ((word & 0xff00) == 0xfc00 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_accumulator_branch(u16 word)
@@ -4808,9 +4808,11 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && staged_conditional_return(m_pipeline_word[4]))
 	{
-		// Direct accumulator consumers have no producer latency (SPRU131G
-		// 7.5.10). Decide after older Execute, not in the earlier Access slot.
-		bool const taken = staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
+		// Consume older accumulator/TC publications before retaining the
+		// decision. Execute must not retest a subsequently changed source.
+		u16 const word = m_pipeline_word[4];
+		bool const taken = (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
+			staged_accumulator_condition(word, accumulator(BIT(word, 3)));
 		m_pipeline_immediate[4] = taken;
 		if (taken)
 		{

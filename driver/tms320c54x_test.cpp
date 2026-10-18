@@ -5894,6 +5894,37 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_tc_return(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const condition = variant % 2, tc = (variant / 2) % 2, producer = (variant / 4) % 3, gap = (variant / 12) % 2, selector = (variant / 24) % 2 ? 15 : 0;
+		unsigned const words = producer == 2 ? 2 : producer;
+		u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x9000 + i, 0xf495);
+		if (producer) { program.write_word(base + 0x9000, producer == 2 ? 0x34f8 : 0x3401); if (producer == 2) program.write_word(base + 0x9001, 0x06d1); }
+		program.write_word(base + 0x9000 + words + gap, condition ? 0xfc30 : 0xfc20);
+		program.write_word(base + 0x9001 + words + gap, 0xf4e1); program.write_word(base + 0x9100, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x2000, 0x9100);
+		u16 const value = tc ? u16(1U << (15 - selector)) : 0;
+		m_cpu->space(AS_DATA).write_word(producer == 2 ? 0x06d1 : 0x1201, value);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824 | ((producer ? !tc : tc) ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0xb00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2000); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xa5f0 | selector);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x81abcdef01ULL);
+		m_pipeline_operand_reads = m_fast_stack_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "tc_return_reads",
+			[this, producer, value, tc, condition](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (at == 0x2000) { expect(tc == condition && !m_fast_stack_reads && word == 0x9100, "Only a taken TC/NTC return reads its stack target once"); ++m_fast_stack_reads; }
+				else { expect(producer && !m_pipeline_operand_reads && at == (producer == 2 ? 0x06d1 : 0x1201) && word == value, "TC return consumes its organic BITT producer once"); ++m_pipeline_operand_reads; } });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "tc_return_no_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Conditional return never writes data memory"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = tc_return_phase;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_bitt(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -16213,6 +16244,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-controls")) { start_pipeline_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "literal-guard")) { start_literal_guard(); return; }
+		if (!strcmp(machine().options().bios(), "tc-return")) { start_tc_return(); return; }
 		if (!strcmp(machine().options().bios(), "bitt-retd")) { start_bitt_retd(); return; }
 		if (!strcmp(machine().options().bios(), "bitt")) { start_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
@@ -18134,6 +18166,43 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase == tc_return_phase)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, producer = (variant / 4) % 3, gap = (variant / 12) % 2;
+			unsigned const offset = (producer == 2 ? 2 : producer) + gap, checkpoint = std::array<unsigned, 4>{3, 4, 5, 7}[variant / 96] + offset;
+			bool const tc = (variant / 2) % 2, taken = tc == bool(variant % 2);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RC TC/NTC and adjacent BITT are admitted");
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == (tick >= (taken ? 11 : 9) + offset), "TC/NTC return retains Class 32's taken/untaken cadence");
+			if (tick == 5 + offset)
+			{
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x2000, 0xdead);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824 | (!tc ? 0x1000 : 0));
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TC return around producer, condition sampling and retained target");
+			}
+			if (tick == 32)
+			{
+				u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
+				expect(m_cpu->state_int(STATE_GENPC) == base + (taken ? 0x9101 : 0x9002 + offset) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2000 + unsigned(taken) &&
+					m_pipeline_operand_reads == unsigned(producer != 0) && m_fast_stack_reads == unsigned(taken) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa824 | (!tc ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0xb00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (0xa5f0 | ((variant / 24) % 2 ? 15 : 0)), "TC/NTC return retains predicate and target, preserves registers and never touches an untaken stack");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TC return without duplicate producer or stack accesses");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = tc_return_phase + 1; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_tc_return(variant + 1); return; }
+				osd_printf_info("TMS320C54x TC returns: PASS cases=384 restore=384 predicates=TC,NTC outcomes=2 producers=status,BITT_short,BITT_absolute gaps=0,1 selectors=0,15 pages=2 snapshots=4 predicate_retained=1 target_retained=1 untaken_stack_reads=0 data_writes=0 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated TC returns complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == tc_return_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = tc_return_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == bitt_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = variant % 8;
@@ -48600,6 +48669,7 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned literal_guard_phase = 62010;
+	static constexpr unsigned tc_return_phase = 62036;
 	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;
@@ -50477,6 +50547,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(30, "rpt-store-edge", "Repeated mapped-store exclusions before DAGEN or bus effects")
 	ROM_SYSTEM_BIOS(31, "bitt", "Retained staged BITT memory and T selection")
 	ROM_SYSTEM_BIOS(32, "bitt-retd", "RETD with an absolute or long-offset BITT delay instruction")
+	ROM_SYSTEM_BIOS(33, "tc-return", "TC/NTC returns with live BITT producers and retained decisions")
 ROM_END
 
 ROM_START(tms54rom4)

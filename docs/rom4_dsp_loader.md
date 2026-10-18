@@ -275,15 +275,15 @@ DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
 staged execution executes its mapped-AR ADDM and the initialization routine's
 ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
-execute, and the backend observes the first completion strobe. Execution
-reaches resident code, executes the absolute BITT in RETD's delay span,
-and stops at `003190`, `fc30` (RC TC), with
-the exposed PC at `3192`, PMST `ffac` and
+execute, and the backend observes completion strobes. Execution
+reaches resident code, executes the absolute BITT in RETD's delay span
+and RC TC, and stops at `009199`, `6dc2` (MAR *AR2-%, circular decrement), with
+the exposed PC at `919b`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
 loader1 image is at `0x99704`). The backend
-reports 70 MCU bootstrap-mailbox writes and one completion strobe. Neither
+reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
 upload completion nor handset boot is accepted for this machine.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
@@ -2699,6 +2699,18 @@ change the result; T, accumulators and other status bits are preserved.
 occupying RETD's two delay words: exactly one stack read, one operand read,
 one extension fetch and target-only continuation. This two-word delay
 admission is limited to RETD; other control owners retain their exclusions.
+
+Nondelayed RC TC/NTC shares the existing conditional-return stack and
+redirect path. SPRU172C 4-133 specifies no status changes, one stack pop
+only on a taken return, and the Class 32 taken/untaken distinction.
+The decision samples TC after the older Execute publication, then retains
+both that decision and the popped target. `tc-return` checks 384 cases plus
+replay: both predicates/outcomes, initial status or short/absolute BITT
+producers, zero/one separating NOP, two bit selectors, two pages and four
+save points. Mutating TC and the stack after the decision cannot change
+the path or target; untaken paths perform no stack access. The fixtures
+retain the existing three/five-cycle untaken/taken cadence. Delayed and
+compound status predicates remain outside the admitted subset.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;
