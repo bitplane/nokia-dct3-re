@@ -3291,10 +3291,11 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
-					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || m_pipeline_word[stage] == 0xf274 || m_pipeline_word[stage] == 0xfe00 || delayed_block_owner) &&
+					bool const conditional_repeat_owner = staged_accumulator_branch(m_pipeline_word[stage]) && BIT(m_pipeline_word[stage], 9);
+					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || m_pipeline_word[stage] == 0xf274 || m_pipeline_word[stage] == 0xfe00 || delayed_block_owner || conditional_repeat_owner) &&
 						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active &&
 						(!m_pipeline_block_active || delayed_block_owner);
-					if (delay_repeat) delay_repeat_target = (m_pipeline_control_address & 0x7f0000) | m_pipeline_operand[stage];
+					if (delay_repeat) delay_repeat_target = (m_pipeline_control_address & 0x7f0000) | (conditional_repeat_owner ? u16(m_pipeline_control_address + 4) : m_pipeline_operand[stage]);
 					delay_bitt = staged_bitt(word) && u8(word) >= 0xe0 && m_pipeline_word[stage] == 0xfe00;
 					bool const basic_arithmetic = (word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word);
 					delay_arithmetic = basic_arithmetic && u8(word) >= 0xe0 && u8(word) <= 0xf8 && (m_pipeline_word[stage] & 0xfff7) == 0xfa45;
@@ -3581,7 +3582,13 @@ void tms320c54x_device::pipeline_step()
 			{
 				auto const count_header = [this](unsigned stage) { return m_pipeline_valid[stage] && (staged_short_repeat(m_pipeline_word[stage]) || staged_immediate_repeat(m_pipeline_word[stage]) || staged_memory_repeat(m_pipeline_word[stage])); };
 				unsigned owner = 3;
-				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) && !count_header(owner)) owner = 4;
+				// BCD's empty prefetch slot moves the short count header to
+				// Read before its one-word delay body reaches Decode.
+				bool const conditional_delay_repeat = m_pipeline_repeat_redirect_pending &&
+					staged_accumulator_branch(m_pipeline_control_word) && BIT(m_pipeline_control_word, 9) &&
+					m_pipeline_address[2] == m_pipeline_control_address + 3 &&
+					m_pipeline_address[4] == m_pipeline_control_address + 2 && staged_short_repeat(m_pipeline_word[4]);
+				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || conditional_delay_repeat) && !count_header(owner)) owner = 4;
 				if (!count_header(owner))
 				{
 					logerror("%s: staged pipeline repeat count owner is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word); m_illegal = true; return;
@@ -5322,6 +5329,11 @@ void tms320c54x_device::pipeline_step()
 			(m_pipeline_word[4] & 0xfdfb) == 0xf808 ? BIT(m_st0, 11) == BIT(m_pipeline_word[4], 2) :
 			overflow ? bool(m_st0 & overflow_mask) == BIT(m_pipeline_word[4], 4) : staged_accumulator_condition(m_pipeline_word[4], accumulator(BIT(m_pipeline_word[4], 3)));
 		if (overflow) m_st0 &= ~overflow_mask;
+		if (m_pipeline_repeat_redirect_pending && m_pipeline_control_address == m_pipeline_address[4] && staged_accumulator_branch(m_pipeline_word[4]))
+			// Delay repeat Decode precedes Evaluate: retain the selected path
+			// only after the predicate has sampled older Execute publications.
+			m_pipeline_repeat_redirect_target = (m_pipeline_address[4] & 0x7f0000) |
+				(m_pipeline_immediate[4] ? m_pipeline_operand[4] : u16(m_pipeline_address[4] + 4));
 	}
 	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
 	{

@@ -637,6 +637,14 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "bcd-rpt": (
+        "TMS320C54x BCD delay repeat: PASS cases=69120 restore=69120 frontends=atomic,staged predicates=12 signed_patterns=4 bodies=STL,MVDD,NOP counts=0,1,8,39,255 path_counts=0,2,7 directions=2 pages=2 snapshots=4 taken_fallthrough=1 predicate_poison=staged_after_Read target_poison=1 opcode_poison=staged_only ordered_copies=1 fresh_path_repeat=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated BCD delay repeat complete",
+    ),
+    "bcd-rpt-edge": (
+        "TMS320C54x BCD delay repeat exclusions: PASS cases=20 restore=20 forms=late,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=0 writes=0 ar_changes=0 counter_changes=0 reset_before_restore=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated BCD delay repeat exclusions complete",
+    ),
     "squr-delay": (
         "TMS320C54x delayed memory SQUR: PASS cases=27648 restore=27648 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD destinations=2 forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read newer_t_preserved=1 smul_product_clamp=0 target_observes_result=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed memory SQUR complete",
@@ -2174,7 +2182,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge", "stld-map"):
         machine = "tms54xtra"
-    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr"):
+    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

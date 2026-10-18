@@ -40,9 +40,9 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-The current staged EFR frame stops at short repeat `ec07`, owner `bdcc`,
-in conditional BCD `bdca` (`fa47`)'s delay span. No complete staged EFR
-frame has passed.
+The current staged EFR frame stops at short BITT `3484`, owner `c311`,
+in TC-conditional BCD `c30e` (`fa20`)'s second delay word. No complete
+staged EFR frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -355,6 +355,29 @@ physical bus arbitration, producer/control hazards or interrupt composition.
 The ROM4 EFR first frame passes its `a20a` mapped-AR3 subtraction but remains
 behind a separate instruction guard; this is not staged EFR acceptance.
 
+## Short repeat in accumulator-conditional BCD delay words
+
+A short immediate RPT in the first BCD delay word owns its following
+one-word body on either branch outcome. Its continuation is selected from
+the branch's retained Read predicate: the encoded target when taken, the
+word after the full delay span otherwise. Repeat Decode must not sample
+the predicate early. BCD's empty prefetch slot also places the count header
+in Read when a one-word body reaches Decode; that exact delay relationship
+admits the Read-owned count, not arbitrary older repeat headers.
+
+`bcd-rpt` passes 69,120 atomic/staged cases and cleared-pipeline replays:
+twelve signed A/B predicates, zero/+1/-1/positive-guard patterns, STL/MVDD/NOP
+bodies, counts 0/1/8/39/255, independent path counts 0/2/7, both directions,
+two pages and four checkpoints. Staged A/B changes after predicate Read
+reverse the condition without changing the selected path. Target/body
+poisoning, execution observations, ordered copies, exact buffers and
+preserved counters/status check that the delay repeat drains before a fresh
+target or fallthrough repeat. `bcd-rpt-edge` adds twenty replayed rejections
+of late headers, long/memory counts and spilling bodies without data,
+pointer or counter effects. TC/carry/overflow/BIO predicates, conditional
+calls, active outer blocks, arbitrary interrupts and silicon phases remain
+unqualified for this repeat composition.
+
 ## Short repeat in CALLD delay words
 
 Short immediate RPT in near CALLD's first delay word owns the following
@@ -416,7 +439,8 @@ TI SPRU131G sections 6.7/6.8 describe the two repeat controllers and RPTBD's
 two delay words. The acquired EFR reset supplies the concrete `f272 c9c9
 ec05 8392` composition. These bounded algorithm and restoration tests do not
 establish silicon pipeline timing or interrupt composition. RETD has the
-separate qualification above, as does near CALLD. Other delayed owners remain guarded.
+separate qualification above, as do near CALLD and accumulator-conditional
+BCD. Other delayed owners remain guarded.
 
 ## Mapped memory logic sources
 
