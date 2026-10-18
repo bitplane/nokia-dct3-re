@@ -56,6 +56,22 @@ are not established.
 
 ## Repeated fixed-accumulator transfer
 
+RPTZ's sequence-opening clear precedes the first MVMD read of the same
+accumulator (SPRU172C 4-150). In the staged prototype, the matching AL/BL
+source sample is retained after the older RPTZ Execute, not before it in
+that same clock. Opposite-accumulator reads and ordinary direct-ALU producer
+latency are unchanged. No result arithmetic or opcode timing is replaced
+with a firmware-specific answer.
+
+`mvmd-rptz` passes 1,536 cases plus replay: AL/BL sources, A/B clears,
+counts 0/1/39/255, four seeds and SXM/OVM combinations, two pages and three
+checkpoints. Matching clears yield zero on the first sample; opposite
+sources retain their value. A deliberate mid-repeat source change must
+affect only later copies. The unmodified core fails the retained-source
+state check. The native FR decoder independently passes all 32 vector
+frames and their full ordinary-RAM replay after this correction; this is
+isolated algorithm acceptance, not handset speech.
+
 `MVMD AL/BL, dmad` (`7308/730b`) can repeat into ordinary RAM. Each iteration
 samples the same mapped source, retains that word, and writes the next EAR
 destination. The original literal is fetched once, not incremented in program

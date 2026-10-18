@@ -15221,21 +15221,25 @@ private:
 	}
 	struct repeated_mvmd_fixture
 	{
-		unsigned count, source, snapshot, read_clock;
-		u16 value, status, destination;
+		unsigned count, source, snapshot, read_clock, clear_accumulator;
+		u16 value, seed, status, destination;
 		u32 base, literal;
 		bool long_header;
 		u16 sample(unsigned index) const { return index > count / 2 ? u16(~value) : value; }
-		u64 initial_accumulator() const { return 0x1234560000ULL | value; }
+		u64 initial_accumulator() const { return 0x1234560000ULL | seed; }
+		u64 selected_after_clear() const { return clear_accumulator == unsigned(source == 0x0b) ? 0 : initial_accumulator(); }
+		u64 other_after_clear() const { return clear_accumulator == unsigned(source == 8) ? 0 : 0xfeabcd9876ULL; }
 	};
-	static repeated_mvmd_fixture repeated_mvmd_case(unsigned v)
+	static repeated_mvmd_fixture repeated_mvmd_case(unsigned v, bool zero = false)
 	{
 		repeated_mvmd_fixture f{};
 		f.source = v % 2 ? 0x0b : 0x08;
 		f.count = std::array<unsigned, 4>{0, 1, 39, 255}[(v / 2) % 4];
-		f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 8) % 4];
+		f.seed = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 8) % 4];
+		f.clear_accumulator = zero ? (v / 128) % 2 : 2;
+		f.value = f.clear_accumulator == unsigned(f.source == 0x0b) ? 0 : f.seed;
 		f.status = 0x800 | (((v / 32) % 4) << 8);
-		f.long_header = (v / 128) % 2;
+		f.long_header = zero || (v / 128) % 2;
 		f.base = (v / 256) % 2 ? 0x20000 : 0;
 		f.snapshot = v / 512;
 		f.destination = f.base ? 0x2400 : 0x122e;
@@ -15246,11 +15250,11 @@ private:
 	void start_repeated_mvmd(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = repeated_mvmd_case(variant);
+		auto const f = repeated_mvmd_case(variant, !strcmp(machine().options().bios(), "mvmd-rptz"));
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		unsigned pc = f.base + 0x600;
-		program.write_word(pc++, f.long_header ? 0xf070 : 0xec00 | f.count);
+		program.write_word(pc++, f.clear_accumulator < 2 ? 0xf071 | (f.clear_accumulator << 8) : f.long_header ? 0xf070 : 0xec00 | f.count);
 		if (f.long_header) program.write_word(pc++, f.count);
 		program.write_word(pc++, 0x7300 | f.source); program.write_word(pc++, f.destination); program.write_word(pc, 0xf4e1);
 		for (unsigned i = 0; i <= f.count + 2; ++i) data.write_word(f.destination - 1 + i, 0xdead);
@@ -15270,7 +15274,7 @@ private:
 				osd_printf_info("MVMD read mismatch: case=%u index=%u count=%u address=%04x expected_address=%04x word=%04x expected_word=%04x cycle=%llu expected_cycle=%u\n",
 					m_pipeline_peripheral_case, i, f.count, unsigned(at), f.source, word, f.sample(i), (unsigned long long)m_cpu->pipeline_cycles(), f.read_clock + i);
 			expect(i <= f.count && at == f.source && word == f.sample(i) && m_cpu->pipeline_cycles() == f.read_clock + i, "Repeated MVMD samples the fixed MMR each iteration");
-			if (i == f.count / 2) m_cpu->set_state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B, f.initial_accumulator() ^ 0xffffULL);
+			if (i == f.count / 2) m_cpu->set_state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B, f.selected_after_clear() ^ 0xffffULL);
 		});
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeated_mvmd_destination", [this, f](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
@@ -18708,7 +18712,7 @@ private:
 		if (!strcmp(machine().options().bios(), "stld") || !strcmp(machine().options().bios(), "stld-edge")) { start_parallel_load(); return; }
 		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge")) { start_circular_move(); return; }
-		if (!strcmp(machine().options().bios(), "mvmd-repeat")) { start_repeated_mvmd(); return; }
+		if (!strcmp(machine().options().bios(), "mvmd-repeat") || !strcmp(machine().options().bios(), "mvmd-rptz")) { start_repeated_mvmd(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-t-load")) { start_rptbd_t_load(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call")) { start_block_near_call(); return; }
@@ -20115,6 +20119,15 @@ private:
 		++m_rom4_codec_replays;
 		return false;
 	}
+	void trace_rom4_fr_state(char const *phase, offs_t address, u16 opcode)
+	{
+		logerror("fr_trace_%s: pc=%06x op=%04x a=%010llx b=%010llx t=%04x st0=%04x st1=%04x sp=%04x ar0=%04x ar1=%04x ar2=%04x ar3=%04x ar4=%04x ar5=%04x ar6=%04x ar7=%04x bk=%04x brc=%04x\n",
+			phase, unsigned(address), opcode, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_T)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR7)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_BK)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)));
+	}
 	void start_rom4_fr_decoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -20167,6 +20180,23 @@ private:
 		m_phase = 72000 + frame * 2 + (initialize ? 0 : 1);
 		m_check_timer->adjust(attotime::from_msec(5));
 		if (!initialize) save_rom4_codec_frame(frame);
+		if (!initialize && frame == 8 && machine().options().verbose())
+		{
+			m_rom4_fr_trace_count = 0;
+			trace_rom4_fr_state("input", 0x8458, 0);
+			{
+				auto const disable = machine().disable_side_effects();
+				for (unsigned at = 0x60; at < 0x10000; ++at) logerror("fr_trace_input_word: address=%04x value=%04x\n", at, data.read_word(at));
+			}
+			m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "fr_frame_read", [this](offs_t at, u16 &value, u16 mask) {
+				if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != 72017 || m_rom4_codec_replay) return;
+				logerror("fr_trace_read: address=%04x value=%04x mask=%04x pc_context=%04x\n", unsigned(at), value, mask, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			});
+			m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "fr_frame_write", [this](offs_t at, u16 &value, u16 mask) {
+				if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != 72017 || m_rom4_codec_replay) return;
+				logerror("fr_trace_write: address=%04x value=%04x mask=%04x pc_context=%04x\n", unsigned(at), value, mask, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			});
+		}
 	}
 
 	void start_rom4_fr_encoder(unsigned frame, unsigned stage)
@@ -44347,7 +44377,7 @@ private:
 		if (m_phase == 600020)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = repeated_mvmd_case(variant);
+			auto const f = repeated_mvmd_case(variant, !strcmp(machine().options().bios(), "mvmd-rptz"));
 			unsigned const checkpoint = f.snapshot == 0 ? 4 : f.snapshot == 1 ? f.read_clock : f.read_clock + f.count / 2;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated MVMD AL/BL to ordinary RAM is admitted");
 			if (tick == checkpoint && !m_pipeline_replay)
@@ -44363,13 +44393,13 @@ private:
 					"Repeated MVMD executes count plus one fixed-source copies with one literal fetch");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x8620 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1e00 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef,
 					"Repeated MVMD preserves status, stack and T");
-				if (m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) != (f.initial_accumulator() ^ 0xffffULL) ||
-					m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) != 0xfeabcd9876ULL)
+				if (m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) != (f.selected_after_clear() ^ 0xffffULL) ||
+					m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) != f.other_after_clear())
 					osd_printf_info("MVMD accumulator mismatch: case=%u replay=%u a=%010llx b=%010llx expected_selected=%010llx\n", variant, unsigned(m_pipeline_replay),
-						(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)(f.initial_accumulator() ^ 0xffffULL));
-				expect(m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.initial_accumulator() ^ 0xffffULL) &&
-					m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0xfeabcd9876ULL,
-					"Only the fixture's deliberate AL/BL change affects accumulator state");
+						(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)(f.selected_after_clear() ^ 0xffffULL));
+				expect(m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.selected_after_clear() ^ 0xffffULL) &&
+					m_cpu->state_int(f.source == 8 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.other_after_clear(),
+					"Only repeat clear and the fixture's deliberate AL/BL change affect accumulator state");
 				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x3300 + i, "MVMD does not turn its fixed MMR into a DAGEN source");
 				{
 					auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
@@ -44386,6 +44416,11 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 1535) { start_repeated_mvmd(variant + 1); return; }
+				if (f.clear_accumulator < 2)
+				{
+					osd_printf_info("TMS320C54x RPTZ MVMD: PASS cases=1536 restore=1536 sources=AL,BL clear=A,B counts=0,1,39,255 patterns=4 flags=4 pages=2 snapshots=3 first_read_after_clear=1 opposite_source_unchanged=1 mid_repeat_source_change=1 literal_fetches=1 physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated RPTZ MVMD complete");
+				}
 				osd_printf_info("TMS320C54x repeated MVMD: PASS cases=1536 restore=1536 sources=AL,BL counts=0,1,39,255 patterns=4 flags=4 headers=short,long pages=2 snapshots=3 fixed_source_reads=each destination=EAR_increment literal_fetches=1 mid_repeat_source_change=1 physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated repeated MVMD complete");
 			}
@@ -52196,6 +52231,7 @@ private:
 	unsigned m_rom4_cni_nonzero_frames = 0;
 	bool m_rom4_codec_replay = false;
 	unsigned m_rom4_codec_replays = 0;
+	unsigned m_rom4_fr_trace_count = 0;
 	// Read-only bench counters stay outside the snapshot; replay emits no duplicate observations.
 	unsigned m_rom4_efr_pitch_observations = 0, m_rom4_efr_code_observations = 0;
 	unsigned m_rom4_homing_resets = 0;
@@ -52602,6 +52638,11 @@ void tms320c54x_test_state::test(machine_config &config)
 void tms320c54x_test_state::rom4(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
+	if (config.options().verbose() && (!strcmp(config.options().bios(), "fr-decoder") || !strcmp(config.options().bios(), "fr-decoder-pipe")))
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (m_phase != 72017 || m_rom4_codec_replay) return;
+			if (++m_rom4_fr_trace_count <= 200000) trace_rom4_fr_state("execute", address, opcode);
+		});
 	if (!strcmp(config.options().bios(), "efr-loss-observe"))
 		m_cpu->instruction_observer_cb().set(FUNC(tms320c54x_test_state::observe_rom4_efr_state));
 	if (!strcmp(config.options().bios(), "efr-home-errors"))
@@ -54251,6 +54292,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(109, "mvmd-repeat", "Fixed AL BL source with incrementing repeated MVMD destination")
 	ROM_SYSTEM_BIOS(110, "rptbd-t-load", "Delay-owned T load consumed by the first RPTBD multiply")
 	ROM_SYSTEM_BIOS(111, "rptb-exit-delay", "Delayed forward block exits retain decision and delay ownership")
+	ROM_SYSTEM_BIOS(112, "mvmd-rptz", "RPTZ clear precedes the first fixed-accumulator MVMD sample")
 ROM_END
 
 ROM_START(tms54rom4)

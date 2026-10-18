@@ -483,43 +483,38 @@ oracle for modifying this numerically consistent path or for declaring
 physical RF acquisition. Further comparison needs matched executable/input
 provenance or independently supported RF sample-format evidence.
 
-The same executable independently passes the ROM4 native FR decoder fixture:
-32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
-does not establish handset RF acquisition, a fitted codec clock or speech.
+`make check-c54x-rom4-fr-decoder` and
+`make check-c54x-rom4-fr-decoder-staged` independently pass 32 acquired-ROM
+decoder frames: 5,120 PCM samples match the reference exactly on atomic and
+staged CPUs. Inputs cover silence, impulses, alternating signed samples and
+deterministic pseudorandom PCM encoded by the independent codec. Each native
+frame is replayed from its prepared input/history snapshot, comparing all
+65,440 ordinary RAM words without advancing the reference twice. The staged
+`fr-decoder-pipe` BIOS loads the same program/DROM and checks the decoder
+entry words. This is isolated decoder acceptance, not handset RF acquisition,
+a fitted codec clock or end-to-end speech.
 
-The staged comparison is available through
-`tools/run_c54x_rom4_crc.py --fr-decoder --staged` with the required MAME and
-ROM paths. Its separate `fr-decoder-pipe` BIOS loads the same acquired
-program/DROM, checks the decoder entry words before execution, and retains
-the atomic fixture's exact PCM, balanced-return and per-frame replay
-requirements. Reset at `8449` returns correctly. The `7308` repeat at
-`84d7` now executes: `MVMD AL, dmad`, preceded by `RPTZ A, #0027`, fills
-40 words starting at `122e`. MMR `08` is AL, not AH; `0b` is BL.
-SPRU172C 4-115 specifies a fixed MMR source and incrementing EAR destination,
-distinct from MVDK/MVKD. The `mvmd-repeat` profile qualifies AL/BL to ordinary
-RAM with 1,536 cases plus replay, including changed source values mid-repeat
-and a poisoned fetched destination literal. Other MMR sources, mapped
-destinations and interrupt composition are not newly qualified.
+The original native clear sequence is `RPTZ A,#0027; MVMD AL,122e` at
+`84d5..84d8`. RPTZ must clear A before the first AL sample, not merely before
+the move retires (SPRU172C 4-150). Matched frame-8 traces had identical entry
+registers, all ordinary RAM and 9,884 executed instructions; their first
+different write was `122e`, atomic `0` versus staged `5`. Sampling after the
+older RPTZ clear fixes the PCM differences without changing arithmetic or
+clamping outputs. The `mvmd-rptz` matrix checks matching/opposite clears;
+ordinary ALU producer latency is unchanged. MMRs `08/0b` are AL/BL.
 
-The RPTBD delay span at `8524` now executes its `4592,302c` words with the
-original T-load semantics. `rptbd-t-load` qualifies one-word direct and
-short-indirect T loads in either delay position: 9,216 cases plus replay,
-including a multiply as the first loop-body instruction. The staged decoder
-matches all 1,280 PCM samples of frames 0..7 (silence-input group), with
-per-frame replay. This is partial arithmetic acceptance, not full FR decoding
-or handset speech.
+The decoder also covers the qualified RPTBD delay T load at `8527` and
+delayed forward exit at `84c2`. Their independent instruction matrices are
+documented in [ROM4 DSP loader](rom4_dsp_loader.md). Other MMR sources,
+mapped destinations and general interrupt compositions are not inferred
+from successful decoder execution.
 
-The delayed forward exit (`fa4e` at `84c2` to `84ca`, beyond block
-`84c1..84c9`) is now admitted under the qualified block-exit contract.
-Staged execution runs all 32 decoder frames and their replay branches without
-an instruction guard, but the PCM comparison is still **failing**: 1,504 of
-5,120 samples differ. The first difference is frame 8, sample 0: staged `8`,
-reference/atomic `0`. The atomic control still matches all samples. The next
-question is the first data divergence before that PCM store, not another
-missing control-flow instruction. Compare operands and state ownership
-against the atomic control before attributing it to rounding or arithmetic.
-No result has been clamped or repaired to match the reference; native speech
-and full staged FR correctness remain unproven.
+`tools/run_c54x_rom4_crc.py --fr-decoder --trace-fr` (optionally `--staged`)
+retains frame-8 entry RAM/registers and execution-owned instruction/data traces.
+Only CPU-executing data accesses are logged; comparison/replay reads and
+debugger peeks are excluded. Trace PC contexts are not operand-owner labels.
+Tracing preserves the same strict PCM/replay criteria and does not turn a
+diagnostic capture into acceptance.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values

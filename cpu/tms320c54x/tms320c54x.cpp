@@ -115,6 +115,13 @@ constexpr bool staged_repeat_destination_copy(u16 word)
 		((word & 0xff00) == 0x7100 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xdf)));
 }
 
+constexpr bool staged_mvmd_cleared_source(u16 move, u16 producer)
+{
+	// RPTZ's clear precedes its repeated body's first source sample
+	// (SPRU172C 4-150). Do not apply this exception to other ALU producers.
+	return (move == 0x7308 && producer == 0xf071) || (move == 0x730b && producer == 0xf171);
+}
+
 constexpr bool staged_accumulator_stm(u16 word)
 {
 	return word >= 0x7708 && word <= 0x770d;
@@ -3917,7 +3924,8 @@ void tms320c54x_device::pipeline_step()
 		// mapped accumulator write may publish later in this same clock;
 		// direct ALU producers deliberately retain their documented latency.
 		m_pipeline_operand_address[3] = source;
-		bool const mapped_write = pipeline_mapped_accumulator_write(source);
+		bool const mapped_write = pipeline_mapped_accumulator_write(source) ||
+			(m_pipeline_valid[5] && staged_mvmd_cleared_source(m_pipeline_word[3], m_pipeline_word[5]));
 		if (!mapped_write) m_pipeline_operand[3] = m_data.read_word(source);
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
@@ -5084,11 +5092,13 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G table 7-14 permits an immediately following RPTB.
 		data_write(7, m_pipeline_operand[4], 4);
 	if (m_pipeline_valid[3] && staged_move(m_pipeline_word[3]) &&
-		pipeline_mapped_accumulator_write(m_pipeline_operand_address[3]))
+		(pipeline_mapped_accumulator_write(m_pipeline_operand_address[3]) ||
+		 (m_pipeline_valid[5] && staged_mvmd_cleared_source(m_pipeline_word[3], m_pipeline_word[5]))))
 	{
 		// SPRU131G 7.5.10/example 7-67: a mapped write followed by a
 		// mapped read has no accumulator conflict. Sample after older mapped
-		// Execute, without changing direct-ALU producer latency.
+		// Execute, without changing direct-ALU producer latency. RPTZ's
+		// sequence-opening clear likewise precedes the first MVMD sample.
 		m_pipeline_operand[3] = m_data.read_word(m_pipeline_operand_address[3]);
 		u16 const destination = m_pipeline_immediate[3];
 		if (((destination >= 0x10 && destination <= 0x19) || destination == 0x1a) && !m_pipeline_early_write_deferred[3])

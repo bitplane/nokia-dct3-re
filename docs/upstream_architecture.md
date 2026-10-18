@@ -164,6 +164,12 @@ The same AR-source Read ordering is separately qualified for zero-shift
 LD/LDU with 18,432 replay cases through DP, indirect, absolute and offset
 addressing. This is ISA coverage, not an additional observed boot blocker;
 other mapped-read families are not silently included.
+The staged laboratory codec gate validates pin-clocked boot, physical key
+tone and active serial save/load. The isolated FR decoder gate separately
+matches 32 frames/5,120 PCM samples and per-frame RAM replay on both CPU
+frontends. RPTZ's clear precedes the first repeated MVMD sample; its matching
+and opposite-accumulator cases have independent replay tests. These results
+do not establish fitted codec clocks, native RF acquisition or handset calls.
 `make check-c54x-rom4-staged` separately checks the reset-free ten-second
 bus/upload checkpoint from fresh NVRAM. Its reviewed data fixture preserves
 the bounded event stream while the checker enforces fault rejection, accepted

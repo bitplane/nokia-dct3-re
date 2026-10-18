@@ -1350,6 +1350,10 @@ check-c54x-rom4-fr-packing: build prepare-c54x-rom4-fixture
 check-c54x-rom4-fr-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-decoder
 
+.PHONY: check-c54x-rom4-fr-decoder-staged
+check-c54x-rom4-fr-decoder-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-decoder --staged
+
 .PHONY: check-c54x-rom4-fr-encoder
 check-c54x-rom4-fr-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-encoder
