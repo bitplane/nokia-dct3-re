@@ -41,9 +41,10 @@ The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete;
 with ordinary delayed square accumulation, parallel MPY and conditional AR
-stores and near-call delay repeat also qualified, the staged EFR frame stops
-at short T load `307d`, owner `d531`, in RETD `d530`'s delay span. No complete staged EFR frame
-has passed.
+stores, near-call delay repeat and ordinary delay T loads also qualified,
+the staged EFR frame stops at unsupported `7767`, owner `b955`. The atomic
+decoder treats this as STM to absolute low address `0067`, not DP-relative
+RAM or a newly identified peripheral. No complete staged EFR frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -70,6 +71,26 @@ register semantics retain their separate gates. On the handset board,
 `0021` reads BSP transmit data without acknowledging it, `0022` reads BSP
 control, `0024..26` are CPU-owned timer registers, and unowned gaps delegate
 to the board map. The BSP receive side effect is qualified separately above.
+
+## Short T loads in ordinary delayed controls
+
+Short RAM `LD Smem,T` may occupy either delay word of BD, BCD, CALLD,
+FCALLD or RETD, in addition to the separate RPTBD/BANZD contracts. Access
+owns the address and pointer modification; Read publishes the sampled word
+to T. Execute must not overwrite a newer T, and the selected continuation
+must consume the resulting T through the ordinary multiply path.
+
+`ctrl-t-load` passes 55,296 cases and cleared-pipeline replays: six control
+outcomes, both slots, direct/plain/postincrement/postdecrement sources,
+DP/CPL, four patterns and flag combinations, both multiply destinations,
+two pages and three checkpoints. Three cohorts retain the loaded T or
+replace it at Read with its complement or `5aa5`. Source/opcode/target
+poisoning, one source read, target products, pointer effects and owner-only
+stack transactions are checked. CPL addresses account for each control's
+SP change; BCD's second delay position uses the existing prototype control
+timing helper, not a newly measured silicon phase. The mapped/peripheral,
+extended-address and arbitrary interrupt/producer compositions are not
+qualified by this RAM fixture.
 
 ## Parallel Store/Multiply
 

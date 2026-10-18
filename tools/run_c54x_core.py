@@ -637,6 +637,10 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "ctrl-t-load": (
+        "TMS320C54x control delay T load: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD patterns=4 forms=direct,plain,postinc,postdec cpl=2 slots=2 flags=4 accumulators=2 pages=2 snapshots=3 t_cohorts=original,complement,5aa5 delay_reads=1 t_publish=Read newer_t_preserved=1 selected_path_multiply=1 source_opcode_target_poison=1 owner_stack_only=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated control delay T load complete",
+    ),
     "calld-rpt": (
         "TMS320C54x CALLD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 stack_reads=1 stack_writes=1 balanced_stack=1 target_poison=1 ordered_copies=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated CALLD delay repeat complete",
@@ -2150,7 +2154,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge", "stld-map"):
         machine = "tms54xtra"
-    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt"):
+    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
