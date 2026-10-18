@@ -716,6 +716,24 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_parallel_arithmetic_scope(self):
+        for profile in ('st-par-alu', 'st-par-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            mutations = (('restore=128', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1'), ('pointer_changes=0', 'pointer_changes=1')) if profile.endswith('edge') else (
+                         ('restore=540672', 'restore=0'), ('read_retained=1', 'read_retained=0'),
+                         ('old_source_store=1', 'old_source_store=0'),
+                         ('subtraction=memory_minus_other', 'subtraction=other_minus_memory'),
+                         ('carry_bit=32', 'carry_bit=40'), ('sticky_overflow=1', 'sticky_overflow=0'))
+            for old, new in mutations + (('reset_before_restore=1', 'reset_before_restore=0'),):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_circular_asm_store_scope(self):
         marker, ending = EXTRA_PROFILES['asm-circular']
         output = marker + '\n' + ending + '\n'

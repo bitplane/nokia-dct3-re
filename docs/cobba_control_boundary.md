@@ -521,9 +521,11 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at parallel
-store/subtract form `c5ba` at `887d`. It is rejected in Decode; that stop's
+return, but frame 0's encoding stage remains **failing** at indexed memory-move
+form `71b2` at `88c9`. It is rejected in Decode; that stop's
 register ages must not be compared directly with atomic Execute observations.
+Parallel store/subtract `c5ba` at `887d` now has ordinary-instruction
+addressing, arithmetic, old-source store and replay qualification.
 ASM-shifted circular store `87db` at `8845` now has its own address, shift,
 late-data and replay qualification. This does not establish full RAM or
 bus-phase parity.

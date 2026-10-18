@@ -18,6 +18,32 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Parallel store with ADD/SUB
+
+The staged frontend admits `ST src,Ymem || ADD/SUB Xmem,dst` (`c000..c7ff`).
+The two pointers resolve in Access, with X modification winning on aliases.
+Read retains X and the store's ASM; Execute samples both accumulators, stores
+the old selected source, then replaces the destination. ADD uses the opposite
+accumulator plus the shifted memory operand. SUB reverses that order:
+`(Xmem << 16) - opposite_accumulator` (SPRU172C 4-177/185). Fractional
+accumulator bits must survive the subtraction; subtracting only high words
+is not equivalent.
+
+`st-par-alu` passes 540,672 cases plus replay: eight operation/source/destination
+forms, 147,456 addressing cases and 393,216 numeric cases, two pages and three
+snapshots. Independent integer expectations check bit-32 carry, sticky
+destination overflow, OVM, shifted/saturated stores and preserved sibling
+state. The fixture changes accumulators after Read and changes ASM/pointers
+after their capture, poisons the sampled memory word, and checks one read and
+one ordered store. Aliased source/destination stores must use the old value.
+Clearing the live pipeline before each load verifies restored retained state.
+
+`st-par-edge` passes 128 cases plus replay, excluding mapped X or Y operands
+before either pointer changes or any data access. Short RPT remains guarded;
+these tests do not qualify repeated arithmetic, arbitrary inter-copy alias
+forwarding, physical bank contention or wider interrupt/control compositions.
+The stage ownership is a partial model, not measured silicon timing.
+
 ## Circular ASM-shifted accumulator stores
 
 ASM-shifted STL/STH (`84xx..87xx`) admit all four short circular modes

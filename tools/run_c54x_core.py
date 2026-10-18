@@ -1170,6 +1170,14 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed CMPM BITF: PASS cases=27648 restore=27648 controls=BD,BCD_TC,BCD_NTC operations=2 forms=DP,SP,postincrement value_pairs=16 initial_tc=2 prefix=none,BITF sources=none,IRQ,NMI pages=2 snapshots=4 branch_decision=retained literal_reads=once operand_writes=0 interrupt_after_publication=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed comparison complete",
     ),
+    "st-par-alu": (
+        "TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated parallel arithmetic complete",
+    ),
+    "st-par-edge": (
+        "TMS320C54x parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated parallel arithmetic exclusions complete",
+    ),
     "asm-circular": (
         "TMS320C54x circular ASM stores: PASS cases=393216 restore=393216 modes=4 selectors=4 auxiliary_registers=8 cmpt=2 bk=4 indices=4 shifts=-16,-1,0,15 sxm_sat=4 pages=2 snapshots=3 bk_sample=Decode address_asm_sample=Read data_sample=Execute destination_reads=0 pointer_updates=once low_page_rejected=1 reset_before_restore=1 bk_zero=legacy_linear physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated circular ASM stores complete",
@@ -1979,7 +1987,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular", "st-par-alu", "st-par-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
