@@ -18,6 +18,35 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Repeated dual-memory MAC
+
+MAC/MACR/MAS/MASR (`bxxx`) can use the existing per-copy pipeline issue path.
+Each copy retains two RAM reads, publishes X to T in Read, and reads its
+feedback accumulator in Execute. MPY/MACSU and parallel-store repeat families
+are not admitted by this change.
+
+`mac-rpt` passes 98,304 cases plus replay: four operations, all four source/
+destination accumulator pairings, four operand/accumulator patterns, sixteen
+FRCT/OVM/SMUL/SXM combinations, counts 0/1/7/255, two pages and three snapshots.
+The four address layouts cover fixed pointers, the ROM's exact `b09a`
+post-increment form, decrement/increment, and conflicting modifiers on an
+aliased AR. Both aliased reads retain the original address and X's update wins
+(SPRU131G 5.5.4). This is representative repeat addressing, not a fresh census
+of all 4,096 non-repeated encodings.
+
+The independent arithmetic expectation checks every accumulator/ST0 clock,
+rounding, product clamp and destination saturation. Source words change after
+each paired read, the opcode is poisoned after capture, and a newer T follows
+the final Read. The gate requires exact paired reads, one opcode fetch, no CPU
+data writes, exact final pointers/status and one fresh continuation. Initial
+carry/overflow states vary with the four patterns, not independently.
+`mac-rpt-edge` adds 512 rejection/replay cases across operations, accumulator
+pairings, either low operand, four low addresses, two pages and two snapshots;
+no reads, writes, pointer or T changes precede rejection. These exclusions are
+bounded model guards, not silicon traps. Memory-count headers, nested blocks,
+interrupt composition, physical RAM banks and bus phases are not newly
+qualified by these gates.
+
 ## Repeated RAM square-accumulate
 
 Short RAM-source SQURA/SQURS use the existing per-iteration pipeline issue

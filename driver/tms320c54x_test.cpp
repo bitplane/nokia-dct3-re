@@ -10613,11 +10613,18 @@ private:
 		start_repeat_load(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
 		bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge");
-		u32 const base = (square ? (variant / 16) % 2 : (variant / 8) % 2) ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
+		bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
+		u32 const base = (dual ? (variant / 128) % 2 : square ? (variant / 16) % 2 : (variant / 8) % 2) ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, 0xec01);
 		program.write_word(base + 0x601, std::array<u16, 8>{0xf4f0, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
 		if (square) { program.write_word(base+0x601,0x3882 | ((variant % 4) << 8)); m_cpu->set_state_int(tms320c54x_device::STATE_AR2,std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/4)%4]); }
+		if (dual)
+		{
+			program.write_word(base+0x601,0xb001 | (((variant/4)%4) << 10) | ((variant%4) << 8));
+			u16 const low = std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/32)%4]; bool const y = (variant/16)%2;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2,y ? 0x1800 : low); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,y ? low : 0x1800);
+		}
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_load_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_load_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_phase = 310500; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -16354,9 +16361,29 @@ private:
 		u64 a, b;
 		bool square = false;
 		unsigned operation = 0;
+		bool dual = false;
+		unsigned selector = 0;
+		u16 xseed = 0, yseed = 0, pmst = 0;
 	};
 	poly_fixture poly_case(unsigned variant) const
 	{
+		if (!strcmp(machine().options().bios(), "mac-rpt"))
+		{
+			unsigned v = variant; poly_fixture f{}; f.dual = true;
+			f.form = v % 4; v /= 4; f.operation = v % 4; v /= 4; f.selector = v % 4; v /= 4;
+			unsigned const pattern = v % 4; v /= 4; unsigned const flags = v % 16; v /= 16;
+			f.iterations = std::array<unsigned,4>{1,2,8,256}[v % 4]; v /= 4;
+			f.base = v % 2 ? 0x20000 : 0; v /= 2;
+			f.checkpoint = std::array<unsigned,3>{5,6+f.iterations/2,6+f.iterations}[v % 3];
+			f.st0 = 0x1030 | (pattern & 1 ? 0x400 : 0) | (pattern & 2 ? 0xa00 : 0);
+			f.st1 = 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0) | (flags & 8 ? 0x100 : 0);
+			f.pmst = flags & 4 ? 2 : 0; f.t = 0x5555;
+			f.xseed = std::array<u16,4>{0x8000,0x7fff,0xffff,0x1234}[pattern];
+			f.yseed = std::array<u16,4>{0x8000,1,0xffff,0x7fff}[pattern];
+			f.a = std::array<u64,4>{0,0x7fffffff,0xff80000000,0x8000000000}[pattern];
+			f.b = std::array<u64,4>{0xffffffffff,0x0180000000,0,0x123456789a}[pattern];
+			return f;
+		}
 		if (!strcmp(machine().options().bios(), "sqacc-repeat"))
 		{
 			unsigned v = variant; poly_fixture f{}; f.square = true;
@@ -16385,6 +16412,30 @@ private:
 	static u16 square_repeat_memory(poly_fixture const &f, unsigned ordinal)
 	{
 		return f.form == 2 ? f.t ^ u16(ordinal * 0x1111) : ordinal & 1 ? u16(~f.t) : f.t;
+	}
+	static u16 mac_repeat_address(poly_fixture const &f, unsigned ordinal, bool y)
+	{
+		if (y && f.form != 3) return 0x1c00 + (f.form == 1 || f.form == 2 ? ordinal : 0);
+		return 0x1800 + (f.form == 2 ? -int(ordinal) : f.form ? int(ordinal) : 0);
+	}
+	static u16 mac_repeat_memory(poly_fixture const &f, unsigned ordinal, bool y)
+	{
+		if (f.form == 3) y = false;
+		return (y ? f.yseed : f.xseed) ^ u16(ordinal * (y ? 0x2222 : 0x1111));
+	}
+	static std::array<u64,3> mac_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal)
+	{
+		u64 const source = state[f.selector >> 1]; unsigned const destination = f.selector & 1;
+		s64 product = s64(s16(mac_repeat_memory(f,ordinal,false))) * s16(mac_repeat_memory(f,ordinal,true)) * (f.st1 & 0x40 ? 2 : 1);
+		if ((f.pmst & 2) && (f.st1 & 0x240) == 0x240) product = std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
+		s64 result = (source & 0x8000000000ULL ? s64(source)-0x10000000000LL : s64(source)) + (f.operation & 2 ? -product : product);
+		if (f.operation & 1) { s64 const biased = result+32768; result = (biased >= 0 ? biased/65536 : -((-biased+65535)/65536))*65536; }
+		if (result < -2147483648LL || result > 2147483647LL)
+		{
+			state[2] |= destination ? 0x200 : 0x400;
+			if (f.st1 & 0x200) result = std::clamp(result,s64(-2147483648LL),s64(2147483647LL));
+		}
+		state[destination] = u64(result) & 0xffffffffffULL; return state;
 	}
 	static std::array<u64,3> square_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal)
 	{
@@ -16426,13 +16477,14 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto const f = poly_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 64; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		unsigned const repeat = f.square ? 1 : (variant / 192) % 3;
+		unsigned const repeat = f.square || f.dual ? 1 : (variant / 192) % 3;
 		program.write_word(f.base + 0x600, repeat ? 0xec00 | (f.iterations - 1) : 0xf495);
-		program.write_word(f.base + 0x601, 0x3600 | std::array<u16,3>{0,0x82,0x92}[f.form]);
-		if (f.square) program.write_word(f.base + 0x601, 0x3800 | (f.operation << 8) | std::array<u16,3>{0,0x82,0x92}[f.form]);
+		u16 const mode = f.dual ? 0 : std::array<u16,3>{0,0x82,0x92}[f.form];
+		program.write_word(f.base+0x601,f.dual ? 0xb000 | (f.operation << 10) | (f.selector << 8) | std::array<u16,4>{0x01,0x9a,0x49,0x84}[f.form] :
+			f.square ? 0x3800 | (f.operation << 8) | mode : 0x3600 | mode);
 		program.write_word(f.base + 0x602, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T,f.t); m_cpu->set_state_int(tms320c54x_device::STATE_AR2,0x1800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0);
 		m_cpu->set_input_line(0,CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI,CLEAR_LINE);
@@ -16443,10 +16495,31 @@ private:
 			m_repeat_load_expected = {{{f.a, f.b, f.st0}}};
 			for (unsigned i = 0; i < f.iterations; ++i) m_repeat_load_expected.push_back(square_repeat_step(f, m_repeat_load_expected.back(), i));
 		}
+		if (f.dual)
+		{
+			for (unsigned ar = 2; ar < 6; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+ar,0x4800+ar);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0+(f.form == 1 ? 3 : 2),0x1800);
+			if (f.form != 3) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+(f.form == 1 ? 4 : 3),0x1c00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0,3); m_cpu->set_state_int(tms320c54x_device::STATE_BK,0);
+			for (unsigned i = 0; i < (f.form ? f.iterations : 1U); ++i) for (bool y : {false,true}) data.write_word(mac_repeat_address(f,i,y),mac_repeat_memory(f,i,y));
+			m_repeat_load_expected = {{{f.a,f.b,f.st0}}};
+			for (unsigned i = 0; i < f.iterations; ++i) m_repeat_load_expected.push_back(mac_repeat_step(f,m_repeat_load_expected.back(),i));
+		}
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"poly_source",[this,f](offs_t at,u16 &word,u16)
 		{
 			if (machine().side_effects_disabled()) return;
+			if (f.dual)
+			{
+				unsigned const ordinal = m_pipeline_operand_reads++, i = ordinal/2; bool const y = ordinal & 1;
+				expect(i < f.iterations && at == mac_repeat_address(f,i,y) && word == mac_repeat_memory(f,i,y) && m_cpu->pipeline_cycles() == 6+i, "Repeated dual MAC retains both ordered Read samples on each clock");
+				if (y)
+				{
+					auto const disable = machine().disable_side_effects();
+					for (bool side : {false,true}) m_cpu->space(AS_DATA).write_word(mac_repeat_address(f,i,side),f.form ? u16(~mac_repeat_memory(f,i,side)) : mac_repeat_memory(f,i+1,side));
+				}
+				return;
+			}
 			if (f.square)
 			{
 				unsigned const i = m_pipeline_operand_reads++;
@@ -16458,7 +16531,7 @@ private:
 		});
 		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"poly_no_write",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false,"POLY must not write data memory"); } });
 		m_pipeline_extensions_reads = 0;
-		if (f.square) m_pipeline_fetch_tap = program.install_read_tap(f.base+0x601,f.base+0x601,"square_repeat_opcode",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) expect(!m_pipeline_extensions_reads++, "Repeated square fetches its body opcode only once"); });
+		if (f.square || f.dual) m_pipeline_fetch_tap = program.install_read_tap(f.base+0x601,f.base+0x601,"repeated_arithmetic_opcode",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) expect(!m_pipeline_extensions_reads++, "Repeated arithmetic fetches its body opcode only once"); });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 399980;
 		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 	}
@@ -18853,6 +18926,8 @@ private:
 		if (!strcmp(machine().options().bios(), "banzd-t-load")) { start_rptbd_t_load(); return; }
 		if (!strcmp(machine().options().bios(), "sqacc-repeat")) { start_poly(); return; }
 		if (!strcmp(machine().options().bios(), "sqacc-rpt-edge")) { start_repeat_load_edge(); return; }
+		if (!strcmp(machine().options().bios(), "mac-rpt")) { start_poly(); return; }
+		if (!strcmp(machine().options().bios(), "mac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call")) { start_block_near_call(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call-edge")) { start_block_near_call_edge(); return; }
@@ -46972,16 +47047,23 @@ private:
 		if (m_phase == 310500)
 		{
 			bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge");
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < (square ? 32U : 16U) ? 3 : 10;
+			bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < (dual ? 256U : square ? 32U : 16U) ? 3 : 10;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded register repeat performs no data transaction");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded register repeat before or after rejection"); }
 			if (tick == 20)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb808 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unadmitted repeat families reject before arithmetic, flags, pointer or stack effects");
 				if (square) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/4)%4] && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Mapped repeated square rejects before source or T publication");
+				if (dual)
+				{
+					u16 const low = std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/32)%4]; bool const y = (variant/16)%2;
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (y ? 0x1800 : low) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == (y ? low : 0x1800) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Repeated dual MAC rejects either low operand before pointer or T publication");
+				}
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded repeat without new effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310510; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (square ? 63U : 31U)) { start_repeat_load_edge(variant + 1); return; }
+				if (variant < (dual ? 511U : square ? 63U : 31U)) { start_repeat_load_edge(variant + 1); return; }
+				if (dual) { osd_printf_info("TMS320C54x repeated dual MAC exclusions: PASS cases=512 restore=512 operations=4 selectors=4 low_operands=X,Y sources=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated dual MAC exclusions complete"); }
 				if (square) { osd_printf_info("TMS320C54x repeated square exclusions: PASS cases=64 restore=64 operations=4 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated square exclusions complete"); }
 				osd_printf_info("TMS320C54x repeated accumulator LD exclusions: PASS cases=32 restore=32 other_families=8 pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 flag_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD exclusions complete");
 			}
@@ -48909,6 +48991,15 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = poly_case(variant);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"POLY is admitted by the staged frontend");
+			if (f.dual)
+			{
+				unsigned const completed = tick < 7 ? 0 : std::min(tick-6,f.iterations); auto const expected = m_repeat_load_expected[completed];
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2], "Repeated dual MAC uses retained paired operands and the Execute-live feedback accumulator");
+				u16 const t = tick < 6 ? f.t : tick > f.iterations+5 ? 0xdead : mac_repeat_memory(f,tick-6,false);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == t, "Repeated dual MAC publishes X in Read without re-publishing T at Execute");
+				if (tick == f.iterations+5) m_cpu->set_state_int(tms320c54x_device::STATE_T,0xdead);
+				if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base+0x601,0xe8ff); }
+			}
 			if (f.square)
 			{
 				unsigned const completed = tick < 7 ? 0 : std::min(tick-6,f.iterations);
@@ -48924,20 +49015,30 @@ private:
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_extensions_reads};
 				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,"Save POLY operand and repeated arithmetic progress");
 			}
-			if (tick == (f.square ? f.iterations+24 : 48))
+			if (tick == (f.square || f.dual ? f.iterations+24 : 48))
 			{
-				auto const expected = f.square ? m_repeat_load_expected.back() : poly_reference(f);
+				auto const expected = f.square || f.dual ? m_repeat_load_expected.back() : poly_reference(f);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2],"POLY uses signed 17-bit A high, old B, rounding, saturation and coefficient extension");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (f.square ? 0xdead : f.t) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1800+(f.form == 2 ? f.iterations : 0),"Repeated arithmetic preserves newer T/status and updates its source pointer once per iteration");
-				if (f.square) expect(m_pipeline_extensions_reads == 1 && m_cpu->state_int(STATE_GENPC) == f.base+0x603, "Repeated square retains one opcode and reaches its fresh continuation");
-				expect(m_pipeline_operand_reads == f.iterations && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"POLY completes exact iterations and reaches the following IDLE");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (f.square || f.dual ? 0xdead : f.t) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && (f.dual || m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1800+(f.form == 2 ? f.iterations : 0)),"Repeated arithmetic preserves newer T/status and updates its source pointer once per iteration");
+				if (f.square || f.dual) expect(m_pipeline_extensions_reads == 1 && m_cpu->state_int(STATE_GENPC) == f.base+0x603, "Repeated arithmetic retains one opcode and reaches its fresh continuation");
+				if (f.dual)
+				{
+					for (unsigned ar = 2; ar < 6; ++ar)
+					{
+						u16 const address = ar == (f.form == 1 ? 3U : 2U) ? mac_repeat_address(f,f.iterations,false) : f.form != 3 && ar == (f.form == 1 ? 4U : 3U) ? mac_repeat_address(f,f.iterations,true) : 0x4800+ar;
+						expect(m_cpu->state_int(tms320c54x_device::STATE_AR0+ar) == address, "Repeated dual MAC modifies each selected pointer once, with X priority on aliases");
+					}
+					expect(m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Repeated dual MAC preserves product-saturation mode");
+				}
+				expect(m_pipeline_operand_reads == f.iterations*(f.dual ? 2 : 1) && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Repeated arithmetic completes exact reads and reaches the following IDLE");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE,"Replay POLY without duplicate coefficient reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase = 399990; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (f.square ? 49151 : 4607)) { start_poly(variant+1); return; }
+				if (variant < (f.dual ? 98303 : f.square ? 49151 : 4607)) { start_poly(variant+1); return; }
+				if (f.dual) { osd_printf_info("TMS320C54x repeated dual MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR selectors=4 layouts=fixed,postinc,postdec,alias patterns=4 flags=16 counts=0,1,7,255 pages=2 snapshots=3 per_clock_accumulator=1 paired_reads=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 writes=0 physical_banks=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated repeated dual MAC complete"); }
 				if (f.square) { osd_printf_info("TMS320C54x repeated square accumulate: PASS cases=49152 restore=49152 operations=SQURA,SQURS destinations=A,B forms=DP,indirect,postincrement patterns=8 flags=16 counts=0,1,7,255 pages=2 snapshots=4 per_clock_accumulator=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated repeated square accumulate complete"); }
 				osd_printf_info("TMS320C54x staged POLY: PASS cases=4608 restore=4608 forms=direct,indirect,postincrement patterns=8 flags=8 repeat=none,0,2 pages=2 snapshots=4 coefficient_reads=iterations data_writes=0 mapped_acceptance=0 extended_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
 				start_register_product(); return;
@@ -54476,6 +54577,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(117, "banzd-t-load", "Delay-owned T load across taken and untaken BANZD")
 	ROM_SYSTEM_BIOS(118, "sqacc-repeat", "Repeated RAM square accumulate per-iteration ownership and replay")
 	ROM_SYSTEM_BIOS(119, "sqacc-rpt-edge", "Repeated square mapped and peripheral source exclusions")
+	ROM_SYSTEM_BIOS(120, "mac-rpt", "Repeated dual MAC paired reads live feedback and replay")
+	ROM_SYSTEM_BIOS(121, "mac-rpt-edge", "Repeated dual MAC low operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

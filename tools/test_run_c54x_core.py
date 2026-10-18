@@ -716,6 +716,30 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_repeated_dual_mac_scope(self):
+        marker, ending = EXTRA_PROFILES['mac-rpt']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mac-rpt')
+        for old, new in (('restore=98304', 'restore=0'), ('per_clock_accumulator=1', 'per_clock_accumulator=0'),
+                         ('paired_reads=1', 'paired_reads=0'), ('newer_t_preserved=1', 'newer_t_preserved=0'),
+                         ('source_opcode_poison=1', 'source_opcode_poison=0'),
+                         ('physical_banks=unvalidated', 'physical_banks=validated')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mac-rpt')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mac-rpt')
+
+    def test_repeated_dual_mac_exclusions(self):
+        marker, ending = EXTRA_PROFILES['mac-rpt-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='mac-rpt-edge')
+        for old, new in (('restore=512', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1'), ('pointer_changes=0', 'pointer_changes=1'),
+                         ('t_changes=0', 't_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='mac-rpt-edge')
+
     def test_repeated_square_exclusions(self):
         marker, ending = EXTRA_PROFILES['sqacc-rpt-edge']
         output = marker + '\n' + ending + '\n'

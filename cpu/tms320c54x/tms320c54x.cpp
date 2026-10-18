@@ -129,7 +129,7 @@ constexpr bool staged_accumulator_stm(u16 word)
 
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || (square_accumulate(word) && u8(word) < 0x98) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || (square_accumulate(word) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)

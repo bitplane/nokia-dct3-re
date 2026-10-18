@@ -652,6 +652,14 @@ EXTRA_PROFILES = {
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST exclusions complete",
     ),
+    "mac-rpt": (
+        "TMS320C54x repeated dual MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR selectors=4 layouts=fixed,postinc,postdec,alias patterns=4 flags=16 counts=0,1,7,255 pages=2 snapshots=3 per_clock_accumulator=1 paired_reads=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 writes=0 physical_banks=unvalidated physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated dual MAC complete",
+    ),
+    "mac-rpt-edge": (
+        "TMS320C54x repeated dual MAC exclusions: PASS cases=512 restore=512 operations=4 selectors=4 low_operands=X,Y sources=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 t_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated repeated dual MAC exclusions complete",
+    ),
     "sqacc-rpt-edge": (
         "TMS320C54x repeated square exclusions: PASS cases=64 restore=64 operations=4 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated repeated square exclusions complete",
@@ -1939,7 +1947,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

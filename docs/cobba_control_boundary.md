@@ -521,14 +521,11 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at repeated
-dual-memory MAC (`b09a` at `fae9`).
-Memory SQUR at `8643`, repeated `SFTA B,-1,B` at `fb60`, and mapped-register
-`ADDM #-3,T` at `fb6a`, and memory-sourced `RPT` at `fb76` inside block
-`fb75..fb83`, the delay-owned T load at `fac6`, and repeated SQURA at `fad7`
-now execute under their independent qualifications.
-No staged parameter or speech acceptance follows
-from passing those preceding routines; the atomic encoder remains the control.
+return, but frame 0's encoding stage remains **failing** at `RPT #8`
+(`ec08` at `fba0`) in the delay span of `BD` at `fb9e`.
+The preceding instruction, repeat and delay-load qualifications live in the
+[ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish staged
+parameter or speech acceptance; the atomic encoder remains the control.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
