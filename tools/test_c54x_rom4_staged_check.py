@@ -19,6 +19,7 @@ class StagedFrontierTest(unittest.TestCase):
                     f'words={self.words} t=0.500000000\n')
         self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
                      'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d2 st0=081f st1=e900\n'
+                     'rom4_staged_accumulators: a=0000000000 b=0000000000 t=11a3 ar3=06ce ar4=0083\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
                      'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.134188962\n'
@@ -72,8 +73,18 @@ class StagedFrontierTest(unittest.TestCase):
         self.assertEqual(result['swwsr'], 0x2000)
         self.assertEqual(result['low_gap_bus_reads'], 6)
         self.assertEqual(result['rf_sample_reads'], 4)
-        for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim', 'physical_low_gap_identity_claim', 'rf_acquisition_claim'):
+        for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim', 'physical_low_gap_identity_claim', 'rf_acquisition_claim', 'preceding_instruction_retirement_claim'):
             self.assertFalse(result[field])
+
+    def test_rejects_changed_or_duplicate_frozen_accumulators(self):
+        row = 'rom4_staged_accumulators: a=0000000000 b=0000000000 t=11a3 ar3=06ce ar4=0083\n'
+        for text in (self.text.replace(row, ''), self.text + row,
+                     self.text.replace('t=11a3', 't=11a2'),
+                     self.text.replace('a=0000000000', 'a=0000000001'),
+                     self.text.replace('ar3=06ce', 'ar3=06cf'),
+                     self.text.replace('ar4=0083', 'ar4=0084')):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check(text, self.image)
 
     def test_rejects_missing_or_changed_native_rf_reads(self):
         for text in (self.text.replace('rom4_rf_read:', 'missing_rf:'),

@@ -29,6 +29,10 @@ def check(text, firmware):
     if (text.count('rom4_staged_dagen:') != 1
             or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0010', '0002', '06d2', '081f', 'e900')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
+    accumulators = re.findall(r'rom4_staged_accumulators: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) ar3=([0-9a-f]{4}) ar4=([0-9a-f]{4})', text)
+    if (text.count('rom4_staged_accumulators:') != 1
+            or accumulators != [('0000000000', '0000000000', '11a3', '06ce', '0083')]):
+        raise ValueError('missing, malformed or changed frozen accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('4', '74')]:
         raise ValueError('missing or changed bootstrap completion boundary')
@@ -113,6 +117,7 @@ def check(text, firmware):
                 bsp_receive_words=[0x0aaa, 0x0aaa],
                 bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 4, completion_strobes=4,
                 swwsr=0x2000, boot_claim=False,
+                preceding_instruction_retirement_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False,
                 physical_low_gap_identity_claim=False, rf_acquisition_claim=False)
 

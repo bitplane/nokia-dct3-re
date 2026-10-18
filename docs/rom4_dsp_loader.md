@@ -2,7 +2,7 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The prototype now reads the existing RF sample provider
-and stops on parallel store/MAC opcode `d6e1` at `3260`;
+and stops at Decode on parallel store/MAC opcode `d6e1` at `3260`;
 its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
@@ -27,6 +27,35 @@ Read and Execute verify retained operands and Execute-owned feedback.
 `mac-family-edge` adds 128 exclusion/replay cases with no mapped reads or
 register publication. Physical memory-bank timing and interrupt/repeat
 composition remain unvalidated; this is not native handset acceptance.
+
+## Parallel store/MAC contract under qualification
+
+The next staged family is `Dxxx`: `ST src,Ymem || MAC[R]/MAS[R] Xmem,dst`.
+SPRU172C pages 4-180/4-182 and TI's
+[SPRU179B, pages 4-184/4-186](https://speech.di.uoa.gr/dsp/manuals/E18.pdf)
+agree on separate store-source and arithmetic-destination selectors,
+signed `T * Xmem`, optional rounding after accumulation, and storage of
+the old source accumulator when source equals destination. SPRU131G
+5.5.4 requires X to be read before an aliased Y write and gives X's
+modifier priority when both operands select the same auxiliary register.
+PMST.SST applies to the shifted store value (SPRU131G 4.1.2).
+
+`d6e1` is specifically `ST B,*AR3 || MACR *AR4+0%,A`. The frozen native
+stop snapshot has A=B=0, T=`11a3`, AR3=`06ce`, AR4=`0083`, BK=`0010`,
+AR0=2 and ASM=0. These are observation-time register values, not proof of
+the inputs at retirement: rejection in Decode can freeze older pending
+slots. In particular, admission of the preceding `b736` is not proof
+that it retired in this native run. Its results are qualified separately
+by the isolated MAC-family tests.
+
+The atomic implementation is not a complete status oracle: both TI
+instruction manuals list C as affected for parallel stores, whereas the
+current helper preserves it for ST/MAC. Their instruction descriptions do
+not define that carry update. Resolve this discrepancy before claiming
+full status fidelity; neither an atomic comparison nor a successful boot
+can establish the missing rule. Staged implementation must additionally
+qualify retained X/T, retained ASM, old-value stores, pointer aliases,
+same-location forwarding, and save/restore across each publication.
 
 ## Staged accumulator saturation
 
@@ -617,8 +646,9 @@ The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
 board map at `0003`, as described above. Circular-address PORTR `74d6`
 at `3249` reads port `0027`, the existing RF sample input. Four provider
 reads occur inside the block established by RPTBD at `3245` (end `3268`),
-before dual-memory MACR `b736` at `325f` executes and the parallel
-store/MAC opcode `d6e1` at `003260` stops the frontend.
+before dual-memory MACR `b736` at `325f` is admitted and the parallel
+store/MAC opcode `d6e1` at `003260` stops the frontend in Decode. Older
+pending slots are not guaranteed to retire after that rejection.
 The exposed PC is `3262`, BK `0010`, AR0 `0002`, AR2 `06d2`,
 ST0 `081f`, ST1 `e900`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
