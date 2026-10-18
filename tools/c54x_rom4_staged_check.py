@@ -26,17 +26,17 @@ def check(text, firmware):
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
     if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('408d', '00', '0', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    if (text.count('unsupported staged C54x form 720b at 0032ee') != 1
+    if (text.count('unsupported staged C54x form 4a60 at 0032f6') != 1
             or text.count('unsupported') != 1 or 'unimplemented' in text):
         raise ValueError('missing or ambiguous staged host-packet instruction stop')
     ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:8] != ('32f0', '00', '1', '10', '9', '15', '21', '7')
+            or ends[0][:8] != ('32f8', '00', '1', '10', '9', '15', '21', '7')
             or not 3 <= float(ends[0][8]) <= 3.05):
         raise ValueError('missing or changed bounded execution endpoint')
     end_time = float(ends[0][8])
     terminal = re.findall(r'rom4_staged_end_state: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4}) bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) ar3=([0-9a-f]{4})', text)
-    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000000e83', '0000003a98', '000b', '081f', '4900', '0010', '037f', '0000', '00ac', '06ce')]:
+    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000000e83', '0000003a98', '000b', '181f', '4900', '0052', '037f', '0000', '00ac', '06ce')]:
         raise ValueError('missing or changed terminal architectural snapshot')
     headers = re.findall(r'rom4_staged_host_header: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_host_header:') != 7
@@ -62,9 +62,9 @@ def check(text, firmware):
             or accumulators != [('0000000000', '0000000000', '000b', '06e3', '0000')]):
         raise ValueError('missing, malformed or changed live accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
-    if summaries != [('319', '74')] or text.count('rom4_interface_summary:') != 1:
+    if summaries != [('320', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=319 mailbox_writes=74 slot_expiries=549 frame_expiries=572 rf_reads=9408 rf_port32_writes=6 rf_port38_reads=0 rf_port39_reads=0 pc=32f0 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0001 transfer_expiries=5$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=320 mailbox_writes=74 slot_expiries=549 frame_expiries=572 rf_reads=9408 rf_port32_writes=6 rf_port38_reads=0 rf_port39_reads=0 pc=32f8 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0001 transfer_expiries=5$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 32
@@ -158,17 +158,17 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_mvdm_accumulator_destination', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_extended_pshm_source', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x32ee, instruction=0x720b,
+                instruction_address=0x32f6, instruction=0x4a60,
                 host_header_reads=7, host_consumed=21,
                 low_gap_bus_reads=15, rf_sample_reads=9408, rf_sample_blocks=294,
                 rf_control_writes=6, transfer_expiries=5,
                 bsp_transmit_words=[0x0aaa, 0xffd5] * 2,
                 bsp_receive_words=[0x0aaa] * 4,
-                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008], completion_strobes=319,
+                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008], completion_strobes=320,
                 checkpoint_illegal=False, uninterrupted_session_claim=False,
                 swwsr=0x2000, boot_claim=False,
                 preceding_instruction_retirement_claim=False,

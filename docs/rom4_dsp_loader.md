@@ -3,15 +3,16 @@
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
-initialization passes, and stops on MVDM to BL (`720b`) at `32ee`
-(reported PC `32f0`).
+initialization passes, and stops on PSHM `4a60` at `32f6`
+(reported PC `32f8`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is retained-source MVDM publication to an
-accumulator slice (`720b 00ae`: absolute data source `00ae`, destination BL).
+The current staged question is the extended PSHM source-address contract:
+`4a60` encodes source `0060`, beyond the staged `0000..001f` admission.
+MVDM `720b 00ae` now copies the absolute data source into BL organically.
 The preceding frame ISR now clears BRAF through its own
 STLM at `321d`; terminal ST1 is `4900`. This does not establish that this
 native ISR has returned or that its interrupted loop has resumed.
@@ -61,6 +62,26 @@ not twenty-one packets in one session. Probe evidence is local artifact
 `tmp/st1-context-native/error.log`; neither probe changes firmware state.
 The exact-stop checker distinguishes the live 0.5-second checkpoint from
 the later illegal-instruction endpoint; neither proves completed boot.
+
+## MVDM accumulator slices
+
+The staged Class-19A path admits MVDM destinations AL/AH/AG/BL/BH/BG.
+The absolute source is retained once and the existing mapped-register write
+merges only that slice; AG/BG retain eight bits, and SXM/OVM do not extend
+or saturate a register copy (SPRU172C 4-110). The two-word slot publishes
+at the existing Class-19A clock; this is not a measured bus-phase claim.
+
+`mvdm-acc` passes 110,592 cases and save-state replays across six slices,
+RAM/AR/BK sources, eight words, eight accumulator patterns, sixteen
+SXM/OVM/CPL/FRCT combinations, two pages and three snapshots. The source
+literal and data change after capture; an immediately following logical
+consumer must preserve the merged accumulator. All neighboring slices,
+status and unrelated accumulator remain checked. `mvdm-acc-edge` adds
+2,064 replayed exclusions covering all 86 currently excluded mapped
+sources in `0000..005f`, two pages and two snapshots, without data reads,
+writes or accumulator/status changes. MVDM-to-accumulator repeats remain
+guarded; arbitrary interrupt/repeat compositions are not newly qualified.
+The unchanged core rejects the first accumulator case before source access.
 
 ## ADDC ownership
 
@@ -467,7 +488,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; frame ISR clears BRAF; MVDM to BL stops at `32ee`. |
+| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; frame ISR clears BRAF and MVDM to BL executes; PSHM `4a60` stops at `32f6`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -895,20 +916,20 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins unsupported MVDM `720b` at `32ee`,
-PC `32f0`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
-consumer advances, 319 completion strobes, 74 mailbox writes and final
+The final observation at 3.016666667 s pins unsupported PSHM `4a60` at `32f6`,
+PC `32f8`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
+consumer advances, 320 completion strobes, 74 mailbox writes and final
 device counters of 9,408 RF reads, 549 slot expiries and 572 frame expiries.
 Six RF-control writes and five transfer expiries occur; `mode_aa` is zero
 and `mode_ac` is one. The terminal architectural snapshot is A=`0e83`,
-B=`3a98`, T=`000b`, ST0=`081f`, ST1=`4900`, BK=`0010`, AR0=`037f`,
+B=`3a98`, T=`000b`, ST0=`181f`, ST1=`4900`, BK=`0052`, AR0=`037f`,
 AR1=0, AR2=`00ac`, AR3=`06ce`. This is a Decode-rejection snapshot,
 not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-one packets in one uninterrupted session. Both fresh
 captures reproduce these observations in
-`tmp/repeat-stlm-native{,-confirm}/error.log`.
+`tmp/mvdm-acc-native{,-confirm}/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
@@ -4889,7 +4910,9 @@ registers, RAM/self/other-AR sources and table-7-7 consumer gaps. The
 original `7212 b6be` at `02:df9b` executes. MVDM `7211 b6a8` at
 `02:dfa6` also executes after a separate 576-case branch-delay gate,
 including both outcomes, pending IRQ/NMI and RETE/save/replay. Repeat
-and non-AR MVDM destinations remain excluded. FCALLD `fb82 dfc2` at
+remains unqualified in this AR gate; accumulator destinations have the
+separate [slice qualification](#mvdm-accumulator-slices). Other non-AR
+destinations remain excluded. FCALLD `fb82 dfc2` at
 `02:dfaf` has a 243-case saved/replayed gate for caller-fetched delay
 words, stacked PC/XPC and IRQ/NMI return. Delay-slot mapped-XPC read
 visibility is explicitly unvalidated, not inferred from the frame contract.
