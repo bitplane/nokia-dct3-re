@@ -3253,7 +3253,7 @@ void tms320c54x_device::pipeline_step()
 			bool const delay_asm = (word & 0xff00) == 0x3200 &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
-			bool const delay_multiply = ((word & 0xfe00) == 0x2000 || (word & 0xf800) == 0x2800) &&
+			bool const delay_multiply = ((word & 0xfc00) == 0x2000 || (word & 0xf800) == 0x2800) &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			// Short MPYA/MASA/MACA/MACAR publish Smem to T in Read;
 			// their independently owned B result retires before redirect.

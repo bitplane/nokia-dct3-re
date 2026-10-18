@@ -952,6 +952,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged delay MPY: PASS cases=18432 restore=18432 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=short,absolute_RAM,absolute_AR,offset destinations=2 operand_pairs=16 frct_ovm=4 pages=2 snapshots=3 source_reads=1 callee_observes_result=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated delay MPY complete",
     ),
+    "mpyr-delay": (
+        "TMS320C54x delayed MPYR: PASS cases=36864 restore=36864 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=postincrement,absolute_RAM,absolute_AR7,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 rounding=biased_high_word smul_product_clamp=0 t_retained=1 callee_observes_result=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated delayed MPYR complete",
+    ),
+    "mpyr-delay-edge": (
+        "TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
+        "Fatal error: TMS320C54x isolated delay MPYR boundary complete",
+    ),
     "mpy-delay-edge": (
         "TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
         "Fatal error: TMS320C54x isolated delay MPY boundary complete",
@@ -2108,7 +2116,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular", "st-par-alu", "st-par-edge", "mvdk-index", "mvdk-index-edge", "mvdk-index-rpt", "mvdk-irpt-edge", "cond-store", "cond-store-edge", "shift16-map", "shift16-map-edge", "logic-map", "logic-map-edge"):
         machine = "tms54xtra"
-    if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square"):
+    if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

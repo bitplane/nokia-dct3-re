@@ -18,6 +18,24 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Rounded memory multiply in delayed controls
+
+Complete MPYR Smem forms may occupy ordinary delayed branch/call/return
+spans. The signed memory and T operands are retained in Read; Execute rounds
+the product by adding `8000` and clearing its low word, then applies the
+existing result-overflow/OVM rules. FRCT doubles the product before rounding.
+MPYR does not use the MAC-family SMUL product clamp and does not publish T.
+
+`mpyr-delay` passes 36,864 cases and save/load replays over BD, both BCD
+outcomes, CALLD, FCALLD and RETD; postincrement, absolute RAM/AR7 and offset;
+both destinations; sixteen signed operand pairs including positive/negative
+rounding ties; FRCT/OVM/SMUL; two pages and three checkpoints. Memory, T,
+pointer and literal poisoning reject resampling, while the target observes
+the completed result and stack effects remain exact. `mpyr-delay-edge`
+retains sixteen straddle rejections without data-side effects. Other
+addressing, interrupt composition and physical pipeline phases remain
+unqualified; ordinary MPY/MAC fixtures are separate controls.
+
 ## Low-address dual ADD/SUB operands
 
 Dual ADD/SUB admit IMR/IFR (`0000/0001`) as Read-owned, non-acknowledging

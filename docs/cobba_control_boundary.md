@@ -2489,9 +2489,11 @@ The low operand of `a0b8` at `d45b` is deliberately initialized AR5, used
 as a postincremented counter/address in both frontends. Its IMR/IFR and
 unowned-board-map reads now execute under the
 [low-address dual-ALU qualification](rom4_dsp_loader.md#low-address-dual-addsub-operands).
-The current guard is word `2292` owned by `d35e`, in RETD `d35d`'s delay
-span. Recover the rounded multiply's operand and delay ownership before
-admitting it.
+The `2292` MPYR owned by `d35e`, in RETD `d35d`'s delay span, executes
+under the [rounded delayed-multiply qualification](rom4_dsp_loader.md#rounded-memory-multiply-in-delayed-controls).
+The current stop is a parallel-store mapped-operand guard, with reported
+fetch PC `d511`. Recover the retained owner and source/destination addresses
+before deciding which mapped-side contract is missing.
 No complete staged EFR frame has passed yet.
 `--trace-efr` (also accepted as `--trace-efr-reset`) retains at most 8,192
 reset and 200,000 first-frame executed instruction/register observations,
