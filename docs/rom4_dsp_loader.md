@@ -42,7 +42,7 @@ also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
 The staged EFR encoder now returns from frame zero with a balanced stack
 and no unsupported-instruction stop. Its independent reference comparison
-reports 62 aggregate mismatches across parameters, flags and packed output;
+reports 59 aggregate mismatches across parameters, flags and packed output;
 this is not a count of differing parameters alone. No staged EFR frame has
 passed vector acceptance. The next boundary is the first numerical/state
 divergence, not an instruction-admission guard. Atomic EFR still passes all
@@ -53,25 +53,34 @@ Both EFR frontend BIOSes must load the same hashed PCM and reference-vector
 files; program/data ROM coverage alone does not establish codec-fixture
 coverage. A fixture-declaration regression enforces this pairing. With these
 inputs loaded, verbose first-frame-entry snapshots agree on all 65,440
-ordinary RAM words after reset and PCM publication. The first observed
-Execute-address sequence difference is instruction 9,522 (`d39c` atomic,
-`d403` staged). This locates a control-flow symptom, not its cause: younger
-Access/Read publications make raw pre-Execute register equality an invalid
-pipeline equivalence test. Verbose tracing retains the independent vector
+ordinary RAM words after reset and PCM publication. Younger Access/Read
+publications make raw pre-Execute register equality an invalid pipeline
+equivalence test. Verbose tracing retains the independent vector
 acceptance requirement and does not alter the ordinary gate.
 
-The first ordinary-RAM write-sequence difference precedes that branch:
-write 1,387 to `0071` is `4c00` atomic versus `e000` staged. At the second
-call from `d392`, the final delay word `d395` is MVDD `e5a1`, copying
-`ed8a=7fd3` to `006e`. Atomic execution commits that copy before the callee
-at `d40d` consumes `006e`; staged tracing shows the callee's read still
-seeing the previous `7ff8`, before MVDD even samples its source. Its later
-read by `d40f` does see `7fd3`. This is a concrete delay-span/target ordering
-candidate, not evidence for changing multiplication semantics. The next
-qualification must isolate a delayed-call final-word MVDD and target-side
-consumer, including retained operands, stack ownership and save/replay.
-Do not indiscriminately forward repeated MVDD: its existing overlapping
-RAM matrix explicitly qualifies Read-before-older-Write ordering separately.
+MVDD's retained Read sample bypasses a pending same-location RAM write to
+an ordinary following load. The acquired example is CALLD `d392`, final
+delay-word MVDD `d395` (`e5a1`, `ed8a` to `006e`), then Xmem load `d40d`.
+Without bypass the load retains previous `006e=7ff8` despite MVDD having
+sampled `7fd3`; the resulting low-word store to `0071` is `e000` instead of
+`4c00`. The earlier read of `006e` belongs to the first delay-word DELAY,
+not the callee: PC context alone is not an operand-ownership annotation.
+
+`mvdd-follow` passes 1,536 cases and cleared-pipeline replays: adjacent and
+both CALLD delay slots, Smem/Xmem loads, all four source modifiers, four
+boundary values, zero/one gap, two program pages and four snapshots. It
+checks retained source after poisoning, new-value consumption, exactly one
+source read and copy write, balanced return and preserved sibling state.
+Disabling only this bypass makes the fixture fail on stale RAM. Physical
+pipeline phases and arbitrary peripheral/interrupt compositions are not
+claimed. Repeated MVDD deliberately remains outside this bypass: its
+overlapping RAM matrix qualifies Read-before-older-Write ordering separately.
+
+With this bypass, the first ordinary-RAM write-sequence difference is now
+write 9,723: `1104=0100` atomic versus `0000` staged, at context `d44c`.
+Execute-address sequences first differ at observation 62,962 (`d1fb`
+versus `d201`). These are the current bounded tracing targets, not a
+numerical root-cause claim. The earlier `0071` copy dependency is closed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.

@@ -6487,6 +6487,53 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = delay_bitt_phase;
 		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 	}
+	struct mvdd_follow_fixture
+	{
+		unsigned pattern, modifier, consumer, gap, layout, snapshot;
+		u32 base;
+		u16 value() const { return std::array<u16,4>{0,1,0x8000,0xffff}[pattern]; }
+		unsigned at() const { return (layout ? 0x700 : 0x601) + gap; }
+		unsigned checkpoint() const { return std::array<unsigned,4>{3,5,6,8}[snapshot]; }
+	};
+	static mvdd_follow_fixture mvdd_follow_case(unsigned v)
+	{
+		mvdd_follow_fixture f{};
+		f.pattern=v%4; v/=4; f.modifier=v%4; v/=4; f.consumer=v%2; v/=2;
+		f.gap=v%2; v/=2; f.layout=v%3; v/=3; f.base=v%2 ? 0x20000 : 0; v/=2; f.snapshot=v;
+		return f;
+	}
+	void start_mvdd_follow(unsigned variant=0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case=variant;
+		auto const f=mvdd_follow_case(variant); auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
+		for(unsigned i=0;i<16;++i) { program.write_word(f.base+0x600+i,0xf495); program.write_word(f.base+0x700+i,0xf495); }
+		if(f.layout) { program.write_word(f.base+0x600,0xf274); program.write_word(f.base+0x601,0x700); program.write_word(f.base+0x604,0xf4e1); }
+		program.write_word(f.base+(f.layout ? 0x601+f.layout : 0x600),0xe521|(f.modifier<<6));
+		program.write_word(f.base+f.at(),f.consumer ? 0x9410 : 0x1083);
+		program.write_word(f.base+f.at()+1,0x80f8); program.write_word(f.base+f.at()+2,0x4100);
+		program.write_word(f.base+f.at()+3,f.layout ? 0xfc00 : 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0x1800); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_A,0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B,0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T,0x5aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0,3); m_cpu->set_state_int(tms320c54x_device::STATE_BK,0); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR4,0x5000);
+		data.write_word(0x4000,0x2468); data.write_word(0x4100,0xdead); data.write_word(0x5000,f.value());
+		m_pipeline_operand_reads=m_pipeline_store_writes=m_pipeline_register_writes=m_fast_stack_reads=m_port_reads=0;
+		m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"mvdd_follow_read",[this,f](offs_t at,u16 &word,u16) {
+			if(machine().side_effects_disabled()) return;
+			if(at==0x5000) { expect(!m_pipeline_operand_reads++ && word==f.value(),"MVDD samples its source once"); auto const disable=machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at,u16(~f.value())); }
+			else if(at==0x4000) { expect(!m_port_reads++ && word==f.value(),"Nonforwarded follower samples the committed copy, never stale RAM"); }
+			else { expect(f.layout && at==0x2fff && word==0x604 && !m_fast_stack_reads++,"Only the callee return reads its owner frame"); }
+		});
+		m_pipeline_write_tap=data.install_write_tap(0,0xffff,"mvdd_follow_write",[this,f](offs_t at,u16 &word,u16) {
+			if(machine().side_effects_disabled()) return;
+			if(at==0x4000) { expect(!m_pipeline_store_writes++ && word==f.value(),"MVDD commits its retained source once"); }
+			else if(at==0x4100) { expect(!m_pipeline_register_writes++ && word==f.value(),"Follower stores the new value independently of source poisoning"); }
+			else expect(f.layout && at==0x2fff && word==0x604,"Only CALLD owns the stack write");
+		});
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=mvdd_follow_phase;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	struct repeat_store_case
 	{
 		unsigned form, mode, reg, count, setup, pattern, flags, checkpoint;
@@ -19605,6 +19652,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rcd")) { start_delayed_condition_return(); return; }
 		if (!strcmp(machine().options().bios(), "bitt-retd")) { start_bitt_retd(); return; }
 		if (!strcmp(machine().options().bios(), "bitt-ctrl")) { start_delay_bitt(); return; }
+		if (!strcmp(machine().options().bios(), "mvdd-follow")) { start_mvdd_follow(); return; }
 		if (!strcmp(machine().options().bios(), "bitt")) { start_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store")) { start_repeat_store(); return; }
@@ -22029,6 +22077,25 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == bitt_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = bitt_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == mvdd_follow_phase)
+		{
+			auto const f=mvdd_follow_case(m_pipeline_peripheral_case); unsigned const tick=++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"MVDD and its follower remain admitted");
+			if(tick==f.checkpoint() && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_register_writes,m_fast_stack_reads,m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save MVDD dependency before or across its Read/Write boundary"); }
+			if(tick==40)
+			{
+				u64 const result=u64(s64(s16(f.value())))&0xffffffffffULL;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC)==f.base+(f.layout ? 0x605 : f.at()+4) && m_cpu->state_int(tms320c54x_device::STATE_SP)==0x3000 && m_cpu->state_int(tms320c54x_device::STATE_A)==result && m_cpu->state_int(tms320c54x_device::STATE_B)==0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T)==0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST0)==0x1800 && m_cpu->state_int(tms320c54x_device::STATE_ST1)==0x900,"MVDD follower preserves flags, sibling registers and balanced call return");
+				expect(m_pipeline_operand_reads==1 && m_pipeline_store_writes==1 && m_pipeline_register_writes==1 && m_fast_stack_reads==unsigned(bool(f.layout)) && m_port_reads<=1,"Dependency has one source read, two owned RAM writes and no duplicated operand reads");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR3)==0x4000 && m_cpu->state_int(tms320c54x_device::STATE_AR4)==unsigned(0x5000+(f.modifier==1 ? -1 : f.modifier==2 ? 1 : f.modifier==3 ? 3 : 0)),"MVDD source modifier executes once with a retained destination");
+				if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint(); m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_pipeline_register_writes=m_recurring_irq_snapshot[2]; m_fast_stack_reads=m_recurring_irq_snapshot[3]; m_port_reads=m_recurring_irq_snapshot[4]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore MVDD dependency after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=mvdd_follow_phase+1; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if(m_pipeline_peripheral_case<1535) { start_mvdd_follow(m_pipeline_peripheral_case+1); return; }
+				osd_printf_info("TMS320C54x MVDD followers: PASS cases=1536 restore=1536 layouts=adjacent,CALLD_first,CALLD_second consumers=LD_Smem,LD_Xmem modifiers=4 values=4 gaps=0,1 pages=2 snapshots=4 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated MVDD followers complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if(m_phase==mvdd_follow_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=mvdd_follow_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == delay_bitt_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_bitt_case(variant);
@@ -54242,6 +54309,7 @@ private:
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned mmr_long_phase = 1'000'010;
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
+	static constexpr unsigned mvdd_follow_phase = 1'000'030;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
@@ -56308,6 +56376,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(177, "bcd-rpt", "Conditional branch outcomes after delay-owned repeats")
 	ROM_SYSTEM_BIOS(178, "bcd-rpt-edge", "Conditional branch delay repeat exclusions")
 	ROM_SYSTEM_BIOS(179, "bitt-ctrl", "Short BITT and T-producer ordering in delayed controls")
+	ROM_SYSTEM_BIOS(180, "mvdd-follow", "Retained MVDD forwarding across adjacency and delayed calls")
 ROM_END
 
 ROM_START(tms54rom4)

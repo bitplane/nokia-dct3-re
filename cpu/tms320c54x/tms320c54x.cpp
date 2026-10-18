@@ -5708,11 +5708,14 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 		if (address == m_pipeline_operand_address[5]) return m_pipeline_operand[5];
 		if (address == (m_pipeline_operand_address[5] ^ 1)) return m_pipeline_immediate[5];
 	}
-	if (address >= 0x60 && m_pipeline_valid[5] && (staged_data_copy(m_pipeline_word[5]) || staged_port_read(m_pipeline_word[5])) &&
+	if (address >= 0x60 && m_pipeline_valid[5] && (staged_data_copy(m_pipeline_word[5]) || staged_port_read(m_pipeline_word[5]) ||
+		(staged_mvdd(m_pipeline_word[5]) && !staged_mvdd(m_pipeline_word[4]))) &&
 		address == m_pipeline_operand_address[5])
 		// Copies and PORTR already retained their Read sample. An adjacent
 		// consumer must not see the old RAM word while EB is still pending.
 		// Forward the sample without another I/O access; preserve the EB write.
+		// Pipelined MVDD iterations retain their separately qualified
+		// Read-before-older-Write ordering rather than using this bypass.
 		return m_pipeline_operand[5];
 	if (address >= 0x60 && m_pipeline_valid[5] && (staged_ram_stm(m_pipeline_word[5]) || staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5]) || staged_conditional_store(m_pipeline_word[5]) || staged_parallel_alu(m_pipeline_word[5]) || staged_parallel_product(m_pipeline_word[5]) || staged_parallel_load(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5]) || (m_pipeline_word[5] & 0xff00) == 0x7600) &&
 		address == m_pipeline_operand_address[5])

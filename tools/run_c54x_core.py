@@ -637,6 +637,10 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "mvdd-follow": (
+        "TMS320C54x MVDD followers: PASS cases=1536 restore=1536 layouts=adjacent,CALLD_first,CALLD_second consumers=LD_Smem,LD_Xmem modifiers=4 values=4 gaps=0,1 pages=2 snapshots=4 source_poison=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated MVDD followers complete",
+    ),
     "bitt-ctrl": (
         "TMS320C54x short control delay BITT: PASS cases=49152 restore=49152 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD,BCD_NTC,BCD_TC forms=DP,plain,postinc,SP slots=2 slot1_producer=LD_T selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 poison_cohorts=memory,T memory_t_sample=Read tc_publish=Execute old_branch_decision=1 owner_stack_only=1 opcode_target_poison=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated short control delay BITT complete",
@@ -2187,6 +2191,8 @@ def main():
     if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge", "stld-map"):
         machine = "tms54xtra"
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
+        machine = "tms54xtra"
+    if args.profile == "mvdd-follow":
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
