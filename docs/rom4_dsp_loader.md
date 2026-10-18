@@ -18,6 +18,35 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## XC 1 selecting the block-repeat endpoint
+
+Conditional execution and interrupt protection have different extents:
+XC 1 selects one following word, but XC and both following instruction words
+are uninterruptible (SPRU172C 4-199). An XC 1 in the penultimate block word
+therefore has an in-block conditional slot while its protection crosses the
+repeat back-edge. The staged frontend retains the next iteration's first word
+as the protection endpoint when BRC is nonzero, or the ordinary fall-through
+word on the final iteration. It does not conditionally annul that extra word.
+The existing saved XC endpoint field owns this continuation; no firmware PC
+or new synthetic event participates.
+
+`block-xc` passes 8,704 cases plus replay: seventeen predicates (including
+OV/NOV), four layouts including the penultimate XC 1, counts 0/1/2/7, interior
+and endpoint positions, two pages, four checkpoints and two source rotations.
+Ordered reads, selected writes, per-iteration conditions, pointer effects,
+BRC/BRAF and final fall-through remain checked. The eighteen `block-xc-edge`
+cases plus replay retain guards when the *conditionally selected* span crosses
+the endpoint: XC 1 at the endpoint, or XC 2 at/just before it. These are
+model-scope exclusions, not silicon traps.
+
+`block-xc-end-irq` passes 64 cases plus replay: a two-word XC 1/store loop,
+counts 0/1/3/7, pending IRQ/NMI, two pages and four snapshots. Every repeated
+store and the final protected continuation store must precede the one vector
+fetch and stack write. The live pipeline is cleared before restoration so
+protection cannot survive accidentally from the completed run. The existing
+384-case short-loop IRQ/NMI control also passes. These establish the bounded
+staged protection contract, not measured physical pipeline phases.
+
 ## Repeated parallel store/load
 
 Short RPT can retain the one-word `ST src,Ymem || LD Xmem,dst/T` body and

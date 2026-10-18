@@ -521,12 +521,14 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at conditional
-execution `fd08` at `8833`, within block repeat `882d..8834`. The current
-guard requires both words of XC's protected span to remain inside the block,
-including for XC 1. Its endpoint composition is not yet qualified. Repeated
-parallel store/load `c8b9` at `881d` now executes under its own operand,
-pointer, accumulator-feedback and replay qualification.
+return, but frame 0's encoding stage remains **failing** at store form `87db`
+at `8845`. The register sample at this boundary matches the atomic control's
+first execution there; this does not establish full RAM or bus-phase parity.
+Conditional execution `fd08` at `8833` now passes its endpoint composition:
+its selected word stays inside block `882d..8834`, while interrupt protection
+follows the repeat back-edge or final fall-through. Repeated parallel
+store/load `c8b9` at `881d` also has its own operand, pointer,
+accumulator-feedback and replay qualification.
 Adding `--trace-fr` captures frame-0 encoding entry RAM/registers and the
 execution-owned instruction/data stream without weakening parameter or replay
 checks. Atomic and staged traces agree on the registers at this boundary:

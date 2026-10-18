@@ -1243,12 +1243,16 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
     "block-xc": (
-        "TMS320C54x block XC: PASS cases=5760 restore=5760 predicates=15 layouts=XC1_single,XC2_two_single,XC2_one_double counts=0,1,2,7 positions=interior,endpoint pages=2 snapshots=4 source_rotations=2 ordered_reads=1 selected_writes=1 rejected_writes=0 opcode_literal=1 counter_braf_owned=1 physical_phase_claim=0",
+        "TMS320C54x block XC: PASS cases=8704 restore=8704 predicates=17 layouts=XC1_single,XC2_two_single,XC2_one_double,XC1_penultimate counts=0,1,2,7 positions=interior,endpoint pages=2 snapshots=4 source_rotations=2 ordered_reads=1 selected_writes=1 rejected_writes=0 opcode_literal=1 counter_braf_owned=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated block XC complete",
     ),
     "block-xc-edge": (
-        "TMS320C54x block XC exclusions: PASS cases=24 restore=24 forms=XC1,XC2 cross_end_positions=2 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0",
+        "TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated block XC exclusions complete",
+    ),
+    "block-xc-end-irq": (
+        "TMS320C54x endpoint XC protection: PASS cases=64 restore=64 counts=0,1,3,7 loop_words=2 sources=IRQ,NMI pages=2 snapshots=4 wrapped_protection=1 final_fallthrough=1 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated endpoint XC protection complete",
     ),
     "block-xc-irq": (
         "TMS320C54x short block XC protection: PASS cases=384 restore=384 counts=0,1,3,7 forms=XC1,XC2 loop_words=3,4,5 sources=IRQ,NMI pages=2 snapshots=4 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 physical_phase_claim=0",
@@ -1971,7 +1975,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

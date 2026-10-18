@@ -1064,10 +1064,25 @@ class CoreResultTests(unittest.TestCase):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)
-            for bad in (output.replace('restore=5760', 'restore=0').replace('restore=24', 'restore=0'),
+            for bad in (output.replace('restore=8704', 'restore=0').replace('restore=18', 'restore=0'),
                         marker + '\n' + output, output + 'late output\n'):
                 with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
                     check_result(bad, 3, profile=profile)
+
+    def test_endpoint_xc_protection_scope(self):
+        marker, ending = EXTRA_PROFILES['block-xc-end-irq']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='block-xc-end-irq')
+        for old, new in (('restore=64', 'restore=0'), ('wrapped_protection=1', 'wrapped_protection=0'),
+                         ('reset_before_restore=1', 'reset_before_restore=0'),
+                         ('final_fallthrough=1', 'final_fallthrough=0'),
+                         ('all_stores_before_vector=1', 'all_stores_before_vector=0'),
+                         ('vector_fetches=1', 'vector_fetches=2')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='block-xc-end-irq')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='block-xc-end-irq')
 
     def test_short_block_xc_protection_scope(self):
         marker, ending = EXTRA_PROFILES['block-xc-irq']

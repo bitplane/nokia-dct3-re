@@ -3497,7 +3497,7 @@ void tms320c54x_device::pipeline_step()
 		bool const block_near_call = staged_call(word) &&
 			m_pipeline_address[2] + (BIT(word, 9) ? 3 : 1) <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
-		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
+		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + (BIT(word, 9) ? 2 : 1) <= m_pipeline_block_end_address;
 		bool const internal_memory_repeat = staged_memory_repeat(word) &&
 			m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
@@ -3548,6 +3548,10 @@ void tms320c54x_device::pipeline_step()
 			// XC 1 also protects two following words (SPRU172C 4-199).
 			m_pipeline_xc_active = true;
 			m_pipeline_xc_end = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_address[2] + 2);
+			if (block_word && !BIT(word, 9) && m_pipeline_address[2] + 1 == m_pipeline_block_end_address && m_brc)
+				// XC 1 selects the endpoint only, but protects the next executed
+				// word too: the repeat's first word, not abandoned fall-through.
+				m_pipeline_xc_end = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_block_start);
 			if (retd_delay_decode)
 				// XC protection counts resumed instruction words, not the
 				// abandoned sequential address beyond RETD's delay window.
