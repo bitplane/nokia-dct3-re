@@ -148,6 +148,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
+    def test_reada_brc_requires_address_width_retention_and_exclusions(self):
+        for profile in ('reada-brc', 'reada-brc16', 'reada-brc-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_forward_block_exit_requires_braf_lifetime_and_replay(self):
         marker, ending = EXTRA_PROFILES['rptb-exit']
         text = marker + '\n' + ending + '\n'

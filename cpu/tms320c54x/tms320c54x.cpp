@@ -4200,7 +4200,8 @@ void tms320c54x_device::pipeline_step()
 		u16 const destination = m_pipeline_operand_address[4];
 		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[4] == m_pipeline_repeat_address;
 		bool const accumulator_word = destination >= 0x08 && destination <= 0x0d;
-		if (destination < 0x60 && (repeat_body || (!accumulator_word && (destination < 0x10 || destination > 0x17))))
+		bool const brc_word = destination == 0x1a && !m_pipeline_block_active;
+		if (destination < 0x60 && (repeat_body || (!accumulator_word && !brc_word && (destination < 0x10 || destination > 0x17))))
 		{
 			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
 				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;

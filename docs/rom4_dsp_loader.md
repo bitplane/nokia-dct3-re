@@ -287,9 +287,10 @@ execution passes the following `f7bb` (set INTM). Execution returns from
 this resident routine and executes uploaded `000e30`, `8821`
 (STLM A to BSP transmit register `0021`), publishing `0aaa` once at
 0.133893750 s. It passes the conditional exit `f845 0e66` from block
-`0e5c..0e62` and the explicit outside BRAF clear. It then stops at
-`000e14`, `7ef8 001a` (absolute READA to BRC), before its program-source
-read or BRC publication. The exposed PC is `0e19`, PMST `ffac` and
+`0e5c..0e62` and the explicit outside BRAF clear. It passes `000e14`,
+`7ef8 001a` (absolute READA to BRC) and the following table-initialization
+loop, then stops at resident `003427`, `8807` (STLM A to ST1).
+The exposed PC is `3429`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -326,6 +327,28 @@ status bits. No data writes occur. Admission adds only status registers
 `0006`/`0007` to BITF's existing mapped-source set; low controls, CMPM's
 mapped-source restriction and other unvalidated sources remain unchanged.
 This is functional pipeline coverage, not a silicon phase measurement.
+
+`reada-brc` and `reada-brc16` each execute 18,432 cases plus replay, with
+fixed 23-/16-bit program addressing respectively. DP, SP, absolute, plain,
+postincrement and postdecrement destinations cover eight indirect AR
+encodings, two source pages, OVLY clear/set and four snapshots. Standalone
+controls use `0/1/8000/ffff`; following RPTB cases use counts `0/1/2/7`
+and one/two/three intervening NOPs. The gap follows SPRU131G table 7-24:
+READA belongs to the one-instruction-latency writer class, not STM/MVDK's
+zero-latency class. Uncomposed controls are repeated alongside each gap.
+The tests change A after PAR capture, poison program data after its one
+Read, and mutate the absolute destination extension after fetch. They
+check one retained program read and BRC publication, no data reads, exact
+subsequent loop counts and pointer updates, preserved status/accumulators,
+and no replay duplicates. Source aliases under OVLY and the standard
+address mask are checked separately; changed A has a different low-word
+decoy even when overlay masks its page.
+`reada-brc-edge` checks 16 repeated/active-block exclusions plus replay,
+with no program/data reads, data writes or BRC changes. New BRC admission
+requires an inactive staged block controller; it does not model in-loop
+count-write latency. Zero-gap RPTB and interrupt/conditional composition
+are not established by this fixture. Program-bus phase placement remains
+the declared partial READA model, not measured silicon timing.
 
 `stlm-bsp` checks 3,072 cases plus replay: A/B, eight accumulator patterns,
 16 SST/SXM/OVM/FRCT combinations, CPL clear/set, two program pages and three
