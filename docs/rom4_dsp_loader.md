@@ -18,6 +18,33 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## LDM AR source age
+
+LDM AR0..AR7 into A/B retains its Read operand before a younger instruction's
+same-clock Access update of that AR. Destination Execute and zero-extension
+are unchanged; SXM does not sign-extend LDM (SPRU172C 4-73, Class 3A).
+This is an age-order correction within the prototype clock, not a new
+physical timing measurement. Other MMR sources retain their existing rules.
+
+The ROM4 timer-descriptor producer uses the five-word block at
+`a1af..a1b3`: LDM AR5,A; MAR *AR5+; STL B,*AR2+; READA *AR2+; LD #1,B.
+The old ordering let MAR change the source of the older LDM, shifting the
+program-table read by one word. Its first target became `0884` instead of
+`0834`; the last target became `0299` instead of `0974`. Ordinary queue
+consumption consequently lost a later `0000/0050` control. Retaining the
+older AR sample restores both the target sequence and the shared RF-control
+prefix, without firmware writes or transport changes. The initializer and
+loop words are pinned by `rf_timer_table_generation` in the codec contract.
+
+`ldm-ar-age` passes 2,304 cases plus replay: eight ARs, A/B destinations,
+four values including sign/wrap boundaries, younger MAR increment/decrement
+and MVMM writes, both SXM states, two pages and three checkpoints around
+Read/Execute. It checks one Read at clock 5, retained zero-extended Execute
+at 6, the younger update, other accumulator and status preservation, and no
+duplicate bus accesses after restore. The unmodified core fails the Read
+sample. General interrupt/stack/control-MMR compositions are not newly
+qualified.
+
 ## ADDM BRC and interactive staged execution
 
 Absolute ADDM admits BRC outside active block, single-repeat and delay
@@ -43,7 +70,7 @@ TC-block, polling-interrupt, RCD and delayed-block exclusion profiles pass.
 
 The native `0a40..0a5f` upload still binds uniquely to MCU offset `958e8`,
 but its ADDM no longer stops execution. A ten-second clean cold checkpoint
-has ILLEGAL clear, 22 host-consumer advances, 260 RF-control writes and 2,880
+has ILLEGAL clear, 22 host-consumer advances, 262 RF-control writes and 2,878
 transfer expiries. Continuing CPU-issued control writes distinguish this from
 the earlier frozen-counter polling failure; they do not establish valid RF
 reception or registration. These counts replace the rejected reset-lifecycle
@@ -789,23 +816,25 @@ sequence. The volatile endpoint is sampled once and the real memory write
 still occurs once per PORTR. This qualifies the logical on-chip RAM contract,
 not measured bank contention or peripheral forwarding.
 
-Three-second reference controls separate frontend and SWWSR selection:
+Duration-matched ten-second cold controls separate frontend and SWWSR selection:
 
-| Machine | Frontend | SWWSR | Host packets committed | RF-control writes | Outcome |
+| Machine | Frontend | SWWSR | Host consumer advances | RF-control writes | Outcome |
 |---|---|---|---|---|---|
-| `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
-| `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 22 | 260 | Ten-second clean service observation; separate physical Menu/lifecycle gates pass. |
+| `noki5110` | atomic | legacy | 22 | 262 | Challenge accepted; ILLEGAL clear. |
+| `nse1astd` | atomic | standard | 22 | 262 | Challenge accepted; ILLEGAL clear. |
+| `nse1pipe` | staged | standard | 22 | 262 | Challenge accepted; separate physical Menu/lifecycle gates pass. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
-The retained atomic controls are three-second observations; the current
-staged endpoint is ten seconds. Their totals are not a duration-matched
-performance or parity comparison. The atomic controls both publish
-639 completion strobes, 19,840 RF reads
-and 33 transfer expiries, with `mode_ac=1`. Matching their counters does not
-prove either bus dialect is physically correct. The fixed-standard comparison
-isolated a frontend data hazard; changing SWWSR alone did not explain the
-missing RF controls. The clean trace includes first-header reads (`0a05` at
+All three live controls end at 10.016666667 s from fresh own-model EEPROMs.
+Their first 32 RF-control pairs match after ignoring instruction-PC context
+and timestamps; so do the first eight logged host-consumer transitions. This
+is bounded prefix agreement, not whole-session parity. Atomic/legacy,
+atomic/standard and staged/standard respectively have 4,242/4,239/4,234 frame
+expiries, 134,816/134,720/134,560 RF reads, and 2,889/2,885/2,878 transfer
+expiries. Their endpoint mode cells differ: atomic has `mode_aa=0,mode_ac=4`,
+staged has `mode_aa=1,mode_ac=0xc`. Neither those differences nor equal prefix
+values establish which bus dialect or clock timing is physical. Wider
+state/traffic agreement remains open. The clean trace includes first-header reads (`0a05` at
 contexts `3871/387f`). The passive tap counts twenty-two nonzero consumer
 advances but logs only the first eight. The eighth changes `0033` to `002f`;
 consumer advances are not independently counted packets.
@@ -820,13 +849,12 @@ source offsets. It does not pin absolute sub-microsecond timestamps. The
 machine identity, clear ILLEGAL flags and accepted MCU challenge are enforced
 independently of the fingerprint, so re-banking data cannot promote a fault.
 The four handset gates independently test physical input and restoration.
-The first eighteen RF-control writes include the original six-write burst,
-a later five-write burst, `2813/0030` at `4026`, and another six-write
-burst. Transfer targets include `0884/08d4/0924/0974/0299`, then periodic
-`0032`, then `03e8`, then a second `0884..0299` sequence.
-Later controls include ascending `2727..272f` writes at `4026`. The observer
+The first RF-control writes include two six-write bursts, `2813/0030` at
+`4026`, then two more six-write bursts. Their transfer targets begin
+`0834/0884/08d4/0924/0974`. Later controls include ascending
+`2727..272d` writes at `4026` in the logged prefix. The observer
 logs only the first 32 controls and first 256 transfer expiries; summaries
-count all 260 controls and 2,880 expiries in this ten-second capture.
+count all 262 controls and 2,878 expiries in this ten-second capture.
 CPU ILLEGAL must remain clear. In stopped runs, device timer edges alone
 are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
@@ -1253,10 +1281,10 @@ AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
 The final observation at 10.016666667 s has PC `09ac`, ILLEGAL clear,
 nine reads through the ring-base tap, twenty-two consumer advances,
-1,639 completion strobes, 74 mailbox writes and final device counters of
-134,656 RF reads, 1,590 slot expiries and 4,237 frame expiries. There are
-260 RF-control writes and 2,880 transfer expiries; only bounded prefixes
-are logged as described above. `mode_aa` is zero and `mode_ac` is twelve.
+1,642 completion strobes, 74 mailbox writes and final device counters of
+134,560 RF reads, 1,591 slot expiries and 4,234 frame expiries. There are
+262 RF-control writes and 2,878 transfer expiries; only bounded prefixes
+are logged as described above. `mode_aa` is one and `mode_ac` is twelve.
 The terminal architectural snapshot is A=B=0, T=`5555`, ST0=`081f`,
 ST1=`6103`, BK=`00fa`, AR0=1, AR1=`0332`, AR2=`0060`, AR3=`00ab`.
 This passive snapshot is not, on its own, proof of a healthy interactive UI.

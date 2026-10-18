@@ -3551,6 +3551,15 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_intm_follow = intm_bit;
 		}
 	}
+	// LDM's Class-3A Read must precede a younger instruction's same-clock
+	// Access update of that AR (SPRU131G figure 7-1; SPRU172C 4-73).
+	// Retain only these qualified register operands before DAGEN publication;
+	// accumulator/control sources keep their existing forwarding/latencies.
+	bool const retained_ar_ldm_read = m_pipeline_valid[4] &&
+		(m_pipeline_word[4] & 0xfe80) == 0x4800 &&
+		m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x17;
+	if (retained_ar_ldm_read)
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7600 &&
 		(m_pipeline_word[3] == 0x76f8 || (u8(m_pipeline_word[3]) < 0x80 && !BIT(m_pipeline_direct_status[3], 14))))
 	{
@@ -4191,7 +4200,7 @@ void tms320c54x_device::pipeline_step()
 	// A mapped T operand must see the same older publication as dedicated T,
 	// while retaining exactly one bus read and excluding Category-I consumers.
 	bool const late_mapped_t_read = read_memory_operand && smem_t_product_read && m_pipeline_operand_address[4] == 0x0e;
-	if (read_memory_operand && !late_mapped_accumulator_read && !late_mapped_t_read)
+	if (read_memory_operand && !late_mapped_accumulator_read && !late_mapped_t_read && !retained_ar_ldm_read)
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];

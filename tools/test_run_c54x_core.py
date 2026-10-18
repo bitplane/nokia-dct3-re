@@ -14,16 +14,17 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
-    def test_store_mvmm_requires_complete_matrix_and_replay(self):
-        marker, ending = EXTRA_PROFILES['st-mvmm']
-        text = marker + '\n' + ending + '\n'
-        check_result(text, 3, profile='st-mvmm')
-        for field in marker.split():
-            if '=' in field:
-                with self.subTest(field=field), self.assertRaises(ValueError):
-                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='st-mvmm')
-        with self.assertRaises(ValueError):
-            check_result(marker, 3, profile='st-mvmm')
+    def test_dagen_age_profiles_require_complete_matrix_and_replay(self):
+        for profile in ('st-mvmm', 'ldm-ar-age'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+            with self.assertRaises(ValueError):
+                check_result(marker, 3, profile=profile)
 
     def test_repeated_writa_requires_retained_par_and_memory_count(self):
         for profile in ('rpt-writa', 'rpt-writa16'):

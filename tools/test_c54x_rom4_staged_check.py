@@ -41,16 +41,16 @@ class StagedFrontierTest(unittest.TestCase):
         self.assertEqual(result["checkpoint_pc"], 0x09ac)
         self.assertEqual(result["host_header_reads"], 9)
         self.assertEqual(result["host_consumed"], 22)
-        self.assertEqual(result["rf_sample_reads"], 134656)
-        self.assertEqual(result["rf_sample_blocks"], 4208)
+        self.assertEqual(result["rf_sample_reads"], 134560)
+        self.assertEqual(result["rf_sample_blocks"], 4205)
         self.assertEqual(result["rf_sample_remainder"], 0)
-        self.assertEqual(result["rf_control_writes"], 260)
+        self.assertEqual(result["rf_control_writes"], 262)
         self.assertEqual(result["observed_rf_control_writes"], 32)
-        self.assertEqual(result["transfer_expiries"], 2880)
+        self.assertEqual(result["transfer_expiries"], 2878)
         self.assertEqual(result["observed_transfer_expiries"], 256)
         self.assertEqual(result["bsp_transmit_words"], [0x0aaa, 0xffd5])
         self.assertEqual(result["bsp_receive_words"], [0x0aaa, 0x0aaa])
-        self.assertEqual(result["completion_strobes"], 1639)
+        self.assertEqual(result["completion_strobes"], 1642)
         self.assertEqual(result["low_gap_bus_reads"], 9)
         self.assertEqual(result["swwsr"], 0x2000)
         self.assertEqual(result["clean_validator_continuations"], 1)
@@ -103,11 +103,19 @@ class StagedFrontierTest(unittest.TestCase):
 
     def test_rejects_old_reset_lifecycle_counts(self):
         for original, old in (("host_consumed=22", "host_consumed=29"),
-                              ("rf_port32_writes=260", "rf_port32_writes=242"),
-                              ("transfer_expiries=2880", "transfer_expiries=2663"),
-                              ("completion_strobes=1639", "completion_strobes=1603")):
+                              ("rf_port32_writes=262", "rf_port32_writes=242"),
+                              ("transfer_expiries=2878", "transfer_expiries=2663"),
+                              ("completion_strobes=1642", "completion_strobes=1603")):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check(self.text.replace(original, old), self.image)
+
+    def test_rejects_shifted_timer_table_and_missing_tail_controls(self):
+        for original, bad in (("target=0834 counter=0834", "target=0884 counter=0884"),
+                              ("port31=0000 port32=0050", "port31=2813 port32=0030"),
+                              ("rf_port32_writes=262", "rf_port32_writes=260")):
+            self.assertIn(original, self.text)
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check(self.text.replace(original, bad), self.image)
 
     def test_rejects_changed_or_duplicate_mcu_uploads(self):
         for offset, payload in self.payloads.items():

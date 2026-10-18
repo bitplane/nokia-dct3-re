@@ -154,6 +154,12 @@ matrix protects that composition. The gates enable reset tracing and use
 explicit failure branches rather than ineffective shell-negation checks.
 The default 5110 still uses the atomic frontend. `NSE1_MACHINE=nse1pipe`
 selects staged execution for the four handset input/restoration gates.
+The duration-matched frontend comparison also qualified LDM's AR-source
+age ordering: retain the older Read before a younger MAR/MVMM Access update.
+A 2,304-case replay matrix and the pinned native descriptor-producer loop
+protect it. Atomic and staged first RF-control prefixes now agree, but their
+cutoff counts and mode cells still differ; complete frontend or physical
+bus-timing parity is not claimed.
 `make check-c54x-rom4-staged` separately checks the reset-free ten-second
 bus/upload checkpoint from fresh NVRAM. Its reviewed data fixture preserves
 the bounded event stream while the checker enforces fault rejection, accepted
