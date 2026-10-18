@@ -3,33 +3,55 @@
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
-initialization passes, and stops on STLM A,ST1 at `321d` (reported PC `321f`).
+initialization passes, and stops on MVDM to BL (`720b`) at `32ee`
+(reported PC `32f0`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is an ST1 write outside an active block:
-at the rejected Decode, delay/RPT/XC are inactive, block context is active
-for `4deb..4dee`, and `321d` is outside that body. The write follows a
-prologue that stacks BRC/RSA/REA and reads ST1. Its status/loop-context
-contract must be qualified without forcing firmware state or dropping the
-control guard indiscriminately.
+The current staged question is retained-source MVDM publication to an
+accumulator slice (`720b 00ae`: absolute data source `00ae`, destination BL).
+The preceding frame ISR now clears BRAF through its own
+STLM at `321d`; terminal ST1 is `4900`. This does not establish that this
+native ISR has returned or that its interrupted loop has resumed.
+
+## STLM suspension of an interrupted loop
+
+Outside-body STLM to ST1 is admitted without delay/RPT/XC composition.
+An Execute-owned BRAF clear retires the private loop predictor only when
+no younger loop-body words remain in flight. Architectural BRC/RSA/REA
+are preserved for software save/restore. In-body writes and overlapping
+control compositions remain guarded; the six-word in-body BRAF latency
+is not newly qualified.
+
+`repeat-stlm` passes 3,840 cases and save-state replays: outer counts
+0/1/2/7/56, inner counts 0/1/3/63, IRQ/NMI, two pages, two stack alignments,
+FRETE/FRETED, six snapshots and callee returns inside the loop or at REA+1.
+The program saves real interrupt state, computes the BRAF-clearing word
+with LDM/AND/OR/STLM, runs its own loop, restores REA/RSA/BRC before ST1,
+then returns through the interrupted callee. Ordered reads/writes,
+one interrupt delivery, actual iteration counts and balanced frames are
+checked. The unchanged core rejects this composition at `090a`.
+The fixture separates STLM from the following STM because BRC's Read-owned
+publication can precede the older status store's Execute in the same clock.
+Primary constraints remain SPRU131G 6.10.6 and 7.5.7.1; physical phases and
+arbitrary overlapping loop-controller writes remain unvalidated.
 
 A read-only live-vector/stack probe identifies this prologue as the frame
 ISR: vector `ffc0` contains delayed branch `f273 3204`, with ST0/ST1 saves
 in its delay slots. The transfer interrupt uses a different vector (`ffc8`
 to `3598`); RF activity alone does not identify the interrupt source.
-At the stop, SP=`1eaf` holds BK/REA/RSA/BRC=`0052/4dee/4deb/0003`.
+At the pre-admission stop, SP=`1eaf` holds BK/REA/RSA/BRC=`0052/4dee/4deb/0003`.
 Saved ST1/ST0 at `1ec1..1ec2` are `c903/081f`; the next stack words are
 ISR return `408d`, callee return `4def`, and outer return `30d8`.
 The interrupted callee was entered by CALLD at `4deb`, whose two-word
 delay instruction ends at the loop endpoint `4dee`.
-Thus the required composition is interrupt entry during an outside-body
+Thus the qualified composition is interrupt entry during an outside-body
 callee, software suspension of the saved loop, and eventual restoration
 through that callee's return. Merely admitting STLM is not sufficient.
 The handler's `AND #2000,A; OR #4900,A` computes `4900` from saved `c903`,
-clearing BRAF; that value has not retired at the guarded Decode stop.
+clearing BRAF. The value now retires organically in the native run.
 
 The same probe logs every changed write at consumer index `0853`, rather
 than the canonical observer's first eight. All twenty-one observed writes
@@ -410,7 +432,7 @@ GSM packets or assert measured physical bus timing.
 The current native run logs the first sixteen RF reads per initialization
 pass, at modeled frames 30 and 28. Observation-time PCs
 `324e/3254/325a/3260` repeat; these are not retirement addresses. Its final
-provider counter is 9,376 reads, not an uninterrupted-run total: the logged
+provider counter is 9,408 reads, not an uninterrupted-run total: the logged
 sample index restarts at one between passes. RF acquisition and handset
 boot remain unclaimed.
 
@@ -445,7 +467,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; STLM ST1 outside an active block stops at `321d`. |
+| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; frame ISR clears BRAF; MVDM to BL stops at `32ee`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -873,19 +895,20 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins the guarded STLM A,ST1 at `321d`,
-PC `321f`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
+The final observation at 3.016666667 s pins unsupported MVDM `720b` at `32ee`,
+PC `32f0`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
 consumer advances, 319 completion strobes, 74 mailbox writes and final
-device counters of 9,376 RF reads, 549 slot expiries and 572 frame expiries.
-Six RF-control writes and five transfer expiries occur; both `mode_aa` and
-`mode_ac` are one. The terminal architectural snapshot is A=`c903`,
-B=`3a98`, T=`000b`, ST0=`081f`, ST1=`c903`, BK=`0052`, AR0=`037f`,
-AR1=0, AR2=`1916`, AR3=`1200`. This is not the prospective STLM source
-at Execute: older AND/OR slots may still be pending at Decode rejection.
+device counters of 9,408 RF reads, 549 slot expiries and 572 frame expiries.
+Six RF-control writes and five transfer expiries occur; `mode_aa` is zero
+and `mode_ac` is one. The terminal architectural snapshot is A=`0e83`,
+B=`3a98`, T=`000b`, ST0=`081f`, ST1=`4900`, BK=`0010`, AR0=`037f`,
+AR1=0, AR2=`00ac`, AR3=`06ce`. This is a Decode-rejection snapshot,
+not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-one packets in one uninterrupted session. Both fresh
-captures reproduce these observations in `tmp/addc-native*/error.log`.
+captures reproduce these observations in
+`tmp/repeat-stlm-native{,-confirm}/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR

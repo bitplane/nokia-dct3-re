@@ -3301,7 +3301,7 @@ void tms320c54x_device::pipeline_step()
 		bool const short_load = staged_memory_load(word);
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
 		if (m_pipeline_valid[2] && (word & 0xfeff) == 0x8807 &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_active))
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_block_active), unsigned(m_pipeline_block_body[2]), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
 		}
@@ -4671,10 +4671,24 @@ void tms320c54x_device::pipeline_step()
 			if (staged_extended_pop(m_op)) ++m_pc;
 		}
 		else if (staged_accumulator_mmr_store(m_op))
+		{
 			// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.
 			// Direct MMR addressing ignores DP/CPL (SPRU172C 4-175).
 			// PMST also publishes here; later Prefetch owns mapping (7.5.9).
-			data_write(u8(m_op), u16(saturated_store(accumulator(BIT(m_op, 8)))));
+			u16 const value = u16(saturated_store(accumulator(BIT(m_op, 8))));
+			if (u8(m_op) == 7 && !(value & ST1_BRAF) && m_pipeline_block_active)
+			{
+				// Software may suspend an interrupted loop outside its body.
+				// Retire only the predictor; architectural BRC/RSA/REA remain
+				// available for the handler's own save/restore sequence.
+				for (unsigned stage = 0; stage < 5; ++stage)
+					if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
+					{ logerror("%s: staged outside STLM BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+				m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
+				m_pipeline_block_fetch_remaining = 0;
+			}
+			data_write(u8(m_op), value);
+		}
 		else if (staged_store(m_op))
 		{
 			data_write(m_pipeline_operand_address[5], pipeline_store_word());
