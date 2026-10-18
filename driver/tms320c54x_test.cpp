@@ -14582,6 +14582,79 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct parallel_load_fixture
+	{
+		dual_multiply_fixture memory;
+		unsigned form;
+		u64 a, b, result_a, result_b;
+	};
+	static parallel_load_fixture parallel_load_case(unsigned variant, bool edge)
+	{
+		unsigned const extent = edge ? 16 : 67584, v = variant % extent;
+		parallel_load_fixture c{}; c.form = variant / extent;
+		auto &f = c.memory; f = dual_multiply_case(edge ? v : v % 18432, edge);
+		unsigned seed = v / 512;
+		if (!edge && v >= 18432)
+		{
+			unsigned const n = v - 18432, flags = (n / 512) % 16;
+			f.x = 8; f.y = 9; f.initial = {0x1000, 0x1100, 0x1200, 0x1300}; f.final = {0x1001, 0x1101, 0x1200, 0x1300};
+			f.xaddress = 0x1000; f.yaddress = 0x1100;
+			f.xword = std::array<u16, 8>{0, 1, 0x7fff, 0x8000, 0xffff, 0x1234, 0x5555, 0xaaaa}[n % 8];
+			int const shift = std::array<int, 8>{-16, -15, -8, -1, 0, 1, 7, 15}[(n / 64) % 8];
+			f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0) | (shift & 31);
+			f.pmst = flags & 2 ? 1 : 0; f.st0 = 0xa002 | (flags & 8 ? 0x800 : 0);
+			f.base = (n / 8192) % 2 ? 0x20000 : 0; f.snapshot = n / 16384; f.linear = true; seed = (n / 8) % 8;
+		}
+		else { f.st1 = (f.st1 & ~31) | (v & 31); f.pmst |= (v / 32) & 1; }
+		f.source = c.form >= 4 ? c.form - 4 : c.form / 2; f.destination = c.form & 1;
+		c.a = std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL}[seed % 8];
+		c.b = c.a ^ 0x5aa55aa55aULL;
+		int const shift = int(f.st1 & 31) - (f.st1 & 16 ? 32 : 0);
+		u64 const source = f.source ? c.b : c.a;
+		s64 const signed_source = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
+		u64 shifted = shift < 0 ? u64(f.st1 & 0x100 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL;
+		if (f.pmst & 1)
+		{
+			if (f.st1 & 0x100) { s64 const number = shifted & (1ULL << 39) ? s64(shifted) - (1LL << 40) : s64(shifted); shifted = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
+			else shifted = std::min(shifted, u64(0xffffffff));
+		}
+		f.stored = shifted >> 16;
+		u64 const loaded = u64(s64(f.st1 & 0x100 ? s16(f.xword) : s32(f.xword)) * 65536) & 0xffffffffffULL;
+		c.result_a = c.form < 4 && !f.destination ? loaded : c.a;
+		c.result_b = c.form < 4 && f.destination ? loaded : c.b;
+		return c;
+	}
+	void start_parallel_load(unsigned variant = 0)
+	{
+		bool const edge = !strcmp(machine().options().bios(), "stld-edge"); auto const c = parallel_load_case(variant, edge); auto const &f = c.memory;
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, (c.form >= 4 ? 0xe400 : 0xc800 | (f.destination << 8)) | (f.source << 9) | (f.x << 4) | f.y);
+		program.write_word(f.base + 0x601, 0xf4e1);
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
+		if (f.yaddress >= 0x60 && f.yaddress != f.xaddress) data.write_word(f.yaddress, 0xdead);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "parallel_load_source", [this, f, edge](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(!edge && !m_pipeline_operand_reads && at == f.xaddress && word == f.xword && m_cpu->pipeline_cycles() == 5, "Parallel load retains one X sample before any aliased Y write"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "parallel_load_store", [this, f, edge](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (edge || at != f.yaddress || word != f.stored) osd_printf_info("STLD store mismatch: case=%u address=%04x expected=%04x value=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(at), f.yaddress, word, f.stored);
+			expect(!edge && !m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == 6, "Parallel store uses the Execute-live old accumulator with retained ASM before its load replacement"); ++m_pipeline_store_writes;
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62164;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct sqdst_fixture
 	{
 		dual_multiply_fixture memory;
@@ -18227,6 +18300,7 @@ private:
 		if (!strcmp(machine().options().bios(), "portr-block")) { start_circular_portr_block(); return; }
 		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
+		if (!strcmp(machine().options().bios(), "stld") || !strcmp(machine().options().bios(), "stld-edge")) { start_parallel_load(); return; }
 		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge")) { start_circular_move(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
@@ -49407,6 +49481,39 @@ private:
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 62164)
+		{
+			bool const edge = !strcmp(machine().options().bios(), "stld-edge");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = parallel_load_case(variant, edge); auto const &f = c.memory;
+			unsigned const checkpoint = 4 + f.snapshot;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Parallel load excludes mapped X or Y operands before data access or pointer changes");
+			if (tick == 5 && !edge)
+			{
+				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Parallel load applies X priority and each dual-address update once");
+				if (c.form >= 4) expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.xword, "Parallel LD Xmem,T publishes the retained input in Read");
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x55aa);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31);
+				for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i);
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.xaddress, f.xword ^ 0xffff);
+			}
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save parallel load around address capture Read and Execute"); }
+			if (tick == 12)
+			{
+				u64 const a = edge ? c.a ^ 0x1111111111ULL : c.result_a, b = edge ? c.b ^ 0x1111111111ULL : c.result_b;
+				if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b) osd_printf_info("STLD result mismatch: case=%u form=%u a=%010llx expected=%010llx b=%010llx expected=%010llx\n", variant, c.form, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b);
+				expect(m_pipeline_operand_reads == unsigned(!edge) && m_pipeline_store_writes == unsigned(!edge) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? 0xbeef : 0x55aa), "Parallel store/load separates Read-owned input and T from Execute-owned old accumulator and destination");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (edge ? f.st1 : f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Parallel store/load retains the existing unvalidated carry policy and does not invent status effects");
+				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "No pointer update is repeated after the retained address is consumed");
+				if (!edge) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay parallel store/load without duplicate samples publications or address effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62165; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 96U : 405504U)) { start_parallel_load(variant + 1); return; }
+				if (edge) { osd_printf_info("TMS320C54x parallel store/load exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load exclusions complete"); }
+				osd_printf_info("TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62165) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62164; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62162)
 		{
 			bool const edge = !strcmp(machine().options().bios(), "stack-page0-edge");
@@ -53390,6 +53497,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(92, "mvdm-acc-edge", "MVDM accumulator control-source exclusions")
 	ROM_SYSTEM_BIOS(93, "stack-page0", "Direct page-zero RAM PSHM and POPM")
 	ROM_SYSTEM_BIOS(94, "stack-page0-edge", "Direct page-zero stack peripheral and indirect exclusions")
+	ROM_SYSTEM_BIOS(95, "stld", "Parallel store with retained Xmem load into accumulator or T")
+	ROM_SYSTEM_BIOS(96, "stld-edge", "Parallel store/load mapped operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

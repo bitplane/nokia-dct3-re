@@ -62,6 +62,11 @@ constexpr bool staged_parallel_mac(u16 word)
 	return (word & 0xf000) == 0xd000;
 }
 
+constexpr bool staged_parallel_load(u16 word)
+{
+	return (word & 0xfc00) == 0xc800 || (word & 0xfd00) == 0xe400;
+}
+
 constexpr bool staged_dual_arithmetic(u16 word)
 {
 	return (word & 0xfc00) == 0xa000;
@@ -3440,7 +3445,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = staged_accumulator_stm(word) || word == 0x771d || word == 0x7700 || staged_bus_control(word) || (staged_timer_control(word) || staged_serial_control(word) || staged_clock_control(word));
 		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && !staged_memory_repeat(word) && !staged_immediate_arp(word) && !staged_immediate_asm(word) && !staged_immediate_repeat(word) && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_parallel_mac(word) && !staged_sqdst(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
+			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_parallel_mac(word) && !staged_parallel_load(word) && !staged_sqdst(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -4012,7 +4017,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (staged_unsigned_memory_arithmetic(m_pipeline_word[3]) && source < 0x60)
 		{
-			logerror("%s: staged unsigned memory arithmetic mapped-register source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged unsigned memory arithmetic mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), m_pipeline_address[3], m_pipeline_word[3], source); m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60 && (source < 8 || source > 0x0d))
 		{
@@ -4084,7 +4089,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_immediate[4]);
 	}
-	if (m_pipeline_valid[3] && staged_parallel_mac(m_pipeline_word[3]))
+	if (m_pipeline_valid[3] && (staged_parallel_mac(m_pipeline_word[3]) || staged_parallel_load(m_pipeline_word[3])))
 	{
 		u8 const x = m_pipeline_word[3] >> 4, y = m_pipeline_word[3];
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
@@ -4092,12 +4097,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = m_ar[yar];
 		if (m_pipeline_immediate[3] < 0x60 || m_pipeline_operand_address[3] < 0x60)
 		{
-			logerror("%s: staged parallel MAC mapped operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged parallel store mapped operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
 	}
-	if (m_pipeline_valid[4] && staged_parallel_mac(m_pipeline_word[4]))
+	if (m_pipeline_valid[4] && (staged_parallel_mac(m_pipeline_word[4]) || staged_parallel_load(m_pipeline_word[4])))
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_immediate[4]);
 		m_pipeline_direct_status[4] = m_st1 & 31;
@@ -4735,6 +4740,17 @@ void tms320c54x_device::pipeline_step()
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
 		}
+		else if (staged_parallel_load(m_op))
+		{
+			// Store the old accumulator before replacing an aliased destination
+			// (SPRU172C 4-179). Retain the atomic model's unresolved C policy.
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
+			if ((m_op & 0xfd00) != 0xe400)
+			{
+				s64 const value = m_pipeline_alu_mode[5] & 0x100 ? s16(m_pipeline_operand[5]) : s32(m_pipeline_operand[5]);
+				accumulator(BIT(m_op, 8)) = u64(value * 65536) & ACC_MASK;
+			}
+		}
 		else if (staged_parallel_mac(m_op))
 		{
 			// Store before replacing an aliased accumulator (SPRU172C 4-180).
@@ -5115,6 +5131,10 @@ void tms320c54x_device::pipeline_step()
 		// MPY/MAC/MACSU load T in Read (SPRU172C 4-101/4-82/4-91). An older
 		// Execute write must not overwrite this younger publication.
 		m_t = m_pipeline_operand[4];
+	if (m_pipeline_valid[4] && staged_parallel_load(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xfd00) == 0xe400)
+		// The load side owns T in Read; do not republish it in Execute or
+		// let an older Execute write erase this younger publication.
+		m_t = m_pipeline_operand[4];
 	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
 	{
 		// LD T and MPYA/MACA/MASA publish T in Read after older Execute.
@@ -5345,7 +5365,7 @@ u16 tms320c54x_device::pipeline_store_word() const
 	// Younger Read bypass and the real Execute write must publish the same
 	// word, including the store's retained shift rather than live ST1.ASM.
 	u16 const word = m_pipeline_word[5];
-	if (staged_parallel_mac(word))
+	if (staged_parallel_mac(word) || staged_parallel_load(word))
 	{
 		int const shift = s8((m_pipeline_direct_status[5] & 31) << 3) >> 3;
 		u64 const source = BIT(word, 9) ? m_b : m_a;
@@ -5394,7 +5414,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 		// consumer must not see the old RAM word while EB is still pending.
 		// Forward the sample without another I/O access; preserve the EB write.
 		return m_pipeline_operand[5];
-	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5]) || staged_parallel_mac(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5]) || (m_pipeline_word[5] & 0xff00) == 0x7600) &&
+	if (address >= 0x60 && m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_xmem_store(m_pipeline_word[5]) || staged_parallel_mac(m_pipeline_word[5]) || staged_parallel_load(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5]) || (m_pipeline_word[5] & 0xff00) == 0x7600) &&
 		address == m_pipeline_operand_address[5])
 		return pipeline_store_word();
 	if (address >= 0x60 && m_pipeline_valid[5] && staged_rmw(m_pipeline_word[5]) &&

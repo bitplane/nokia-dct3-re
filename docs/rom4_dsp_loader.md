@@ -3,21 +3,18 @@
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
-initialization passes, and stops on parallel store/load `e4e9` at `3322`
-(reported PC `3324`).
+initialization passes, and stops on absolute ADDS `0af8 000b` at `403e`
+(reported PC `4042`), whose mapped BL source is not yet admitted.
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is parallel store/load ownership for `e4e9`
-(store accumulator to Ymem while loading Xmem into T). Direct PSHM
-`4a60/4a61` now saves page-zero sources `0060/0061` organically.
-MVDM `720b 00ae` also copies the absolute data source into BL organically.
-The preceding frame ISR now clears BRAF through its own
-STLM at `321d`, publishing `4900` before its own loop. Terminal ST1 is now
-`c900`, with BRAF active again. This does not establish that this
-native ISR has returned or that its interrupted loop has resumed.
+The current staged question is unsigned memory arithmetic's mapped source
+ownership: absolute data address `000b` is BL, not external RAM. The
+STLM suspension, page-zero stack transfers and parallel store/load data
+path now execute. Parallel-store carry and physical bus phases remain
+unvalidated; these results do not establish completed handset boot.
 
 ## STLM suspension of an interrupted loop
 
@@ -113,6 +110,38 @@ write and samples the younger source once after that same-clock publication,
 as for the existing adjacent PSHM/POPM contract. This does not qualify all
 memory arbitration or measured bus phases; indirect and arbitrary interrupt/
 repeat compositions remain outside this gate.
+
+## Parallel Store/Load
+
+The staged frontend admits all six ST||LD forms: either accumulator as
+store source, with A/B or T as load destination (1,536 encodings).
+X/Y addresses and updates are Access-owned, using original pointers and
+Xmod priority when the auxiliary registers alias. The X sample and ASM
+are retained in Read. The store samples the old accumulator at Execute,
+before replacing an aliased accumulator destination. Loading T publishes
+in Read after older Execute writes; it is not republished at Execute.
+Mapped/peripheral X or Y addresses remain excluded before pointer changes.
+
+`stld` passes 405,504 cases and save-state replays: 110,592 address cases
+and 294,912 numeric cases, including aliased pointers/memory/accumulators,
+circular and linear modes, eight words, eight accumulator patterns,
+all 32 ASM values across the address cases, eight numeric boundary shifts,
+SXM/SST/OVM/carry combinations, two pages and three snapshots. Source memory,
+ASM, accumulators, pointers and T change after their respective capture
+points. `stld-edge` adds 96 replayed no-read/no-write/no-pointer-change
+mapped-operand exclusions. The unchanged core rejects the first ST||LD case.
+The existing parallel-MAC store-shift path and ordinary-RAM forwarding
+are shared; no DSP reply or firmware state is supplied by this qualification.
+
+Primary data semantics are TI SPRU172C 4-178/4-179; PMST.SST saturation is
+specified by SPRU131G table 4-3, rather than assuming that OVM controls
+store saturation. A remaining status ambiguity is explicit: SPRU172C lists
+a C effect without an equation, while SPRU131G table 4-1's carry summary
+does not name this form. The atomic model's carry-preservation policy is
+retained and regression-tested, **not** promoted to a silicon contract.
+Gate output requires `carry_policy=preserve_unvalidated`; native acceptance
+reports `parallel_store_carry_claim=false`. Physical bus phases and arbitrary
+interrupt/repeat compositions remain outside the standalone fixture scope.
 
 ## ADDC ownership
 
@@ -484,7 +513,7 @@ GSM packets or assert measured physical bus timing.
 The current native run logs the first sixteen RF reads per initialization
 pass, at modeled frames 30 and 28. Observation-time PCs
 `324e/3254/325a/3260` repeat; these are not retirement addresses. Its final
-provider counter is 9,412 reads, not an uninterrupted-run total: the logged
+provider counter is 10,336 reads, not an uninterrupted-run total: the logged
 sample index restarts at one between passes. RF acquisition and handset
 boot remain unclaimed.
 
@@ -519,7 +548,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; page-zero pushes execute; parallel store/load `e4e9` stops at `3322`. |
+| `nse1pipe` | staged | standard | 21 | 11 | Two initialization passes and later RF-control burst; mapped ADDS source stops at `403e`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -531,9 +560,13 @@ reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
 The passive tap counts twenty-one nonzero consumer advances but logs only the
 first eight. The index restarts between the seventh and eighth observations,
 so these are not twenty-one packets from one uninterrupted DSP session.
-Six actual RF-control writes alternate with five transfer expiries, including
-targets `0884/08d4/0924/0974/0299`. RF-control and transfer-expiry parity
-remain open; these are calibrated bench-device events, not RF acquisition.
+Eleven actual RF-control writes include the original six-write burst and
+a later five-write burst. Transfer targets include
+`0884/08d4/0924/0974/0299`, then periodic `0032`. Of 255 timer-expiry records,
+31 precede the guarded CPU stop and 224 follow it. The latter are still-running
+device timers, not firmware servicing or further native execution. RF-control
+and transfer-expiry parity remain open; these are calibrated bench-device
+events, not RF acquisition.
 
 ## Current result
 
@@ -947,20 +980,21 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins unsupported parallel form `e4e9`
-at `3322`, PC `3324`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
-consumer advances, 320 completion strobes, 74 mailbox writes and final
-device counters of 9,412 RF reads, 549 slot expiries and 572 frame expiries.
-Six RF-control writes and five transfer expiries occur; `mode_aa` is zero
-and `mode_ac` is one. The terminal architectural snapshot is A=B=0,
-T=`11a3`, ST0=`181f`, ST1=`c900`, BK=`0010`, AR0=`0002`,
-AR1=0, AR2=AR3=`1a48`. This is a Decode-rejection snapshot,
+The final observation at 3.016666667 s pins the Access guard for unsigned
+arithmetic `0af8` at `403e`, source `000b`, PC `4042`, ILLEGAL set, seven
+reads through the ring-base tap, twenty-one consumer advances, 354 completion
+strobes, 74 mailbox writes and final device counters of 10,336 RF reads,
+327 slot expiries and 573 frame expiries. Eleven RF-control writes and
+255 transfer expiries occur, with only 31 expiries before the stop;
+`mode_aa` is zero and `mode_ac` is two. The terminal architectural snapshot
+is A=`1413`, B=`0050`, T=`000c`, ST0=`001f`, ST1=`6103`, BK=`0052`,
+AR0=`126d`, AR1=`03e8`, AR2=`0031`, AR3=`0008`. This is an Access-rejection snapshot,
 not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-one packets in one uninterrupted session. Both fresh
 captures reproduce these observations in
-`tmp/page0-stack-native{,-confirm}/error.log`.
+`tmp/stld-native-{confirm,final}/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
