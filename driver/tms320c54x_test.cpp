@@ -6420,6 +6420,73 @@ private:
 			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "RETD retains BITT's delay extension without refetch"); ++m_pipeline_extensions_reads; } });
 		m_pipeline_peripheral_case = variant; m_phase = bitt_phase + 2;
 	}
+	struct delay_bitt_fixture
+	{
+		unsigned control, form, slot, selector, snapshot;
+		bool upper, invert, initial_tc;
+		u32 base;
+		unsigned timing_kind() const { return control >= 6 ? 1 : control; }
+		unsigned read() const { return delay_multiply_fixture::operand_read(timing_kind(), slot); }
+		unsigned producer_read() const { return delay_multiply_fixture::operand_read(timing_kind(), 0); }
+		u16 t() const { return selector | (upper ? 0xa5f0 : 0); }
+		u16 final_t() const { return upper ? t() ^ 15 : t(); }
+		u16 value() const { u16 const mask = 1U << (15 - selector); return invert ? u16(~mask) : mask; }
+		u16 opcode() const { return 0x3400 | (form == 0 || form == 3 ? 0x60 : form == 1 ? 0x84 : 0x94); }
+		u16 final_sp() const { return 0x3000 + (control == 3 ? -1 : control == 4 ? -2 : control == 5 ? 1 : 0); }
+		u16 source() const { return form == 0 ? 0x1060 : form == 3 ? final_sp() + 0x60 : 0x5000; }
+		u16 status(unsigned tick) const { return 0xa820 | (tick > read() ? invert ? 0 : 0x1000 : initial_tc ? 0x1000 : 0); }
+		u16 st1() const { return 0xb00 | (form == 3 ? 0x4000 : 0); }
+		bool taken() const { return control == 2 ? false : control == 6 ? !initial_tc : control == 7 ? initial_tc : true; }
+		u32 target_base() const { return control == 4 ? base ^ 0x20000 : base; }
+		u32 selected() const { return taken() ? target_base() + 0x700 : base + 0x604; }
+		u16 delay_start() const { return control == 5 ? 0x601 : 0x602; }
+		u64 a() const { return control == 1 ? 0 : control == 2 ? 1 : 0xff12345678ULL; }
+	};
+	static delay_bitt_fixture delay_bitt_case(unsigned v)
+	{
+		delay_bitt_fixture f{}; f.control = v % 8; v /= 8; f.form = v % 4; v /= 4;
+		f.slot = v % 2; v /= 2; f.selector = v % 16; v /= 16; f.upper = v % 2; v /= 2;
+		f.invert = v % 2; v /= 2; f.initial_tc = v % 2; v /= 2;
+		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v;
+		return f;
+	}
+	void start_delay_bitt(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case = variant;
+		auto const f = delay_bitt_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		for (unsigned i = 0; i < 8; ++i) program.write_word(f.base+0x600+i,0xf495);
+		program.write_word(f.base+0x600,f.control == 4 ? 0xfb80 | (f.target_base() >> 16) : std::array<u16,8>{0xf273,0xfa45,0xfa45,0xf274,0,0xfe00,0xfa20,0xfa30}[f.control]);
+		if (f.control != 5) program.write_word(f.base+0x601,0x700);
+		if (f.slot) program.write_word(f.base+f.delay_start(),0x3083);
+		program.write_word(f.base+f.delay_start()+f.slot,f.opcode());
+		for (u32 at : {f.base+0x604,f.target_base()+0x700}) { program.write_word(at,0x7760); program.write_word(at+1,u16(at)); program.write_word(at+2,0xf4e1); }
+		data.write_word(0x60,0xdead); data.write_word(0x5100,f.t()); data.write_word(f.source(),f.value());
+		if (f.control == 5) data.write_word(0x3000,0x700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.status(0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1());
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a()); m_cpu->set_state_int(tms320c54x_device::STATE_B,0x81abcdef01ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_T,f.slot ? f.t() ^ 15 : f.t());
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC,13);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+i,i == 3 ? 0x5100 : i == 4 ? 0x5000 : 0x4000+i);
+		m_pipeline_operand_reads = m_port_reads = m_fast_stack_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"delay_bitt_read",[this,f](offs_t at,u16 &word,u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x3000) { expect(f.control == 5 && !m_fast_stack_reads++ && word == 0x700,"RETD retains one original return word"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at,0x620); }
+			else if (at == 0x5100) { expect(f.slot && !m_port_reads++ && word == f.t() && m_cpu->pipeline_cycles() == f.producer_read(),"Delay-slot LD publishes its original T source once"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at,u16(~word)); }
+			else { if (at != f.source() || word != f.value() || m_cpu->pipeline_cycles() != f.read()) osd_printf_info("Delay BITT source mismatch: case=%u control=%u slot=%u form=%u address=%04x word=%04x clock=%llu expected=%u\n",m_pipeline_peripheral_case,f.control,f.slot,f.form,unsigned(at),word,(unsigned long long)m_cpu->pipeline_cycles(),f.read()); expect(!m_pipeline_operand_reads++ && at == f.source() && word == f.value() && m_cpu->pipeline_cycles() == f.read(),"Delay BITT reads one captured RAM source"); }
+		});
+		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"delay_bitt_write",[this,f](offs_t at,u16 &word,u16) {
+			if (machine().side_effects_disabled()) return;
+			if (at == 0x2fff || at == 0x2ffe) { unsigned const i = m_pipeline_register_writes++; expect((f.control == 3 || f.control == 4) && i < unsigned(f.control == 4 ? 2 : 1) && at == 0x2fff-i && word == (i ? f.base >> 16 : 0x604),"Delay BITT preserves only its call owner's continuation frame"); }
+			else expect(at == 0x60 && word == u16(f.selected()) && !m_pipeline_store_writes++ && m_pipeline_operand_reads == 1,"Only the path selected before BITT publishes its marker");
+		});
+		m_pipeline_fetch_tap = program.install_read_tap(f.base+f.delay_start()+f.slot,f.base+f.delay_start()+f.slot,"delay_bitt_opcode",[this,f](offs_t at,u16 &word,u16) { if (machine().side_effects_disabled()) return; expect(word == f.opcode(),"Delay BITT retains one original opcode"); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(at,0xe8ff); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = delay_bitt_phase;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	struct repeat_store_case
 	{
 		unsigned form, mode, reg, count, setup, pattern, flags, checkpoint;
@@ -19537,6 +19604,7 @@ private:
 		if (!strcmp(machine().options().bios(), "tc-return")) { start_tc_return(); return; }
 		if (!strcmp(machine().options().bios(), "rcd")) { start_delayed_condition_return(); return; }
 		if (!strcmp(machine().options().bios(), "bitt-retd")) { start_bitt_retd(); return; }
+		if (!strcmp(machine().options().bios(), "bitt-ctrl")) { start_delay_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "bitt")) { start_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store")) { start_repeat_store(); return; }
@@ -21959,6 +22027,35 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == bitt_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = bitt_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == delay_bitt_phase)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_bitt_case(variant);
+			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || m_cpu->state_int(tms320c54x_device::STATE_ST0) != f.status(tick)) osd_printf_info("Delay BITT status mismatch: case=%u control=%u slot=%u tick=%u st0=%04x expected=%04x\n",variant,f.control,f.slot,tick,unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)),f.status(tick));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.status(tick),"Delay BITT changes only TC at Execute, after the branch decision");
+			if (tick == f.read()-1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == unsigned(f.form == 2 ? 0x5001 : 0x5000),"Delay BITT owns one Access-stage pointer update"); m_cpu->set_state_int(tms320c54x_device::STATE_AR4,0x7000); }
+			if (tick == f.read())
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t(),"BITT Read consumes the live T value, including its older delay-slot producer");
+				if (f.upper) m_cpu->set_state_int(tms320c54x_device::STATE_T,f.final_t());
+				else { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source(),u16(~f.value())); }
+			}
+			if (f.control != 5 && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base+0x601,0x620); }
+			unsigned const checkpoint = std::array<unsigned,3>{3,f.read()-1,f.read()}[f.snapshot];
+			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads,m_port_reads,m_fast_stack_reads,m_pipeline_store_writes,m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,"Save delayed BITT before or after its owned operand samples"); }
+			if (tick == 32)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.selected()+3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.final_sp() && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1() && m_cpu->state_int(tms320c54x_device::STATE_T) == f.final_t() && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a() && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13,"Delay BITT preserves the selected path, T retention, accumulators, modes and owner stack");
+				expect(m_pipeline_operand_reads == 1 && m_port_reads == f.slot && m_fast_stack_reads == unsigned(f.control == 5) && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.control == 4 ? 2 : f.control == 3 ? 1 : 0),"Delay BITT and its optional T producer each execute once with owner-only stack transactions");
+				for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0+ar) == unsigned(ar == 3 ? 0x5100 : ar == 4 ? 0x7000 : 0x4000+ar),"No retained BITT address is recomputed after pointer poisoning");
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x60) == u16(f.selected()),"The selected continuation leaves its distinct RAM marker"); }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_port_reads = m_recurring_irq_snapshot[1]; m_fast_stack_reads = m_recurring_irq_snapshot[2]; m_pipeline_store_writes = m_recurring_irq_snapshot[3]; m_pipeline_register_writes = m_recurring_irq_snapshot[4]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE,"Restore delayed BITT after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase = delay_bitt_phase+1; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 49151) { start_delay_bitt(variant+1); return; }
+				osd_printf_info("TMS320C54x short control delay BITT: PASS cases=49152 restore=49152 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD,BCD_NTC,BCD_TC forms=DP,plain,postinc,SP slots=2 slot1_producer=LD_T selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 poison_cohorts=memory,T memory_t_sample=Read tc_publish=Execute old_branch_decision=1 owner_stack_only=1 opcode_target_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated short control delay BITT complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if (m_phase == delay_bitt_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = delay_bitt_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == repeat_store_phase)
 		{
 			auto const f = repeat_store_fixture(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
@@ -54142,6 +54239,7 @@ private:
 	unsigned m_phase = 0;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned mmr_long_phase = 1'000'010;
+	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
@@ -54470,7 +54568,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	if (!strcmp(config.options().bios(), "mcbsp-control")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::mcbsp_control_map);
 	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
-	else if (!strncmp(config.options().bios(), "mvdd-source", 11) || !strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge") || !strcmp(config.options().bios(), "stm-low-ram")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
+	else if (!strncmp(config.options().bios(), "mvdd-source", 11) || !strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge") || !strcmp(config.options().bios(), "stm-low-ram") || !strcmp(config.options().bios(), "bitt-ctrl")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
 	else m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
 	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);
 }
@@ -56207,6 +56305,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(176, "rptbd-squr", "Memory SQUR and MPYA in RPTBD delay words")
 	ROM_SYSTEM_BIOS(177, "bcd-rpt", "Conditional branch outcomes after delay-owned repeats")
 	ROM_SYSTEM_BIOS(178, "bcd-rpt-edge", "Conditional branch delay repeat exclusions")
+	ROM_SYSTEM_BIOS(179, "bitt-ctrl", "Short BITT and T-producer ordering in delayed controls")
 ROM_END
 
 ROM_START(tms54rom4)

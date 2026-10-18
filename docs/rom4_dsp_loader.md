@@ -40,9 +40,14 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-The current staged EFR frame stops at short BITT `3484`, owner `c311`,
-in TC-conditional BCD `c30e` (`fa20`)'s second delay word. No complete
-staged EFR frame has passed.
+The staged EFR encoder now returns from frame zero with a balanced stack
+and no unsupported-instruction stop. Its independent reference comparison
+reports 31 aggregate mismatches across parameters, flags and packed output;
+this is not a count of differing parameters alone. No staged EFR frame has
+passed vector acceptance. The next boundary is the first numerical/state
+divergence, not an instruction-admission guard. Atomic EFR still passes all
+163 reference frames; staged FR encoder and decoder pass their separate
+32-frame controls. These isolated codec results do not prove handset speech.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -4816,6 +4821,19 @@ change the result; T, accumulators and other status bits are preserved.
 occupying RETD's two delay words: exactly one stack read, one operand read,
 one extension fetch and target-only continuation. This two-word delay
 admission is limited to RETD; other control owners retain their exclusions.
+
+Short BITT also admits either delay word of BD, BCD, CALLD, FCALLD and
+RETD. `bitt-ctrl` checks 49,152 cases plus cleared-pipeline replays: DP,
+plain/postincrement AR and SP sources, all sixteen selectors, two T-high-bit
+patterns, complementary words, both initial TC values, two pages and three
+checkpoints. The second-slot cases use an organic first-slot LD to T.
+Separate post-Read memory and T poison cohorts check retention without
+allowing the two mutations to cancel. BITT publishes TC at Execute, while
+TC/NTC BCD retains its earlier branch decision. The fixture checks owner-only
+stack effects, poisoned opcode/target/return data and exact continuation.
+These are prototype ordering checks, not measured physical pipeline phases;
+mapped operands, extended BITT under other controls and arbitrary interrupt
+composition remain outside this qualification.
 
 Nondelayed RC TC/NTC shares the existing conditional-return stack and
 redirect path. SPRU172C 4-133 specifies no status changes, one stack pop
