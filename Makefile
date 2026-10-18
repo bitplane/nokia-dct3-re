@@ -449,7 +449,7 @@ help:
 	@echo "make verify-3410-radio-unsuitable-cells check NHM-2 cell and assignment rejection"
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
-	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu"
+	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (NSE1_MENU_MACHINE=nse1pipe for staged CPU)"
 	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
 	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses"
@@ -1544,32 +1544,37 @@ check-c54x-rom4-rf-boundary: build
 			-autoboot_script $(abspath tools/c54x_rom4_codec_observe.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --scan-30s
 
+verify-5110-menu: NSE1_MENU_MACHINE ?= noki5110
 verify-5110-menu: build
-	@set -eu; tmp="$$(mktemp -d -t noki5110-menu.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-menu.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
-		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MENU_MACHINE)" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/noki5110/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MENU_MACHINE)/eeprom"; \
+		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
+		if [ "$(NSE1_MENU_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_POST_READY_KEYS=menu \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
-		$(abspath $(MAME_DIR))/mame noki5110 \
+		$(abspath $(MAME_DIR))/mame $(NSE1_MENU_MACHINE) \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
-			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null; \
+			-autoboot_script "$$script" >/dev/null; \
 		grep -q 'input-press: .* name=menu' error.log; \
 		grep -q 'input-release: .* name=menu' error.log; \
 		! grep -q 'rom4_reset_request' error.log; \
 		! grep -q 'TMS320C54x.*illegal' error.log; \
+		! grep -Eq 'unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; \
+		if [ "$(NSE1_MENU_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
-		echo 'NSE-1 ROM4 unassisted Phone book menu: PASS'
+		echo 'NSE-1 ROM4 $(NSE1_MENU_MACHINE) unassisted Phone book menu: PASS'
 
 verify-5110-late-input: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-late-input.XXXXXX")"; \

@@ -145,6 +145,13 @@ frame. `make verify-5110-save-state` repeats that UI path after restoring the
 running DSP composition. These gates establish useful ROM4 execution, not
 complete RF acquisition or speech behavior.
 
+The opt-in staged frontend also passes the same physical-menu oracle with
+`make verify-5110-menu NSE1_MENU_MACHINE=nse1pipe`, and remains fault-free
+through a thirty-second cold observation. The default 5110 still uses the
+atomic frontend; staged handset save-state, wider application coverage and
+the fitted bus dialect are not promoted by the menu result. Its upload and
+instruction contracts are maintained in [ROM4 DSP loader](rom4_dsp_loader.md).
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:

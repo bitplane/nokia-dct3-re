@@ -177,6 +177,16 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='poll-interrupt')
 
+    def test_brc_addm_requires_complete_qualification_markers(self):
+        for profile in ('addm-brc', 'addm-brc-loop'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_rcd_requires_complete_qualification_marker(self):
         marker, ending = EXTRA_PROFILES['rcd']
         text = marker + '\n' + ending + '\n'

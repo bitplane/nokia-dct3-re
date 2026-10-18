@@ -3,19 +3,60 @@
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend reaches the first organic
 host-packet decoder, records twenty-nine consumer advances across observed
-initialization/service passes, and passes the frame-buffer polling loop and
-delayed TC branch inside block `473c..4777`. Conditional delayed return
-`fe44` at `90eb` also executes. The current stop is uploaded `ADDM #1,BRC`
-at `0a4c` (reported PC `0a50`), at about 6.742 seconds.
-Its upload completion, RF acquisition and handset boot remain unaccepted. The
-instruction qualifications below do not promote these claims. See
+initialization/service passes. The frame-buffer polling loop, delayed TC
+branch inside block `473c..4777`, conditional delayed return and uploaded
+`ADDM #1,BRC` now execute. Cold runs remain fault-free through thirty seconds;
+a physical Menu press opens the existing byte-exact Phone book oracle.
+The passive ten-second checkpoint does not by itself prove boot. Physical
+menu access has its own gate; RF acquisition, native calls and speech remain
+unaccepted. The instruction qualifications below do not promote those claims. See
 [Current result](#current-result) for the established loader lifecycle and
-[Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
+[Observed lifecycle](#observed-lifecycle) for the bounded live checkpoint.
 
-The current staged question is ADDM's mapped BRC read/write ownership and
-the following repeat count, not a missing peripheral reply.
+The staged profile remains opt-in. Next work is broader native lifecycle and
+frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
+
+## ADDM BRC and interactive staged execution
+
+Absolute ADDM admits BRC outside active block, single-repeat and delay
+compositions. Read captures the source once and Execute publishes the
+retained arithmetic result. This uses ADDM's existing SXM/OVM, carry and
+overflow behavior (SPRU172C 4-9). Other low controls remain guarded.
+
+`addm-brc` passes 3,072 cases plus save-state replay: four initial values,
+four immediates, sixteen SXM/OVM/C/OVA combinations, two CMPT states,
+two pages and three snapshots. The immediate and BRC are changed after
+capture. Source Read at clock 7 and publication at 8 occur once; ARs and
+accumulators remain unchanged. These are prototype stage assertions, not
+measured physical phases.
+
+SPRU131G 7.5.8.1/table 7-24 gives ADDM one intervening instruction before
+RPTB[D], unlike the separately listed zero-latency STM/MVDK writers.
+`addm-brc-loop` passes 320 cases plus replay: derived counts 0/1/3/7,
+increments +1/-1, NOP/CALL separators, RPTB/RPTBD, two pages and five
+snapshots. It checks one arithmetic publication, exactly count+1 body
+iterations, final BRC/BRAF and balanced call frames. Zero-gap and active-loop
+counter edits are not newly qualified. Existing mapped-AR ADDM/consumer,
+TC-block, polling-interrupt, RCD and delayed-block exclusion profiles pass.
+
+The native `0a40..0a5f` upload still binds uniquely to MCU offset `958e8`,
+but its ADDM no longer stops execution. A ten-second cold checkpoint has
+ILLEGAL clear, 29 host-consumer advances, 242 RF-control writes and 2,663
+transfer expiries. Thirty seconds remain fault-free, with 3,621 completion
+strobes, 1,516 RF-control writes and 18,701 transfer expiries. Continuing
+CPU-issued control writes distinguish this from the earlier frozen-counter
+polling failure; they do not establish valid RF reception or registration.
+
+`make verify-5110-menu NSE1_MENU_MACHINE=nse1pipe` performs a fresh own-model
+EEPROM boot, presses/releases the physical Menu key at eight seconds and
+requires the existing Phone book frame SHA-256
+`d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5`.
+The staged wrapper also requires terminal ILLEGAL clear and no unsupported
+form or reset. The default `verify-5110-menu` still tests the atomic profile.
+Both profiles use the native DSP backend, not `nokia_dsp_hle`. This proves
+interactive menu access, not native calls, network registration or speech.
 
 ## Conditional delayed returns
 
@@ -46,8 +87,9 @@ then reaches `6bf8 001a 0001` in uploaded program RAM at `0a4c`.
 The 32-word live window `0a40..0a5f` binds uniquely to MCU offset `958e8`;
 the following helper begins with RPTB at `0a52`. The canonical observer
 captures this window at stop and the checker verifies its MCU binding.
-The new boundary is mapped ADDM to the block-repeat counter, not corrupt
-program bytes or a guessed instruction recovered from a different image.
+Mapped ADDM to the block-repeat counter is now qualified above. The source
+binding protects against mistaking corrupt bytes or another image's code
+for a missing instruction.
 
 ## Delayed TC branches inside a block
 
@@ -196,8 +238,8 @@ are nonzero, including ring wraps; the second initialization resets the
 index before advance eight. This confirms the aggregate for this capture,
 not twenty-one packets in one session. Probe evidence is local artifact
 `tmp/st1-context-native/error.log`; neither probe changes firmware state.
-The exact-stop checker distinguishes the live 0.5-second checkpoint from
-the later illegal-instruction endpoint; neither proves completed boot.
+The live checker retains the 0.5-second register/upload checkpoint and
+the later service evidence; physical menu access is verified separately.
 
 ## MVDM accumulator slices
 
@@ -712,7 +754,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 29 | 18 | Initialization/service passes and RF-control bursts; uploaded ADDM to BRC stops at `0a4c`. |
+| `nse1pipe` | staged | standard | 29 | 242 | Ten-second live service checkpoint; separate physical Menu gate passes. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The retained atomic controls are three-second observations; the current
@@ -727,12 +769,15 @@ reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
 The passive tap counts twenty-nine nonzero consumer advances but logs only the
 first eight. The index restarts between the seventh and eighth observations,
 so these are not twenty-nine packets from one uninterrupted DSP session.
-Eighteen actual RF-control writes include the original six-write burst,
+The first eighteen RF-control writes include the original six-write burst,
 a later five-write burst, `2813/0030` at `4026`, and another six-write
 burst. Transfer targets include `0884/08d4/0924/0974/0299`, then periodic
 `0032`, then `03e8`, then a second `0884..0299` sequence.
-All 37 transfer expiries precede the guarded CPU stop. Frame timers can
-continue after that stop; those edges are not further execution. RF-control
+Later controls include ascending `2727..272f` writes at `4026`. The observer
+logs only the first 32 controls and first 256 transfer expiries; summaries
+count all 242 controls and 2,663 expiries in this ten-second capture.
+CPU ILLEGAL must remain clear. In stopped runs, device timer edges alone
+are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
 events, not RF acquisition.
 
@@ -1148,25 +1193,24 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 10.016666667 s pins the mapped ADDM guard for
-`6bf8 001a 0001` at `0a4c`, PC `0a50`, ILLEGAL set, eleven reads through
-the ring-base tap, twenty-nine consumer advances, 1,376 completion strobes,
-74 mailbox writes and final device counters of 43,296 RF reads,
-1,333 slot expiries and 2,090 frame expiries. Eighteen RF-control
-writes and 37 transfer expiries occur, all transfers before the stop;
-`mode_aa` is zero and `mode_ac` is two. The terminal architectural snapshot
-is A=B=0, T=`000c`, ST0=`081f`, ST1=`6103`, BK=`0052`,
-AR0=2, AR1=`03e8`, AR2=`0e12`, AR3=`0286`. This rejection snapshot is
-not proof that older pending instructions have retired.
+The final observation at 10.016666667 s has PC `09ac`, ILLEGAL clear,
+eleven reads through the ring-base tap, twenty-nine consumer advances,
+1,603 completion strobes, 74 mailbox writes and final device counters of
+127,232 RF reads, 1,555 slot expiries and 4,003 frame expiries. There are
+242 RF-control writes and 2,663 transfer expiries; only bounded prefixes
+are logged as described above. `mode_aa` is one and `mode_ac` is twelve.
+The terminal architectural snapshot is A=B=0, T=`5555`, ST0=`081f`,
+ST1=`6103`, BK=`00fa`, AR0=1, AR1=`0332`, AR2=`0060`, AR3=`00ab`.
+This passive snapshot is not, on its own, proof of a healthy interactive UI.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-nine packets in one uninterrupted session. The
 ring-base tap's legacy `host_headers` name counts memory reads, not packet
 headers: reads include `7fff/0000/7fb2` at PC context `3f4a` and zero at
-`3da3`. Native endpoint artifacts are `tmp/rcd-native{,-confirm,-final}/error.log`.
-The final capture uses the canonical demand-upload observer; the earlier
-confirmation used a local read-only program probe. Frame expiries after
-the fault are post-stop device activity, not further execution.
+`3da3`. Current native artifacts are `tmp/addm-brc-native{,-long}/error.log`;
+the ten-second capture passes the live checker. The independent physical-key
+capture is `tmp/addm-brc-native-menu/`, with the exact Phone book frame.
+The reusable staged-menu gate reproduces that result without firmware writes.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR

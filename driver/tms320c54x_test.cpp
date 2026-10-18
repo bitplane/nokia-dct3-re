@@ -5921,7 +5921,9 @@ private:
 	void start_ar_addm(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = ar_addm_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		bool const brc = !strcmp(machine().options().bios(), "addm-brc");
+		auto f = ar_addm_case(brc ? variant * 8 : variant); if (brc) f.reg = 10;
+		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x9000 + i, 0xf495);
 		program.write_word(f.base + 0x9000, 0x6bf8); program.write_word(f.base + 0x9001, 0x10 + f.reg);
 		program.write_word(f.base + 0x9002, f.immediate); program.write_word(f.base + 0x9003, 0xf4e1);
@@ -5931,6 +5933,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == f.reg ? f.initial : 0x3000 + ar);
+		if (brc) m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.initial);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ar_addm_read",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x10 + f.reg && word == f.initial && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7, "Absolute ADDM samples its mapped AR once in Read"); ++m_pipeline_operand_reads; });
@@ -5941,6 +5944,26 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = ar_addm_phase;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_addm_brc_loop(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4]; bool const subtract = (variant / 4) % 2, call = (variant / 8) % 2, delayed = (variant / 16) % 2;
+		u32 const base = (variant / 32) % 2 ? 0x20000 : 0, setup = base + (call ? 0x700 : 0x604), body = setup + (delayed ? 4 : 2);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, 0x6bf8); program.write_word(base + 0x601, 0x1a); program.write_word(base + 0x602, subtract ? 0xffff : 1);
+		if (call) { program.write_word(base + 0x603, 0xf074); program.write_word(base + 0x604, 0x700); program.write_word(base + 0x605, 0xf4e1); }
+		program.write_word(setup, delayed ? 0xf272 : 0xf072); program.write_word(setup + 1, u16(body + 1)); program.write_word(body, 0x6d90); program.write_word(body + 2, call ? 0xfc00 : 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, u16(subtract ? count + 1 : count - 1)); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa024); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1200);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1a, 0x1a, "addm_brc_loop_read", [this, count, subtract](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == u16(subtract ? count + 1 : count - 1), "ADDM samples its BRC source once before the subsequent loop"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x1a, 0x1a, "addm_brc_loop_write", [this, count](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == count, "ADDM publishes the derived BRC count once"); ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 276020;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 	struct repeated_writa_fixture
 	{
@@ -18204,6 +18227,8 @@ private:
 		if (!strcmp(machine().options().bios(), "sat")) { start_sat(); return; }
 		if (!strcmp(machine().options().bios(), "rotate")) { start_rotate(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar")) { start_ar_addm(); return; }
+		if (!strcmp(machine().options().bios(), "addm-brc")) { start_ar_addm(); return; }
+		if (!strcmp(machine().options().bios(), "addm-brc-loop")) { start_addm_brc_loop(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar-load")) { start_ar_addm_load(); return; }
 		if (!strcmp(machine().options().bios(), "std-swwsr")) { start_standard_swwsr_test(); return; }
 		if (standard_bus_io()) { start_bus_io_test(); return; }
@@ -20571,10 +20596,12 @@ private:
 		if (m_phase == rotate_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = rotate_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == ar_addm_phase)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = ar_addm_case(variant);
+			bool const brc = !strcmp(machine().options().bios(), "addm-brc");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto f = ar_addm_case(brc ? variant * 8 : variant); if (brc) f.reg = 10;
+			unsigned const destination = brc ? tms320c54x_device::STATE_BRC : tms320c54x_device::STATE_AR0 + f.reg;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute mapped-AR ADDM is admitted");
 			if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x9002, 0xdead); }
-			if (tick == 7) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, 0x55aa);
+			if (tick == 7) m_cpu->set_state_int(destination, 0x55aa);
 			if (tick == f.checkpoint && !m_pipeline_replay)
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -20582,7 +20609,7 @@ private:
 			}
 			if (tick == 24)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == f.result && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Mapped ADDM preserves retained operands, arithmetic flags and unaffected accumulators");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_cpu->state_int(destination) == f.result && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Mapped ADDM preserves retained operands, arithmetic flags and unaffected accumulators");
 				for (unsigned ar = 0; ar < 8; ++ar) if (ar != f.reg) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0x3000 + ar, "Absolute ADDM does not retarget other ARs under CMPT");
 				if (!m_pipeline_replay)
 				{
@@ -20591,7 +20618,8 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = ar_addm_phase + 1; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 24575) { start_ar_addm(variant + 1); return; }
+				if (variant < (brc ? 3071 : 24575)) { start_ar_addm(variant + 1); return; }
+				if (brc) { osd_printf_info("TMS320C54x mapped BRC ADDM: PASS cases=3072 restore=3072 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 retained_source=1 active_loop_composition=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped BRC ADDM complete"); }
 				osd_printf_info("TMS320C54x mapped AR ADDM: PASS cases=24576 restore=24576 registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 accumulators_preserved=1 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated mapped AR ADDM complete");
 			}
@@ -49505,6 +49533,23 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 276020)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], checkpoint = std::array<unsigned, 5>{6, 7, 8, 10, 16}[variant / 64];
+			bool const call = (variant / 8) % 2, delayed = (variant / 16) % 2; u32 const base = (variant / 32) % 2 ? 0x20000 : 0, body = base + (call ? 0x700 : 0x604) + (delayed ? 4 : 2);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "ADDM BRC followed by a separated RPTB or RPTBD is supported");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0, 0}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BRC arithmetic publication or consuming loop"); }
+			if (tick == 128)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (call ? base + 0x606 : body + 3) && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1201 + count && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "A legal-gap loop consumes the ADDM result for exactly count plus one iterations");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BRC publication and loop without duplicate arithmetic writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 276030; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 319) { start_addm_brc_loop(variant + 1); return; }
+				osd_printf_info("TMS320C54x ADDM BRC loop consumers: PASS cases=320 restore=320 counts=0,1,3,7 increments=1,-1 separators=NOP,CALL controls=RPTB,RPTBD pages=2 snapshots=5 ordered_publication=1 actual_iterations=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated ADDM BRC loop consumers complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 276030) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 276020; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 276000)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_condition_return_case(variant);
@@ -53703,6 +53748,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(101, "poll-interrupt", "Interrupt delivery through a delayed conditional polling loop")
 	ROM_SYSTEM_BIOS(102, "rptb-tc-delay", "TC NTC delayed branch ownership inside a block repeat")
 	ROM_SYSTEM_BIOS(103, "rcd", "Conditional delayed return predicate stack and retained delay words")
+	ROM_SYSTEM_BIOS(104, "addm-brc", "Retained absolute ADDM arithmetic on BRC")
+	ROM_SYSTEM_BIOS(105, "addm-brc-loop", "ADDM BRC publication before separated RPTB and RPTBD consumers")
 ROM_END
 
 ROM_START(tms54rom4)

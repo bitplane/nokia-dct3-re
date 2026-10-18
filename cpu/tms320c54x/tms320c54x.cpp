@@ -3386,8 +3386,13 @@ void tms320c54x_device::pipeline_step()
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
 		bool const rmw = staged_rmw(word) && (staged_extended_rmw(word) || u8(word) == 0xf8 || u8(word) < 0x98);
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
+		bool const addm_brc = word == 0x6bf8 && m_pipeline_operand_address[2] == 0x1a;
+		if (m_pipeline_valid[2] && addm_brc && (m_pipeline_block_active || BIT(m_st1, 15) || m_pipeline_repeat_active || m_pipeline_delay_decode_words))
+		{
+			logerror("%s: staged ADDM BRC active-loop or delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (m_pipeline_valid[2] && word == 0x6bf8 && m_pipeline_operand_address[2] < 0x60 &&
-			(m_pipeline_operand_address[2] < 0x10 || m_pipeline_operand_address[2] > 0x18))
+			(m_pipeline_operand_address[2] < 0x10 || m_pipeline_operand_address[2] > 0x18) && !addm_brc)
 		{
 			logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_operand_address[2]);
 			m_illegal = true; return;

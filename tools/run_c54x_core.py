@@ -970,6 +970,14 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed conditional calls in block: PASS cases=1024 restore=1024 counts=0,1,2,7 conditions=AEQ,ANEQ,BEQ,BNEQ outcomes=2 positions=middle,endpoint delay_layouts=2 pages=2 snapshots=4 ordered_copies=1 balanced_frames=1 stack_return=PC+4 outer_count=Decode interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed conditional calls in block complete",
     ),
+    "addm-brc": (
+        "TMS320C54x mapped BRC ADDM: PASS cases=3072 restore=3072 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 retained_source=1 active_loop_composition=excluded physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped BRC ADDM complete",
+    ),
+    "addm-brc-loop": (
+        "TMS320C54x ADDM BRC loop consumers: PASS cases=320 restore=320 counts=0,1,3,7 increments=1,-1 separators=NOP,CALL controls=RPTB,RPTBD pages=2 snapshots=5 ordered_publication=1 actual_iterations=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated ADDM BRC loop consumers complete",
+    ),
     "rcd": (
         "TMS320C54x conditional delayed returns: PASS cases=4480 restore=4480 predicates=14 patterns=8 delay_layouts=2 stack_alignments=2 pages=2 snapshots=5 predicate_before_delay=1 taken_stack_reads=1 untaken_stack_reads=0 retained_target=1 delay_fetches=once interrupt_block_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated conditional delayed returns complete",
@@ -1873,7 +1881,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge", "cmpm-map", "cmpm-map-edge"):
         machine = "tms54xtra"
-    if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd"):
+    if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

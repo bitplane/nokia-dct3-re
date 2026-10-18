@@ -1,4 +1,4 @@
-"""Pin organic NSE-1 host-packet entry and its staged instruction stop."""
+"""Pin organic NSE-1 uploads and a bounded live staged DSP checkpoint."""
 import argparse
 import hashlib
 import json
@@ -27,18 +27,16 @@ def check(text, firmware):
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
     if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('408d', '00', '0', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    stop = 'staged ADDM register/peripheral destination is unsupported instruction=000a4c word=6bf8 destination=001a'
-    if (text.count(stop) != 1
-            or text.count('unsupported') != 1 or 'unimplemented' in text):
-        raise ValueError('missing or ambiguous staged host-packet instruction stop')
+    if 'unsupported' in text or 'unimplemented' in text:
+        raise ValueError('staged DSP faulted before the live checkpoint')
     ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:8] != ('0a50', '00', '1', '18', '16', '15', '29', '11')
+            or ends[0][:8] != ('09ac', '00', '0', '18', '16', '15', '29', '11')
             or not 10 <= float(ends[0][8]) <= 10.05):
         raise ValueError('missing or changed bounded execution endpoint')
     end_time = float(ends[0][8])
     terminal = re.findall(r'rom4_staged_end_state: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4}) bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) ar3=([0-9a-f]{4})', text)
-    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000000000', '0000000000', '000c', '081f', '6103', '0052', '0002', '03e8', '0e12', '0286')]:
+    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000000000', '0000000000', '5555', '081f', '6103', '00fa', '0001', '0332', '0060', '00ab')]:
         raise ValueError('missing or changed terminal architectural snapshot')
     headers = re.findall(r'rom4_staged_host_header: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_host_header:') != 11
@@ -64,9 +62,9 @@ def check(text, firmware):
             or accumulators != [('0000000000', '0000000000', '000b', '06e3', '0000')]):
         raise ValueError('missing, malformed or changed live accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
-    if summaries != [('1376', '74')] or text.count('rom4_interface_summary:') != 1:
+    if summaries != [('1603', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=1376 mailbox_writes=74 slot_expiries=1333 frame_expiries=2090 rf_reads=43296 rf_port32_writes=18 rf_port38_reads=0 rf_port39_reads=0 pc=0a50 pmst=ffac ifr=0021 imr=035f mode_aa=0000 mode_ac=0002 transfer_expiries=37$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=1603 mailbox_writes=74 slot_expiries=1555 frame_expiries=4003 rf_reads=127232 rf_port32_writes=242 rf_port38_reads=0 rf_port39_reads=0 pc=09ac pmst=ffac ifr=0020 imr=035f mode_aa=0001 mode_ac=000c transfer_expiries=2663$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 32
@@ -74,7 +72,7 @@ def check(text, firmware):
             or not all(0.15 < float(row[3]) < float(timestamp) for row in rf[:16])
             or not all(float(timestamp) < float(row[3]) < end_time for row in rf[16:])
             or not all(float(before[3]) <= float(after[3]) for before, after in zip(rf, rf[1:]))
-            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['43296']):
+            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['127232']):
         raise ValueError('missing, malformed or changed native RF provider reads')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
     if text.count('rom4_staged_bsp_write:') != 21 or [(value, mask) for value, mask, _ in bsp] != ([('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4) * 2 + [('c008', 'ffff')] * 3 + [('c0c8', 'ffff'), ('c008', 'ffff'), ('c0c8', 'ffff'), ('c008', 'ffff'), ('c008', 'ffff'), ('c0c8', 'ffff')]:
@@ -124,26 +122,30 @@ def check(text, firmware):
             or re.findall(r'rom4_staged_gap_count: reads=(\d+)', text) != ['12']):
         raise ValueError('changed low-page observation ordering or counts')
     controls = re.findall(r'^rom4_rf_port32: sequence=(\d+) port31=([0-9a-f]{4}) port32=([0-9a-f]{4}) pc=([0-9a-f]{4}) t=([0-9.]+)$', text, re.M)
-    if (text.count('rom4_rf_port32:') != 18
-            or [row[:4] for row in controls] != [(str(i + 1), p31, p32, pc) for i, (p31, p32, pc) in enumerate([
-                ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('0000', '0050', '3711'), ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('2813', '0030', '4026'), ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('0000', '0050', '3711')])]
+    control_prefix = [
+        ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('0000', '0050', '3711'), ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('2813', '0030', '4026'), ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'), ('0000', '0050', '3711'),
+        ('2a04', '0006', 'a23f'), ('0041', '0040', '3711'), ('27a2', '0030', '3711'), ('0041', '0020', '3711'), ('0488', '0010', '3711'),
+    ] + [(f'{value:04x}', '0030', '4026') for value in range(0x2727, 0x2730)]
+    # The device logs only the first 32 writes; the summary counts all 242.
+    if (text.count('rom4_rf_port32:') != 32
+            or [row[:4] for row in controls] != [(str(i + 1), p31, p32, pc) for i, (p31, p32, pc) in enumerate(control_prefix)]
             or not times[33] < float(controls[0][4]) < float(controls[11][4]) < times[-1] < float(controls[12][4]) < float(controls[-1][4]) < end_time):
         raise ValueError('missing or changed native RF control writes')
     transfers = re.findall(r'^rom4_transfer_timer: expiry=(\d+) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) delay=(\d+) t=([0-9.]+)$', text, re.M)
     expected_transfers = [(target, target, delay) for target, delay in [('0884', '2160'), ('08d4', '77'), ('0924', '77'), ('0974', '77'), ('0299', '3242'), ('0884', '2158'), ('08d4', '77'), ('0924', '77'), ('0974', '77')]] + [('0032', '0032', '36')] + [('0032', '0031', '35')] * 21 + [('03e8', '03e8', '984')] + [(target, target, delay) for target, delay in [('0884', '2159'), ('08d4', '77'), ('0924', '77'), ('0974', '77'), ('0299', '3243')]]
-    if (text.count('rom4_transfer_timer:') != 37
+    expected_transfers += [('0884', '0884', '2158'), ('08d4', '08d4', '77'), ('0924', '0924', '77'), ('0974', '0974', '77')] + [('0032', '0032', '36')] * 215
+    # Transfer logging is capped at 256; total expiries continue to 2663.
+    if (text.count('rom4_transfer_timer:') != 256
             or [row[:4] for row in transfers] != [(str(i + 1), *row) for i, row in enumerate(expected_transfers)]
             or not all(float(controls[i][4]) < float(row[4]) < float(controls[i + 1][4]) < end_time for i, row in enumerate(transfers[:5]))
             or not all(float(controls[i + 6][4]) < float(row[4]) < float(controls[i + 7][4]) for i, row in enumerate(transfers[5:9]))
             or not float(controls[10][4]) < float(transfers[9][4])
             or not float(controls[11][4]) < float(transfers[31][4]) < bsp_times[-2]
-            or not all(float(controls[i + 12][4]) < float(row[4]) < float(controls[i + 13][4]) < end_time for i, row in enumerate(transfers[32:]))
+            or not all(float(controls[i + 12][4]) < float(row[4]) < float(controls[i + 13][4]) < end_time for i, row in enumerate(transfers[32:37]))
+            or not all(float(controls[i + 18][4]) < float(row[4]) < float(controls[i + 19][4]) < end_time for i, row in enumerate(transfers[37:41]))
+            or not float(controls[22][4]) < float(transfers[41][4]) < float(controls[23][4])
             or not all(float(a[4]) < float(b[4]) < end_time for a, b in zip(transfers, transfers[1:]))):
         raise ValueError('missing or changed native transfer-timer/control ordering')
-    stop_offset = text.index(stop)
-    before_stop = sum(match.start() < stop_offset for match in re.finditer(r'^rom4_transfer_timer:', text, re.M))
-    if before_stop != 37:
-        raise ValueError('timer expiries before CPU stop changed; do not count stopped-device events as firmware progress')
     words = [int(word, 16) for word in encoded.split(',')]
     if (len(words) != 40 or words[:7] != [0x7718, 0x1ec6, 0x7728, 0x2000, 0xf7be, 0x7758, 0x3146]
             or words[13:16] != [0xf071, 0x079f, 0x8093]
@@ -181,18 +183,19 @@ def check(text, firmware):
     packed_demand = struct.pack('>32H', *demand)
     if firmware.find(packed_demand) != DEMAND_SOURCE_OFFSET or firmware.find(packed_demand, DEMAND_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded demand routine does not bind uniquely to the MCU source')
-    return dict(status='unsupported_staged_addm_brc', source_offset=SOURCE_OFFSET,
+    return dict(status='live_staged_native_service_checkpoint', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
                 demand_source_offset=DEMAND_SOURCE_OFFSET, observed_demand_words=32,
-                instruction_address=0x0a4c, instruction=0x6bf8, mapped_destination=0x001a,
+                checkpoint_pc=0x09ac, terminal_illegal=False,
                 host_header_reads=11, host_consumed=29,
-                low_gap_bus_reads=15, rf_sample_reads=43296, rf_sample_blocks=1353, rf_sample_remainder=0,
-                rf_control_writes=18, transfer_expiries=37, transfer_expiries_before_stop=37, transfer_expiries_after_stop=0,
+                low_gap_bus_reads=15, rf_sample_reads=127232, rf_sample_blocks=3976, rf_sample_remainder=0,
+                rf_control_writes=242, observed_rf_control_writes=32,
+                transfer_expiries=2663, observed_transfer_expiries=256,
                 bsp_transmit_words=[0x0aaa, 0xffd5] * 2,
                 bsp_receive_words=[0x0aaa] * 4,
-                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8, 0xc008, 0xc008, 0xc0c8], completion_strobes=1376,
+                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8, 0xc008, 0xc008, 0xc0c8], completion_strobes=1603,
                 checkpoint_illegal=False, uninterrupted_session_claim=False,
                 swwsr=0x2000, boot_claim=False,
                 preceding_instruction_retirement_claim=False,
