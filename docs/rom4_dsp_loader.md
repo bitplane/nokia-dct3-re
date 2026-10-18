@@ -91,6 +91,36 @@ The adjacent-repeat case is a documented BRAF overwrite hazard (7.5.7.1),
 not a safe composition or an emulated hardware trap. Other excluded cases
 remain implementation boundaries, not claims that silicon forbids them.
 
+## Shifted peripheral operand reads
+
+The staged `LD Smem, SHIFT, A/B` path admits peripheral sources
+`0020..005f` through the ordinary data bus. It retains the computed address,
+address/operation words and source operand, paying the existing one-clock
+peripheral hold before Read and publishing in the following Execute clock.
+This follows the peripheral-access cost in classes 4A/4B, pages 3-7/3-8
+of [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), not an
+independently measured placement of the peripheral bus cycle.
+
+`shift-periph` checks 245,760 cases with replay: all 64 peripheral addresses,
+shifts -16/-1/4/15, DP/SP/absolute/postincrement/long-offset addressing,
+SXM/OVM, A/B, four values, two pages and three snapshots. These are volatile
+synthetic endpoints, not assertions about the identity of every mapped
+register. Literals are poisoned after Decode and postincrement's pointer
+is changed after Access; the original address and word must still be used.
+
+`shift-bsp` checks 40,960 cases with replay against the existing completed-word
+BSP state, using all 32 shifts and an additional post-Execute snapshot.
+It starts with receive-ready and overrun, requires exactly one read to clear
+both, then supplies a second frame which must remain pending after Execute
+and replay. Debugger peeks cannot acknowledge either frame. This validates
+CPU/register composition, not a physical serial clock or handset speech.
+
+Mapped shifted ADD/SUB remain outside this admission, as do ST1/BRC sources
+and the tested repeat/block/XC/delay compositions. The 64-case
+`shift-per-edge` fixture requires rejection before data-side effects and
+reproduces it across save/load. These are implementation boundaries, not
+claims that real silicon prohibits those instructions.
+
 ## Repeat endpoint and page hazard
 
 The C54x repeat-end comparator is 16-bit, not XPC-qualified. An active
@@ -357,10 +387,13 @@ this resident routine and executes uploaded `000e30`, `8821`
 `0e5c..0e62` and the explicit outside BRAF clear. It passes `000e14`,
 `7ef8 001a` (absolute READA to BRC) and the following table-initialization
 loop and executes resident `003427`, `8807` (STLM A to ST1). The native
-status is subsequently `4900`. It then stops at resident `003461`,
+status is subsequently `4900`. It executes resident `003461`,
 `6ff8 0020 0c44`, a shifted load from BSP receive register `0020`.
-The staged core rejects this mapped source before consuming it; no reply
-word is synthesized to advance the loader. The exposed PC is `3466`, PMST `ffac` and
+A passive read tap observes two firmware reads of BSP's retained test
+word `0aaa`, at 0.133909558 and 0.133937654 s. The second is the newly
+admitted shifted read, not a new serial frame or an injected reply.
+Execution then stops at resident `003473`, `f483` (SAT A). The exposed PC is
+`3475`, ST0 `081f`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
