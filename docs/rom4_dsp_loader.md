@@ -18,6 +18,31 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Repeated parallel store/load
+
+Short RPT can retain the one-word `ST src,Ymem || LD Xmem,dst/T` body and
+issue fresh Access/Read/Execute work for every copy. X and Y addresses are
+captured before either pointer update; X modification wins when ARs alias.
+Each copy samples X in Read, then stores the Execute-live old accumulator
+before replacing an aliased destination accumulator. T loads publish in Read
+and are not repeated at Execute. Store shift retains the existing Read-owned
+ASM contract. Carry remains the single-instruction model's unvalidated
+preserve policy, not a new silicon claim (SPRU172C 4-178/179).
+
+`stld-repeat` passes 9,216 cases plus replay: all six A/B/T forms; fixed,
+native `b9` postincrement, decrement/increment and same-AR X-priority layouts;
+four shifts; SXM/SAT combinations; counts 0/1/7/255; two pages; and three
+checkpoints across pending reads, stores and drain. A separate integer oracle
+checks every accumulator/T transition and each RAM publication. Source and
+opcode poisoning check retention; fixed-source samples change between copies.
+The live pipeline is cleared before loading each snapshot.
+
+`stld-rpt-edge` reuses the single-instruction mapped-leg fixtures under short
+RPT: 96 cases plus replay reject X or Y mapped operands before data reads,
+writes or pointer changes. The guard is a supported-model boundary, not a
+silicon trap. Memory-bank contention, circular repeated addressing and
+same-address inter-copy forwarding are not established by this qualification.
+
 ## Plain indirect STM to page-zero RAM
 
 `STM #lk,*ARx` (`7780..7787`) resolves a page-zero address in Access,

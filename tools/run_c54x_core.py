@@ -652,6 +652,14 @@ EXTRA_PROFILES = {
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST exclusions complete",
     ),
+    "stld-repeat": (
+        "TMS320C54x repeated STLD: PASS cases=9216 restore=9216 forms=6 layouts=4 shifts=4 sxm_sat=4 counts=0,1,7,255 pages=2 snapshots=3 source_retained=1 accumulator_feedback=1 t_publish=Read alias_priority=X opcode_fetches=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated STLD complete",
+    ),
+    "stld-rpt-edge": (
+        "TMS320C54x repeated STLD exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated repeated STLD exclusions complete",
+    ),
     "stm-ind": (
         "TMS320C54x indirect STM RAM: PASS cases=1536 restore=1536 selectors=8 cmpt=2 literals=4 destinations=4 pages=2 snapshots=3 reads=0 writes=1 pointer_clear=Access ram_write=Execute retained=1 reset_before_restore=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated indirect STM RAM complete",
@@ -1963,7 +1971,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
