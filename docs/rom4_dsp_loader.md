@@ -15,6 +15,28 @@ for `4deb..4dee`, and `321d` is outside that body. The write follows a
 prologue that stacks BRC/RSA/REA and reads ST1. Its status/loop-context
 contract must be qualified without forcing firmware state or dropping the
 control guard indiscriminately.
+
+A read-only live-vector/stack probe identifies this prologue as the frame
+ISR: vector `ffc0` contains delayed branch `f273 3204`, with ST0/ST1 saves
+in its delay slots. The transfer interrupt uses a different vector (`ffc8`
+to `3598`); RF activity alone does not identify the interrupt source.
+At the stop, SP=`1eaf` holds BK/REA/RSA/BRC=`0052/4dee/4deb/0003`.
+Saved ST1/ST0 at `1ec1..1ec2` are `c903/081f`; the next stack words are
+ISR return `408d`, callee return `4def`, and outer return `30d8`.
+The interrupted callee was entered by CALLD at `4deb`, whose two-word
+delay instruction ends at the loop endpoint `4dee`.
+Thus the required composition is interrupt entry during an outside-body
+callee, software suspension of the saved loop, and eventual restoration
+through that callee's return. Merely admitting STLM is not sufficient.
+The handler's `AND #2000,A; OR #4900,A` computes `4900` from saved `c903`,
+clearing BRAF; that value has not retired at the guarded Decode stop.
+
+The same probe logs every changed write at consumer index `0853`, rather
+than the canonical observer's first eight. All twenty-one observed writes
+are nonzero, including ring wraps; the second initialization resets the
+index before advance eight. This confirms the aggregate for this capture,
+not twenty-one packets in one session. Probe evidence is local artifact
+`tmp/st1-context-native/error.log`; neither probe changes firmware state.
 The exact-stop checker distinguishes the live 0.5-second checkpoint from
 the later illegal-instruction endpoint; neither proves completed boot.
 
