@@ -516,24 +516,22 @@ debugger peeks are excluded. Trace PC contexts are not operand-owner labels.
 Tracing preserves the same strict PCM/replay criteria and does not turn a
 diagnostic capture into acceptance.
 
-The paired transmit-side probe is
-`tools/run_c54x_rom4_crc.py --fr-encoder --staged` with the required MAME and
-ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
-encoder, verifies its entry words and retains exact parameter, preprocessing
-history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return. Staged encoding now completes the eight silence frames (0..7):
-608 parameters match the independent reference, preprocessing histories match,
-and each completed frame passes its full-RAM replay. The 32-frame encoder gate
-remains **failing** on the first impulse frame (8), at logical operation `180e`
-at `fc34`, where the resolved mapped T source `000e` is excluded. The reported
-fetch context `fcc9` is not the instruction owner. Guard-time register ages
-must not be compared directly with atomic Execute observations.
+`check-c54x-rom4-fr-encoder-staged` validates the transmit direction on the
+staged frontend; `check-c54x-rom4-fr-encoder` remains its atomic control.
+`fr-encoder-pipe` loads the acquired program/DROM and verifies its entry words
+before running reset, preprocessing and encoding. Both frontends match all
+2,432 parameters over 32 frames: eight each of silence, impulse, alternating
+and deterministic random PCM. Preprocessing histories match independently.
+Every frame replays from its pre-preprocessing checkpoint and reproduces all
+65,440 ordinary RAM words, with the independent reference advancing once.
+The eight native PCM-mute cases also pass, including buffer guards.
 Adding `--trace-fr` captures frame-0 encoding entry RAM/registers and the
 execution-owned instruction/data stream without weakening parameter or replay
 checks; it does not yet capture the frame-8 instruction stream.
 Instruction, repeat and delay-load qualifications live in the
-[ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish complete
-staged parameter or speech acceptance; the atomic encoder remains the control.
+[ROM4 DSP loader contract](rom4_dsp_loader.md). This is bounded isolated FR
+algorithm acceptance, not a handset PCM stream, fitted codec clock, native
+RF acquisition or end-to-end call. Broader frontend/bus parity remains open.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values

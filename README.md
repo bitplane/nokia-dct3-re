@@ -57,6 +57,12 @@ emulation, but do not call firmware handlers or write registration state.
 Firmware-PC conditions are confined to diagnostic traces; product provisioning
 enters through EEPROM and other ordinary device boundaries.
 
+Native DSP acceptance is tracked separately: the acquired ROM4 FR encoder and
+decoder match their independent 32-frame references on both atomic and staged
+CPU frontends, including per-frame RAM replay. These isolated codec gates do
+not yet establish a native handset speech stream or RF/call lifecycle; see
+[`docs/cobba_control_boundary.md`](docs/cobba_control_boundary.md).
+
 ## Maturity
 
 The labels below have precise meanings:

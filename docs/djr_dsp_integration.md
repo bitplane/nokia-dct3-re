@@ -703,7 +703,8 @@ Keep the ROM4-compatible linear behavior pending independent execution or
 hardware evidence, and do not promote it to a universally validated C54x
 rule. Nonzero circular buffers follow the separately tested CPU contract.
 
-`make check-c54x-rom4-fr-encoder` invokes native reset wrapper `0x8045`,
+`make check-c54x-rom4-fr-encoder` (atomic) and
+`make check-c54x-rom4-fr-encoder-staged` invoke native reset wrapper `0x8045`,
 preprocessing `0x85e0` with AR4 pointing to 160 PCM words, then `0x860c`.
 Preprocessing writes `0x127d..0x131c`; encoding writes the 76 parameters
 at `0x1390`. All 2,432 parameters across the same four eight-frame sequences

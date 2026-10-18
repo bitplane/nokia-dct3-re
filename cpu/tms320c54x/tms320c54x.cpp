@@ -4085,7 +4085,8 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged long-offset RMW register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (staged_memory_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < (offset_logic ? 0x60 : 0x20))
+		if (staged_memory_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < (offset_logic ? 0x60 : 0x20) &&
+			(offset_logic || m_pipeline_operand_address[3] < 8 || m_pipeline_operand_address[3] > 0x17))
 		{
 			logerror("%s: staged logical register/peripheral operand is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;

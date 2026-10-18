@@ -18,6 +18,31 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Mapped memory logic sources
+
+Basic and absolute Smem AND/OR/XOR admit owned mapped sources `0008..0017`.
+Read retains the raw sixteen-bit word; Execute combines its zero extension
+with the live destination accumulator. SXM/OVM do not change the logical
+operand or result, and no status bits are written. Existing peripheral-logic
+contracts are unchanged. Long-offset mapped sources and the remaining low
+register/control addresses stay guarded.
+
+`logic-map` passes 110,592 cases plus replay: AND/OR/XOR, sixteen mapped
+sources, DP/absolute/plain-indirect forms, both accumulators, eight flag
+states, four patterns, early/late accumulators, two pages and three snapshots.
+The independent bitwise reference checks high accumulator bits, zero
+extension, source/destination lane aliases and preservation of Execute-live
+status. Mapped sources change after Read without retargeting or resampling.
+`logic-map-edge` passes 1,152 cases plus replay over sixteen unqualified low
+addresses, with no reads, writes or pointer changes. Both profiles clear the
+live pipeline before load. Producer forwarding, wider control compositions
+and physical pipeline timing remain outside this qualification.
+
+The isolated ROM4 FR encoder and decoder now pass their complete bounded
+32-frame comparisons and full-RAM replay on both frontends. The acceptance
+scope and commands live in the [COBBA control boundary](cobba_control_boundary.md);
+this does not establish a handset speech stream or native RF lifecycle.
+
 ## Mapped shift-16 ADD/SUB sources
 
 Shift-16 Smem ADD/SUB admits the sixteen owned mapped sources `0008..0017`:

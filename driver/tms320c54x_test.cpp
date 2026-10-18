@@ -15852,14 +15852,25 @@ private:
 		f.opcode = (subtract ? 0x4000 : 0x3c00) | (unsigned(source_b) << 9) | (unsigned(destination_b) << 8) | u8(f.opcode);
 		return f;
 	}
+	static addc_fixture mapped_logic_case(unsigned variant, bool edge)
+	{
+		unsigned const extent = edge ? 384 : 36864, operation = variant / extent, v = variant % extent;
+		auto f = addc_case(edge ? v % 16 + (v / 16) * 80 : 73728 + v, edge, 1);
+		bool const b = BIT(f.opcode, 8); u64 const source = b ? f.after_b : f.after_a;
+		u64 const result = operation == 0 ? source & f.word : operation == 1 ? source | f.word : source ^ f.word;
+		f.final_a = b ? f.after_a : result; f.final_b = b ? result : f.after_b; f.final_st0 = f.execute_st0;
+		f.opcode = 0x1800 | (operation << 9) | (unsigned(b) << 8) | u8(f.opcode);
+		return f;
+	}
 	void start_addc(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const arithmetic = !strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge");
 		bool const shift16 = !strcmp(machine().options().bios(), "shift16-map") || !strcmp(machine().options().bios(), "shift16-map-edge");
-		bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge") || !strcmp(machine().options().bios(), "shift16-map-edge");
-		unsigned const extent = edge ? 1920 : shift16 ? 36864 : 110592;
-		auto const f = shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
+		bool const logic = !strcmp(machine().options().bios(), "logic-map") || !strcmp(machine().options().bios(), "logic-map-edge");
+		bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge") || !strcmp(machine().options().bios(), "shift16-map-edge") || !strcmp(machine().options().bios(), "logic-map-edge");
+		unsigned const extent = edge ? logic ? 384 : 1920 : shift16 || logic ? 36864 : 110592;
+		auto const f = logic ? mapped_logic_case(variant, edge) : shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.opcode); if (f.extension) program.write_word(f.base + 0x601, f.literal);
@@ -19212,6 +19223,7 @@ private:
 		if (!strcmp(machine().options().bios(), "addc") || !strcmp(machine().options().bios(), "addc-edge")) { start_addc(); return; }
 		if (!strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge")) { start_addc(); return; }
 		if (!strcmp(machine().options().bios(), "shift16-map") || !strcmp(machine().options().bios(), "shift16-map-edge")) { start_addc(); return; }
+		if (!strcmp(machine().options().bios(), "logic-map") || !strcmp(machine().options().bios(), "logic-map-edge")) { start_addc(); return; }
 		if (!strcmp(machine().options().bios(), "addc-chain")) { start_addc_chain(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
@@ -51097,8 +51109,9 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const arithmetic = !strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge");
 			bool const shift16 = !strcmp(machine().options().bios(), "shift16-map") || !strcmp(machine().options().bios(), "shift16-map-edge");
-			bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge") || !strcmp(machine().options().bios(), "shift16-map-edge");
-			unsigned const extent = edge ? 1920 : shift16 ? 36864 : 110592; auto const f = shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
+			bool const logic = !strcmp(machine().options().bios(), "logic-map") || !strcmp(machine().options().bios(), "logic-map-edge");
+			bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge") || !strcmp(machine().options().bios(), "shift16-map-edge") || !strcmp(machine().options().bios(), "logic-map-edge");
+			unsigned const extent = edge ? logic ? 384 : 1920 : shift16 || logic ? 36864 : 110592; auto const f = logic ? mapped_logic_case(variant, edge) : shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
 			unsigned const checkpoint = f.read_clock - (edge ? 2 : 1) + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_clock - 1), "Unsigned arithmetic rejects unowned mapped/control sources before Read");
 			if (tick == f.read_clock && !edge)
@@ -51120,10 +51133,15 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (!edge && f.address == 14 ? 0xa55a : f.t) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (!edge && f.address == 15 ? 0xa55a : f.trn) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unsigned arithmetic preserves unselected registers and does not rewrite a mutated mapped operand");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; if (shift16) m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore unsigned arithmetic without duplicated reads or address updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62157; m_check_timer->enable(true); return;
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; if (shift16 || logic) m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore unsigned arithmetic without duplicated reads or address updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62157; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < extent * (shift16 ? 4U : arithmetic ? 2U : 1U)) { start_addc(variant + 1); return; }
+				if (variant + 1 < extent * (logic ? 3U : shift16 ? 4U : arithmetic ? 2U : 1U)) { start_addc(variant + 1); return; }
+				if (logic)
+				{
+					if (edge) { osd_printf_info("TMS320C54x mapped logic exclusions: PASS cases=1152 restore=1152 operations=AND,OR,XOR addresses=16 modes=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped logic exclusions complete"); }
+					osd_printf_info("TMS320C54x mapped memory logic: PASS cases=110592 restore=110592 operations=AND,OR,XOR mapped_sources=16 modes=DP,absolute,indirect accumulators=2 flags=8 patterns=4 late_accumulator=2 pages=2 snapshots=3 zero_extend=1 source_sample=Read accumulator_sample=Execute flags_preserved=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped memory logic complete");
+				}
 				if (shift16)
 				{
 					if (edge) { osd_printf_info("TMS320C54x mapped shift16 exclusions: PASS cases=7680 restore=7680 forms=8 addresses=80 modes=DP,absolute,indirect pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped shift16 exclusions complete"); }
@@ -55121,6 +55139,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(137, "cond-store-edge", "Conditional store mapped destination exclusions")
 	ROM_SYSTEM_BIOS(138, "shift16-map", "Shift16 ADD SUB with retained owned mapped sources")
 	ROM_SYSTEM_BIOS(139, "shift16-map-edge", "Shift16 arithmetic control and peripheral source exclusions")
+	ROM_SYSTEM_BIOS(140, "logic-map", "Memory logic with retained owned mapped sources")
+	ROM_SYSTEM_BIOS(141, "logic-map-edge", "Memory logic unowned low-register exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

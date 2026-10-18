@@ -165,9 +165,11 @@ LD/LDU with 18,432 replay cases through DP, indirect, absolute and offset
 addressing. This is ISA coverage, not an additional observed boot blocker;
 other mapped-read families are not silently included.
 The staged laboratory codec gate validates pin-clocked boot, physical key
-tone and active serial save/load. The isolated FR decoder gate separately
-matches 32 frames/5,120 PCM samples and per-frame RAM replay on both CPU
-frontends. RPTZ's clear precedes the first repeated MVMD sample; its matching
+tone and active serial save/load. The isolated FR codec gates separately
+match 32 frames/5,120 decoded PCM samples and 2,432 encoded parameters,
+preprocessing histories and per-frame RAM replay on both CPU frontends.
+`check-c54x-rom4-fr-encoder-staged` also requires the native mute-buffer cases.
+RPTZ's clear precedes the first repeated MVMD sample; its matching
 and opposite-accumulator cases have independent replay tests. These results
 do not establish fitted codec clocks, native RF acquisition or handset calls.
 `make check-c54x-rom4-staged` separately checks the reset-free ten-second

@@ -1358,6 +1358,10 @@ check-c54x-rom4-fr-decoder-staged: build prepare-c54x-rom4-fixture
 check-c54x-rom4-fr-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-encoder
 
+.PHONY: check-c54x-rom4-fr-encoder-staged
+check-c54x-rom4-fr-encoder-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-encoder --staged
+
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
 .PHONY: probe-c54x-timer-boundary
