@@ -14640,11 +14640,12 @@ private:
 	void start_indexed_store(unsigned variant = 0)
 	{
 		bool const immediate = !strcmp(machine().options().bios(), "imm-index");
-		bool const circular = !strcmp(machine().options().bios(), "store-circular");
-		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
+		bool const asm_circular = !strcmp(machine().options().bios(), "asm-circular");
+		bool const circular = asm_circular || !strcmp(machine().options().bios(), "store-circular");
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = asm_circular ? asm_circular_store_case(variant) : circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (immediate ? 0x7600 : 0x8000 | (f.selector << 8)) | (circular ? f.mode : (f.add ? 0xb0 : 0xa8) | f.ar));
+		program.write_word(f.base + 0x600, (immediate ? 0x7600 : (asm_circular ? 0x8400 : 0x8000) | (f.selector << 8)) | (circular ? f.mode : (f.add ? 0xb0 : 0xa8) | f.ar));
 		if (immediate) program.write_word(f.base + 0x601, f.word);
 		program.write_word(f.base + (immediate ? 0x602 : 0x601), 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -14715,6 +14716,25 @@ private:
 		{
 			if (!(f.st1 & 0x100)) stored = f.value > 0xffffffffULL ? 0xffffffffU : u32(f.value);
 			else { s64 const value = BIT(f.value, 39) ? s64(f.value) - (s64(1) << 40) : s64(f.value); stored = u32(std::clamp(value, s64(-2147483648LL), s64(2147483647LL))); }
+		}
+		f.word = f.selector & 2 ? stored >> 16 : stored;
+		return f;
+	}
+	static indexed_store_fixture asm_circular_store_case(unsigned v)
+	{
+		unsigned const flags = (v / 8192) % 4;
+		auto f = circular_load_case(v % 2048 + ((flags & 1) | ((flags & 2) << 1)) * 8192);
+		f.selector |= ((v / 32768) % 2) << 1;
+		f.base = (v / 65536) % 2 ? 0x20000 : 0; f.snapshot = v / 131072;
+		int const shift = std::array<int, 4>{-16, -1, 0, 15}[(v / 2048) % 4];
+		f.st1 = (f.st1 & ~31) | (shift & 31);
+		f.value = std::array<u64, 4>{0x123456789aULL, 0xff80000001ULL, 0x7fffffffULL, 0xff7fffffffULL}[(v / 4) % 4];
+		s64 const signed_value = f.value & 0x8000000000ULL ? s64(f.value) - 0x10000000000LL : s64(f.value);
+		u64 stored = shift < 0 ? u64(f.st1 & 0x100 ? signed_value >> -shift : s64(f.value >> -shift)) & 0xffffffffffULL : (f.value << shift) & 0xffffffffffULL;
+		if (f.pmst)
+		{
+			if (f.st1 & 0x100) { s64 const number = stored & 0x8000000000ULL ? s64(stored) - 0x10000000000LL : s64(stored); stored = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
+			else stored = std::min(stored, u64(0xffffffff));
 		}
 		f.word = f.selector & 2 ? stored >> 16 : stored;
 		return f;
@@ -18986,7 +19006,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mar-index")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "mar-reverse")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "minmax") || !strcmp(machine().options().bios(), "squr")) { start_minmax(); return; }
-		if (!strcmp(machine().options().bios(), "store-index") || !strcmp(machine().options().bios(), "imm-index") || !strcmp(machine().options().bios(), "store-circular")) { start_indexed_store(); return; }
+		if (!strcmp(machine().options().bios(), "store-index") || !strcmp(machine().options().bios(), "imm-index") || !strcmp(machine().options().bios(), "store-circular") || !strcmp(machine().options().bios(), "asm-circular")) { start_indexed_store(); return; }
 		if (!strcmp(machine().options().bios(), "poll-interrupt")) { start_poll_interrupt(); return; }
 		if (!strcmp(machine().options().bios(), "compare-delay")) { start_delay_compare(); return; }
 		if (!strcmp(machine().options().bios(), "cmp-delay-edge")) { start_delay_compare_edge(); return; }
@@ -50722,23 +50742,27 @@ private:
 		if (m_phase == 254960)
 		{
 			bool const immediate = !strcmp(machine().options().bios(), "imm-index");
-			bool const circular = !strcmp(machine().options().bios(), "store-circular");
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, read = immediate ? 6 : 5; auto const f = circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
+			bool const asm_circular = !strcmp(machine().options().bios(), "asm-circular");
+			bool const circular = asm_circular || !strcmp(machine().options().bios(), "store-circular");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, read = immediate ? 6 : 5; auto const f = asm_circular ? asm_circular_store_case(variant) : circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= read), "Indexed store excludes low-page destinations before pointer or data effects");
 			u64 const value = !f.excluded && tick > read ? f.value : f.value ^ 0xffffffffffULL;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.selector & 1 ? 0x33445566 : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.selector & 1 ? value : 0x33445566) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= read ? f.st0 : 0x8608), "Indexed store preserves distinct accumulators T and status except compatibility ARP");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.selector & 1 ? 0x33445566 : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.selector & 1 ? value : 0x33445566) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (asm_circular && !f.excluded && tick > read ? f.st1 ^ 31 : f.st1) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= read ? f.st0 : 0x8608), "Indexed store preserves distinct accumulators T and status except compatibility ARP");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick < read ? 0x3300 + i : !f.excluded && tick > read ? 0x2200 + i : !f.excluded && i == f.selected ? f.final_ar : f.initial[i]), "Indexed store consumes Read-owned address and AR0 then modifies AR once");
 			if (tick == read - 1) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+			if (asm_circular && tick == 3) m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x1234);
+			if (asm_circular) expect(m_cpu->state_int(tms320c54x_device::STATE_BK) == (tick < 3 ? f.bk : 0x1234), "Circular ASM store uses Decode-owned BK without replacing a newer live BK");
 			if (immediate && tick == 4) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-			if (!f.excluded && tick == read) { for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); }
+			if (!f.excluded && tick == read) { for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); if (asm_circular) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31); }
 			unsigned const checkpoint = read - 1 + f.snapshot;
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed store before or after address and data publication"); }
 			if (tick == 12)
 			{
 				expect(m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == (immediate ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded, "Indexed store performs exactly one write or zero effects on exclusion");
-				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed store without resampling address or repeating writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254970; m_check_timer->enable(true); return; }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; if (asm_circular) m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore indexed store without resampling address or repeating writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254970; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (circular ? 786431U : 98303U)) { start_indexed_store(variant + 1); return; }
+				if (variant < (asm_circular ? 393215U : circular ? 786431U : 98303U)) { start_indexed_store(variant + 1); return; }
+				if (asm_circular) { osd_printf_info("TMS320C54x circular ASM stores: PASS cases=393216 restore=393216 modes=4 selectors=4 auxiliary_registers=8 cmpt=2 bk=4 indices=4 shifts=-16,-1,0,15 sxm_sat=4 pages=2 snapshots=3 bk_sample=Decode address_asm_sample=Read data_sample=Execute destination_reads=0 pointer_updates=once low_page_rejected=1 reset_before_restore=1 bk_zero=legacy_linear physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular ASM stores complete"); }
 				if (circular) { osd_printf_info("TMS320C54x staged circular STL STH: PASS cases=786432 restore=786432 modes=4 selectors=4 auxiliary_registers=8 compatibility_states=2 bk=4 indices=4 patterns=4 flags=8 pages=2 snapshots=3 destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 bk_zero=legacy_linear physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated circular STL STH complete"); }
 				if (immediate) { osd_printf_info("TMS320C54x staged indexed immediate ST: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 literals=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 accumulator_patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read literal=retained destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated indexed immediate ST complete"); }
 				osd_printf_info("TMS320C54x staged indexed STL STH: PASS cases=98304 ram_cases=96000 excluded_cases=2304 restore=98304 selectors=4 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 patterns=4 sst_sxm=4 pages=2 snapshots=3 address=Read data=Execute destination_reads=0 duplicate_writes=0 excluded_pointer_updates=0 producer_composition=unvalidated silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated indexed STL STH complete");
@@ -54912,6 +54936,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(126, "stld-repeat", "Repeated parallel store and accumulator or T load")
 	ROM_SYSTEM_BIOS(127, "stld-rpt-edge", "Repeated parallel store/load mapped operand exclusions")
 	ROM_SYSTEM_BIOS(128, "block-xc-end-irq", "XC1 repeat-end protection across wrap and final fallthrough")
+	ROM_SYSTEM_BIOS(129, "asm-circular", "ASM-shifted circular accumulator stores")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -610,7 +610,7 @@ constexpr bool staged_extended_store(u16 word)
 
 constexpr bool staged_asm_store(u16 word)
 {
-	return (word & 0xfc00) == 0x8400 && (u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8));
+	return (word & 0xfc00) == 0x8400 && (u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || (u8(word) >= 0xc0 && u8(word) < 0xe0));
 }
 
 constexpr bool staged_store(u16 word)

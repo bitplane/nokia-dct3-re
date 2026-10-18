@@ -716,6 +716,22 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_circular_asm_store_scope(self):
+        marker, ending = EXTRA_PROFILES['asm-circular']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='asm-circular')
+        for old, new in (('restore=393216', 'restore=0'), ('bk_sample=Decode', 'bk_sample=Execute'),
+                         ('address_asm_sample=Read', 'address_asm_sample=Execute'),
+                         ('data_sample=Execute', 'data_sample=Read'),
+                         ('destination_reads=0', 'destination_reads=1'),
+                         ('low_page_rejected=1', 'low_page_rejected=0'),
+                         ('reset_before_restore=1', 'reset_before_restore=0')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='asm-circular')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='asm-circular')
+
     def test_repeated_stld_scope(self):
         for profile in ('stld-repeat', 'stld-rpt-edge'):
             marker, ending = EXTRA_PROFILES[profile]

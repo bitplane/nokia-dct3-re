@@ -18,6 +18,31 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Circular ASM-shifted accumulator stores
+
+ASM-shifted STL/STH (`84xx..87xx`) admit all four short circular modes
+`c0..df`. They use the existing circular address generator with Decode-owned
+BK, Read-owned pointer/AR0 and ASM, and Execute-live accumulator data. The
+destination is retained after one pointer update. Register/peripheral
+destinations remain rejected before circular or compatibility-ARP changes.
+
+`asm-circular` passes 393,216 cases plus replay: low/high A/B selectors,
+four circular modes, all eight encoded ARs, both CMPT states, four BK inputs,
+four index cases, shifts -16/-1/0/15, SXM/SAT combinations, two pages and three
+snapshots. Source patterns are coupled to the AR selection; this is not a
+complete arithmetic-pattern cross-product. Independent modulo and shifted
+store expectations check the one RAM publication and no destination read.
+Live BK changes after Decode, pointers/ASM change after Read, and accumulator
+data changes immediately before Execute. The saved pipeline must restore the
+retained values after the live pipeline is cleared.
+
+BK=0 retains the pre-existing linear behavior required by the atomic ROM4
+control; the physical-silicon discrepancy remains unresolved. The fixtures
+respect the documented nonzero-BK index bounds, including a large block for
+self-indexed AR0. Wider producer, control and repeat compositions are not
+qualified here. The stage ownership is a partial model, not measured bus
+timing.
+
 ## XC 1 selecting the block-repeat endpoint
 
 Conditional execution and interrupt protection have different extents:
