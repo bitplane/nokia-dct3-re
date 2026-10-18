@@ -716,6 +716,21 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_banzd_delay_t_load_scope(self):
+        marker, ending = EXTRA_PROFILES['banzd-t-load']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='banzd-t-load')
+        for old, new in (('restore=9216', 'restore=0'), ('delay_reads=1', 'delay_reads=2'),
+                         ('selected_path_multiply=1', 'selected_path_multiply=0'),
+                         ('source_opcode_target_poison=1', 'source_opcode_target_poison=0'),
+                         ('brc_preserved=1', 'brc_preserved=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='banzd-t-load')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='banzd-t-load')
+
     def test_memory_repeat_in_block_scope(self):
         marker, ending = EXTRA_PROFILES['rptb-memory']
         output = marker + '\n' + ending + '\n'

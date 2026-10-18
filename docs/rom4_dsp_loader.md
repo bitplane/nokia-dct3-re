@@ -18,6 +18,24 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## BANZD delay-owned T loads
+
+One-word `LD Smem,T` can occupy either delay position of BANZD, using the
+existing Read-owned T publication. `banzd-t-load` passes 9,216 cases plus
+replay: counters 0/1/7, four source patterns, DP/SP and plain/post-increment/
+post-decrement addressing, both delay positions, four SXM/OVM combinations,
+A/B multiply consumers, two program pages and three snapshots.
+
+Each selected target or fallthrough multiplies the loaded T by an independent
+RAM operand. The fixture checks exactly one delay read, one multiply/store,
+one source-pointer modification, the original-condition AR7 decrement,
+unchanged BRC/status/stack and final PC. Source data, the load opcode and
+the branch-target literal are poisoned after capture. Forward/backward target
+layouts are paired with A/B destinations, not independently crossed.
+The original RPTBD delay-load matrix retains its separate result. Other
+control owners, extended loads, mapped/peripheral delay sources and interrupt
+composition are not newly qualified; physical bus phases remain unvalidated.
+
 ## Memory-counted single repeat inside a block
 
 RPT with a memory count can occur inside an active block when its complete

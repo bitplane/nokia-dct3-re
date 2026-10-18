@@ -3232,7 +3232,8 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
-					delay_t_load = delayed_block_owner && (word & 0xff00) == 0x3000 && u8(word) < 0x98;
+					delay_t_load = (delayed_block_owner || (m_pipeline_word[stage] & 0xff00) == 0x6e00) &&
+						(word & 0xff00) == 0x3000 && u8(word) < 0x98;
 					delay_bitt = staged_bitt(word) && u8(word) >= 0xe0 && m_pipeline_word[stage] == 0xfe00;
 					bool const basic_arithmetic = (word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word);
 					delay_arithmetic = basic_arithmetic && u8(word) >= 0xe0 && u8(word) <= 0xf8 && (m_pipeline_word[stage] & 0xfff7) == 0xfa45;

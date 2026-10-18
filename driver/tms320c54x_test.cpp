@@ -15239,10 +15239,13 @@ private:
 		unsigned count, slot, form, snapshot, accumulator;
 		u16 value, status, mode, source;
 		u32 base;
+		bool branch = false;
+		unsigned branch_count = 0;
 		unsigned read_clock() const { return 7 + slot; }
+		u16 target() const { return accumulator ? 0x580 : 0x610; }
 		u16 product() const { return u16(s32(s16(value)) * 3); }
 	};
-	static rptbd_t_load_fixture rptbd_t_load_case(unsigned v)
+	rptbd_t_load_fixture rptbd_t_load_case(unsigned v) const
 	{
 		rptbd_t_load_fixture f{};
 		f.count = std::array<unsigned, 3>{0, 1, 7}[v % 3];
@@ -15253,6 +15256,8 @@ private:
 		f.base = (v / 1536) % 2 ? 0x20000 : 0; f.snapshot = v / 3072;
 		f.mode = std::array<u16, 4>{0x12, 0x84, 0x94, 0x8c}[f.form];
 		f.source = f.form ? 0x2800 : f.status & 0x4000 ? 0x1e12 : 0x1412;
+		f.branch = !strcmp(machine().options().bios(), "banzd-t-load");
+		if (f.branch) { f.branch_count = f.count; f.count = 0; }
 		return f;
 	}
 	void start_rptbd_t_load(unsigned variant = 0)
@@ -15264,6 +15269,12 @@ private:
 		program.write_word(f.base + 0x602 + f.slot, 0x3000 | f.mode);
 		program.write_word(f.base + 0x604, 0x2083 | (f.accumulator << 8));
 		program.write_word(f.base + 0x605, 0x8092 | (f.accumulator << 8)); program.write_word(f.base + 0x606, 0xf4e1);
+		if (f.branch)
+		{
+			program.write_word(f.base + 0x600, 0x6e8f); program.write_word(f.base + 0x601, f.target());
+			program.write_word(f.base + f.target(), 0x2083 | (f.accumulator << 8));
+			program.write_word(f.base + f.target() + 1, 0x8092 | (f.accumulator << 8)); program.write_word(f.base + f.target() + 2, 0xf4e1);
+		}
 		data.write_word(f.source, f.value); data.write_word(0x3000, 3);
 		for (unsigned i = 0; i <= f.count + 2; ++i) data.write_word(0x3fff + i, 0xdead);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -15272,6 +15283,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1e00); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5555); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x2800);
+		if (f.branch) { m_cpu->set_state_int(tms320c54x_device::STATE_AR7, f.branch_count); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 13); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
@@ -18786,6 +18798,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge")) { start_circular_move(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-repeat") || !strcmp(machine().options().bios(), "mvmd-rptz")) { start_repeated_mvmd(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-t-load")) { start_rptbd_t_load(); return; }
+		if (!strcmp(machine().options().bios(), "banzd-t-load")) { start_rptbd_t_load(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call")) { start_block_near_call(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call-edge")) { start_block_near_call_edge(); return; }
@@ -44417,17 +44430,19 @@ private:
 				m_cpu->space(AS_DATA).write_word(f.source, u16(~f.value));
 				m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602 + f.slot, 0x3000);
 			}
+			if (f.branch && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0x620); }
 			if (tick == 80)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == f.count + 1 && m_pipeline_extensions_reads == f.count + 1,
 					"Delay T load executes once and every count-plus-one body consumes it");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.value && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1e00,
+				if (f.branch) expect(m_cpu->state_int(STATE_GENPC) == f.base + (f.branch_count ? f.target() + 3 : 0x607), "BANZD retains the selected target or fallthrough despite target-literal poisoning");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.value && m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.branch ? 13 : 0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1e00,
 					"RPTBD preserves loaded T, status and stack while draining BRC");
 				expect(m_cpu->state_int(f.accumulator ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x123456789aULL,
 					"The unselected accumulator remains untouched");
 				for (unsigned i = 0; i < 8; ++i)
 				{
-					u16 const expected = i == 2 ? 0x4001 + f.count : i == 3 ? 0x3000 : i == 4 ? 0x2800 + (f.form == 2 ? 1 : f.form == 3 ? -1 : 0) : 0x3300 + i;
+					u16 const expected = f.branch && i == 7 ? u16(f.branch_count - 1) : i == 2 ? 0x4001 + f.count : i == 3 ? 0x3000 : i == 4 ? 0x2800 + (f.form == 2 ? 1 : f.form == 3 ? -1 : 0) : 0x3300 + i;
 					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == expected, "Delay DAGEN changes once while the body advances its own destination");
 				}
 				{
@@ -44445,6 +44460,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 9215) { start_rptbd_t_load(variant + 1); return; }
+				if (f.branch) { osd_printf_info("TMS320C54x BANZD delay T load: PASS cases=9216 restore=9216 counters=0,1,7 patterns=4 forms=direct,plain,postinc,postdec cpl=2 slots=2 flags=4 accumulators=2 pages=2 snapshots=3 delay_reads=1 selected_path_multiply=1 source_opcode_target_poison=1 brc_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated BANZD delay T load complete"); }
 				osd_printf_info("TMS320C54x RPTBD delay T load: PASS cases=9216 restore=9216 counts=0,1,7 patterns=4 forms=direct,plain,postinc,postdec cpl=2 slots=2 flags=4 accumulators=2 pages=2 snapshots=3 delay_reads=1 first_body_multiply=1 source_and_opcode_poison=1 physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated RPTBD delay T load complete");
 			}
@@ -54388,6 +54404,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(114, "rpt-sfta", "Repeated arithmetic accumulator shift carry overflow and replay")
 	ROM_SYSTEM_BIOS(115, "addm-t", "Mapped T ADDM retained arithmetic and replay")
 	ROM_SYSTEM_BIOS(116, "rptb-memory", "Memory-counted single repeat inside an outer block")
+	ROM_SYSTEM_BIOS(117, "banzd-t-load", "Delay-owned T load across taken and untaken BANZD")
 ROM_END
 
 ROM_START(tms54rom4)
