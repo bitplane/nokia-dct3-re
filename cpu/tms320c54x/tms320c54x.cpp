@@ -321,6 +321,11 @@ constexpr bool staged_data_copy(u16 word)
 	return staged_direct_mvdm(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8)));
 }
 
+constexpr bool staged_delay_copy(u16 word)
+{
+	return (word & 0xff00) == 0x4d00 && u8(word) < 0x98;
+}
+
 constexpr bool staged_extended_data_copy(u16 word)
 {
 	return staged_data_copy(word) && u8(word) >= 0xe0;
@@ -3425,7 +3430,11 @@ void tms320c54x_device::pipeline_step()
 		bool const mmr_move = staged_mmr_move(word);
 		bool const memory_dp = staged_memory_dp(word);
 		bool const direct_move = staged_move(word);
-		bool const data_copy = staged_data_copy(word);
+		bool const data_copy = staged_data_copy(word) || staged_delay_copy(word);
+		if (m_pipeline_valid[2] && staged_delay_copy(word) && (m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged LTD/DELAY repeat/block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const program_move = staged_program_move(word);
 		if (m_pipeline_valid[2] && staged_extended_program_move(word) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
@@ -3854,7 +3863,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[3] && staged_accumulator_mmr_store(m_pipeline_word[3]))
 		m_pipeline_operand_address[3] = u8(m_pipeline_word[3]);
-	if (m_pipeline_valid[3] && (staged_data_copy(m_pipeline_word[3]) || staged_long_arithmetic(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && (staged_data_copy(m_pipeline_word[3]) || staged_delay_copy(m_pipeline_word[3]) || staged_long_arithmetic(m_pipeline_word[3])))
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
 			? m_pipeline_immediate[4] : m_sp;
 	if (m_pipeline_valid[3] && (staged_memory_repeat(m_pipeline_word[3]) || staged_memory_load(m_pipeline_word[3]) || staged_memory_immediate_multiply(m_pipeline_word[3]) ||
@@ -3863,6 +3872,19 @@ void tms320c54x_device::pipeline_step()
 		// PSHM allocates its stack word in this clock's Read stage.
 		m_pipeline_direct_sp[3] = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x4b00
 			? m_pipeline_immediate[4] : m_sp; // Table 7-9: one-clock Category-I latency after PSHD.
+	if (m_pipeline_valid[3] && staged_delay_copy(m_pipeline_word[3]))
+	{
+		u8 const mode = m_pipeline_word[3];
+		u16 const source = basic_address(3, mode);
+		if (source < 0x60 || source == 0xffff)
+		{
+			logerror("%s: staged LTD/DELAY mapped or wrapping operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		m_pipeline_operand_address[3] = source;
+		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
+	}
+	if (m_pipeline_valid[4] && staged_delay_copy(m_pipeline_word[4]))
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[3] && staged_data_copy(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
@@ -4774,6 +4796,10 @@ void tms320c54x_device::pipeline_step()
 			m_pc += staged_extended_program_move(m_op) ? 2 : 1;
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[5] == m_pipeline_repeat_address)
 				pipeline_begin_repeat_stream();
+		}
+		else if (staged_delay_copy(m_op))
+		{
+			data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
 		}
 		else if (staged_data_copy(m_op))
 		{

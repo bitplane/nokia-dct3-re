@@ -18,6 +18,26 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Staged successor memory copy
+
+Short `DELAY Smem` (`4dxx`, low byte below `98`) retains its source address
+and applies its pointer modifier in Access, samples one RAM word in Read,
+and writes that retained word to source+1 in Execute. It does not modify
+A/B, T/TRN or arithmetic flags. Compiler-mode DP/SP and compatibility ARP
+selection use the existing address-age model. Mapped operands and a source
+at `ffff` fail before reads, writes or pointer updates. LTD, longer address
+forms, repeat/block/XC composition and physical bus arbitration remain
+outside this qualification.
+
+`delay-copy` passes 15,360 cases and replays over DP/SP, indirect,
+postdecrement and postincrement, all eight AR selectors, eight patterns,
+SXM/OVM, compatibility, two pages and three checkpoints. Post-Access pointer
+poisoning and post-Read source poisoning cannot redirect or change the copy.
+`delay-copy-ctrl` passes 73,728 cases and replays over BD, both BCD outcomes,
+CALLD, FCALLD and RETD. Its four address forms exclude SP-relative data;
+the control owner retains its independent stack transactions. This is the
+declared staged operand-age model, not a physical pipeline timing claim.
+
 ## Accumulator-source multiply in control-delay words
 
 Short MPYA/MASA/MACA/MACAR may run in BD/BCD/CALLD/FCALLD/RETD delay

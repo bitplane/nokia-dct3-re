@@ -2472,8 +2472,12 @@ and now executes under the
 [shifted delay qualification](rom4_dsp_loader.md#shifted-arithmetic-in-control-delay-words).
 The `3562` MACA at `d583`, in RETD `d582`'s delay span, now executes under
 the [accumulator-source delay qualification](rom4_dsp_loader.md#accumulator-source-multiply-in-control-delay-words).
-The current guard is unsupported word `4d6e` owned by `d394` (reported fetch
-PC `d396`). Decode and qualify that operation before admitting it.
+The `4d6e` DELAY at `d394` now executes under the
+[successor-copy qualification](rom4_dsp_loader.md#staged-successor-memory-copy),
+including its delayed-control composition. The current guard is immediate
+ST1 word `7707` at `befe`, with XC active (reported fetch PC `bf01`).
+Qualify status-publication and conditional-execution ownership together
+before admitting that composition.
 No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and

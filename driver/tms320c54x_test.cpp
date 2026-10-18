@@ -9797,6 +9797,49 @@ private:
 		u64 const stored = u64(overflow && (flags & 2) ? (result < 0 ? -2147483648LL : 2147483647LL) : result) & 0xffffffffffULL;
 		return {f, a, b, stored, u16(f.st0 | (overflow ? 0x200 : 0)), u16(flags & 4 ? 2 : 0)};
 	}
+	static memory_arithmetic_fixture delay_copy_case(unsigned variant)
+	{
+		unsigned v = variant;
+		unsigned const form = v % 5; v /= 5; unsigned const reg = v % 8; v /= 8;
+		unsigned const pattern = v % 8; v /= 8; unsigned const flags = v % 4; v /= 4;
+		auto f = memory_arithmetic_case(form + 18 * reg + 576 * pattern + 4608 * flags + 18432 * (v % 2));
+		f.opcode = 0x4d00 | u8(f.opcode);
+		f.result_st0 = (v % 2 && reg && form >= 2) ? (f.st0 & 0x1fff) | (reg << 13) : f.st0;
+		return f;
+	}
+	void start_delay_copy(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const control = !strcmp(machine().options().bios(), "delay-copy-ctrl");
+		unsigned const kind = variant % 6, v = control ? (variant / 6 / 4) * 5 + std::array<unsigned, 4>{0, 2, 3, 4}[(variant / 6) % 4] : variant;
+		auto const f = delay_copy_case(v); u32 const base = (v / 2560) % 2 ? 0x20000 : 0, target = control && kind == 4 ? base ^ 0x20000 : base;
+		unsigned const read = control ? delay_multiply_fixture::operand_read(kind, 0) : 5;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		if (control)
+		{
+			program.write_word(base + 0x600, kind == 4 ? 0xfb80 | (target >> 16) : std::array<u16, 6>{0xf273, 0xfa45, 0xfa45, 0xf274, 0, 0xfe00}[kind]);
+			if (kind != 5) program.write_word(base + 0x601, 0x700);
+			program.write_word(base + (kind == 5 ? 0x601 : 0x602), f.opcode);
+			program.write_word(base + 0x604, 0xf4e1); program.write_word(target + 0x700, 0xf4e1);
+		}
+		else { program.write_word(base + 0x600, f.opcode); program.write_word(base + 0x602, 0xf4e1); }
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, control && kind == 1 ? 0 : control && kind == 2 ? 1 : 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xa55a);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x5007);
+		data.write_word(f.address, f.memory); data.write_word(f.address + 1, 0xbeef);
+		if (control) data.write_word(0x1000, 0x700);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_fast_stack_reads = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_copy_read", [this, f, control, kind, read](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (control && at == 0x1000) { expect(kind == 5 && word == 0x700 && !m_fast_stack_reads++, "DELAY does not reread its RETD owner's frame"); return; } expect(at == f.address && word == f.memory && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == read, "DELAY owns one Read-stage source sample"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_copy_write", [this, f, control, kind, base, read](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (control && (at == 0xfff || at == 0xffe)) { unsigned const i = m_pipeline_register_writes++; expect((kind == 3 || kind == 4) && i < (kind == 4 ? 2 : 1) && at == 0xfff - i && word == (i ? base >> 16 : 0x604), "DELAY preserves the delayed call frame"); return; } expect(at == f.address + 1 && word == f.memory && !m_pipeline_store_writes++ && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == read + 1, "DELAY writes its retained sample to the successor in Execute"); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62174;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_memory_multiply(unsigned variant = 0)
 	{
 		unsigned const raw = variant % 55296;
@@ -19224,6 +19267,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvmd-status-alu")) { start_mvmd_status_alu(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-cpl") || !strcmp(machine().options().bios(), "mvmd-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-delay") || !strcmp(machine().options().bios(), "mac-delay") || !strcmp(machine().options().bios(), "maca-delay")) { start_delay_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "delay-copy")) { start_delay_copy(); return; }
+		if (!strcmp(machine().options().bios(), "delay-copy-ctrl")) { start_delay_copy(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-delay-edge") || !strcmp(machine().options().bios(), "mac-delay-edge")) { start_delay_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "move-t")) { start_t_register_move(); return; }
 		if (!strcmp(machine().options().bios(), "st-delay-edge")) { start_delay_store_edge(); return; }
@@ -49035,6 +49080,32 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 62113) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62112; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62174)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const control = !strcmp(machine().options().bios(), "delay-copy-ctrl");
+			unsigned const kind = variant % 6, v = control ? (variant / 6 / 4) * 5 + std::array<unsigned, 4>{0, 2, 3, 4}[(variant / 6) % 4] : variant;
+			auto const f = delay_copy_case(v); unsigned const read = control ? delay_multiply_fixture::operand_read(kind, 0) : 5;
+			unsigned const checkpoint = std::array<unsigned, 3>{3, read - 1, read}[v / 5120];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short DELAY remains admitted through retirement");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (control && kind == 1 ? 0 : control && kind == 2 ? 1 : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0xa55a && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= read - 1 ? f.result_st0 : f.st0), "DELAY preserves accumulators T TRN and non-addressing flags");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick > read - 1 ? 0x6000 + i : tick == read - 1 && i == f.selected ? f.next_ar : 0x5007), "DELAY applies its pointer update once in Access");
+			if (tick == read - 1) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x6000 + i);
+			if (tick == read) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_fast_stack_reads, m_pipeline_register_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save DELAY around Access and retained Read"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "DELAY completes with exactly one read and successor write");
+				if (control) expect(m_fast_stack_reads == unsigned(kind == 5) && m_pipeline_register_writes == (kind == 4 ? 2U : unsigned(kind == 3)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (kind == 4 ? 0xffe : kind == 3 ? 0xfff : kind == 5 ? 0x1001 : 0x1000), "DELAY control owner balances its independent stack transactions");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_fast_stack_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore DELAY without rereading or duplicate write"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62175; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (control ? 73727U : 15359U)) { start_delay_copy(variant + 1); return; }
+				if (control) { osd_printf_info("TMS320C54x control-delay DELAY: PASS cases=73728 restore=73728 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postdecrement,postincrement registers=8 patterns=8 sxm_ovm=4 compatibility=2 pages=2 snapshots=3 reads=1 writes=1 stack=owned physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated control-delay DELAY complete"); }
+				osd_printf_info("TMS320C54x staged DELAY: PASS cases=15360 restore=15360 forms=DP,SP,indirect,postdecrement,postincrement registers=8 patterns=8 sxm_ovm=4 compatibility=2 pages=2 snapshots=3 reads=1 writes=1 source=Read destination=Execute physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated DELAY complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62175) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62174; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62172)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -55622,6 +55693,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(151, "ov-branch-pipe", "Overflow branch decision and consumed sticky flags")
 	ROM_SYSTEM_BIOS(152, "shift-alu-delay", "Shifted memory ADD SUB in delayed transfer words")
 	ROM_SYSTEM_BIOS(153, "maca-delay", "Accumulator memory multiply in delayed transfer words")
+	ROM_SYSTEM_BIOS(154, "delay-copy", "Read retained successor memory copy")
+	ROM_SYSTEM_BIOS(155, "delay-copy-ctrl", "Successor memory copy in control delay words")
 ROM_END
 
 ROM_START(tms54rom4)
