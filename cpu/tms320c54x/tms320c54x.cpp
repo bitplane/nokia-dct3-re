@@ -5468,7 +5468,16 @@ void tms320c54x_device::pipeline_step()
 		if (destination == 0x18) pipeline_delay_compiler_sp(previous_sp);
 	}
 	if (m_pipeline_valid[2] && staged_mmr_move(m_pipeline_word[2]))
-		m_pipeline_operand[2] = data_read(0x10 + ((m_pipeline_word[2] >> 4) & 15));
+	{
+		unsigned const source = (m_pipeline_word[2] >> 4) & 15;
+		// An adjacent short accumulator ST *ARx+ has a pending DAGEN
+		// increment. MVMM consumes that address result, not the stale AR
+		// cell; the store still owns its original Read address and EB write.
+		bool const postincrement = m_pipeline_valid[3] &&
+			(m_pipeline_word[3] & 0xfcf8) == 0x8090 &&
+			indirect_ar(u8(m_pipeline_word[3]), 3) == source && m_ar[source] >= 0x60;
+		m_pipeline_operand[2] = postincrement ? u16(m_ar[source] + 1) : data_read(0x10 + source);
+	}
 	if (m_pipeline_valid[2] && staged_block_repeat(m_pipeline_word[2]))
 	{
 		// There is one architectural loop controller, not a hidden loop stack.

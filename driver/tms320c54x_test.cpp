@@ -8277,23 +8277,28 @@ private:
 	void start_pipeline_store_mvmm(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const accumulator = !strcmp(machine().options().bios(), "st-acc-mvmm");
 		unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
-		unsigned const gap = (variant / 128) % 2, read_cycle = 3 + 2 * count + gap;
+		unsigned const width = accumulator ? 1 : 2, form=(variant/1536)%4;
+		u16 const stored=std::array<u16,4>{0,1,0x8000,0xffff}[variant/6144];
+		unsigned const gap = (variant / 128) % 2, read_cycle = 3 + width * count + gap;
 		u32 const base = (variant / 256) % 2 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		for (unsigned i = 0; i < count; ++i)
 		{
-			program.write_word(base + 0x600 + 2 * i, 0x7690 | source);
-			program.write_word(base + 0x601 + 2 * i, i ? 0 : 0x3532);
+			program.write_word(base + 0x600 + width * i, (accumulator ? 0x8090|(form<<8) : 0x7690) | source);
+			if (!accumulator) program.write_word(base + 0x601 + 2 * i, i ? 0 : 0x3532);
 		}
-		program.write_word(base + 0x600 + 2 * count + gap, 0xe700 | (source << 4) | destination);
-		program.write_word(base + 0x601 + 2 * count + gap, 0x1080 | destination);
+		program.write_word(base + 0x600 + width * count + gap, 0xe700 | (source << 4) | destination);
+		program.write_word(base + 0x601 + width * count + gap, 0x1080 | destination);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,u64(stored)<<(form&2 ? 16 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_B,u64(stored)<<(form&2 ? 16 : 0));
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + source, 0x1200);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -8302,12 +8307,12 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0;
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "store_mvmm_read",
-			[this, source, count, read_cycle](offs_t at, u16 &word, u16) {
+			[this, source, count, read_cycle, accumulator, gap](offs_t at, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				if (at == 0x10 + source)
 				{
-					expect(word == 0x1200 + count && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
-						"MVMM Decode observes preceding immediate-store postincrements"); ++m_pipeline_operand_reads;
+					expect((!accumulator || gap) && word == 0x1200 + count && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
+						"MVMM reads the committed AR only when no internal DAGEN bypass applies"); ++m_pipeline_operand_reads;
 				}
 				else
 				{
@@ -8316,14 +8321,14 @@ private:
 				}
 			});
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "store_mvmm_write",
-			[this, destination, count, read_cycle](offs_t at, u16 &word, u16) {
+			[this, destination, count, read_cycle, accumulator, stored](offs_t at, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
 				if (at == 0x10 + destination)
 					expect(word == 0x1200 + count && m_cpu->pipeline_cycles() == read_cycle + 1,
 						"MVMM publishes its retained sample in Access");
 				else
-					expect(at >= 0x1200 && at < 0x1200 + count && word == (at == 0x1200 ? 0x3532 : 0) &&
-						m_cpu->pipeline_cycles() == 7 + 2 * (at - 0x1200), "Immediate stores retain addresses and publish once in Execute");
+					expect(at >= 0x1200 && at < 0x1200 + count && word == (accumulator ? stored : at == 0x1200 ? 0x3532 : 0) &&
+						m_cpu->pipeline_cycles() == (accumulator ? 6 + (at-0x1200) : 7 + 2 * (at - 0x1200)), "Stores retain original addresses and publish once in Execute");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 600001; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -19699,6 +19704,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rmw-long-periph")) { start_pipeline_long_rmw(); return; }
 		if (!strcmp(machine().options().bios(), "st-long-periph")) { start_pipeline_long_immediate_store(); return; }
 		if (!strcmp(machine().options().bios(), "st-mvmm")) { start_pipeline_store_mvmm(); return; }
+		if (!strcmp(machine().options().bios(), "st-acc-mvmm")) { start_pipeline_store_mvmm(); return; }
 		if (!strcmp(machine().options().bios(), "ldm-ar-age")) { start_pipeline_mapped_load_age(); return; }
 		if (!strcmp(machine().options().bios(), "mapped-load-age")) { start_pipeline_mapped_load_age(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-st")) { start_preincrement_store(); return; }
@@ -46049,9 +46055,10 @@ private:
 		if (m_phase == 600001)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const accumulator = !strcmp(machine().options().bios(), "st-acc-mvmm");
 			unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
-			unsigned const read_cycle = 3 + 2 * count + (variant / 128) % 2;
-			unsigned const checkpoint = read_cycle - 1 + variant / 512;
+			unsigned const gap=(variant/128)%2, read_cycle = 3 + (accumulator ? 1 : 2) * count + gap;
+			unsigned const checkpoint = read_cycle - 1 + (variant / 512)%3;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store/MVMM chain remains supported");
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
@@ -46062,7 +46069,7 @@ private:
 			}
 			if (tick == 20)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == 1 &&
+				expect(m_pipeline_operand_reads == unsigned(!accumulator || gap) && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0 + source) == 0x1200 + count &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0 + destination) == 0x1200 + count &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55aa, "Store/MVMM composition preserves each pointer and bus access across replay");
@@ -46071,12 +46078,13 @@ private:
 					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
 					m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained store/MVMM chain");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 600002; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 1535) { start_pipeline_store_mvmm(variant + 1); return; }
+				if (variant < (accumulator ? 24575 : 1535)) { start_pipeline_store_mvmm(variant + 1); return; }
+				if(accumulator) { osd_printf_info("TMS320C54x accumulator store MVMM: PASS cases=24576 restore=24576 forms=STL_A,STL_B,STH_A,STH_B values=4 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 pending_dagen_bypass=1 original_write_addresses=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated accumulator store MVMM complete"); }
 				osd_printf_info("TMS320C54x staged store MVMM: PASS cases=1536 restore=1536 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated store MVMM complete");
 			}
@@ -56377,6 +56385,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(178, "bcd-rpt-edge", "Conditional branch delay repeat exclusions")
 	ROM_SYSTEM_BIOS(179, "bitt-ctrl", "Short BITT and T-producer ordering in delayed controls")
 	ROM_SYSTEM_BIOS(180, "mvdd-follow", "Retained MVDD forwarding across adjacency and delayed calls")
+	ROM_SYSTEM_BIOS(181, "st-acc-mvmm", "Pending accumulator-store DAGEN visibility to MVMM")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -42,7 +42,7 @@ also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
 The staged EFR encoder now returns from frame zero with a balanced stack
 and no unsupported-instruction stop. Its independent reference comparison
-reports 59 aggregate mismatches across parameters, flags and packed output;
+reports 35 aggregate mismatches across parameters, flags and packed output;
 this is not a count of differing parameters alone. No staged EFR frame has
 passed vector acceptance. The next boundary is the first numerical/state
 divergence, not an instruction-admission guard. Atomic EFR still passes all
@@ -76,11 +76,11 @@ pipeline phases and arbitrary peripheral/interrupt compositions are not
 claimed. Repeated MVDD deliberately remains outside this bypass: its
 overlapping RAM matrix qualifies Read-before-older-Write ordering separately.
 
-With this bypass, the first ordinary-RAM write-sequence difference is now
-write 9,723: `1104=0100` atomic versus `0000` staged, at context `d44c`.
-Execute-address sequences first differ at observation 62,962 (`d1fb`
-versus `d201`). These are the current bounded tracing targets, not a
-numerical root-cause claim. The earlier `0071` copy dependency is closed.
+The first ordinary-RAM write-sequence difference is now write 14,095:
+`0fa6=0002` atomic versus `0003` staged, at context `b9a0`.
+Execute-address sequences first differ at observation 104,626 (`bdce`
+versus `bdd5`). These are bounded tracing targets, not a numerical
+root-cause claim. The `0071` copy and `1104` DAGEN dependencies are closed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -1146,6 +1146,23 @@ AR sources and destinations (including aliases), zero/one NOP gaps, two
 pages and three snapshots around Decode/Access. It checks each original
 store address/value and Execute clock, the one-time retained MVMM read/write,
 and a following indirect load. The unmodified core fails at the source read.
+
+An adjacent MVMM also consumes the pending short STL/STH postincrement
+through an internal DAGEN bypass. The accumulator store retains its existing
+Read-address/Execute-write placement; unrelated mapped loads and explicit
+AR stores retain their separate latency contracts. The acquired case is
+STL at `d444` followed by MVMM `d445` (`e734`): the copied AR3 is `1104`,
+not `1103`. Reading the stale cell made a later copy start one word early.
+
+`st-acc-mvmm` passes 24,576 cases and cleared-pipeline replays: STL/STH
+from A/B, four boundary words, one/two stores, every AR source/destination
+pair including aliases, zero/one NOP gap, two pages and three snapshots.
+It checks the original store addresses and Execute write clocks, one
+retained MVMM publication and the following indirect load. The adjacent
+case bypasses the stale cell; a gapped case performs the ordinary mapped
+read. Disabling only this bypass fails the matrix. Other modifiers,
+mapped destinations, interrupts and physical pipeline timing are outside
+this qualification.
 These are prototype phase assertions, not measured silicon clocks; other
 immediate-store forms and general interrupt/repeat composition are not newly
 qualified.

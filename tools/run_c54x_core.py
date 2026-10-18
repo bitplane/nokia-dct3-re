@@ -637,6 +637,10 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "st-acc-mvmm": (
+        "TMS320C54x accumulator store MVMM: PASS cases=24576 restore=24576 forms=STL_A,STL_B,STH_A,STH_B values=4 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 pending_dagen_bypass=1 original_write_addresses=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated accumulator store MVMM complete",
+    ),
     "mvdd-follow": (
         "TMS320C54x MVDD followers: PASS cases=1536 restore=1536 layouts=adjacent,CALLD_first,CALLD_second consumers=LD_Smem,LD_Xmem modifiers=4 values=4 gaps=0,1 pages=2 snapshots=4 source_poison=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDD followers complete",
@@ -2192,7 +2196,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
         machine = "tms54xtra"
-    if args.profile == "mvdd-follow":
+    if args.profile in ("mvdd-follow", "st-acc-mvmm"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

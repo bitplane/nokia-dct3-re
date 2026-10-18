@@ -2247,6 +2247,19 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='mvdd-follow')
 
+    def test_accumulator_store_mvmm_scope(self):
+        marker, ending = EXTRA_PROFILES['st-acc-mvmm']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='st-acc-mvmm')
+        for field in marker.split()[4:]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(output.replace(field, field + '_wrong', 1), 3,
+                             profile='st-acc-mvmm')
+        for bad in (ending + '\n', marker + '\n' + output,
+                    output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='st-acc-mvmm')
+
     def test_short_control_delay_bitt_scope(self):
         marker, ending = EXTRA_PROFILES['bitt-ctrl']
         output = marker + '\n' + ending + '\n'
