@@ -40,8 +40,8 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete;
-the staged EFR frame then stops at square-accumulate word `3892`, owner
-`d0f2`, in the delay span of CALLD `d0f0` (`f274`). No complete staged
+with ordinary delayed square accumulation also qualified, the staged EFR
+frame stops at unsupported word `cc5c`, owner `d12d`. No complete staged
 EFR frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
@@ -69,6 +69,25 @@ register semantics retain their separate gates. On the handset board,
 `0021` reads BSP transmit data without acknowledging it, `0022` reads BSP
 control, `0024..26` are CPU-owned timer registers, and unowned gaps delegate
 to the board map. The BSP receive side effect is qualified separately above.
+
+## Square accumulation in ordinary delayed controls
+
+Short RAM SQURA/SQURS forms may occupy ordinary delayed branch/call/return
+spans as well as the independently qualified RPTBD delays. Read retains
+the signed memory operand and publishes it to T; Execute adds or subtracts
+its square from the selected live accumulator. FRCT doubles the square,
+OVM applies to the result, and SMUL does not clamp the product.
+
+`square-delay` passes 55,296 cases and save/load replays: BD, both BCD
+outcomes, CALLD, FCALLD and RETD; direct, indirect and postincrement RAM;
+both operations and destinations; eight patterns; FRCT/OVM/SMUL/SXM;
+two pages and three checkpoints. It checks one retained read, pointer
+updates, T publication followed by a newer T value, per-clock accumulator
+publication, result/status/stack preservation and target observation.
+BCD fixes A to satisfy its branch condition, so those cases do not vary
+A independently. Extended/mapped sources and arbitrary interrupt composition
+remain unqualified. The existing RPTBD square matrix and mapped-repeat
+exclusions remain separate controls; physical silicon phases are not proved.
 
 ## Rounded memory multiply in delayed controls
 

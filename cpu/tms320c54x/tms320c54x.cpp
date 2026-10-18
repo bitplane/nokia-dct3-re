@@ -3262,7 +3262,7 @@ void tms320c54x_device::pipeline_step()
 			bool delay_compare = false;
 			bool delay_bitt = false;
 			bool delay_arithmetic = false;
-			bool delay_square = false;
+			bool const delay_square = square_accumulate(word) && u8(word) < 0x98;
 			bool delay_t_load = false;
 			bool delay_repeat = false;
 			u32 delay_repeat_target = 0;
@@ -3271,7 +3271,6 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
-					delay_square = delayed_block_owner && square_accumulate(word) && u8(word) < 0x98;
 					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || m_pipeline_word[stage] == 0xfe00 || delayed_block_owner) &&
 						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active &&
 						(!m_pipeline_block_active || delayed_block_owner);
