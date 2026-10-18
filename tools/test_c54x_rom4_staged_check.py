@@ -10,7 +10,7 @@ class StagedFrontierTest(unittest.TestCase):
                       '252a,f010,23c4,8811,7712,0d00,47f8,0011')
         self.payload = bytes.fromhex(self.words.replace(',', ''))
         self.image = bytes(SOURCE_OFFSET) + self.payload
-        self.row = ('rom4_staged_frontier: pc=8e52 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=8e69 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = STOP + '\n' + self.row + 'rom4_interface_summary: completion_strobes=2 mailbox_writes=71 \n'
 
@@ -18,9 +18,8 @@ class StagedFrontierTest(unittest.TestCase):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x0af8)
-        self.assertEqual(result['instruction_address'], 0x8e51)
-        self.assertEqual(result['control_address'], 0x8e4f)
+        self.assertEqual(result['instruction'], 0xf947)
+        self.assertEqual(result['instruction_address'], 0x8e67)
         self.assertEqual(result['completion_strobes'], 2)
         self.assertEqual(result['swwsr'], 0x2000)
         for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim'):
@@ -30,7 +29,7 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=8e52', 'pc=0f1f'),
+                     self.text.replace('pc=8e69', 'pc=0f1f'),
                      self.text.replace('completion_strobes=2', 'completion_strobes=0'),
                      self.text.replace('mailbox_writes=71', 'mailbox_writes=70'),
                      self.text.replace('swwsr=2000', 'swwsr=0000'),

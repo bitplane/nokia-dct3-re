@@ -323,6 +323,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "bcd-arith-edge": (
+        "TMS320C54x BCD arithmetic exclusions: PASS cases=288 restore=288 exclusions=ANEQ,BNEQ,second_delay_word accumulators=2 branch_accumulators=2 outcomes=2 forms=3 pages=2 snapshots=2 data_accesses=0 ar_changes=0 accumulator_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated BCD arithmetic exclusions complete",
+    ),
+    "bcd-arithmetic": (
+        "TMS320C54x BCD arithmetic: PASS cases=36864 restore=36864 operations=ADD,SUB,ADDS,SUBS accumulators=2 predicates=AEQ,BEQ outcomes=2 forms=absolute,long_offset,long_update operands=4 sources=4 sxm_ovm=4 pages=2 snapshots=3 predicate_retained=1 operand_retained=1 data_reads=1 data_writes=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated BCD arithmetic complete",
+    ),
     "mar-circular": (
         "TMS320C54x circular MAR: PASS cases=49152 restore=49152 modifiers=minus1,minusAR0,plus1,plusAR0 registers=8 cmpt=2 bk=1,2,3,13,16,31,32,250 positions=4 strides=4 pages=2 snapshots=3 legal_domain=1 independent_residue_oracle=1 publication=Access data_accesses=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated circular MAR complete",
@@ -1593,7 +1601,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular"):
+    if args.profile in ("rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

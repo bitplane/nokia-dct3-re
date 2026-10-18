@@ -3102,12 +3102,15 @@ void tms320c54x_device::pipeline_step()
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			bool delay_compare = false;
 			bool delay_bitt = false;
+			bool delay_arithmetic = false;
 			bool delayed_block_owner = false;
 			for (unsigned stage = 3; stage < 6; ++stage)
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
 					delay_bitt = staged_bitt(word) && u8(word) >= 0xe0 && m_pipeline_word[stage] == 0xfe00;
+					bool const basic_arithmetic = (word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word);
+					delay_arithmetic = basic_arithmetic && u8(word) >= 0xe0 && u8(word) <= 0xf8 && (m_pipeline_word[stage] & 0xfff7) == 0xfa45;
 				}
 			// SPRU131G 7.5.8.1 forbids BRC modification in RPTBD delay slots.
 			// Reject these direct writers before Access; indirect aliases remain
@@ -3128,7 +3131,7 @@ void tms320c54x_device::pipeline_step()
 			if (!m_pipeline_decode_remaining && staged_data_to_program(word)) { logerror("%s: staged MVDP inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_compare && !delay_bitt && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
 					machine().describe_context(), word, m_pipeline_address[2], m_pipeline_delay_decode_words,
@@ -3137,7 +3140,7 @@ void tms320c54x_device::pipeline_step()
 					logerror("staged_control_delay_slot: stage=%u valid=%u address=%06x word=%04x\n", stage, unsigned(m_pipeline_valid[stage]), m_pipeline_address[stage], m_pipeline_word[stage]);
 				m_illegal = true; return;
 			}
-			unsigned const words = staged_absolute_add(word) || delay_store || delay_load || delay_dld || delay_shift || delay_compare || delay_bitt || ((delay_multiply || delay_asm) && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
+			unsigned const words = staged_absolute_add(word) || delay_store || delay_load || delay_dld || delay_shift || delay_compare || delay_bitt || delay_arithmetic || ((delay_multiply || delay_asm) && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || staged_block_repeat(word) || staged_port_read(word) || staged_port_write(word) || staged_memory_repeat(word) || staged_banz(word) || staged_read_a(word) || staged_immediate_repeat(word) || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{

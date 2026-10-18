@@ -277,10 +277,9 @@ staged execution executes its mapped-AR ADDM and the initialization routine's
 ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
 execute, and the backend observes completion strobes. Execution
 reaches resident code, executes the absolute BITT in RETD's delay span
-and RC TC, and passes short circular MAR. It stops at `008e51`, `0af8`
-(absolute-memory SUBS, unsigned-word subtraction) in the two delay words
-of BCD BEQ at `008e4f`, with
-the exposed PC at `8e52`, PMST `ffac` and
+and RC TC, and passes short circular MAR and the delayed SUBS under BCD
+BEQ at `008e4f`. It stops at `008e67`, `f947` (CC ALEQ), with
+the exposed PC at `8e69`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -2727,6 +2726,21 @@ AR2=0701, a nonzero-buffer case. BK=0 remains the qualified ROM4 behavior
 described in `djr_dsp_integration.md`, not a newly validated silicon rule.
 Long-offset circular MAR and close BK/AR producer compositions remain
 unvalidated; no physical pipeline-phase claim is made.
+
+BCD AEQ/BEQ admits a complete two-word Smem ADD/SUB/ADDS/SUBS instruction
+in its delay span, using the existing retained operand and ALU semantics.
+`bcd-arithmetic` checks 36,864 cases plus replay across both accumulators,
+both branch predicates/outcomes, absolute and two long-offset forms, four
+operand/source patterns, SXM/OVM combinations, two pages and three save
+points. Arithmetic may change the branch-tested accumulator without
+changing the already sampled decision. An independent signed-40-bit oracle
+checks the result, saturation and C/OV flags; memory mutation after Read
+cannot change the operand. There is one data read and no data write or call
+frame. `bcd-arith-edge` checks 288 replay cases preserving the new subset's
+ANEQ/BNEQ exclusions and rejecting a two-word operand starting in the final
+delay word before DAGEN or operand effects. The pre-existing absolute ADD
+admission for other owners is unchanged. Other new owner compositions and
+physical pipeline timing are not claimed.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;

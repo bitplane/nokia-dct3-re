@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_bcd_arithmetic_requires_predicate_and_operand_retention(self):
+        for profile in ('bcd-arithmetic', 'bcd-arith-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_circular_mar_requires_legal_domain_and_independent_oracle(self):
         marker, ending = EXTRA_PROFILES['mar-circular']
         text = marker + '\n' + ending + '\n'
