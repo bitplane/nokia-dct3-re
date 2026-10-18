@@ -716,6 +716,31 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_repeated_square_exclusions(self):
+        marker, ending = EXTRA_PROFILES['sqacc-rpt-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='sqacc-rpt-edge')
+        for old, new in (('restore=64', 'restore=0'), ('data_reads=0', 'data_reads=1'),
+                         ('arithmetic_changes=0', 'arithmetic_changes=1'),
+                         ('t_changes=0', 't_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='sqacc-rpt-edge')
+
+    def test_repeated_square_accumulate_scope(self):
+        marker, ending = EXTRA_PROFILES['sqacc-repeat']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='sqacc-repeat')
+        for old, new in (('restore=49152', 'restore=0'), ('per_clock_accumulator=1', 'per_clock_accumulator=0'),
+                         ('newer_t_preserved=1', 'newer_t_preserved=0'),
+                         ('source_opcode_poison=1', 'source_opcode_poison=0'),
+                         ('data_writes=0', 'data_writes=1'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='sqacc-repeat')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='sqacc-repeat')
+
     def test_banzd_delay_t_load_scope(self):
         marker, ending = EXTRA_PROFILES['banzd-t-load']
         output = marker + '\n' + ending + '\n'

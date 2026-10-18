@@ -18,6 +18,32 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Repeated RAM square-accumulate
+
+Short RAM-source SQURA/SQURS use the existing per-iteration pipeline issue
+path. Every copy owns Access/Read/Execute: the memory sample publishes T in
+Read and the retained sample is squared against the live Execute accumulator
+(SPRU172C 4-163/4-164). FRCT scales the square, OVM controls saturation,
+SMUL does not clamp it, and carry is unchanged.
+
+`sqacc-repeat` passes 49,152 cases plus replay: add/subtract, A/B destinations,
+DP/plain/post-increment RAM sources, eight input/accumulator patterns, sixteen
+FRCT/SXM/OVM/SMUL combinations, counts 0/1/7/255, two program pages and four
+snapshots. An independent expectation checks every accumulator/status clock.
+Fixed-address inputs alternate after each read; post-increment inputs vary
+by address and consumed words are poisoned. The body opcode is overwritten
+after capture, and a newer T is installed after the final Read. It checks
+one opcode fetch, exact reads, no CPU data writes, and final continuation.
+Initial carry/overflow states vary with the eight patterns, not as independent
+full-cross-product axes. Extended or mapped/peripheral repeats, interrupt and
+nested-block composition are not newly qualified; physical bus phases remain
+unvalidated. Non-repeated square arithmetic retains its separate matrix.
+`sqacc-rpt-edge` adds 64 rejection/replay cases across all four operations,
+mapped T/AR5 and two low peripheral/hole addresses, two pages and snapshots
+before/after rejection. It checks zero source reads, CPU writes or changes to
+accumulators, ST0, T and the source pointer. This is a bounded model
+exclusion, not a claimed silicon trap.
+
 ## BANZD delay-owned T loads
 
 One-word `LD Smem,T` can occupy either delay position of BANZD, using the

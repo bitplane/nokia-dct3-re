@@ -129,7 +129,7 @@ constexpr bool staged_accumulator_stm(u16 word)
 
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || (square_accumulate(word) && u8(word) < 0x98) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -4061,6 +4061,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3)) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if (m_pipeline_repeat_active && square_accumulate(m_pipeline_word[3]) && source < 0x60)
+		{
+			logerror("%s: repeated square mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (staged_poly(m_pipeline_word[3]) && source < 0x60)
 		{
 			logerror("%s: staged POLY mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
