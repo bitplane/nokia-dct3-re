@@ -15357,12 +15357,35 @@ private:
 		dual_multiply_fixture memory;
 		unsigned form;
 		u64 a, b, result_a, result_b;
+		u16 imr = 0, ifr = 0;
 	};
-	static parallel_load_fixture parallel_load_case(unsigned variant, bool edge)
+	static void finish_parallel_load_case(parallel_load_fixture &c)
+	{
+		auto &f = c.memory;
+		int const shift = int(f.st1 & 31) - (f.st1 & 16 ? 32 : 0);
+		u64 const source = f.source ? c.b : c.a;
+		s64 const signed_source = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
+		u64 shifted = shift < 0 ? u64(f.st1 & 0x100 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL;
+		if (f.pmst & 1)
+		{
+			if (f.st1 & 0x100) { s64 const number = shifted & (1ULL << 39) ? s64(shifted) - (1LL << 40) : s64(shifted); shifted = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
+			else shifted = std::min(shifted, u64(0xffffffff));
+		}
+		f.stored = shifted >> 16;
+		u64 const loaded = u64(s64(f.st1 & 0x100 ? s16(f.xword) : s32(f.xword)) * 65536) & 0xffffffffffULL;
+		c.result_a = c.form < 4 && !f.destination ? loaded : c.a;
+		c.result_b = c.form < 4 && f.destination ? loaded : c.b;
+	}
+	static parallel_load_fixture parallel_load_case(unsigned variant, bool edge, bool original_edge_sources = false)
 	{
 		unsigned const extent = edge ? 16 : 67584, v = variant % extent;
 		parallel_load_fixture c{}; c.form = variant / extent;
 		auto &f = c.memory; f = dual_multiply_case(edge ? v : v % 18432, edge);
+		if (edge && !original_edge_sources && f.xaddress < 0x60 && f.yaddress >= 0x60)
+		{
+			f.xaddress = v % 4 ? 0x58 : 0x20;
+			f.initial[f.x & 3] = f.final[f.x & 3] = f.xaddress;
+		}
 		unsigned seed = v / 512;
 		if (!edge && v >= 18432)
 		{
@@ -15379,25 +15402,43 @@ private:
 		f.source = c.form >= 4 ? c.form - 4 : c.form / 2; f.destination = c.form & 1;
 		c.a = std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL}[seed % 8];
 		c.b = c.a ^ 0x5aa55aa55aULL;
-		int const shift = int(f.st1 & 31) - (f.st1 & 16 ? 32 : 0);
-		u64 const source = f.source ? c.b : c.a;
-		s64 const signed_source = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-		u64 shifted = shift < 0 ? u64(f.st1 & 0x100 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL;
-		if (f.pmst & 1)
-		{
-			if (f.st1 & 0x100) { s64 const number = shifted & (1ULL << 39) ? s64(shifted) - (1LL << 40) : s64(shifted); shifted = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
-			else shifted = std::min(shifted, u64(0xffffffff));
-		}
-		f.stored = shifted >> 16;
-		u64 const loaded = u64(s64(f.st1 & 0x100 ? s16(f.xword) : s32(f.xword)) * 65536) & 0xffffffffffULL;
-		c.result_a = c.form < 4 && !f.destination ? loaded : c.a;
-		c.result_b = c.form < 4 && f.destination ? loaded : c.b;
+		finish_parallel_load_case(c);
 		return c;
+	}
+	static parallel_load_fixture mapped_parallel_load_case(unsigned v)
+	{
+		parallel_load_fixture c{}; auto &f = c.memory;
+		c.form = v % 6; v /= 6; f.xaddress = v % 32; v /= 32;
+		unsigned const selectors = std::array<unsigned, 8>{0x01,0x0a,0x45,0xcd,0xf2,0x83,0xbc,0xef}[v % 8]; v /= 8;
+		unsigned const pattern = v % 2; v /= 2; unsigned const flags = v % 8; v /= 8;
+		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v;
+		f.x = selectors >> 4; f.y = selectors & 15; f.source = c.form >= 4 ? c.form - 4 : c.form / 2; f.destination = c.form & 1;
+		f.initial = {0x401f,0x411f,0x421f,0x431f}; f.initial[f.x & 3] = f.xaddress; f.yaddress = f.initial[f.y & 3]; f.final = f.initial;
+		auto modify = [](u16 at, unsigned mode) -> u16 { return at + (mode == 1 ? -1 : mode == 2 ? 1 : mode == 3 ? 3 : 0); };
+		f.final[f.x & 3] = modify(f.initial[f.x & 3], f.x >> 2); f.final[f.y & 3] = modify(f.initial[f.y & 3], f.y >> 2); f.linear = true;
+		f.st0 = 0xa002 | (pattern ? 0x800 : 0); f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0) | (pattern ? 31 : 0); f.pmst = flags & 2 ? 1 : 0;
+		c.a = pattern ? 0xfe7fffffffULL : 0x123456789aULL; c.b = c.a ^ 0x5aa55aa55aULL; c.imr = pattern ? 0xa55a : 0; c.ifr = pattern ? 0x5aa5 : 0;
+		u64 const initial_a = c.a ^ 0x1111111111ULL, initial_b = c.b ^ 0x1111111111ULL;
+		if (f.xaddress == 0) f.xword = c.imr;
+		else if (f.xaddress == 1) f.xword = c.ifr;
+		else if (f.xaddress < 6 || f.xaddress == 0x1f) f.xword = pattern ? 0x7fff : 0x8001;
+		else if (f.xaddress == 6) f.xword = f.st0;
+		else if (f.xaddress == 7) f.xword = f.st1;
+		else if (f.xaddress <= 0x0a) f.xword = initial_a >> ((f.xaddress - 8) * 16);
+		else if (f.xaddress <= 0x0d) f.xword = initial_b >> ((f.xaddress - 11) * 16);
+		else if (f.xaddress == 0x0e) f.xword = 0xbeef;
+		else if (f.xaddress == 0x0f) f.xword = 0x7fff;
+		else if (f.xaddress == 0x10) f.xword = 3;
+		else if (f.xaddress == 0x11) f.xword = 0x1700;
+		else if (f.xaddress <= 0x15) f.xword = f.final[f.xaddress - 0x12];
+		else if (f.xaddress <= 0x17) f.xword = f.xaddress == 0x16 ? 0x1800 : 0x1900;
+		else f.xword = std::array<u16, 7>{0x3000,0,7,0x4321,0x5678,f.pmst,u16(f.base >> 16)}[f.xaddress - 0x18];
+		finish_parallel_load_case(c); return c;
 	}
 	static parallel_load_fixture parallel_arithmetic_case(unsigned variant, bool edge)
 	{
 		unsigned const extent = edge ? 16 : 67584, form = variant / extent;
-		auto c = parallel_load_case(variant % extent + (form % 4) * extent, edge);
+		auto c = parallel_load_case(variant % extent + (form % 4) * extent, edge, true);
 		c.form = form; auto &f = c.memory;
 		u64 const old_other = f.destination ? c.a : c.b;
 		s64 const other = old_other & 0x8000000000ULL ? s64(old_other) - 0x10000000000LL : s64(old_other);
@@ -15414,7 +15455,8 @@ private:
 	{
 		bool const repeated_edge = !strcmp(machine().options().bios(), "stld-rpt-edge");
 		bool const arithmetic = !strcmp(machine().options().bios(), "st-par-alu") || !strcmp(machine().options().bios(), "st-par-edge");
-		bool const edge = repeated_edge || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "st-par-edge"); auto const c = arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge); auto const &f = c.memory;
+		bool const mapped = !strcmp(machine().options().bios(), "stld-map");
+		bool const edge = repeated_edge || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "st-par-edge"); auto const c = mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -15424,12 +15466,13 @@ private:
 		m_cpu->set_pipeline_frontend(false);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, c.ifr); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, c.imr); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
 		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
+		if (mapped) { m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1700); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1800); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x1900); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x7fff); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 7); m_cpu->set_state_int(tms320c54x_device::STATE_RSA, 0x4321); m_cpu->set_state_int(tms320c54x_device::STATE_REA, 0x5678); }
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
+		if (f.xaddress >= 0x60 || (mapped && ((f.xaddress >= 2 && f.xaddress <= 5) || f.xaddress == 0x1f))) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60 && f.yaddress != f.xaddress) data.write_word(f.yaddress, 0xdead);
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "parallel_load_source", [this, f, edge](offs_t at, u16 &word, u16) {
@@ -19559,6 +19602,7 @@ private:
 		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
 		if (!strcmp(machine().options().bios(), "stld") || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "stld-rpt-edge") || !strcmp(machine().options().bios(), "st-par-alu") || !strcmp(machine().options().bios(), "st-par-edge")) { start_parallel_load(); return; }
+		if (!strcmp(machine().options().bios(), "stld-map")) { start_parallel_load(); return; }
 		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge") || !strcmp(machine().options().bios(), "mvdk-index") || !strcmp(machine().options().bios(), "mvdk-index-edge")) { start_circular_move(); return; }
 		if (!strcmp(machine().options().bios(), "mvmd-repeat") || !strcmp(machine().options().bios(), "mvmd-rptz")) { start_repeated_mvmd(); return; }
@@ -51725,18 +51769,22 @@ private:
 		{
 			bool const repeated_edge = !strcmp(machine().options().bios(), "stld-rpt-edge");
 			bool const arithmetic = !strcmp(machine().options().bios(), "st-par-alu") || !strcmp(machine().options().bios(), "st-par-edge");
+			bool const mapped = !strcmp(machine().options().bios(), "stld-map");
 			bool const edge = repeated_edge || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "st-par-edge");
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge); auto const &f = c.memory;
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
 			unsigned const checkpoint = 4 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= (repeated_edge ? 5 : 4)), "Parallel load excludes mapped X or Y operands before data access or pointer changes");
 			if (tick == 5 && !edge)
 			{
+				if (mapped) expect(m_cpu->state_int(tms320c54x_device::STATE_IMR) == c.imr && m_cpu->state_int(tms320c54x_device::STATE_IFR) == c.ifr, "Parallel mapped reads do not acknowledge interrupt state");
 				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Parallel load applies X priority and each dual-address update once");
 				if (!arithmetic && c.form >= 4) expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.xword, "Parallel LD Xmem,T publishes the retained input in Read");
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x55aa);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31);
 				for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i);
-				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.xaddress, f.xword ^ 0xffff);
+				auto const disable = machine().disable_side_effects();
+				if (!mapped || (f.xaddress >= 2 && f.xaddress <= 5) || f.xaddress == 0x1f) m_cpu->space(AS_DATA).write_word(f.xaddress, f.xword ^ 0xffff);
+				if (mapped) { m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0f0f); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0xf0f0); }
 			}
 			if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save parallel load around address capture Read and Execute"); }
 			if (tick == 12)
@@ -51747,9 +51795,10 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (arithmetic && !edge ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (edge ? f.st1 : f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Parallel operation preserves modes and publishes only its specified arithmetic status");
 				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "No pointer update is repeated after the retained address is consumed");
 				if (!edge) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
-				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; if (arithmetic) m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay parallel store/load without duplicate samples publications or address effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62165; m_check_timer->enable(true); return; }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; if (arithmetic || mapped) m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay parallel store/load without duplicate samples publications or address effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62165; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < (arithmetic ? edge ? 128U : 540672U : edge ? 96U : 405504U)) { start_parallel_load(variant + 1); return; }
+				if (variant + 1 < (mapped ? 147456U : arithmetic ? edge ? 128U : 540672U : edge ? 96U : 405504U)) { start_parallel_load(variant + 1); return; }
+				if (mapped) { osd_printf_info("TMS320C54x mapped parallel load: PASS cases=147456 restore=147456 forms=6 source_addresses=0000..001f destination=RAM selector_pairs=8 patterns=2 sxm_sst_ovm=8 asm=0,-1 pages=2 snapshots=3 source_sample=Read store_source=Execute reads=1 writes=1 pointer_updates=once t_publish=Read carry_policy=preserve_unvalidated reset_before_restore=1 repeat_peripheral_composition=unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped parallel load complete"); }
 				if (arithmetic)
 				{
 					if (edge) { osd_printf_info("TMS320C54x parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel arithmetic exclusions complete"); }
@@ -55892,6 +55941,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(160, "alu-low-bus", "Dual ADD SUB samples unowned low words through board map")
 	ROM_SYSTEM_BIOS(161, "mpyr-delay", "Rounded memory multiplication in delayed controls")
 	ROM_SYSTEM_BIOS(162, "mpyr-delay-edge", "Reject rounded memory multiply straddling delay end")
+	ROM_SYSTEM_BIOS(163, "stld-map", "Parallel load from owned registers and unowned board words")
 ROM_END
 
 ROM_START(tms54rom4)

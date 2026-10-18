@@ -2491,9 +2491,14 @@ unowned-board-map reads now execute under the
 [low-address dual-ALU qualification](rom4_dsp_loader.md#low-address-dual-addsub-operands).
 The `2292` MPYR owned by `d35e`, in RETD `d35d`'s delay span, executes
 under the [rounded delayed-multiply qualification](rom4_dsp_loader.md#rounded-memory-multiply-in-delayed-controls).
-The current stop is a parallel-store mapped-operand guard, with reported
-fetch PC `d511`. Recover the retained owner and source/destination addresses
-before deciding which mapped-side contract is missing.
+The `c8ba` parallel Store/Load at `d50e` uses deliberately incremented AR5
+as its X address/counter, with an ordinary RAM Y destination. Its reads
+through `0000..001f` execute under the
+[mapped parallel-load qualification](rom4_dsp_loader.md#mapped-source-in-parallel-storeload).
+The current guard is the same instruction with source=`0020` and
+destination=`114a` (reported fetch PC `d511`). Qualify the peripheral read's
+endpoint, latency and acknowledgement semantics before admitting it; do not
+replace it with a zero or treat the discarded load result as no read.
 No complete staged EFR frame has passed yet.
 `--trace-efr` (also accepted as `--trace-efr-reset`) retains at most 8,192
 reset and 200,000 first-frame executed instruction/register observations,

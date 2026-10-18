@@ -4262,9 +4262,10 @@ void tms320c54x_device::pipeline_step()
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
 		m_pipeline_immediate[3] = m_ar[xar];
 		m_pipeline_operand_address[3] = m_ar[yar];
-		if (m_pipeline_immediate[3] < 0x60 || m_pipeline_operand_address[3] < 0x60)
+		bool const mapped_load_source = staged_parallel_load(m_pipeline_word[3]) && m_pipeline_immediate[3] < 0x20 && !m_pipeline_repeat_active;
+		if ((!mapped_load_source && m_pipeline_immediate[3] < 0x60) || m_pipeline_operand_address[3] < 0x60)
 		{
-			logerror("%s: staged parallel store mapped operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged parallel store mapped operand is unsupported instruction=%06x word=%04x source=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_immediate[3], m_pipeline_operand_address[3]); m_illegal = true; return;
 		}
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);

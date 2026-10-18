@@ -18,6 +18,30 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Mapped source in parallel Store/Load
+
+ST||LD may read X addresses `0000..001f` while Y remains ordinary RAM.
+Owned registers use their existing read interfaces; gaps `0002..0005` and
+`001f` delegate to the board map. X is retained in Read, whereas the store
+uses the Execute-live old accumulator before load replacement. Mapped AR
+sources observe the existing Access-stage modifier model. Loading T retains
+its Read publication and cannot overwrite a newer T in Execute.
+
+`stld-map` passes 147,456 cases and cleared-pipeline replays: all six A/B/T forms, all 32
+source addresses, eight nonaliasing selector pairs, two patterns, SXM/SST/OVM,
+ASM=0/-1, two pages and three checkpoints. It checks one read and one RAM
+write, exact pointer updates, late accumulator/ASM/T changes and preserved
+carry under the existing explicitly unvalidated policy. IMR/IFR reads do not
+acknowledge interrupt state. Same-pointer aliasing, other ASM values and RAM
+numeric boundaries remain in the separate `stld` matrix. Peripheral X reads,
+mapped Y writes and mapped single-repeat bodies remain excluded. Physical
+timing and arbitrary block/interrupt composition are not proved here.
+
+The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
+also performs its X read; atomic and staged traces agree on that deliberate
+low-address sequence. Supporting `0000..001f` advances it to the distinct
+peripheral-source boundary at `0020`, not to a complete EFR result.
+
 ## Rounded memory multiply in delayed controls
 
 Complete MPYR Smem forms may occupy ordinary delayed branch/call/return
@@ -1129,7 +1153,10 @@ Xmod priority when the auxiliary registers alias. The X sample and ASM
 are retained in Read. The store samples the old accumulator at Execute,
 before replacing an aliased accumulator destination. Loading T publishes
 in Read after older Execute writes; it is not republished at Execute.
-Mapped/peripheral X or Y addresses remain excluded before pointer changes.
+The [mapped-source qualification](#mapped-source-in-parallel-storeload)
+extends X reads below `0020`. Peripheral X and mapped/peripheral Y remain
+excluded before pointer changes; single-repeat mapped sources are separately
+excluded.
 
 `stld` passes 405,504 cases and save-state replays: 110,592 address cases
 and 294,912 numeric cases, including aliased pointers/memory/accumulators,
@@ -1138,7 +1165,8 @@ all 32 ASM values across the address cases, eight numeric boundary shifts,
 SXM/SST/OVM/carry combinations, two pages and three snapshots. Source memory,
 ASM, accumulators, pointers and T change after their respective capture
 points. `stld-edge` adds 96 replayed no-read/no-write/no-pointer-change
-mapped-operand exclusions. The unchanged core rejects the first ST||LD case.
+peripheral-X/mapped-Y exclusions. The repeated-source exclusion retains
+owned mapped X cases as well.
 The existing parallel-MAC store-shift path and ordinary-RAM forwarding
 are shared; no DSP reply or firmware state is supplied by this qualification.
 
