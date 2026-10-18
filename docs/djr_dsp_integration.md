@@ -176,6 +176,14 @@ words, with exact-word assertion coverage checked separately. The supplied
 1 MHz bit clock, 8 kHz frame cadence and sync phase are laboratory inputs,
 not recovered production handset wiring. See the authoritative
 [physical-clock contract](cobba_control_boundary.md#nse-1-physical-clock-contract).
+The paired `nse1aclk`/`nse1pclk` laboratory configurations hold standard
+SWWSR and pin clocks constant while changing atomic/staged CPU execution.
+Run `tools.run_c54x_rom4_pcm_clock --staged --coverage` with its required
+MAME/ROM paths: atomic pin-clocked boot and key-tone acceptance passes;
+staged execution currently stops at `7721` (`STM` to BDXR) at `0x0e61`.
+This is a staged mapped-peripheral-store boundary, not evidence of missing
+codec clock wiring. Neither profile is an ordinary handset configuration;
+atomic instruction fingerprints are not imposed on the staged observation.
 Isolated native FR and EFR
 encoder/decoder gates validate algorithm results, not handset speech. The
 EFR reference, entry order and replay scope are maintained in

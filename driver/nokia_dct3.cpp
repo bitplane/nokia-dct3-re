@@ -4695,6 +4695,16 @@ public:
 		subdevice<nokia_dsp_c54x_device>("dsp_c54x")->set_external_codec_clock(true);
 		m_clocked_loopback = true;
 	}
+	void nse1aclk(machine_config &config)
+	{
+		nse1pin(config);
+		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
+	}
+	void nse1pclk(machine_config &config)
+	{
+		nse1aclk(config);
+		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(true);
+	}
 protected:
 	virtual void machine_start() override
 	{
@@ -4784,6 +4794,8 @@ private:
 #define rom_nse1pcm rom_noki5110
 #define rom_nse1bit rom_noki5110
 #define rom_nse1pin rom_noki5110
+#define rom_nse1aclk rom_noki5110
+#define rom_nse1pclk rom_noki5110
 #define rom_nse1pipe rom_noki5110
 #define rom_nse1plg rom_noki5110
 #define rom_nse1astd rom_noki5110
@@ -4797,6 +4809,8 @@ SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empt
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1aclk, noki5110, 0, nse1aclk, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 atomic standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1pclk, noki5110, 0, nse1pclk, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 staged standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pipe, noki5110, 0, nse1pipe, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP frontend integration probe", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1plg, noki5110, 0, nse1plg, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP with legacy SWWSR comparison fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1astd, noki5110, 0, nse1astd, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 atomic DSP with standard SWWSR comparison fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

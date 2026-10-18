@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 
-from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, demand_transitions
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, demand_transitions, reject_native_faults
 from tools.c54x_opcode_coverage import summarize, require_extension_capture, require_extension_decoding, decoded_boundaries
 from tools.c54x_rom4_codec_contract import check as check_codec, check_mcu_speech_field
 from tools.c54x_rom4_rf_delivery_check import check_observer_health
@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--wire', action='store_true', help='also test explicit 1 MHz edges with assumed one-clock sync and RX/TX fan-out')
     parser.add_argument('--coverage', action='store_true', help='retain native opcode/extension observations using MAME verbose teardown')
     parser.add_argument('--clocked-loopback', action='store_true', help='also test pin-clocked boot loopback with the untimed word path disabled')
+    parser.add_argument('--staged', action='store_true', help='compare atomic/staged standard-SWWSR CPUs with identical laboratory pin clocks')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -87,6 +88,10 @@ def main():
             cases.append(('wire_restore', True, 'nse1bit'))
         if args.clocked_loopback:
             cases.append(('pin_restore', True, 'nse1pin'))
+    if args.staged:
+        cases.extend([('atomic_pin', True, 'nse1aclk'), ('staged_pin', True, 'nse1pclk')])
+        if args.restore:
+            cases.extend([('atomic_pin_restore', True, 'nse1aclk'), ('staged_pin_restore', True, 'nse1pclk')])
     for label, clock, machine in cases:
         restoring = label.endswith('restore')
         case = root / label
@@ -102,7 +107,7 @@ def main():
                    '-nvram_directory', str(case / 'nvram'), '-noreadconfig', '-video', 'none',
                    '-sound', 'none', '-log', '-skip_gameinfo', '-nothrottle', '-seconds_to_run', '12',
                    '-autoboot_script', str(restore_observer if restoring else observer)]
-        if args.coverage:
+        if args.coverage or args.staged:
             command.append('-verbose')
         (case / 'invocation.json').write_text(json.dumps(dict(command=command, cwd=str(case),
             fixture_env={key: value for key, value in env.items() if key.startswith('NOKIA_DCT3_')},
@@ -114,20 +119,27 @@ def main():
                 raise ValueError(f'MAME exit status {completed.returncode}')
             check_observer_health((case / 'console.log').read_text())
             text = (case / 'error.log').read_text()
+            reject_native_faults(text)
+            wire = machine in ('nse1bit', 'nse1pin', 'nse1aclk', 'nse1pclk')
             if restoring:
-                result = check_restore(text, wire=machine in ('nse1bit', 'nse1pin'))
+                result = check_restore(text, wire=wire)
             else:
-                result = check_wire(text) if machine in ('nse1bit', 'nse1pin') else check(text, clock=clock)
-            if machine == 'nse1pin':
+                result = check_wire(text) if wire else check(text, clock=clock)
+            if machine in ('nse1pin', 'nse1aclk', 'nse1pclk'):
                 result['clocked_boot'] = check_clocked_boot(text)
                 reference_machine = 'nse1bit' if args.wire else 'nse1pcm'
                 reference_case = ('wire_restore' if args.wire else 'restore') if restoring else ('wire' if args.wire else 'clock')
+                if machine == 'nse1pclk':
+                    reference_machine = 'nse1aclk'
+                    reference_case = 'atomic_pin_restore' if restoring else 'atomic_pin'
                 result['screen'] = paired_screen(case / 'snap' / machine / '0000.png',
                     root / reference_case / 'snap' / reference_machine / '0000.png')
             result['codec_demand'] = demand_transitions(text)
             if args.coverage:
                 profile = 'control' if not clock else 'pin_boot' if machine == 'nse1pin' else 'tone'
-                result['instruction_observations'] = instruction_report(text, profile)
+                # New frontend/bus combinations are observations, not inherited
+                # atomic-legacy instruction-set fingerprints.
+                result['instruction_observations'] = instruction_report(text, None if machine in ('nse1aclk', 'nse1pclk') else profile)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
             result = dict(clock=clock, status='failed', error=str(error))

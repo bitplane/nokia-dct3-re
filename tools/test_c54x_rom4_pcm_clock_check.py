@@ -2,7 +2,19 @@ import functools
 import math
 import unittest
 
-from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, control_timeline, demand_transitions, tone_fraction, WORDS
+from tools.c54x_rom4_pcm_clock_check import check, check_wire, check_restore, check_clocked_boot, control_timeline, demand_transitions, tone_fraction, WORDS, reject_native_faults
+
+
+class NativeFaultTests(unittest.TestCase):
+    def test_clean(self):
+        reject_native_faults('native_pcm_fixture_echo_summary: words=42 untimed=0 handset_clock_claim=0')
+
+    def test_reject_faults(self):
+        for text in ('unsupported staged C54x form 7721 at 000e61',
+                     'UNIMPLEMENTED instruction', 'rom4_reset_request: reason=4',
+                     'TMS320C54x illegal opcode'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                reject_native_faults(text)
 
 
 KEYS = 'input-press: t=8.000000 name=2 port=1f\ninput-release: t=8.220000 name=2 port=0f\n'

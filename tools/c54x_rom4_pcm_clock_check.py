@@ -7,6 +7,11 @@ WORDS = re.compile(r'native_pcm_fixture_word: value=([0-9a-f]{4}) t=([0-9.]+)')
 SUMMARY = re.compile(r'rom4_tone_summary: tx_words=(\d+) rx_reads=(\d+) tone_reads=(\d+) tone_copies=(\d+) t=([0-9.]+)')
 
 
+def reject_native_faults(text):
+    if re.search(r'unimplemented|unsupported|rom4_reset_request|TMS320C54x[^\n]*illegal', text, re.IGNORECASE):
+        raise ValueError('native DSP fault or baseband reset during clocked comparison')
+
+
 def check_clocked_boot(text):
     """Require a pin-completed native self-test, not the untimed word echo."""
     summaries = re.findall(r'native_pcm_fixture_echo_summary: words=(\d+) untimed=(\d+) handset_clock_claim=0', text)
