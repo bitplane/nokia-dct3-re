@@ -2,6 +2,7 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local captured = false
+local stop_notifier
 local low_reads, low_writes = 0, 0
 local gap_reads = 0
 local gap_read_tap = cpu.spaces.data:install_read_tap(0x0003, 0x0003, 'staged_unowned_low_read', function(address, value, mask)
@@ -46,7 +47,7 @@ local rx_tap = cpu.spaces.data:install_read_tap(0x20, 0x20, 'staged_bsp_receive'
     end
 end)
 emu.register_frame_done(function()
-    assert(bsp_tap and tx_tap and rx_tap and low_read_tap and low_write_tap and gap_read_tap)
+    assert(bsp_tap and tx_tap and rx_tap and low_read_tap and low_write_tap and gap_read_tap and stop_notifier)
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
     machine:logerror(string.format('rom4_staged_low_count: reads=%d writes=%d\n', low_reads, low_writes))
@@ -82,4 +83,10 @@ emu.register_frame_done(function()
         loop[#loop + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
     end
     machine:logerror('rom4_staged_repeat_tail: base=0e58 words=' .. table.concat(loop, ',') .. '\n')
+end)
+stop_notifier = emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format(
+        'rom4_staged_end: pc=%04x xpc=%02x illegal=%d reads=%d writes=%d gap_reads=%d t=%.9f\n',
+        cpu.state.PC.value, cpu.state.XPC.value, cpu.state.ILLEGAL.value,
+        low_reads, low_writes, gap_reads, machine.time:as_double()))
 end)

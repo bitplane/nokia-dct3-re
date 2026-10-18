@@ -14431,6 +14431,69 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct sqdst_fixture
+	{
+		dual_multiply_fixture memory;
+		u64 a, b, result_a, result_b;
+		u16 result_st0;
+	};
+	static sqdst_fixture sqdst_case(unsigned variant, bool edge)
+	{
+		bool const numeric = !edge && variant >= 9216;
+		unsigned const n = numeric ? variant - 9216 : variant;
+		sqdst_fixture c{};
+		auto &f = c.memory;
+		f = dual_multiply_case(edge ? n : numeric ? 0 : n % 256 + 512 * (n / 256), edge);
+		static constexpr std::array<u16, 8> words{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa};
+		if (numeric)
+		{
+			f.x = 0; f.y = 1; f.xaddress = 0x1000; f.yaddress = 0x1100;
+			f.initial = {0x1000, 0x1100, 0x1200, 0x1300}; f.final = f.initial;
+			f.xword = words[n % 8]; f.yword = words[(n / 8) % 8];
+			f.flags = (n / 4096) % 32; f.snapshot = n / 131072;
+			f.base = (n / 64) & 1 ? 0x20000 : 0; f.linear = true;
+			f.st0 = 0xa002 | (f.flags & 16 ? 0x1e00 : 0);
+			f.st1 = 0x800 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.flags & 8 ? 0x100 : 0);
+			f.pmst = f.flags & 4 ? 2 : 0;
+		}
+		c.a = std::array<u64, 8>{0, 0x007fff0000ULL, 0x0080000000ULL, 0x00ffff0000ULL, 0x0100000000ULL, 0x017fff0000ULL, 0xff80000000ULL, 0xffffffffffULL}[(n / (numeric ? 64 : 128)) % 8];
+		c.b = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x0180000000ULL, 0xfe7fffffffULL, 0x123456789aULL, 0xffffffffffULL}[(n / 512) % 8];
+		s64 const high = s64((c.a >> 16) & 0xffff) - (c.a & (u64(1) << 32) ? 65536 : 0);
+		s64 square = high * high * (f.flags & 1 ? 2 : 1);
+		if ((f.flags & 7) == 7) square = std::min(square, s64(2147483647LL));
+		s64 const sum = (c.b & (u64(1) << 39) ? s64(c.b) - (s64(1) << 40) : s64(c.b)) + square;
+		s64 const difference = (s64(f.flags & 8 ? s16(f.xword) : s32(f.xword)) - s64(f.flags & 8 ? s16(f.yword) : s32(f.yword))) * 65536;
+		bool const ova = difference < -2147483648LL || difference > 2147483647LL;
+		bool const ovb = sum < -2147483648LL || sum > 2147483647LL;
+		c.result_a = u64((f.flags & 2) ? std::clamp(difference, s64(-2147483648LL), s64(2147483647LL)) : difference) & 0xffffffffffULL;
+		c.result_b = u64((f.flags & 2) ? std::clamp(sum, s64(-2147483648LL), s64(2147483647LL)) : sum) & 0xffffffffffULL;
+		c.result_st0 = (f.st0 & ~0x800) | (f.xword >= f.yword ? 0x800 : 0) | (ova ? 0x400 : 0) | (ovb ? 0x200 : 0);
+		return c;
+	}
+	void start_sqdst(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const edge = !strcmp(machine().options().bios(), "sqdst-edge");
+		auto const c = sqdst_case(variant, edge); auto const &f = c.memory;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xe200 | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
+		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ (edge ? 0 : 0xffffffffffULL)); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ (edge ? 0 : 0xffffffffffULL)); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "sqdst_reads", [this, f, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "SQDST reads both retained operands once"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "sqdst_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "SQDST has no data write"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "sqdst_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "SQDST opcode fetched once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62142;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -17439,6 +17502,7 @@ private:
 		if (!strcmp(machine().options().bios(), "portr-circular")) { start_circular_portr(); return; }
 		if (!strcmp(machine().options().bios(), "portr-block")) { start_circular_portr_block(); return; }
 		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -48586,6 +48650,48 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62142)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const edge = !strcmp(machine().options().bios(), "sqdst-edge");
+			auto const c = sqdst_case(variant, edge); auto const &f = c.memory;
+			unsigned const checkpoint = 3 + f.snapshot;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "SQDST rejects mapped operands before effects");
+			u64 const mask = !edge && tick <= 5 ? 0xffffffffffULL : 0;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 ? c.result_a : c.a ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 ? c.result_b : c.b ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? c.result_st0 : f.st0), "SQDST computes both results from Execute-owned old A/B and retains independent overflow flags");
+			if (tick == 4)
+			{
+				for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "SQDST updates aliased pointers with X priority"); if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
+				if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			}
+			if (!edge && tick == 5)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef, "SQDST does not publish T");
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b);
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu->space(AS_DATA).write_word(f.yaddress, 0xbeef);
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SQDST around address capture and paired Read");
+			}
+			if (tick == 12)
+			{
+				expect(m_pipeline_operand_reads == (edge ? 0 : 2) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? 0xbeef : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "SQDST retains memory samples without changing T or mode bits");
+				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "SQDST does not repeat pointer updates");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore SQDST without duplicate reads or publications"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62143; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 16U : 402432U)) { start_sqdst(variant + 1); return; }
+				if (edge) { osd_printf_info("TMS320C54x SQDST exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST exclusions complete"); }
+				osd_printf_info("TMS320C54x staged SQDST: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62143) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62142; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254900)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -52241,6 +52347,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(72, "mac-family-edge", "Dual MAC family mapped operand exclusions")
 	ROM_SYSTEM_BIOS(73, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(74, "stmac-edge", "Parallel MAC mapped operand exclusions")
+	ROM_SYSTEM_BIOS(75, "sqdst", "Square distance with retained operands and old accumulator feedback")
+	ROM_SYSTEM_BIOS(76, "sqdst-edge", "Square distance mapped operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

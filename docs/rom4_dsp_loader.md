@@ -1,9 +1,9 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype now reads the existing RF sample provider
-and stops at Decode on SQDST opcode `e210` at `3266`;
-its upload completion and handset boot remain unaccepted. The
+acceptance scopes. The prototype now sustains the resident RF loop through
+a bounded three-second run without an unsupported instruction. Its upload
+completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
@@ -40,13 +40,10 @@ the old source accumulator when source equals destination. SPRU131G
 modifier priority when both operands select the same auxiliary register.
 PMST.SST applies to the shifted store value (SPRU131G 4.1.2).
 
-`d6e1` is specifically `ST B,*AR3 || MACR *AR4+0%,A`. The current frozen
-native stop is SQDST `e210` (`*AR3,*AR2`) at `3266`, with A=B=0,
-T=`0387`, AR2=`06d3`, AR3=`06ce`, AR4=`0086`, BK=`0010`, AR0=2 and ASM=0.
-These are observation-time register values, not proof of inputs at
-retirement: rejection in Decode can freeze older pending slots. Admission
-alone does not prove retirement; isolated instruction fixtures qualify
-results separately from the native stop observation.
+`d6e1` is specifically `ST B,*AR3 || MACR *AR4+0%,A`. Pipeline observations
+are not retirement records: rejection in Decode can freeze older pending
+slots. Admission alone does not prove retirement; isolated instruction
+fixtures qualify results separately from bounded native execution.
 
 The atomic implementation is not a complete status oracle: both TI
 instruction manuals list C as affected for parallel stores, whereas the
@@ -75,6 +72,27 @@ SXM and SST to the shifted old source, including source/destination aliases.
 `stmac-edge` passes 128 mapped-operand exclusions/replays with no bus writes,
 reads or pointer updates. The acceptance marker explicitly leaves C
 unvalidated rather than promoting the carry-preservation hypothesis.
+
+## Staged square distance
+
+SQDST uses all 256 `E2xx` encodings. TI SPRU172C page 4-160 specifies
+that B accumulates the square of old A's signed bits 32..16, before A is
+replaced by the X/Y difference shifted left sixteen bits. The implementation
+retains both memory words in Read and samples old A/B at Execute. T is
+neither an input nor a publication. The generic SMUL product clamp remains
+the existing arithmetic model, not new evidence about the fitted MAD2 revision.
+
+`sqdst` passes 9,216 addressing cases plus 393,216 numerical cases and
+402,432 save-state replays. The cohorts cover all encodings, three pointer
+layouts, circular/legacy BK=0 modes, both program pages, 64 operand pairs,
+eight signed-17-bit A patterns, eight B patterns, 32 status combinations
+and three snapshots. Independent expected results check subtraction carry,
+separate sticky A/B overflow, OVM clamping, FRCT, and the existing SMUL model.
+Post-Read accumulator mutation distinguishes Execute-owned feedback from
+retained X/Y words; it also detects squaring A after replacing it. Sixteen
+mapped-operand exclusion/replay cases reject before reads or publications.
+Physical memory-bank timing and interrupt/single-repeat composition remain
+unvalidated.
 
 ## Staged accumulator saturation
 
@@ -227,7 +245,7 @@ The two profiles use different SWWSR policies, so this comparison is not
 a timing oracle. Logged `pc_context` values are observation-time PCs, not
 asserted instruction-retirement addresses.
 
-The staged checker retains the ordered field writes/reads, six gap reads
+The staged checker retains the ordered field writes/reads, six early gap reads
 and their counts as regression evidence. Its result explicitly leaves
 `physical_low_gap_identity_claim` false. The Lua taps issue no extra reads
 of these fields or endpoints and never replace values.
@@ -255,13 +273,26 @@ fixture checks two-word issue cadence, retained sample publication,
 ring wrap, final BRC and unchanged unrelated registers. It does not supply
 GSM packets or assert measured physical bus timing.
 
-The native probe now calls the existing RF sample provider four times,
-at modeled frame 30 around 0.162033 s. Observation-time PCs are
-`324e/3254/325a/3260`; these are not retirement addresses. The first block
-iteration still stops on a later unadmitted arithmetic opcode, so neither
-completed filtering nor RF acquisition is established. The checker requires
-the four ordered reads and matching backend count and leaves
-`rf_acquisition_claim` false.
+The native probe's bounded run reaches 19,808 RF-provider reads and 623
+completion strobes by its endpoint at 3.016666667 s, without an illegal
+instruction. Only the first sixteen reads are logged individually, all at
+modeled frame 30, with observation-time PCs `324e/3254/325a/3260` repeated;
+these are not retirement addresses. The total corresponds to 619 blocks of
+32 samples, not an independent observation of each block's frame ownership.
+A further BSP/low-page exchange around 2.29175 s contributes a third
+`00f2=3` publication, two more low-page reads and three more gap reads.
+The checker requires these late events, seven BSP control writes, final
+low-page counts (6 reads/5 writes/9 gap reads), exact backend counters and
+a clean final CPU snapshot. RF acquisition and handset boot remain unclaimed.
+
+An otherwise fresh ordinary `noki5110` atomic run at the same duration also
+waits at resident PC `408d`, but publishes 639 completion strobes, 19,840 RF
+reads, 13 RF-control port-32 writes and 33 transfer expiries, with `mode_ac=1`.
+The staged run instead has no port-32 writes or transfer expiries and
+`mode_ac=0`. This is an unresolved functional divergence, not parity. The
+comparison changes both frontend and SWWSR dialect (atomic legacy versus
+staged standard), so a controlled two-axis comparison is needed before
+assigning the difference to pipeline semantics, bus timing or interrupt delivery.
 
 ## Current result
 
@@ -663,14 +694,14 @@ from `b706` through post-incrementing AR0, and STM AL `7708` at `45b0`
 executes, as does absolute ST T `8cf8` at `a548` (destination `1f28`).
 The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
 board map at `0003`, as described above. Circular-address PORTR `74d6`
-at `3249` reads port `0027`, the existing RF sample input. Four provider
-reads occur inside the block established by RPTBD at `3245` (end `3268`),
-before dual-memory MACR `b736` and parallel store/MAC `d6e1` are admitted.
-SQDST opcode `e210` at `003266` stops the frontend in Decode. Older
-pending slots are not guaranteed to retire after that rejection.
-The exposed PC is `3268`, BK `0010`, AR0 `0002`, AR2 `06d3`,
-ST0 `081f`, ST1 `e900`, PMST `ffac` and
-ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
+at `3249` reads port `0027`, the existing RF sample input. The block
+established by RPTBD at `3245` (end `3268`), including MACR `b736`, parallel
+store/MAC `d6e1` and SQDST `e210`, no longer encounters an unsupported form
+in the bounded run. At 0.5 s the exposed PC is `408d`, BK `00fa`, AR0 `1987`,
+AR2 `06e4`, ST0 `081f`, ST1 `6108`, A=B=0, T=`000b`, AR3=`06e3`, AR4=0,
+PMST `ffac` and ILLEGAL clear. The final observation is also at `408d` with
+ILLEGAL clear; the RF-loop counters and unresolved atomic/staged difference
+are specified above. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
 loader1 image is at `0x99704`). The 24 uploaded words at `0e10..0e27`

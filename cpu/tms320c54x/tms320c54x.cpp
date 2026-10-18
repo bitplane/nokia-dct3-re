@@ -67,6 +67,11 @@ constexpr bool staged_dual_arithmetic(u16 word)
 	return (word & 0xfc00) == 0xa000;
 }
 
+constexpr bool staged_sqdst(u16 word)
+{
+	return (word & 0xff00) == 0xe200;
+}
+
 constexpr bool staged_mvdd(u16 word)
 {
 	return (word & 0xff00) == 0xe500;
@@ -3410,7 +3415,7 @@ void tms320c54x_device::pipeline_step()
 		bool const immediate_t = word == 0x770e;
 		bool const immediate_control = staged_accumulator_stm(word) || word == 0x771d || word == 0x7700 || staged_bus_control(word) || (staged_timer_control(word) || staged_serial_control(word) || staged_clock_control(word));
 		if (m_pipeline_valid[2] && !software_intr && !staged_port_write(word) && !staged_absolute_add(word) && !staged_memory_repeat(word) && !staged_immediate_arp(word) && !staged_immediate_asm(word) && !staged_immediate_repeat(word) && word != 0xf495 && word != 0xf4e1 && (word & 0xfcf8) != 0xf4a8 && !staged_memory_logic(word) && !staged_mar(word) && !staged_xc(word) && !fast_return && !plain_return && !delayed_return && !far_return && !status_bit && !immediate_dp && !immediate_alu && !branch && !dagen_immediate && !immediate_brc && !immediate_t && !immediate_control && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_parallel_mac(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
+			(word & 0xff00) != 0xe900 && !short_repeat && !frame && !direct_push && !data_push && !data_pop && !direct_pop && !direct_long_load && !direct_long_store && !long_arithmetic && !register_alu && !direct_mmr_load && !mmr_move && !memory_dp && !direct_move && !data_copy && !program_move && !read_a && !short_load && !direct_store && !immediate_store && !long_load && !rmw && !staged_xmem_bit(word) && !staged_xmem_load(word) && !staged_xmem_arithmetic(word) && !staged_xmem_store(word) && !staged_dual_multiply(word) && !staged_parallel_mac(word) && !staged_sqdst(word) && !staged_dual_arithmetic(word) && !staged_mvdd(word) && !staged_port_read(word) && !smem_arithmetic && !staged_bitfield(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -4020,7 +4025,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
-	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_sqdst(m_pipeline_word[3])))
 	{
 		u8 const x = m_pipeline_word[3] >> 4, y = m_pipeline_word[3];
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
@@ -4035,7 +4040,7 @@ void tms320c54x_device::pipeline_step()
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
 	}
-	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4])))
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_sqdst(m_pipeline_word[4])))
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_immediate[4]);
@@ -4686,6 +4691,17 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_mvdd(m_op))
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		else if (staged_sqdst(m_op))
+		{
+			// SQDST squares old A before the vector subtraction replaces it.
+			s64 const high = accumulator_high17(m_a);
+			s64 square = high * high;
+			if (BIT(m_st1, 6)) square *= 2;
+			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(square), true);
+			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
+			s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
+			m_a = add_sub(u64(x * 65536) & ACC_MASK, u64(y * 65536) & ACC_MASK, true, false);
+		}
 		else if (staged_dual_arithmetic(m_op))
 		{
 			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
