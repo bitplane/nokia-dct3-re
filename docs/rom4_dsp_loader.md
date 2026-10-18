@@ -40,7 +40,7 @@ The passage does not explicitly resolve whether a memory write of zero
 may clear INTM. That behavior is retained from the legacy model and is
 **unverified**, not promoted to a silicon contract. No C55x compatibility
 rule or another emulator's implementation settles this C54x question.
-The native frontier's status-store admission remains separate work.
+Staged STLM A/B to ST1 uses this same constrained register map.
 
 `st1-rules` exhausts 65,536 input words, both old INTM states and four
 write masks (524,288 cases), checking readback, other fields, XF and one
@@ -56,6 +56,40 @@ The DST regression uses PMST.SST and ST1.SXM for signed saturation; ST1
 bit 10 is not a saturation control. Its overflow inputs have low words
 different from the clamped result, so a disabled clamp cannot satisfy the
 data oracle accidentally.
+
+### Staged accumulator-to-status publication
+
+STLM A/B to ST1 publishes the Execute-live, SST-qualified low word once
+through the data bus, independent of DP/CPL, without reading the destination.
+The `stlm-st1` fixture checks 18,432 cases with replay: both sources, raw
+status words and negative-source saturation, SXM loads, ASM register
+loads/add/subtract, long-offset SXM loads, four gaps, two program pages and
+three save points.
+It mutates the source before Execute to distinguish live publication from
+an incorrectly retained Decode operand.
+
+SPRU131G tables 7-20/7-22 require one separating instruction for short
+SXM/ASM consumers. Their Read-owned mode sample is retained across Execute
+and save/load; the long-offset load supplies its own separation. Dedicated
+ASM loads still forward with zero latency. This qualification covers the
+tested load/register-ASM families, not every arithmetic/multiply consumer.
+The `stlm-cpl` and `stlm-cmpt` profiles each check 16 cases with replay:
+basic load/store consumers retain the old addressing mode with zero to two
+NOPs and use the new mode with three (tables 7-16/7-19).
+
+`stlm-st1-irq` checks 576 cases with replay, using B, a separating NOP,
+IRQ/NMI, all requested INTM pairs, IMR enabled/disabled, two follower forms,
+three arrival clocks, two pages and three save points. It requires one
+status publication, no source-memory read, at most one interrupt frame
+and exactly one foreground marker. It does not inherit the special
+SSBX/RSBX INTM guard or settle the unverified clearing policy.
+
+The `stlm-st1-edge` fixture rejects 64 cases with replay before data-side
+effects: delay slots, single/block repeat, XC, and adjacent RPTB/RPTBD,
+including adjacency across the 16-bit PC wrap on both tested pages.
+The adjacent-repeat case is a documented BRAF overwrite hazard (7.5.7.1),
+not a safe composition or an emulated hardware trap. Other excluded cases
+remain implementation boundaries, not claims that silicon forbids them.
 
 ## Repeat endpoint and page hazard
 
@@ -322,8 +356,11 @@ this resident routine and executes uploaded `000e30`, `8821`
 0.133893750 s. It passes the conditional exit `f845 0e66` from block
 `0e5c..0e62` and the explicit outside BRAF clear. It passes `000e14`,
 `7ef8 001a` (absolute READA to BRC) and the following table-initialization
-loop, then stops at resident `003427`, `8807` (STLM A to ST1).
-The exposed PC is `3429`, PMST `ffac` and
+loop and executes resident `003427`, `8807` (STLM A to ST1). The native
+status is subsequently `4900`. It then stops at resident `003461`,
+`6ff8 0020 0c44`, a shifted load from BSP receive register `0020`.
+The staged core rejects this mapped source before consuming it; no reply
+word is synthesized to advance the loader. The exposed PC is `3466`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial

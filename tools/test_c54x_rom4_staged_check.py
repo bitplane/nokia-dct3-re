@@ -15,9 +15,10 @@ class StagedFrontierTest(unittest.TestCase):
         self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
         self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
         self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
-        self.row = ('rom4_staged_frontier: pc=3429 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=3466 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
+                     'rom4_staged_dagen: bk=00fa ar0=0001 ar2=0284 st0=001f st1=4900\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
                      'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
                      'rom4_staged_bsp_tx: index=1 value=0aaa mask=ffff t=0.133893750\n'
@@ -29,10 +30,10 @@ class StagedFrontierTest(unittest.TestCase):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x8807)
-        self.assertEqual(result['instruction_address'], 0x3427)
+        self.assertEqual(result['instruction'], 0x6ff8)
+        self.assertEqual(result['instruction_address'], 0x3461)
         self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
-        self.assertEqual(result['destination'], 0x07)
+        self.assertEqual(result['source_address'], 0x20)
         self.assertEqual(result['bsp_transmit_words'], [0x0aaa])
         self.assertEqual(result['repeat_source_offset'], REPEAT_SOURCE_OFFSET)
         self.assertEqual(result['bsp_control_writes'], [0xc008, 0xc0c8])
@@ -45,7 +46,12 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=3429', 'pc=0f1f'),
+                     self.text.replace('pc=3466', 'pc=0f1f'),
+                     self.text.replace('source=0020', 'source=0021'),
+                     self.text.replace('st1=4900', 'st1=4901'),
+                     self.text + 'rom4_staged_dagen: malformed\n',
+                     self.text + 'rom4_staged_dagen: bk=00fa ar0=0001 ar2=0284 st0=001f st1=4900\n',
+                     self.text + 'unsupported alternate instruction\n',
                      self.text.replace('value=0aaa', 'value=0aab'),
                      self.text.replace('count=1', 'count=2'),
                      self.text.replace('base=0e58', 'base=0e59'),

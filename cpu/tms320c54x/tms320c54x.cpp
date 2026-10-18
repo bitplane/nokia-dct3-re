@@ -552,7 +552,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d || u8(word) == 0x21);
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || u8(word) == 0x07 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d || u8(word) == 0x21);
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -1356,6 +1356,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_io_ready_required));
 	save_item(NAME(m_pipeline_intm_protected));
 	save_item(NAME(m_pipeline_direct_status));
+	save_item(NAME(m_pipeline_alu_mode));
 	save_item(NAME(m_pipeline_cmpt));
 	save_item(NAME(m_pipeline_bk));
 	save_item(NAME(m_pipeline_direct_sp));
@@ -2615,6 +2616,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_io_ready_required = false;
 	m_pipeline_intm_protected.fill(false);
 	m_pipeline_direct_status.fill(0);
+	m_pipeline_alu_mode.fill(0);
 	m_pipeline_cmpt.fill(false);
 	m_pipeline_bk.fill(0);
 	m_pipeline_direct_sp.fill(0);
@@ -2920,6 +2922,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_io_wait_paid[stage] = m_pipeline_io_wait_paid[stage - 1];
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
+		m_pipeline_alu_mode[stage] = m_pipeline_alu_mode[stage - 1];
 		m_pipeline_cmpt[stage] = m_pipeline_cmpt[stage - 1];
 		m_pipeline_bk[stage] = m_pipeline_bk[stage - 1];
 		m_pipeline_direct_sp[stage] = m_pipeline_direct_sp[stage - 1];
@@ -3246,6 +3249,18 @@ void tms320c54x_device::pipeline_step()
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = staged_memory_load(word);
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
+		if (m_pipeline_valid[2] && (word & 0xfeff) == 0x8807 &&
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_active))
+		{
+			logerror("%s: staged STLM ST1 control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		if (m_pipeline_valid[2] && staged_block_repeat(word))
+			for (unsigned stage = 3; stage < 6; ++stage)
+				if (m_pipeline_valid[stage] && (m_pipeline_word[stage] & 0xfeff) == 0x8807 && m_pipeline_address[2] == ((m_pipeline_address[stage] & 0x7f0000) | u16(m_pipeline_address[stage] + 1)))
+				{
+					// SPRU131G 7.5.7.1: STLM can overwrite the younger BRAF update.
+					logerror("%s: staged adjacent STLM ST1/RPTB hazard is unsupported\n", machine().describe_context()); m_illegal = true; return;
+				}
 		if (m_pipeline_valid[2] && (word & 0xfeff) == 0x8821 &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
@@ -4289,6 +4304,10 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_word[4] == 0xfe00)
 			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
 	}
+	if (m_pipeline_valid[4])
+		// Tables 7-20/7-22: short SXM/ASM consumers sample before an
+		// older store retires. Long-offset Decode adds its documented gap.
+		m_pipeline_alu_mode[4] = m_st1 & 0x011f;
 	if (m_pipeline_valid[5])
 	{
 		u32 const address = m_pipeline_address[5];
@@ -4470,10 +4489,13 @@ void tms320c54x_device::pipeline_step()
 			m_pc += staged_extended_move(m_op) ? 2 : 1; // Retained move already committed at its owned write clock.
 		else if (staged_memory_load(m_op))
 		{
+			u16 const status = m_st1;
+			m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
 			u64 const value = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
 			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x1400 ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) :
 				(m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
-		if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
+			m_st1 = status;
+			if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
 		}
 		else if ((m_op & 0xfe80) == 0x4800)
 			accumulator(BIT(m_op, 8)) = m_pipeline_operand[5];
@@ -4724,6 +4746,13 @@ void tms320c54x_device::pipeline_step()
 		{
 			if (staged_long_mar(m_op)) ++m_pc;
 		}
+		else if ((m_op & 0xfcff) == 0xf480 || (m_op & 0xfcff) == 0xf481 || (m_op & 0xfcff) == 0xf482)
+		{
+			u16 const status = m_st1;
+			m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
+			execute_one(m_op);
+			m_st1 = status;
+		}
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
 		if (staged_pipelined_repeat(m_op) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
@@ -4762,6 +4791,9 @@ void tms320c54x_device::pipeline_step()
 		update_xf();
 	}
 
+	if (m_pipeline_valid[4] && m_pipeline_valid[5] &&
+		(staged_immediate_asm(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x3200))
+		m_pipeline_alu_mode[4] = (m_pipeline_alu_mode[4] & ~u16(0x001f)) | (m_st1 & 0x001f);
 	if (m_pipeline_valid[4] && staged_asm_store(m_pipeline_word[4]) && m_pipeline_valid[5] &&
 		(staged_immediate_asm(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x3200))
 		// SPRU131G example 7-52: dedicated ASM loads forward with no gap;

@@ -323,6 +323,26 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "stlm-st1-irq": (
+        "TMS320C54x staged STLM ST1 IRQ: PASS cases=576 restore=576 sources=IRQ,NMI accumulator=B gap_nops=1 intm_requests=4 memory_cannot_set_intm=1 clear_policy=legacy_unverified imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=0 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM ST1 IRQ complete",
+    ),
+    "stlm-cpl": (
+        "TMS320C54x staged STLM CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM addressing mode complete",
+    ),
+    "stlm-cmpt": (
+        "TMS320C54x staged STLM CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM addressing mode complete",
+    ),
+    "stlm-st1-edge": (
+        "TMS320C54x staged STLM ST1 exclusions: PASS cases=64 restore=64 sources=A,B pages=2 snapshots=2 classes=delay,repeat,block,XC,adjacent_RPTB,adjacent_RPTBD page_wrap=1 data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM ST1 exclusions complete",
+    ),
+    "stlm-st1": (
+        "TMS320C54x staged STLM ST1: PASS cases=18432 restore=18432 sources=A,B families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 execute_live=1 status_writes=1 destination_reads=0 short_latency=1 long_latency=0 clear_policy=legacy_unverified silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated STLM ST1 complete",
+    ),
     "rpt-writa16": (
         "TMS320C54x repeated WRITA: PASS cases=19200 restore=19200 sources=DP,SP,plain,postdec,postinc count_sources=short,long,direct,absolute_RAM,absolute_AR registers=8 counts=0,1,7,255 targets=ordinary,halfspace_cross,wrap16 address_bits=16 ovly=ignored pages=1 snapshots=4 retained_first_source=1 retained_par=1 count_reads=once data_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated WRITA complete",
@@ -1653,7 +1673,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
+    if args.profile in ("stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

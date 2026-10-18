@@ -338,6 +338,7 @@ private:
 	bool m_pipeline_io_ready_required = false;
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
+	std::array<u16, 6> m_pipeline_alu_mode = {};
 	std::array<bool, 6> m_pipeline_cmpt = {};
 	std::array<u16, 6> m_pipeline_bk = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};

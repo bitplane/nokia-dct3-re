@@ -149,7 +149,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
     def test_st1_rules_require_primary_constraints_and_unverified_clear_label(self):
-        for profile in ('st1-rules', 'st1-bits'):
+        for profile in ('st1-rules', 'st1-bits', 'stlm-st1', 'stlm-st1-edge', 'stlm-st1-irq', 'stlm-cpl', 'stlm-cmpt'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending + '\n'
             check_result(text, 3, profile=profile)
