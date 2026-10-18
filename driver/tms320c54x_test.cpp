@@ -18697,8 +18697,13 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "fr-decoder"))
+				(!strcmp(machine().options().bios(), "fr-decoder") || !strcmp(machine().options().bios(), "fr-decoder-pipe")))
 		{
+			if (!strcmp(machine().options().bios(), "fr-decoder-pipe"))
+			{
+				m_cpu->set_pipeline_frontend(true);
+				osd_printf_info("ROM4 FR decoder frontend: staged handset_audio_claim=0\n");
+			}
 			start_rom4_fr_decoder(0, true);
 			return;
 		}
@@ -19963,6 +19968,8 @@ private:
 	void start_rom4_fr_decoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		expect(memregion("dspprg")->as_u16(0x8449) == 0xf074 && memregion("dspprg")->as_u16(0x844a) == 0x23c4,
+			"FR decoder fixture has the acquired program loaded, not an empty BIOS region");
 		if (initialize)
 		{
 			m_rom4_codec.reset();
@@ -50929,7 +50936,8 @@ private:
 		{
 			unsigned const frame = (m_phase - 72000) / 2;
 			bool const initialize = !(m_phase & 1);
-			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) ||
+				m_cpu->state_int(tms320c54x_device::STATE_PC) != 0x0f01 || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1ec4)
 				osd_printf_info("ROM4 FR decoder stop: frame=%u initialize=%u pc=%04x illegal=%u sp=%04x\n",
 					frame, initialize, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
@@ -53998,7 +54006,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(17, "efr-invalid-sid", "Isolated acquired ROM EFR invalid SID and bad SID decoder")
 	ROM_SYSTEM_BIOS(18, "efr-home-errors", "Characterize original EFR homing/error reset and PCM differences")
 	ROM_SYSTEM_BIOS(19, "cold-pipeline", "Cold mask ROM execution with the staged CPU frontend")
+	ROM_SYSTEM_BIOS(20, "fr-decoder-pipe", "Isolated acquired ROM FR decoder on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(20))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(19))
@@ -54060,6 +54072,9 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(20))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(19))

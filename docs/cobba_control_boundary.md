@@ -487,6 +487,20 @@ The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
 
+The staged comparison is available through
+`tools/run_c54x_rom4_crc.py --fr-decoder --staged` with the required MAME and
+ROM paths. Its separate `fr-decoder-pipe` BIOS loads the same acquired
+program/DROM, checks the decoder entry words before execution, and retains
+the atomic fixture's exact PCM, balanced-return and per-frame replay
+requirements. It is currently **failing**: reset at `8449` returns correctly,
+but frame zero reaches the repeat-body exclusion for `7308` at `84d7`.
+This is `MVMD AH, dmad`, preceded by `RPT #0027`, with first destination
+`122e`. SPRU172C 4-115 specifies a fixed MMR source and incrementing EAR
+destination under repeat. Qualification must preserve that distinction from
+MVDK/MVKD, check original-literal retention and one source/read and write per
+iteration, and cover replay before admitting it. No CPU instruction or
+handset state has been forced to bypass the exclusion.
+
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
 `((n*7919+1237) mod 4096)-2048`, through port `27`, then zeros. The native

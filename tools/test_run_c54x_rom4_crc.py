@@ -205,6 +205,19 @@ class Rom4HelperResultTest(unittest.TestCase):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
                 check_result(invalid, 3, fr_decoder=True)
 
+    def test_staged_decoder_requires_frontend_and_full_comparison(self):
+        marker = 'ROM4 FR decoder frontend: staged handset_audio_claim=0'
+        result = '\n'.join((DECODER_COMPARISON, DECODER_REPLAY, DECODER_PASS, DECODER_COMPLETE))
+        text = marker + '\n' + result
+        check_result(text, 3, fr_decoder=True, staged=True)
+        for invalid in (result, marker + '\n' + text,
+                        text.replace('mismatches=0', 'mismatches=1'),
+                        text.replace(DECODER_REPLAY, '')):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, fr_decoder=True, staged=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 3, staged=True)
+
     def test_completion(self):
         check_result(PASS + "\n" + COMPLETE + "\n", 3)
 
