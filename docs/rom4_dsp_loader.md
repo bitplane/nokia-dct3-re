@@ -2,7 +2,7 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The prototype now reads the existing RF sample provider
-and stops at Decode on parallel store/MAC opcode `d6e1` at `3260`;
+and stops at Decode on SQDST opcode `e210` at `3266`;
 its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
@@ -28,7 +28,7 @@ Read and Execute verify retained operands and Execute-owned feedback.
 register publication. Physical memory-bank timing and interrupt/repeat
 composition remain unvalidated; this is not native handset acceptance.
 
-## Parallel store/MAC contract under qualification
+## Staged parallel store/MAC
 
 The next staged family is `Dxxx`: `ST src,Ymem || MAC[R]/MAS[R] Xmem,dst`.
 SPRU172C pages 4-180/4-182 and TI's
@@ -40,22 +40,41 @@ the old source accumulator when source equals destination. SPRU131G
 modifier priority when both operands select the same auxiliary register.
 PMST.SST applies to the shifted store value (SPRU131G 4.1.2).
 
-`d6e1` is specifically `ST B,*AR3 || MACR *AR4+0%,A`. The frozen native
-stop snapshot has A=B=0, T=`11a3`, AR3=`06ce`, AR4=`0083`, BK=`0010`,
-AR0=2 and ASM=0. These are observation-time register values, not proof of
-the inputs at retirement: rejection in Decode can freeze older pending
-slots. In particular, admission of the preceding `b736` is not proof
-that it retired in this native run. Its results are qualified separately
-by the isolated MAC-family tests.
+`d6e1` is specifically `ST B,*AR3 || MACR *AR4+0%,A`. The current frozen
+native stop is SQDST `e210` (`*AR3,*AR2`) at `3266`, with A=B=0,
+T=`0387`, AR2=`06d3`, AR3=`06ce`, AR4=`0086`, BK=`0010`, AR0=2 and ASM=0.
+These are observation-time register values, not proof of inputs at
+retirement: rejection in Decode can freeze older pending slots. Admission
+alone does not prove retirement; isolated instruction fixtures qualify
+results separately from the native stop observation.
 
 The atomic implementation is not a complete status oracle: both TI
 instruction manuals list C as affected for parallel stores, whereas the
 current helper preserves it for ST/MAC. Their instruction descriptions do
 not define that carry update. Resolve this discrepancy before claiming
 full status fidelity; neither an atomic comparison nor a successful boot
-can establish the missing rule. Staged implementation must additionally
-qualify retained X/T, retained ASM, old-value stores, pointer aliases,
-same-location forwarding, and save/restore across each publication.
+can establish the missing rule. The staged prototype retains the atomic
+model's carry-preservation hypothesis explicitly, not as a validated rule.
+It captures the two addresses before X-priority pointer modification,
+retains X and T in Read, retains ASM separately, and samples both
+accumulators at Execute before writing the old source and replacing dst.
+The store shares the ordinary pending-store forwarding mechanism, whose
+adjacent-consumer composition is not qualified by the isolated fixture.
+Adjacent ASM/SXM/FRCT/OVM writers, physical memory-bank timing and
+interrupt/single-repeat composition remain unvalidated.
+
+The `stmac` profile passes 1,720,320 cases and save-state replays over all
+4,096 encodings, all source/destination pairs, 32 ASM shifts, distinct and
+aliased addresses, both program pages, circular/legacy BK=0 modes, numerical
+operand/accumulator patterns and status combinations. These are distributed
+cohorts, not the Cartesian product of every dimension. Read owns one X
+access and retained T; Execute owns one Y write and accumulator publication.
+Mutating X, T, ASM, source pointers and feedback after their respective
+sampling points verifies retention. Expected stores independently apply
+SXM and SST to the shifted old source, including source/destination aliases.
+`stmac-edge` passes 128 mapped-operand exclusions/replays with no bus writes,
+reads or pointer updates. The acceptance marker explicitly leaves C
+unvalidated rather than promoting the carry-preservation hypothesis.
 
 ## Staged accumulator saturation
 
@@ -646,10 +665,10 @@ The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
 board map at `0003`, as described above. Circular-address PORTR `74d6`
 at `3249` reads port `0027`, the existing RF sample input. Four provider
 reads occur inside the block established by RPTBD at `3245` (end `3268`),
-before dual-memory MACR `b736` at `325f` is admitted and the parallel
-store/MAC opcode `d6e1` at `003260` stops the frontend in Decode. Older
+before dual-memory MACR `b736` and parallel store/MAC `d6e1` are admitted.
+SQDST opcode `e210` at `003266` stops the frontend in Decode. Older
 pending slots are not guaranteed to retire after that rejection.
-The exposed PC is `3262`, BK `0010`, AR0 `0002`, AR2 `06d2`,
+The exposed PC is `3268`, BK `0010`, AR0 `0002`, AR2 `06d3`,
 ST0 `081f`, ST1 `e900`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind

@@ -14301,10 +14301,10 @@ private:
 		bool linear;
 		u32 base;
 		std::array<u16, 4> initial, final;
-		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0;
+		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0, stored;
 		u64 result;
 	};
-	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false, bool signed_mac = false, bool family = false)
+	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false, bool signed_mac = false, bool family = false, bool parallel = false)
 	{
 		dual_multiply_fixture f{};
 		unsigned const family_index = family ? variant / (edge ? 16U : 215040U) : 0;
@@ -14348,6 +14348,21 @@ private:
 		f.st0 = 0xa002 | (f.flags & 16 ? 0x1e00 : 0);
 		f.st1 = 0x800 | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.flags & 8 ? 0x100 : 0) | (v & 1 ? 0x4020 : 0);
 		f.pmst = f.flags & 4 ? 2 : 0;
+		if (parallel)
+		{
+			f.st1 |= v & 31;
+			f.pmst |= (v / 32) & 1;
+			u64 const source = f.source == f.destination ? dual_macsu_seed(variant, edge) : f.source ? 0xfeabcd9876ULL : 0x123456789aULL;
+			int const shift = int(v & 31) - (v & 16 ? 32 : 0);
+			s64 const signed_source = source & (u64(1) << 39) ? s64(source) - (s64(1) << 40) : s64(source);
+			u64 shifted = shift < 0 ? u64(f.flags & 8 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL;
+			if (f.pmst & 1)
+			{
+				if (f.flags & 8) { s64 const number = shifted & (u64(1) << 39) ? s64(shifted) - (s64(1) << 40) : s64(shifted); shifted = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
+				else shifted = std::min(shifted, u64(0xffffffff));
+			}
+			f.stored = u16(shifted >> 16);
+		}
 		s64 const product = s64(s16(f.xword)) * s64(s16(f.yword)) * (f.flags & 1 ? 2 : 1);
 		bool const overflow = product < -2147483648LL || product > 2147483647LL;
 		f.result = u64(overflow && (f.flags & 2) ? (product < 0 ? -2147483648LL : 2147483647LL) : product) & 0xffffffffffULL;
@@ -14388,26 +14403,29 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-		bool const family = !strncmp(machine().options().bios(), "mac-family", 10);
+		bool const parallel = !strncmp(machine().options().bios(), "stmac", 5);
+		bool const family = parallel || !strncmp(machine().options().bios(), "mac-family", 10);
 		bool const signed_mac = family || !strncmp(machine().options().bios(), "mac-dual", 8);
 		bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
-		bool const edge = !strcmp(machine().options().bios(), "mac-family-edge") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family);
+		bool const edge = !strcmp(machine().options().bios(), "stmac-edge") || !strcmp(machine().options().bios(), "mac-family-edge") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family, parallel);
+		unsigned const feedback = parallel ? f.destination : f.source;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : signed_mac ? 0xb000 | (f.operation << 10) : macsu ? 0xa600 : 0xa400) | (signed_mac ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (alu ? 0xa000 | (variant >= (edge ? 16U : 43008U) ? 0x200 : 0) : signed_mac ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : macsu ? 0xa600 : 0xa400) | (signed_mac ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
-		if (macsu) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge) ^ (edge ? 0 : 0xffffffffffULL));
+		if (parallel) m_cpu->set_state_int(tms320c54x_device::STATE_T, f.yword);
+		if (macsu) m_cpu->set_state_int(feedback ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge) ^ (edge ? 0 : 0xffffffffffULL));
 		for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "Dual MPY reads each captured logical operand once in Read, including aliased addresses"); ++m_pipeline_operand_reads; });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Dual MPY never writes data memory"); });
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, edge, parallel](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && m_pipeline_operand_reads < (parallel ? 1U : 2U) && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "Dual multiply retains its captured logical operands in Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f, edge, parallel](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(parallel && !edge && !m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "dual_multiply_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Dual MPY opcode is fetched once"); ++m_pipeline_extensions_reads; } });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254900;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -17420,7 +17438,7 @@ private:
 		if (!strcmp(machine().options().bios(), "st-t-branch")) { start_t_store_branch(); return; }
 		if (!strcmp(machine().options().bios(), "portr-circular")) { start_circular_portr(); return; }
 		if (!strcmp(machine().options().bios(), "portr-block")) { start_circular_portr_block(); return; }
-		if (!strncmp(machine().options().bios(), "mac-family", 10)) { start_dual_multiply(); return; }
+		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -48572,14 +48590,16 @@ private:
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 			bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
-			bool const family = !strncmp(machine().options().bios(), "mac-family", 10);
+			bool const parallel = !strncmp(machine().options().bios(), "stmac", 5);
+			bool const family = parallel || !strncmp(machine().options().bios(), "mac-family", 10);
 			bool const signed_mac = family || !strncmp(machine().options().bios(), "mac-dual", 8);
 			bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
-			bool const edge = !strcmp(machine().options().bios(), "mac-family-edge") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family);
+			bool const edge = !strcmp(machine().options().bios(), "stmac-edge") || !strcmp(machine().options().bios(), "mac-family-edge") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual-edge") || !strcmp(machine().options().bios(), "macsu-dual-edge") || !strcmp(machine().options().bios(), "mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family, parallel);
+			unsigned const feedback = parallel ? f.destination : f.source;
 			unsigned const checkpoint = 3 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
 			u64 const before = dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge) ^ (!edge && tick <= 5 ? 0xffffffffffULL : 0);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : macsu && !f.source ? before : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : macsu && f.source ? before : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : macsu && !feedback ? before : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : macsu && feedback ? before : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
 			if (tick == 4)
 			{
 				for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Dual MPY captures both addresses before one X-priority alias update"); if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
@@ -48587,24 +48607,25 @@ private:
 			}
 			if (!edge && tick == 5)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (alu ? 0xabcd : f.xword), "Dual memory Read publishes T only for multiply");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (parallel ? f.yword : alu ? 0xabcd : f.xword), "Dual memory Read publishes T only for dual-read multiply");
 				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
-				if (macsu) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge));
+				if (macsu) m_cpu->set_state_int(feedback ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge));
+				if (parallel) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31);
 				auto const disable = machine().disable_side_effects();
 				m_cpu->space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu->space(AS_DATA).write_word(f.yaddress, 0xbeef);
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
-				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save dual MPY around address, paired Read and T publication");
 			}
 			if (tick == 12)
 			{
-				expect(m_pipeline_operand_reads == (edge ? 0 : 2) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? 0xabcd : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Dual MPY retains both words, does not rewrite T at Execute, and preserves other status");
+				expect(m_pipeline_operand_reads == (edge ? 0U : parallel ? 1U : 2U) && m_pipeline_store_writes == unsigned(parallel && !edge) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? parallel ? f.yword : 0xabcd : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (parallel && !edge ? f.st1 ^ 31 : f.st1) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Dual multiply retains operands and ASM without duplicate publications");
 				for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "Dual MPY never reapplies its address modification");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore dual MPY without resampling data, refetching or duplicate pointer updates");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254910; m_check_timer->enable(true); return;
 				}
@@ -48612,6 +48633,11 @@ private:
 				if (variant + 1 < (edge ? 16U : macsu ? 215040U : 43008U) * (family ? 8U : alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return; }
 				if (family)
 				{
+					if (parallel)
+					{
+						if (edge) { osd_printf_info("TMS320C54x parallel MAC exclusions: PASS cases=128 restore=128 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC exclusions complete"); }
+						osd_printf_info("TMS320C54x parallel MAC: PASS cases=1720320 restore=1720320 operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
+					}
 					if (edge) { osd_printf_info("TMS320C54x dual MAC family exclusions: PASS cases=128 restore=128 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family exclusions complete"); }
 					osd_printf_info("TMS320C54x dual MAC family: PASS cases=1720320 restore=1720320 operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
 				}
@@ -52213,6 +52239,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(70, "portr-block", "Circular I/O sampling within a retained RPTBD block")
 	ROM_SYSTEM_BIOS(71, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
 	ROM_SYSTEM_BIOS(72, "mac-family-edge", "Dual MAC family mapped operand exclusions")
+	ROM_SYSTEM_BIOS(73, "stmac", "Parallel MAC stores with retained T X and ASM")
+	ROM_SYSTEM_BIOS(74, "stmac-edge", "Parallel MAC mapped operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
