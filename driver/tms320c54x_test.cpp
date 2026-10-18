@@ -14898,8 +14898,8 @@ private:
 		if (edge)
 		{
 			unsigned const kind = v % 4;
-			if (kind < 2) f.initial[0] = kind ? 0x20 : 0x0e;
-			else f.initial[1] = kind == 2 ? 0x0e : 0x33;
+			if (kind < 2) f.initial[0] = kind ? 0x20 : alu ? 0x06 : 0x0e;
+			else f.initial[1] = kind == 2 ? (alu ? 0x06 : 0x0e) : 0x33;
 		}
 		f.xaddress = f.initial[f.x & 3]; f.yaddress = f.initial[f.y & 3];
 		static constexpr std::array<u16, 8> words{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa};
@@ -15000,6 +15000,88 @@ private:
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f, edge, parallel](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(parallel && !edge && !m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_pipeline_store_writes; });
 		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "dual_multiply_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Dual MPY opcode is fetched once"); ++m_pipeline_extensions_reads; } });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254900;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	struct mapped_dual_fixture
+	{
+		u32 base;
+		u16 opcode, xaddress, yaddress, xword, yword, st0, st1, result_st0, bk;
+		unsigned checkpoint, destination;
+		u64 a, b, result;
+		std::array<u16, 8> initial, final;
+	};
+	static mapped_dual_fixture mapped_dual_case(unsigned variant, bool edge)
+	{
+		mapped_dual_fixture f{}; unsigned v = variant;
+		unsigned const address = v % (edge ? 80 : 16); v /= edge ? 80 : 16;
+		u16 const mapped = edge ? (address < 8 ? address : 0x18 + address - 8) : 8 + address;
+		unsigned const lanes = v % 3; v /= 3;
+		unsigned const selectors = edge ? 0x89 : std::array<unsigned, 8>{0x01,0x0a,0x89,0x45,0xcd,0x88,0x4c,0xf2}[v % 8];
+		if (!edge) v /= 8;
+		bool const subtract = v % 2; v /= 2; f.destination = v % 2; v /= 2;
+		unsigned const flags = edge ? 0 : v % 4; if (!edge) v /= 4;
+		f.bk = !edge && v % 2 ? 32 : 0; if (!edge) v /= 2;
+		unsigned const pattern = edge ? 0 : v % 2; if (!edge) v /= 2;
+		f.base = v % 2 ? 0x20000 : 0; v /= 2;
+		f.checkpoint = edge ? 3 + v % 2 : std::array<unsigned, 3>{3,5,6}[v % 3];
+		unsigned const x = selectors >> 4, y = selectors & 15, xar = 2 + (x & 3), yar = 2 + (y & 3);
+		f.initial = {3,0x1700,0x101f,0x111f,0x121f,0x131f,0x1800,0x1900};
+		if (lanes != 1) f.initial[xar] = mapped;
+		if (lanes != 0) f.initial[yar] = lanes == 2 && xar != yar ? (edge ? (mapped == 0x5f ? 0 : mapped + 1) : 8 + (address + 5) % 16) : mapped;
+		f.xaddress = f.initial[xar]; f.yaddress = f.initial[yar]; f.final = f.initial;
+		auto modify = [&f](u16 pointer, unsigned mode) -> u16 {
+			if (mode == 1) return pointer - 1;
+			if (mode == 2) return pointer + 1;
+			if (mode == 3) return f.bk ? (pointer & 0xffc0) | ((pointer + 3) & 31) : pointer + 3;
+			return pointer;
+		};
+		if (!edge) { f.final[xar] = modify(f.initial[xar], x >> 2); if (xar != yar) f.final[yar] = modify(f.initial[yar], y >> 2); }
+		f.a = pattern ? 0x7fffff8001ULL : 0x8055557fffULL;
+		f.b = pattern ? 0x8055557fffULL : 0x7fffff8001ULL;
+		f.st0 = 0xa002 | (pattern ? 0x800 : 0); f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0);
+		auto sample = [&f,pattern](u16 at) -> u16 {
+			if (at >= 0x60) return pattern ? 0x7fff : 0x8001;
+			if (at >= 0x10 && at <= 0x17) return f.final[at - 0x10];
+			if (at >= 8 && at <= 10) return f.a >> ((at - 8) * 16);
+			if (at >= 11 && at <= 13) return f.b >> ((at - 11) * 16);
+			return at == 14 ? 0x8001 : 0x7fff;
+		};
+		f.xword = sample(f.xaddress); f.yword = sample(f.yaddress);
+		s64 const left = s64(flags & 1 ? s16(f.xword) : s32(f.xword)) * 65536;
+		s64 const right = s64(flags & 1 ? s16(f.yword) : s32(f.yword)) * 65536;
+		s64 const result = subtract ? left - right : left + right;
+		bool const overflow = result < -2147483648LL || result > 2147483647LL;
+		f.result = u64(flags & 2 ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
+		f.result_st0 = (f.st0 & ~0x800) | ((subtract ? f.xword >= f.yword : u32(f.xword) + f.yword > 65535) ? 0x800 : 0) | (overflow ? f.destination ? 0x200 : 0x400 : 0);
+		f.opcode = 0xa000 | (subtract ? 0x200 : 0) | (f.destination << 8) | selectors;
+		return f;
+	}
+	void start_mapped_dual(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
+		auto const f = mapped_dual_case(variant, edge); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, 0xf4e1);
+		m_cpu->set_pipeline_frontend(false);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8001); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x7fff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
+		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mapped_dual_reads", [this,f,edge](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(!edge && m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "Mapped dual ALU samples both captured addresses once at Read"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mapped_dual_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62170;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -19200,6 +19282,7 @@ private:
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual") || !strcmp(machine().options().bios(), "alu-dual-edge")) { start_dual_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "alu-map") || !strcmp(machine().options().bios(), "alu-map-edge")) { start_mapped_dual(); return; }
 		if (!strcmp(machine().options().bios(), "macsu-dual") || !strcmp(machine().options().bios(), "macsu-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mac-dual") || !strcmp(machine().options().bios(), "mac-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
@@ -48852,6 +48935,74 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 62113) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62112; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62170)
+		{
+			bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = mapped_dual_case(variant, edge);
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual ALU rejects unowned sources before Read and pointer updates");
+			if (!edge && tick == 5)
+			{
+				auto const disable = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(f.xaddress, 0x5a5a); m_cpu->space(AS_DATA).write_word(f.yaddress, 0x5a5a);
+			}
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped dual operands before/after Read and Execute");
+			}
+			if (tick == 12)
+			{
+				u64 a = f.a, b = f.b; auto final = f.final;
+				if (!edge)
+					for (u16 at : {f.xaddress, f.yaddress})
+					{
+						if (at >= 8 && at <= 13)
+						{
+							unsigned const lane = at <= 10 ? at - 8 : at - 11, shift = lane * 16;
+							u64 &acc = at <= 10 ? a : b; u64 const mask = lane == 2 ? 0xff : 0xffff;
+							acc = (acc & ~(mask << shift)) | ((0x5a5a & mask) << shift);
+						}
+						if (at >= 0x10 && at <= 0x17) final[at - 0x10] = 0x5a5a;
+					}
+				if (!edge) (f.destination ? b : a) = f.result;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (edge ? f.st0 : f.result_st0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_pipeline_operand_reads == (edge ? 0U : 2U) &&
+					!m_pipeline_store_writes && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge,
+					"Mapped dual arithmetic uses retained signed/unsigned words with independent carry/overflow and no data write");
+				for (unsigned i = 0; i < 8; ++i)
+				{
+					if (m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) != final[i])
+						osd_printf_info("Mapped dual pointer mismatch case=%u edge=%u replay=%u ar=%u expected=%04x actual=%04x\n", variant, unsigned(edge), unsigned(m_pipeline_replay), i, final[i], unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i)));
+					expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == final[i], "Mapped dual address updates are not repeated after Read or restoration");
+				}
+				for (unsigned i = 0; i < 2; ++i)
+					expect(m_cpu->state_int(i ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T) ==
+						(!edge && (f.xaddress == 14 + i || f.yaddress == 14 + i) ? 0x5a5a : i ? 0x7fff : 0x8001), "Dual arithmetic preserves post-Read T/TRN values");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); m_cpu->set_pipeline_frontend(true);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped dual operands after clearing the pipeline");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62171; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 3840U : 147456U)) { start_mapped_dual(variant + 1); return; }
+				if (edge)
+				{
+					osd_printf_info("TMS320C54x mapped dual ALU exclusions: PASS cases=3840 restore=3840 addresses=80 lanes=3 operations=ADD,SUB accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated mapped dual ALU exclusions complete");
+				}
+				osd_printf_info("TMS320C54x mapped dual ALU: PASS cases=147456 restore=147456 mapped_sources=16 lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 source_sample=Read address_update=Access post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated mapped dual ALU complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62171) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62170; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62110)
 		{
 			bool const immediate = !strcmp(machine().options().bios(), "stm-st1");
@@ -55314,6 +55465,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(146, "stm-st1-edge", "Immediate ST1 control composition exclusions")
 	ROM_SYSTEM_BIOS(147, "stm-cpl", "Immediate ST1 CPL consumer latency")
 	ROM_SYSTEM_BIOS(148, "stm-cmpt", "Immediate ST1 CMPT consumer latency")
+	ROM_SYSTEM_BIOS(149, "alu-map", "Dual memory ADD SUB with owned mapped sources")
+	ROM_SYSTEM_BIOS(150, "alu-map-edge", "Dual memory ADD SUB unowned source exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

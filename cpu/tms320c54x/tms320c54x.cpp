@@ -4194,7 +4194,9 @@ void tms320c54x_device::pipeline_step()
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
 		m_pipeline_operand_address[3] = m_ar[xar];
 		m_pipeline_immediate[3] = m_ar[yar];
-		if (m_pipeline_operand_address[3] < 0x60 || m_pipeline_immediate[3] < 0x60)
+		bool const mapped_alu = staged_dual_arithmetic(m_pipeline_word[3]);
+		auto const unowned = [mapped_alu](u16 address) { return address < 0x60 && (!mapped_alu || address < 8 || address > 0x17); };
+		if (unowned(m_pipeline_operand_address[3]) || unowned(m_pipeline_immediate[3]))
 		{
 			logerror("%s: staged dual arithmetic/multiply low-page register/peripheral operand is unsupported instruction=%06x word=%04x x=%04x y=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3], m_pipeline_immediate[3]); m_illegal = true; return;
 		}

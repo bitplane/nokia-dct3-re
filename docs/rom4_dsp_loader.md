@@ -18,6 +18,33 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Mapped dual-memory arithmetic operands
+
+Dual ADD/SUB admit mapped sources `0008..0017` on either or both operand
+lanes. Access retains both addresses and applies the existing X-priority
+dual modifier; Read samples the resulting mapped-register values once.
+Execute uses those retained words with the existing signedness, saturation,
+carry and sticky-overflow arithmetic. A source that is also an updated AR
+therefore observes that update in this model. Multiply/MAC and SQDST mapped
+operands remain separately guarded.
+
+`alu-map` passes 147,456 cases plus cleared-pipeline replay: sixteen mapped
+addresses, X/Y/both lane placements, eight selector pairs (including aliases),
+ADD/SUB, both accumulators, SXM/OVM, BK=0/32, two value patterns, two pages and
+three checkpoints. The BK=32 fixtures use valid circular pointer geometry and
+include wrap; BK=0 retains the declared linear behavior. Post-Read poisoning
+of mapped or RAM sources cannot change the result or cause another pointer
+update. Carry/overflow, unselected accumulator lanes, T/TRN and all ARs are
+checked independently. `alu-map-edge` passes 3,840 cases plus replay over
+eighty unqualified low/control/peripheral addresses, with no reads, writes
+or address updates. The prior arithmetic negative fixture now uses unowned
+ST0 rather than newly admitted T; multiply/square negatives are unchanged.
+
+This qualifies the declared operand-age/register/arithmetic model, not
+physical bus arbitration, producer/control hazards or interrupt composition.
+The ROM4 EFR first frame passes its `a20a` mapped-AR3 subtraction but remains
+behind a separate instruction guard; this is not staged EFR acceptance.
+
 ## Short repeat in RETD delay words
 
 A short immediate RPT in RETD's first delay word retains the return target

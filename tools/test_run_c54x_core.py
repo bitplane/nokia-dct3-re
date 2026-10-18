@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mapped_dual_alu_scope(self):
+        for profile in ('alu-map', 'alu-map-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+            for bad in (marker, text + '\n' + marker, text + '\nunexpected'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_bios_fallback_cannot_satisfy_profile(self):
         marker, ending = EXTRA_PROFILES['stm-cpl']
         for warning in ('invalid BIOS "stm-cpl", reverting to default', 'INVALID BIOS', 'reverting to default'):

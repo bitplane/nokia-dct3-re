@@ -2463,11 +2463,11 @@ compositions. Both reset traces contain the same 732 executed address/opcode
 pairs; this is not register-state or physical-timing parity. The first frame's
 immediate ST1 write now executes under its
 [isolated qualification](rom4_dsp_loader.md#staged-immediate-status-publication).
-The next guard belongs to instruction `a20a` at `cc02`, with resolved X
-address `0013` (mapped AR3) and Y address `0cf4` (PCM RAM). The guard log's
-current fetch PC `cc03` is not its instruction owner. Qualify mapped-source
-Read, dual address updates and accumulator publication before admitting this
-dual-memory operation. No complete staged EFR frame has passed yet.
+The `a20a` dual SUB at `cc02` reads mapped AR3 and PCM RAM under the
+[mapped dual-ALU qualification](rom4_dsp_loader.md#mapped-dual-memory-arithmetic-operands).
+The current guard is instruction `fa60` at `d253`; current fetch PC `d255`
+is not its owner. Recover its predicate and control-flow contract before
+admitting it. No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
