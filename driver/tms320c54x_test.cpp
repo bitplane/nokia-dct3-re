@@ -20417,6 +20417,10 @@ private:
 		u16 *const program = &memregion("dspprg")->as_u16();
 		if (initialize)
 		{
+			expect(program[0xcc0e] == 0x7711 && program[0xcc0f] == 0x0ba8,
+				"EFR encoder acquired reset entry is loaded before CPU execution");
+			expect(data.read_word(0xea70) == 0x7530 && data.read_word(0xea71) == 0x6590,
+				"EFR encoder acquired reset data table is loaded before CPU execution");
 			data.write_word(0x0bac, dtx ? 4 : 0); // Encoder DTX mode is an explicit algorithm input.
 			m_rom4_pcm_mismatches = 0;
 			unsigned pc = 0x0e00;
@@ -20449,7 +20453,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = initialize ? 304000 : 304001 + frame;
-		m_idle_fixture_tick = 0;
+		if (initialize) m_rom4_fr_trace_count = 0;
 		m_check_timer->adjust(attotime::from_msec(20));
 		if (!initialize) save_rom4_codec_frame(frame);
 	}
@@ -52454,14 +52458,6 @@ private:
 		}
 		if (m_phase >= 304000 && m_phase < 304519)
 		{
-			// Bounded fixture deadline, not a fitted DSP frame-clock claim.
-			if (!strcmp(machine().options().bios(), "efr-encoder-pipe") &&
-				!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && ++m_idle_fixture_tick < 10)
-			{
-				m_check_timer->adjust(attotime::from_msec(20));
-				return;
-			}
 			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
 			bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
 			unsigned const frames = dtx ? 518 : homing ? 46 : 163;
@@ -53475,6 +53471,11 @@ void tms320c54x_test_state::rom4(machine_config &config)
 		m_cpu->instruction_observer_cb().set([this,trace_encoder](offs_t address, u16 opcode) {
 			if (m_phase != (trace_encoder ? 74002U : 72017U) || m_rom4_codec_replay) return;
 			if (++m_rom4_fr_trace_count <= 200000) trace_rom4_fr_state("execute", address, opcode);
+		});
+	if (config.options().verbose() && (!strcmp(config.options().bios(), "efr-encoder") || !strcmp(config.options().bios(), "efr-encoder-pipe")))
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (m_phase == 304000 && ++m_rom4_fr_trace_count <= 8192)
+				trace_rom4_fr_state("efr_reset_execute", address, opcode);
 		});
 	if (!strcmp(config.options().bios(), "efr-loss-observe"))
 		m_cpu->instruction_observer_cb().set(FUNC(tms320c54x_test_state::observe_rom4_efr_state));
@@ -55184,6 +55185,9 @@ ROM_START(tms54rom4)
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(22))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(21))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
@@ -55249,6 +55253,9 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(22))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(21))

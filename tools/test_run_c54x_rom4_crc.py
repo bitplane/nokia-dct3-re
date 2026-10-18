@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import re
 from pathlib import Path
 
 from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, FR_COMPLETE, FR_PASS, check_result
@@ -22,6 +23,16 @@ from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_every_rom4_bios_loads_program_and_data(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
+        declared = set(map(int, re.findall(r'ROM_SYSTEM_BIOS\((\d+),', body)))
+        for region in ('dspprg', 'dspdata'):
+            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
+            loaded = list(map(int, re.findall(r'ROM_BIOS\((\d+)\)', content)))
+            self.assertEqual(set(loaded), declared, region)
+            self.assertEqual(len(loaded), len(declared), region)
+
     def test_efr_encoder_homing_requires_every_result_and_replay(self):
         frames = "\n".join(f"ROM4 EFR homing encoder comparison: frame={frame} mismatches=0" for frame in range(46))
         text = "\n".join((frames, EFR_ENCODER_HOMING_REPLAY, EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE))
@@ -117,6 +128,12 @@ class Rom4HelperResultTest(unittest.TestCase):
         frontend = 'ROM4 EFR encoder frontend: staged handset_audio_claim=0'
         staged = frontend + '\n' + text
         check_result(staged, 3, efr_encoder=True, staged=True)
+        teardown = '\nEnter sdlwindow_exit\nLeave sdlwindow_exit'
+        check_result(staged + teardown, 3, efr_encoder=True, staged=True, verbose_teardown=True)
+        with self.assertRaises(ValueError):
+            check_result(staged + teardown, 3, efr_encoder=True, staged=True)
+        with self.assertRaises(ValueError):
+            check_result(staged + teardown + '\nunexpected', 3, efr_encoder=True, staged=True, verbose_teardown=True)
         for bad in (text, staged.replace('EFR encoder frontend', 'FR encoder frontend'),
                     frontend + '\n' + staged,
                     staged.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),

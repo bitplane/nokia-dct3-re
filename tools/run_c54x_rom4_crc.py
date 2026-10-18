@@ -187,11 +187,14 @@ def main():
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
     parser.add_argument('--staged', action='store_true', help='run FR encoder/decoder or EFR encoder vectors on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
+    parser.add_argument('--trace-efr-reset', action='store_true', help='observe at most 8192 executed EFR encoder reset instructions, without changing acceptance')
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder):
         parser.error('--staged currently requires --fr-decoder, --fr-encoder or --efr-encoder')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
+    if args.trace_efr_reset and not args.efr_encoder:
+        parser.error('--trace-efr-reset requires --efr-encoder')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -226,8 +229,8 @@ def main():
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "90" if args.staged and args.efr_encoder else "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
-    if args.trace_fr:
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
+    if args.trace_fr or args.trace_efr_reset:
         command.append('-verbose')
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
@@ -301,7 +304,7 @@ def main():
                 check_homing_errors(text, result.returncode, reference, strict=True)
             print(f"ROM4 EFR homing/error characterized: total_mismatches={report['total_mismatches']} reset_mismatch_frames={report['reset_mismatch_frames']} conformance_claim=0")
         else:
-            check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr)
+            check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr or args.trace_efr_reset)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1
