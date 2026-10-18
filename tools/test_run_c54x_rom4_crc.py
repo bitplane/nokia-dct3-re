@@ -25,6 +25,21 @@ from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_encoder_frontends_load_the_same_vectors(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
+        bios = dict((name, int(number)) for number, name in
+                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
+        for region, filename in (('efr_encoder_pcm', 'spch_dos.inp'),
+                                 ('efr_encoder_serial', 'spch_dos.cod')):
+            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
+            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
+                               r'"(.*), ROM_BIOS\((\d+)\)\)', content)
+            by_bios = {int(number): payload for payload, number in loads}
+            self.assertEqual(len(loads), 2, region)
+            self.assertEqual(by_bios[bios['efr-encoder']],
+                             by_bios[bios['efr-encoder-pipe']], region)
+
     def test_every_rom4_bios_loads_program_and_data(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]

@@ -42,12 +42,23 @@ also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
 The staged EFR encoder now returns from frame zero with a balanced stack
 and no unsupported-instruction stop. Its independent reference comparison
-reports 31 aggregate mismatches across parameters, flags and packed output;
+reports 62 aggregate mismatches across parameters, flags and packed output;
 this is not a count of differing parameters alone. No staged EFR frame has
 passed vector acceptance. The next boundary is the first numerical/state
 divergence, not an instruction-admission guard. Atomic EFR still passes all
 163 reference frames; staged FR encoder and decoder pass their separate
 32-frame controls. These isolated codec results do not prove handset speech.
+
+Both EFR frontend BIOSes must load the same hashed PCM and reference-vector
+files; program/data ROM coverage alone does not establish codec-fixture
+coverage. A fixture-declaration regression enforces this pairing. With these
+inputs loaded, verbose first-frame-entry snapshots agree on all 65,440
+ordinary RAM words after reset and PCM publication. The first observed
+Execute-address sequence difference is instruction 9,522 (`d39c` atomic,
+`d403` staged). This locates a control-flow symptom, not its cause: younger
+Access/Read publications make raw pre-Execute register equality an invalid
+pipeline equivalence test. Verbose tracing retains the independent vector
+acceptance requirement and does not alter the ordinary gate.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.

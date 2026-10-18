@@ -21177,6 +21177,8 @@ private:
 		m_phase = initialize ? 304000 : 304001 + frame;
 		if (initialize || !frame) m_rom4_fr_trace_count = 0;
 		m_check_timer->adjust(attotime::from_msec(20));
+		// Compare drained reset RAM before frame execution, not phase-skewed registers.
+		if (!initialize && !frame && machine().options().verbose()) trace_rom4_fr_input(304001, 0x0e00);
 		if (!initialize) save_rom4_codec_frame(frame);
 	}
 
@@ -56504,8 +56506,10 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dtx.out", 0, 165760, CRC(a2bc82da) SHA1(44ea0a4b98623d3282f8bdafb0a068287a879f47), ROM_BIOS(11))
 	ROM_REGION(52352, "efr_encoder_pcm", 0)
 	ROMX_LOAD("spch_dos.inp", 0, 52352, CRC(36fb2ba9) SHA1(3d4abd66d2d033de929175f1d84e970f78007628), ROM_BIOS(10))
+	ROMX_LOAD("spch_dos.inp", 0, 52352, CRC(36fb2ba9) SHA1(3d4abd66d2d033de929175f1d84e970f78007628), ROM_BIOS(22))
 	ROM_REGION(80196, "efr_encoder_serial", 0)
 	ROMX_LOAD("spch_dos.cod", 0, 80196, CRC(f4d761a3) SHA1(49bd709881e15e018632567bedabf6ed3b94c479), ROM_BIOS(10))
+	ROMX_LOAD("spch_dos.cod", 0, 80196, CRC(f4d761a3) SHA1(49bd709881e15e018632567bedabf6ed3b94c479), ROM_BIOS(22))
 	ROM_REGION(80522, "efr_reference_input", 0)
 	ROMX_LOAD("spch_dos.dec", 0, 80522, CRC(cdaa4997) SHA1(e93d62943336e4327e7bab5905dee73a58b7ce4b), ROM_BIOS(9))
 	ROM_REGION(52160, "efr_reference_pcm", 0)
