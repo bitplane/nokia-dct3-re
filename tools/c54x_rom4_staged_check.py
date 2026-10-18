@@ -11,7 +11,7 @@ import sys
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a60
 REPEAT_SOURCE_OFFSET = 0x98af0
-STOP = 'staged CMPM mapped-register source is unsupported instruction=0025fe word=60f8 source=000b'
+STOP = 'staged repeat body 7090 at 003053 is unsupported'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -22,25 +22,25 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('2603', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('3056', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or text.count('unsupported') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
     if (text.count('rom4_staged_dagen:') != 1
-            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('00fa', '0001', '0002', '181f', '6102')]):
+            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('00fa', '1984', '06bc', '181f', '4908')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
-    if summaries != [('2', '72')]:
+    if summaries != [('2', '74')]:
         raise ValueError('missing or changed bootstrap completion boundary')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
-    if text.count('rom4_staged_bsp_write:') != 2 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')]:
+    if text.count('rom4_staged_bsp_write:') != 4 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff'), ('c008', 'ffff'), ('c008', 'ffff')]:
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
-    if not 0 < float(bsp[0][2]) < float(bsp[1][2]) < float(timestamp):
+    if not 0 < float(bsp[0][2]) < float(bsp[1][2]) < float(bsp[2][2]) < float(bsp[3][2]) < float(timestamp):
         raise ValueError('native BSP publication order changed')
     tx = re.findall(r'rom4_staged_bsp_tx: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_bsp_tx:') != 2 or len(tx) != 2
             or [row[:3] for row in tx] != [('1', '0aaa', 'ffff'), ('2', 'ffd5', 'ffff')]
-            or not float(bsp[1][2]) < float(tx[0][3]) < float(tx[1][3]) < float(timestamp)
+            or not float(bsp[1][2]) < float(tx[0][3]) < float(tx[1][3]) < float(bsp[2][2])
             or re.findall(r'rom4_staged_bsp_tx_count: count=(\d+)', text) != ['2']):
         raise ValueError('missing, duplicate or changed native BSP transmit publication')
     rx = re.findall(r'rom4_staged_bsp_rx: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
@@ -77,14 +77,14 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_cmpm_mapped', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_repeated_mvkd', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x25fe, instruction=0x60f8, source_address=0x000b,
+                instruction_address=0x3053, instruction=0x7090,
                 bsp_transmit_words=[0x0aaa, 0xffd5],
                 bsp_receive_words=[0x0aaa, 0x0aaa],
-                bsp_control_writes=[0xc008, 0xc0c8], completion_strobes=2,
+                bsp_control_writes=[0xc008, 0xc0c8, 0xc008, 0xc008], completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)
 

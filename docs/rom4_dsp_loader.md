@@ -1,5 +1,12 @@
 # ROM4 DSP loader contract
 
+The native boundary profiles and the staged-frontend prototype have different
+acceptance scopes. The prototype currently stops on repeated MVKD `7090` at
+`3053`; its upload completion and handset boot remain unaccepted. The
+instruction qualifications below do not promote either claim. See
+[Current result](#current-result) for the established loader lifecycle and
+[Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
+
 ## Staged accumulator saturation
 
 SAT A/B is admitted as a register-only Execute operation. TI SPRU172C,
@@ -45,6 +52,20 @@ decision may allocate a frame, the target must stay retained and RET
 must balance the single taken-call write. Untaken calls touch neither
 SP nor stack memory. Delayed TC calls remain unadmitted; this fixture
 does not establish measured silicon pipeline phases.
+
+## Staged accumulator-lane comparisons
+
+CMPM admits accumulator lanes `0008..000d` through the existing memory-read
+path. SPRU172C page 4-33 defines a 16-bit equality test that replaces TC;
+the staged implementation captures the operand at Read and publishes TC at
+Execute. `cmpm-acc` verifies 6,912 cases and replays across all six lanes,
+direct/indirect/absolute forms, DP/SP modes, four values, two literals, both
+TC branch senses, both initial TC values, two program pages and three
+snapshots. Accumulators are poisoned before Read and changed after it;
+the literal is also overwritten after capture. Only one operand read occurs,
+with no data write, and the branch consumes the retained comparison result.
+Other mapped registers and peripherals remain outside this qualification;
+the fixture does not claim measured physical pipeline phases.
 
 ## Current result
 
@@ -440,9 +461,10 @@ word `0aaa`, at 0.133909558 and 0.133937654 s. The second is the newly
 admitted shifted read, not a new serial frame or an injected reply.
 The staged frontend executes SAT A/B at `3473/3475` and the circular
 post-increment store `80d3` at `34d3`, then the TC conditional call `f930`
-at `354c`. It stops at `0025fe`, `60f8`, a CMPM whose mapped source is
-`000b`. The exposed PC is `2603`, BK `00fa`, AR2 `0002`, ST0 `181f`,
-ST1 `6102`, PMST `ffac` and
+at `354c`, followed by accumulator-lane CMPM at `0025fe`, `60f8`, whose
+source `000b` is BL. It then stops on an unadmitted repeated MVKD at
+`003053`, `7090`. The exposed PC is `3056`, BK `00fa`, AR0 `1984`,
+AR2 `06bc`, ST0 `181f`, ST1 `4908`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -457,9 +479,11 @@ STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
 The backend
-reports 72 MCU mailbox writes and two completion strobes. After the two
+reports 74 MCU mailbox writes and two completion strobes. After the two
 retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
-at 0.133940788 s. This is a firmware write, not a supplied receive frame. Neither
+at 0.133940788 s. Two later BSP control writes publish `c008` at
+0.134188962 and 0.134294769 s, in addition to the initial reset/release pair.
+These are firmware writes, not supplied receive frames. Neither
 upload completion nor handset boot is accepted for this machine.
 
 Immediate STM `0022` retains its extension and publishes through the normal

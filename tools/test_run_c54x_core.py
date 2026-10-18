@@ -159,7 +159,7 @@ class CoreResultTests(unittest.TestCase):
                         check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
 
     def test_saturation_and_circular_store_require_complete_qualification_markers(self):
-        for profile in ('sat', 'store-circular', 'tc-call'):
+        for profile in ('sat', 'store-circular', 'tc-call', 'cmpm-acc'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending + '\n'
             check_result(text, 3, profile=profile)

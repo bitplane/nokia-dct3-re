@@ -1371,6 +1371,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged timer STM: PASS cases=36 restore=36 registers=TIM,PRD,TCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 stopped_timer=1 trb_reload=1 psc_write_mask=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated staged timer STM complete",
     ),
+    "cmpm-acc": (
+        "TMS320C54x accumulator CMPM: PASS cases=6912 restore=6912 lanes=6 forms=direct,indirect,absolute cpl=2 values=4 literals=2 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 source=Read tc=Execute retained=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated accumulator CMPM complete",
+    ),
     "cmpm-direct": (
         "TMS320C54x staged direct CMPM: PASS cases=384 restore=384 layouts=DP,SP values=4 literals=2 initial_tc=2 conditions=TC,NTC pages=2 snapshots=3 source_read=6 tc_publish=7 target_fetch=10 reads=1 writes=0 literal_fetches=1 address_retained=1 mapped_source_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated direct CMPM complete",
@@ -1697,7 +1701,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
+    if args.profile in ("cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

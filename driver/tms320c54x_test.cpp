@@ -8729,6 +8729,57 @@ private:
 		m_phase = 253010; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct accumulator_cmpm_fixture
+	{
+		unsigned lane, form, read, snapshot;
+		u16 source, value, literal, st1;
+		u32 base;
+		bool tc, initial_tc;
+		u64 a, b;
+	};
+	static accumulator_cmpm_fixture accumulator_cmpm_case(unsigned v)
+	{
+		accumulator_cmpm_fixture f{};
+		f.lane = v % 6; v /= 6;
+		f.value = std::array<u16, 4>{0, 1, 0x7f, u16(f.lane % 3 == 2 ? 0x80 : 0x8000)}[v % 4];
+		f.tc = (v / 4) % 2; f.initial_tc = (v / 8) % 2;
+		f.literal = (v / 16) % 2 ? 0x7f : 1;
+		f.form = (v / 32) % 3; f.st1 = 0x800 | ((v / 96) % 2 ? 0x4000 : 0);
+		f.base = (v / 192) % 2 ? 0x20000 : 0; f.snapshot = v / 384;
+		f.source = 8 + f.lane; f.read = f.form == 2 ? 7 : 6;
+		f.a = 0x0011223344ULL; f.b = 0x0055667788ULL;
+		u64 &accumulator = f.lane < 3 ? f.a : f.b;
+		unsigned const shift = 16 * (f.lane % 3);
+		accumulator = (accumulator & ~(0xffffULL << shift)) | (u64(f.value) << shift);
+		return f;
+	}
+	void start_accumulator_cmpm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = accumulator_cmpm_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.form == 2 ? 0x60f8 : f.form == 1 ? 0x6082 : 0x6000 | f.source);
+		if (f.form == 2) program.write_word(f.base + 0x601, f.source);
+		unsigned const words = f.form == 2 ? 3 : 2;
+		program.write_word(f.base + 0x600 + words - 1, f.literal);
+		program.write_word(f.base + 0x600 + words, 0xf820 | (f.tc << 4));
+		program.write_word(f.base + 0x601 + words, 0x700);
+		program.write_word(f.base + 0x602 + words, 0xe811); program.write_word(f.base + 0x603 + words, 0xf4e1);
+		program.write_word(f.base + 0x700, 0xe855); program.write_word(f.base + 0x701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600 | (f.initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, f.source);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "accumulator_cmpm_read", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(at == f.source && value == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "CMPM samples its selected accumulator lane exactly once at Read"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "accumulator_cmpm_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62126;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_direct_cmpm(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -17109,6 +17160,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
+		if (!strcmp(machine().options().bios(), "cmpm-acc")) { start_accumulator_cmpm(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-smem") || !strcmp(machine().options().bios(), "bitf-smem")) { start_pipeline_bitfield(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-branch")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "st-extended-ar") || !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use")) { start_extended_ar_store(); return; }
@@ -45804,6 +45856,30 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 253940) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253930; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62126)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = accumulator_cmpm_case(variant);
+			bool const result = f.value == f.literal, taken = result == f.tc;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == (tick <= f.read ? f.initial_tc : result), "Accumulator CMPM publishes TC only at Execute");
+			if (tick == f.read - 1) { m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); }
+			if (tick == f.read)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL);
+				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x600 + (f.form == 2 ? 2 : 1), 0xdead);
+			}
+			unsigned const checkpoint = f.read - 1 + f.snapshot;
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained accumulator comparison around Read/Execute"); }
+			if (tick == 30)
+			{
+				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ^ 0xffffffffffULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (result ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && !m_cpu->state_int(tms320c54x_device::STATE_SP), "CMPM branch uses retained accumulator lane and literal without writes or unrelated state changes");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore accumulator CMPM without duplicate reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62127; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 6911) { start_accumulator_cmpm(variant + 1); return; }
+				osd_printf_info("TMS320C54x accumulator CMPM: PASS cases=6912 restore=6912 lanes=6 forms=direct,indirect,absolute cpl=2 values=4 literals=2 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 source=Read tc=Execute retained=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated accumulator CMPM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62127) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62126; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254030)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{3, 6, 7}[variant / 128];
@@ -51714,6 +51790,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(58, "sat", "Staged signed saturation and overflow publication")
 	ROM_SYSTEM_BIOS(59, "store-circular", "Circular accumulator stores with retained addresses")
 	ROM_SYSTEM_BIOS(60, "tc-call", "TC and NTC conditional calls with retained predicate")
+	ROM_SYSTEM_BIOS(61, "cmpm-acc", "Retained CMPM reads of all accumulator register lanes")
 ROM_END
 
 ROM_START(tms54rom4)
