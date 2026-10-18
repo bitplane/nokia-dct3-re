@@ -168,6 +168,15 @@ class CoreResultTests(unittest.TestCase):
                     with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
                         check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
 
+    def test_poll_interrupt_requires_complete_qualification_marker(self):
+        marker, ending = EXTRA_PROFILES['poll-interrupt']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='poll-interrupt')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='poll-interrupt')
+
     def test_shifted_peripheral_requires_retention_and_honest_boundary_labels(self):
         for profile in ('shift-periph', 'shift-bsp', 'shift-per-edge', 'shift-unowned'):
             marker, ending = EXTRA_PROFILES[profile]

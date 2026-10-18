@@ -14169,6 +14169,33 @@ private:
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "asm_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "LD ASM exclusions never write data memory"); } });
 		m_pipeline_peripheral_case = variant; m_phase = 255040; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	}
+	void start_poll_interrupt(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u32 const base = (variant / 64) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 64; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); program.write_word(base + i, 0xf495); }
+		std::array<u16, 9> const body{0x10f8, 0x1002, 0x0881, 0xfa45, 0x0602, 0x10f8, 0x1002, 0xe955, 0xf4e1};
+		for (unsigned i = 0; i < body.size(); ++i) program.write_word(base + 0x600 + i, body[i]);
+		for (unsigned vector : {4U, 0x40U}) { program.write_word(base + vector, 0xf273); program.write_word(base + vector + 1, 0x700); program.write_word(base + vector + 2, 0xf495); program.write_word(base + vector + 3, 0xf495); }
+		program.write_word(base + 0x700, 0x80f8); program.write_word(base + 0x701, 0x1004);
+		program.write_word(base + 0x702, 0x76f8); program.write_word(base + 0x703, 0x1002); program.write_word(base + 0x704, 2); program.write_word(base + 0x705, 0xf4eb);
+		data.write_word(0x1002, 1); data.write_word(0x1003, 1); data.write_word(0x1004, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1003);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0x1002, 0x1003, "poll_interrupt_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0x1002, 0x1002, "poll_interrupt_release", [this](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled()) { expect(word == 2 && !m_pipeline_store_writes, "Only the interrupt handler releases the polling loop once"); ++m_pipeline_store_writes; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 256100;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct delay_compare_fixture
 	{
 		unsigned kind, form, interrupt, prefix, read, literal_clock, checkpoint;
@@ -18206,6 +18233,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mar-reverse")) { start_indexed_mar(); return; }
 		if (!strcmp(machine().options().bios(), "minmax") || !strcmp(machine().options().bios(), "squr")) { start_minmax(); return; }
 		if (!strcmp(machine().options().bios(), "store-index") || !strcmp(machine().options().bios(), "imm-index") || !strcmp(machine().options().bios(), "store-circular")) { start_indexed_store(); return; }
+		if (!strcmp(machine().options().bios(), "poll-interrupt")) { start_poll_interrupt(); return; }
 		if (!strcmp(machine().options().bios(), "compare-delay")) { start_delay_compare(); return; }
 		if (!strcmp(machine().options().bios(), "cmp-delay-edge")) { start_delay_compare_edge(); return; }
 		if (!strcmp(machine().options().bios(), "asm-load") || !strcmp(machine().options().bios(), "asm-consumer")) { start_asm_load(); return; }
@@ -49411,6 +49439,30 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 256100)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			// set_input_line queues a scheduler event; snapshot only after it
+			// settles, not in the host callback that first asserts the pin.
+			unsigned const arrival = 16 + variant % 32, checkpoint = arrival - 1 + std::array<unsigned, 3>{0, 2, 6}[variant / 128];
+			u32 const base = (variant / 64) % 2 ? 0x20000 : 0;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Polling loop and interrupt handler use supported instructions");
+			if (tick == arrival) m_cpu->set_input_line((variant / 32) % 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks, 0}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save polling loop before during or after interrupt arrival"); }
+			if (tick == 160)
+			{
+				bool const passed = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x609 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1003 && m_pipeline_store_writes == 1 && m_vector_acks == 1;
+				if (!passed) osd_printf_info("poll_interrupt_state: case=%u replay=%u pc=%llx idle=%llu sp=%llx st1=%llx ifr=%llx reads=%u writes=%u acks=%u\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(STATE_GENPC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IFR), m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks);
+				expect(passed, "IRQ NMI must release a short delayed-branch polling loop and return with a balanced frame");
+				expect(m_cpu->space(AS_DATA).read_word(0x1004) == 1, "The decoded delay load completes before the handler observes the foreground accumulator");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_vector_acks = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore polling and interrupt ownership without duplicate handler writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 256110; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_cpu->set_pipeline_frontend(false);
+				if (variant < 383) { start_poll_interrupt(variant + 1); return; }
+				osd_printf_info("TMS320C54x polling loop interrupts: PASS cases=384 restore=384 sources=IRQ,NMI arrivals=32 pages=2 snapshots=3 release=handler balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated polling loop interrupts complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 256110) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 256100; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254980)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_compare_case(variant);
@@ -51693,6 +51745,11 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 256100)
+		{
+			expect(line == ((m_pipeline_peripheral_case / 32) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x602, "Polling loop acknowledges its pending source once with the branch target as continuation");
+			++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE);
+		}
 		if (m_phase == 259960)
 		{
 			unsigned const variant = m_pipeline_peripheral_case;
@@ -53560,6 +53617,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(98, "unsigned-edge", "ADDS and SUBS mapped control-source exclusions")
 	ROM_SYSTEM_BIOS(99, "cmpm-map", "CMPM retained T TRN and auxiliary sources with TC consumers")
 	ROM_SYSTEM_BIOS(100, "cmpm-map-edge", "CMPM unowned mapped-source exclusions")
+	ROM_SYSTEM_BIOS(101, "poll-interrupt", "Interrupt delivery through a delayed conditional polling loop")
 ROM_END
 
 ROM_START(tms54rom4)

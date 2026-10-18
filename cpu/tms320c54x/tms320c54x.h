@@ -362,6 +362,7 @@ private:
 	u8 m_pipeline_control_words = 0;
 	u8 m_pipeline_delay_decode_words = 0;
 	u32 m_pipeline_control_address = 0;
+	u16 m_pipeline_control_word = 0;
 	bool m_pipeline_bc_held = false;
 	u16 m_pipeline_bc_word = 0;
 	u32 m_pipeline_bc_address = 0;

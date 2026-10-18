@@ -1,21 +1,51 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The last exact-stop acceptance reaches the first organic
+acceptance scopes. The staged frontend reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
-initialization passes, and stops on CMPM `60f8` at `401a`
-(reported PC `401f`). The mapped AR2 source is now qualified; the new
-three- and thirty-second captures are fault-free, pending live-wait
-acceptance below.
+initialization passes, and now passes the frame-buffer polling loop before
+stopping on delayed TC branch `fa30` at `4749` inside block `473c..4777`
+(reported PC `474c`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is the live firmware wait after the admitted
-CMPM, not another guessed instruction extension. Absolute data address
-`0012` is AR2, not external RAM. Parallel-store carry and physical bus phases remain
-unvalidated.
+The current staged question is TC-owned delayed branching inside a block
+repeat. Absolute data address `0012` is AR2, not external RAM.
+Parallel-store carry and physical bus phases remain unvalidated.
+
+## Delayed-branch polling interrupts
+
+The staged CPU must not wait for every delay instruction to reach Execute
+before recognizing a pending interrupt. In a short polling loop, the only
+clock with the old control fully retired can coincide with the next branch's
+partial Decode, starving interrupt recognition indefinitely. A synthetic
+polling loop reproduces this with an enabled pending IRQ and no handler entry.
+
+The qualified exception covers a retired delayed near branch with a complete
+two-word absolute LD in Access, after discarded fall-through prefetch has
+cleared. The decoded load drains ahead of INTR, following SPRU131G 6.10.7
+and 7.2. Prefetch/Fetch instances at the same PC are not decoded control
+owners. The retained control opcode is saved with the rest of the pipeline;
+calls, returns and flag-writing delay instructions keep their existing guards.
+This is a bounded composition, not a general interrupt-latency claim.
+
+`poll-interrupt` passes 384 cases and save-state replays: IRQ/NMI, 32
+arrival phases, two pages and three snapshots before assertion, after the
+pin event settles and during entry. The handler stores the foreground
+accumulator to prove that the delay load completed, updates the polled RAM
+once, then returns. The test requires the branch target as the stacked
+continuation, one acknowledgement, balanced SP and eventual loop exit.
+Delayed-comparison, delayed far-call, delayed block-repeat, interrupted STLM,
+status-mask, BITT/RETD and block/XC interrupt profiles also pass unchanged.
+A broader guard relaxation failed comparison-publication and far-call-frame
+tests and is not part of this contract.
+
+In the native run, this releases the `4717` polling loop without changing
+RAM, firmware inputs or peripheral timing. Execution reaches the guarded
+delayed TC branch inside block `473c..4777`. The exact-stop checker now
+pins that endpoint; this is not native handset boot or RF acquisition.
 
 ## CMPM mapped-register source qualification
 
@@ -55,16 +85,13 @@ actively reading equal words, not CPU IDLE or an unsupported-opcode halt.
 Artifact: `tmp/cmpm-wait-native/error.log`, produced by the read-only
 `tmp/cmpm_wait_probe.lua`.
 
-The terminal IFR=`0225` and IMR=`035f` include enabled pending frame
+The pre-correction terminal IFR=`0225` and IMR=`035f` include enabled pending frame
 source 0; ST1=`6103` has INTM clear. Thus the next question is delivery
 through the short delayed-branch loop, not a fabricated peripheral reply.
-The staged acceptance path also protects delayed controls and pending
-operand transactions; which guard prevents delivery here remains to be
-proved with an executable interrupt/loop fixture. Timer advancement alone
-is not evidence of ongoing firmware service or a healthy wait.
-These captures supersede the old CMPM rejection as runtime observations,
-but the exact-stop checker below still describes the previous accepted
-checkpoint pending replacement with a qualified live-wait contract.
+The delayed-control guard was responsible, as qualified above. This is an
+important counterexample: timer advancement alone is not evidence of ongoing
+firmware service or a healthy wait. These pre-correction captures are not
+the current acceptance endpoint.
 It does not establish upload completion, RF acquisition or handset boot.
 
 ## STLM suspension of an interrupted loop
@@ -626,7 +653,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 21 | 11 | Two initialization passes and later RF-control burst; mapped CMPM source stops at `401a`. |
+| `nse1pipe` | staged | standard | 21 | 12 | Two initialization passes and later RF-control burst; delayed TC branch inside block stops at `4749`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -1058,21 +1085,21 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins the Access guard for CMPM
-`60f8` at `401a`, source `0012`, PC `401f`, ILLEGAL set, seven
-reads through the ring-base tap, twenty-one consumer advances, 354 completion
-strobes, 74 mailbox writes and final device counters of 10,336 RF reads,
-327 slot expiries and 573 frame expiries. Eleven RF-control writes and
-255 transfer expiries occur, with only 31 expiries before the stop;
-`mode_aa` is zero and `mode_ac` is two. The terminal architectural snapshot
-is A=B=`302813`, T=`000c`, ST0=`001f`, ST1=`6103`, BK=`0052`,
-AR0=`126d`, AR1=`03e8`, AR2=`0031`, AR3=`0008`. This is an Access-rejection snapshot,
+The final observation at 3.016666667 s pins the block-control guard for
+delayed TC branch `fa30` at `4749`, block `473c..4777`, PC `474c`, ILLEGAL
+set, seven reads through the ring-base tap, twenty-one consumer advances,
+357 completion strobes, 74 mailbox writes and final device counters of
+10,688 RF reads, 329 slot expiries and 573 frame expiries. Twelve RF-control
+writes and 32 transfer expiries occur, all transfers before the stop;
+`mode_aa` is zero and `mode_ac` is one. The terminal architectural snapshot
+is A=`1a08`, B=0, T=`5555`, ST0=`081f`, ST1=`e103`, BK=`0048`,
+AR0=1, AR1=`06b8`, AR2=`1a04`, AR3=`1250`. This rejection snapshot is
 not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-one packets in one uninterrupted session. Both fresh
-captures reproduce these observations in
-`tmp/unsigned-map-native{,-confirm}/error.log`.
+captures reproduce the endpoint and pass the checker:
+`tmp/poll-interrupt-native{,-confirm}/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
@@ -1115,8 +1142,9 @@ pages and three snapshots around source Read/TC publication. Each source
 is mutated after its single Read, including ST0's own TC bit, to verify
 that publication uses the retained sample while preserving other current
 status bits. No data writes occur. Admission adds only status registers
-`0006`/`0007` to BITF's existing mapped-source set; low controls, CMPM's
-mapped-source restriction and other unvalidated sources remain unchanged.
+`0006`/`0007` to BITF's existing mapped-source set. CMPM separately admits
+`0008..0017` as qualified above, not these status registers. Low controls
+and other unvalidated sources remain guarded.
 This is functional pipeline coverage, not a silicon phase measurement.
 
 `reada-brc` and `reada-brc16` each execute 18,432 cases plus replay, with
@@ -5075,7 +5103,8 @@ passes 96 cases/restores: sampled flags, late physical IRQ, selected IRQ
 whose flag is cleared, independent NMI, and RETE stack restoration. The
 absolute CMPM `60f8 3762 000c` at `02:909c` now executes after a 96-case
 retained-extension/source and adjacent TC/NTC branch replay gate.
-Mapped-register CMPM remains excluded; the shared mapped-BITF gate passes.
+Mapped-register CMPM is separately qualified for `0008..0017` above;
+the shared mapped-BITF gate also passes.
 MVKD `7082 0010` at `02:8fbd` now copies AR0 through AR2 to McBSP's
 mapped control-data register `0049`, after a 648-case peripheral
 wait/publication/replay gate. The extra peripheral clock precedes a

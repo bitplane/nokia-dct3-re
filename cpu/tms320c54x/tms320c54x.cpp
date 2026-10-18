@@ -1444,6 +1444,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_control_words));
 	save_item(NAME(m_pipeline_delay_decode_words));
 	save_item(NAME(m_pipeline_control_address));
+	save_item(NAME(m_pipeline_control_word));
 	save_item(NAME(m_pipeline_bc_held));
 	save_item(NAME(m_pipeline_bc_word));
 	save_item(NAME(m_pipeline_bc_address));
@@ -2693,6 +2694,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_flush_front = m_pipeline_vector_pending = false;
 	m_pipeline_decode_flush = m_pipeline_control_words = m_pipeline_delay_decode_words = 0;
 	m_pipeline_control_address = 0;
+	m_pipeline_control_word = 0;
 	m_pipeline_bc_held = false;
 	m_pipeline_bc_word = 0;
 	m_pipeline_bc_address = 0;
@@ -3493,6 +3495,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_idle_barrier = true;
 			m_pipeline_idle_resume_address = (m_pipeline_address[2] & 0x7f0000) | u16(m_pipeline_address[2] + 1);
 			m_pipeline_control_address = m_pipeline_address[2];
+			m_pipeline_control_word = word;
 			m_pipeline_control_words = 1;
 			m_pipeline_valid[0] = m_pipeline_valid[1] = false;
 		}
@@ -3502,6 +3505,7 @@ void tms320c54x_device::pipeline_step()
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
+			m_pipeline_control_word = word;
 			m_pipeline_control_words = (staged_accumulator_transfer(word) ? 1 : staged_extended_banz(word) ? 3 : branch || block_setup ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed || staged_conditional_branch(word) || staged_banz(word) ? 0 : 2;
@@ -5186,6 +5190,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_immediate[2] = u16(m_pipeline_address[2] + 1);
 		m_rtn = m_pipeline_immediate[2];
 		m_pipeline_control_address = m_pipeline_address[2];
+		m_pipeline_control_word = m_pipeline_word[2];
 		m_pipeline_control_words = 1;
 		m_pipeline_decode_flush = 2;
 		m_pipeline_vector_pending = true;
@@ -5340,8 +5345,19 @@ void tms320c54x_device::pipeline_accept_interrupt()
 	bool intm_protected = m_pipeline_intm_follow;
 	for (unsigned stage = 0; stage < 5; ++stage)
 		intm_protected |= m_pipeline_valid[stage] && m_pipeline_intm_protected[stage];
+	// Qualified near-branch / two-word LD composition: the branch has
+	// retired and the load has reached Access. It drains ahead of INTR
+	// (SPRU131G 7.2); waiting for its Execute can starve a short polling loop.
+	// Calls, returns and flag-writing delay instructions retain their guards.
+	bool near_branch_retired = !m_pipeline_decode_flush &&
+		(m_pipeline_control_word == 0xf273 || (staged_conditional_branch(m_pipeline_control_word) && !staged_conditional_call(m_pipeline_control_word) && BIT(m_pipeline_control_word, 9)));
+	for (unsigned stage = 2; stage < 5; ++stage)
+		if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address) near_branch_retired = false;
+	bool const retained_load_delay = !m_pipeline_delay_decode_words && m_pipeline_valid[3] &&
+		m_pipeline_address[3] == m_pipeline_control_address + 2 && staged_absolute_load(m_pipeline_word[3]);
+	bool const control_protected = m_pipeline_control_words && !(near_branch_retired && retained_load_delay);
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !m_pipeline_control_words && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);
