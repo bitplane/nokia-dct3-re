@@ -6,10 +6,19 @@ local bsp_tap = cpu.spaces.data:install_write_tap(0x22, 0x22, 'staged_bsp_contro
     machine:logerror(string.format('rom4_staged_bsp_write: value=%04x mask=%04x t=%.9f\n',
         value, mask, machine.time:as_double()))
 end)
+local tx_count = 0
+local tx_tap = cpu.spaces.data:install_write_tap(0x21, 0x21, 'staged_bsp_transmit', function(_, value, mask)
+    tx_count = tx_count + 1
+    if tx_count <= 16 then
+        machine:logerror(string.format('rom4_staged_bsp_tx: index=%d value=%04x mask=%04x t=%.9f\n',
+            tx_count, value, mask, machine.time:as_double()))
+    end
+end)
 emu.register_frame_done(function()
-    assert(bsp_tap)
+    assert(bsp_tap and tx_tap)
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
+    machine:logerror(string.format('rom4_staged_bsp_tx_count: count=%d\n', tx_count))
     local words = {}
     for address = 0x0f00, 0x0f27 do
         words[#words + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
@@ -28,4 +37,9 @@ emu.register_frame_done(function()
         tail[#tail + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
     end
     machine:logerror('rom4_staged_uploaded_tail: base=0e18 words=' .. table.concat(tail, ',') .. '\n')
+    local loop = {}
+    for address = 0x0e58, 0x0e6f do
+        loop[#loop + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
+    end
+    machine:logerror('rom4_staged_repeat_tail: base=0e58 words=' .. table.concat(loop, ',') .. '\n')
 end)

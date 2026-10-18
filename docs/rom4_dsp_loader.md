@@ -284,15 +284,22 @@ then `c0c8` to the existing BSP-control endpoint `0022`. A passive data-write
 tap observes both full-word writes in order, at 0.133888750 and 0.133888808 s.
 Absolute BITF `61f8 0007 0800` at `004615` reads ST1's INTM bit and
 execution passes the following `f7bb` (set INTM). Execution returns from
-this resident routine and stops at uploaded `000e30`, `8821`
-(STLM A to BSP transmit register `0021`). The exposed PC is `0e32`, PMST `ffac` and
+this resident routine and executes uploaded `000e30`, `8821`
+(STLM A to BSP transmit register `0021`), publishing `0aaa` once at
+0.133893750 s. It stops at `000e5f`, conditional branch `f845 0e66`
+leaving block `0e5c..0e62`. The exposed PC is `0e62`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
 loader1 image is at `0x99704`). The 16 uploaded words at `0e18..0e27`
 also bind uniquely to offset `0x98a70`, including successive BSP control
 writes `c008` and `c0c8`; these are uploaded instructions, not mask-ROM
-contents. The backend
+contents. The 24 observed words at `0e58..0e6f` bind uniquely to MCU file
+offset `0x98af0`: the loop reads BSP receive `0020`, compares it with AR6,
+branches to `0e66` on equality, and otherwise writes another `0aaa` using
+STM `0021`; `0e66` explicitly clears BRAF. The frontier is a staged
+block-exit admission restriction, not evidence of a missing serial reply.
+The backend
 reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
 upload completion nor handset boot is accepted for this machine.
 
@@ -315,6 +322,21 @@ status bits. No data writes occur. Admission adds only status registers
 `0006`/`0007` to BITF's existing mapped-source set; low controls, CMPM's
 mapped-source restriction and other unvalidated sources remain unchanged.
 This is functional pipeline coverage, not a silicon phase measurement.
+
+`stlm-bsp` checks 3,072 cases plus replay: A/B, eight accumulator patterns,
+16 SST/SXM/OVM/FRCT combinations, CPL clear/set, two program pages and three
+snapshots around the peripheral hold/publication. The source is changed
+before Execute to establish live accumulator sampling; DP is nonzero and
+CPL varies to distinguish encoded MMR addressing from ordinary Smem. Each
+case writes once to `0021`, performs no data reads, preserves accumulators
+and status, and applies the existing saturated-store semantics. The model
+adds one peripheral access clock (publication at core clock 7), not a
+measured silicon phase. `stlm-bsp-edge` checks 32 cases plus replay with no
+bus/accumulator effects for excluded delay, single-repeat, block-repeat
+and XC compositions. Only standalone STLM `0021` is newly admitted.
+The native passive transmit tap proves the backend received the one `0aaa`
+write. This is register-level publication, not proof of PCM transport,
+speech or handset boot.
 
 Repeated short-source WRITA uses a retained logical PAR stream, with each
 program destination translated independently for overlay and address-width

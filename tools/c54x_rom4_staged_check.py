@@ -10,7 +10,9 @@ import sys
 
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a70
-STOP = 'unsupported staged C54x form 8821 at 000e30'
+REPEAT_SOURCE_OFFSET = 0x98af0
+STOP = ('staged block control/count modification is unsupported instruction=000e5f '
+        'word=f845 block=000e5c..000e62')
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -21,9 +23,9 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e32', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e62', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
-    if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
+    if text.count(STOP) != 1 or 'unsupported staged C54x form' in text:
         raise ValueError('missing or ambiguous unsupported instruction')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('2', '71')]:
@@ -33,6 +35,11 @@ def check(text, firmware):
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
     if not 0 < float(bsp[0][2]) < float(bsp[1][2]) < float(timestamp):
         raise ValueError('native BSP publication order changed')
+    tx = re.findall(r'rom4_staged_bsp_tx: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
+    if (text.count('rom4_staged_bsp_tx:') != 1 or len(tx) != 1 or tx[0][:3] != ('1', '0aaa', 'ffff')
+            or not float(bsp[1][2]) < float(tx[0][3]) < float(timestamp)
+            or re.findall(r'rom4_staged_bsp_tx_count: count=(\d+)', text) != ['1']):
+        raise ValueError('missing, duplicate or changed native BSP transmit publication')
     words = [int(word, 16) for word in encoded.split(',')]
     if (len(words) != 40 or words[:7] != [0x7718, 0x1ec6, 0x7728, 0x2000, 0xf7be, 0x7758, 0x3146]
             or words[13:16] != [0xf071, 0x079f, 0x8093]
@@ -50,10 +57,22 @@ def check(text, firmware):
     packed_tail = struct.pack('>16H', *tail)
     if firmware.find(packed_tail) != TAIL_SOURCE_OFFSET or firmware.find(packed_tail, TAIL_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded tail does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_bsp_transmit_stlm', source_offset=SOURCE_OFFSET,
+    loops = re.findall(r'^(?:\[luaengine\] )?rom4_staged_repeat_tail: base=0e58 words=([0-9a-f,]+)$', text, re.M)
+    if len(loops) != 1 or text.count('rom4_staged_repeat_tail:') != 1:
+        raise ValueError('missing, malformed or duplicate uploaded repeat loop')
+    loop = [int(word, 16) for word in loops[0].split(',')]
+    if (len(loop) != 24 or loop[:6] != [0x771a, 0x1388, 0xf072, 0x0e62, 0x4920, 0x4816]
+            or loop[7:11] != [0xf845, 0x0e66, 0x7721, 0x0aaa] or loop[14] != 0xf6bf):
+        raise ValueError('uploaded loop exit or serial instructions changed')
+    packed_loop = struct.pack('>24H', *loop)
+    if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
+        raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
+    return dict(status='unsupported_staged_block_exit_branch', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=16,
+                repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x0e30, instruction=0x8821, destination=0x21,
+                instruction_address=0x0e5f, instruction=0xf845, branch_target=0x0e66,
+                bsp_transmit_words=[0x0aaa],
                 bsp_control_writes=[0xc008, 0xc0c8], completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)

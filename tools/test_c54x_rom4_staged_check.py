@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, STOP, check
+from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, REPEAT_SOURCE_OFFSET, STOP, check
 
 
 class StagedFrontierTest(unittest.TestCase):
@@ -12,21 +12,29 @@ class StagedFrontierTest(unittest.TestCase):
         self.tail = '0e1e,7ef8,0014,0093,7e8b,0093,e552,fc00,7722,c008,7722,c0c8,f7bb,e908,f074,4610'
         self.tail_payload = bytes.fromhex(self.tail.replace(',', ''))
         self.image = (bytes(SOURCE_OFFSET) + self.payload).ljust(TAIL_SOURCE_OFFSET, b'\0') + self.tail_payload
-        self.row = ('rom4_staged_frontier: pc=0e32 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
+        self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
+        self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
+        self.row = ('rom4_staged_frontier: pc=0e62 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e18 words={self.tail}\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
                      'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
+                     'rom4_staged_bsp_tx: index=1 value=0aaa mask=ffff t=0.133893750\n'
+                     'rom4_staged_bsp_tx_count: count=1\n'
+                     f'rom4_staged_repeat_tail: base=0e58 words={self.loop}\n'
                      'rom4_interface_summary: completion_strobes=2 mailbox_writes=71 \n')
 
     def test_binds_observation_without_promoting_boot(self):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x8821)
-        self.assertEqual(result['instruction_address'], 0x0e30)
+        self.assertEqual(result['instruction'], 0xf845)
+        self.assertEqual(result['instruction_address'], 0x0e5f)
         self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
-        self.assertEqual(result['destination'], 0x21)
+        self.assertEqual(result['branch_target'], 0x0e66)
+        self.assertEqual(result['bsp_transmit_words'], [0x0aaa])
+        self.assertEqual(result['repeat_source_offset'], REPEAT_SOURCE_OFFSET)
         self.assertEqual(result['bsp_control_writes'], [0xc008, 0xc0c8])
         self.assertEqual(result['completion_strobes'], 2)
         self.assertEqual(result['swwsr'], 0x2000)
@@ -37,7 +45,12 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=0e32', 'pc=0f1f'),
+                     self.text.replace('pc=0e62', 'pc=0f1f'),
+                     self.text.replace('value=0aaa', 'value=0aab'),
+                     self.text.replace('count=1', 'count=2'),
+                     self.text.replace('base=0e58', 'base=0e59'),
+                     self.text.replace('f845,0e66', 'f845,0e65'),
+                     self.text + f'rom4_staged_repeat_tail: base=0e58 words={self.loop}\n',
                      self.text.replace('value=c008', 'value=c009'),
                      self.text.replace('mask=ffff', 'mask=00ff'),
                      self.text + 'rom4_staged_bsp_write: malformed\n',
@@ -56,6 +69,7 @@ class StagedFrontierTest(unittest.TestCase):
 
     def test_rejects_wrong_source_position_or_ambiguous_binding(self):
         for image in (b'', self.image[2:], self.image + self.payload, self.image + self.tail_payload,
+                      self.image + self.loop_payload,
                       self.image[:-2] + b'\x00\x00'):
             with self.subTest(length=len(image)), self.assertRaises(ValueError):
                 check(self.text, image)

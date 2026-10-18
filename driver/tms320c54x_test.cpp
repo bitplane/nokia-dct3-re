@@ -9582,6 +9582,50 @@ private:
 		return {trn, source, gap, 6 + gap, u16(stored), consumed, memory, st0, st1, u16(flags & 1), u16(st0 | (overflow ? source ? 0x400 : 0x200 : 0)),
 			u16(trn ? 0x480f | ((!source) << 8) : (0x2000 + kind * 0x200) | ((!source) << 8) | 0x81), value, result, pattern & 1 ? 0x20000U : 0};
 	}
+	void start_stlm_bsp(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto f = stlm_t_case(variant % 256);
+		f.st1 = (f.st1 & ~u16(0x4000)) | (((variant / 256) % 2) ? 0x4000 : 0);
+		f.base = (variant / 512) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, f.source ? 0x8921 : 0x8821);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : 0x1111); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? 0x1111 : 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		data.write_word(0x21, 0xa55a);
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stlm_bsp_no_reads",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "STLM BSP has no data-source or destination read"); } });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_bsp_write",
+			[this, f](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
+				expect(!m_pipeline_store_writes && address == 0x21 && value == f.stored && m_cpu->pipeline_cycles() == 7,
+					"STLM BSP publishes its Execute-live saturated accumulator once after the peripheral clock"); ++m_pipeline_store_writes; });
+		m_phase = 62060; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_stlm_bsp_edge(unsigned variant = 0)
+	{
+		start_stlm_bsp((variant / 4) % 2 + ((variant / 8) % 2) * 512);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+		u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
+		u16 const word = (variant / 4) % 2 ? 0x8921 : 0x8821;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		switch (variant % 4)
+		{
+		case 0: program.write_word(base + 0x600, 0xf273); program.write_word(base + 0x601, 0x700); program.write_word(base + 0x602, word); break;
+		case 1: program.write_word(base + 0x600, 0xec01); program.write_word(base + 0x601, word); break;
+		case 2: program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, 0x603); program.write_word(base + 0x602, word); break;
+		case 3: program.write_word(base + 0x600, 0xfd00); program.write_word(base + 0x601, word); break;
+		}
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_bsp_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_bsp_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 62062; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
 	void start_pipeline_stlm_t(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -16474,6 +16518,8 @@ private:
 		if (!strcmp(machine().options().bios(), "clock-stm")) { start_staged_bus_stm(); return; }
 		if (!strcmp(machine().options().bios(), "serial-stm")) { start_staged_bus_stm(); return; }
 		if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
+		if (!strcmp(machine().options().bios(), "stlm-bsp")) { start_stlm_bsp(); return; }
+		if (!strcmp(machine().options().bios(), "stlm-bsp-edge")) { start_stlm_bsp_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
@@ -47806,6 +47852,70 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254060) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254050; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62062)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 16;
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded STLM BSP before Decode admission");
+			}
+			if (tick == 12)
+			{
+				bool const source = (variant / 4) % 2;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (source ? 0xdead : 0x1111) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (source ? 0x1111 : 0xdead), "Excluded STLM BSP composition has no data-bus or accumulator effects");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded STLM BSP before any peripheral publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62063; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 31) { start_stlm_bsp_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x BSP STLM exclusions: PASS cases=32 restore=32 compositions=delay,repeat,block,XC accumulators=2 pages=2 snapshots=2 data_reads=0 data_writes=0 accumulator_changes=0 silicon_trap_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated BSP STLM exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62063) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62062; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62060)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto f = stlm_t_case(variant % 256);
+			f.st1 = (f.st1 & ~u16(0x4000)) | (((variant / 256) % 2) ? 0x4000 : 0);
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 8}[variant / 1024];
+			if (tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "STLM BSP preserves status and uses its encoded register independent of DP/CPL");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save STLM BSP around peripheral hold and publication");
+			}
+			if (tick == 12)
+			{
+				expect(!m_pipeline_operand_reads && m_pipeline_store_writes == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source ? 0xdead : f.value) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source ? f.value : 0xdead), "STLM BSP leaves accumulators intact and performs one write without reads");
+				{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x21) == f.stored, "STLM BSP destination retains the saturated word"); }
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore STLM BSP without repeating a published write");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62061; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 3071) { start_stlm_bsp(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged BSP STLM: PASS cases=3072 restore=3072 accumulators=2 patterns=8 flags=16 cpl=2 pages=2 snapshots=3 source_sample=Execute writes_each=1 data_reads=0 publish_clock=7 peripheral_extra_clock=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated BSP STLM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62061) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62060; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 253590)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -50919,6 +51029,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(39, "rpt-writa16", "Repeated WRITA on the standard 16-bit program-address profile")
 	ROM_SYSTEM_BIOS(40, "serial-stm", "Retained immediate BSP control publication")
 	ROM_SYSTEM_BIOS(41, "status-bitf", "Retained ST0 and ST1 bitfield sampling")
+	ROM_SYSTEM_BIOS(42, "stlm-bsp", "Accumulator publication to external BSP transmit register")
+	ROM_SYSTEM_BIOS(43, "stlm-bsp-edge", "Excluded BSP transmit control and repeat compositions")
 ROM_END
 
 ROM_START(tms54rom4)

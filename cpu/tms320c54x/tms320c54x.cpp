@@ -550,7 +550,7 @@ constexpr bool staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d);
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d || u8(word) == 0x21);
 }
 
 constexpr bool staged_extended_dst(u16 word)
@@ -2869,7 +2869,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f) ||
 		(staged_mvdd(m_pipeline_word[3]) && m_pipeline_immediate[3] >= 0x20 && m_pipeline_immediate[3] <= 0x5f));
 	bool const write_peripheral = m_pipeline_valid[4] &&
-		(((staged_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
+		(((staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
 		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
 	if (read_peripheral && write_peripheral)
 	{
@@ -3234,6 +3234,11 @@ void tms320c54x_device::pipeline_step()
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = staged_memory_load(word);
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
+		if (m_pipeline_valid[2] && (word & 0xfeff) == 0x8821 &&
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged BSP STLM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const direct_long_load = staged_dld(word);
 		bool const direct_long_store = staged_dst(word);
 		bool const long_arithmetic = staged_long_arithmetic(word);

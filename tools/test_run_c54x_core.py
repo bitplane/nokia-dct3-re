@@ -148,6 +148,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
+    def test_bsp_stlm_requires_publication_scope_and_exclusions(self):
+        for profile in ('stlm-bsp', 'stlm-bsp-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_status_bitf_requires_retained_sampling_and_replay(self):
         marker, ending = EXTRA_PROFILES['status-bitf']
         text = marker + '\n' + ending + '\n'
