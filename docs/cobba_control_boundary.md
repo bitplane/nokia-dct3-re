@@ -521,9 +521,15 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at conditional
-accumulator store `9e1b` at `fd6d`. It is rejected in Decode; that stop's
-register ages must not be compared directly with atomic Execute observations.
+return. Staged encoding now completes the eight silence frames (0..7):
+608 parameters match the independent reference, preprocessing histories match,
+and each completed frame passes its full-RAM replay. The 32-frame encoder gate
+remains **failing** on the first impulse frame (8), at `400e` at `fb40`, where
+shift-16 memory arithmetic excludes the resolved mapped T source `000e`.
+The reported fetch context `89b7` is not the instruction owner. Register ages
+at this guard must not be compared directly with atomic Execute observations.
+Conditional accumulator store `9e1b` at `fd6d` now has read/write-back,
+late-source, non-saturating shift and replay qualification.
 Indexed memory move `71b2` at `88c9` now has both ordinary-instruction and
 short-repeat qualification, including pointer/destination aliases, overlapping
 RAM and replay. The encoder executes through that sequence into a ROM library

@@ -716,6 +716,23 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_staged_conditional_store_scope(self):
+        for profile in ('cond-store', 'cond-store-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            mutations = (('restore=1024', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1'), ('pointer_changes=0', 'pointer_changes=1')) if profile.endswith('edge') else (
+                         ('restore=442368', 'restore=0'), ('false_read_writeback=1', 'false_read_writeback=0'),
+                         ('read_retained=1', 'read_retained=0'), ('saturation_ignored=1', 'saturation_ignored=0'),
+                         ('predicate_source_sample=Execute', 'predicate_source_sample=Read'))
+            for old, new in mutations + (('reset_before_restore=1', 'reset_before_restore=0'),):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_repeated_indexed_mvdk_scope(self):
         for profile in ('mvdk-index-rpt', 'mvdk-irpt-edge'):
             marker, ending = EXTRA_PROFILES[profile]

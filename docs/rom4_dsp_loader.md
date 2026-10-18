@@ -18,6 +18,35 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Conditional register and accumulator stores
+
+The staged frontend admits STRCD, SRCCD and SACCD A/B (`9cxx..9fxx`, valid
+signed accumulator conditions). Every instruction captures one Xmem address,
+updates its pointer regardless of the predicate, reads RAM and writes once.
+A false predicate writes back the retained Read sample, not the later live
+memory value (SPRU131G 6.6.3; SPRU172C 4-152). SACCD obeys ASM/SXM but does
+not use SST saturation.
+
+The partial staged model captures address/DAGEN in Access and memory/ASM in
+Read, then samples the predicate and source in Execute. SRCCD's Execute-owned
+BRC is explicitly documented in SPRU131G 7-73; this qualification does not
+establish silicon timing for every other predicate/source or producer pairing.
+The shared store-word calculation is also used for an adjacent RAM bypass,
+without replacing the actual write transaction.
+
+`cond-store` passes 442,368 cases plus replay: four source forms, twelve A/B
+predicates, six zero/sign/guard patterns, sixteen Xmem encodings, four ASM
+shifts, four flag combinations, two pages and three snapshots. OVM/SST are
+toggled together; the two BK values are coupled to source patterns. These are
+not independent full cross-products. Late pointer and ASM changes check
+retention; changing A/B/T/BRC after Read checks the declared Execute sampling
+policy. Poisoning RAM after Read checks the false write-back path. Source
+registers and status are preserved. `cond-store-edge` passes 1,024 cases plus
+replay, rejecting mapped destinations before pointer or bus effects. Both
+profiles clear live pipeline state before restoration. Short repeat, mapped
+device semantics, physical bank contention and wider interrupt/control
+compositions remain unqualified.
+
 ## AR0-indexed MVDK sources
 
 MVDK admits short `*ARx-0` / `*ARx+0` source modes (`71a8..71b7`).
