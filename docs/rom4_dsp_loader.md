@@ -18,6 +18,37 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## AR0-indexed MVDK sources
+
+MVDK admits short `*ARx-0` / `*ARx+0` source modes (`71a8..71b7`).
+The old source address is sampled before its linear AR0-indexed update and
+before a potentially aliasing mapped destination is published. CMPT/ARP
+selection and destination-specific publication use the established move
+path. BK does not impose circular wrapping on these modes.
+
+`mvdk-index` passes 294,336 cases plus replay, including 8,064 excluded source
+geometries. It reuses the circular-move matrix with independently recomputed
+linear pointer results: sixteen unique encodings, twenty-one destination
+kinds, eighteen mapped sources, representative signed indices, two pages and
+two/three checkpoints. Each accepted case samples one raw word, fetches one
+destination literal and publishes once; accumulator lanes, T/TRN, DAGEN,
+BRC and RAM destinations retain their separate ownership. The 19,712
+`mvdk-index-edge` cases plus replay preserve control/peripheral exclusions.
+Both profiles clear the live pipeline before restoring their snapshots.
+
+Short RPT has a separate `mvdk-index-rpt` qualification: 8,928 cases plus
+replay, all sixteen encodings, counts 0/1/5/15, six separated/overlapping RAM
+placements, CMPT/CPL combinations, two pages and three checkpoints. Source
+samples and pointer updates are fresh per copy; EAR advances from the one
+retained destination literal. The reference preserves the existing staged
+ordering in which a copy's Access sample precedes the previous copy's Read
+publication. This is not independent silicon validation of overlapping-bus
+ordering. 288 self-indexed source geometries that enter mapped space are
+excluded from positive acceptance. `mvdk-irpt-edge` checks 480 first-access
+mapped source/destination exclusions with zero transactions and replay after
+clearing live pipeline state. Interrupt and wider control compositions remain
+unqualified; no firmware-specific address participates in the implementation.
+
 ## Parallel store with ADD/SUB
 
 The staged frontend admits `ST src,Ymem || ADD/SUB Xmem,dst` (`c000..c7ff`).

@@ -716,6 +716,40 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_repeated_indexed_mvdk_scope(self):
+        for profile in ('mvdk-index-rpt', 'mvdk-irpt-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            mutations = (('restore=480', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1')) if profile.endswith('edge') else (
+                         ('restore=8928', 'restore=0'), ('source_geometries_skipped=288', 'source_geometries_skipped=0'),
+                         ('ordered_samples=1', 'ordered_samples=0'),
+                         ('destination_literal_once=1', 'destination_literal_once=0'))
+            for old, new in mutations + (('reset_before_restore=1', 'reset_before_restore=0'),):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
+    def test_indexed_mvdk_scope(self):
+        for profile in ('mvdk-index', 'mvdk-index-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            mutations = (('restore=19712', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1')) if profile.endswith('edge') else (
+                         ('restore=294336', 'restore=0'), ('raw_words=1', 'raw_words=0'),
+                         ('alias_order=sample,modify,publish', 'alias_order=modify,sample,publish'),
+                         ('mapped_sources=18', 'mapped_sources=0'))
+            for old, new in mutations + (('reset_before_restore=1', 'reset_before_restore=0'),):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_parallel_arithmetic_scope(self):
         for profile in ('st-par-alu', 'st-par-edge'):
             marker, ending = EXTRA_PROFILES[profile]
