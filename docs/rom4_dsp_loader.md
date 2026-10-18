@@ -274,16 +274,15 @@ or execute a loader.
 DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
 staged execution executes its mapped-AR ADDM and the initialization routine's
-ROL B, then reaches a replacement upload at `0f00`. The RPTZ setup is
-admitted, but its repeated body at `000f0f`, `8093` (STL A,*AR3+), is not.
-The rejection occurs before the older RPTZ retires; admission alone does
-not prove that the accumulator was cleared in this run. Prefetched PC is
-`0f11`, with PMST `ffa8` and
+ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
+execute, and the backend observes the first completion strobe. Execution
+reaches resident code and stops at `0031b3`, `34f8` (absolute BITT), with
+the exposed PC at `31b2`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
 loader1 image is at `0x99704`). The backend
-reports 69 MCU bootstrap-mailbox writes and no completion strobe. Neither
+reports 70 MCU bootstrap-mailbox writes and one completion strobe. Neither
 upload completion nor handset boot is accepted for this machine.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
@@ -2668,7 +2667,22 @@ store body proves exactly count-plus-one ordered writes and AR updates;
 mutating the setup literal after Decode cannot change the repeat. Other
 accumulator and status bits remain unchanged. Existing nested, block and
 control-delay repeat exclusions also apply to RPTZ. This does not admit
-new body instructions, in particular the loader's repeated STL.
+new body instructions by itself.
+
+Short indirect STL/STH A/B bodies now use the pipelined repeat issuer:
+each iteration owns a Read-stage address update and Execute-stage store,
+not a host-side memory fill. The `rpt-store` profile checks 49,152 cases plus
+replay across all ARs, plain/postdecrement/postincrement/preincrement modes,
+counts 0/1/7/255, RPT/RPTZ setup, SST/SXM combinations, two source patterns,
+two instruction pages and three save points. A test-only source mutation
+after each write verifies Execute-live sampling and independent saturation
+results. There are no data reads, exactly count-plus-one writes, and no
+changes to other ARs, the other accumulator or status. `rpt-store-edge`
+checks 4,096 cases plus replay for mapped first destinations 0000/0010/
+0020/005f: rejection precedes both DAGEN updates and bus effects, including
+preincrement wrap. These are implementation exclusions, not claimed silicon
+traps. Direct, indexed, extended, ASM-shift and mapped repeated stores remain
+outside this admitted subset; physical bus phase is not claimed.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;

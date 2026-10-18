@@ -5894,6 +5894,66 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeat_store_case
+	{
+		unsigned form, mode, reg, count, setup, pattern, flags, checkpoint;
+		u32 base;
+	};
+	static repeat_store_case repeat_store_fixture(unsigned variant)
+	{
+		return {variant % 4, (variant / 4) % 4, (variant / 16) % 8,
+			std::array<unsigned, 4>{0, 1, 7, 255}[(variant / 128) % 4],
+			(variant / 512) % 2, (variant / 1024) % 2, (variant / 2048) % 4,
+			std::array<unsigned, 3>{5, 10, 17}[variant / 16384], (variant / 8192) % 2 ? 0x20000U : 0U};
+	}
+	static u64 repeat_store_value(unsigned pattern) { return pattern ? 0xff7fff1357ULL : 0x7f80002468ULL; }
+	void start_repeat_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = repeat_store_fixture(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 12; ++i) program.write_word(f.base + 0x9000 + i, 0xf495);
+		program.write_word(f.base + 0x9000, f.setup ? 0xf071 | ((f.form & 1) << 8) : 0xf070);
+		program.write_word(f.base + 0x9001, f.count);
+		program.write_word(f.base + 0x9002, 0x8000 | (f.form << 8) | 0x80 | (f.mode << 3) | f.reg);
+		program.write_word(f.base + 0x9003, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((f.flags & 2) ? 0x100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, (f.form & 1) ? 0x123456789aULL : repeat_store_value(f.pattern));
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, (f.form & 1) ? repeat_store_value(f.pattern) : 0x123456789aULL);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == f.reg ? 0x1200 : 0x4000 + ar);
+		m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_store_no_read",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Repeated accumulator store performs no data read"); });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_store_write",
+			[this, f](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const n = m_pipeline_store_writes;
+				u16 const destination = f.mode == 0 ? 0x1200 : f.mode == 1 ? 0x1200 - n : 0x1200 + n + unsigned(f.mode == 3);
+				u64 const source = f.setup && !n ? 0 : repeat_store_value(f.pattern ^ (n & 1));
+				s64 const signed_source = (source & 0x8000000000ULL) ? s64(source) - 0x10000000000LL : s64(source);
+				u32 const saturated = !(f.flags & 1) ? u32(source) : (f.flags & 2) ? u32(std::clamp<s64>(signed_source, -0x80000000LL, 0x7fffffffLL)) : u32(std::min<u64>(source, 0xffffffffULL));
+				expect(n <= f.count && at == destination && word == u16(saturated >> ((f.form & 2) ? 16 : 0)), "Each repeated STL/STH writes its ordered address and Execute-live saturated source");
+				++m_pipeline_store_writes;
+				// A test-only producer changes the source after each real write.
+				m_cpu->set_state_int((f.form & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, repeat_store_value(f.pattern ^ (m_pipeline_store_writes & 1)));
+			});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = repeat_store_phase;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_repeat_store_edge(unsigned variant = 0)
+	{
+		start_repeat_store(variant % 512);
+		auto const f = repeat_store_fixture(variant % 512);
+		u16 const destination = std::array<u16, 4>{0, 0x10, 0x20, 0x5f}[(variant / 512) % 4];
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, u16(destination - unsigned(f.mode == 3)));
+		m_pipeline_write_tap.remove();
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_store_excluded_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Excluded repeated mapped store has no data write"); });
+		m_pipeline_peripheral_case = variant; m_phase = repeat_store_phase + 2;
+	}
 	void start_rptz(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -16095,6 +16155,8 @@ private:
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-controls")) { start_pipeline_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "literal-guard")) { start_literal_guard(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-store")) { start_repeat_store(); return; }
 		if (!strcmp(machine().options().bios(), "rptz")) { start_rptz(); return; }
 		if (!strcmp(machine().options().bios(), "rotate")) { start_rotate(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar")) { start_ar_addm(); return; }
@@ -18012,6 +18074,63 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase == repeat_store_phase)
+		{
+			auto const f = repeat_store_fixture(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated short accumulator stores are admitted");
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot[0] = m_pipeline_store_writes; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated accumulator store before or during issue");
+			}
+			if (tick == f.count + 32)
+			{
+				u16 const pointer = f.mode == 0 ? 0x1200 : f.mode == 1 ? 0x1200 - f.count - 1 : 0x1200 + f.count + 1;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == pointer &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa824 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((f.flags & 2) ? 0x100 : 0)) &&
+					m_cpu->state_int((f.form & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x123456789aULL, "Repeated store drains count-plus-one, preserves status and other accumulator, and resumes IDLE");
+				for (unsigned ar = 0; ar < 8; ++ar) if (ar != f.reg) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0x4000 + ar, "Repeat store does not update another AR");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated stores without duplicate writes or AR progression");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = repeat_store_phase + 1; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 49151) { start_repeat_store(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x repeated accumulator stores: PASS cases=49152 restore=49152 forms=STL_A,STL_B,STH_A,STH_B modes=plain,postdec,postinc,preinc registers=8 counts=0,1,7,255 setups=RPT,RPTZ patterns=2 sst_sxm=4 pages=2 snapshots=3 execute_live=1 reads=0 writes=count+1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator stores complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == repeat_store_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = repeat_store_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == repeat_store_phase + 2)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 2048 ? 5 : 8;
+			auto const f = repeat_store_fixture(variant % 512);
+			u16 const destination = std::array<u16, 4>{0, 0x10, 0x20, 0x5f}[(variant / 512) % 4];
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == u16(destination - unsigned(f.mode == 3)), "Excluded repeated store does not pre/postmodify its AR");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded repeat before or after rejection");
+			}
+			if (tick == 12)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated mapped destination is explicitly unsupported, not fabricated");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded repeated store without bus effects");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = repeat_store_phase + 3; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 4095) { start_repeat_store_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x repeated store exclusions: PASS cases=4096 restore=4096 forms=4 modes=4 registers=8 counts=4 destinations=0000,0010,0020,005f snapshots=2 reads=0 writes=0 ar_changes=0 silicon_trap_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated store exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == repeat_store_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = repeat_store_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == rptz_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, target = variant % 2;
@@ -48347,6 +48466,7 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned literal_guard_phase = 62010;
+	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;
 	static constexpr unsigned rotate_phase = 62024;
 	static constexpr unsigned ar_addm_phase = 62020;
@@ -50218,6 +50338,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(26, "addm-ar-load", "Legal-gap indirect consumers after mapped-AR addition")
 	ROM_SYSTEM_BIOS(27, "rotate", "Staged accumulator rotates and carry forwarding")
 	ROM_SYSTEM_BIOS(28, "rptz", "Retained staged repeat and accumulator clearing")
+	ROM_SYSTEM_BIOS(29, "rpt-store", "Repeated short accumulator stores through real pipeline slots")
+	ROM_SYSTEM_BIOS(30, "rpt-store-edge", "Repeated mapped-store exclusions before DAGEN or bus effects")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -10,17 +10,17 @@ class StagedFrontierTest(unittest.TestCase):
                       '252a,f010,23c4,8811,7712,0d00,47f8,0011')
         self.payload = bytes.fromhex(self.words.replace(',', ''))
         self.image = bytes(SOURCE_OFFSET) + self.payload
-        self.row = ('rom4_staged_frontier: pc=0f11 xpc=00 illegal=1 pmst=ffa8 swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=31b2 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
-        self.text = STOP + '\n' + self.row
+        self.text = STOP + '\n' + self.row + 'rom4_interface_summary: completion_strobes=1 mailbox_writes=70 \n'
 
     def test_binds_observation_without_promoting_boot(self):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x8093)
-        self.assertEqual(result['instruction_address'], 0x0f0f)
-        self.assertEqual(result['repeat_count_literal'], 0x079f)
+        self.assertEqual(result['instruction'], 0x34f8)
+        self.assertEqual(result['instruction_address'], 0x31b3)
+        self.assertEqual(result['completion_strobes'], 1)
         self.assertEqual(result['swwsr'], 0x2000)
         for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim'):
             self.assertFalse(result[field])
@@ -29,7 +29,9 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=0f11', 'pc=0f1f'),
+                     self.text.replace('pc=31b2', 'pc=0f1f'),
+                     self.text.replace('completion_strobes=1', 'completion_strobes=0'),
+                     self.text.replace('mailbox_writes=70', 'mailbox_writes=69'),
                      self.text.replace('swwsr=2000', 'swwsr=0000'),
                      self.text.replace('bscr=0000', 'bscr=f000'),
                      self.text.replace('swcr=0000', 'swcr=0001'),

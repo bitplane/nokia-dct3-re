@@ -80,9 +80,14 @@ constexpr bool register_product_form(u16 word)
 	return (word & 0xfeff) == 0xf48c || (word & 0xfcfc) == 0xf488;
 }
 
+constexpr bool staged_repeat_accumulator_store(u16 word)
+{
+	return (word & 0xfc00) == 0x8000 && u8(word) >= 0x80 && u8(word) < 0xa0;
+}
+
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -3484,6 +3489,12 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[4];
 		bool const extended = staged_extended_accumulator_store(m_pipeline_word[4]);
 		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (m_pipeline_repeat_active && staged_repeat_accumulator_store(m_pipeline_word[4]) &&
+			u16(basic_address(4, mode) + unsigned(preincrement)) < 0x60)
+		{
+			// Exclude mapped destinations before any DAGEN or bus effect.
+			logerror("%s: repeated accumulator store mapped destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (preincrement) indirect_modify(mode, false, 4);
 		if (staged_extended_accumulator_store(m_pipeline_word[4]))
 		{
