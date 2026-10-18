@@ -1,19 +1,56 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The staged frontend now reaches the first organic
+acceptance scopes. The last exact-stop acceptance reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
 initialization passes, and stops on CMPM `60f8` at `401a`
-(reported PC `401f`), whose mapped AR2 source is not yet admitted.
+(reported PC `401f`). The mapped AR2 source is now qualified; the new
+three- and thirty-second captures are fault-free, pending live-wait
+acceptance below.
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is CMPM's mapped-source capture, immediate
-binding and TC publication. Absolute data address `0012` is AR2, not
-external RAM. Parallel-store carry and physical bus phases remain
+The current staged question is the live firmware wait after the admitted
+CMPM, not another guessed instruction extension. Absolute data address
+`0012` is AR2, not external RAM. Parallel-store carry and physical bus phases remain
 unvalidated.
+
+## CMPM mapped-register source qualification
+
+CMPM now admits T, TRN and AR0..AR7 (`000e..0017`) in addition to
+the qualified accumulator slices. These are CPU-owned mapped registers,
+not board RAM. The operand is captured at Read; TC is published at
+Execute, and the source is not written back. Immediate and absolute-address
+extensions are retained rather than fetched again after capture.
+
+`cmpm-map` passes 69,120 cases and save-state replays across direct,
+indirect and absolute addressing, both CPL settings, two pages, three
+snapshots, eight source values, six literals, initial TC clear/set and
+both TC/NTC branches. Sources and instruction extensions are changed
+after capture to detect re-reads. The indirect pointer is distinct from
+the source register. `cmpm-map-edge` passes 3,840 exclusion cases and
+replays for controls `0000..0007` and `0018..005f`; those guards are an
+implementation boundary, not a claim that silicon traps on those addresses.
+The original accumulator, direct-memory and TC-call profiles also pass.
+
+Fresh three- and thirty-second native captures after this change reach
+PC `471c` and `471a`, respectively, with ILLEGAL clear. Both retain twelve
+RF-control writes, 32 transfer expiries, 357 completion strobes, 74 mailbox
+writes, 329 slot expiries, 10,400 RF reads and twenty-one consumer advances.
+Frame expiries advance from 573 to 6,423. The terminal T=`5555`, BK=`0048`,
+ST0/ST1=`081f/6103` and AR0..AR3=`126d/06b8/067a/0008` agree; A differs
+between `1a00` and zero. Artifacts are
+`tmp/cmpm-map-native{,-long}/error.log`.
+The surrounding mask-ROM loop reads `06b7`, subtracts an indirect operand
+and conditionally branches to `4717`; the exact wait predicate and
+its producer remain to be qualified. Timer advancement alone is not
+evidence of ongoing firmware service or a healthy wait.
+These captures supersede the old CMPM rejection as runtime observations,
+but the exact-stop checker below still describes the previous accepted
+checkpoint pending replacement with a qualified live-wait contract.
+It does not establish upload completion, RF acquisition or handset boot.
 
 ## STLM suspension of an interrupted loop
 

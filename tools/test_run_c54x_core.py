@@ -159,7 +159,7 @@ class CoreResultTests(unittest.TestCase):
                         check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
 
     def test_staged_loader_profiles_require_complete_qualification_markers(self):
-        for profile in ('sat', 'store-circular', 'tc-call', 'cmpm-acc', 'rpt-mvkd', 'rpt-mvkd-edge', 'stm-acc', 'st-t-long', 'st-t-long-edge', 'st-t-branch', 'portr-circular', 'portr-block', 'mvdm-acc', 'mvdm-acc-edge', 'stack-page0', 'stack-page0-edge', 'stld', 'stld-edge', 'unsigned-map', 'unsigned-edge'):
+        for profile in ('sat', 'store-circular', 'tc-call', 'cmpm-acc', 'rpt-mvkd', 'rpt-mvkd-edge', 'stm-acc', 'st-t-long', 'st-t-long-edge', 'st-t-branch', 'portr-circular', 'portr-block', 'mvdm-acc', 'mvdm-acc-edge', 'stack-page0', 'stack-page0-edge', 'stld', 'stld-edge', 'unsigned-map', 'unsigned-edge', 'cmpm-map', 'cmpm-map-edge'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending + '\n'
             check_result(text, 3, profile=profile)

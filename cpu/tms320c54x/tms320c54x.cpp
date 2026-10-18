@@ -4019,7 +4019,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged unsigned memory arithmetic mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), m_pipeline_address[3], m_pipeline_word[3], source); m_illegal = true; return;
 		}
-		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60 && (source < 8 || source > 0x0d))
+		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60 && (source < 8 || source > 0x17))
 		{
 			logerror("%s: staged CMPM mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source);
 			m_illegal = true; return;

@@ -970,6 +970,14 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed conditional calls in block: PASS cases=1024 restore=1024 counts=0,1,2,7 conditions=AEQ,ANEQ,BEQ,BNEQ outcomes=2 positions=middle,endpoint delay_layouts=2 pages=2 snapshots=4 ordered_copies=1 balanced_frames=1 stack_return=PC+4 outer_count=Decode interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed conditional calls in block complete",
     ),
+    "cmpm-map": (
+        "TMS320C54x mapped CMPM: PASS cases=69120 restore=69120 registers=T,TRN,AR0..7 forms=direct,indirect,absolute cpl=2 values=8 literals=6 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 literal_words=1,2 source=Read tc=Execute retained=1 indirect_pointer=separate physical_phase_claim=0 control_composition=unvalidated",
+        "Fatal error: TMS320C54x isolated mapped CMPM complete",
+    ),
+    "cmpm-map-edge": (
+        "TMS320C54x mapped CMPM exclusions: PASS cases=3840 restore=3840 addresses=80 forms=direct,indirect,absolute cpl=2 initial_tc=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 status_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated mapped CMPM exclusions complete",
+    ),
     "unsigned-map": (
         "TMS320C54x unsigned mapped arithmetic: PASS cases=221184 restore=221184 operations=ADDS,SUBS numeric_cases=147456 mapped_cases=73728 ram_forms=6 mapped_sources=16 accumulators=2 carry_inputs=ignored sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated",
         "Fatal error: TMS320C54x isolated unsigned mapped arithmetic complete",
@@ -1851,7 +1859,7 @@ def main():
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
     if args.profile in ("portr-circular", "portr-block", "shift-unowned", "st-t-branch", "st-t-long", "st-t-long-edge", "stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
-    if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge"):
+    if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge", "cmpm-map", "cmpm-map-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
