@@ -521,9 +521,10 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at repeated `f77f`
-(`SFTA B,-1,B`) at `fb60`. Memory SQUR at `8643` now executes under its
-independent qualification. No staged parameter or speech acceptance follows
+return, but frame 0's encoding stage remains **failing** at mapped-register
+`ADDM #-3,T` (`6b0e fffd` at `fb6a`; the guard's PC context is `fb6e`).
+Memory SQUR at `8643` and repeated `SFTA B,-1,B` at `fb60` now execute under
+their independent qualifications. No staged parameter or speech acceptance follows
 from passing those preceding routines; the atomic encoder remains the control.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to

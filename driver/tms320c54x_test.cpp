@@ -10480,14 +10480,15 @@ private:
 	struct repeat_load_fixture
 	{
 		unsigned selector, flags, pattern, count, setup, irq, checkpoint, first, outer;
-		bool asm_form, block;
+		bool asm_form, block, arithmetic;
 		int shift;
 		u32 base, body;
 		u16 word, st0, st1, address;
 	};
-	static repeat_load_fixture repeat_load_case(unsigned v)
+	repeat_load_fixture repeat_load_case(unsigned v)
 	{
 		repeat_load_fixture f{}; unsigned snapshot = v % 3;
+		f.arithmetic = !strcmp(machine().options().bios(), "rpt-sfta");
 		if (v >= 198656)
 		{
 			v -= 198656; f.block = true; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
@@ -10514,7 +10515,9 @@ private:
 		if (f.block) { f.body = f.base + 0x603; f.first = 11; }
 		f.checkpoint = snapshot == 0 ? 3 : snapshot == 1 ? f.first + f.count / 2 : f.first + f.count;
 		f.word = (f.asm_form ? 0xf482 : 0xf440 | (f.shift & 31)) | ((f.selector & 2) << 8) | ((f.selector & 1) << 8);
+		if (f.arithmetic) f.word = 0xf460 | (f.shift & 31) | ((f.selector & 3) << 8);
 		f.st0 = 0xb808 | (f.pattern & 1 ? 0x600 : 0);
+		if (f.arithmetic && !(f.pattern & 2)) f.st0 &= ~0x800;
 		f.st1 = (f.setup == 3 ? 0x4000 : 0) | (f.irq ? 0 : 0x800) | (f.flags & 1 ? 0x100 : 0) | (f.flags & 2 ? 0x200 : 0) | (f.asm_form ? f.shift & 31 : 11);
 		f.address = f.setup == 3 ? 0x3000 : f.setup == 5 ? 0x15 : 0x400;
 		return f;
@@ -10527,13 +10530,15 @@ private:
 	static std::array<u64, 3> repeat_load_step(repeat_load_fixture const &f, std::array<u64, 3> state)
 	{
 		u64 const source = state[(f.selector >> 1) & 1]; u64 value = source;
+		if (f.arithmetic && f.shift)
+			state[2] = (state[2] & ~0x800ULL) | ((source >> (f.shift < 0 ? -f.shift - 1 : 39 - f.shift)) & 1 ? 0x800 : 0);
 		if (f.shift < 0)
 			for (int i = 0; i < -f.shift; ++i) value = (value >> 1) | (f.flags & 1 && value & 0x8000000000ULL ? 0x8000000000ULL : 0);
 		else
 		{
 			s64 const signed_source = source & 0x8000000000ULL ? s64(source) - (s64(1) << 40) : s64(source);
 			s64 const full = signed_source * (s64(1) << f.shift); value = u64(full) & 0xffffffffffULL;
-			if (full < -2147483648LL || full > 2147483647LL)
+			if ((!f.arithmetic || f.shift > 0) && (full < -2147483648LL || full > 2147483647LL))
 			{
 				state[2] |= f.selector & 1 ? 0x200 : 0x400;
 				if (f.flags & 2) value = full < 0 ? 0xff80000000ULL : 0x007fffffffULL;
@@ -10587,7 +10592,7 @@ private:
 		u32 const base = (variant / 8) % 2 ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, 0xec01);
-		program.write_word(base + 0x601, std::array<u16, 8>{0xf460, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
+		program.write_word(base + 0x601, std::array<u16, 8>{0xf4f0, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_load_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_load_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_phase = 310500; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -18632,6 +18637,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rpt-smem")) { start_basic_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-smem-edge")) { start_basic_repeat_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-ld")) { start_repeat_load(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-sfta")) { start_repeat_load(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-ld-block")) { start_repeat_load(198656); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst")) { start_stlm_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-t")) { start_pipeline_stlm_t(); return; }
@@ -46832,7 +46838,8 @@ private:
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeat iteration, live accumulators and sticky flags without restarting"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310490; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 200703) { start_repeat_load(variant + 1); return; }
+				if (variant < (f.arithmetic ? 16383U : 200703U)) { start_repeat_load(variant + 1); return; }
+				if (f.arithmetic) { osd_printf_info("TMS320C54x repeated SFTA: PASS cases=16384 restore=16384 selectors=4 shifts=-16..15 patterns=8 sxm_ovm=4 counts=0,1,7,255 each_iteration=1 retained_opcode=1 carry_overflow=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated SFTA complete"); }
 				if (!strcmp(machine().options().bios(), "rpt-ld-block")) { osd_printf_info("TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD block complete"); }
 				osd_printf_info("TMS320C54x repeated accumulator LD: PASS cases=200704 restore=200704 arithmetic_cases=32768 composition_cases=165888 block_cases=2048 selectors=4 shifts=-16..15 shift_sources=opcode,ASM sxm_ovm=4 counts=0,1,7,255 count_sources=short,long,DP,SP,absolute_RAM,absolute_AR pages=2 sources=none,IRQ,NMI snapshots=3 each_iteration=1 retained_opcode=1 retained_count=1 fresh_continuation=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD complete");
 			}
@@ -52397,7 +52404,7 @@ private:
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain"))
+	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	if (!strcmp(config.options().bios(), "mpy-mem-imm"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
@@ -54323,6 +54330,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(111, "rptb-exit-delay", "Delayed forward block exits retain decision and delay ownership")
 	ROM_SYSTEM_BIOS(112, "mvmd-rptz", "RPTZ clear precedes the first fixed-accumulator MVMD sample")
 	ROM_SYSTEM_BIOS(113, "squr-smem", "Memory SQUR retains its signed operand and publishes T at Read")
+	ROM_SYSTEM_BIOS(114, "rpt-sfta", "Repeated arithmetic accumulator shift carry overflow and replay")
 ROM_END
 
 ROM_START(tms54rom4)

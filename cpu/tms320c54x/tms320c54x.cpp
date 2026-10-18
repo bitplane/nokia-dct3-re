@@ -134,7 +134,7 @@ constexpr bool staged_pipelined_repeat(u16 word)
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
 {
-	return (word & 0xfce0) == 0xf440 || (word & 0xfcff) == 0xf482;
+	return (word & 0xfce0) == 0xf440 || (word & 0xfcff) == 0xf482 || (word & 0xfce0) == 0xf460;
 }
 
 constexpr bool staged_immediate_alu(u16 word)
@@ -2818,10 +2818,15 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_repeat_accumulator_load(m_pipeline_repeat_word))
 		{
-			// LD src,SHIFT/ASM,dst remains Execute-live on every iteration;
-			// only the fetched instruction is retained, not its source value.
-			unsigned const code = (m_pipeline_repeat_word & 0xfcff) == 0xf482 ? m_st1 & 31 : m_pipeline_repeat_word & 31;
-			accumulator(BIT(m_pipeline_repeat_word, 8)) = shifted_load(accumulator(BIT(m_pipeline_repeat_word, 9)), code >= 16 ? int(code) - 32 : int(code), BIT(m_pipeline_repeat_word, 8));
+			if ((m_pipeline_repeat_word & 0xfce0) == 0xf460)
+				execute_one(m_pipeline_repeat_word);
+			else
+			{
+				// LD src,SHIFT/ASM,dst remains Execute-live on every iteration;
+				// only the fetched instruction is retained, not its source value.
+				unsigned const code = (m_pipeline_repeat_word & 0xfcff) == 0xf482 ? m_st1 & 31 : m_pipeline_repeat_word & 31;
+				accumulator(BIT(m_pipeline_repeat_word, 8)) = shifted_load(accumulator(BIT(m_pipeline_repeat_word, 9)), code >= 16 ? int(code) - 32 : int(code), BIT(m_pipeline_repeat_word, 8));
+			}
 		}
 		else if (staged_data_to_program(m_pipeline_repeat_word))
 		{

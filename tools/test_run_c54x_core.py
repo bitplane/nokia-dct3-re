@@ -716,6 +716,20 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_repeated_arithmetic_shift_scope(self):
+        marker, ending = EXTRA_PROFILES['rpt-sfta']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rpt-sfta')
+        for old, new in (('restore=16384', 'restore=0'), ('carry_overflow=1', 'carry_overflow=0'),
+                         ('each_iteration=1', 'each_iteration=0'),
+                         ('retained_opcode=1', 'retained_opcode=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rpt-sfta')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rpt-sfta')
+
     def test_repeated_accumulator_load_exclusion_scope(self):
         marker, ending = EXTRA_PROFILES['rpt-ld-edge']
         output = marker + '\n' + ending + '\n'

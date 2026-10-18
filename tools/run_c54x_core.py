@@ -652,6 +652,10 @@ EXTRA_PROFILES = {
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST exclusions complete",
     ),
+    "rpt-sfta": (
+        "TMS320C54x repeated SFTA: PASS cases=16384 restore=16384 selectors=4 shifts=-16..15 patterns=8 sxm_ovm=4 counts=0,1,7,255 each_iteration=1 retained_opcode=1 carry_overflow=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated SFTA complete",
+    ),
     "rpt-ld-block": (
         "TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated accumulator LD block complete",
@@ -1914,6 +1918,8 @@ def main():
     if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge", "cmpm-map", "cmpm-map-edge"):
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
+        machine = "tms54xtra"
+    if args.profile == "rpt-sfta":
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

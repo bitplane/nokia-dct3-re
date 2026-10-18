@@ -18,6 +18,24 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Repeated arithmetic accumulator shifts
+
+Single-repeat SFTA reuses the ordinary instruction's arithmetic on each
+Execute iteration, with a live source accumulator and retained opcode.
+Unlike shifted LD, it updates carry for nonzero shifts and does not raise
+new overflow for a zero shift (SPRU172C 4-155). The existing left-carry
+formula/zero-shift policy remains explicit: the manual's left-shift example
+and formula disagree, so these tests do not establish silicon behavior.
+
+`rpt-sfta` passes 16,384 cases plus save/load replay: all four source/destination
+selections, shifts -16 through 15, eight signed/guard-bit patterns, both SXM
+and OVM values, and short repeat counts 0, 1, 7 and 255. The independent
+expectation checks every arithmetic publication, carry and sticky overflow,
+one accepted body fetch despite opcode poisoning, and one fresh continuation.
+Both initial carry values and program pages are represented, but not a full
+cross-product of those axes. Memory count sources, IRQ/NMI and nested-block
+composition are not newly qualified for SFTA.
+
 ## Memory SQUR
 
 `SQUR Smem,A/B` (`26xx/27xx`) squares the signed sixteen-bit memory word,
