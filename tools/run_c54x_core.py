@@ -652,6 +652,14 @@ EXTRA_PROFILES = {
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST exclusions complete",
     ),
+    "bd-rpt": (
+        "TMS320C54x BD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 ordered_copies=1 target_retained=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated BD delay repeat complete",
+    ),
+    "bd-rpt-edge": (
+        "TMS320C54x BD delay repeat exclusions: PASS cases=32 restore=32 forms=late,BANZD,CALLD,RETD,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=RETD_stack_only writes=0 ar_changes=0 counter_changes=0 owner_stack=CALLD,RETD reset_before_restore=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated BD delay repeat exclusions complete",
+    ),
     "mac-rpt": (
         "TMS320C54x repeated dual MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR selectors=4 layouts=fixed,postinc,postdec,alias patterns=4 flags=16 counts=0,1,7,255 pages=2 snapshots=3 per_clock_accumulator=1 paired_reads=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 writes=0 physical_banks=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated dual MAC complete",
@@ -1947,7 +1955,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

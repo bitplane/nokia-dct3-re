@@ -1485,6 +1485,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_repeat_status));
 	save_item(NAME(m_pipeline_repeat_sp));
 	save_item(NAME(m_pipeline_repeat_address));
+	save_item(NAME(m_pipeline_repeat_redirect_pending));
+	save_item(NAME(m_pipeline_repeat_redirect_target));
 	save_item(NAME(m_pipeline_read_a_wait));
 	save_item(NAME(m_pipeline_write_a_wait));
 	save_item(NAME(m_pipeline_write_a_target));
@@ -2732,6 +2734,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_repeat_issue_remaining = 0;
 	m_pipeline_repeat_word = m_pipeline_repeat_source = m_pipeline_repeat_status = m_pipeline_repeat_sp = 0;
 	m_pipeline_repeat_address = 0;
+	m_pipeline_repeat_redirect_pending = false;
+	m_pipeline_repeat_redirect_target = 0;
 	m_pipeline_read_a_wait = 0;
 	m_pipeline_write_a_wait = 0;
 	m_pipeline_mvdp_wait = 0;
@@ -3227,11 +3231,16 @@ void tms320c54x_device::pipeline_step()
 			bool delay_bitt = false;
 			bool delay_arithmetic = false;
 			bool delay_t_load = false;
+			bool delay_repeat = false;
+			u32 delay_repeat_target = 0;
 			bool delayed_block_owner = false;
 			for (unsigned stage = 3; stage < 6; ++stage)
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
+					delay_repeat = staged_short_repeat(word) && m_pipeline_word[stage] == 0xf273 &&
+						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active && !m_pipeline_block_active;
+					if (delay_repeat) delay_repeat_target = (m_pipeline_control_address & 0x7f0000) | m_pipeline_operand[stage];
 					delay_t_load = (delayed_block_owner || (m_pipeline_word[stage] & 0xff00) == 0x6e00) &&
 						(word & 0xff00) == 0x3000 && u8(word) < 0x98;
 					delay_bitt = staged_bitt(word) && u8(word) >= 0xe0 && m_pipeline_word[stage] == 0xfe00;
@@ -3257,7 +3266,7 @@ void tms320c54x_device::pipeline_step()
 			if (!m_pipeline_decode_remaining && staged_data_to_program(word)) { logerror("%s: staged MVDP inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && !delay_repeat && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
 					machine().describe_context(), word, m_pipeline_address[2], m_pipeline_delay_decode_words,
@@ -3273,6 +3282,11 @@ void tms320c54x_device::pipeline_step()
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
 				return;
+			}
+			if (delay_repeat)
+			{
+				m_pipeline_repeat_redirect_pending = true;
+				m_pipeline_repeat_redirect_target = delay_repeat_target;
 			}
 			--m_pipeline_delay_decode_words;
 		}
@@ -5388,6 +5402,14 @@ void tms320c54x_device::pipeline_restore_block_on_return(u32 address)
 
 void tms320c54x_device::pipeline_resume_after_repeat()
 {
+	// RPT in BD's first delay word discards the target prefetch. The
+	// repeated second word must drain before that retained target resumes.
+	if (m_pipeline_repeat_redirect_pending)
+	{
+		m_pipeline_fetch_address = m_pipeline_repeat_redirect_target;
+		m_pipeline_repeat_redirect_pending = false;
+		return;
+	}
 	u32 const next = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address +
 		(staged_repeat_data_copy(m_pipeline_repeat_word) || staged_repeat_destination_copy(m_pipeline_repeat_word) ? 2 : staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
 	// Inner RPT discards undecoded prefetch, including any predicted block

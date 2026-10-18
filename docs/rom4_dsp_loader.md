@@ -18,6 +18,37 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Short repeat in BD's delay span
+
+Short RPT in BD's first delay word owns the following one-word body before
+control reaches the branch target. Starting a staged repeat discards target
+prefetch, so the CPU retains the decoded target separately and resumes it only
+after all repeated delay copies drain. Both continuation fields are reset and
+saved. This is instruction-derived continuation state, not a firmware hook.
+
+`bd-rpt` passes 5,760 cases plus replay on atomic and staged frontends: STL,
+MVDD and NOP bodies; counts 0/1/8/39/255; independent target repeat counts
+0/2/7; forward/backward targets; four data/status patterns; two pages; and four
+checkpoints before, during or after the pending continuation. The selected
+frontend's live pipeline is cleared before each load, so retained targets and
+repeat metadata must actually be restored rather than survive from the future
+run. It checks exact
+buffer contents/guards, ordered transactions, pointers, preserved registers,
+execution-owned body/header counts and final PC. The target literal is poisoned
+after capture; body-opcode poisoning is staged-only because the atomic frontend
+refetches repeat opcodes. Equal architectural outcomes are not a clock/bus
+equivalence claim. The existing acquired-ROM atomic delayed-repeat fixture
+provides separate BD/RETD corroboration.
+
+`bd-rpt-edge` passes 32 rejection/replay cases: late header, BANZD/CALLD/RETD
+owners, long/memory counts and spilling store/copy bodies, over two pages and
+two checkpoints. No rejected-repeat transaction or address-register/counter
+change occurs. The enclosing CALLD's Decode stack reservation and RETD's one
+return-word Read/SP increment legitimately precede rejection and are retained,
+not undone. These are bounded model exclusions, not silicon traps. Other
+control owners, active blocks, interrupt composition and physical bus phases
+are not newly qualified.
+
 ## Repeated dual-memory MAC
 
 MAC/MACR/MAS/MASR (`bxxx`) can use the existing per-copy pipeline issue path.

@@ -716,6 +716,31 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_bd_delay_repeat_scope(self):
+        marker, ending = EXTRA_PROFILES['bd-rpt']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='bd-rpt')
+        for old, new in (('restore=5760', 'restore=0'), ('ordered_copies=1', 'ordered_copies=0'),
+                         ('target_retained=1', 'target_retained=0'), ('fresh_target_repeat=1', 'fresh_target_repeat=0'),
+                         ('opcode_poison=staged_only', 'opcode_poison=none'),
+                         ('reset_before_restore=1', 'reset_before_restore=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='bd-rpt')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='bd-rpt')
+
+    def test_bd_delay_repeat_exclusions(self):
+        marker, ending = EXTRA_PROFILES['bd-rpt-edge']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='bd-rpt-edge')
+        for old, new in (('restore=32', 'restore=0'), ('reads=RETD_stack_only', 'reads=all'),
+                         ('writes=0', 'writes=1'), ('ar_changes=0', 'ar_changes=1'),
+                         ('counter_changes=0', 'counter_changes=1'), ('silicon_trap_claim=0', 'silicon_trap_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='bd-rpt-edge')
+
     def test_repeated_dual_mac_scope(self):
         marker, ending = EXTRA_PROFILES['mac-rpt']
         output = marker + '\n' + ending + '\n'

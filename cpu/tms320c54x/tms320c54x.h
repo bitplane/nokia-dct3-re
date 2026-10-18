@@ -392,6 +392,8 @@ private:
 	u16 m_pipeline_repeat_status = 0;
 	u16 m_pipeline_repeat_sp = 0;
 	u32 m_pipeline_repeat_address = 0;
+	bool m_pipeline_repeat_redirect_pending = false;
+	u32 m_pipeline_repeat_redirect_target = 0;
 	u8 m_pipeline_read_a_wait = 0;
 	u8 m_pipeline_write_a_wait = 0;
 	u32 m_pipeline_write_a_target = 0;

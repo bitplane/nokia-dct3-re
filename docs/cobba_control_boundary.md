@@ -521,8 +521,8 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at `RPT #8`
-(`ec08` at `fba0`) in the delay span of `BD` at `fb9e`.
+return, but frame 0's encoding stage remains **failing** at indirect `STM`
+(`7782 b3a6` at `879c`).
 The preceding instruction, repeat and delay-load qualifications live in the
 [ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish staged
 parameter or speech acceptance; the atomic encoder remains the control.
