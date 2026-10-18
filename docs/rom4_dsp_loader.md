@@ -18,6 +18,32 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Mapped shift-16 ADD/SUB sources
+
+Shift-16 Smem ADD/SUB admits the sixteen owned mapped sources `0008..0017`:
+A/B lanes, T/TRN and AR0..7. The mapped word is retained in Read while the
+independently selected input accumulator and carry state remain Execute-owned.
+The existing arithmetic preserves partial carry: ADD only sets C on a carry,
+and SUB only clears it on a borrow. Overflow remains sticky on the selected
+destination, with OVM clamping. Memory sampling and arithmetic do not republish
+the mapped source after it changes.
+
+`shift16-map` passes 147,456 cases plus replay: eight ADD/SUB/input/output
+forms, sixteen mapped sources, DP/absolute/plain-indirect addressing, eight
+carry/SXM/OVM flag states, four input patterns, early/late input accumulators,
+two pages and three checkpoints. An independent integer oracle checks the
+shifted result and flags. The fixture changes the mapped source after Read,
+including aliases with either accumulator, then checks the retained word
+against the later live accumulator and carry. Pipeline state is cleared before
+restoring each snapshot.
+
+`shift16-map-edge` passes 7,680 cases plus replay over eighty unqualified
+control/peripheral addresses, with no reads, writes or pointer updates. SP/BK
+and other control registers remain outside this extension. These tests do not
+establish arbitrary producer forwarding, repeat/interrupt compositions or
+physical pipeline timing; in particular they do not inherit the separate
+LDM/LD AR read-age exception.
+
 ## Conditional register and accumulator stores
 
 The staged frontend admits STRCD, SRCCD and SACCD A/B (`9cxx..9fxx`, valid
@@ -191,6 +217,11 @@ their own AR. The selected pointer's upper nine bits are cleared, as in
 SPRU172C 4-176. The literal and destination are retained for one ordinary
 RAM write at Execute, with no destination read. This is a partial staged
 publication model, not measured silicon timing.
+
+For example, the ROM4 encoder's `7782 b3a6` at `879c` uses AR2=`1268`
+(ST0=`0024`, ST1=`0340`), writes `b3a6` to RAM `0068`, and leaves AR2=`0068`.
+Atomic and staged entry registers agree there. Treating this as a write to
+`1268` loses the MMR-addressing contract.
 
 `stm-ind` passes 1,536 cases plus replay: eight selectors, both CMPT modes,
 four literals, four RAM destinations spanning `0060..007f`, two program

@@ -716,6 +716,24 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_mapped_shift16_scope(self):
+        for profile in ('shift16-map', 'shift16-map-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            mutations = (('restore=7680', 'restore=0'), ('reads=0', 'reads=1'),
+                         ('writes=0', 'writes=1'), ('pointer_changes=0', 'pointer_changes=1')) if profile.endswith('edge') else (
+                         ('restore=147456', 'restore=0'), ('mapped_sources=16', 'mapped_sources=0'),
+                         ('source_sample=Read', 'source_sample=Execute'),
+                         ('accumulator_sample=Execute', 'accumulator_sample=Read'),
+                         ('partial_carry=1', 'partial_carry=0'), ('sticky_overflow=1', 'sticky_overflow=0'))
+            for old, new in mutations + (('reset_before_restore=1', 'reset_before_restore=0'),):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_staged_conditional_store_scope(self):
         for profile in ('cond-store', 'cond-store-edge'):
             marker, ending = EXTRA_PROFILES[profile]

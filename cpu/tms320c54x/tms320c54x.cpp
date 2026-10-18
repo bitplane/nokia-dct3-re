@@ -4087,7 +4087,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (staged_memory_logic(m_pipeline_word[3]) && m_pipeline_operand_address[3] < (offset_logic ? 0x60 : 0x20))
 		{
-			logerror("%s: staged logical register/peripheral operand is unsupported\n", machine().describe_context());
+			logerror("%s: staged logical register/peripheral operand is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < (extended_rmw ? 0x20 : 0x60) &&
@@ -4128,7 +4128,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged LD ASM control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), m_pipeline_address[3], m_pipeline_word[3], source); m_illegal = true; return;
 		}
-		if (((m_pipeline_word[3] & 0xfc00) == 0x3c00 || (m_pipeline_word[3] & 0xfc00) == 0x4000) && source < 0x60)
+		if (((m_pipeline_word[3] & 0xfc00) == 0x3c00 || (m_pipeline_word[3] & 0xfc00) == 0x4000) && source < 0x60 && (source < 8 || source > 0x17))
 		{
 			logerror("%s: staged shift-16 memory arithmetic mapped source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source); m_illegal = true; return;
 		}

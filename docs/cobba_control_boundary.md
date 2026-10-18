@@ -524,37 +524,16 @@ history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
 return. Staged encoding now completes the eight silence frames (0..7):
 608 parameters match the independent reference, preprocessing histories match,
 and each completed frame passes its full-RAM replay. The 32-frame encoder gate
-remains **failing** on the first impulse frame (8), at `400e` at `fb40`, where
-shift-16 memory arithmetic excludes the resolved mapped T source `000e`.
-The reported fetch context `89b7` is not the instruction owner. Register ages
-at this guard must not be compared directly with atomic Execute observations.
-Conditional accumulator store `9e1b` at `fd6d` now has read/write-back,
-late-source, non-saturating shift and replay qualification.
-Indexed memory move `71b2` at `88c9` now has both ordinary-instruction and
-short-repeat qualification, including pointer/destination aliases, overlapping
-RAM and replay. The encoder executes through that sequence into a ROM library
-routine before reaching the current guard.
-Parallel store/subtract `c5ba` at `887d` now has ordinary-instruction
-addressing, arithmetic, old-source store and replay qualification.
-ASM-shifted circular store `87db` at `8845` now has its own address, shift,
-late-data and replay qualification. This does not establish full RAM or
-bus-phase parity.
-Conditional execution `fd08` at `8833` now passes its endpoint composition:
-its selected word stays inside block `882d..8834`, while interrupt protection
-follows the repeat back-edge or final fall-through. Repeated parallel
-store/load `c8b9` at `881d` also has its own operand, pointer,
-accumulator-feedback and replay qualification.
+remains **failing** on the first impulse frame (8), at logical operation `180e`
+at `fc34`, where the resolved mapped T source `000e` is excluded. The reported
+fetch context `fcc9` is not the instruction owner. Guard-time register ages
+must not be compared directly with atomic Execute observations.
 Adding `--trace-fr` captures frame-0 encoding entry RAM/registers and the
 execution-owned instruction/data stream without weakening parameter or replay
-checks. Atomic and staged traces agree on the registers at this boundary:
-AR2 is `1268`, ST0 is `0024` and ST1 is `0340`. The atomic instruction writes
-`b3a6` to ordinary page-zero RAM at `0068` and leaves AR2=`0068`.
-This is MMR addressing, not a write to `1268`: SPRU172C's STM contract clears
-the selected AR's upper nine bits. Plain-indirect RAM STM now has explicit
-address/publication, exclusion and replay tests and executes past this point.
-The preceding instruction, repeat and delay-load qualifications live in the
-[ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish staged
-parameter or speech acceptance; the atomic encoder remains the control.
+checks; it does not yet capture the frame-8 instruction stream.
+Instruction, repeat and delay-load qualifications live in the
+[ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish complete
+staged parameter or speech acceptance; the atomic encoder remains the control.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
