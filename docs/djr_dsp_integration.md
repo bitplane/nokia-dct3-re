@@ -659,10 +659,17 @@ execution allowance, not measured hardware timing.
 
 The decoder requires `%` address updates to remain linear when BK is zero:
 its RPE inverse quantizer uses `*AR2+0%` with AR0=3 and BK=0. Suppressing
-that update overwrites pulses. This rule is independently documented in
+that update overwrites pulses. The retained behavior is protected by 320
+core cases covering signed strides, wraparound and single/dual-memory forms,
+but its authority is the acquired codec's bit-exact execution, not a silicon
+measurement. [TI SPRU131G section 5.5.3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+instead describes suppressing modification with BK=0.
 [TI SPRU429A section 3.3.6](https://www.ti.com/lit/ug/spru429a/spru429a.pdf)
-and protected by 320 core cases covering signed strides, wraparound and
-single/dual-memory forms.
+recommends removing unnecessary percent modifiers during C54x-to-C55x
+migration; it does not explicitly resolve the nonzero AR0-stride discrepancy.
+Keep the ROM4-compatible linear behavior pending independent execution or
+hardware evidence, and do not promote it to a universally validated C54x
+rule. Nonzero circular buffers follow the separately tested CPU contract.
 
 `make check-c54x-rom4-fr-encoder` invokes native reset wrapper `0x8045`,
 preprocessing `0x85e0` with AR4 pointing to 160 PCM words, then `0x860c`.

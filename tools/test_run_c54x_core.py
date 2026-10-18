@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_circular_mar_requires_legal_domain_and_independent_oracle(self):
+        marker, ending = EXTRA_PROFILES['mar-circular']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='mar-circular')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mar-circular')
+
     def test_tc_returns_require_producer_and_retention_evidence(self):
         marker, ending = EXTRA_PROFILES['tc-return']
         text = marker + '\n' + ending + '\n'

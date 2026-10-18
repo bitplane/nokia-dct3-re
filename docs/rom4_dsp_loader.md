@@ -277,8 +277,10 @@ staged execution executes its mapped-AR ADDM and the initialization routine's
 ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
 execute, and the backend observes completion strobes. Execution
 reaches resident code, executes the absolute BITT in RETD's delay span
-and RC TC, and stops at `009199`, `6dc2` (MAR *AR2-%, circular decrement), with
-the exposed PC at `919b`, PMST `ffac` and
+and RC TC, and passes short circular MAR. It stops at `008e51`, `0af8`
+(absolute-memory SUBS, unsigned-word subtraction) in the two delay words
+of BCD BEQ at `008e4f`, with
+the exposed PC at `8e52`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -2711,6 +2713,20 @@ save points. Mutating TC and the stack after the decision cannot change
 the path or target; untaken paths perform no stack access. The fixtures
 retain the existing three/five-cycle untaken/taken cadence. Delayed and
 compound status predicates remain outside the admitted subset.
+
+Short circular MAR admits the four modifiers -1/-AR0/+1/+AR0 through the
+existing Access-owned DAGEN update. `mar-circular` checks 49,152 cases plus
+replay across all AR encodings, CMPT states, BK=1/2/3/13/16/31/32/250,
+four legal positions/stride classes, two pages and three save points.
+Explicit alignments and a signed-residue oracle are independent of the
+CPU's mask/adjust implementation; inputs obey SPRU131G 5.5.3.4's buffer
+and stride constraints, including the AR0 pointer/index alias. The opcode
+performs no data access, updates only the selected AR/ARP, and does not
+repeat its update after restore. The native 6dc2 entry used BK=00fa and
+AR2=0701, a nonzero-buffer case. BK=0 remains the qualified ROM4 behavior
+described in `djr_dsp_integration.md`, not a newly validated silicon rule.
+Long-offset circular MAR and close BK/AR producer compositions remain
+unvalidated; no physical pipeline-phase claim is made.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;

@@ -9,7 +9,8 @@ import sys
 
 
 SOURCE_OFFSET = 0x94cf8
-STOP = 'unsupported staged C54x form 6dc2 at 009199'
+STOP = ('staged long-memory operation in a control delay is unsupported: '
+        'word=0af8 address=008e51 decode_words=2 control=008e4f control_words=4')
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -20,9 +21,9 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('919b', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('8e52', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
-    if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
+    if text.count(STOP) != 1 or 'unsupported staged C54x form' in text:
         raise ValueError('missing or ambiguous unsupported instruction')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('2', '71')]:
@@ -35,9 +36,9 @@ def check(text, firmware):
     packed = struct.pack('>40H', *words)
     if firmware.find(packed) != SOURCE_OFFSET or firmware.find(packed, SOURCE_OFFSET + 1) != -1:
         raise ValueError('observed upload does not bind uniquely to the reviewed NSE-1 MCU source')
-    return dict(status='unsupported_staged_circular_mar', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_bcd_subs', source_offset=SOURCE_OFFSET,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x9199, instruction=0x6dc2, completion_strobes=2,
+                instruction_address=0x8e51, instruction=0x0af8, control_address=0x8e4f, completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)
 

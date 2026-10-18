@@ -14,4 +14,8 @@ emu.register_frame_done(function()
         cpu.state.PC.value, cpu.state.XPC.value, cpu.state.ILLEGAL.value,
         cpu.state.PMST.value, cpu.state.SWWSR.value, cpu.state.BSCR.value,
         cpu.state.SWCR.value, table.concat(words, ','), machine.time:as_double()))
+    machine:logerror(string.format(
+        'rom4_staged_dagen: bk=%04x ar0=%04x ar2=%04x st0=%04x st1=%04x\n',
+        cpu.state.BK.value, cpu.state.AR0.value, cpu.state.AR2.value,
+        cpu.state.ST0.value, cpu.state.ST1.value))
 end)

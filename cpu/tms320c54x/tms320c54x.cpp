@@ -440,7 +440,7 @@ constexpr bool staged_port_read(u16 word)
 constexpr bool staged_mar(u16 word)
 {
 	return (word & 0xff00) == 0x6d00 &&
-		((u8(word) >= 0x80 && u8(word) < 0x98) || (u8(word) >= 0xa0 && u8(word) < 0xc0) || (word & 0xf8) == 0xe8);
+		((u8(word) >= 0x80 && u8(word) < 0x98) || (u8(word) >= 0xa0 && u8(word) < 0xe0) || (word & 0xf8) == 0xe8);
 }
 
 constexpr bool staged_long_mar(u16 word)
@@ -2314,7 +2314,8 @@ void tms320c54x_device::circular_modify(unsigned ar, s16 step, unsigned stage)
 	u16 const bk = stage < 6 ? m_pipeline_bk[stage] : m_bk;
 	if (!bk)
 	{
-		// BK=0 makes the % modifier linear (SPRU429A section 3.3.6).
+		// Retained ROM4 codec behavior: BK=0 remains linear. SPRU131G
+		// describes suppression instead; the fitted-silicon rule is unresolved.
 		m_ar[ar] += step;
 		return;
 	}
