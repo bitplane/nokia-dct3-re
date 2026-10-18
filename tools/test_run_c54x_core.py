@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_rptz_requires_accumulator_clear_and_count_retention(self):
+        marker, ending = EXTRA_PROFILES['rptz']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='rptz')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='rptz')
+
     def test_rotate_requires_carry_guard_and_restore_evidence(self):
         marker, ending = EXTRA_PROFILES['rotate']
         text = marker + '\n' + ending + '\n'

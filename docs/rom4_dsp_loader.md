@@ -274,9 +274,11 @@ or execute a loader.
 DSPIF, native backend and product inputs, with the staged frontend and
 explicit standard SWWSR option. The MCU organically uploads loader1;
 staged execution executes its mapped-AR ADDM and the initialization routine's
-ROL B, then reaches a replacement upload at `0f00`. It stops at `000f0d`,
-instruction `f071 079f` (RPTZ A, #079f), with prefetched PC
-`0f0f`, PMST `ffa8` and
+ROL B, then reaches a replacement upload at `0f00`. The RPTZ setup is
+admitted, but its repeated body at `000f0f`, `8093` (STL A,*AR3+), is not.
+The rejection occurs before the older RPTZ retires; admission alone does
+not prove that the accumulator was cleared in this run. Prefetched PC is
+`0f11`, with PMST `ffa8` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -2656,6 +2658,17 @@ SXM/OVM combinations, two pages and three snapshots. Each case executes two
 adjacent rotates and checks state every clock, including carry forwarding
 and preservation of the other accumulator. Repeat-body admission remains
 excluded; these fixtures make no silicon bus-phase claim.
+
+RPTZ A/B,#lk shares immediate RPT's retained-count, body-latching and
+interrupt-protection path, additionally clearing the selected 40-bit
+accumulator once at Execute (SPRU172C 4-150). The `rptz` profile checks
+768 cases plus replay across both accumulators, counts 0/1/3/17, C/TC and
+SXM/OVM settings, two pages and three save points. An existing immediate
+store body proves exactly count-plus-one ordered writes and AR updates;
+mutating the setup literal after Decode cannot change the repeat. Other
+accumulator and status bits remain unchanged. Existing nested, block and
+control-delay repeat exclusions also apply to RPTZ. This does not admit
+new body instructions, in particular the loader's repeated STL.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;
