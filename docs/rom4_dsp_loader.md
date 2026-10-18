@@ -40,9 +40,18 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete;
-with ordinary delayed square accumulation also qualified, the staged EFR
-frame stops at unsupported word `cc5c`, owner `d12d`. No complete staged
-EFR frame has passed.
+with ordinary delayed square accumulation and parallel MPY also qualified,
+the staged EFR frame stops at a conditional-store mapped-destination guard
+(fetch PC `d1b0`, not established as the instruction owner). No complete
+staged EFR frame has passed.
+
+The bounded frame trace ends after RPTBD `d1a9`. Both frontend traces show
+STM at `d1a6` setting AR5 to `0016`; the atomic continuation executes
+conditional store `9d3a` at `d1ad`, whose X selector addresses AR5 and thus
+the mapped AR6 register. This identifies a deliberate mapped-register
+target, not evidence of accidental pointer corruption or frontend state
+parity. Exact staged ownership and conditional MMIO read/write semantics
+still need qualification; the guard remains in place.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -69,6 +78,26 @@ register semantics retain their separate gates. On the handset board,
 `0021` reads BSP transmit data without acknowledging it, `0022` reads BSP
 control, `0024..26` are CPU-owned timer registers, and unowned gaps delegate
 to the board map. The BSP receive side effect is qualified separately above.
+
+## Parallel Store/Multiply
+
+The staged frontend admits `ccxx..cfxx`: either accumulator as store
+source and either accumulator as multiply destination. X/Y capture and
+modification share the parallel-store path. Read retains X, T and ASM;
+Execute stores the old live accumulator before replacing the selected
+destination with signed X times T. FRCT doubles the product, OVM applies
+to the result, and SMUL does not apply the MAC-family product clamp.
+The atomic model's carry-preservation policy remains silicon-unvalidated.
+
+`st-par-mpy` passes 270,336 cases and cleared-pipeline replays: 73,728
+address cases and 196,608 numeric cases, all 1,024 encodings, linear and
+circular addressing, pointer/memory/accumulator aliases, all 32 ASM modes,
+signed word patterns, FRCT/OVM/SMUL/SXM/SST and sticky-status combinations,
+two pages and three checkpoints. T and source memory change after Read;
+the accumulator changes before Execute and ASM changes after capture.
+`st-mpy-edge` retains 64 replayed mapped-X/Y rejections before reads,
+writes or pointer effects. Mapped/peripheral operands, arbitrary producer/
+interrupt/repeat composition and physical bus phases are not qualified.
 
 ## Square accumulation in ordinary delayed controls
 

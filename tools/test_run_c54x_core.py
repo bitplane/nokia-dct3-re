@@ -2234,6 +2234,20 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='stld-bsp')
 
+    def test_parallel_multiply_scope(self):
+        for profile in ('st-par-mpy', 'st-mpy-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for field in marker.split()[4:]:
+                with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                    check_result(output.replace(field, field + '_wrong', 1), 3,
+                                 profile=profile)
+            for bad in (ending + '\n', marker + '\n' + output,
+                        output + 'late output\n'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_delayed_square_scope(self):
         marker, ending = EXTRA_PROFILES['square-delay']
         output = marker + '\n' + ending + '\n'
