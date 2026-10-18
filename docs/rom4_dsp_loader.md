@@ -1,8 +1,8 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype currently stops on circular-address PORTR
-`74d6` at `3249`;
+acceptance scopes. The prototype now reads the existing RF sample provider
+and stops on dual-arithmetic opcode `b736` at `325f`;
 its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
@@ -163,6 +163,37 @@ The staged checker retains the ordered field writes/reads, six gap reads
 and their counts as regression evidence. Its result explicitly leaves
 `physical_low_gap_identity_claim` false. The Lua taps issue no extra reads
 of these fields or endpoints and never replace values.
+
+## Circular PORTR and block composition
+
+PORTR admits short circular modes 8/9/10/11 through the shared address
+generator (SPRU131G 5.5.3.4). Access retains the old destination and updates
+its selected pointer once; Read samples the retained port and Execute
+publishes the sampled word. No data-destination read occurs. Unsupported
+mapped destinations stop before pointer or I/O effects.
+
+`portr-circular` verifies 98,304 cases and replays across all four modes,
+eight registers, compatibility selection, block sizes and index boundaries,
+four samples, two full-width port literals, mode flags, program pages and
+three snapshots. Literal, pointer and volatile I/O values change after their
+ownership stages, so re-sampling and duplicate side effects are observable.
+BK=0 retains the declared legacy linear behavior, not a new silicon claim.
+
+`portr-block` verifies 1,728 cases and replays of circular post-increment
+inside RPTBD: counts 2/7/17, BK 1/7/16, every auxiliary register,
+compatibility modes, two initial ring positions, two program pages and
+three snapshots. A volatile test provider supplies distinct words; the
+fixture checks two-word issue cadence, retained sample publication,
+ring wrap, final BRC and unchanged unrelated registers. It does not supply
+GSM packets or assert measured physical bus timing.
+
+The native probe now calls the existing RF sample provider four times,
+at modeled frame 30 around 0.162033 s. Observation-time PCs are
+`324e/3254/325a/3260`; these are not retirement addresses. The first block
+iteration still stops on a later unadmitted arithmetic opcode, so neither
+completed filtering nor RF acquisition is established. The checker requires
+the four ordered reads and matching backend count and leaves
+`rf_acquisition_claim` false.
 
 ## Current result
 
@@ -563,11 +594,12 @@ source `000b` is BL. Repeated MVKD `7090` at `3053` copies three words
 from `b706` through post-incrementing AR0, and STM AL `7708` at `45b0`
 executes, as does absolute ST T `8cf8` at `a548` (destination `1f28`).
 The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
-board map at `0003`, as described above. Execution stops at circular-address
-PORTR `74d6` at `003249`, whose port literal is `0027`, the existing RF
-sample input. It is inside the block established by RPTBD at `3245`
-(end `3268`), before the port read occurs. The exposed PC is `324b`, BK `0010`,
-AR0 `0002`, AR2 `00ac`, ST0 `081f`, ST1 `e900`, PMST `ffac` and
+board map at `0003`, as described above. Circular-address PORTR `74d6`
+at `3249` reads port `0027`, the existing RF sample input. Four provider
+reads occur inside the block established by RPTBD at `3245` (end `3268`),
+before execution stops on dual-arithmetic opcode `b736` at `00325f`.
+The exposed PC is `3261`, BK `0010`, AR0 `0002`, AR2 `06d2`,
+ST0 `081f`, ST1 `e900`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial

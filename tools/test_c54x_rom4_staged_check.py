@@ -15,10 +15,10 @@ class StagedFrontierTest(unittest.TestCase):
         self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
         self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
         self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
-        self.row = ('rom4_staged_frontier: pc=324b xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=3261 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
-                     'rom4_staged_dagen: bk=0010 ar0=0002 ar2=00ac st0=081f st1=e900\n'
+                     'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d2 st0=081f st1=e900\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
                      'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.134188962\n'
@@ -32,7 +32,11 @@ class StagedFrontierTest(unittest.TestCase):
                      'rom4_staged_bsp_rx: index=2 value=0aaa mask=ffff t=0.133937654\n'
                      'rom4_staged_bsp_rx_count: count=2\n'
                      f'rom4_staged_repeat_tail: base=0e58 words={self.loop}\n'
-                     'rom4_interface_summary: completion_strobes=4 mailbox_writes=74 \n')
+                     'rom4_interface_summary: completion_strobes=4 mailbox_writes=74 rf_reads=4 next=0\n')
+        self.text += ('rom4_rf_read: sample=1 pc=324e frame=30 t=0.162032\n'
+                      'rom4_rf_read: sample=2 pc=3254 frame=30 t=0.162033\n'
+                      'rom4_rf_read: sample=3 pc=325a frame=30 t=0.162033\n'
+                      'rom4_rf_read: sample=4 pc=3260 frame=30 t=0.162033\n')
         observations = [
             ('low_write', '00f1', '0000', '0f10', '0.133253635'),
             ('low_write', '00f2', '0000', '0f10', '0.133253654'),
@@ -57,8 +61,8 @@ class StagedFrontierTest(unittest.TestCase):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x74d6)
-        self.assertEqual(result['instruction_address'], 0x3249)
+        self.assertEqual(result['instruction'], 0xb736)
+        self.assertEqual(result['instruction_address'], 0x325f)
         self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
         self.assertEqual(result['bsp_receive_words'], [0x0aaa, 0x0aaa])
         self.assertEqual(result['bsp_transmit_words'], [0x0aaa, 0xffd5])
@@ -67,8 +71,20 @@ class StagedFrontierTest(unittest.TestCase):
         self.assertEqual(result['completion_strobes'], 4)
         self.assertEqual(result['swwsr'], 0x2000)
         self.assertEqual(result['low_gap_bus_reads'], 6)
-        for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim', 'physical_low_gap_identity_claim'):
+        self.assertEqual(result['rf_sample_reads'], 4)
+        for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim', 'physical_low_gap_identity_claim', 'rf_acquisition_claim'):
             self.assertFalse(result[field])
+
+    def test_rejects_missing_or_changed_native_rf_reads(self):
+        for text in (self.text.replace('rom4_rf_read:', 'missing_rf:'),
+                     self.text + 'rom4_rf_read: malformed\n',
+                     self.text.replace('rf_reads=4', 'rf_reads=3'),
+                     self.text.replace('sample=4', 'sample=3'),
+                     self.text.replace('pc=3254', 'pc=3253'),
+                     self.text.replace('frame=30', 'frame=29'),
+                     self.text.replace('0.162032', '0.700000')):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check(text, self.image)
 
     def test_rejects_changed_pointer_and_unowned_bus_evidence(self):
         for text in (self.text.replace('rom4_staged_gap_read:', 'missing_gap:'),
@@ -86,11 +102,11 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=324b', 'pc=0f1f'),
+                     self.text.replace('pc=3261', 'pc=0f1f'),
                      self.text.replace('st0=081f', 'st0=001f'),
                      self.text.replace('st1=e900', 'st1=4901'),
                      self.text + 'rom4_staged_dagen: malformed\n',
-                     self.text + 'rom4_staged_dagen: bk=0010 ar0=0002 ar2=00ac st0=081f st1=e900\n',
+                     self.text + 'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d2 st0=081f st1=e900\n',
                      self.text.replace('rom4_staged_bsp_rx_count: count=2', 'rom4_staged_bsp_rx_count: count=3'),
                      self.text.replace('index=2 value=0aaa', 'index=2 value=0aab'),
                      self.text.replace('0.133937654', '0.133909557'),

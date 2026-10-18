@@ -11,7 +11,7 @@ import sys
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a60
 REPEAT_SOURCE_OFFSET = 0x98af0
-STOP = 'unsupported staged C54x form 74d6 at 003249'
+STOP = 'unsupported staged C54x form b736 at 00325f'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -22,16 +22,23 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('324b', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('3261', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or text.count('unsupported') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
     if (text.count('rom4_staged_dagen:') != 1
-            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0010', '0002', '00ac', '081f', 'e900')]):
+            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0010', '0002', '06d2', '081f', 'e900')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('4', '74')]:
         raise ValueError('missing or changed bootstrap completion boundary')
+    rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
+    if (text.count('rom4_rf_read:') != 4
+            or [row[:3] for row in rf] != [('1', '324e', '30'), ('2', '3254', '30'), ('3', '325a', '30'), ('4', '3260', '30')]
+            or not all(0.15 < float(row[3]) < float(timestamp) for row in rf)
+            or not all(float(before[3]) <= float(after[3]) for before, after in zip(rf, rf[1:]))
+            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['4']):
+        raise ValueError('missing, malformed or changed native RF provider reads')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
     if text.count('rom4_staged_bsp_write:') != 6 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4:
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
@@ -97,17 +104,17 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_circular_portr', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_dual_arithmetic', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x3249, instruction=0x74d6, low_gap_bus_reads=6,
+                instruction_address=0x325f, instruction=0xb736, low_gap_bus_reads=6, rf_sample_reads=4,
                 bsp_transmit_words=[0x0aaa, 0xffd5],
                 bsp_receive_words=[0x0aaa, 0x0aaa],
                 bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 4, completion_strobes=4,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False,
-                physical_low_gap_identity_claim=False)
+                physical_low_gap_identity_claim=False, rf_acquisition_claim=False)
 
 
 def main():

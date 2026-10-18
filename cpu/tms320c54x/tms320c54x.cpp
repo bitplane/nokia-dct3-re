@@ -445,7 +445,7 @@ constexpr bool staged_port_write(u16 word)
 
 constexpr bool staged_port_read(u16 word)
 {
-	return (word & 0xff00) == 0x7400 && (u8(word) < 0x98 || u8(word) == 0xf8);
+	return (word & 0xff00) == 0x7400 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0) || u8(word) == 0xf8);
 }
 
 constexpr bool staged_mar(u16 word)
