@@ -3250,6 +3250,9 @@ void tms320c54x_device::pipeline_step()
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
 			bool const delay_multiply = ((word & 0xfe00) == 0x2000 || (word & 0xf800) == 0x2800) &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
+			// Short MPYA/MASA/MACA/MACAR publish Smem to T in Read;
+			// their independently owned B result retires before redirect.
+			bool const delay_accumulator_multiply = ((word & 0xf9ff) == (0x3100 | u8(word))) && u8(word) < 0x98;
 			bool delay_compare = false;
 			bool delay_bitt = false;
 			bool delay_arithmetic = false;
@@ -3290,7 +3293,7 @@ void tms320c54x_device::pipeline_step()
 			if (!m_pipeline_decode_remaining && staged_data_to_program(word)) { logerror("%s: staged MVDP inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && !delay_repeat && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
+			if (!m_pipeline_decode_remaining && !delay_repeat && !delay_t_load && !delay_store && !delay_load && !delay_dld && !delay_asm && !delay_shift && !delay_multiply && !delay_accumulator_multiply && !delay_compare && !delay_bitt && !delay_arithmetic && ((word & 0xfe00) == 0x1e00 || staged_immediate_multiply(word) || staged_shifted_smem(word) || staged_smem_special(word) || staged_extended_dld(word) || staged_offset_load(word) || (staged_extended_logic(word) && !staged_absolute_logic(word)) || staged_bitfield(word) || staged_extended_smem_arithmetic(word) || staged_extended_rmw(word) || staged_extended_move(word) || staged_extended_dst(word) || (staged_data_copy(word) && !staged_two_word_data_copy(word)) || staged_long_arithmetic(word) || staged_extended_immediate_store(word) || staged_short_repeat(word)))
 			{
 				logerror("%s: staged long-memory operation in a control delay is unsupported: word=%04x address=%06x decode_words=%u control=%06x control_words=%u cycle=%llu\n",
 					machine().describe_context(), word, m_pipeline_address[2], m_pipeline_delay_decode_words,

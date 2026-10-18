@@ -2470,9 +2470,11 @@ The `fa60` delayed ANOV branch at `d253` now has an
 The RETD delay operation at `d27d`, `6f17 0e20`, is shifted SUB from B to A
 and now executes under the
 [shifted delay qualification](rom4_dsp_loader.md#shifted-arithmetic-in-control-delay-words).
-The current guard is long-memory word `3562` at `d583`, in RETD `d582`'s
-delay span. Recover that operation's memory and delay ownership before
-admitting it. No complete staged EFR frame has passed yet.
+The `3562` MACA at `d583`, in RETD `d582`'s delay span, now executes under
+the [accumulator-source delay qualification](rom4_dsp_loader.md#accumulator-source-multiply-in-control-delay-words).
+The current guard is unsupported word `4d6e` owned by `d394` (reported fetch
+PC `d396`). Decode and qualify that operation before admitting it.
+No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every

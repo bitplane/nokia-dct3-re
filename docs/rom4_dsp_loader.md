@@ -18,6 +18,22 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Accumulator-source multiply in control-delay words
+
+Short MPYA/MASA/MACA/MACAR may run in BD/BCD/CALLD/FCALLD/RETD delay
+words. They use the ordinary signed 17-bit A-high and signed Smem arithmetic;
+memory publishes to T in Read and B publishes in Execute. The return/call
+frame remains independently owned. Extended address forms remain guarded.
+
+`maca-delay` passes 55,296 cases and save/load replays: six control paths,
+four operations, DP/indirect/postincrement, eight input patterns,
+FRCT/OVM/SMUL/SXM, two pages and three checkpoints. The two BCD paths seed
+A=0/1 to select their outcomes; they do not independently vary A-high.
+Checks cover A preservation, B publication, one memory sample, pointer update,
+T poisoning after Read, balanced frames and target observation. This does
+not qualify interrupt composition, accumulator-producer hazards or physical
+pipeline phases.
+
 ## Shifted arithmetic in control-delay words
 
 Two-word shifted Smem ADD/SUB may occupy the complete delay span of BD,
