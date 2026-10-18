@@ -14,6 +14,25 @@ unrelated status bits and modes remain unchanged. This qualifies the
 declared staged schedule, not measured silicon pipeline phases;
 single-instruction repeat remains rejected by the existing repeat guard.
 
+## Staged circular accumulator stores
+
+Short STL/STH modes 8 through 11 use the existing circular address generator:
+the old auxiliary-register address is retained at Read, its pointer is updated
+once using the retained BK, and accumulator data is sampled at Execute.
+TI SPRU131G section 5.5.3.4 defines the nonzero-block alignment, initial-index
+and step-size constraints. The `store-circular` fixture reuses the independently
+calculated circular-load address cases and the indexed-store transaction checks.
+Its 786,432 cases and replays cover all four store selectors, eight auxiliary
+registers, compatibility selection,
+block sizes, boundary indices, signed steps, saturation modes, program pages
+and snapshots before/after address and data publication. Low-page destinations
+are rejected before pointer or bus effects; destinations are never read.
+
+BK=0 retains the pre-existing linear-update behavior as an explicit legacy
+exception. The manual describes suppressed circular modification instead;
+this store extension does not resolve that fitted-silicon discrepancy or claim
+measured physical pipeline timing. Single-instruction repeat is still excluded.
+
 ## Current result
 
 The current native boundary profiles are distinct: the four-second coherent
@@ -406,9 +425,9 @@ status is subsequently `4900`. It executes resident `003461`,
 A passive read tap observes two firmware reads of BSP's retained test
 word `0aaa`, at 0.133909558 and 0.133937654 s. The second is the newly
 admitted shifted read, not a new serial frame or an injected reply.
-The staged frontend executes SAT A/B at `3473/3475`, then stops at
-resident `0034d3`, `80d3` (an unsupported accumulator store form).
-The exposed PC is `34d5`, BK `0278`, ST0 `001f`, PMST `ffac` and
+The staged frontend executes SAT A/B at `3473/3475` and the circular
+post-increment store `80d3` at `34d3`, then stops at resident `00354c`,
+`f930` (CC on NTC). The exposed PC is `354e`, BK `0278`, ST0 `081f`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial

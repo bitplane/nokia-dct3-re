@@ -552,6 +552,7 @@ constexpr bool staged_store(u16 word)
 {
 	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xa0) ||
 		((word & 0xfc00) == 0x8000 && u8(word) >= 0xa8 && u8(word) < 0xb8) ||
+		((word & 0xfc00) == 0x8000 && u8(word) >= 0xc0 && u8(word) < 0xe0) ||
 		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || staged_extended_accumulator_store(word) || staged_asm_store(word);
 }
 
@@ -3590,7 +3591,7 @@ void tms320c54x_device::pipeline_step()
 			}
 			m_pipeline_immediate[4] = m_st1 & 0x1f;
 		}
-		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && mode >= 0xa8 && mode < 0xb8 && m_pipeline_operand_address[4] < 0x60)
+		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && ((mode >= 0xa8 && mode < 0xb8) || (mode >= 0xc0 && mode < 0xe0)) && m_pipeline_operand_address[4] < 0x60)
 		{
 			logerror("%s: staged AR0-indexed accumulator store low-page destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

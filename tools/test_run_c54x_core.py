@@ -158,6 +158,16 @@ class CoreResultTests(unittest.TestCase):
                     with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
                         check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
 
+    def test_saturation_and_circular_store_require_complete_qualification_markers(self):
+        for profile in ('sat', 'store-circular'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_shifted_peripheral_requires_retention_and_honest_boundary_labels(self):
         for profile in ('shift-periph', 'shift-bsp', 'shift-per-edge'):
             marker, ending = EXTRA_PROFILES[profile]
