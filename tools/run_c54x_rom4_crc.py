@@ -187,14 +187,14 @@ def main():
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
     parser.add_argument('--staged', action='store_true', help='run FR encoder/decoder or EFR encoder vectors on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
-    parser.add_argument('--trace-efr-reset', action='store_true', help='observe at most 8192 executed EFR encoder reset instructions, without changing acceptance')
+    parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder):
         parser.error('--staged currently requires --fr-decoder, --fr-encoder or --efr-encoder')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
     if args.trace_efr_reset and not args.efr_encoder:
-        parser.error('--trace-efr-reset requires --efr-encoder')
+        parser.error('--trace-efr requires --efr-encoder')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     args.output_root.mkdir(parents=True, exist_ok=True)

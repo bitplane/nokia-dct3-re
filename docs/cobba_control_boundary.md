@@ -2485,13 +2485,18 @@ not an RPTBD delay; it now executes under the
 The `3895` squares owned by `cf61` and `cf62`, in RPTBD `cf5f`'s delay
 span, execute under the
 [delayed-square qualification](rom4_dsp_loader.md#square-arithmetic-in-rptbd-delay-words).
-The current guard is dual ADD `a0b8` owned by `d45b`, with X=`0000` and
-Y=`111b` (reported fetch PC `d447`). Establish the low operand's pointer
-provenance before deciding whether this needs register-operand admission
-or correction of an earlier state error.
+The low operand of `a0b8` at `d45b` is deliberately initialized AR5, used
+as a postincremented counter/address in both frontends. Its IMR/IFR and
+unowned-board-map reads now execute under the
+[low-address dual-ALU qualification](rom4_dsp_loader.md#low-address-dual-addsub-operands).
+The current guard is word `2292` owned by `d35e`, in RETD `d35d`'s delay
+span. Recover the rounded multiply's operand and delay ownership before
+admitting it.
 No complete staged EFR frame has passed yet.
-`--trace-efr-reset` retains at most 8,192 executed reset instructions, and
-does not change the comparison requirements. Both reset entry words and
+`--trace-efr` (also accepted as `--trace-efr-reset`) retains at most 8,192
+reset and 200,000 first-frame executed instruction/register observations,
+excluding replay. It does not change the comparison requirements or claim
+that snapshot ages match between frontends. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
 fixture BIOS must declare both program and data images. No staged EFR
 acceptance gate is promoted. This is independent of the handset's

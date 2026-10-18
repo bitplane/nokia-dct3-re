@@ -27,7 +27,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(bad, 3, profile='ov-branch-pipe')
 
     def test_mapped_dual_alu_scope(self):
-        for profile in ('alu-map', 'alu-map-edge'):
+        for profile in ('alu-map', 'alu-map-edge', 'alu-map-irq', 'alu-low-bus'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending
             check_result(text, 3, profile=profile)

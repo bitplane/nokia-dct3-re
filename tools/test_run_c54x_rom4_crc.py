@@ -1,6 +1,8 @@
 import unittest
 import tempfile
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, FR_COMPLETE, FR_PASS, check_result
@@ -276,6 +278,16 @@ class Rom4HelperResultTest(unittest.TestCase):
                 check_result(invalid, 3, fr_decoder=True, verbose_teardown=True)
         with self.assertRaises(ValueError):
             check_result(text, 3, fr_decoder=True)
+
+    def test_efr_trace_aliases_require_encoder(self):
+        script = Path(__file__).with_name('run_c54x_rom4_crc.py')
+        for option in ('--trace-efr', '--trace-efr-reset'):
+            result = subprocess.run([sys.executable, str(script), '--mame', 'unused',
+                                     '--rompath', 'unused', '--fr-decoder', option],
+                                    capture_output=True, text=True)
+            with self.subTest(option=option):
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('--trace-efr requires --efr-encoder', result.stderr)
 
     def test_completion(self):
         check_result(PASS + "\n" + COMPLETE + "\n", 3)

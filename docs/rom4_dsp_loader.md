@@ -18,6 +18,32 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Low-address dual ADD/SUB operands
+
+Dual ADD/SUB admit IMR/IFR (`0000/0001`) as Read-owned, non-acknowledging
+sources, and delegate `0002..0005` to the existing board map. No read constant
+or peripheral identity is introduced for those unowned words. ST0/ST1 and
+other low control/peripheral sources remain guarded, as do low sources for
+multiply/MAC/SQDST.
+
+`alu-map-irq` passes 18,432 cases and cleared-pipeline replays over IMR/IFR,
+X/Y/both placements, eight selector pairs, ADD/SUB, both accumulators,
+SXM/OVM, BK=0/32, two patterns, two pages and three checkpoints. Reads leave
+IMR/IFR intact. Post-Read poisoning changes both registers to a disjoint
+mask/pending pair, avoiding an unrelated IDLE wake, while Execute must use
+the retained operands. This does not qualify concurrent interrupt arrival.
+`alu-low-bus` passes 36,864 corresponding cases over all four unowned words,
+with mutable board-map values and post-Read poisoning. Address modifiers and
+alias priority retain the existing dual-operand model; physical bus phases
+and producer/control hazards remain unvalidated.
+
+Both acquired-ROM frontends deliberately set AR5=0 via `8815` at `d43b`
+after clearing A at `d436`. `a0b8` at `d45b` uses it as a postincremented
+operand address/counter. The staged stops at values 0 and then 2 therefore
+identified missing operand domains, not an unexplained zero pointer. The
+frontends already differ in other data values here; this observation is not
+state or EFR-result parity.
+
 ## Square arithmetic in RPTBD delay words
 
 Short SQURA/SQURS RAM forms may occupy either or both RPTBD delay words.
@@ -170,8 +196,8 @@ three checkpoints. The BK=32 fixtures use valid circular pointer geometry and
 include wrap; BK=0 retains the declared linear behavior. Post-Read poisoning
 of mapped or RAM sources cannot change the result or cause another pointer
 update. Carry/overflow, unselected accumulator lanes, T/TRN and all ARs are
-checked independently. `alu-map-edge` passes 3,840 cases plus replay over
-eighty unqualified low/control/peripheral addresses, with no reads, writes
+checked independently. `alu-map-edge` passes 3,552 cases plus replay over
+74 unqualified low/control/peripheral addresses, with no reads, writes
 or address updates. The prior arithmetic negative fixture now uses unowned
 ST0 rather than newly admitted T; multiply/square negatives are unchanged.
 

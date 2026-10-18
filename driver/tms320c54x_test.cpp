@@ -15194,16 +15194,17 @@ private:
 	struct mapped_dual_fixture
 	{
 		u32 base;
-		u16 opcode, xaddress, yaddress, xword, yword, st0, st1, result_st0, bk;
+		u16 opcode, xaddress, yaddress, xword, yword, st0, st1, result_st0, bk, imr = 0, ifr = 0;
 		unsigned checkpoint, destination;
 		u64 a, b, result;
 		std::array<u16, 8> initial, final;
 	};
-	static mapped_dual_fixture mapped_dual_case(unsigned variant, bool edge)
+	static mapped_dual_fixture mapped_dual_case(unsigned variant, bool edge, bool interrupt_registers = false, bool low_bus = false)
 	{
 		mapped_dual_fixture f{}; unsigned v = variant;
-		unsigned const address = v % (edge ? 80 : 16); v /= edge ? 80 : 16;
-		u16 const mapped = edge ? (address < 8 ? address : 0x18 + address - 8) : 8 + address;
+		unsigned const addresses = edge ? 74 : interrupt_registers ? 2 : low_bus ? 4 : 16;
+		unsigned const address = v % addresses; v /= addresses;
+		u16 const mapped = edge ? (address < 2 ? address + 6 : 0x18 + address - 2) : interrupt_registers ? address : low_bus ? address + 2 : 8 + address;
 		unsigned const lanes = v % 3; v /= 3;
 		unsigned const selectors = edge ? 0x89 : std::array<unsigned, 8>{0x01,0x0a,0x89,0x45,0xcd,0x88,0x4c,0xf2}[v % 8];
 		if (!edge) v /= 8;
@@ -15216,7 +15217,7 @@ private:
 		unsigned const x = selectors >> 4, y = selectors & 15, xar = 2 + (x & 3), yar = 2 + (y & 3);
 		f.initial = {3,0x1700,0x101f,0x111f,0x121f,0x131f,0x1800,0x1900};
 		if (lanes != 1) f.initial[xar] = mapped;
-		if (lanes != 0) f.initial[yar] = lanes == 2 && xar != yar ? (edge ? (mapped == 0x5f ? 0 : mapped + 1) : 8 + (address + 5) % 16) : mapped;
+		if (lanes != 0) f.initial[yar] = lanes == 2 && xar != yar ? (edge ? (mapped == 0x5f ? 6 : mapped + 1) : interrupt_registers ? (address + 1) % 2 : low_bus ? 2 + (address + 1) % 4 : 8 + (address + 5) % 16) : mapped;
 		f.xaddress = f.initial[xar]; f.yaddress = f.initial[yar]; f.final = f.initial;
 		auto modify = [&f](u16 pointer, unsigned mode) -> u16 {
 			if (mode == 1) return pointer - 1;
@@ -15228,8 +15229,11 @@ private:
 		f.a = pattern ? 0x7fffff8001ULL : 0x8055557fffULL;
 		f.b = pattern ? 0x8055557fffULL : 0x7fffff8001ULL;
 		f.st0 = 0xa002 | (pattern ? 0x800 : 0); f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0);
+		if (interrupt_registers) { f.imr = pattern ? 0xa55a : 0; f.ifr = pattern ? 0x5aa5 : 0; }
 		auto sample = [&f,pattern](u16 at) -> u16 {
 			if (at >= 0x60) return pattern ? 0x7fff : 0x8001;
+			if (at < 2) return at ? f.ifr : f.imr;
+			if (at < 6) return pattern ? 0xf495 : 0x8001;
 			if (at >= 0x10 && at <= 0x17) return f.final[at - 0x10];
 			if (at >= 8 && at <= 10) return f.a >> ((at - 8) * 16);
 			if (at >= 11 && at <= 13) return f.b >> ((at - 11) * 16);
@@ -15249,20 +15253,22 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
-		auto const f = mapped_dual_case(variant, edge); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		bool const interrupt_registers = !strcmp(machine().options().bios(), "alu-map-irq");
+		bool const low_bus = !strcmp(machine().options().bios(), "alu-low-bus");
+		auto const f = mapped_dual_case(variant, edge, interrupt_registers, low_bus); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, 0xf4e1);
 		m_cpu->set_pipeline_frontend(false);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, f.ifr); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.imr);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8001); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x7fff);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
 		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
-		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
+		if (f.xaddress >= 0x60 || (low_bus && f.xaddress >= 2 && f.xaddress <= 5)) data.write_word(f.xaddress, f.xword);
+		if (f.yaddress >= 0x60 || (low_bus && f.yaddress >= 2 && f.yaddress <= 5)) data.write_word(f.yaddress, f.yword);
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mapped_dual_reads", [this,f,edge](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
@@ -19476,7 +19482,7 @@ private:
 		if (!strcmp(machine().options().bios(), "subs")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "adds")) { start_pipeline_memory_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-dual") || !strcmp(machine().options().bios(), "mpy-dual-edge") || !strcmp(machine().options().bios(), "alu-dual") || !strcmp(machine().options().bios(), "alu-dual-edge")) { start_dual_multiply(); return; }
-		if (!strcmp(machine().options().bios(), "alu-map") || !strcmp(machine().options().bios(), "alu-map-edge")) { start_mapped_dual(); return; }
+		if (!strcmp(machine().options().bios(), "alu-map") || !strcmp(machine().options().bios(), "alu-map-edge") || !strcmp(machine().options().bios(), "alu-map-irq") || !strcmp(machine().options().bios(), "alu-low-bus")) { start_mapped_dual(); return; }
 		if (!strcmp(machine().options().bios(), "macsu-dual") || !strcmp(machine().options().bios(), "macsu-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mac-dual") || !strcmp(machine().options().bios(), "mac-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
@@ -20845,7 +20851,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = initialize ? 304000 : 304001 + frame;
-		if (initialize) m_rom4_fr_trace_count = 0;
+		if (initialize || !frame) m_rom4_fr_trace_count = 0;
 		m_check_timer->adjust(attotime::from_msec(20));
 		if (!initialize) save_rom4_codec_frame(frame);
 	}
@@ -49302,13 +49308,23 @@ private:
 		if (m_phase == 62170)
 		{
 			bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
+			bool const interrupt_registers = !strcmp(machine().options().bios(), "alu-map-irq");
+			bool const low_bus = !strcmp(machine().options().bios(), "alu-low-bus");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = mapped_dual_case(variant, edge);
+			auto const f = mapped_dual_case(variant, edge, interrupt_registers, low_bus);
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual ALU rejects unowned sources before Read and pointer updates");
 			if (!edge && tick == 5)
 			{
 				auto const disable = machine().disable_side_effects();
-				m_cpu->space(AS_DATA).write_word(f.xaddress, 0x5a5a); m_cpu->space(AS_DATA).write_word(f.yaddress, 0x5a5a);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IMR) == f.imr && m_cpu->state_int(tms320c54x_device::STATE_IFR) == f.ifr, "Dual source reads do not acknowledge IFR or change IMR");
+				for (u16 at : {f.xaddress, f.yaddress}) if (at >= 2) m_cpu->space(AS_DATA).write_word(at, 0x5a5a);
+				if (interrupt_registers)
+				{
+					// Change both sources without making the terminal IDLE wake
+					// on IMR & IFR, independently of INTM's vector-entry mask.
+					m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0f0f);
+					m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0xf0f0);
+				}
 			}
 			if (tick == f.checkpoint && !m_pipeline_replay)
 			{
@@ -49331,12 +49347,13 @@ private:
 						if (at >= 0x10 && at <= 0x17) final[at - 0x10] = 0x5a5a;
 					}
 				if (!edge) (f.destination ? b : a) = f.result;
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				bool const valid = m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (edge ? f.st0 : f.result_st0) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_pipeline_operand_reads == (edge ? 0U : 2U) &&
-					!m_pipeline_store_writes && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge,
-					"Mapped dual arithmetic uses retained signed/unsigned words with independent carry/overflow and no data write");
+					!m_pipeline_store_writes && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge;
+				if (!valid) osd_printf_info("mapped_dual_result: case=%u replay=%u a=%010llx/%010llx b=%010llx/%010llx st0=%04llx/%04x st1=%04llx/%04x sp=%04llx bk=%04llx read=%u write=%u idle=%llu\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), edge ? f.st0 : f.result_st0, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), f.st1, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_BK), m_pipeline_operand_reads, m_pipeline_store_writes, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE));
+				expect(valid, "Mapped dual arithmetic uses retained signed/unsigned words with independent carry/overflow and no data write");
 				for (unsigned i = 0; i < 8; ++i)
 				{
 					if (m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) != final[i])
@@ -49346,6 +49363,7 @@ private:
 				for (unsigned i = 0; i < 2; ++i)
 					expect(m_cpu->state_int(i ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T) ==
 						(!edge && (f.xaddress == 14 + i || f.yaddress == 14 + i) ? 0x5a5a : i ? 0x7fff : 0x8001), "Dual arithmetic preserves post-Read T/TRN values");
+				if (interrupt_registers) expect(m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0x0f0f && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0xf0f0, "Execute and restoration do not resample or acknowledge interrupt sources");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint;
@@ -49355,12 +49373,14 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62171; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant + 1 < (edge ? 3840U : 147456U)) { start_mapped_dual(variant + 1); return; }
+				if (variant + 1 < (edge ? 3552U : interrupt_registers ? 18432U : low_bus ? 36864U : 147456U)) { start_mapped_dual(variant + 1); return; }
 				if (edge)
 				{
-					osd_printf_info("TMS320C54x mapped dual ALU exclusions: PASS cases=3840 restore=3840 addresses=80 lanes=3 operations=ADD,SUB accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n");
+					osd_printf_info("TMS320C54x mapped dual ALU exclusions: PASS cases=3552 restore=3552 addresses=74 lanes=3 operations=ADD,SUB accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n");
 					throw emu_fatalerror(3, "TMS320C54x isolated mapped dual ALU exclusions complete");
 				}
+				if (interrupt_registers) { osd_printf_info("TMS320C54x interrupt-register dual ALU: PASS cases=18432 restore=18432 registers=IMR,IFR lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 interrupt_masked=1 reads_do_not_ack=1 source_sample=Read post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated interrupt-register dual ALU complete"); }
+				if (low_bus) { osd_printf_info("TMS320C54x low-bus dual ALU: PASS cases=36864 restore=36864 addresses=0002..0005 lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 source_sample=Read address_update=Access post_read_poison=1 reads=2 writes=0 reset_before_restore=1 endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated low-bus dual ALU complete"); }
 				osd_printf_info("TMS320C54x mapped dual ALU: PASS cases=147456 restore=147456 mapped_sources=16 lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 source_sample=Read address_update=Access post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated mapped dual ALU complete");
 			}
@@ -54154,6 +54174,8 @@ void tms320c54x_test_state::rom4(machine_config &config)
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			if (m_phase == 304000 && ++m_rom4_fr_trace_count <= 8192)
 				trace_rom4_fr_state("efr_reset_execute", address, opcode);
+			else if (m_phase == 304001 && !m_rom4_codec_replay && ++m_rom4_fr_trace_count <= 200000)
+				trace_rom4_fr_state("efr_frame_execute", address, opcode);
 		});
 	if (!strcmp(config.options().bios(), "efr-loss-observe"))
 		m_cpu->instruction_observer_cb().set(FUNC(tms320c54x_test_state::observe_rom4_efr_state));
@@ -55851,6 +55873,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(156, "xc-ret", "Return preserves bounded XC word protection")
 	ROM_SYSTEM_BIOS(157, "move-brc-delay", "BRC move in ordinary delayed control words")
 	ROM_SYSTEM_BIOS(158, "rptbd-square", "Square arithmetic in delayed block setup words")
+	ROM_SYSTEM_BIOS(159, "alu-map-irq", "Dual ADD SUB samples IMR IFR without acknowledgement")
+	ROM_SYSTEM_BIOS(160, "alu-low-bus", "Dual ADD SUB samples unowned low words through board map")
 ROM_END
 
 ROM_START(tms54rom4)
