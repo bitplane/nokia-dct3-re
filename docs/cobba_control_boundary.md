@@ -509,11 +509,17 @@ matches all 1,280 PCM samples of frames 0..7 (silence-input group), with
 per-frame replay. This is partial arithmetic acceptance, not full FR decoding
 or handset speech.
 
-Frame 8 is still **failing** at the block-control guard: delayed conditional
-branch `fa4e` at `84c2` targets `84ca`, immediately beyond block
-`84c1..84c9`. Qualify that delayed forward-exit contract, including its delay
-words and repeat ownership, before broadening admission. No CPU instruction
-or handset state has been forced around a guard.
+The delayed forward exit (`fa4e` at `84c2` to `84ca`, beyond block
+`84c1..84c9`) is now admitted under the qualified block-exit contract.
+Staged execution runs all 32 decoder frames and their replay branches without
+an instruction guard, but the PCM comparison is still **failing**: 1,504 of
+5,120 samples differ. The first difference is frame 8, sample 0: staged `8`,
+reference/atomic `0`. The atomic control still matches all samples. The next
+question is the first data divergence before that PCM store, not another
+missing control-flow instruction. Compare operands and state ownership
+against the atomic control before attributing it to rounding or arithmetic.
+No result has been clamped or repaired to match the reference; native speech
+and full staged FR correctness remain unproven.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values

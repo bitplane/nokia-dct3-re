@@ -18,6 +18,25 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Delayed forward block exits
+
+BD and the twelve signed-accumulator BCD predicates can exit forward beyond
+an active block when both delay words remain strictly inside its bounds.
+The existing delayed-control engine retains the predicate before the delay
+words and executes those words once on both outcomes. This admission does
+not automatically clear architectural BRAF or consume the remaining BRC;
+software can clear BRAF outside the block and revisit the old endpoint after
+the documented spacing. Backward exits, endpoint-overlapping delay spans,
+other predicate families and interrupt composition are not newly qualified.
+
+`rptb-exit-delay` passes 9,984 cases plus replay: BD/twelve A/B predicates,
+counts 0/1/2/7, first/middle/last/never exits, two endpoint layouts, two delay
+load/store orders, two program pages and six checkpoints. A delay load
+reverses the selected condition, so a re-evaluated rather than retained
+decision fails. Ordered reads/writes, single delay effects, BRC/BRAF at exit,
+explicit software clear and a spaced endpoint revisit are checked. Original
+non-delayed forward exits and internal delayed branches retain their gates.
+
 ## RPTBD delay-owned T load
 
 One-word `LD Smem,T` can occupy either RPTBD delay position while retaining

@@ -11009,53 +11009,84 @@ private:
 	}
 	struct block_exit_fixture
 	{
-		unsigned count, exit, reads, body_writes, writes, checkpoint;
+		unsigned count, exit, reads, body_writes, writes, checkpoint, form;
 		u32 base;
 		u16 end;
-		bool b, taken, endpoint_store;
+		bool b, taken, endpoint_store, delayed, reverse_delay;
+		u16 tail() const { return delayed ? 0x607 : 0x605; }
+		u16 value(bool condition) const
+		{
+			if (!delayed || !form) return condition ? 0 : 1;
+			switch ((form - 1) % 6)
+			{
+			case 0: return condition ? 0 : 0xffff; // >= 0
+			case 1: return condition ? 0xffff : 0; // < 0
+			case 2: return condition ? 1 : 0; // != 0
+			case 3: return condition ? 0 : 1; // == 0
+			case 4: return condition ? 1 : 0; // > 0
+			default: return condition ? 0 : 1; // <= 0
+			}
+		}
 	};
-	static block_exit_fixture block_exit_case(unsigned v)
+	static block_exit_fixture block_exit_case(unsigned v, bool delayed = false)
 	{
-		unsigned const count = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4], pattern = (v / 4) % 4, form = (v / 16) % 3;
+		unsigned const forms = delayed ? 13 : 3;
+		unsigned const count = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4], pattern = (v / 4) % 4, form = (v / 16) % forms;
 		unsigned const exit = !form || !pattern ? 0 : pattern == 1 ? count + 1 : pattern == 2 ? count / 2 : count;
-		bool const taken = exit <= count, endpoint_store = !((v / 48) % 2);
+		bool const taken = exit <= count, endpoint_store = !((v / (16 * forms)) % 2);
 		unsigned const body_writes = taken ? exit : count + 1;
 		return {count, exit, taken ? exit + 1 : count + 1, body_writes,
-			body_writes + unsigned(taken && endpoint_store), std::array<unsigned, 6>{3, 8, 9, 10, 12, 18}[v / 192],
-			(v / 96) % 2 ? 0x20000U : 0, u16(endpoint_store ? 0x606 : 0x609), form == 2, taken, endpoint_store};
+			body_writes + unsigned(taken && endpoint_store), std::array<unsigned, 6>{3, 8, 9, 10, 12, 18}[v / ((delayed ? 128 : 64) * forms)], form,
+			(v / (32 * forms)) % 2 ? 0x20000U : 0, u16((delayed ? 2 : 0) + (endpoint_store ? 0x606 : 0x609)), delayed ? form >= 7 : form == 2, taken, endpoint_store, delayed, delayed && (v / (64 * forms)) % 2};
 	}
 	void start_block_exit(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = block_exit_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		auto const f = block_exit_case(variant, !strcmp(machine().options().bios(), "rptb-exit-delay")); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 0x120; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, f.end);
 		program.write_word(f.base + 0x602, f.b ? 0x1192 : 0x1092);
-		program.write_word(f.base + 0x603, (variant / 16) % 3 ? f.b ? 0xf84d : 0xf845 : 0xf073);
+		program.write_word(f.base + 0x603, f.delayed ? f.form ? 0xfa42 + ((f.form - 1) % 6) + (f.b ? 8 : 0) : 0xf273 : f.form ? f.b ? 0xf84d : 0xf845 : 0xf073);
 		program.write_word(f.base + 0x604, 0x700);
-		program.write_word(f.base + 0x605, 0x7693); program.write_word(f.base + 0x606, 0x1111);
+		if (f.delayed)
+		{
+			program.write_word(f.base + 0x605 + unsigned(f.reverse_delay), f.b ? 0x1195 : 0x1095);
+			program.write_word(f.base + 0x606 - unsigned(f.reverse_delay), f.b ? 0x8194 : 0x8094);
+		}
+		program.write_word(f.base + f.tail(), 0x7693); program.write_word(f.base + f.tail() + 1, 0x1111);
 		program.write_word(f.base + f.end + 1, 0xf4e1);
 		program.write_word(f.base + 0x700, 0x76f8); program.write_word(f.base + 0x701, 0x5200); program.write_word(f.base + 0x702, 0xcccc);
 		program.write_word(f.base + 0x703, 0xf6bf);
 		// SPRU131G 7.5.8.2: do not revisit the old endpoint until six
 		// complete words after software BRAF clear. The branch adds more spacing.
-		program.write_word(f.base + 0x70a, 0xf073); program.write_word(f.base + 0x70b, f.endpoint_store ? 0x605 : f.end);
+		program.write_word(f.base + 0x70a, 0xf073); program.write_word(f.base + 0x70b, f.endpoint_store ? f.tail() : f.end);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2345); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5100);
-		for (unsigned i = 0; i <= f.count + 1; ++i) { data.write_word(0x5000 + i, i == f.exit ? 0 : 1); data.write_word(0x5100 + i, 0xaaaa); }
-		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x5300); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x5400);
+		for (unsigned i = 0; i <= f.count + 1; ++i) { data.write_word(0x5000 + i, f.value(i == f.exit)); data.write_word(0x5100 + i, 0xaaaa); data.write_word(0x5400 + i, f.value(i != f.exit)); }
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = m_fast_stack_reads = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_exit_read", [this, f](offs_t address, u16 &value, u16) {
 			if (machine().side_effects_disabled()) return;
+			if (f.delayed && address >= 0x5400 && address <= 0x5408)
+			{
+				unsigned const i = m_fast_stack_reads++;
+				expect(i < f.reads && address == 0x5400 + i && value == f.value(i != f.exit), "Each delayed exit consumes its opposite-condition input once"); return;
+			}
 			unsigned const i = m_pipeline_operand_reads++;
-			expect(i < f.reads && address == 0x5000 + i && value == (i == f.exit ? 0 : 1), "Block exit consumes each selected iteration once without speculative body reads");
+			expect(i < f.reads && address == 0x5000 + i && value == f.value(i == f.exit), "Block exit consumes each selected iteration once without speculative body reads");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == f.count - i && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (i < f.count), "Block exit retains Decode-owned count and final-iteration BRAF");
 		});
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_exit_write", [this, f](offs_t address, u16 &value, u16) {
 			if (machine().side_effects_disabled()) return;
+			if (f.delayed && address >= 0x5300 && address <= 0x5308)
+			{
+				unsigned const i = m_pipeline_extensions_reads++;
+				expect(i < f.reads && address == 0x5300 + i && value == f.value(f.reverse_delay ? i == f.exit : i != f.exit), "Retained delay words change the tested accumulator after the decision"); return;
+			}
 			if (address == 0x5200)
 			{
 				expect(f.taken && !m_pipeline_register_writes && value == 0xcccc && m_pipeline_operand_reads == f.reads && m_pipeline_store_writes == f.body_writes &&
@@ -18467,7 +18498,7 @@ private:
 		if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bsp")) { start_stlm_bsp(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bsp-edge")) { start_stlm_bsp_edge(); return; }
-		if (!strcmp(machine().options().bios(), "rptb-exit")) { start_block_exit(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-exit") || !strcmp(machine().options().bios(), "rptb-exit-delay")) { start_block_exit(); return; }
 		if (!strcmp(machine().options().bios(), "reada-brc") || standard_reada_brc()) { start_reada_brc(); return; }
 		if (!strcmp(machine().options().bios(), "reada-brc-edge")) { start_reada_brc_edge(); return; }
 		if (!strcmp(machine().options().bios(), "st1-rules")) { check_st1_memory_rules(); return; }
@@ -50911,15 +50942,19 @@ private:
 		if (m_phase == 62067) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62066; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62064)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_exit_case(variant);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = block_exit_case(variant, !strcmp(machine().options().bios(), "rptb-exit-delay"));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Forward block exits and spaced outside BRAF clear are admitted");
 			if (tick == f.checkpoint && !m_pipeline_replay)
 			{
-				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_pipeline_extensions_reads, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save block exit with held words, pending endpoint predictions and software-clear state");
 			}
 			if (tick == 256)
 			{
+				if (f.delayed) expect(m_fast_stack_reads == f.reads && m_pipeline_extensions_reads == f.reads &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x5300 + f.reads && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x5400 + f.reads,
+					"Every taken or untaken delayed exit owns exactly two delay-word effects");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == f.reads && m_pipeline_store_writes == f.writes && m_pipeline_register_writes == unsigned(f.taken) &&
 					m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.taken ? f.count - f.exit : 0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
 					m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end &&
@@ -50928,12 +50963,18 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
+					m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; m_fast_stack_reads = m_recurring_irq_snapshot[4];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore block exit without lost held tags or duplicated outside publication");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62065; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 1151) { start_block_exit(variant + 1); return; }
+				if (variant < (f.delayed ? 9983U : 1151U)) { start_block_exit(variant + 1); return; }
+				if (f.delayed)
+				{
+					osd_printf_info("TMS320C54x delayed forward block exits: PASS cases=9984 restore=9984 branches=BD,BCD_signed12 counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 delay_layouts=2 pages=2 snapshots=6 delay_words_once=1 decision_before_opposite_load=1 braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated delayed forward block exits complete");
+				}
 				osd_printf_info("TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated forward block exits complete");
 			}
@@ -54209,6 +54250,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(108, "mapped-load-age", "Mapped LD and LDU before younger DAGEN updates")
 	ROM_SYSTEM_BIOS(109, "mvmd-repeat", "Fixed AL BL source with incrementing repeated MVMD destination")
 	ROM_SYSTEM_BIOS(110, "rptbd-t-load", "Delay-owned T load consumed by the first RPTBD multiply")
+	ROM_SYSTEM_BIOS(111, "rptb-exit-delay", "Delayed forward block exits retain decision and delay ownership")
 ROM_END
 
 ROM_START(tms54rom4)
