@@ -546,12 +546,35 @@ These are bounded data-space observations, not an exhaustive writer census
 (program-overlay stores are a separate path).
 
 The checked scheduler lists at `ee0c` and `ee18` contain encoder wrapper
-`9c4f` and decoder wrapper `9cb9`, respectively. The next integration question
-is which firmware-owned traffic-channel request selects those lists and
-publishes their mode and PCM buffers. The idle/key-tone laboratory supplies
-neither that lifecycle nor evidence for inventing it. Keep clock qualification,
-mode selection and codec algorithm acceptance separate: do not set the mode
-cells or call the wrappers from the handset backend to bridge this gap.
+`9c4f` and decoder wrapper `9cb9`, respectively. The type-2 host parser supplies
+pending mode `1869`, and the pending-to-active copy includes `1836`. The MCU
+constructor and parsed channel-description/mode fields are already mapped in
+[the native mode producer contract](djr_dsp_integration.md#native-speech-activation-and-pcm-buffers).
+The remaining native ingress requires successful RF reception and traffic
+assignment, not another guessed configuration packet. The idle/key-tone
+laboratory supplies neither that lifecycle nor evidence for inventing it.
+Keep clock qualification, mode selection and codec algorithm acceptance
+separate: do not set the mode cells or call the wrappers from the handset
+backend to bridge this gap.
+
+#### Independent RF input references
+
+The [gr-gsm test-data collection](https://github.com/ptrkrysik/test_data)
+provides raw signal captures and a separately stored burst stream. Its README
+attributes the `vf_call6` signal to SRLabs. The
+[grgsm_decode input path](https://github.com/osmocom/gr-gsm/blob/master/apps/grgsm_decode)
+reads complex samples, adapts their declared sample rate, then feeds a
+four-sample-per-symbol receiver; burst files use a distinct input path.
+These are potential independent receive references, not MAD2 port words.
+
+Before using such data as a native acceptance fixture, pin its revision/hash
+and licensing, verify decoded broadcast results with the independent receiver,
+and establish the transformation to the ROM's port-`27` representation:
+sample rate, I/Q ordering, numerical width/sign, filtering and ready cadence.
+Compare intermediate native filter results as well as final decoding. Do not
+reinterpret a complex-float capture as packed integers or tune permutations
+until the phone advances. No capture is installed as a production input, and
+no native reception result is claimed from this source inventory.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
