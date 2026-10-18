@@ -10,6 +10,8 @@
 namespace {
 
 constexpr u16 ST1_BRAF = 0x8000;
+constexpr u16 ST1_INTM = 0x0800;
+constexpr u16 ST1_RESERVED = 0x0400;
 
 constexpr int normalization_shift(u16 t)
 {
@@ -1801,7 +1803,10 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 		reset_pipeline();
 	}
 	else if (entry.index() == STATE_ST1)
+	{
+		m_st1 &= ~ST1_RESERVED;
 		update_xf();
+	}
 	else if (entry.index() == STATE_BSCR)
 		publish_bus_controls();
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
@@ -1822,6 +1827,7 @@ void tms320c54x_device::update_xf(bool force)
 
 void tms320c54x_device::device_post_load()
 {
+	m_st1 &= ~ST1_RESERVED;
 	// The output cache is derived; re-drive the restored architectural level.
 	update_xf(true);
 	m_pll_clock_stop_cb(m_idle_mode == 3);
@@ -1909,7 +1915,7 @@ u16 tms320c54x_device::register_read(u16 address)
 	if (address == 0x06)
 		return m_st0;
 	if (address == 0x07)
-		return m_st1;
+		return m_st1 & ~ST1_RESERVED;
 	if (address == 0x08)
 		return u16(m_a);
 	if (address == 0x09)
@@ -1971,7 +1977,13 @@ void tms320c54x_device::register_write(u16 address, u16 value)
 	else if (address == 0x06)
 		m_st0 = value;
 	else if (address == 0x07)
-		m_st1 = value;
+	{
+		// SPRU131G table 4-2 forbids setting INTM through memory writes.
+		// Zero-write clearing retains the legacy model; that passage does
+		// not independently establish its semantics.
+		m_st1 = (value & ~(ST1_INTM | ST1_RESERVED)) | (m_st1 & value & ST1_INTM);
+		update_xf();
+	}
 	else if (address == 0x08)
 		m_a = (m_a & ~u64(0xffff)) | value;
 	else if (address == 0x09)
@@ -4345,6 +4357,7 @@ void tms320c54x_device::pipeline_step()
 			u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
 			u16 const mask = u16(1) << (m_op & 15);
 			status = BIT(m_op, 8) ? status | mask : status & ~mask;
+			if (BIT(m_op, 9)) status &= ~ST1_RESERVED;
 		}
 		else if ((m_op & 0xfdfe) == 0xf4e4)
 		{
@@ -5354,6 +5367,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
 		status |= u16(1) << (low & 0x0f);
+		if (BIT(op, 9)) status &= ~ST1_RESERVED;
 		// SPRU131G 6.10.7 protects this instruction and the following
 		// complete instruction (not merely one program word).
 		if (BIT(op, 9) && (low & 0x0f) == 11)
@@ -5364,6 +5378,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
 		status &= ~(u16(1) << (low & 0x0f));
+		if (BIT(op, 9)) status &= ~ST1_RESERVED;
 		if (BIT(op, 9) && (low & 0x0f) == 11)
 			m_intm_guard = 2;
 		return;

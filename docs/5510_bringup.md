@@ -8052,14 +8052,17 @@ ARP-writer latency and other indirect consumer categories require separate
 coverage; this fixture establishes the basic CMPT category only.
 
 The `mvmd-status-irq` fixture passes 576 cases/restores across IRQ/NMI,
-four INTM transitions, enabled/disabled IMR, arrivals at clocks 4/6/8,
+four requested INTM pairs, enabled/disabled IMR, arrivals at clocks 4/6/8,
 two pages, three snapshots and one-/two-word followers. It checks one
 status publication, accepted continuation/frame ownership, no masked frame,
 one foreground marker, RETE restoration and masked-pending IFR persistence.
-The one-word follower permits early selection before the status write;
-the two-word follower's incomplete Decode delays selection until the new
-mask is visible. This is ordinary Decode completion, not inherited
-RSBX/SSBX following-instruction protection. Negative masked cases keep a
+The shared register map prevents memory writes from setting INTM. A
+write-one cannot make an unmasked source ineligible; old-mask/set-mask
+selection races are therefore not established by these cases. Zero-write
+clearing remains a legacy, unverified policy: see the
+[ST1 access contract](rom4_dsp_loader.md#st1-memory-access-constraints).
+Generic status writes do not inherit RSBX/SSBX following-instruction
+protection. Negative masked cases keep a
 valid bounded IDLE continuation: pending sources may wake IDLE without
 being serviced. This fixture does not establish arbitrary interrupt arrival
 phases or all combinations with status consumers/block repeats.

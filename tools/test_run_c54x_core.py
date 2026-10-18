@@ -148,6 +148,16 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
+    def test_st1_rules_require_primary_constraints_and_unverified_clear_label(self):
+        for profile in ('st1-rules', 'st1-bits'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_reada_brc_requires_address_width_retention_and_exclusions(self):
         for profile in ('reada-brc', 'reada-brc16', 'reada-brc-edge'):
             marker, ending = EXTRA_PROFILES[profile]
@@ -1897,6 +1907,8 @@ class CoreResultTests(unittest.TestCase):
         output = marker + '\n' + ending + '\n'
         check_result(output, 3, profile='mvmd-status-irq')
         for bad in (output.replace('restore=576', 'restore=0'),
+                    output.replace('memory_cannot_set_intm=1', 'memory_cannot_set_intm=0'),
+                    output.replace('clear_policy=legacy_unverified', 'clear_policy=proven'),
                     output.replace('masked_frame=0', 'masked_frame=1'),
                     output.replace('foreground_once=1', 'foreground_once=0'),
                     output.replace('rsbx_guard_inherited=0', 'rsbx_guard_inherited=1'),

@@ -24,6 +24,39 @@ flat DSP image into `0x2000..0x27ff`. Its old explanation was wrong: loader2
 does not clear that range. Loader1 itself populates the resident branch table
 with a repeated MVDP data-to-program transfer.
 
+## ST1 memory-access constraints
+
+[SPRU131G table 4-2](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+requires bit 10 to read zero and prohibits memory writes from setting
+INTM. The shared CPU register map enforces both: full/partial writes cannot
+cause an INTM 0-to-1 transition, and reserved-bit writes/imports cannot
+produce bit-10 readback. Data-bus taps still see the requested write word;
+register readback applies the hardware constraints. Debugger setup and
+save-state restoration can seed architectural INTM independently of the
+firmware memory-write path. Dedicated SSBX/RSBX and interrupt-entry/return
+operations retain their explicit INTM behavior.
+
+The passage does not explicitly resolve whether a memory write of zero
+may clear INTM. That behavior is retained from the legacy model and is
+**unverified**, not promoted to a silicon contract. No C55x compatibility
+rule or another emulator's implementation settles this C54x question.
+The native frontier's status-store admission remains separate work.
+
+`st1-rules` exhausts 65,536 input words, both old INTM states and four
+write masks (524,288 cases), checking readback, other fields, XF and one
+save-state restoration. Its marker labels the retained clear policy
+`legacy_unverified`. `st1-bits` separately checks 128 executable status-bit
+cases plus replay: SSBX still sets INTM, and bit 10 remains zero. The
+576-case MVMD IRQ/NMI fixture covers four **requested** INTM pairs, not
+four effective transitions; write-one cannot mask an already unmasked CPU.
+These gates establish the declared register model, not independent silicon
+measurement of the unresolved clearing behavior.
+
+The DST regression uses PMST.SST and ST1.SXM for signed saturation; ST1
+bit 10 is not a saturation control. Its overflow inputs have low words
+different from the clamped result, so a disabled clamp cannot satisfy the
+data oracle accidentally.
+
 ## Repeat endpoint and page hazard
 
 The C54x repeat-end comparator is 16-bit, not XPC-qualified. An active
@@ -4342,9 +4375,11 @@ Adjacent SXM/ASM LD consumers pass 768 save/replay cases; immediately
 following RPTB passes 24, including preservation and final clearing of BRAF.
 Basic CMPT indirect LD/ST passes 16 cases/restores after replacing live-mode
 address selection with saved Decode sampling shared by pointer updates.
-The status IRQ/NMI fixture passes 576 save/replay cases with mask transitions,
-three arrivals and one-/two-word followers, distinguishing incomplete Decode
-from special INTM protection. Other CMPT categories, ARP-writer latency and
+The status IRQ/NMI fixture passes 576 save/replay cases with requested mask
+pairs, three arrivals and one-/two-word followers. Memory writes cannot set
+INTM; zero-write clearing retains the explicitly unverified policy in the
+[ST1 access contract](#st1-memory-access-constraints). Generic word writes
+do not inherit special INTM-bit-instruction protection. Other CMPT categories, ARP-writer latency and
 arbitrary cross-products of consumers/block repeats with IRQ remain unvalidated;
 the accepted subset does not establish every status-register interaction.
 Delayed FCALAD has separate staged frame, delay and IRQ/NMI coverage;
