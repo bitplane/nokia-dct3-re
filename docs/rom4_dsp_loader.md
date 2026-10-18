@@ -282,9 +282,10 @@ BEQ at `008e4f`, CC ALEQ and repeated `WRITA *AR2+` at `0031d6`.
 The uploaded immediate STM writes at `000e20` and `000e22` publish `c008`
 then `c0c8` to the existing BSP-control endpoint `0022`. A passive data-write
 tap observes both full-word writes in order, at 0.133888750 and 0.133888808 s.
-Execution stops at `004615`, absolute BITF `61f8 0007 0800` reading ST1's
-INTM bit, followed in the acquired program ROM by `f7bb` (set INTM).
-The exposed PC is `461a`, PMST `ffac` and
+Absolute BITF `61f8 0007 0800` at `004615` reads ST1's INTM bit and
+execution passes the following `f7bb` (set INTM). Execution returns from
+this resident routine and stops at uploaded `000e30`, `8821`
+(STLM A to BSP transmit register `0021`). The exposed PC is `0e32`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -304,6 +305,16 @@ literal fetch and one destination write without a destination read. The
 isolated endpoint is external RAM, not a second BSP implementation; the
 native uploaded-code observation supplies the backend-composition evidence.
 Neither fixture establishes silicon phase timing, serial traffic or speech.
+
+`status-bitf` covers ST0/ST1 sampling in 768 cases plus save-state replay:
+direct and absolute forms, four masks, both initial TC values, two program
+pages and three snapshots around source Read/TC publication. Each source
+is mutated after its single Read, including ST0's own TC bit, to verify
+that publication uses the retained sample while preserving other current
+status bits. No data writes occur. Admission adds only status registers
+`0006`/`0007` to BITF's existing mapped-source set; low controls, CMPM's
+mapped-source restriction and other unvalidated sources remain unchanged.
+This is functional pipeline coverage, not a silicon phase measurement.
 
 Repeated short-source WRITA uses a retained logical PAR stream, with each
 program destination translated independently for overlay and address-width

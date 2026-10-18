@@ -148,6 +148,15 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='mvpd-extended')
 
+    def test_status_bitf_requires_retained_sampling_and_replay(self):
+        marker, ending = EXTRA_PROFILES['status-bitf']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='status-bitf')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='status-bitf')
+
     def test_serial_stm_requires_retained_publication_without_endpoint_claim(self):
         marker, ending = EXTRA_PROFILES['serial-stm']
         text = marker + '\n' + ending + '\n'
