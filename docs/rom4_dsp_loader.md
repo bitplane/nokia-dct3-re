@@ -40,9 +40,8 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-The current staged EFR frame stops at
-repeated parallel ADD `c3c9`, owner `ba96`. No complete staged EFR frame
-has passed.
+The current staged EFR frame stops at memory SQUR `2692`, owner `bb07`,
+in RPTBD `bb05`'s delay span. No complete staged EFR frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -604,6 +603,26 @@ fetch and stack write. The live pipeline is cleared before restoration so
 protection cannot survive accidentally from the completed run. The existing
 384-case short-loop IRQ/NMI control also passes. These establish the bounded
 staged protection contract, not measured physical pipeline phases.
+
+## Repeated parallel store/ADD/SUB
+
+Short RPT admits the RAM parallel ADD/SUB families using fresh address and
+Read stages for each copy. Execute stores the old live source accumulator,
+then computes the selected result using the opposite accumulator and the
+retained X sample. SUB remains memory-minus-opposite-accumulator. Carry
+uses the 32-bit boundary; overflow is sticky and OVM clamps the result.
+Store-side ASM/SXM/SST behavior is shared with the isolated instruction.
+
+`st-alu-rpt` passes 30,720 cases and cleared-pipeline replays: eight forms,
+fixed/incrementing/decrementing/aliased/AR0-strided layouts, four shifts,
+SXM/SST/OVM combinations, counts 0/1/7/255, two pages and three checkpoints.
+An independent integer reference checks per-clock A/B/carry/overflow
+feedback, unchanged T, every old-source store, source/opcode retention and
+exact pointer updates. The strided layout uses AR0=3 with linear BK=0;
+arbitrary circular strides are not qualified here. `st-alu-rpt-edge` adds
+128 replayed mapped-X/Y rejections without data or pointer effects.
+Interrupt/control composition, inter-copy same-address forwarding and
+physical bank phases remain unqualified.
 
 ## Repeated parallel store/load
 

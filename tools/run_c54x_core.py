@@ -637,6 +637,14 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "st-alu-rpt": (
+        "TMS320C54x repeated parallel arithmetic: PASS cases=30720 restore=30720 forms=8 operations=ADD,SUB layouts=5 ar0_stride=3 shifts=4 sxm_sst_ovm=8 counts=0,1,7,255 pages=2 snapshots=3 fresh_sources=1 old_source_store=1 accumulator_feedback=1 carry_bit=32 sticky_overflow=1 t_preserved=1 alias_priority=X opcode_fetches=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated parallel arithmetic complete",
+    ),
+    "st-alu-rpt-edge": (
+        "TMS320C54x repeated parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 repeat_count=7 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated repeated parallel arithmetic exclusions complete",
+    ),
     "stm-low-ram": (
         "TMS320C54x direct low RAM STM: PASS cases=65536 restore=65536 destinations=0060..007f literals=8 dp=4 cpl_cmpt=4 pages=2 snapshots=4 consumer_gaps=0,1 writes=1 bus_reads=0,1 immediate_retained=1 address_absolute=1 dp_cpl_sp_poison=1 adjacent_forwarding=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated direct low RAM STM complete",
@@ -2158,7 +2166,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge", "stld-map"):
         machine = "tms54xtra"
-    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram"):
+    if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
