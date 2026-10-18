@@ -177,6 +177,15 @@ class CoreResultTests(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='poll-interrupt')
 
+    def test_rcd_requires_complete_qualification_marker(self):
+        marker, ending = EXTRA_PROFILES['rcd']
+        text = marker + '\n' + ending + '\n'
+        check_result(text, 3, profile='rcd')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile='rcd')
+
     def test_block_tc_delay_requires_complete_qualification_marker(self):
         marker, ending = EXTRA_PROFILES['rptb-tc-delay']
         text = marker + '\n' + ending + '\n'

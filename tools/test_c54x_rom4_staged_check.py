@@ -1,7 +1,7 @@
 import re
 import unittest
 
-from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, REPEAT_SOURCE_OFFSET, check
+from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, REPEAT_SOURCE_OFFSET, DEMAND_SOURCE_OFFSET, check
 
 
 class StagedFrontierTest(unittest.TestCase):
@@ -16,9 +16,12 @@ class StagedFrontierTest(unittest.TestCase):
         self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
         self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
         self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
+        self.demand = 'f073,0a2d,f120,0f0c,09f8,0012,f77f,891a,e900,f074,0a52,fc00,6bf8,001a,0001,f074,0a52,fc00,f072,0a5a,8092,8192,f000,0001,ff30,f010,0002,fc00,76f8,1251,1a80,e800'
+        self.demand_payload = bytes.fromhex(self.demand.replace(',', ''))
+        self.image = self.image[:DEMAND_SOURCE_OFFSET] + self.demand_payload + self.image[DEMAND_SOURCE_OFFSET + len(self.demand_payload):]
         self.row = ('rom4_staged_frontier: pc=408d xpc=00 illegal=0 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
-        self.stop = 'unsupported staged C54x form fe44 at 0090eb'
+        self.stop = 'staged ADDM register/peripheral destination is unsupported instruction=000a4c word=6bf8 destination=001a'
         self.text = ('rom4_staged_profile: system=nse1pipe\n'
                      + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
                      'rom4_staged_dagen: bk=00fa ar0=0001 ar2=06e4 st0=081f st1=6103\n'
@@ -46,6 +49,7 @@ class StagedFrontierTest(unittest.TestCase):
                      'rom4_staged_host_header: index=8 value=7fff mask=ffff pc_context=3f4a t=2.431870846\n'
                      'rom4_staged_host_header: index=9 value=0000 mask=ffff pc_context=3f4a t=2.441101615\n'
                      'rom4_staged_host_header: index=10 value=7fb2 mask=ffff pc_context=3f4a t=2.450332385\n'
+                     'rom4_staged_host_header: index=11 value=0000 mask=ffff pc_context=3da3 t=6.701103365\n'
                      'rom4_staged_host_consume: index=1 previous=0000 next=0006 pc_context=3907 t=0.175900019\n'
                      'rom4_staged_host_consume: index=2 previous=0006 next=000b pc_context=3907 t=0.175909212\n'
                      'rom4_staged_host_consume: index=3 previous=000b next=000f pc_context=3907 t=0.258977019\n'
@@ -54,8 +58,8 @@ class StagedFrontierTest(unittest.TestCase):
                      'rom4_staged_host_consume: index=6 previous=0023 next=0031 pc_context=3907 t=0.272823750\n'
                      'rom4_staged_host_consume: index=7 previous=0031 next=0033 pc_context=3907 t=0.273096615\n'
                      'rom4_staged_host_consume: index=8 previous=0000 next=0006 pc_context=3907 t=0.515166404\n'
-                     'rom4_staged_end: pc=90ed xpc=00 illegal=1 reads=18 writes=16 gap_reads=15 host_consumed=28 host_headers=10 t=5.016666667\n'
-                     'rom4_interface_summary: completion_strobes=945 mailbox_writes=74 slot_expiries=909 frame_expiries=1007 rf_reads=29760 rf_port32_writes=12 rf_port38_reads=0 rf_port39_reads=0 pc=90ed pmst=ffac ifr=0021 imr=035f mode_aa=0000 mode_ac=0001 transfer_expiries=32\n')
+                     'rom4_staged_end: pc=0a50 xpc=00 illegal=1 reads=18 writes=16 gap_reads=15 host_consumed=29 host_headers=11 t=10.016666667\n'
+                     'rom4_interface_summary: completion_strobes=1376 mailbox_writes=74 slot_expiries=1333 frame_expiries=2090 rf_reads=43296 rf_port32_writes=18 rf_port38_reads=0 rf_port39_reads=0 pc=0a50 pmst=ffac ifr=0021 imr=035f mode_aa=0000 mode_ac=0002 transfer_expiries=37\n')
         self.text += ''.join(f'rom4_rf_read: sample={i + 1} pc={pc} frame=30 t={0.162032 + i * 0.0000002:.6f}\n'
                              for i, pc in enumerate(('324e', '3254', '325a', '3260') * 4))
         self.text += ''.join(f'rom4_rf_read: sample={i + 1} pc={pc} frame=28 t={0.501299 + i * 0.0000002:.6f}\n'
@@ -67,13 +71,14 @@ class StagedFrontierTest(unittest.TestCase):
         self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=1.865369269\nrom4_staged_bsp_write: value=c008 mask=ffff t=1.865382385\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=1.865382442\n'
         self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=1.989395461\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=1.989395519\n'
         self.text += 'rom4_staged_bsp_write: value=c008 mask=ffff t=2.108726788\nrom4_staged_bsp_write: value=c008 mask=ffff t=2.631936808\nrom4_staged_bsp_write: value=c0c8 mask=ffff t=2.631936865\n'
-        self.terminal = 'rom4_staged_end_state: a=0000000000 b=000000fc9c t=000b st0=081f st1=6103 bk=00fa ar0=06f3 ar1=0000 ar2=0100 ar3=06e3\n'
+        self.terminal = 'rom4_staged_end_state: a=0000000000 b=0000000000 t=000c st0=081f st1=6103 bk=0052 ar0=0002 ar1=03e8 ar2=0e12 ar3=0286\n'
         self.text += self.terminal
         controls = [('2a04', '0006', 'a23f', '1.844394'), ('0041', '0040', '3711', '1.846390'),
                     ('27a2', '0030', '3711', '1.846464'), ('0041', '0020', '3711', '1.846538'),
                     ('0488', '0010', '3711', '1.846611'), ('0000', '0050', '3711', '1.849606'),
                     ('2a04', '0006', 'a23f', '1.881319'), ('0041', '0040', '3711', '1.883314'),
                     ('27a2', '0030', '3711', '1.883387'), ('0041', '0020', '3711', '1.883461'), ('0488', '0010', '3711', '1.883535'), ('2813', '0030', '4026', '1.984099')]
+        controls += [('2a04', '0006', 'a23f', '6.705713'), ('0041', '0040', '3711', '6.707709'), ('27a2', '0030', '3711', '6.707782'), ('0041', '0020', '3711', '6.707856'), ('0488', '0010', '3711', '6.707930'), ('0000', '0050', '3711', '6.710926')]
         self.text += ''.join(f'rom4_rf_port32: sequence={i + 1} port31={p31} port32={p32} pc={pc} t={timestamp}\n'
                              for i, (p31, p32, pc, timestamp) in enumerate(controls))
         transfers = [('0884', '2160', '1.846387692'), ('08d4', '77', '1.846461385'),
@@ -82,6 +87,7 @@ class StagedFrontierTest(unittest.TestCase):
         self.transfer_rows = [f'rom4_transfer_timer: expiry={i + 1} target={target} counter={target} delay={delay} t={timestamp}\n' for i, (target, delay, timestamp) in enumerate(transfers)]
         self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 1} target=0032 counter=0031 delay=35 t={1.887207250 + (i - 10) * 0.004615384615:.9f}\n' for i in range(10, 31)]
         self.transfer_rows += ['rom4_transfer_timer: expiry=32 target=03e8 counter=03e8 delay=984 t=1.985007654\n']
+        self.transfer_rows += [f'rom4_transfer_timer: expiry={i + 33} target={target} counter={target} delay={delay} t={timestamp}\n' for i, (target, delay, timestamp) in enumerate([('0884', '2159', '6.707706231'), ('08d4', '77', '6.707779923'), ('0924', '77', '6.707853615'), ('0974', '77', '6.707927307'), ('0299', '3243', '6.710923461')])]
         self.text += ''.join(self.transfer_rows) + self.stop + '\n'
         observations = [
             ('low_write', '00f1', '0000', '0f10', '0.133253635'),
@@ -125,30 +131,34 @@ class StagedFrontierTest(unittest.TestCase):
                       'rom4_staged_low_read: address=00f1 value=b71a mask=ffff pc_context=a5ed t=2.631934596\n'
                       'rom4_staged_low_read: address=00f2 value=0000 mask=ffff pc_context=a5ef t=2.631934635\n')
         self.text += 'rom4_staged_low_count: reads=8 writes=8\nrom4_staged_gap_count: reads=12\n'
+        self.text += f'rom4_staged_demand_tail: base=0a40 words={self.demand}\n'
 
     def test_binds_observation_without_promoting_boot(self):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['status'], 'unsupported_staged_delayed_conditional_return')
-        self.assertEqual(result['instruction'], 0xfe44)
-        self.assertEqual(result['instruction_address'], 0x90eb)
-        self.assertEqual(result['host_header_reads'], 10)
-        self.assertEqual(result['host_consumed'], 28)
-        self.assertEqual(result['rf_sample_blocks'], 930)
+        self.assertEqual(result['status'], 'unsupported_staged_addm_brc')
+        self.assertEqual(result['instruction'], 0x6bf8)
+        self.assertEqual(result['instruction_address'], 0x0a4c)
+        self.assertEqual(result['mapped_destination'], 0x001a)
+        self.assertEqual(result['demand_source_offset'], DEMAND_SOURCE_OFFSET)
+        self.assertEqual(result['observed_demand_words'], 32)
+        self.assertEqual(result['host_header_reads'], 11)
+        self.assertEqual(result['host_consumed'], 29)
+        self.assertEqual(result['rf_sample_blocks'], 1353)
         self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
         self.assertEqual(result['bsp_receive_words'], [0x0aaa] * 4)
         self.assertEqual(result['bsp_transmit_words'], [0x0aaa, 0xffd5] * 2)
         self.assertEqual(result['repeat_source_offset'], REPEAT_SOURCE_OFFSET)
         self.assertEqual(result['bsp_control_writes'], ([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8, 0xc008, 0xc008, 0xc0c8])
-        self.assertEqual(result['completion_strobes'], 945)
+        self.assertEqual(result['completion_strobes'], 1376)
         self.assertEqual(result['swwsr'], 0x2000)
         self.assertEqual(result['low_gap_bus_reads'], 15)
-        self.assertEqual(result['rf_sample_reads'], 29760)
+        self.assertEqual(result['rf_sample_reads'], 43296)
         self.assertEqual(result['rf_sample_remainder'], 0)
-        self.assertEqual(result['rf_control_writes'], 12)
-        self.assertEqual(result['transfer_expiries'], 32)
-        self.assertEqual(result['transfer_expiries_before_stop'], 32)
+        self.assertEqual(result['rf_control_writes'], 18)
+        self.assertEqual(result['transfer_expiries'], 37)
+        self.assertEqual(result['transfer_expiries_before_stop'], 37)
         self.assertEqual(result['transfer_expiries_after_stop'], 0)
         self.assertFalse(result['parallel_store_carry_claim'])
         self.assertNotIn('active_block', result)
@@ -168,7 +178,7 @@ class StagedFrontierTest(unittest.TestCase):
     def test_rejects_missing_or_changed_native_rf_reads(self):
         for text in (self.text.replace('rom4_rf_read:', 'missing_rf:'),
                      self.text + 'rom4_rf_read: malformed\n',
-                     self.text.replace('rf_reads=29760', 'rf_reads=703'),
+                     self.text.replace('rf_reads=43296', 'rf_reads=703'),
                      self.text.replace('sample=4', 'sample=3'),
                      self.text.replace('pc=3254', 'pc=3253'),
                      self.text.replace('frame=30', 'frame=29'),
@@ -192,7 +202,7 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=90ed', 'pc=0f1f'),
+                     self.text.replace('pc=0a50', 'pc=0f1f'),
                      self.text.replace('st0=081f', 'st0=001f'),
                      self.text.replace('st1=6103', 'st1=4901'),
                      self.text + 'rom4_staged_dagen: malformed\n',
@@ -216,7 +226,7 @@ class StagedFrontierTest(unittest.TestCase):
                      self.text.replace('base=0e10', 'base=0e11'),
                      self.text.replace('7722,c008', '7722,c009'),
                      self.text + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n',
-                     self.text.replace('completion_strobes=945', 'completion_strobes=0'),
+                     self.text.replace('completion_strobes=1376', 'completion_strobes=0'),
                      self.text.replace('mailbox_writes=74', 'mailbox_writes=70'),
                      self.text.replace('swwsr=2000', 'swwsr=0000'),
                      self.text.replace('bscr=0000', 'bscr=f000'),
@@ -226,12 +236,12 @@ class StagedFrontierTest(unittest.TestCase):
                 check(text, self.image)
 
     def test_requires_bounded_stop_endpoint_and_transport(self):
-        row = 'rom4_staged_end: pc=90ed xpc=00 illegal=1 reads=18 writes=16 gap_reads=15 host_consumed=28 host_headers=10 t=5.016666667\n'
+        row = 'rom4_staged_end: pc=0a50 xpc=00 illegal=1 reads=18 writes=16 gap_reads=15 host_consumed=29 host_headers=11 t=10.016666667\n'
         for index, text in enumerate((self.text.replace(row, ''), self.text + row,
-                     self.text.replace('t=5.016666667', 't=0.516666667'),
-                     self.text.replace('slot_expiries=909', 'slot_expiries=26'),
-                     self.text.replace('frame_expiries=1007', 'frame_expiries=647'),
-                     self.text.replace('rf_port32_writes=12', 'rf_port32_writes=1'),
+                     self.text.replace('t=10.016666667', 't=0.516666667'),
+                     self.text.replace('slot_expiries=1333', 'slot_expiries=26'),
+                     self.text.replace('frame_expiries=2090', 'frame_expiries=647'),
+                     self.text.replace('rf_port32_writes=18', 'rf_port32_writes=1'),
                      self.text.replace('ifr=0021', 'ifr=0020'),
                      self.text.replace('0.175897519', '0.575897519'),
                      self.text.replace('0.175897808', '0.175897518'),
@@ -246,7 +256,7 @@ class StagedFrontierTest(unittest.TestCase):
             self.stop + '\n' + no_stop,
             self.text.replace(self.transfer_rows[-1], ''),
             self.text.replace('counter=0031 delay=35', 'counter=0030 delay=35', 1),
-            self.text.replace('form fe44 at 0090eb', 'form fe44 at 0090ec'),
+            self.text.replace('instruction=000a4c word=6bf8', 'instruction=000a4d word=6bf8'),
             self.text + self.stop + '\n',
         )
         for index, text in enumerate(cases):
@@ -260,8 +270,8 @@ class StagedFrontierTest(unittest.TestCase):
                      self.text.replace(row, ''), self.text + row,
                      self.text.replace('value=0a05', 'value=0a04'),
                      self.text.replace('pc_context=387f', 'pc_context=387e'),
-                     self.text.replace('host_headers=10', 'host_headers=0'),
-                     self.text.replace('host_consumed=28', 'host_consumed=2'),
+                     self.text.replace('host_headers=11', 'host_headers=0'),
+                     self.text.replace('host_consumed=29', 'host_consumed=2'),
                      self.text.replace('previous=0006 next=000b', 'previous=0007 next=000b'),
                      self.text.replace('pc_context=3907', 'pc_context=3906'),
                      self.text.replace('0.258977019', '0.175899019'),
@@ -281,7 +291,7 @@ class StagedFrontierTest(unittest.TestCase):
     def test_distinguishes_live_checkpoint_and_reinitialized_ring(self):
         for text in (self.text.replace(self.row, self.row.replace('illegal=0', 'illegal=1')),
                      self.text.replace('index=8 previous=0000 next=0006', 'index=8 previous=0033 next=0039'),
-                     self.text.replace('host_consumed=28', 'host_consumed=8'),
+                     self.text.replace('host_consumed=29', 'host_consumed=8'),
                      self.text.replace('frame=28', 'frame=30'),
                      self.text.replace('0.501299', '0.401299'),
                      self.text.replace('0.515164192', '0.175897700'),
@@ -292,8 +302,8 @@ class StagedFrontierTest(unittest.TestCase):
     def test_requires_terminal_context_and_actual_rf_control_order(self):
         for text in (self.text.replace(self.terminal, ''), self.text + self.terminal,
                      self.text.replace('rom4_staged_end_state: a=0000000000', 'rom4_staged_end_state: a=0000000001'),
-                     self.text.replace('st1=6103 bk=00fa', 'st1=6102 bk=00fa'),
-                     self.text.replace('form fe44 at 0090eb', 'form fe45 at 0090eb'),
+                     self.text.replace('st1=6103 bk=0052', 'st1=6102 bk=0052'),
+                     self.text.replace('instruction=000a4c word=6bf8', 'instruction=000a4c word=6af8'),
                      self.text.replace('rom4_rf_port32:', 'missing_rf_control:'),
                      self.text.replace('port31=27a2', 'port31=27a3'),
                      self.text.replace('expiry=3', 'expiry=2'),
@@ -302,3 +312,15 @@ class StagedFrontierTest(unittest.TestCase):
                      self.text + 'rom4_transfer_timer: malformed\n'):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check(text, self.image)
+
+    def test_requires_bound_demand_upload(self):
+        row = f'rom4_staged_demand_tail: base=0a40 words={self.demand}\n'
+        for text in (self.text.replace(row, ''), self.text + row,
+                     self.text.replace('base=0a40', 'base=0a41'),
+                     self.text.replace('6bf8,001a,0001', '6bf8,0019,0001'),
+                     self.text.replace('6bf8,001a,0001', '6bf8,001a,0002'),
+                     self.text.replace('f072,0a5a', 'f072,0a5b')):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check(text, self.image)
+        with self.assertRaises(ValueError):
+            check(self.text, self.image + self.demand_payload)

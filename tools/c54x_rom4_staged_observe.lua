@@ -114,4 +114,9 @@ stop_notifier = emu.add_machine_stop_notifier(function()
         cpu.state.A.value, cpu.state.B.value, cpu.state.T.value,
         cpu.state.ST0.value, cpu.state.ST1.value, cpu.state.BK.value,
         cpu.state.AR0.value, cpu.state.AR1.value, cpu.state.AR2.value, cpu.state.AR3.value))
+    local demand = {}
+    for address = 0x0a40, 0x0a5f do
+        demand[#demand + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
+    end
+    machine:logerror('rom4_staged_demand_tail: base=0a40 words=' .. table.concat(demand, ',') .. '\n')
 end)

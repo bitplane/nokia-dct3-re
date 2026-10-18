@@ -2,18 +2,52 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend reaches the first organic
-host-packet decoder, records twenty-eight consumer advances across observed
+host-packet decoder, records twenty-nine consumer advances across observed
 initialization/service passes, and passes the frame-buffer polling loop and
-delayed TC branch inside block `473c..4777`. It stops on delayed conditional
-return `fe44` at `90eb` (reported PC `90ed`), at about 4.786 seconds.
+delayed TC branch inside block `473c..4777`. Conditional delayed return
+`fe44` at `90eb` also executes. The current stop is uploaded `ADDM #1,BRC`
+at `0a4c` (reported PC `0a50`), at about 6.742 seconds.
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is conditional delayed-return predicate, stack
-and delay-word ownership. Absolute data address `0012` is AR2, not external RAM.
+The current staged question is ADDM's mapped BRC read/write ownership and
+the following repeat count, not a missing peripheral reply.
+Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
+
+## Conditional delayed returns
+
+The staged frontend admits the twelve signed A/B predicates and TC/NTC for
+RCD outside active block bodies and other delay spans. The predicate is
+retained at Read after older Execute publications. A taken return reads and
+pops the stack once; an untaken return neither reads nor changes it. Both
+paths execute the two retained delay words, with false conditions resuming
+at PC+3. Delay-word values cannot change the captured decision. Carry,
+BIO and overflow predicates are not admitted by this qualification.
+This follows SPRU172C 4-133/4-134, reusing the retained RETD delay-word path.
+
+`rcd` passes 4,480 cases plus save-state replay: fourteen predicates, eight
+patterns including signed 32-/40-bit boundaries, two delay layouts, two
+stack alignments, two pages and five snapshots. One layout changes the
+tested accumulator or TC after the decision; the other contains a two-word
+STM with an opcode-shaped literal. Stack memory is changed after its one
+read to detect resampling. Ordered continuation stores observe the delay
+results, and the fixture checks selected target, final registers/status,
+balanced conditional pop, no untaken stack read and no repeated delay fetch.
+The unchanged core rejects `fe42` at `0600` in the fixture. Existing
+conditional/TC returns, BITT/RETD, load-return, interrupted STLM, polling-loop
+and delayed TC-block profiles pass. General interrupt/block compositions
+and physical bus phases remain unvalidated.
+
+Native execution proceeds through `90eb` and another RF-control burst,
+then reaches `6bf8 001a 0001` in uploaded program RAM at `0a4c`.
+The 32-word live window `0a40..0a5f` binds uniquely to MCU offset `958e8`;
+the following helper begins with RPTB at `0a52`. The canonical observer
+captures this window at stop and the checker verifies its MCU binding.
+The new boundary is mapped ADDM to the block-repeat counter, not corrupt
+program bytes or a guessed instruction recovered from a different image.
 
 ## Delayed TC branches inside a block
 
@@ -35,11 +69,10 @@ Accumulator-condition, unconditional and BANZ block profiles, block-repeat
 exclusions/interrupts, and the polling-loop interrupt profile remain green.
 General TC-branch/block interrupt composition remains unvalidated.
 
-The native three-second capture now has ILLEGAL clear and continues through
+The native three-second capture after this qualification has ILLEGAL clear and continues through
 28 consumer advances. A longer cold run finds the next unsupported staged
-form at `90eb`, `fe44` (`RCD ANEQ`); its atomic implementation already has
-separate conformance coverage. This does not establish the staged return's
-stack or interrupt contract. The five-second endpoint is pinned below.
+form at `90eb`, `fe44` (`RCD ANEQ`), now separately qualified above.
+The intermediate five-second capture is not the current acceptance endpoint.
 
 ## Delayed-branch polling interrupts
 
@@ -679,11 +712,11 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 28 | 12 | Initialization/service passes and later RF-control burst; conditional delayed return stops at `90eb`. |
+| `nse1pipe` | staged | standard | 29 | 18 | Initialization/service passes and RF-control bursts; uploaded ADDM to BRC stops at `0a4c`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The retained atomic controls are three-second observations; the current
-staged endpoint is five seconds. Their totals are not a duration-matched
+staged endpoint is ten seconds. Their totals are not a duration-matched
 performance or parity comparison. The atomic controls both publish
 639 completion strobes, 19,840 RF reads
 and 33 transfer expiries, with `mode_ac=1`. Matching their counters does not
@@ -691,13 +724,14 @@ prove either bus dialect is physically correct. The fixed-standard comparison
 isolated a frontend data hazard; changing SWWSR alone did not explain the
 missing RF controls. The staged checker now requires actual first-header
 reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
-The passive tap counts twenty-eight nonzero consumer advances but logs only the
+The passive tap counts twenty-nine nonzero consumer advances but logs only the
 first eight. The index restarts between the seventh and eighth observations,
-so these are not twenty-eight packets from one uninterrupted DSP session.
-Twelve actual RF-control writes include the original six-write burst,
-a later five-write burst and `2813/0030` at `4026`. Transfer targets include
-`0884/08d4/0924/0974/0299`, then periodic `0032`, then `03e8`.
-All 32 transfer expiries precede the guarded CPU stop. Frame timers can
+so these are not twenty-nine packets from one uninterrupted DSP session.
+Eighteen actual RF-control writes include the original six-write burst,
+a later five-write burst, `2813/0030` at `4026`, and another six-write
+burst. Transfer targets include `0884/08d4/0924/0974/0299`, then periodic
+`0032`, then `03e8`, then a second `0884..0299` sequence.
+All 37 transfer expiries precede the guarded CPU stop. Frame timers can
 continue after that stop; those edges are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
 events, not RF acquisition.
@@ -1114,26 +1148,25 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 5.016666667 s pins unsupported staged conditional
-delayed return `fe44` at `90eb`, PC `90ed`, ILLEGAL set, ten reads through
-the ring-base tap, twenty-eight consumer advances, 945 completion strobes,
-74 mailbox writes and final device counters of 29,760 RF reads,
-909 slot expiries and 1,007 frame expiries. Twelve RF-control
-writes and 32 transfer expiries occur, all transfers before the stop;
-`mode_aa` is zero and `mode_ac` is one. The terminal architectural snapshot
-is A=0, B=`fc9c`, T=`000b`, ST0=`081f`, ST1=`6103`, BK=`00fa`,
-AR0=`06f3`, AR1=0, AR2=`0100`, AR3=`06e3`. This rejection snapshot is
+The final observation at 10.016666667 s pins the mapped ADDM guard for
+`6bf8 001a 0001` at `0a4c`, PC `0a50`, ILLEGAL set, eleven reads through
+the ring-base tap, twenty-nine consumer advances, 1,376 completion strobes,
+74 mailbox writes and final device counters of 43,296 RF reads,
+1,333 slot expiries and 2,090 frame expiries. Eighteen RF-control
+writes and 37 transfer expiries occur, all transfers before the stop;
+`mode_aa` is zero and `mode_ac` is two. The terminal architectural snapshot
+is A=B=0, T=`000c`, ST0=`081f`, ST1=`6103`, BK=`0052`,
+AR0=2, AR1=`03e8`, AR2=`0e12`, AR3=`0286`. This rejection snapshot is
 not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
-does not establish twenty-eight packets in one uninterrupted session. The
+does not establish twenty-nine packets in one uninterrupted session. The
 ring-base tap's legacy `host_headers` name counts memory reads, not packet
-headers: the last three reads are `7fff/0000/7fb2` at PC context `3f4a`.
-The three-second capture is `tmp/rptb-tc-native/error.log`; the five-second
-captures `tmp/rptb-tc-native-{five,confirm}/error.log` reproduce the endpoint
-and pass the exact checker. The
-thirty-second run (`tmp/rptb-tc-native-long/error.log`) reaches the same
-unsupported return, but later frame expiries are post-stop device activity.
+headers: reads include `7fff/0000/7fb2` at PC context `3f4a` and zero at
+`3da3`. Native endpoint artifacts are `tmp/rcd-native{,-confirm,-final}/error.log`.
+The final capture uses the canonical demand-upload observer; the earlier
+confirmation used a local read-only program probe. Frame expiries after
+the fault are post-stop device activity, not further execution.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR

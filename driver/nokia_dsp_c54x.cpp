@@ -622,7 +622,7 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	{
 		m_rf_port32 = data;
 		++m_rf_port32_writes;
-		if (m_rf_port32_writes <= 16)
+		if (m_rf_port32_writes <= 32)
 			machine().logerror(
 					"rom4_rf_port32: sequence=%u port31=%04x port32=%04x pc=%04x t=%.6f\n",
 					m_rf_port32_writes, m_rf_port31, m_rf_port32,

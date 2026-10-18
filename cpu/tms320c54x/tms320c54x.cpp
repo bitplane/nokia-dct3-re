@@ -154,6 +154,11 @@ constexpr bool staged_conditional_return(u16 word)
 	return word == 0xfc20 || word == 0xfc30 || ((word & 0xff00) == 0xfc00 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
+constexpr bool staged_delayed_conditional_return(u16 word)
+{
+	return (word & 0xff00) == 0xfe00 && staged_conditional_return(word & 0xfdff);
+}
+
 constexpr bool staged_accumulator_branch(u16 word)
 {
 	u8 const condition = word;
@@ -3217,7 +3222,7 @@ void tms320c54x_device::pipeline_step()
 						delay_compare = m_pipeline_word[stage] == 0xf273 ||
 							((m_pipeline_word[stage] & 0xfe00) == 0xfa00 && staged_conditional_branch(m_pipeline_word[stage]) && !staged_conditional_call(m_pipeline_word[stage]));
 			if (!m_pipeline_decode_remaining && staged_software_intr(word)) { logerror("%s: staged software INTR in a control delay is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			if (!m_pipeline_decode_remaining && staged_conditional_return(word)) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+			if (!m_pipeline_decode_remaining && (staged_conditional_return(word) || staged_delayed_conditional_return(word))) { logerror("%s: staged RC inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_data_to_program(word)) { logerror("%s: staged MVDP inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_write_a(word)) { logerror("%s: staged WRITA inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			if (!m_pipeline_decode_remaining && staged_accumulator_transfer(word)) { logerror("%s: staged accumulator transfer inside a delay slot is unsupported\n", machine().describe_context()); m_illegal = true; return; }
@@ -3388,7 +3393,7 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		bool const plain_return = word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word);
-		bool const delayed_return = word == 0xfe00;
+		bool const delayed_return = word == 0xfe00 || staged_delayed_conditional_return(word);
 		bool const far_return = (word & 0xfdfe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
@@ -4475,12 +4480,13 @@ void tms320c54x_device::pipeline_step()
 			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
 		else if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
-		else if (staged_conditional_return(m_op))
+		else if (staged_conditional_return(m_op) || staged_delayed_conditional_return(m_op))
 		{
-			if (m_pipeline_immediate[5])
+			if (m_pipeline_immediate[5] || staged_delayed_conditional_return(m_op))
 			{
 				m_pc = m_pipeline_operand[5];
 				m_pipeline_fetch_address = (address & 0x7f0000) | m_pc;
+				if (m_pipeline_immediate[5] && staged_delayed_conditional_return(m_op)) pipeline_restore_block_on_return(address);
 				m_pipeline_flush_front = false; m_pipeline_decode_flush = 0;
 			}
 		}
@@ -5088,15 +5094,22 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + (BIT(m_pipeline_word[4], 9) ? 4 : 2)); }
 		if (!BIT(m_pipeline_word[4], 9)) m_pipeline_cc_pending = true;
 	}
-	if (m_pipeline_valid[4] && staged_conditional_return(m_pipeline_word[4]))
+	if (m_pipeline_valid[4] && (staged_conditional_return(m_pipeline_word[4]) || staged_delayed_conditional_return(m_pipeline_word[4])))
 	{
 		// Consume older accumulator/TC publications before retaining the
 		// decision. Execute must not retest a subsequently changed source.
-		u16 const word = m_pipeline_word[4];
+		u16 const word = m_pipeline_word[4] & 0xfdff;
 		bool const taken = (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
 			staged_accumulator_condition(word, accumulator(BIT(word, 3)));
 		m_pipeline_immediate[4] = taken;
-		if (taken)
+		if (staged_delayed_conditional_return(m_pipeline_word[4]))
+		{
+			// Both paths execute the retained two-word delay span. A false
+			// condition owns no stack bus access (SPRU172C 4-133/4-134).
+			m_pipeline_operand[4] = taken ? data_read(m_sp++) : u16(m_pipeline_address[4] + 3);
+			m_pipeline_retd_target = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_operand[4];
+		}
+		else if (taken)
 		{
 			m_pipeline_flush_front = true;
 			m_pipeline_operand_address[4] = m_sp++;
