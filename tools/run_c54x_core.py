@@ -1467,6 +1467,18 @@ EXTRA_PROFILES = {
         "TMS320C54x in-block near call exclusions: PASS cases=72 restore=72 forms=internal_target,delay_spill,literal_spill pages=3 counts=2 snapshots=4 reads=0 writes=0 stack_allocation=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated in-block near call exclusions complete",
     ),
+    "rpt-mem-copy": (
+        "TMS320C54x memory-count copies: PASS cases=27648 restore=27648 count_sources=24 owned_mapped_sources=18 counts=0,1,7,31 bodies=MVDD,MVKD,MVDK flag_states=2 pages=2 sources=none,IRQ,NMI snapshots=4 patterns=2 count_reads=once mutation_after_read=1 body_fetches=once physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated memory-count copies complete",
+    ),
+    "rpt-mem-wrap": (
+        "TMS320C54x memory-count wrap: PASS cases=192 restore=192 count_sources=AL,RAM counts=0,1,7,31 bodies=MVDD,MVKD,MVDK pages=2 snapshots=4 header=fffe,ffff body=0000 count_reads=once physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated memory-count wrap complete",
+    ),
+    "rpt-mem-chain": (
+        "TMS320C54x memory-count chaining: PASS cases=384 restore=384 count_sources=AL,RAM bodies=MVDD,MVKD,MVDK then=RPT_NOP first_counts=0,1,7,31 second_count=3 flag_states=2 pages=2 snapshots=4 stale_body=excluded physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated memory-count chaining complete",
+    ),
     "mvdk-circ-edge": (
         "TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated circular MVDK exclusions complete",
@@ -1791,7 +1803,7 @@ def main():
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
     if args.profile in ("portr-circular", "portr-block", "shift-unowned", "st-t-branch", "st-t-long", "st-t-long-edge", "stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
-    if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge"):
+    if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

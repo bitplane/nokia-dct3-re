@@ -3438,16 +3438,21 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_valid[2] && m_pipeline_repeat_active && !staged_immediate_repeat(word) && !staged_memory_repeat(word) && !short_repeat && !m_pipeline_repeat_body_latched)
 		{
 			if (!program_move && !read_a && !staged_pipelined_repeat(word) && !staged_repeat_accumulator_load(word) && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0x98)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
+			// Every body replaces the previous repeat's opcode, including
+			// non-pipelined bodies whose count arrives in the older Read slot.
+			m_pipeline_repeat_word = word;
 			if (staged_pipelined_repeat(word))
 			{
+				auto const count_header = [this](unsigned stage) { return m_pipeline_valid[stage] && (staged_short_repeat(m_pipeline_word[stage]) || staged_immediate_repeat(m_pipeline_word[stage]) || staged_memory_repeat(m_pipeline_word[stage])); };
 				unsigned owner = 3;
-				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) && (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))) owner = 4;
-				if (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))
+				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) && !count_header(owner)) owner = 4;
+				if (!count_header(owner))
 				{
-					logerror("%s: staged pipeline repeat requires an immediate count instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word); m_illegal = true; return;
+					logerror("%s: staged pipeline repeat count owner is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word); m_illegal = true; return;
 				}
-				m_pipeline_repeat_word = word;
-				m_pipeline_repeat_issue_remaining = m_pipeline_immediate[owner];
+				// Smem's count is not its address literal. Read supplies it once,
+				// before the held pipeline can issue any later body iteration.
+				m_pipeline_repeat_issue_remaining = staged_memory_repeat(m_pipeline_word[owner]) ? 0 : m_pipeline_immediate[owner];
 				if (staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) m_pipeline_repeat_source = m_pipeline_immediate[2] + 1;
 			}
 			m_pipeline_repeat_body_latched = true;
@@ -4294,11 +4299,14 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[4];
 		// Class 5A/5B samples RC once in Read, not once per body iteration.
 		u16 const source = mode == 0xf8 ? m_pipeline_immediate[4] : basic_address(4, mode);
-		if (source < 0x60 && (source < 0x10 || source > 0x17))
+		if (source < 0x60 && (source < 8 || source > 0x19))
 		{
 			logerror("%s: staged RPT control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		m_pipeline_operand[4] = pipeline_read_data(source);
+		if (m_pipeline_repeat_body_latched && staged_pipelined_repeat(m_pipeline_repeat_word) &&
+			m_pipeline_repeat_address == ((m_pipeline_address[4] & 0x7f0000) | u16(m_pipeline_address[4] + (mode == 0xf8 ? 2 : 1))))
+			m_pipeline_repeat_issue_remaining = m_pipeline_operand[4];
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 4);
 		m_pipeline_memory_repeat_wait = 2; // Class 5A/5B's extra clocks; placement is partial.
 	}

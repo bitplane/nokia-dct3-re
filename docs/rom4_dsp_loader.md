@@ -2,16 +2,19 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
-host-packet decoder, consumes three host packets, and stops on MVDD `e59c`
-at `37fb` after a memory-count repeat (reported PC `37fd`).
+host-packet decoder, records twenty consumer advances across two observed
+initialization passes, and stops on `07f8` at `4914` (reported PC `4916`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
-instruction qualifications below do not promote either claim. See
+instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is how the retained memory repeat count feeds
-the pipelined copies, without bypassing the firmware parser or injecting ring state. The exact-stop checker
-pins the three committed host-ring positions as well as the instruction stop.
+The current staged question is the retained operand/carry contract for
+`07f8 000e` (ADDC T,B), without bypassing the firmware parser or injecting ring state.
+TI SPRU172C page 4-8 specifies an unsigned Smem operand regardless of SXM,
+with OVM/C inputs and C/OVB outputs; this family is not yet staged-qualified.
+The exact-stop checker distinguishes the live 0.5-second checkpoint from
+the later illegal-instruction endpoint; neither proves completed boot.
 
 ## Circular MVDK qualification
 
@@ -24,12 +27,6 @@ BK=82. `mvdk-circ-edge` passes 19,712 exclusion/replay cases with no data
 reads or writes. Unsupported literal destinations reject in Decode;
 unsupported resolved sources reject in Access. Physical phase timing and
 interrupt/repeat composition remain unvalidated.
-
-The fresh `tmp/block-near-call-native-final/error.log` capture consumes ring positions
-0→6→11→15, at 0.175900019, 0.175909212 and 0.258977019 seconds. It records
-704 RF sample reads, 32 completion strobes and 27 slot expiries before
-rejecting the memory-count repeat composition. No RF control-port writes or transfer expiries
-occur; upload completion and native handset boot remain unproved.
 
 The resident sequence `ec05 7192 13d0` at `7f8d..7f8f` is qualified:
 `RPT #5; MVDK *AR2+,13d0`. TI SPRU172C page 4-108 specifies six
@@ -72,14 +69,31 @@ spilled delay words and a spilled target literal, with no data reads,
 writes or stack allocation. The existing far-call exclusion profile now
 uses an internal near-call target rather than rejecting all near calls.
 
-The native stop is at `47f8 0008; e59c` (`37f9..37fb`): a memory-sourced
-RPT followed by MVDD. The snapshot shows AL=7, but the current pipelined
-repeat controller accepts only immediate count ownership. Qualifying the
-retained memory count, rather than replacing it with a constant, is next.
-The existing memory-RPT Read guard also admits mapped sources only at
-`0010..0017` (AR0..AR7), not AL at `0008`. Both the count handoff and the
-owned mapped-source Read require qualification; removing the first guard
-alone is insufficient.
+## Memory-sourced repeat counts
+
+`RPT Smem` captures RC once in Read, rather than interpreting its address
+literal as a count. That retained value supplies the pipelined body's
+remaining issues. The admitted mapped sources are `0008..0019`: A/B lanes,
+T, TRN, AR0..AR7, SP and BK. Control/peripheral reads remain excluded.
+Every new body replaces the previous opcode before Read can seed an issue
+count, including non-pipelined bodies such as NOP. Otherwise a following
+NOP repeat can issue stale copies and update their auxiliary registers.
+The count-owner address comparison wraps the low 16-bit PC within XPC.
+
+`rpt-mem-copy` passes 27,648 cases and replays: 24 addressing/source forms,
+18 owned mapped sources, counts 0/1/7/31, MVDD/MVKD/MVDK bodies, two flag
+states, two pages, IRQ/NMI controls, four snapshots and two raw-word
+patterns. Each source is mutated after Read; body fetches and count reads
+remain once-only, copies total RC+1, and interrupts follow the final copy.
+`rpt-mem-wrap` adds 192 replays with an absolute header at `fffe..ffff`
+and the body at `0000`. `rpt-mem-chain` adds 384 copy→memory-count-NOP
+sequences and replays, checking four NOP retirements and no stale pointer
+updates. The chained fixture fails without replacing non-pipelined body
+ownership. Class-5A/5B's existing two held clocks remain partial stage
+placement, not a measured physical timing claim.
+
+The native `47f8 0008; e59c` sequence at `37f9..37fb` executes with the
+firmware's own AL count. No count or packet is supplied by the observer.
 
 ## Staged dual-memory MAC family
 
@@ -346,12 +360,12 @@ fixture checks two-word issue cadence, retained sample publication,
 ring wrap, final BRC and unchanged unrelated registers. It does not supply
 GSM packets or assert measured physical bus timing.
 
-The native prefix records 128 RF-provider reads before the packet-decoder
-stop. Only the first sixteen reads are logged individually, all at modeled
-frame 30, with observation-time PCs `324e/3254/325a/3260` repeated; these
-are not retirement addresses. Their total is four 32-sample blocks, not an
-independent observation of each block's frame ownership. RF acquisition and
-handset boot remain unclaimed.
+The current native run logs the first sixteen RF reads per initialization
+pass, at modeled frames 30 and 28. Observation-time PCs
+`324e/3254/325a/3260` repeat; these are not retirement addresses. Its final
+provider counter is 9,312 reads, not an uninterrupted-run total: the logged
+sample index restarts at one between passes. RF acquisition and handset
+boot remain unclaimed.
 
 ## PORTR consumer forwarding
 
@@ -384,7 +398,7 @@ Fresh three-second controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 3 | 0 | Three packets consumed; memory-count MVDD at `37fb` is unsupported. |
+| `nse1pipe` | staged | standard | 20 | 0 | Two initialization passes; `07f8` at `4914` is unsupported. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -393,8 +407,10 @@ prove either bus dialect is physically correct. The fixed-standard comparison
 isolated a frontend data hazard; changing SWWSR alone did not explain the
 missing RF controls. The staged checker now requires actual first-header
 reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
-It stops before the consumer index advances, so packet completion and RF
-parity remain open.
+The passive tap counts twenty nonzero consumer advances but logs only the
+first eight. The index restarts between the seventh and eighth observations,
+so these are not twenty packets from one uninterrupted DSP session. RF-control
+and transfer-expiry parity remain open.
 
 ## Current result
 
@@ -803,13 +819,20 @@ in the observed prefix. The first incoming host packet is then read twice
 from `0800` as `0a05` at 0.175897519/0.175897808 s. Circular-source MVDK
 `71d2 0015` at `3eee` executes; the ring consumer advances through 6, 11
 and 15. Repeated MVDK `7192` at `7f8e` executes, as does CALL `f074 7ffa`
-at `7ff7` inside block `7ff7..7ff8`. MVDD `e59c` at `37fb` after the
-memory-count repeat is then rejected.
-At 0.5 s the exposed PC is `37fd`, BK `0064`, AR0=1, AR2=`0881`,
-ST0=`081f`, ST1=`6103`, A=7, B=`1074`, T=`000b`, AR3=`1200`, AR4=`0074`,
-PMST `ffac` and ILLEGAL set. The final observation at 3.016666667 s pins
-the same stop, two header reads, three committed packets, 32 completion strobes,
-74 mailbox writes, 704 RF reads and no RF-control writes. Older pending
+at `7ff7` inside block `7ff7..7ff8`. MVDD `e59c` after the memory-count
+repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
+`00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
+AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
+registers, not the later stopped instruction's operands.
+The final observation at 3.016666667 s pins unsupported `07f8` at `4914`,
+PC `4916`, ILLEGAL set, seven reads through the ring-base tap, twenty
+consumer advances, 309 completion strobes, 74 mailbox writes and final
+device counters of 9,312 RF reads, 294 slot expiries and 572 frame expiries.
+No RF-control writes or transfer expiries occur. The ring and RF sample
+counters show reinitialization between the two BSP/upload prefixes; this
+does not establish twenty packets in one uninterrupted session. Both fresh
+captures reproduce these observations in `tmp/memory-count-native*/error.log`.
+Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
@@ -824,13 +847,10 @@ branches to `0e66` on equality, and otherwise writes another `0aaa` using
 STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
-The backend
-reports 74 MCU mailbox writes and four completion strobes. An additional
-strobe alone does not prove upload completion. After the two
-retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
-at 0.133940788 s. Four later BSP control writes publish `c008` at
-0.134188962, 0.134294769, 0.158807577 and 0.159053500 s,
-in addition to the initial reset/release pair.
+An additional strobe alone does not prove upload completion. Each of the
+two observed BSP sequences publishes TX words `0aaa/ffd5`, reads two
+retained `0aaa` words, and writes `c008/c0c8` followed by four `c008` values.
+The second sequence's initial pair appears at 0.482299596/0.482299654 s.
 These are firmware writes, not supplied receive frames. Neither
 upload completion nor handset boot is accepted for this machine.
 
