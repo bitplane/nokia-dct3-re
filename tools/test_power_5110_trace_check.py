@@ -27,6 +27,17 @@ class Power5110TraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "before"):
             verify(OFF + PRESS + RELEASE, "long")
 
+    def test_rejects_staged_dsp_faults(self):
+        for fault in ('unsupported staged C54x form fe44', 'staged ADDM BRC is unsupported', 'unimplemented C54x operation'):
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, 'illegal instruction'):
+                verify(fault + '\n' + PRESS + RELEASE, 'short')
+
+    def test_rejects_reset_even_when_power_actions_succeed(self):
+        for kind, actions in (("short", PRESS + RELEASE),
+                              ("long", PRESS + OFF + RELEASE)):
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "reset"):
+                verify("rom4_reset_request: reason=00000004 t=0.349649\n" + actions, kind)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,9 @@ def verify(text: str, kind: str) -> None:
         raise ValueError("short power press removed the baseband rail")
     if kind == "long" and not off:
         raise ValueError("sustained power press did not remove the baseband rail")
-    if "TMS320C54x" in text and "illegal" in text:
+    if "rom4_reset_request" in text:
+        raise ValueError("ROM4 baseband reset during power lifecycle")
+    if ("TMS320C54x" in text and "illegal" in text) or re.search(r'unsupported.*staged|staged.*unsupported|unimplemented.*C54x', text):
         raise ValueError("DSP executed an illegal instruction")
 
 

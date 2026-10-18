@@ -145,13 +145,16 @@ frame. `make verify-5110-save-state` repeats that UI path after restoring the
 running DSP composition. These gates establish useful ROM4 execution, not
 complete RF acquisition or speech behavior.
 
-The opt-in staged frontend also passes the same physical-menu oracle with
-`make verify-5110-menu NSE1_MENU_MACHINE=nse1pipe`, and remains fault-free
-through a thirty-second cold observation. The default 5110 still uses the
-atomic frontend. `make verify-5110-save-state NSE1_MENU_MACHINE=nse1pipe`
-also verifies exact native save/load snapshots, a matching 160 ms DSP I/O
-continuation and physical Menu input after restoring the staged
-idle/radio-service composition. Saves during calls/SMS,
+The opt-in staged frontend renders the same physical-menu oracle and has
+clear terminal ILLEGAL in a thirty-second observation. However, verbose
+late-input acceptance exposes an earlier MCU reason-4 reset after a divergent
+DSP challenge response. Prior menu/restoration gates hid that reset without
+verbose tracing and used ineffective shell-negation failure checks; both
+blind spots are corrected. Clean staged boot is not accepted. The default 5110 still uses the
+atomic frontend and passes late-input acceptance. `NSE1_MACHINE=nse1pipe`
+selects the staged profile for the four handset input/restoration gates.
+Exact save/load snapshots and a matching 160 ms DSP I/O continuation were
+observed, but do not override the cold-boot failure. Saves during calls/SMS,
 wider application coverage and the fitted bus dialect are not promoted.
 Its upload and
 instruction contracts are maintained in [ROM4 DSP loader](rom4_dsp_loader.md).

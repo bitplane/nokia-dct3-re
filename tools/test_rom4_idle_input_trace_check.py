@@ -24,6 +24,11 @@ class Rom4IdleInputTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not traced"):
             verify(PRESS + RELEASE)
 
+    def test_rejects_staged_dsp_faults(self):
+        for fault in ('unsupported staged C54x form fe44', 'staged ADDM BRC is unsupported', 'unimplemented C54x operation'):
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, 'DSP faulted'):
+                verify(CLOCK + PRESS + RELEASE + fault)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -44,17 +44,17 @@ TC-block, polling-interrupt, RCD and delayed-block exclusion profiles pass.
 The native `0a40..0a5f` upload still binds uniquely to MCU offset `958e8`,
 but its ADDM no longer stops execution. A ten-second cold checkpoint has
 ILLEGAL clear, 29 host-consumer advances, 242 RF-control writes and 2,663
-transfer expiries. Thirty seconds remain fault-free, with 3,621 completion
+transfer expiries. Thirty seconds retain clear ILLEGAL, with 3,621 completion
 strobes, 1,516 RF-control writes and 18,701 transfer expiries. Continuing
 CPU-issued control writes distinguish this from the earlier frozen-counter
 polling failure; they do not establish valid RF reception or registration.
 
-`make verify-5110-menu NSE1_MENU_MACHINE=nse1pipe` performs a fresh own-model
+`make verify-5110-menu NSE1_MACHINE=nse1pipe` performs a fresh own-model
 EEPROM boot, presses/releases the physical Menu key at eight seconds and
 requires the existing Phone book frame SHA-256
 `d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5`.
 The staged wrapper also requires terminal ILLEGAL clear and no unsupported
-form or reset. `make verify-5110-save-state NSE1_MENU_MACHINE=nse1pipe`
+form or reset. `make verify-5110-save-state NSE1_MACHINE=nse1pipe`
 saves the running handset at seven seconds. It compares save-time
 PC/ST0/ST1/SP, I/O `21`, BSP control `22` and emulated time exactly, then
 requires an identical nonempty 160 ms stream of DSP I/O writes and timestamps
@@ -64,8 +64,25 @@ input. Its structural check also requires a clear DSP ILLEGAL flag after load. D
 of both gates still test the atomic profile. This validates the running
 idle/radio-service composition and subsequent menu input, not saves inside
 native calls, SMS transactions or every application.
-Both profiles use the native DSP backend, not `nokia_dsp_hle`. This proves
-interactive menu access, not native calls, network registration or speech.
+Both profiles use the native DSP backend, not `nokia_dsp_hle`. Physical menu
+access and the save/load replay were observed, but the earlier staged runs
+did not establish reset-free cold boot: their non-verbose invocation hid the
+reset-reason probe, and shell `! grep` checks did not abort under `set -e`.
+These are now explicit failing branches. The verbose late-input gate exposes a reason-4 reset at
+0.349649 s, called from MCU validator continuation `0x258d3c`. The first
+response object contains `3532 5929 581a 5dae 412b b0a7 11a9`, rather than
+the atomic frontend's accepted wildcard response documented under coherent
+challenge validation. A second validator
+entry occurs at 0.635758 s and continues with `r6=0`. Terminal ILLEGAL is
+clear at 16 s, so it does not detect this semantic failure. The default
+atomic late-input gate passes; staged clean-boot acceptance remains failed.
+Menu and restoration gates now enable verbose tracing so reset rejection
+is observable. This does not establish native calls, registration or speech.
+
+`NSE1_MACHINE` selects the frontend for menu, restoration, late-input and
+power-lifecycle gates; the former `NSE1_MENU_MACHINE` remains a compatibility
+alias. The staged short/long physical power actions were observed, but do
+not establish clean startup; the power checker also rejects reason-4 resets.
 
 ## Conditional delayed returns
 

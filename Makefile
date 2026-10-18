@@ -8,6 +8,8 @@ JOBS        ?= 4
 
 PYTHON ?= python3
 VENV   := .venv
+# Shared native acceptance frontend; retain the earlier menu-only selector.
+NSE1_MACHINE ?= $(if $(strip $(NSE1_MENU_MACHINE)),$(NSE1_MENU_MACHINE),noki5110)
 DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-arm7-pc-export.patch \
@@ -449,11 +451,11 @@ help:
 	@echo "make verify-3410-radio-unsuitable-cells check NHM-2 cell and assignment rejection"
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
-	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (NSE1_MENU_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (NSE1_MACHINE=nse1pipe for staged CPU)"
 	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
-	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval"
-	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses"
-	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (NSE1_MENU_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval (NSE1_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (NSE1_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (NSE1_MACHINE=nse1pipe for staged CPU)"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
 	@echo "make verify-3330-frontier complete virgin-PMM setup and reach v4.50 idle"
@@ -1544,93 +1546,98 @@ check-c54x-rom4-rf-boundary: build
 			-autoboot_script $(abspath tools/c54x_rom4_codec_observe.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --scan-30s
 
-verify-5110-menu: NSE1_MENU_MACHINE ?= noki5110
 verify-5110-menu: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-menu.XXXXXX")"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
-		mkdir -p "$$tmp/nvram/$(NSE1_MENU_MACHINE)" "$$tmp/snap"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native menu failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MACHINE)" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/$(NSE1_MENU_MACHINE)/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
 		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
-		if [ "$(NSE1_MENU_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_POST_READY_KEYS=menu \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
-		$(abspath $(MAME_DIR))/mame $(NSE1_MENU_MACHINE) \
+		$(abspath $(MAME_DIR))/mame $(NSE1_MACHINE) \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
-			-video none -sound none -log -skip_gameinfo -nothrottle \
+			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
 			-autoboot_script "$$script" >/dev/null; \
 		grep -q 'input-press: .* name=menu' error.log; \
 		grep -q 'input-release: .* name=menu' error.log; \
-		! grep -q 'rom4_reset_request' error.log; \
-		! grep -q 'TMS320C54x.*illegal' error.log; \
-		! grep -Eq 'unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; \
-		if [ "$(NSE1_MENU_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
+		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
+			echo 'FAIL - native menu boot reset or DSP fault' >&2; exit 1; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
-		echo 'NSE-1 ROM4 $(NSE1_MENU_MACHINE) unassisted Phone book menu: PASS'
+		echo 'NSE-1 ROM4 $(NSE1_MACHINE) unassisted Phone book menu: PASS'
 
 verify-5110-late-input: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-late-input.XXXXXX")"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
-		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native late input failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MACHINE)" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/noki5110/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
+		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_POST_READY_KEYS=menu \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
-		$(abspath $(MAME_DIR))/mame noki5110 \
+		$(abspath $(MAME_DIR))/mame $(NSE1_MACHINE) \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 16 \
-			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null; \
+			-autoboot_script "$$script" >/dev/null; \
 		$(PYTHON) $(abspath tools/rom4_idle_input_trace_check.py) error.log; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
-		echo 'NSE-1 ROM4 late physical Menu input: PASS'
+		echo 'NSE-1 ROM4 $(NSE1_MACHINE) late physical Menu input: PASS'
 
 verify-5110-power-lifecycle: build
-	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; for kind in short long; do \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp=""; \
+		trap 'status=$$?; if test "$$status" -ne 0; then printf "Native power lifecycle failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
+		for kind in short long; do \
 		tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-power.XXXXXX")"; \
-		mkdir -p "$$tmp/nvram/noki5110"; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MACHINE)"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/noki5110/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
+		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		if test "$$kind" = short; then duration=220; seconds=11; else duration=4000; seconds=14; fi; \
 		(cd "$$tmp"; \
 			NOKIA_DCT3_POST_READY_KEYS=power \
 			NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
 			NOKIA_DCT3_POST_READY_KEY_DURATION_MS="$$duration" \
-			$(abspath $(MAME_DIR))/mame noki5110 \
+			$(abspath $(MAME_DIR))/mame $(NSE1_MACHINE) \
 				-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 				-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 				-seconds_to_run "$$seconds" \
-				-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null); \
+				-autoboot_script "$$script" >/dev/null); \
 		$(PYTHON) tools/power_5110_trace_check.py "$$kind" "$$tmp/error.log"; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' "$$tmp/error.log"; fi; \
 		rm -rf "$$tmp"; \
 	done
 
-verify-5110-save-state: NSE1_MENU_MACHINE ?= noki5110
 verify-5110-save-state: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-state.XXXXXX")"; \
 		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native save-state failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
-		mkdir -p "$$tmp/nvram/$(NSE1_MENU_MACHINE)" "$$tmp/snap"; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MACHINE)" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/$(NSE1_MENU_MACHINE)/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=7 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=200 \
@@ -1639,9 +1646,9 @@ verify-5110-save-state: build
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
-		$(abspath $(MAME_DIR))/mame $(NSE1_MENU_MACHINE) \
+		$(abspath $(MAME_DIR))/mame $(NSE1_MACHINE) \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
-			-video none -sound none -log -skip_gameinfo -nothrottle \
+			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
 			-autoboot_script $(abspath tools/c54x_rom4_codec_restore.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
@@ -1649,12 +1656,11 @@ verify-5110-save-state: build
 			--restore-log error.log --require-restore-replay; \
 		grep -q 'state_roundtrip: result=pass' error.log; \
 		grep -q 'input-press: .* name=menu' error.log; \
-		! grep -q 'rom4_reset_request' error.log; \
-		! grep -q 'TMS320C54x.*illegal' error.log; \
-		! grep -Eq 'unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; \
+		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
+			echo 'FAIL - native restoration boot reset or DSP fault' >&2; exit 1; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
-		echo 'NSE-1 ROM4 $(NSE1_MENU_MACHINE) C54x save-state round trip: PASS'
+		echo 'NSE-1 ROM4 $(NSE1_MACHINE) C54x save-state round trip: PASS'
 
 check-c54x-rom4-transform:
 	$(PYTHON) tools/c54x_rom4_transform_check.py $(TRACE) $(DATA_MEMORY)

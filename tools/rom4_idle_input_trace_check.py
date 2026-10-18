@@ -30,6 +30,8 @@ def verify(text: str) -> None:
         raise ValueError("ARM suspended during the late-input fixture")
     if "rom4_reset_request" in text:
         raise ValueError("ROM4 baseband reset during late input")
+    if ("TMS320C54x" in text and "illegal" in text) or re.search(r'unsupported.*staged|staged.*unsupported|unimplemented.*C54x', text):
+        raise ValueError('DSP faulted during late input')
 
 
 def main() -> int:
