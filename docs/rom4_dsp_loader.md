@@ -40,18 +40,10 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete;
-with ordinary delayed square accumulation and parallel MPY also qualified,
-the staged EFR frame stops at a conditional-store mapped-destination guard
-(fetch PC `d1b0`, not established as the instruction owner). No complete
-staged EFR frame has passed.
-
-The bounded frame trace ends after RPTBD `d1a9`. Both frontend traces show
-STM at `d1a6` setting AR5 to `0016`; the atomic continuation executes
-conditional store `9d3a` at `d1ad`, whose X selector addresses AR5 and thus
-the mapped AR6 register. This identifies a deliberate mapped-register
-target, not evidence of accidental pointer corruption or frontend state
-parity. Exact staged ownership and conditional MMIO read/write semantics
-still need qualification; the guard remains in place.
+with ordinary delayed square accumulation, parallel MPY and conditional AR
+stores also qualified, the staged EFR frame stops at short repeat `ec27`,
+owner `b93f`, in CALLD `b93d`'s delay span. No complete staged EFR frame
+has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -423,7 +415,8 @@ LDM/LD AR read-age exception.
 
 The staged frontend admits STRCD, SRCCD and SACCD A/B (`9cxx..9fxx`, valid
 signed accumulator conditions). Every instruction captures one Xmem address,
-updates its pointer regardless of the predicate, reads RAM and writes once.
+updates its pointer regardless of the predicate, reads RAM or a mapped
+auxiliary register and writes once.
 A false predicate writes back the retained Read sample, not the later live
 memory value (SPRU131G 6.6.3; SPRU172C 4-152). SACCD obeys ASM/SXM but does
 not use SST saturation.
@@ -443,10 +436,25 @@ not independent full cross-products. Late pointer and ASM changes check
 retention; changing A/B/T/BRC after Read checks the declared Execute sampling
 policy. Poisoning RAM after Read checks the false write-back path. Source
 registers and status are preserved. `cond-store-edge` passes 1,024 cases plus
-replay, rejecting mapped destinations before pointer or bus effects. Both
-profiles clear live pipeline state before restoration. Short repeat, mapped
-device semantics, physical bank contention and wider interrupt/control
-compositions remain unqualified.
+replay, rejecting accumulator, BRC and peripheral destinations before pointer
+or bus effects.
+
+`cond-store-ar` passes 221,184 cases and cleared-pipeline replays: four
+forms, twelve predicates, six patterns, sixteen Xmem encodings, all eight
+mapped AR destinations, two pages and three checkpoints. BK is zero;
+ASM=0/-1 and SXM/OVM/SST are coupled to patterns rather than a full cross
+product. The target may alias the addressing pointer: its Read sample then
+contains the Access-stage modification, and its Execute write replaces that
+register once. A false predicate writes the retained sample, not a newer
+poisoned AR value. AR0 destinations also test signed AR0-based address steps.
+Source/predicate values change before Execute, and non-target registers and
+status remain unchanged except for the declared pointer update.
+
+The acquired EFR block deliberately sets AR5 to `0016` at `d1a6` and uses
+conditional store `9d3a` at `d1ad` to target mapped AR6. Atomic and staged
+traces agree on that initialization, not on all preceding data values.
+Control/peripheral register writes, mapped circular and arbitrary short-repeat/
+interrupt/control compositions and physical bank contention remain unqualified.
 
 ## AR0-indexed MVDK sources
 

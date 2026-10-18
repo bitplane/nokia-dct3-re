@@ -4255,9 +4255,9 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const x = m_pipeline_word[3] >> 4;
 		m_pipeline_operand_address[3] = m_ar[2 + (x & 3)];
-		if (m_pipeline_operand_address[3] < 0x60)
+		if (m_pipeline_operand_address[3] < 0x60 && (m_pipeline_operand_address[3] < 0x10 || m_pipeline_operand_address[3] > 0x17))
 		{
-			logerror("%s: staged conditional store mapped destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged conditional store mapped destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]); m_illegal = true; return;
 		}
 		dual_modify(x, 3);
 	}
