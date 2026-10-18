@@ -1480,6 +1480,24 @@ bit 10 is not a saturation control. Its overflow inputs have low words
 different from the clamped result, so a disabled clamp cannot satisfy the
 data oracle accidentally.
 
+### Staged immediate status publication
+
+`STM #literal,ST1` retains its second word in Decode and publishes once at
+Read, without reading the destination or applying SST saturation. The
+`stm-st1` fixture passes 18,432 cases and cleared-pipeline replays over raw
+status, SXM loads and ASM load/add/subtract consumers, four gaps, two pages
+and three checkpoints. Poisoning the consumed literal cannot change the
+publication. Reserved-bit, XF and INTM handling uses the existing register
+contract; zero-write INTM clearing remains explicitly unverified.
+
+`stm-cpl` and `stm-cmpt` each pass sixteen cases plus replay for basic LD/ST
+followers: two directions and gaps 0/1/2/3. They select the new addressing
+mode after two separating instructions, matching SPRU131G tables 7-16/7-19.
+The tested SXM/ASM followers need no separating instruction. Sixteen negative
+cases plus replay reject delay, short-repeat, block-body and XC compositions
+before data effects. Other status-producer hazards, interrupt composition
+and physical bus-stage timing are not qualified by these fixtures.
+
 ### Staged accumulator-to-status publication
 
 STLM A/B to ST1 publishes the Execute-live, SST-qualified low word once

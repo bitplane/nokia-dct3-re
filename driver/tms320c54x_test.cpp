@@ -3376,8 +3376,9 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		bool const stlm = !strcmp(machine().options().bios(), "stlm-cpl") || !strcmp(machine().options().bios(), "stlm-cmpt");
-		bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt") || !strcmp(machine().options().bios(), "stlm-cmpt");
-		bool const mvmd = stlm || cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
+		bool const stm = !strcmp(machine().options().bios(), "stm-cpl") || !strcmp(machine().options().bios(), "stm-cmpt");
+		bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt") || !strcmp(machine().options().bios(), "stlm-cmpt") || !strcmp(machine().options().bios(), "stm-cmpt");
+		bool const mvmd = stm || stlm || cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
 		bool const set = BIT(variant, 0), store = BIT(variant, 3);
 		bool const dp = BIT(variant, 4);
 		unsigned const gap = (variant / 2) % 4;
@@ -3419,6 +3420,7 @@ private:
 			program.write_word(0x602 + gap, 0xf495);
 			program.write_word(0x601 + gap, cmpt ? (store ? 0x8090 : 0x1090) : (store ? 0x8027 : 0x1027));
 		}
+		if (stm) { program.write_word(0x600, 0x7707); program.write_word(0x601, set ? (cmpt ? 0x820 : 0x4800) : 0x800); }
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
@@ -18646,7 +18648,7 @@ private:
 		u16 before, requested, status;
 		u64 value;
 	};
-	static stlm_status_fixture stlm_status_case(unsigned variant)
+	static stlm_status_fixture stlm_status_case(unsigned variant, bool immediate = false)
 	{
 		unsigned const pattern = variant % 64;
 		stlm_status_fixture f{(variant / 64) % 6, (variant / 768) % 4, 4 + (variant / 6144), bool((variant / 384) % 2),
@@ -18654,14 +18656,15 @@ private:
 		f.requested = f.family ? 0x800 | (pattern & 31) | (pattern & 32 ? 0x100 : 0) : u16(0xffff ^ (pattern * 0x421));
 		f.before = ((f.requested ^ 0x611f) & 0x711f) | ((variant / 384) % 2 ? 0x800 : 0);
 		f.value = 0x8012340000ULL | f.requested;
-		if (!f.family && (pattern & 32)) f.requested = f.before & 0x100 ? 0 : 0xffff;
+		if (!immediate && !f.family && (pattern & 32)) f.requested = f.before & 0x100 ? 0 : 0xffff;
 		f.status = (f.requested & ~u16(0xc00)) | (f.before & f.requested & 0x800);
 		return f;
 	}
 	void start_stlm_status(unsigned variant = 0)
 	{
+		bool const immediate = !strcmp(machine().options().bios(), "stm-st1");
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = stlm_status_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		auto const f = stlm_status_case(variant, immediate); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.source ? 0x8907 : 0x8807);
 		if (f.family == 1 || f.family == 3)
@@ -18670,6 +18673,11 @@ private:
 			if (f.family == 3) program.write_word(f.base + 0x602 + f.gap, 0);
 		}
 		if (f.family == 2 || f.family >= 4) program.write_word(f.base + 0x601 + f.gap, (f.family == 2 ? 0xf482 : f.family == 4 ? 0xf480 : 0xf481) | (f.source ? 0x100 : 0x200));
+		if (immediate)
+		{
+			for (unsigned i = 31; i > 0; --i) program.write_word(f.base + 0x601 + i, program.read_word(f.base + 0x600 + i));
+			program.write_word(f.base + 0x600, 0x7707); program.write_word(f.base + 0x601, f.requested);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x260e);
 		if (!f.family) m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant % 64) & 32 ? 1 : 0);
@@ -18684,10 +18692,14 @@ private:
 			if (machine().side_effects_disabled()) return;
 			expect((f.family == 1 || f.family == 3) && at == 0x1400 && word == 0x8001 && !m_pipeline_operand_reads,
 				"STLM ST1 never reads its destination and the following load reads RAM once"); ++m_pipeline_operand_reads; });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_status_write", [this, f](offs_t at, u16 &word, u16) {
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_status_write", [this, f, immediate](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
 			expect(at == 7 && word == f.requested && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6,
 				"STLM ST1 publishes the Execute-live accumulator once independent of DP/CPL"); ++m_pipeline_store_writes; });
+		m_pipeline_extensions_reads = 0;
+		if (immediate) m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "stm_status_literal", [this, f](offs_t, u16 &word, u16) {
+			if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads++ && word == f.requested, "STM ST1 retains one original literal"); }
+		});
 		m_phase = 62110; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -18711,6 +18723,15 @@ private:
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_status_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_status_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
 		m_cpu->set_state_int(STATE_GENPC, base + (variant % 8 >= 6 ? 0xffff : 0x600)); m_phase = 62112; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	}
+	void start_stm_status_edge(unsigned ordinal = 0)
+	{
+		unsigned const kind = ordinal % 4, variant = kind + (ordinal / 4) * 16;
+		start_stlm_status_edge(variant);
+		u32 const base = (ordinal / 4) % 2 ? 0x20000 : 0;
+		unsigned const at = kind == 0 || kind == 2 ? 0x602 : 0x601;
+		m_cpu->space(AS_PROGRAM).write_word(base + at, 0x7707);
+		m_cpu->space(AS_PROGRAM).write_word(base + at + 1, 0x0740);
 	}
 	void check_st1_memory_rules()
 	{
@@ -19033,11 +19054,14 @@ private:
 		if (!strcmp(machine().options().bios(), "st1-rules")) { check_st1_memory_rules(); return; }
 		if (!strcmp(machine().options().bios(), "st1-bits")) { start_pipeline_status_bit(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1")) { start_stlm_status(); return; }
+		if (!strcmp(machine().options().bios(), "stm-st1")) { start_stlm_status(); return; }
+		if (!strcmp(machine().options().bios(), "stm-st1-edge")) { start_stm_status_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1-edge")) { start_stlm_status_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1-irq")) { start_mvmd_status_irq(); return; }
 		if (!strcmp(machine().options().bios(), "shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "shift-per-edge")) { start_shifted_peripheral_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-cpl") || !strcmp(machine().options().bios(), "stlm-cmpt")) { start_pipeline_cpl(); return; }
+		if (!strcmp(machine().options().bios(), "stm-cpl") || !strcmp(machine().options().bios(), "stm-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
@@ -40963,8 +40987,9 @@ private:
 		if (m_phase == 251350)
 		{
 			bool const stlm = !strcmp(machine().options().bios(), "stlm-cpl") || !strcmp(machine().options().bios(), "stlm-cmpt");
-			bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt") || !strcmp(machine().options().bios(), "stlm-cmpt");
-			bool const mvmd = stlm || cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
+			bool const stm = !strcmp(machine().options().bios(), "stm-cpl") || !strcmp(machine().options().bios(), "stm-cmpt");
+			bool const cmpt = !strcmp(machine().options().bios(), "mvmd-cmpt") || !strcmp(machine().options().bios(), "stlm-cmpt") || !strcmp(machine().options().bios(), "stm-cmpt");
+			bool const mvmd = stm || stlm || cmpt || !strcmp(machine().options().bios(), "mvmd-cpl");
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const gap = (m_pipeline_peripheral_case / 2) % 4;
 			bool const set = BIT(m_pipeline_peripheral_case, 0), store = BIT(m_pipeline_peripheral_case, 3);
@@ -41005,6 +41030,11 @@ private:
 				if (mvmd)
 				{
 					if (m_pipeline_peripheral_case < 15) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
+					if (stm)
+					{
+						osd_printf_info("TMS320C54x staged STM %s: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0\n", cmpt ? "CMPT" : "CPL");
+						throw emu_fatalerror(0, "TMS320C54x isolated STM addressing mode complete");
+					}
 					if (stlm)
 					{
 						osd_printf_info("TMS320C54x staged STLM %s: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0\n", cmpt ? "CMPT" : "CPL");
@@ -48800,6 +48830,7 @@ private:
 		if (m_phase == 62121) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62120; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62112)
 		{
+			bool const immediate = !strcmp(machine().options().bios(), "stm-st1-edge");
 			unsigned const tick = ++m_idle_fixture_tick, checkpoint = 2 + m_pipeline_peripheral_case / 32;
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded status/control prefix before admission"); }
 			if (tick == 12)
@@ -48807,6 +48838,13 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Excluded STLM status control/repeat composition stops before data-side effects");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded STLM prefix"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62113; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (immediate)
+				{
+					unsigned const ordinal = (m_pipeline_peripheral_case / 16) * 4 + m_pipeline_peripheral_case % 8;
+					if (ordinal < 15) { start_stm_status_edge(ordinal + 1); return; }
+					osd_printf_info("TMS320C54x staged STM ST1 exclusions: PASS cases=16 restore=16 pages=2 snapshots=2 classes=delay,repeat,block,XC data_reads=0 data_writes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated STM ST1 exclusions complete");
+				}
 				if (m_pipeline_peripheral_case < 63) { start_stlm_status_edge(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged STLM ST1 exclusions: PASS cases=64 restore=64 sources=A,B pages=2 snapshots=2 classes=delay,repeat,block,XC,adjacent_RPTB,adjacent_RPTBD page_wrap=1 data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated STLM ST1 exclusions complete");
@@ -48816,18 +48854,21 @@ private:
 		if (m_phase == 62113) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62112; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62110)
 		{
-			auto const f = stlm_status_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
+			bool const immediate = !strcmp(machine().options().bios(), "stm-st1");
+			auto const f = stlm_status_case(m_pipeline_peripheral_case, immediate); unsigned const tick = ++m_idle_fixture_tick;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM status publication and qualified consumers stay staged");
 			if (tick == 4 || tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 4 ? f.value ^ 0xffff : f.value);
+			if (immediate && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, u16(~f.requested)); }
 			if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_xf_pin == bool(f.status & 0x2000), "STLM applies reserved-bit/INTM rules and publishes XF at Execute");
 			if (tick == f.checkpoint && !m_pipeline_replay)
 			{
-				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained STLM and consumer mode before/at publication");
 			}
 			if (tick == 18)
 			{
-				u16 const mode = f.gap || f.family == 3 ? f.status : f.before;
+				if (immediate) expect(m_pipeline_extensions_reads == 1, "STM captures the literal once across replay");
+				u16 const mode = immediate || f.gap || f.family == 3 ? f.status : f.before;
 				u64 expected = f.value;
 				if (f.family == 1 || f.family == 3) expected = mode & 0x100 ? 0xffffff8001ULL : 0x8001;
 				if (f.family == 2 || f.family >= 4)
@@ -48842,10 +48883,18 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					if (immediate) m_cpu->set_pipeline_frontend(true);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay STLM without duplicate publication or loss of sampled modes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62111; m_check_timer->enable(true); return;
 				}
-				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 18431) { start_stlm_status(m_pipeline_peripheral_case + 1); return; }
+				if (immediate)
+				{
+					expect(m_pipeline_extensions_reads == 1, "STM captures the literal once across replay");
+					osd_printf_info("TMS320C54x staged STM ST1: PASS cases=18432 restore=18432 families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 literal_reads=1 literal_poison=1 status_writes=1 destination_reads=0 short_latency=0 long_latency=0 clear_policy=legacy_unverified reset_before_restore=1 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated STM ST1 complete");
+				}
 				osd_printf_info("TMS320C54x staged STLM ST1: PASS cases=18432 restore=18432 sources=A,B families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 execute_live=1 status_writes=1 destination_reads=0 short_latency=1 long_latency=0 clear_policy=legacy_unverified silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated STLM ST1 complete");
 			}
@@ -55261,6 +55310,10 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(142, "rptbd-rpt", "Short repeat in the first RPTBD delay word")
 	ROM_SYSTEM_BIOS(143, "rptbd-rpt-edge", "RPTBD delay repeat span and count exclusions")
 	ROM_SYSTEM_BIOS(144, "retd-rpt", "Delay repeat drains before a retained stack return")
+	ROM_SYSTEM_BIOS(145, "stm-st1", "Immediate ST1 publication and arithmetic consumers")
+	ROM_SYSTEM_BIOS(146, "stm-st1-edge", "Immediate ST1 control composition exclusions")
+	ROM_SYSTEM_BIOS(147, "stm-cpl", "Immediate ST1 CPL consumer latency")
+	ROM_SYSTEM_BIOS(148, "stm-cmpt", "Immediate ST1 CMPT consumer latency")
 ROM_END
 
 ROM_START(tms54rom4)

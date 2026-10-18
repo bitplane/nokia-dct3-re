@@ -14,6 +14,25 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_bios_fallback_cannot_satisfy_profile(self):
+        marker, ending = EXTRA_PROFILES['stm-cpl']
+        for warning in ('invalid BIOS "stm-cpl", reverting to default', 'INVALID BIOS', 'reverting to default'):
+            with self.subTest(warning=warning), self.assertRaises(ValueError):
+                check_result(warning + '\n' + marker + '\n' + ending, 3, profile='stm-cpl')
+
+    def test_stm_status_profiles_require_scope_and_replay(self):
+        for profile in ('stm-st1', 'stm-st1-edge', 'stm-cpl', 'stm-cmpt'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+            for bad in (marker, text + '\n' + marker, text + '\nunexpected'):
+                with self.subTest(profile=profile, bad=bad), self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_retd_delay_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['retd-rpt']
         text = marker + '\n' + ending

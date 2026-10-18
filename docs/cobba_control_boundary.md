@@ -2460,11 +2460,14 @@ stack after separately qualified
 [RPTBD](rom4_dsp_loader.md#short-repeat-in-rptbd-delay-words) and
 [RETD](rom4_dsp_loader.md#short-repeat-in-retd-delay-words) short-repeat
 compositions. Both reset traces contain the same 732 executed address/opcode
-pairs; this is not register-state or physical-timing parity. The first frame
-reaches `7707` at `cf9f`, an immediate ST1
-write, which remains unqualified on this frontend. Recover its control/status
-semantics and qualify them independently before enabling the instruction;
-passing reset does not establish a passing EFR frame.
+pairs; this is not register-state or physical-timing parity. The first frame's
+immediate ST1 write now executes under its
+[isolated qualification](rom4_dsp_loader.md#staged-immediate-status-publication).
+The next guard belongs to instruction `a20a` at `cc02`, with resolved X
+address `0013` (mapped AR3) and Y address `0cf4` (PCM RAM). The guard log's
+current fetch PC `cc03` is not its instruction owner. Qualify mapped-source
+Read, dual address updates and accumulator publication before admitting this
+dual-memory operation. No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
