@@ -1,8 +1,8 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype currently stops on repeated MVKD `7090` at
-`3053`; its upload completion and handset boot remain unaccepted. The
+acceptance scopes. The prototype currently stops on STM AL `7708` at
+`45b0`; its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
@@ -66,6 +66,31 @@ the literal is also overwritten after capture. Only one operand read occurs,
 with no data write, and the branch consumes the retained comparison result.
 Other mapped registers and peripherals remain outside this qualification;
 the fixture does not claim measured physical pipeline phases.
+
+## Repeated data-memory moves
+
+Short MVKD destinations use real repeated pipeline slots, not the atomic
+interpreter or a bulk memory copy. SPRU172C page 4-113 and SPRU131G section
+6.7/table 6-17 specify count+1 transfers, an incrementing absolute source
+address and single-cycle issue after setup. The fetched source literal is
+retained; each injected slot owns its incremented 16-bit source, DAGEN
+destination, Read value and Execute write. Resume skips both words of MVKD,
+unlike the pre-existing one-word pipelined repeat bodies.
+
+`rpt-mvkd` verifies 9,216 cases and replays across DP/SP and four short
+indirect modes, eight auxiliary registers, counts 0/1/2/7, both immediate
+count forms, distinct/equal/overlapping layouts, two program pages and four
+snapshots. It checks consecutive writes, source progression, pointer updates,
+one opcode/literal fetch and retention after source/literal poisoning.
+Same-address reads inherit the existing pending-write bypass documented by
+SPRU131G 7.3.2: forwarded iterations do not issue a second RAM read.
+This differs from assuming that physical Read-before-Write ordering must
+return the old memory word. The source and issue state survive restoration.
+
+Mapped sources/destinations and long-offset/absolute Smem repeat forms
+remain excluded. `rpt-mvkd-edge` checks 32 cases and replays of those exclusions
+before bus or pointer effects. Interrupt composition and physical pipeline phases remain
+unqualified for this new repeated form.
 
 ## Current result
 
@@ -462,9 +487,10 @@ admitted shifted read, not a new serial frame or an injected reply.
 The staged frontend executes SAT A/B at `3473/3475` and the circular
 post-increment store `80d3` at `34d3`, then the TC conditional call `f930`
 at `354c`, followed by accumulator-lane CMPM at `0025fe`, `60f8`, whose
-source `000b` is BL. It then stops on an unadmitted repeated MVKD at
-`003053`, `7090`. The exposed PC is `3056`, BK `00fa`, AR0 `1984`,
-AR2 `06bc`, ST0 `181f`, ST1 `4908`, PMST `ffac` and
+source `000b` is BL. Repeated MVKD `7090` at `3053` copies three words
+from `b706` through post-incrementing AR0, then execution stops on
+STM AL `7708` at `0045b0`. The exposed PC is `45b2`, BK `00fa`,
+AR0 `1987`, AR2 `0060`, ST0 `081f`, ST1 `4108`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -479,7 +505,8 @@ STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
 The backend
-reports 74 MCU mailbox writes and two completion strobes. After the two
+reports 74 MCU mailbox writes and three completion strobes. The additional
+strobe alone does not prove upload completion. After the two
 retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
 at 0.133940788 s. Two later BSP control writes publish `c008` at
 0.134188962 and 0.134294769 s, in addition to the initial reset/release pair.

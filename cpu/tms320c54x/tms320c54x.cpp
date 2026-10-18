@@ -87,9 +87,14 @@ constexpr bool staged_repeat_accumulator_store(u16 word)
 	return (word & 0xfc00) == 0x8000 && u8(word) >= 0x80 && u8(word) < 0xa0;
 }
 
+constexpr bool staged_repeat_data_copy(u16 word)
+{
+	return (word & 0xff00) == 0x7000 && u8(word) < 0xa0;
+}
+
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_data_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -2947,6 +2952,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_valid[2] = false;
 		--m_pipeline_decode_flush;
 	}
+	bool repeated_data_copy = false;
 	if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched &&
 		staged_pipelined_repeat(m_pipeline_repeat_word) && m_pipeline_repeat_issue_remaining)
 	{
@@ -2954,6 +2960,8 @@ void tms320c54x_device::pipeline_step()
 		// Execute's data write for iteration n-1 in the same clock.
 		m_pipeline_valid[2] = true;
 		m_pipeline_word[2] = m_pipeline_repeat_word;
+		repeated_data_copy = staged_repeat_data_copy(m_pipeline_repeat_word);
+		if (repeated_data_copy) m_pipeline_immediate[2] = m_pipeline_operand[2] = m_pipeline_repeat_source++;
 		m_pipeline_address[2] = m_pipeline_repeat_address;
 		m_pipeline_block_body[2] = m_pipeline_block_end[2] = m_pipeline_block_first_final[2] = false;
 		m_pipeline_peripheral_wait_paid[2] = m_pipeline_io_wait_paid[2] = false;
@@ -3186,7 +3194,12 @@ void tms320c54x_device::pipeline_step()
 			}
 			--m_pipeline_delay_decode_words;
 		}
-		if (m_pipeline_decode_remaining)
+		if (repeated_data_copy)
+		{
+			// The injected iteration already owns its incremented literal;
+			// it must not decode or fetch an extension a second time.
+		}
+		else if (m_pipeline_decode_remaining)
 		{
 			// Extension words belong to the retained opcode, not independently
 			// executable instructions. Absolute RMW/ST use address, then literal.
@@ -3392,12 +3405,15 @@ void tms320c54x_device::pipeline_step()
 			if (!program_move && !read_a && !staged_pipelined_repeat(word) && !staged_repeat_accumulator_load(word) && word != 0xf495 && !((word & 0xff00) == 0x7600 && u8(word) < 0x98) && !((word & 0xfe00) == 0x1e00 && u8(word) < 0x98)) { logerror("%s: staged repeat body %04x at %06x is unsupported\n", machine().describe_context(), word, m_pipeline_address[2]); m_illegal = true; return; }
 			if (staged_pipelined_repeat(word))
 			{
-				if (!m_pipeline_valid[3] || (!staged_short_repeat(m_pipeline_word[3]) && !staged_immediate_repeat(m_pipeline_word[3])))
+				unsigned owner = 3;
+				if (staged_repeat_data_copy(word) && (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))) owner = 4;
+				if (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))
 				{
 					logerror("%s: staged pipeline repeat requires an immediate count\n", machine().describe_context()); m_illegal = true; return;
 				}
 				m_pipeline_repeat_word = word;
-				m_pipeline_repeat_issue_remaining = m_pipeline_immediate[3];
+				m_pipeline_repeat_issue_remaining = m_pipeline_immediate[owner];
+				if (staged_repeat_data_copy(word)) m_pipeline_repeat_source = m_pipeline_immediate[2] + 1;
 			}
 			m_pipeline_repeat_body_latched = true;
 			m_pipeline_repeat_address = m_pipeline_address[2];
@@ -3680,6 +3696,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const extended = staged_extended_data_copy(m_pipeline_word[3]);
 		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[3] == m_pipeline_repeat_address &&
+			(source < 0x60 || u16(basic_address(3, mode) + unsigned(preincrement)) < 0x60))
+		{
+			logerror("%s: repeated MVKD mapped source/destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (preincrement) indirect_modify(mode, false, 3);
 		if (extended && mode != 0xf8)
 			m_pipeline_operand_address[3] = long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3);
@@ -5109,7 +5130,7 @@ void tms320c54x_device::pipeline_restore_block_on_return(u32 address)
 void tms320c54x_device::pipeline_resume_after_repeat()
 {
 	u32 const next = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address +
-		(staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
+		(staged_repeat_data_copy(m_pipeline_repeat_word) ? 2 : staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
 	// Inner RPT discards undecoded prefetch, including any predicted block
 	// wrap. Rebuild that prediction from Decode-owned BRC, not RPTC. The
 	// outer endpoint was decoded once, never once per repeated body copy.

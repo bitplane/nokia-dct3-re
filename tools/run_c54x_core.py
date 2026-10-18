@@ -511,6 +511,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged repeated MVDP interrupts: PASS cases=288 restore=288 sources=IRQ,NMI counts=0,1,7,255 count_forms=2 pages=2 arrivals=3 snapshots=3 deferred_until_final_write=1 balanced_stack=1 duplicate_transfers=0",
         "Fatal error: TMS320C54x isolated repeated MVDP interrupts complete",
     ),
+    "rpt-mvkd-edge": (
+        "TMS320C54x repeated MVKD exclusions: PASS cases=32 restore=32 kinds=mapped_source,mapped_destination,absolute,long_offset count_forms=2 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated repeated MVKD exclusions complete",
+    ),
+    "rpt-mvkd": (
+        "TMS320C54x repeated MVKD: PASS cases=9216 restore=9216 forms=DP,SP,plain,postinc,postdec,preinc registers=8 counts=0,1,2,7 count_forms=2 layouts=distinct,equal,overlap pages=2 snapshots=4 source_increment=1 same_address_bypass=1 issue_interval=1 literal_fetches=once mapped_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated repeated MVKD complete",
+    ),
     "rpt-mvdp": (
         "TMS320C54x staged repeated MVDP: PASS cases=9600 restore=9600 forms=5 registers=8 counts=0,1,2,7,255 count_forms=2 pages=2 destinations=ordinary,wrap ovly=2 snapshots=3 source_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated MVDP complete",
@@ -1701,7 +1709,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
+    if args.profile in ("rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
