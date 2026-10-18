@@ -3405,7 +3405,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_valid[2] && ((word & 0xfeff) == 0x8807 || word == 0x7707) &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
-			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_block_active), unsigned(m_pipeline_block_body[2]), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
+			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u xc_end=%06x block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_xc_end), unsigned(m_pipeline_block_active), unsigned(m_pipeline_block_body[2]), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
 		}
 		if (m_pipeline_valid[2] && staged_block_repeat(word))
 			for (unsigned stage = 3; stage < 6; ++stage)
@@ -4671,6 +4671,10 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = m_pipeline_operand[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
+			if (m_op == 0xfc00 && m_pipeline_xc_active && m_pipeline_xc_end == ((address & 0x7f0000) | u16(address + 1)))
+				// The return discards the sequential second protected word.
+				// Retain protection for the first resumed instruction word.
+				m_pipeline_xc_end = m_pipeline_fetch_address;
 			pipeline_restore_block_on_return(address);
 			m_pipeline_flush_front = false;
 			if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);

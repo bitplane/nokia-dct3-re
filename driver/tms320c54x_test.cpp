@@ -4204,6 +4204,34 @@ private:
 		m_phase = 251710; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_xc_return(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const zero = variant & 1, invert = variant & 2, wide = variant & 4;
+		bool const selected = zero != invert;
+		unsigned const source = (variant / 16) % 3; u32 const base = variant & 8 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, invert ? 0xfd4c : 0xfd4d); program.write_word(base + 0x601, 0xfc00); program.write_word(base + 0x603, 0xf4e1);
+		program.write_word(base + 0x700, wide ? 0x7660 : 0x8c60); if (wide) program.write_word(base + 0x701, 0xbeef);
+		// The ordinary status probe is beyond the protected word's retirement;
+		// adjacent status admission remains a separate conservative boundary.
+		program.write_word(base + 0x706, 0x7707); program.write_word(base + 0x707, 0x0740); program.write_word(base + 0x708, 0xf4e1);
+		program.write_word(base + 0x40, 0xf4e1); program.write_word(base + 4, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa020); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, zero ? 0 : 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		data.write_word(0x3000, 0x700); data.write_word(0x1060, 0xdead);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_vector_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "xc_return_stack", [this, selected](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(selected && at == 0x3000 && word == 0x700 && !m_pipeline_operand_reads++, "Selected XC return samples one stack target"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "xc_return_writes", [this, selected, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x3000) { expect(selected && source && m_pipeline_store_writes == 1 && !m_pipeline_register_writes++, "Pending interrupt waits for the resumed protected word before stacking"); return; } if (at == 7) { expect(selected && word == 0x0740 && !m_pipeline_extensions_reads++, "Later ordinary STM ST1 is not trapped by stale XC protection"); return; } expect(selected && at == 0x1060 && word == 0xbeef && !m_pipeline_store_writes++, "Resumed protected instruction writes once"); });
+		m_vector_prefetch_tap = program.install_read_tap(base + (source == 2 ? 4 : 0x40), base + (source == 2 ? 4 : 0x40), "xc_return_vector", [this, selected, source](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(selected && source && m_pipeline_store_writes == 1 && !m_vector_reads++, "XC protection expires after the resumed word and permits vector Fetch"); m_cpu->set_input_line(source == 2 ? INPUT_LINE_NMI : 0, CLEAR_LINE); });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62176;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_xc_tc(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -19381,6 +19409,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mac-dual") || !strcmp(machine().options().bios(), "mac-dual-edge")) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "xc-signed")) { start_signed_xc(); return; }
 		if (!strcmp(machine().options().bios(), "xc-controls")) { start_pipeline_xc_irq(); return; }
+		if (!strcmp(machine().options().bios(), "xc-ret")) { start_xc_return(); return; }
 		if (!strcmp(machine().options().bios(), "norm") || !strcmp(machine().options().bios(), "norm-edge") || !strcmp(machine().options().bios(), "exp-norm")) { start_normalization(); return; }
 		if (!strcmp(machine().options().bios(), "drsub") || !strcmp(machine().options().bios(), "long-pair")) { start_pipeline_long_pair(); return; }
 		if (!strcmp(machine().options().bios(), "xmem-store")) { start_xmem_store(); return; }
@@ -49080,6 +49109,32 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 62113) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62112; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62176)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, source = (variant / 16) % 3;
+			bool const selected = bool(variant & 1) != bool(variant & 2); unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 8, 12}[variant / 48];
+			if (tick == 7 && selected && source) m_cpu->set_input_line(source == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC return protection must not leak into a later ordinary status write");
+			if (m_pipeline_operand_reads && !m_pipeline_register_writes) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000, 0xdead); }
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC return, resumed protection and pending vector"); }
+			if (tick == 32)
+			{
+				if (m_vector_reads != unsigned(selected && source)) osd_printf_info("xc_return_vector: case=%u replay=%u vectors=%u ifr=%llx imr=%llx st1=%llx\n", variant, unsigned(m_pipeline_replay), m_vector_reads, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IFR), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IMR), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1));
+				bool const valid = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(selected) && m_pipeline_store_writes == unsigned(selected) && m_pipeline_register_writes == unsigned(selected && source) && m_vector_reads == unsigned(selected && source) && (source || m_pipeline_extensions_reads == unsigned(selected)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (selected && !source ? 0x3001 : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (selected ? (m_pipeline_extensions_reads ? 0x340 : 0x100) | (source ? 0x800 : 0) : 0x100);
+				if (!valid) osd_printf_info("xc_return_final: case=%u replay=%u selected=%u source=%u read=%u write=%u frame=%u vector=%u status_write=%u sp=%llx st1=%llx pc=%llx idle=%llu\n", variant, unsigned(m_pipeline_replay), unsigned(selected), source, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_reads, m_pipeline_extensions_reads, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(STATE_GENPC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE));
+				expect(valid, "Selected and annulled XC returns preserve one target sample, balanced stack effects and bounded protection");
+				// Do not queue synchronized input changes before read_stream:
+				// it restores scheduler timers, not device_input's pending queue.
+				// IFR/NMI and any accepted entry are already in the CPU snapshot;
+				// a fresh assertion would duplicate the original physical event.
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); m_cpu->set_pipeline_frontend(false); m_cpu->set_pipeline_frontend(true); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC return protection without retaining future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62177; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 191) { start_xc_return(variant + 1); return; }
+				osd_printf_info("TMS320C54x XC return protection: PASS cases=192 restore=192 predicates=BEQ,BNEQ outcomes=2 resumed_words=one,two pages=2 snapshots=4 sources=none,IRQ,NMI irq_selected_only=1 return_reads=once resumed_write=once later_STM_ST1=ordinary reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated XC return protection complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62177) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62176; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62174)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -55695,6 +55750,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(153, "maca-delay", "Accumulator memory multiply in delayed transfer words")
 	ROM_SYSTEM_BIOS(154, "delay-copy", "Read retained successor memory copy")
 	ROM_SYSTEM_BIOS(155, "delay-copy-ctrl", "Successor memory copy in control delay words")
+	ROM_SYSTEM_BIOS(156, "xc-ret", "Return preserves bounded XC word protection")
 ROM_END
 
 ROM_START(tms54rom4)

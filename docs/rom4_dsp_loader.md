@@ -18,6 +18,32 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## XC protection across a selected near return
+
+TI [SPRU172C, XC description](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+states that XC and the two following instruction words are uninterruptible,
+including for XC 1. In the staged model, a selected plain RET in the first
+following word redirects the remaining protection endpoint to its return
+target. Leaving that endpoint at the abandoned sequential address would
+retain protection indefinitely. A later ordinary status write must not be
+misclassified as an XC-controlled instruction.
+
+`xc-ret` passes 192 cases and cleared-pipeline replays: XC 1 BEQ/BNEQ,
+selected/annulled returns, one-/two-word resumed instructions, two pages,
+four checkpoints and none/IRQ/NMI. Interrupts are introduced only on selected
+return paths, at fixture clock 7. The resumed write precedes interrupt
+stack/vector effects; the original stack target is sampled once and poisoned
+after Read. No-interrupt runs also execute a later ordinary STM ST1, beyond
+the protected word's retirement. Adjacent-status admission, other return or
+control-transfer forms and silicon interrupt timing remain unqualified.
+This validates the declared resumed-word protection model, not an independent
+measurement of the physical return pipeline.
+
+Save/load fixtures must not queue synchronized input changes immediately
+before `read_stream`: restoring scheduler timers does not restore the pending
+`device_input` event queue. Saved IFR/NMI/entry state must not be followed by
+a duplicate assertion of the original physical event.
+
 ## Staged successor memory copy
 
 Short `DELAY Smem` (`4dxx`, low byte below `98`) retains its source address

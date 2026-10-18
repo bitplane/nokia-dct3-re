@@ -2474,10 +2474,13 @@ The `3562` MACA at `d583`, in RETD `d582`'s delay span, now executes under
 the [accumulator-source delay qualification](rom4_dsp_loader.md#accumulator-source-multiply-in-control-delay-words).
 The `4d6e` DELAY at `d394` now executes under the
 [successor-copy qualification](rom4_dsp_loader.md#staged-successor-memory-copy),
-including its delayed-control composition. The current guard is immediate
-ST1 word `7707` at `befe`, with XC active (reported fetch PC `bf01`).
-Qualify status-publication and conditional-execution ownership together
-before admitting that composition.
+including its delayed-control composition. The ordinary ST1 write at `befe`
+was not XC-controlled: `XC 1,BEQ` at `d3f6` selected RET at `d3f7`, leaving
+the former sequential protection endpoint `d3f8` unreachable. The
+[near-return protection qualification](rom4_dsp_loader.md#xc-protection-across-a-selected-near-return)
+corrects that bookkeeping without relaxing the status guard. The current stop
+is a memory move involving BRC in a repeat/control-delay composition, with
+reported fetch PC `cedd`; recover its retained owner and operand span next.
 No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
