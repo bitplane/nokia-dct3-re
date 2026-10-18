@@ -2234,6 +2234,19 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='stld-bsp')
 
+    def test_direct_low_ram_stm_scope(self):
+        marker, ending = EXTRA_PROFILES['stm-low-ram']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stm-low-ram')
+        for field in marker.split()[4:]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(output.replace(field, field + '_wrong', 1), 3,
+                             profile='stm-low-ram')
+        for bad in (ending + '\n', marker + '\n' + output,
+                    output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stm-low-ram')
+
     def test_control_delay_t_load_scope(self):
         marker, ending = EXTRA_PROFILES['ctrl-t-load']
         output = marker + '\n' + ending + '\n'

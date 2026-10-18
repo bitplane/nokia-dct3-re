@@ -39,12 +39,10 @@ timing and arbitrary block/interrupt composition are not proved here.
 
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
-low-address sequence. Qualified peripheral reads let that loop complete;
-with ordinary delayed square accumulation, parallel MPY and conditional AR
-stores, near-call delay repeat and ordinary delay T loads also qualified,
-the staged EFR frame stops at unsupported `7767`, owner `b955`. The atomic
-decoder treats this as STM to absolute low address `0067`, not DP-relative
-RAM or a newly identified peripheral. No complete staged EFR frame has passed.
+low-address sequence. Qualified peripheral reads let that loop complete.
+The current staged EFR frame stops at
+repeated parallel ADD `c3c9`, owner `ba96`. No complete staged EFR frame
+has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -631,6 +629,26 @@ RPT: 96 cases plus replay reject X or Y mapped operands before data reads,
 writes or pointer changes. The guard is a supported-model boundary, not a
 silicon trap. Memory-bank contention, circular repeated addressing and
 same-address inter-copy forwarding are not established by this qualification.
+
+## Direct STM to absolute low RAM
+
+`7760..777f` stores the retained immediate to the encoded absolute address
+`0060..007f`, independent of DP, CPL, CMPT or SP. Access retains the address;
+Execute writes once without a destination read or DAGEN early publication.
+The pending literal participates in the existing RAM forwarding path, while
+the actual write is preserved. These RAM forms share retained-literal
+handling with plain indirect STM, not the early register-write path.
+
+`stm-low-ram` passes 65,536 cases and cleared-pipeline replays: all 32
+addresses, eight literals including opcode values, four DP settings,
+four CPL/CMPT combinations, two pages and four checkpoints. An adjacent
+LDM consumes the forwarded word without a physical read; with one NOP gap
+it reads committed RAM once. Literal, pointer, DP/CPL and SP poisoning
+checks retention and absolute addressing; exact consumer results, one
+write, neighboring RAM, unrelated registers and continuation PC are checked.
+This does not qualify arbitrary repeat/control/interrupt composition or
+physical bank arbitration. The EFR `7767` at `b955` is this absolute-RAM
+form, not a DP-relative write or an identified peripheral.
 
 ## Plain indirect STM to page-zero RAM
 
@@ -5128,8 +5146,9 @@ conflicts remain excluded or unvalidated. This covers the idle wrapper's
 far-call primitive, not execution of the complete original idle call.
 
 Direct STM immediate initialization of AR0--AR7, SP, BK and T is supported;
-PMST is the separately covered non-DAGEN exception below. Other MMR
-destinations and indirect STM remain excluded from this frontend.
+PMST is the separately covered non-DAGEN exception below. Qualified low-RAM
+direct and plain-indirect forms are described above; other MMR destinations
+and extended indirect STM forms require their own contracts.
 
 STM immediate to PMST (`771d`, class 12A in SPRU172C page 4-176) retains
 its second word and publishes once in Execute rather than inheriting DAGEN
@@ -6762,7 +6781,8 @@ bank arbitration. Checkpoints before/after the normal write and during/after
 the deferred write restore without duplicate bus writes. These tests cover
 that store/STM conflict, not general DAGEN hazard resolution or peripheral
 register initialization timing. The negative Decode fixture now uses an
-unsupported indirect STM rather than the newly supported direct AR1 form.
+unsupported extended indirect STM `77e1`, not the qualified plain-indirect
+RAM forms, rather than the supported direct AR1 form.
 
 #### Peripheral MMR access cost
 
