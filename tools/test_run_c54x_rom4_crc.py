@@ -114,6 +114,15 @@ class Rom4HelperResultTest(unittest.TestCase):
         frames = "\n".join(f"ROM4 EFR encoder comparison: frame={frame} mismatches=0" for frame in range(163))
         text = "\n".join((frames, EFR_ENCODER_REPLAY, EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE))
         check_result(text, 3, efr_encoder=True)
+        frontend = 'ROM4 EFR encoder frontend: staged handset_audio_claim=0'
+        staged = frontend + '\n' + text
+        check_result(staged, 3, efr_encoder=True, staged=True)
+        for bad in (text, staged.replace('EFR encoder frontend', 'FR encoder frontend'),
+                    frontend + '\n' + staged,
+                    staged.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
+                    staged.replace(EFR_ENCODER_REPLAY, '')):
+            with self.subTest(staged=bad[-200:]), self.assertRaises(ValueError):
+                check_result(bad, 3, efr_encoder=True, staged=True)
         check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_encoder=True)
         for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
                         text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),

@@ -2449,6 +2449,20 @@ acceptance boundaries below; none of these fixtures attaches a handset clock.
 
 ### Independent EFR speech reference
 
+EFR encoder frontend qualification is not shared with FR. The atomic
+encoder passes all 163 frames (9,291 parameters, 326 flags and 2,771 packed
+words), including full-RAM replay. The diagnostic
+`tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms
+--efr-encoder --staged` explicitly selects `efr-encoder-pipe` and retains
+those same strict comparison requirements, but currently fails before the
+first frame: reset entry `cc0e` has not returned at the bounded 200 ms
+fixture deadline (PC `f935`, SP `1e21`, illegal flag clear). That deadline
+is a diagnostic budget, not a physical DSP frame rate. No staged EFR
+acceptance gate is promoted. Compare atomic/staged reset execution to locate
+the first divergence before changing instruction behavior; lack of an
+illegal-opcode flag is not proof of correct execution. This is independent
+of the handset's unresolved RF/traffic-channel activation boundary.
+
 The separately acquired ETSI source archive and its provenance live in
 `roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete
 archive hash before extracting to an isolated ignored run directory. The source

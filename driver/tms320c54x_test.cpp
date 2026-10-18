@@ -19324,9 +19324,14 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-dtx-encoder") ||
+				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-encoder-pipe") || !strcmp(machine().options().bios(), "efr-dtx-encoder") ||
 				 !strcmp(machine().options().bios(), "efr-enc-homing")))
 		{
+			if (!strcmp(machine().options().bios(), "efr-encoder-pipe"))
+			{
+				m_cpu->set_pipeline_frontend(true);
+				osd_printf_info("ROM4 EFR encoder frontend: staged handset_audio_claim=0\n");
+			}
 			start_rom4_efr_encoder(0, true);
 			return;
 		}
@@ -20444,6 +20449,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = initialize ? 304000 : 304001 + frame;
+		m_idle_fixture_tick = 0;
 		m_check_timer->adjust(attotime::from_msec(20));
 		if (!initialize) save_rom4_codec_frame(frame);
 	}
@@ -52448,6 +52454,14 @@ private:
 		}
 		if (m_phase >= 304000 && m_phase < 304519)
 		{
+			// Bounded fixture deadline, not a fitted DSP frame-clock claim.
+			if (!strcmp(machine().options().bios(), "efr-encoder-pipe") &&
+				!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && ++m_idle_fixture_tick < 10)
+			{
+				m_check_timer->adjust(attotime::from_msec(20));
+				return;
+			}
 			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
 			bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
 			unsigned const frames = dtx ? 518 : homing ? 46 : 163;
@@ -55166,6 +55180,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(19, "cold-pipeline", "Cold mask ROM execution with the staged CPU frontend")
 	ROM_SYSTEM_BIOS(20, "fr-decoder-pipe", "Isolated acquired ROM FR decoder on staged CPU")
 	ROM_SYSTEM_BIOS(21, "fr-encoder-pipe", "Isolated acquired ROM FR encoder on staged CPU")
+	ROM_SYSTEM_BIOS(22, "efr-encoder-pipe", "Isolated acquired ROM EFR encoder on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
