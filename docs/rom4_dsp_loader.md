@@ -18,6 +18,30 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Plain indirect STM to page-zero RAM
+
+`STM #lk,*ARx` (`7780..7787`) resolves a page-zero address in Access,
+independent of DP. CMPT with selector zero uses ARP; other selectors name
+their own AR. The selected pointer's upper nine bits are cleared, as in
+SPRU172C 4-176. The literal and destination are retained for one ordinary
+RAM write at Execute, with no destination read. This is a partial staged
+publication model, not measured silicon timing.
+
+`stm-ind` passes 1,536 cases plus replay: eight selectors, both CMPT modes,
+four literals, four RAM destinations spanning `0060..007f`, two program
+pages, and checkpoints before/after address resolution and publication.
+Literal poisoning and a subsequent pointer change verify retained operands;
+neighboring RAM, unrelated registers and flags remain unchanged. The live
+pipeline is cleared before loading each saved state.
+
+`stm-ind-edge` passes the same case count/replay over destinations `0000`,
+`0010`, `0028` and `005f`: these unqualified register/peripheral targets are
+rejected before pointer changes or data transactions. This is a model-scope
+guard, not a silicon trap. Modifying indirect modes, mapped-register timing
+and control/repeat compositions are not qualified by these tests. These
+profiles use plain RAM instead of the generic test map's synthetic endpoints
+at `0060..0061`.
+
 ## Short repeat in BD's delay span
 
 Short RPT in BD's first delay word owns the following one-word body before

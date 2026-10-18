@@ -716,6 +716,23 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_indirect_stm_scope(self):
+        for profile in ('stm-ind', 'stm-ind-edge'):
+            marker, ending = EXTRA_PROFILES[profile]
+            output = marker + '\n' + ending + '\n'
+            check_result(output, 3, profile=profile)
+            for old, new in (('restore=1536', 'restore=0'), ('reads=0', 'reads=1'),
+                             ('writes=0' if profile.endswith('edge') else 'writes=1',
+                              'writes=1' if profile.endswith('edge') else 'writes=0'),
+                             ('retained=1', 'retained=0'),
+                             ('reset_before_restore=1', 'reset_before_restore=0'),
+                             ('silicon_phase_claim=0', 'silicon_phase_claim=1')):
+                with self.subTest(profile=profile, mutation=old), self.assertRaises(ValueError):
+                    check_result(output.replace(old, new), 3, profile=profile)
+            for bad in (marker + '\n' + output, output + 'late output\n'):
+                with self.assertRaises(ValueError):
+                    check_result(bad, 3, profile=profile)
+
     def test_bd_delay_repeat_scope(self):
         marker, ending = EXTRA_PROFILES['bd-rpt']
         output = marker + '\n' + ending + '\n'

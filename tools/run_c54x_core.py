@@ -652,6 +652,14 @@ EXTRA_PROFILES = {
         "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated STLM PMST exclusions complete",
     ),
+    "stm-ind": (
+        "TMS320C54x indirect STM RAM: PASS cases=1536 restore=1536 selectors=8 cmpt=2 literals=4 destinations=4 pages=2 snapshots=3 reads=0 writes=1 pointer_clear=Access ram_write=Execute retained=1 reset_before_restore=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated indirect STM RAM complete",
+    ),
+    "stm-ind-edge": (
+        "TMS320C54x indirect STM exclusions: PASS cases=1536 restore=1536 selectors=8 cmpt=2 literals=4 destinations=4 pages=2 snapshots=3 reads=0 writes=0 pointer_clear=Access ram_write=Execute retained=1 reset_before_restore=1 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated indirect STM exclusions complete",
+    ),
     "bd-rpt": (
         "TMS320C54x BD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 ordered_copies=1 target_retained=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated BD delay repeat complete",
@@ -1955,7 +1963,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
-    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge"):
+    if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

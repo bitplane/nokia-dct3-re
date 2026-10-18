@@ -2937,6 +2937,52 @@ private:
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "constant_dagen_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
 		m_phase = 310020; m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 	}
+	struct indirect_stm_fixture
+	{
+		unsigned selector, ar, snapshot;
+		u16 destination, literal, st1;
+		u32 base;
+		bool edge;
+	};
+	indirect_stm_fixture indirect_stm_case(unsigned v) const
+	{
+		indirect_stm_fixture f{};
+		f.selector = v % 8;
+		f.edge = !strcmp(machine().options().bios(), "stm-ind-edge");
+		f.destination = (f.edge ? std::array<u16, 4>{0, 0x10, 0x28, 0x5f} : std::array<u16, 4>{0x60, 0x68, 0x70, 0x7f})[(v / 8) % 4];
+		f.literal = std::array<u16, 4>{0, 1, 0xb3a6, 0xffff}[(v / 32) % 4];
+		bool const cmpt = (v / 128) % 2;
+		f.st1 = 0xb00 | (cmpt ? 0x20 : 0);
+		f.ar = cmpt && !f.selector ? 5 : f.selector;
+		f.base = (v / 256) % 2 ? 0x20000 : 0;
+		f.snapshot = v / 512;
+		return f;
+	}
+	void start_indirect_stm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		auto const f = indirect_stm_case(variant);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x7780 | f.selector);
+		program.write_word(f.base + 0x601, f.literal); program.write_word(f.base + 0x602, 0xf4e1);
+		for (unsigned i = 0x60; i < 0x80; ++i) data.write_word(i, 0x5aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa633); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xabcdef0123ULL);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == f.ar ? 0x1200 | f.destination : 0x2000 + i);
+		m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "indirect_stm_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "indirect_stm_write", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!f.edge && at == f.destination && value == f.literal && m_cpu->pipeline_cycles() == 7 && !m_pipeline_store_writes, "Indirect STM publishes retained RAM destination/literal once at Execute"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "indirect_stm_literal", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62134;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct accumulator_stm_fixture
 	{
 		unsigned lane, snapshot;
@@ -19012,6 +19058,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt")) { start_branch_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt-edge")) { start_branch_repeat_edge(); return; }
+		if (!strcmp(machine().options().bios(), "stm-ind") || !strcmp(machine().options().bios(), "stm-ind-edge")) { start_indirect_stm(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call")) { start_block_near_call(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-call-edge")) { start_block_near_call_edge(); return; }
@@ -48118,6 +48165,30 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 62127) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62126; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62134)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			auto const f = indirect_stm_case(variant);
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.edge && tick >= 5), "Indirect STM guards unqualified destinations before pointer mutation");
+			for (unsigned i = 0; i < 8; ++i)
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i != f.ar ? 0x2000 + i : f.edge || tick < 5 ? 0x1200 | f.destination : tick < 6 ? f.destination : 0xface), "Indirect STM ignores DP, applies CMPT/ARP, and clears only selected pointer high bits");
+			if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
+			if (tick == 5 && !f.edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.ar, 0xface);
+			unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 7}[f.snapshot];
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indirect STM before/after address and RAM publication"); }
+			if (tick == 20)
+			{
+				expect(!m_pipeline_operand_reads && m_pipeline_store_writes == unsigned(!f.edge) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.edge && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa633 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xabcdef0123ULL, "Indirect STM has no destination reads or unrelated architectural effects");
+				{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0x60; i < 0x80; ++i) expect(m_cpu->space(AS_DATA).read_word(i) == (!f.edge && i == f.destination ? f.literal : 0x5aa5), "Indirect STM preserves neighboring RAM"); }
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained indirect STM after clearing pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62135; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_indirect_stm(variant + 1); return; }
+				osd_printf_info("TMS320C54x indirect STM %s: PASS cases=1536 restore=1536 selectors=8 cmpt=2 literals=4 destinations=4 pages=2 snapshots=3 reads=0 writes=%u pointer_clear=Access ram_write=Execute retained=1 reset_before_restore=1 silicon_phase_claim=0\n", f.edge ? "exclusions" : "RAM", unsigned(!f.edge));
+				throw emu_fatalerror(3, "TMS320C54x isolated indirect STM %s complete", f.edge ? "exclusions" : "RAM");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62135) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62134; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62132)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = accumulator_stm_case(variant);
@@ -53067,7 +53138,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	if (!strcmp(config.options().bios(), "mcbsp-control")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::mcbsp_control_map);
 	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
-	else if (!strncmp(config.options().bios(), "mvdd-source", 11)) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
+	else if (!strncmp(config.options().bios(), "mvdd-source", 11) || !strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
 	else m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
 	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);
 }
@@ -54742,6 +54813,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(121, "mac-rpt-edge", "Repeated dual MAC low operand exclusions")
 	ROM_SYSTEM_BIOS(122, "bd-rpt", "BD delay repeat completes before a fresh target repeat")
 	ROM_SYSTEM_BIOS(123, "bd-rpt-edge", "Delay repeat owner and word-span exclusions")
+	ROM_SYSTEM_BIOS(124, "stm-ind", "Plain indirect STM page-zero RAM publication")
+	ROM_SYSTEM_BIOS(125, "stm-ind-edge", "Plain indirect STM register and peripheral exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
