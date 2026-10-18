@@ -327,6 +327,10 @@ EXTRA_PROFILES = {
         "TMS320C54x shifted peripheral exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,ADD,SUB data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated shifted peripheral exclusions complete",
     ),
+    "shift-unowned": (
+        "TMS320C54x shifted unowned low bus: PASS cases=122880 restore=122880 addresses=0002..0005 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=0 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated shifted peripheral load complete",
+    ),
     "shift-periph": (
         "TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated shifted peripheral load complete",
@@ -1725,7 +1729,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     machine = "tms54rom4" if args.profile == "cold-pipeline" else "tms54xtra" if args.profile in ("addm-ar", "addm-ar-load", "literal-guard", "mvpd-controls", "mvpd-ext-edge", "mvpd-extended", "st1-rules", "st1-bits", "reada-brc", "reada-brc16", "reada-brc-edge", "rptb-exit", "stlm-bsp", "stlm-bsp-edge", "status-bitf", "serial-stm", "clock-stm", "std-swwsr", "std-stm", "std-io", "std-io-atomic", "rpt-mvdp-irq", "rpt-mvdp", "mvdp-pair", "mvdp", "stlm-t", "ov-branch", "cond-reg-store", "saccd", "atomic-ret", "xorm", "xc-status", "xc-latency", "xc-barrier", "parallel-sub", "mmr-long-edge", "rpt-xfer-edge") else "tms54test"
-    if args.profile in ("st-t-branch", "st-t-long", "st-t-long-edge", "stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
+    if args.profile in ("shift-unowned", "st-t-branch", "st-t-long", "st-t-long-edge", "stm-acc", "rpt-mvkd-edge", "rpt-mvkd", "cmpm-acc", "tc-call", "store-circular", "sat", "shift-periph", "shift-bsp", "shift-per-edge", "stlm-st1", "stlm-st1-edge", "rotate", "rptz", "rpt-store", "rpt-store-edge", "bitt", "bitt-retd", "tc-return", "mar-circular", "bcd-arithmetic", "bcd-arith-edge", "signed-call", "rpt-writa", "rpt-writa16"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

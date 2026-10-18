@@ -1,8 +1,8 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype currently stops on shifted Smem `6f83 0c5f`
-at `a5ef`, resolving to unsupported low-page address `0003`;
+acceptance scopes. The prototype currently stops on circular-address PORTR
+`74d6` at `3249`;
 its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
@@ -132,6 +132,37 @@ A draining conditional-branch control counter is not evidence that the
 following instruction occupies a delay span. Actual delay spans, repeats,
 XC and block-body compositions remain unqualified and explicitly excluded
 for this new form. The schedule is not a measured silicon-phase claim.
+
+## Unowned low-address bus reads
+
+The CPU's internal map does not own data words `0002..0005`; accesses
+delegate to the board data map. Shifted LD now preserves that dispatch
+instead of rejecting every low-page address as an unsupported CPU register.
+No register, return constant or peripheral response has been added.
+`shift-unowned` verifies 122,880 cases and replays: all four addresses,
+all 32 shifts, DP/SP/absolute/post-increment/offset forms, SXM/OVM states,
+both accumulators, four volatile word patterns, two program pages and three
+snapshots. It checks a single bus read, retained operands/literals/pointers
+and Execute publication without the peripheral-region extra clock. This
+qualifies bus delegation in the current model, not the physical identity,
+electrical behavior or fitted-silicon timing of reserved register-map gaps.
+
+The native `a5e8` chain loads data word `00f1`, adds word `00f2`, and
+publishes AR3 through STLM `8813` at `a5ec`. Passive existing-access taps
+show boot clearing both fields, then firmware storing `00f2=3` while
+`00f1` remains zero. Both the staged and ordinary atomic profiles take this
+initial path and make six early reads of board word `0003`, returning zero
+under the existing board model. The atomic run later publishes `00f1=b736`
+and `b71a`. Thus the zero base is not a staged-only AR3 derivation error;
+it is not independent proof of real reserved-gap hardware behavior either.
+The two profiles use different SWWSR policies, so this comparison is not
+a timing oracle. Logged `pc_context` values are observation-time PCs, not
+asserted instruction-retirement addresses.
+
+The staged checker retains the ordered field writes/reads, six gap reads
+and their counts as regression evidence. Its result explicitly leaves
+`physical_low_gap_identity_claim` false. The Lua taps issue no extra reads
+of these fields or endpoints and never replace values.
 
 ## Current result
 
@@ -531,11 +562,12 @@ at `354c`, followed by accumulator-lane CMPM at `0025fe`, `60f8`, whose
 source `000b` is BL. Repeated MVKD `7090` at `3053` copies three words
 from `b706` through post-incrementing AR0, and STM AL `7708` at `45b0`
 executes, as does absolute ST T `8cf8` at `a548` (destination `1f28`).
-The next stop is `6f83 0c5f` at `00a5ef`, a shifted load through AR3
-resolving to unsupported low-page address `0003`. This is not yet
-classified as a valid mapped source versus an earlier state error.
-The exposed PC is `a5f3`, BK `00fa`, AR0 `1987`, AR2 `00f3`,
-ST0 `101f`, ST1 `6908`, PMST `ffac` and
+The shifted load `6f83 0c5f` at `a5ef` now reads through the existing
+board map at `0003`, as described above. Execution stops at circular-address
+PORTR `74d6` at `003249`, whose port literal is `0027`, the existing RF
+sample input. It is inside the block established by RPTBD at `3245`
+(end `3268`), before the port read occurs. The exposed PC is `324b`, BK `0010`,
+AR0 `0002`, AR2 `00ac`, ST0 `081f`, ST1 `e900`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -553,8 +585,9 @@ The backend
 reports 74 MCU mailbox writes and four completion strobes. An additional
 strobe alone does not prove upload completion. After the two
 retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
-at 0.133940788 s. Three later BSP control writes publish `c008` at
-0.134188962, 0.134294769 and 0.158807577 s, in addition to the initial reset/release pair.
+at 0.133940788 s. Four later BSP control writes publish `c008` at
+0.134188962, 0.134294769, 0.158807577 and 0.159053500 s,
+in addition to the initial reset/release pair.
 These are firmware writes, not supplied receive frames. Neither
 upload completion nor handset boot is accepted for this machine.
 

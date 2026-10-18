@@ -11,8 +11,7 @@ import sys
 SOURCE_OFFSET = 0x94cf8
 TAIL_SOURCE_OFFSET = 0x98a60
 REPEAT_SOURCE_OFFSET = 0x98af0
-STOP = ('staged shifted load control/peripheral source is unsupported instruction=00a5ef '
-        'last_fetch_physical=00a5f0 word=6f83 source=0003 pmst=ffac')
+STOP = 'unsupported staged C54x form 74d6 at 003249'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -23,20 +22,21 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('a5f3', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('324b', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or text.count('unsupported') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
     if (text.count('rom4_staged_dagen:') != 1
-            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('00fa', '1987', '00f3', '101f', '6908')]):
+            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0010', '0002', '00ac', '081f', 'e900')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('4', '74')]:
         raise ValueError('missing or changed bootstrap completion boundary')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
-    if text.count('rom4_staged_bsp_write:') != 5 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff'), ('c008', 'ffff'), ('c008', 'ffff'), ('c008', 'ffff')]:
+    if text.count('rom4_staged_bsp_write:') != 6 or [(value, mask) for value, mask, _ in bsp] != [('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4:
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
-    if not 0 < float(bsp[0][2]) < float(bsp[1][2]) < float(bsp[2][2]) < float(bsp[3][2]) < float(bsp[4][2]) < float(timestamp):
+    bsp_times = [float(row[2]) for row in bsp]
+    if not 0 < bsp_times[0] < bsp_times[-1] < float(timestamp) or not all(before < after for before, after in zip(bsp_times, bsp_times[1:])):
         raise ValueError('native BSP publication order changed')
     tx = re.findall(r'rom4_staged_bsp_tx: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_bsp_tx:') != 2 or len(tx) != 2
@@ -50,6 +50,25 @@ def check(text, firmware):
             or not float(tx[0][3]) < float(rx[0][3]) < float(rx[1][3]) < float(tx[1][3]) < float(timestamp)
             or re.findall(r'rom4_staged_bsp_rx_count: count=(\d+)', text) != ['2']):
         raise ValueError('missing, duplicate or changed native BSP receive observations')
+    expected_low = {
+        'low_write': [('00f1', '0000', 'ffff', '0f10'), ('00f2', '0000', 'ffff', '0f10'),
+                      ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5')],
+        'low_read': [('00f1', '0000', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] * 2,
+        'gap_read': [('0003', '0000', 'ffff', pc) for pc in ('a5f4', 'a5f8', 'a601')] * 2,
+    }
+    low = {}
+    for tag, expected in expected_low.items():
+        prefix = f'rom4_staged_{tag}:'
+        low[tag] = re.findall(prefix + r' address=([0-9a-f]{4}) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
+        if text.count(prefix) != len(expected) or [row[:4] for row in low[tag]] != expected:
+            raise ValueError('missing, malformed or changed low-page bus observation')
+    ordered = [*low['low_write'][:3], *low['low_read'][:2], *low['gap_read'][:3],
+               low['low_write'][3], *low['low_read'][2:], *low['gap_read'][3:]]
+    times = [float(row[4]) for row in ordered]
+    if (not all(0 < before < after < float(timestamp) for before, after in zip(times, times[1:]))
+            or re.findall(r'rom4_staged_low_count: reads=(\d+) writes=(\d+)', text) != [('4', '4')]
+            or re.findall(r'rom4_staged_gap_count: reads=(\d+)', text) != ['6']):
+        raise ValueError('changed low-page observation ordering or counts')
     words = [int(word, 16) for word in encoded.split(',')]
     if (len(words) != 40 or words[:7] != [0x7718, 0x1ec6, 0x7728, 0x2000, 0xf7be, 0x7758, 0x3146]
             or words[13:16] != [0xf071, 0x079f, 0x8093]
@@ -78,16 +97,17 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_shifted_low_page', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_circular_portr', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0xa5ef, instruction=0x6f83, source_address=0x0003,
+                instruction_address=0x3249, instruction=0x74d6, low_gap_bus_reads=6,
                 bsp_transmit_words=[0x0aaa, 0xffd5],
                 bsp_receive_words=[0x0aaa, 0x0aaa],
-                bsp_control_writes=[0xc008, 0xc0c8, 0xc008, 0xc008, 0xc008], completion_strobes=4,
+                bsp_control_writes=[0xc008, 0xc0c8] + [0xc008] * 4, completion_strobes=4,
                 swwsr=0x2000, boot_claim=False,
-                upload_complete_claim=False, fitted_bus_dialect_claim=False)
+                upload_complete_claim=False, fitted_bus_dialect_claim=False,
+                physical_low_gap_identity_claim=False)
 
 
 def main():

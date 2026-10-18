@@ -169,7 +169,7 @@ class CoreResultTests(unittest.TestCase):
                         check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
 
     def test_shifted_peripheral_requires_retention_and_honest_boundary_labels(self):
-        for profile in ('shift-periph', 'shift-bsp', 'shift-per-edge'):
+        for profile in ('shift-periph', 'shift-bsp', 'shift-per-edge', 'shift-unowned'):
             marker, ending = EXTRA_PROFILES[profile]
             text = marker + '\n' + ending + '\n'
             check_result(text, 3, profile=profile)

@@ -16886,21 +16886,21 @@ private:
 	{
 		u16 address, value, st1, opcode, operation;
 		unsigned form, read, checkpoint, literals;
-		bool b, bsp;
+		bool b, bsp, unowned;
 		u32 base;
 		u64 result;
 	};
-	static shifted_peripheral_fixture shifted_peripheral_case(unsigned variant, bool bsp)
+	static shifted_peripheral_fixture shifted_peripheral_case(unsigned variant, bool bsp, bool unowned = false)
 	{
-		shifted_peripheral_fixture f{}; f.bsp = bsp;
-		f.address = bsp ? 0x20 : 0x20 + variant % 64; if (!bsp) variant /= 64;
-		unsigned const shift_code = bsp ? variant % 32 : std::array<unsigned, 4>{16, 31, 4, 15}[variant % 4]; variant /= bsp ? 32 : 4;
+		shifted_peripheral_fixture f{}; f.bsp = bsp; f.unowned = unowned;
+		f.address = bsp ? 0x20 : unowned ? 2 + variant % 4 : 0x20 + variant % 64; if (!bsp) variant /= unowned ? 4 : 64;
+		unsigned const shift_code = bsp || unowned ? variant % 32 : std::array<unsigned, 4>{16, 31, 4, 15}[variant % 4]; variant /= bsp || unowned ? 32 : 4;
 		f.form = variant % 5; variant /= 5;
 		unsigned const flags = variant % 4; variant /= 4;
 		f.b = variant % 2; variant /= 2;
 		f.value = std::array<u16, 4>{0, 0xffff, 0x8000, 0x1234}[variant % 4]; variant /= 4;
 		f.base = variant % 2 ? 0x20000 : 0; variant /= 2;
-		f.read = f.form == 2 || f.form == 4 ? 8 : 7;
+		f.read = (f.form == 2 || f.form == 4 ? 8 : 7) - unsigned(unowned);
 		f.checkpoint = f.read - 2 + variant;
 		f.literals = f.form == 2 || f.form == 4 ? 2 : 1;
 		f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (f.form == 1 ? 0x4000 : 0);
@@ -16912,10 +16912,11 @@ private:
 		return f;
 	}
 	bool shifted_bsp_fixture() const { return !strcmp(machine().options().bios(), "shift-bsp"); }
+	bool shifted_unowned_fixture() const { return !strcmp(machine().options().bios(), "shift-unowned"); }
 	void start_shifted_peripheral(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = shifted_peripheral_case(variant, shifted_bsp_fixture()); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		auto const f = shifted_peripheral_case(variant, shifted_bsp_fixture(), shifted_unowned_fixture()); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.opcode);
 		if (f.literals == 2) program.write_word(f.base + 0x601, f.form == 2 ? f.address : 0x10);
@@ -16923,7 +16924,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xb800); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, f.form == 4 ? f.address - 0x10 : f.address);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, f.form == 4 ? u16(f.address - 0x10) : f.address);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
 		m_shifted_bus_word = f.value; m_shifted_bsp.reset(); m_shifted_bsp.control_w(0x80);
 		if (f.bsp) { expect(m_shifted_bsp.frame_receive(f.value), "Seed one completed BSP receive frame"); expect(!m_shifted_bsp.frame_receive(f.value ^ 0xffff) && m_shifted_bsp.receive_overrun, "Unread BSP frame establishes an overrun for the CPU to acknowledge"); }
@@ -16931,7 +16932,7 @@ private:
 		// The generic cohort supplies a volatile bus endpoint, not a recovered part identity.
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "shifted_peripheral_read", [this, f](offs_t at, u16 &word, u16) {
 			if (machine().side_effects_disabled()) { if (at == f.address) word = f.bsp ? m_shifted_bsp.receive : m_shifted_bus_word; return; }
-			expect(at == f.address && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Shifted peripheral LD pays one extra clock and consumes one owned Read");
+			expect(at == f.address && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Shifted LD consumes one owned bus Read with its address-class timing");
 			word = f.bsp ? m_shifted_bsp.receive_r() : m_shifted_bus_word; expect(word == f.value, "Shifted load captures the original volatile word"); ++m_pipeline_operand_reads;
 			m_shifted_bus_word = f.value ^ 0xffff;
 			if (f.bsp) { expect(!m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun, "The CPU read acknowledges BSP ready and overrun once"); expect(m_shifted_bsp.frame_receive(m_shifted_bus_word), "A second frame can arrive after acknowledgement and must remain unread"); }
@@ -17153,7 +17154,7 @@ private:
 		if (!strcmp(machine().options().bios(), "stlm-st1")) { start_stlm_status(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1-edge")) { start_stlm_status_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1-irq")) { start_mvmd_status_irq(); return; }
-		if (!strcmp(machine().options().bios(), "shift-periph") || shifted_bsp_fixture()) { start_shifted_peripheral(); return; }
+		if (!strcmp(machine().options().bios(), "shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "shift-per-edge")) { start_shifted_peripheral_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-cpl") || !strcmp(machine().options().bios(), "stlm-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
@@ -46261,7 +46262,7 @@ private:
 		if (m_phase == 62123) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62122; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62120)
 		{
-			auto const f = shifted_peripheral_case(m_pipeline_peripheral_case, shifted_bsp_fixture()); unsigned const tick = ++m_idle_fixture_tick;
+			auto const f = shifted_peripheral_case(m_pipeline_peripheral_case, shifted_bsp_fixture(), shifted_unowned_fixture()); unsigned const tick = ++m_idle_fixture_tick;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Shifted peripheral load remains staged");
 			expect(m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (tick > f.read ? f.result : f.b ? 0xfedcba9876ULL : 0x123456789aULL), "Shifted load publishes only in the Execute clock following its owned Read");
 			if (tick < f.read) expect(!m_pipeline_operand_reads, "Peripheral wait cannot acknowledge its source early");
@@ -46279,12 +46280,13 @@ private:
 			}
 			if (tick == 16)
 			{
-				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes && m_pipeline_extensions_reads == f.literals && m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.b ? 0x123456789aULL : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb800 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (f.form == 3 ? 0x4444 : f.form == 4 ? f.address - 0x10 : f.address), "Shifted peripheral load retains its original operand/address and exact literals across replay without changing flags");
+				expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes && m_pipeline_extensions_reads == f.literals && m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.b ? 0x123456789aULL : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb800 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (f.form == 3 ? 0x4444 : f.form == 4 ? u16(f.address - 0x10) : f.address), "Shifted peripheral load retains its original operand/address and exact literals across replay without changing flags");
 				if (f.bsp) expect(m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun && m_shifted_bsp.receive == u16(f.value ^ 0xffff), "The next BSP frame remains pending after CPU retirement and replay");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore shifted peripheral operand without repeating an acknowledged bus read"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62121; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case + 1 < (f.bsp ? 40960U : 245760U)) { start_shifted_peripheral(m_pipeline_peripheral_case + 1); return; }
-				if (f.bsp) osd_printf_info("TMS320C54x shifted BSP receive: PASS cases=40960 restore=40960 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=4 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 original_word=1 next_frame_pending=1 ready_overrun_ack=1 debugger_peek=1 physical_clock_claim=0 silicon_phase_claim=0\n");
+				if (m_pipeline_peripheral_case + 1 < (f.bsp ? 40960U : f.unowned ? 122880U : 245760U)) { start_shifted_peripheral(m_pipeline_peripheral_case + 1); return; }
+				if (f.unowned) osd_printf_info("TMS320C54x shifted unowned low bus: PASS cases=122880 restore=122880 addresses=0002..0005 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=0 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n");
+				else if (f.bsp) osd_printf_info("TMS320C54x shifted BSP receive: PASS cases=40960 restore=40960 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=4 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 original_word=1 next_frame_pending=1 ready_overrun_ack=1 debugger_peek=1 physical_clock_claim=0 silicon_phase_claim=0\n");
 				else osd_printf_info("TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated shifted peripheral load complete");
 			}
@@ -52082,6 +52084,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(65, "st-t-long", "Long-address T/TRN stores with retained destinations")
 	ROM_SYSTEM_BIOS(66, "st-t-long-edge", "Rejected long-address T/TRN mapped destinations")
 	ROM_SYSTEM_BIOS(67, "st-t-branch", "Ordinary T/TRN stores after nondelayed conditional branches")
+	ROM_SYSTEM_BIOS(68, "shift-unowned", "Shifted bus reads of unowned low-address gaps")
 ROM_END
 
 ROM_START(tms54rom4)

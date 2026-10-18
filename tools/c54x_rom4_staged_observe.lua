@@ -2,6 +2,29 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local captured = false
+local low_reads, low_writes = 0, 0
+local gap_reads = 0
+local gap_read_tap = cpu.spaces.data:install_read_tap(0x0003, 0x0003, 'staged_unowned_low_read', function(address, value, mask)
+    gap_reads = gap_reads + 1
+    if gap_reads <= 64 then
+        machine:logerror(string.format('rom4_staged_gap_read: address=%04x value=%04x mask=%04x pc_context=%04x t=%.9f\n',
+            address, value, mask, cpu.state.PC.value, machine.time:as_double()))
+    end
+end)
+local low_read_tap = cpu.spaces.data:install_read_tap(0x00f1, 0x00f2, 'staged_low_pointer_read', function(address, value, mask)
+    low_reads = low_reads + 1
+    if low_reads <= 64 then
+        machine:logerror(string.format('rom4_staged_low_read: address=%04x value=%04x mask=%04x pc_context=%04x t=%.9f\n',
+            address, value, mask, cpu.state.PC.value, machine.time:as_double()))
+    end
+end)
+local low_write_tap = cpu.spaces.data:install_write_tap(0x00f1, 0x00f2, 'staged_low_pointer_write', function(address, value, mask)
+    low_writes = low_writes + 1
+    if low_writes <= 64 then
+        machine:logerror(string.format('rom4_staged_low_write: address=%04x value=%04x mask=%04x pc_context=%04x t=%.9f\n',
+            address, value, mask, cpu.state.PC.value, machine.time:as_double()))
+    end
+end)
 local bsp_tap = cpu.spaces.data:install_write_tap(0x22, 0x22, 'staged_bsp_control', function(_, value, mask)
     machine:logerror(string.format('rom4_staged_bsp_write: value=%04x mask=%04x t=%.9f\n',
         value, mask, machine.time:as_double()))
@@ -23,9 +46,11 @@ local rx_tap = cpu.spaces.data:install_read_tap(0x20, 0x20, 'staged_bsp_receive'
     end
 end)
 emu.register_frame_done(function()
-    assert(bsp_tap and tx_tap and rx_tap)
+    assert(bsp_tap and tx_tap and rx_tap and low_read_tap and low_write_tap and gap_read_tap)
     if captured or machine.time:as_double() < 0.5 then return end
     captured = true
+    machine:logerror(string.format('rom4_staged_low_count: reads=%d writes=%d\n', low_reads, low_writes))
+    machine:logerror(string.format('rom4_staged_gap_count: reads=%d\n', gap_reads))
     machine:logerror(string.format('rom4_staged_bsp_tx_count: count=%d\n', tx_count))
     machine:logerror(string.format('rom4_staged_bsp_rx_count: count=%d\n', rx_count))
     local words = {}

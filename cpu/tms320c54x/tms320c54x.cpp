@@ -3977,11 +3977,14 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const bk_arithmetic = source == 0x19 && ((m_pipeline_word[3] & 0xfe00) == 0x0000 || (m_pipeline_word[3] & 0xfe00) == 0x0800 || (m_pipeline_word[3] & 0xf800) == 0x2800);
 		bool const shifted_peripheral = staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) && source >= 0x20 && source <= 0x5f;
+		// These gaps are not owned by internal_data_map: retain the ordinary
+		// board-bus read instead of inventing a CPU register or return value.
+		bool const shifted_unowned = staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) && source >= 2 && source <= 5;
 		if (shifted_peripheral && (m_pipeline_repeat_active || m_pipeline_block_body[3] || m_pipeline_xc_active || m_pipeline_control_words))
 		{
 			logerror("%s: staged shifted peripheral load repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (source < 0x60 && (source < (special || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !bk_arithmetic && !shifted_peripheral && !(bitfield && (source == 6 || source == 7 || source >= 0x20)))
+		if (source < 0x60 && (source < (special || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !bk_arithmetic && !shifted_peripheral && !shifted_unowned && !(bitfield && (source == 6 || source == 7 || source >= 0x20)))
 		{
 			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x last_fetch_physical=%06x word=%04x source=%04x pmst=%04x\n", machine().describe_context(), shifted ? "shifted load" : special ? "Smem special" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), unsigned(m_pipeline_physical_address[3]), m_pipeline_word[3], source, m_pmst);
 			m_illegal = true; return;
