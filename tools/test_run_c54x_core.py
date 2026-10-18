@@ -1712,7 +1712,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(bad, 3, profile='repeat-popd')
 
     def test_dual_mac_scope(self):
-        for profile in ('mac-dual', 'mac-dual-edge', 'mac-family', 'mac-family-edge', 'stmac', 'stmac-edge', 'sqdst', 'sqdst-edge', 'portr-bypass', 'mvdk-circular', 'mvdk-circ-edge', 'mvdk-repeat', 'mvdk-rpt-edge', 'rptb-call', 'rptb-call-edge', 'rpt-mem-copy', 'rpt-mem-wrap', 'rpt-mem-chain'):
+        for profile in ('mac-dual', 'mac-dual-edge', 'mac-family', 'mac-family-edge', 'stmac', 'stmac-edge', 'sqdst', 'sqdst-edge', 'portr-bypass', 'mvdk-circular', 'mvdk-circ-edge', 'mvdk-repeat', 'mvdk-rpt-edge', 'rptb-call', 'rptb-call-edge', 'rpt-mem-copy', 'rpt-mem-wrap', 'rpt-mem-chain', 'addc', 'addc-edge', 'addc-chain'):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)

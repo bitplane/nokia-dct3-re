@@ -2,19 +2,44 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
-host-packet decoder, records twenty consumer advances across two observed
-initialization passes, and stops on `07f8` at `4914` (reported PC `4916`).
+host-packet decoder, records twenty-one consumer advances across two observed
+initialization passes, and stops on STLM A,ST1 at `321d` (reported PC `321f`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is the retained operand/carry contract for
-`07f8 000e` (ADDC T,B), without bypassing the firmware parser or injecting ring state.
-TI SPRU172C page 4-8 specifies an unsigned Smem operand regardless of SXM,
-with OVM/C inputs and C/OVB outputs; this family is not yet staged-qualified.
+The current staged question is an ST1 write outside an active block:
+at the rejected Decode, delay/RPT/XC are inactive, block context is active
+for `4deb..4dee`, and `321d` is outside that body. The write follows a
+prologue that stacks BRC/RSA/REA and reads ST1. Its status/loop-context
+contract must be qualified without forcing firmware state or dropping the
+control guard indiscriminately.
 The exact-stop checker distinguishes the live 0.5-second checkpoint from
 the later illegal-instruction endpoint; neither proves completed boot.
+
+## ADDC ownership
+
+ADDC retains unsigned Smem in Read and samples its accumulator and carry
+in Execute. Sign extension is suppressed regardless of SXM; OVM and
+sticky OVA/OVB follow the arithmetic result (TI SPRU172C page 4-8).
+Carry is defined at bit 32, not at the 40-bit guard boundary (SPRU131G
+table 4-1). An input word of `ffff` plus carry must remain a 17-bit
+increment, not wrap to zero before addition.
+
+`addc` passes 110,592 cases and replays: 73,728 numeric cases over six RAM
+addressing forms and 36,864 mapped cases over sixteen sources `0008..0017`.
+Both accumulators, two carry inputs, SXM/OVM combinations, eight words and
+eight accumulator patterns, direct/absolute/indirect mapped addressing,
+two pages and three snapshots are covered. Source words and auxiliary
+registers change after Read; half the cases also change the accumulator
+and carry before Execute. `addc-chain` adds 4,096 replays of adjacent
+ADDC instructions in AA/BA/AB/BB order, checking the preceding ALU's carry
+and accumulator updates without a gap. `addc-edge` adds 1,920 no-read,
+no-write exclusions for control/unowned mapped sources. Interrupt,
+repeat/control composition and physical phase timing remain unqualified.
+The native `07f8 000e` (ADDC T,B) at `4914` executes; no arithmetic result
+is supplied by the observer.
 
 ## Circular MVDK qualification
 
@@ -363,7 +388,7 @@ GSM packets or assert measured physical bus timing.
 The current native run logs the first sixteen RF reads per initialization
 pass, at modeled frames 30 and 28. Observation-time PCs
 `324e/3254/325a/3260` repeat; these are not retirement addresses. Its final
-provider counter is 9,312 reads, not an uninterrupted-run total: the logged
+provider counter is 9,376 reads, not an uninterrupted-run total: the logged
 sample index restarts at one between passes. RF acquisition and handset
 boot remain unclaimed.
 
@@ -392,13 +417,13 @@ sequence. The volatile endpoint is sampled once and the real memory write
 still occurs once per PORTR. This qualifies the logical on-chip RAM contract,
 not measured bank contention or peripheral forwarding.
 
-Fresh three-second controls separate frontend and SWWSR selection:
+Three-second reference controls separate frontend and SWWSR selection:
 
 | Machine | Frontend | SWWSR | Host packets committed | RF-control writes | Outcome |
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 20 | 0 | Two initialization passes; `07f8` at `4914` is unsupported. |
+| `nse1pipe` | staged | standard | 21 | 6 | Two initialization passes; STLM ST1 outside an active block stops at `321d`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -407,10 +432,12 @@ prove either bus dialect is physically correct. The fixed-standard comparison
 isolated a frontend data hazard; changing SWWSR alone did not explain the
 missing RF controls. The staged checker now requires actual first-header
 reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
-The passive tap counts twenty nonzero consumer advances but logs only the
+The passive tap counts twenty-one nonzero consumer advances but logs only the
 first eight. The index restarts between the seventh and eighth observations,
-so these are not twenty packets from one uninterrupted DSP session. RF-control
-and transfer-expiry parity remain open.
+so these are not twenty-one packets from one uninterrupted DSP session.
+Six actual RF-control writes alternate with five transfer expiries, including
+targets `0884/08d4/0924/0974/0299`. RF-control and transfer-expiry parity
+remain open; these are calibrated bench-device events, not RF acquisition.
 
 ## Current result
 
@@ -824,14 +851,19 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins unsupported `07f8` at `4914`,
-PC `4916`, ILLEGAL set, seven reads through the ring-base tap, twenty
-consumer advances, 309 completion strobes, 74 mailbox writes and final
-device counters of 9,312 RF reads, 294 slot expiries and 572 frame expiries.
-No RF-control writes or transfer expiries occur. The ring and RF sample
+The final observation at 3.016666667 s pins the guarded STLM A,ST1 at `321d`,
+PC `321f`, ILLEGAL set, seven reads through the ring-base tap, twenty-one
+consumer advances, 319 completion strobes, 74 mailbox writes and final
+device counters of 9,376 RF reads, 549 slot expiries and 572 frame expiries.
+Six RF-control writes and five transfer expiries occur; both `mode_aa` and
+`mode_ac` are one. The terminal architectural snapshot is A=`c903`,
+B=`3a98`, T=`000b`, ST0=`081f`, ST1=`c903`, BK=`0052`, AR0=`037f`,
+AR1=0, AR2=`1916`, AR3=`1200`. This is not the prospective STLM source
+at Execute: older AND/OR slots may still be pending at Decode rejection.
+The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
-does not establish twenty packets in one uninterrupted session. Both fresh
-captures reproduce these observations in `tmp/memory-count-native*/error.log`.
+does not establish twenty-one packets in one uninterrupted session. Both fresh
+captures reproduce these observations in `tmp/addc-native*/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
@@ -851,6 +883,10 @@ An additional strobe alone does not prove upload completion. Each of the
 two observed BSP sequences publishes TX words `0aaa/ffd5`, reads two
 retained `0aaa` words, and writes `c008/c0c8` followed by four `c008` values.
 The second sequence's initial pair appears at 0.482299596/0.482299654 s.
+A later `c008` write at 1.844339654 s precedes a third F1/F2/gap
+exchange. The snapshot counters at 0.5 s remain reads=8/writes=8/gap=12;
+the endpoint counters are reads=10/writes=9/gap=15. Do not confuse the
+live checkpoint's counts or registers with those at the later stop.
 These are firmware writes, not supplied receive frames. Neither
 upload completion nor handset boot is accepted for this machine.
 

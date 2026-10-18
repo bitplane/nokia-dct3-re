@@ -412,7 +412,7 @@ constexpr bool staged_ts_arithmetic(u16 word)
 
 constexpr bool staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && (word & 0xf8) != 0x98 && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && (word & 0xf8) != 0x98 && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0600 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_extended_smem_arithmetic(u16 word)
@@ -3303,7 +3303,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_valid[2] && (word & 0xfeff) == 0x8807 &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_active))
 		{
-			logerror("%s: staged STLM ST1 control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_block_active), unsigned(m_pipeline_block_body[2]), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
 		}
 		if (m_pipeline_valid[2] && staged_block_repeat(word))
 			for (unsigned stage = 3; stage < 6; ++stage)
@@ -4815,9 +4815,12 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_smem_arithmetic(m_op))
 		{
 			u64 &destination = accumulator(BIT(m_op, 8));
+			bool const with_carry = (m_op & 0xfe00) == 0x0600;
 			bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
-			u64 const memory = staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			u64 const operand = staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
+			u64 const memory = with_carry || staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			// ADDC retains unsigned Smem in Read, but consumes the accumulator
+			// and carry in Execute, including an adjacent ALU's carry output.
+			u64 const operand = with_carry ? memory + unsigned(BIT(m_st0, 11)) : staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
 			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
 				add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);
 			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
