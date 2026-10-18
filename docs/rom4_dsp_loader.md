@@ -18,6 +18,23 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Shifted arithmetic in control-delay words
+
+Two-word shifted Smem ADD/SUB may occupy the complete delay span of BD,
+BCD, CALLD, FCALLD or RETD. Access owns the address and pointer update;
+Read retains one memory operand; Execute consumes the selected accumulator
+and publishes the result, carry and sticky overflow. Source and destination
+accumulators are independently selected. The existing SXM/OVM rules apply.
+
+`shift-alu-delay` passes 442,368 cases and save/load replays: six control
+paths including both BCD outcomes, DP/indirect/postincrement addressing,
+ADD/SUB, four source/destination pairs, all 32 signed shifts, four memory
+values, SXM/OVM, two pages and three checkpoints. Extension and memory
+poisoning check retained ownership; the target observes the result and
+stack/pointer counts remain exact. `shift-delay-edge` retains 16 negative
+cases for spill, store extension, write-only source and long source forms.
+Interrupt composition and physical pipeline phases remain unvalidated.
+
 ## Overflow-only conditional branches
 
 Staged BC/BCD admit AOV, ANOV, BOV and BNOV. Their predicate tests the

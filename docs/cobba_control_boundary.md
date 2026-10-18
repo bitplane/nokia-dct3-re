@@ -2467,10 +2467,12 @@ The `a20a` dual SUB at `cc02` reads mapped AR3 and PCM RAM under the
 [mapped dual-ALU qualification](rom4_dsp_loader.md#mapped-dual-memory-arithmetic-operands).
 The `fa60` delayed ANOV branch at `d253` now has an
 [isolated predicate qualification](rom4_dsp_loader.md#overflow-only-conditional-branches).
-The current guard is the control-delay Smem extension at owner `d27d`, word
-`6f17`, extension operation `0e20`. The reported fetch PC `bee7` is not its
-owner. Recover that operation's operand and delay ownership before admitting
-it. No complete staged EFR frame has passed yet.
+The RETD delay operation at `d27d`, `6f17 0e20`, is shifted SUB from B to A
+and now executes under the
+[shifted delay qualification](rom4_dsp_loader.md#shifted-arithmetic-in-control-delay-words).
+The current guard is long-memory word `3562` at `d583`, in RETD `d582`'s
+delay span. Recover that operation's memory and delay ownership before
+admitting it. No complete staged EFR frame has passed yet.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
