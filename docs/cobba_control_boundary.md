@@ -533,6 +533,26 @@ Instruction, repeat and delay-load qualifications live in the
 algorithm acceptance, not a handset PCM stream, fitted codec clock, native
 RF acquisition or end-to-end call. Broader frontend/bus parity remains open.
 
+### Handset FR activation boundary
+
+The twelve-second atomic/staged pin-clock comparison in
+`check-c54x-rom4-staged-codec` does not activate the FR scheduler. In both
+captures, data-space write observations for active mode `1836` and pending
+mode `1869` contain three writes each, all zero. PCM ingress state
+`167c/167d` likewise has three zero writes per cell; ring cursors `06de/06df`
+are initialized to `0400/0560` and have no subsequent observed data-space
+writes. Each count is below the observer's 32-record per-address cap.
+These are bounded data-space observations, not an exhaustive writer census
+(program-overlay stores are a separate path).
+
+The checked scheduler lists at `ee0c` and `ee18` contain encoder wrapper
+`9c4f` and decoder wrapper `9cb9`, respectively. The next integration question
+is which firmware-owned traffic-channel request selects those lists and
+publishes their mode and PCM buffers. The idle/key-tone laboratory supplies
+neither that lifecycle nor evidence for inventing it. Keep clock qualification,
+mode selection and codec algorithm acceptance separate: do not set the mode
+cells or call the wrappers from the handset backend to bridge this gap.
+
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
 `((n*7919+1237) mod 4096)-2048`, through port `27`, then zeros. The native
