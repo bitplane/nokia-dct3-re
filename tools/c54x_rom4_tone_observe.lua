@@ -134,9 +134,11 @@ watch(dsp, 'io', 0x002d, 'cobba_data')
 -- entry, not a data read of its opcode; the stack read is ordinary RAM.
 local control_calls = 0
 local demand_entries = 0
+local execution_demand = machine.system.name == 'nse1aclk' or machine.system.name == 'nse1pclk'
 for _, address in ipairs({0xa484, 0xa4cb}) do
     taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
         address, address, 'codec_demand_entry_' .. address, function()
+            if execution_demand then return end
             if dsp.state['PC'].value ~= address + 1 then return end
             demand_entries = demand_entries + 1
             if demand_entries <= 128 then
@@ -185,8 +187,10 @@ local stop = emu.add_machine_stop_notifier(function()
     local serial = assert(_G.rom4_codec_observe[2])
     machine:logerror(string.format('rom4_codec_control_summary: calls=%d t=%.9f\n',
         control_calls, machine.time:as_double()))
-    machine:logerror(string.format('rom4_codec_demand_summary: entries=%d t=%.9f\n',
-        demand_entries, machine.time:as_double()))
+    if not execution_demand then
+        machine:logerror(string.format('rom4_codec_demand_summary: entries=%d t=%.9f\n',
+            demand_entries, machine.time:as_double()))
+    end
     machine:logerror(string.format('rom4_codec_host_summary: requests=%d accepts=%d t=%.9f\n',
         request_reads, request_accepts, machine.time:as_double()))
     machine:logerror(string.format('rom4_codec_parameter_summary: boot=%d interactive=%d t=%.9f\n',

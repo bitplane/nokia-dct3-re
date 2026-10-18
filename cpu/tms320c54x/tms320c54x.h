@@ -322,6 +322,9 @@ private:
 	std::array<u16, 6> m_pipeline_operand_address = {};
 	std::array<u16, 6> m_pipeline_operand = {};
 	std::array<u16, 6> m_pipeline_immediate = {};
+	// Original first extension for three-word diagnostic tuples; DAGEN may
+	// subsequently replace operand_address with the resolved address.
+	std::array<u16, 6> m_pipeline_extension_first = {};
 	std::array<bool, 6> m_pipeline_valid = {};
 	std::array<bool, 6> m_pipeline_block_first_final = {};
 	std::array<bool, 6> m_pipeline_block_end = {};

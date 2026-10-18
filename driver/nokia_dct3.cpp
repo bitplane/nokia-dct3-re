@@ -4699,6 +4699,8 @@ public:
 	{
 		nse1pin(config);
 		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
+		subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(nse1_pcm_fixture_state::instruction_w));
+		m_execution_demand_observer = true;
 	}
 	void nse1pclk(machine_config &config)
 	{
@@ -4719,18 +4721,39 @@ protected:
 		m_wire_word = 0;
 		m_wire_bits = 0;
 		m_clocked_echo_words = 0;
+		m_demand_entries = 0;
 	}
 	virtual void device_stop() override
 	{
 		if (m_clocked_loopback)
 			logerror("native_pcm_fixture_echo_summary: words=%llu untimed=%llu handset_clock_claim=0\n",
 				m_clocked_echo_words, subdevice<nokia_cobba_device>("cobba")->codec_serial_loopbacks());
+		if (m_execution_demand_observer)
+			logerror("rom4_codec_demand_summary: entries=%u t=%.9f\n", m_demand_entries, machine().time().as_double());
 	}
 private:
 	u16 m_wire_word = 0;
 	u8 m_wire_bits = 0;
 	bool m_clocked_loopback = false;
+	bool m_execution_demand_observer = false;
+	// Diagnostic sequence, intentionally not rewound by architectural save/load.
+	unsigned m_demand_entries = 0;
 	u64 m_clocked_echo_words = 0;
+	void instruction_w(offs_t address, u16 word)
+	{
+		if (address != 0xa484 && address != 0xa4cb)
+			return;
+		++m_demand_entries;
+		if (m_demand_entries > 128)
+			return;
+		auto &cpu = *subdevice<tms320c54x_device>("dsp_c54x:cpu");
+		// This laboratory observer owns firmware symbols. CPU and transport
+		// devices remain symbol-free; reading this bitmap is ordinary RAM.
+		logerror("rom4_codec_demand_entry: hit=%u operation=%s mask=%04x previous=%04x t=%.9f\n",
+			m_demand_entries, address == 0xa484 ? "acquire" : "release",
+			u16(cpu.state_int(tms320c54x_device::STATE_B)), cpu.space(AS_DATA).read_word(0x00ef),
+			machine().time().as_double());
+	}
 	void bit_w(int state)
 	{
 		auto &backend = *subdevice<nokia_dsp_c54x_device>("dsp_c54x");

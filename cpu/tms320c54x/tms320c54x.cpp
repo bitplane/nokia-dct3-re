@@ -1404,6 +1404,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_operand_address));
 	save_item(NAME(m_pipeline_operand));
 	save_item(NAME(m_pipeline_immediate));
+	save_item(NAME(m_pipeline_extension_first));
 	save_item(NAME(m_pipeline_valid));
 	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
@@ -2690,6 +2691,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_valid.fill(false);
 	m_pipeline_annulled.fill(false);
 	m_pipeline_physical_address.fill(0);
+	m_pipeline_extension_first.fill(0);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
 	m_pipeline_decode_word = 0;
@@ -2987,6 +2989,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
+		m_pipeline_extension_first[stage] = m_pipeline_extension_first[stage - 1];
 		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
 		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
 		m_pipeline_io_wait_paid[stage] = m_pipeline_io_wait_paid[stage - 1];
@@ -3276,6 +3279,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_block_first_final[2] = m_pipeline_decode_block_first_final;
 				m_pipeline_block_body[2] = m_pipeline_decode_block_body;
 				m_pipeline_operand_address[2] = m_pipeline_decode_extension;
+				m_pipeline_extension_first[2] = m_pipeline_decode_extension;
 				m_pipeline_word[2] = m_pipeline_decode_word;
 				m_pipeline_address[2] = m_pipeline_decode_address;
 			}
@@ -4492,6 +4496,15 @@ void tms320c54x_device::pipeline_step()
 		++m_pc;
 		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
 		++m_opcode_count[m_op];
+		if (staged_shifted_smem(m_op) && machine().options().verbose())
+		{
+			bool const extended = u8(m_op) >= 0xe0;
+			std::array<u16, 4> const words = {u16(extended ? 3 : 2), m_op,
+				extended ? m_pipeline_extension_first[5] : m_pipeline_immediate[5],
+				extended ? m_pipeline_immediate[5] : u16(0)};
+			auto entry = m_extension_observations.try_emplace(words, extension_observation{address}).first;
+			++entry->second.count;
+		}
 		if (staged_immediate_repeat(m_op) || staged_memory_repeat(m_op) || staged_short_repeat(m_op))
 		{
 			if ((m_op & 0xfeff) == 0xf071) accumulator(BIT(m_op, 8)) = 0;

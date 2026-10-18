@@ -193,16 +193,19 @@ placement, not a recovered silicon arbitration policy. The backend test
 also executes adjacent STM/LDM, checks the retained previous receive word,
 and requires external clocks before the new echo or ready sources appear.
 
-Staged execution now sustains laboratory pin traffic and passes the DTMF
-waveform, delayed boot echo and active partial-word save/load checks.
-The full comparison is still **failing**, at codec-demand accounting:
-program-fetch helper-entry observations contain unmatched release entries
-immediately after acquire commits. Resolve speculative/squashed fetch versus
-missing commit with an execution-owned observation before claiming complete
-staged codec acceptance. The memory-tap PC contexts are frontend-specific:
+`make check-c54x-rom4-staged-codec` validates laboratory pin traffic, DTMF
+waveform, delayed boot echo, exact paired screen and active partial-word
+save/load on both frontends. Demand helper entries use the CPU's execution
+observer in these laboratory configurations: program fetch alone is not
+proof of execution, because staged prefetch can enter the next helper and
+then be discarded. Each executed entry has its matching bitmap commit.
+The memory-tap PC contexts are frontend-specific:
 boot BDRR consumption `0e5d` atomic / `0e60` staged; demand commits
 `a4c4,a4e0` atomic / `a4c3,a4df` staged. These contexts are not instruction
-ownership claims. No native handset speech is established by these tests.
+ownership claims. Coverage retains actual two/three-word `6f` tuples from
+staged execution, not re-reads of potentially changed program memory; the
+original first extension survives DAGEN and save/load. This gate establishes
+laboratory codec integration, not fitted clock wiring or native handset speech.
 Neither profile is an ordinary handset configuration;
 atomic instruction fingerprints are not imposed on the staged observation.
 Isolated native FR and EFR
