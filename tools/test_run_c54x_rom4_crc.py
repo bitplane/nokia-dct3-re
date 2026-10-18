@@ -230,6 +230,17 @@ class Rom4HelperResultTest(unittest.TestCase):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
                 check_result(invalid, 3, fr_encoder=True, staged=True)
 
+    def test_encoder_verbose_footer_does_not_waive_parameters_or_replay(self):
+        result = '\n'.join((ENCODER_COMPARISON, ENCODER_REPLAY, ENCODER_PASS, PCM_MUTE_PASS, ENCODER_COMPLETE))
+        text = result + '\nEnter sdlwindow_exit\nLeave sdlwindow_exit\n'
+        check_result(text, 3, fr_encoder=True, verbose_teardown=True)
+        for invalid in (text + 'unexpected\n', text.replace('mismatches=0', 'mismatches=1'),
+                        text.replace(ENCODER_REPLAY, ''), text.replace(PCM_MUTE_PASS, '')):
+            with self.subTest(text=invalid), self.assertRaises(ValueError):
+                check_result(invalid, 3, fr_encoder=True, verbose_teardown=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 3, fr_encoder=True)
+
     def test_decoder_verbose_footer_is_explicit_and_does_not_waive_pcm(self):
         result = '\n'.join((DECODER_COMPARISON, DECODER_REPLAY, DECODER_PASS, DECODER_COMPLETE))
         text = result + '\nEnter sdlwindow_exit\nLeave sdlwindow_exit\n'

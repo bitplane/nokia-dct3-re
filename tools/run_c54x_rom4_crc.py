@@ -186,12 +186,12 @@ def main():
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
     parser.add_argument('--staged', action='store_true', help='run FR encoder/decoder vectors on the staged CPU, not a handset speech claim')
-    parser.add_argument('--trace-fr', action='store_true', help='retain frame-8 executed instructions, entry RAM and actual data accesses')
+    parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder):
         parser.error('--staged currently requires --fr-decoder or --fr-encoder')
-    if args.trace_fr and not args.fr_decoder:
-        parser.error('--trace-fr requires --fr-decoder')
+    if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
+        parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -266,6 +266,8 @@ def main():
     evidence = {"command": command, "bios": bios,
                 "inputs": [file_identity(path) for path in inputs],
                 "handset_audio_claim": False}
+    if args.trace_fr:
+        evidence['trace_scope'] = 'encoder_frame0_encoding' if args.fr_encoder else 'decoder_frame8'
     if args.efr_homing_errors:
         evidence['comparison_scope'] = 'characterization' if args.observe_homing_errors else 'whole_sequence'
     (run / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")

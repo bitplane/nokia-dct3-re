@@ -20431,6 +20431,23 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR5)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR7)),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_BK)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)));
 	}
+	void trace_rom4_fr_input(unsigned phase, u16 entry)
+	{
+		auto &data = m_cpu->space(AS_DATA); m_rom4_fr_trace_count = 0;
+		trace_rom4_fr_state("input",entry,0);
+		{
+			auto const disable = machine().disable_side_effects();
+			for (unsigned at = 0x60; at < 0x10000; ++at) logerror("fr_trace_input_word: address=%04x value=%04x\n",at,data.read_word(at));
+		}
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"fr_frame_read",[this,phase](offs_t at,u16 &value,u16 mask) {
+			if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != phase || m_rom4_codec_replay) return;
+			logerror("fr_trace_read: address=%04x value=%04x mask=%04x pc_context=%04x\n",unsigned(at),value,mask,unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+		});
+		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"fr_frame_write",[this,phase](offs_t at,u16 &value,u16 mask) {
+			if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != phase || m_rom4_codec_replay) return;
+			logerror("fr_trace_write: address=%04x value=%04x mask=%04x pc_context=%04x\n",unsigned(at),value,mask,unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+		});
+	}
 	void start_rom4_fr_decoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -20484,22 +20501,7 @@ private:
 		m_check_timer->adjust(attotime::from_msec(5));
 		if (!initialize) save_rom4_codec_frame(frame);
 		if (!initialize && frame == 8 && machine().options().verbose())
-		{
-			m_rom4_fr_trace_count = 0;
-			trace_rom4_fr_state("input", 0x8458, 0);
-			{
-				auto const disable = machine().disable_side_effects();
-				for (unsigned at = 0x60; at < 0x10000; ++at) logerror("fr_trace_input_word: address=%04x value=%04x\n", at, data.read_word(at));
-			}
-			m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "fr_frame_read", [this](offs_t at, u16 &value, u16 mask) {
-				if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != 72017 || m_rom4_codec_replay) return;
-				logerror("fr_trace_read: address=%04x value=%04x mask=%04x pc_context=%04x\n", unsigned(at), value, mask, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
-			});
-			m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "fr_frame_write", [this](offs_t at, u16 &value, u16 mask) {
-				if (machine().side_effects_disabled() || !m_cpu->executing() || m_phase != 72017 || m_rom4_codec_replay) return;
-				logerror("fr_trace_write: address=%04x value=%04x mask=%04x pc_context=%04x\n", unsigned(at), value, mask, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
-			});
-		}
+			trace_rom4_fr_input(72017,0x8458);
 	}
 
 	void start_rom4_fr_encoder(unsigned frame, unsigned stage)
@@ -20554,6 +20556,7 @@ private:
 		m_phase = 74000 + frame * 3 + stage;
 		m_check_timer->adjust(attotime::from_msec(5));
 		if (stage == 1) save_rom4_codec_frame(frame);
+		if (!frame && stage == 2 && !m_rom4_codec_replay && machine().options().verbose()) trace_rom4_fr_input(74002,0x860c);
 	}
 
 	void start_bsp_interrupt_case(unsigned index)
@@ -51705,8 +51708,11 @@ private:
 			unsigned const stage = (m_phase - 74000) % 3;
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) ||
 				m_cpu->state_int(tms320c54x_device::STATE_PC) != 0x0f01 || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1ec4)
+			{
 				osd_printf_info("ROM4 FR encoder stop: frame=%u stage=%u pc=%04x sp=%04x illegal=%u\n", frame, stage,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+				if (machine().options().verbose()) trace_rom4_fr_state("encoder_stop",m_cpu->state_int(tms320c54x_device::STATE_PC),0);
+			}
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
 				"native FR encoder stage returns with balanced stack");
@@ -53069,9 +53075,10 @@ void tms320c54x_test_state::test(machine_config &config)
 void tms320c54x_test_state::rom4(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (config.options().verbose() && (!strcmp(config.options().bios(), "fr-decoder") || !strcmp(config.options().bios(), "fr-decoder-pipe")))
-		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
-			if (m_phase != 72017 || m_rom4_codec_replay) return;
+	bool const trace_encoder = !strcmp(config.options().bios(),"fr-encoder") || !strcmp(config.options().bios(),"fr-encoder-pipe");
+	if (config.options().verbose() && (trace_encoder || !strcmp(config.options().bios(), "fr-decoder") || !strcmp(config.options().bios(), "fr-decoder-pipe")))
+		m_cpu->instruction_observer_cb().set([this,trace_encoder](offs_t address, u16 opcode) {
+			if (m_phase != (trace_encoder ? 74002U : 72017U) || m_rom4_codec_replay) return;
 			if (++m_rom4_fr_trace_count <= 200000) trace_rom4_fr_state("execute", address, opcode);
 		});
 	if (!strcmp(config.options().bios(), "efr-loss-observe"))

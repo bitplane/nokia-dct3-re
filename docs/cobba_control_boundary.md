@@ -523,6 +523,15 @@ encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
 return, but frame 0's encoding stage remains **failing** at indirect `STM`
 (`7782 b3a6` at `879c`).
+Adding `--trace-fr` captures frame-0 encoding entry RAM/registers and the
+execution-owned instruction/data stream without weakening parameter or replay
+checks. Atomic and staged traces agree on the registers at this boundary:
+AR2 is `1268`, ST0 is `0024` and ST1 is `0340`. The atomic instruction writes
+`b3a6` to ordinary page-zero RAM at `0068` and leaves AR2=`0068`.
+This is MMR addressing, not a write to `1268`: SPRU172C's STM contract clears
+the selected AR's upper nine bits. The staged guard currently rejects that
+indirect form before its transaction. Implementing it requires explicit
+DAGEN/publication and replay tests; the trace alone is not qualification.
 The preceding instruction, repeat and delay-load qualifications live in the
 [ROM4 DSP loader contract](rom4_dsp_loader.md). They do not establish staged
 parameter or speech acceptance; the atomic encoder remains the control.
