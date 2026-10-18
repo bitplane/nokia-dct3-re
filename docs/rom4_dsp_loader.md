@@ -18,6 +18,31 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Short repeat in RPTBD delay words
+
+The staged model admits a short immediate RPT in the first RPTBD delay word,
+followed by an already-qualified one-word repeat body. Its count-plus-one
+copies complete once before the outer block runs. This does not install a
+branch redirect: RPTBD retains its block controller rather than BD's target.
+Discarding speculative outer-body prefetch rebuilds its remaining-iteration
+prediction from BRC, including a single-iteration outer block. Otherwise a
+correct store count can conceal an incorrectly retained BRAF.
+
+`rptbd-rpt` passes 5,760 cases plus cleared-pipeline replay: atomic/staged,
+STL/MVDD/NOP delay bodies, inner counts 0/1/8/39/255, outer counts 0/2/7,
+one/two-word outer blocks, four patterns, two pages and four checkpoints.
+Ordered read/write observations require the delay body to drain before outer
+publication; counters, pointer updates, stack and final status are checked.
+`rptbd-rpt-edge` passes twenty cases plus replay, rejecting late placement,
+long/memory count forms and spilling store/copy bodies before data access or
+short-repeat pointer/counter updates. RPTBD's preceding setup is retained.
+
+TI SPRU131G sections 6.7/6.8 describe the two repeat controllers and RPTBD's
+two delay words. The acquired EFR reset supplies the concrete `f272 c9c9
+ec05 8392` composition. These bounded algorithm and restoration tests do not
+establish silicon pipeline timing or interrupt composition. RETD/CALLD and
+other delayed owners retain their separate exclusions.
+
 ## Mapped memory logic sources
 
 Basic and absolute Smem AND/OR/XOR admit owned mapped sources `0008..0017`.

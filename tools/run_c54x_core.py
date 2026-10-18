@@ -680,6 +680,14 @@ EXTRA_PROFILES = {
         "TMS320C54x BD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 ordered_copies=1 target_retained=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated BD delay repeat complete",
     ),
+    "rptbd-rpt": (
+        "TMS320C54x RPTBD delay repeat: PASS cases=5760 restore=5760 frontends=2 bodies=3 inner_counts=0,1,8,39,255 outer_counts=0,2,7 block_layouts=2 patterns=4 pages=2 snapshots=4 delay_effects=once reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated RPTBD delay repeat complete",
+    ),
+    "rptbd-rpt-edge": (
+        "TMS320C54x RPTBD delay repeat exclusions: PASS cases=20 restore=20 forms=late,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=0 writes=0 ar_changes=0 repeat_counter_changes=0 owner_setup_retained=1 reset_before_restore=1 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated RPTBD delay repeat exclusions complete",
+    ),
     "bd-rpt-edge": (
         "TMS320C54x BD delay repeat exclusions: PASS cases=32 restore=32 forms=late,BANZD,CALLD,RETD,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=RETD_stack_only writes=0 ar_changes=0 counter_changes=0 owner_stack=CALLD,RETD reset_before_restore=1 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated BD delay repeat exclusions complete",
@@ -2028,6 +2036,8 @@ def main():
     if args.profile in ("poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
     if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular", "st-par-alu", "st-par-edge", "mvdk-index", "mvdk-index-edge", "mvdk-index-rpt", "mvdk-irpt-edge", "cond-store", "cond-store-edge", "shift16-map", "shift16-map-edge", "logic-map", "logic-map-edge"):
+        machine = "tms54xtra"
+    if args.profile in ("rptbd-rpt", "rptbd-rpt-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

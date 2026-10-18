@@ -2455,17 +2455,18 @@ words), including full-RAM replay. The diagnostic
 `tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms
 --efr-encoder --staged` explicitly selects `efr-encoder-pipe` and retains
 those same strict comparison requirements, but currently fails before the
-first frame on an explicit staged composition guard. Reset contains
-`RPTBD c9c9` at `c9c3`, with `RPT #5` (`ec05`) at `c9c5` and
-`STH B,*AR2+` (`8392`) at `c9c6` in its delay words. The core rejects
-the nested short-repeat/control-delay composition before executing the
-short repeat. An atomic/staged execution trace shares a 614-instruction
-address/opcode prefix before this rejection; that is not state/timing parity.
+first frame on an explicit staged composition guard. Reset's `RPTBD c9c9`
+with short-repeat delay words now executes under its
+[isolated qualification](rom4_dsp_loader.md#short-repeat-in-rptbd-delay-words).
+The next rejected composition is `RETD` at `c9ca`, with `RPT #27`
+(`ec1b`) at `c9cb` in its first delay word. This is a distinct return-target,
+stack and repeat-ownership contract, not permission to broaden all delayed
+owners based on the RPTBD result.
 `--trace-efr-reset` retains at most 8,192 executed reset instructions, and
 does not change the comparison requirements. Both reset entry words and
 the acquired reset data-table prefix are checked before execution; every
 fixture BIOS must declare both program and data images. No staged EFR
-acceptance gate is promoted. Qualify this repeat/delay composition in
+acceptance gate is promoted. Qualify the return/repeat composition in
 isolation before enabling it. This is independent of the handset's
 unresolved RF/traffic-channel activation boundary.
 

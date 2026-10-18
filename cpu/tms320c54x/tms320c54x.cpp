@@ -3258,8 +3258,9 @@ void tms320c54x_device::pipeline_step()
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address)
 				{
 					delayed_block_owner = m_pipeline_word[stage] == 0xf272;
-					delay_repeat = staged_short_repeat(word) && m_pipeline_word[stage] == 0xf273 &&
-						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active && !m_pipeline_block_active;
+					delay_repeat = staged_short_repeat(word) && (m_pipeline_word[stage] == 0xf273 || delayed_block_owner) &&
+						m_pipeline_delay_decode_words == 2 && !m_pipeline_repeat_active &&
+						(!m_pipeline_block_active || delayed_block_owner);
 					if (delay_repeat) delay_repeat_target = (m_pipeline_control_address & 0x7f0000) | m_pipeline_operand[stage];
 					delay_t_load = (delayed_block_owner || (m_pipeline_word[stage] & 0xff00) == 0x6e00) &&
 						(word & 0xff00) == 0x3000 && u8(word) < 0x98;
@@ -3303,7 +3304,7 @@ void tms320c54x_device::pipeline_step()
 				m_illegal = true;
 				return;
 			}
-			if (delay_repeat)
+			if (delay_repeat && !delayed_block_owner)
 			{
 				m_pipeline_repeat_redirect_pending = true;
 				m_pipeline_repeat_redirect_target = delay_repeat_target;
@@ -5481,6 +5482,9 @@ void tms320c54x_device::pipeline_resume_after_repeat()
 	// Inner RPT discards undecoded prefetch, including any predicted block
 	// wrap. Rebuild that prediction from Decode-owned BRC, not RPTC. The
 	// outer endpoint was decoded once, never once per repeated body copy.
+	if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
+		m_pipeline_repeat_address == ((m_pipeline_block_start & 0x7f0000) | u16(m_pipeline_block_start - 1)))
+		m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 	if (m_pipeline_block_active && m_pipeline_block_fetch_enabled &&
 		m_pipeline_repeat_address >= m_pipeline_block_start && m_pipeline_repeat_address <= m_pipeline_block_end_address)
 	{
