@@ -60,6 +60,19 @@ Access/Read publications make raw pre-Execute register equality an invalid
 pipeline equivalence test. Verbose tracing retains the independent vector
 acceptance requirement and does not alter the ordinary gate.
 
+The first ordinary-RAM write-sequence difference precedes that branch:
+write 1,387 to `0071` is `4c00` atomic versus `e000` staged. At the second
+call from `d392`, the final delay word `d395` is MVDD `e5a1`, copying
+`ed8a=7fd3` to `006e`. Atomic execution commits that copy before the callee
+at `d40d` consumes `006e`; staged tracing shows the callee's read still
+seeing the previous `7ff8`, before MVDD even samples its source. Its later
+read by `d40f` does see `7fd3`. This is a concrete delay-span/target ordering
+candidate, not evidence for changing multiplication semantics. The next
+qualification must isolate a delayed-call final-word MVDD and target-side
+consumer, including retained operands, stack ownership and save/replay.
+Do not indiscriminately forward repeated MVDD: its existing overlapping
+RAM matrix explicitly qualifies Read-before-older-Write ordering separately.
+
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
 The independent `shift-bsp` control passes 40,960 cases and save/load replays.
