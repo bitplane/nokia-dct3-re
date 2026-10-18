@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_staged_check import SOURCE_OFFSET, STOP, check
+from tools.c54x_rom4_staged_check import SOURCE_OFFSET, TAIL_SOURCE_OFFSET, STOP, check
 
 
 class StagedFrontierTest(unittest.TestCase):
@@ -9,18 +9,22 @@ class StagedFrontierTest(unittest.TestCase):
                       '7713,1000,f071,1fff,8093,76f8,2290,0432,76f8,2291,3232,7314,1f0e,7315,1f0f,f020,'
                       '252a,f010,23c4,8811,7712,0d00,47f8,0011')
         self.payload = bytes.fromhex(self.words.replace(',', ''))
-        self.image = bytes(SOURCE_OFFSET) + self.payload
-        self.row = ('rom4_staged_frontier: pc=31d8 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.tail = '0e1e,7ef8,0014,0093,7e8b,0093,e552,fc00,7722,c008,7722,c0c8,f7bb,e908,f074,4610'
+        self.tail_payload = bytes.fromhex(self.tail.replace(',', ''))
+        self.image = (bytes(SOURCE_OFFSET) + self.payload).ljust(TAIL_SOURCE_OFFSET, b'\0') + self.tail_payload
+        self.row = ('rom4_staged_frontier: pc=0e22 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
-        self.text = STOP + '\n' + self.row + 'rom4_interface_summary: completion_strobes=2 mailbox_writes=71 \n'
+        self.text = (STOP + '\n' + self.row + f'rom4_staged_uploaded_tail: base=0e18 words={self.tail}\n'
+                     'rom4_interface_summary: completion_strobes=2 mailbox_writes=71 \n')
 
     def test_binds_observation_without_promoting_boot(self):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['instruction'], 0x7f92)
-        self.assertEqual(result['instruction_address'], 0x31d6)
-        self.assertTrue(result['repeat_active'])
+        self.assertEqual(result['instruction'], 0x7722)
+        self.assertEqual(result['instruction_address'], 0x0e20)
+        self.assertEqual(result['tail_source_offset'], TAIL_SOURCE_OFFSET)
+        self.assertEqual(result['destination'], 0x22)
         self.assertEqual(result['completion_strobes'], 2)
         self.assertEqual(result['swwsr'], 0x2000)
         for field in ('boot_claim', 'upload_complete_claim', 'fitted_bus_dialect_claim'):
@@ -30,9 +34,10 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row, self.text + STOP,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=31d8', 'pc=0f1f'),
-                     self.text.replace('repeat=1', 'repeat=0'),
-                     self.text.replace('delay=0', 'delay=1'),
+                     self.text.replace('pc=0e22', 'pc=0f1f'),
+                     self.text.replace('base=0e18', 'base=0e19'),
+                     self.text.replace('7722,c008', '7722,c009'),
+                     self.text + f'rom4_staged_uploaded_tail: base=0e18 words={self.tail}\n',
                      self.text.replace('completion_strobes=2', 'completion_strobes=0'),
                      self.text.replace('mailbox_writes=71', 'mailbox_writes=70'),
                      self.text.replace('swwsr=2000', 'swwsr=0000'),
@@ -43,7 +48,7 @@ class StagedFrontierTest(unittest.TestCase):
                 check(text, self.image)
 
     def test_rejects_wrong_source_position_or_ambiguous_binding(self):
-        for image in (b'', self.image[2:], self.image + self.payload,
+        for image in (b'', self.image[2:], self.image + self.payload, self.image + self.tail_payload,
                       self.image[:-2] + b'\x00\x00'):
             with self.subTest(length=len(image)), self.assertRaises(ValueError):
                 check(self.text, image)

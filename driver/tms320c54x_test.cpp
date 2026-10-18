@@ -5894,6 +5894,76 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeated_writa_fixture
+	{
+		unsigned form, setup, reg, count, words, read, write, checkpoint;
+		bool mapped, standard_width;
+		u16 source, count_address;
+		u32 target, page;
+		int direction;
+	};
+	static repeated_writa_fixture repeated_writa_case(unsigned variant, bool standard_width = false)
+	{
+		repeated_writa_fixture f{};
+		f.standard_width = standard_width;
+		if (standard_width) variant = variant % 4800 + (variant / 4800) * 9600;
+		f.form = variant % 5; f.setup = (variant / 5) % 5; f.reg = (variant / 25) % 8;
+		f.count = std::array<unsigned, 4>{0, 1, 7, 255}[(variant / 200) % 4];
+		f.target = (standard_width ? std::array<u32, 3>{0x3200, 0x7ffe, 0xfffe} : std::array<u32, 3>{0x033200, 0x037ffe, 0x7ffffe})[(variant / 800) % 3];
+		f.mapped = (variant / 2400) % 2; f.page = (variant / 4800) % 2 ? 0x20000 : 0;
+		f.words = f.setup == 0 || f.setup == 2 ? 1 : 2;
+		f.read = 5 + f.words + (f.setup >= 2 ? 2 : 0); f.write = f.read + 5;
+		f.checkpoint = std::array<unsigned, 4>{f.read, f.read + 1, f.write, f.write + 3}[variant / 9600];
+		f.source = f.form < 2 ? 0x1201 : 0x3000; f.direction = f.form == 3 ? -1 : f.form == 4 ? 1 : 0;
+		f.count_address = f.setup == 2 ? 0x1202 : f.setup == 3 ? 0x1400 : 0x10 + ((f.reg + 1) % 8);
+		return f;
+	}
+	static u16 repeated_writa_word(unsigned reg, unsigned index) { return 0x2468 ^ (reg * 0x1111) ^ (index * 0x0101); }
+	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index)
+	{
+		if (f.standard_width) return (f.target + index) & 0xffff;
+		u32 const logical = (f.target + index) & 0x7fffff;
+		return f.mapped && !(logical & 0x8000) ? logical & 0xffff : logical;
+	}
+	void start_repeated_writa(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const standard_width = !strcmp(machine().options().bios(), "rpt-writa16");
+		auto const f = repeated_writa_case(variant, standard_width); m_cpu->set_extended_program(!standard_width);
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.page + 0x9000 + i, 0xf495);
+		program.write_word(f.page + 0x9000, f.setup == 0 ? 0xec00 | f.count : f.setup == 1 ? 0xf070 : f.setup == 2 ? 0x4702 : 0x47f8);
+		if (f.words == 2) program.write_word(f.page + 0x9001, f.setup == 1 ? f.count : f.count_address);
+		program.write_word(f.page + 0x9000 + f.words, 0x7f00 | (f.form < 2 ? 1 : (f.form == 2 ? 0x80 : f.form == 3 ? 0x88 : 0x90) | f.reg));
+		program.write_word(f.page + 0x9001 + f.words, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.form == 1 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.mapped ? 0x20 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL | f.target); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x81abcdef01ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, f.form >= 2 && ar == f.reg ? f.source : 0x4000 + ar);
+		if (f.setup == 4) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ((f.reg + 1) % 8), f.count);
+		else if (f.setup >= 2) data.write_word(f.count_address, f.count);
+		data.write_word(f.source, repeated_writa_word(f.reg, 0));
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_port_reads = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_writa_reads",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				if (f.setup >= 2 && at == f.count_address) { expect(!m_port_reads && word == f.count, "WRITA memory-repeat setup samples its count once"); ++m_port_reads; return; }
+				unsigned const n = m_pipeline_operand_reads;
+				expect(n <= f.count && n == m_pipeline_store_writes && at == u16(f.source + f.direction * int(n)) && word == repeated_writa_word(f.reg, n) && m_cpu->pipeline_cycles() == (n ? f.write + n : f.read), "Repeated WRITA reads each fresh source once, including its retained first operand"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_writa_no_data_write",
+			[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "WRITA writes program memory, never data memory"); });
+		m_pipeline_fetch_tap = program.install_write_tap(0, 0x7fffff, "repeat_writa_program_write",
+			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				unsigned const n = m_pipeline_store_writes;
+				expect(n <= f.count && m_pipeline_operand_reads == n + 1 && at == repeated_writa_destination(f, n) && word == repeated_writa_word(f.reg, n) && m_cpu->pipeline_cycles() == f.write + n, "WRITA advances retained logical PAR and maps each one-clock stream write correctly"); ++m_pipeline_store_writes;
+				if (n < f.count) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(u16(f.source + f.direction * int(n + 1)), repeated_writa_word(f.reg, n + 1)); }
+			});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = repeated_writa_phase;
+		m_cpu->set_state_int(STATE_GENPC, f.page + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct branch_arithmetic_fixture
 	{
 		unsigned operation, destination, branch_b, form, flags, checkpoint;
@@ -15145,7 +15215,7 @@ private:
 			}
 			else if (kind == 2)
 			{
-				program.write_word(0x600, 0xf070); program.write_word(0x601, 1); program.write_word(0x602, 0x7f03);
+				program.write_word(0x600, 0xf070); program.write_word(0x601, 1); program.write_word(0x602, 0x7ff8); program.write_word(0x603, 0x1000);
 			}
 			else if (kind == 3)
 			{
@@ -16369,6 +16439,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-controls")) { start_pipeline_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "literal-guard")) { start_literal_guard(); return; }
+		if (!strcmp(machine().options().bios(), "rpt-writa") || !strcmp(machine().options().bios(), "rpt-writa16")) { start_repeated_writa(); return; }
 		if (!strcmp(machine().options().bios(), "bcd-arith-edge")) { start_branch_arithmetic_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bcd-arithmetic")) { start_branch_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "mar-circular")) { start_circular_mar(); return; }
@@ -18295,6 +18366,48 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase == repeated_writa_phase)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const standard_width = !strcmp(machine().options().bios(), "rpt-writa16"); auto const f = repeated_writa_case(variant, standard_width);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short-source WRITA accepts immediate and memory repeat setup");
+			if (f.setup >= 2 && m_port_reads && !m_pipeline_register_writes)
+			{
+				auto const disable = machine().disable_side_effects();
+				if (f.setup == 4) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ((f.reg + 1) % 8), f.count ^ 0xffff);
+				else m_cpu->space(AS_DATA).write_word(f.count_address, f.count ^ 0xffff);
+				m_pipeline_register_writes = 1;
+			}
+			if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
+			if (tick == f.read + 1) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0056789a);
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_port_reads, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save WRITA before PAR capture, at first write or during stream");
+			}
+			if (tick == f.write + f.count + 24)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.count + 1 && m_port_reads == unsigned(f.setup >= 2) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0056789a && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa824 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.form == 1 ? 0x4000 : 0)) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && (f.form < 2 || m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == u16(f.source + f.direction * int(f.count + 1))), "WRITA owns count-plus-one transfers and pointer progression without updating A or unrelated state");
+				{ auto const disable = machine().disable_side_effects(); for (unsigned n = 0; n <= f.count; ++n) expect(m_cpu->space(AS_PROGRAM).read_word(repeated_writa_destination(f, n)) == repeated_writa_word(f.reg, n), "Repeated WRITA publishes actual program RAM, not just write notifications"); }
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_port_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated WRITA without duplicate first writes or lost PAR progression");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = repeated_writa_phase + 1; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (standard_width ? 19199 : 38399)) { start_repeated_writa(variant + 1); return; }
+				if (standard_width)
+					osd_printf_info("TMS320C54x repeated WRITA: PASS cases=19200 restore=19200 sources=DP,SP,plain,postdec,postinc count_sources=short,long,direct,absolute_RAM,absolute_AR registers=8 counts=0,1,7,255 targets=ordinary,halfspace_cross,wrap16 address_bits=16 ovly=ignored pages=1 snapshots=4 retained_first_source=1 retained_par=1 count_reads=once data_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0\n");
+				else
+					osd_printf_info("TMS320C54x repeated WRITA: PASS cases=38400 restore=38400 sources=DP,SP,plain,postdec,postinc count_sources=short,long,direct,absolute_RAM,absolute_AR registers=8 counts=0,1,7,255 targets=ordinary,overlay_cross,wrap23 address_bits=23 ovly=2 pages=2 snapshots=4 retained_first_source=1 retained_par=1 count_reads=once data_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeated WRITA complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == repeated_writa_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = repeated_writa_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == branch_arithmetic_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = branch_arithmetic_case(variant);
@@ -45392,7 +45505,7 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 11) { start_write_a_edge(variant + 1); return; }
-				osd_printf_info("TMS320C54x staged WRITA exclusions: PASS cases=12 restore=12 classes=cpu_source,peripheral_source,repeat,control_delay,block_repeat,XC source_reads=0 program_writes=0 atomic_fallback=0\n");
+				osd_printf_info("TMS320C54x staged WRITA exclusions: PASS cases=12 restore=12 classes=cpu_source,peripheral_source,repeat_extended,control_delay,block_repeat,XC source_reads=0 program_writes=0 atomic_fallback=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated WRITA exclusions complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -48886,6 +48999,7 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned literal_guard_phase = 62010;
+	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned circular_mar_phase = 62038;
 	static constexpr unsigned tc_return_phase = 62036;
@@ -50771,6 +50885,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(35, "bcd-arithmetic", "Retained arithmetic in AEQ/BEQ branch delay words")
 	ROM_SYSTEM_BIOS(36, "bcd-arith-edge", "Excluded branch predicates and incomplete arithmetic delay spans")
 	ROM_SYSTEM_BIOS(37, "signed-call", "All signed A/B conditional calls with retained target and frame")
+	ROM_SYSTEM_BIOS(38, "rpt-writa", "Retained repeated WRITA with immediate and memory counts")
+	ROM_SYSTEM_BIOS(39, "rpt-writa16", "Repeated WRITA on the standard 16-bit program-address profile")
 ROM_END
 
 ROM_START(tms54rom4)

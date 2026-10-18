@@ -278,15 +278,31 @@ ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
 execute, and the backend observes completion strobes. Execution
 reaches resident code, executes the absolute BITT in RETD's delay span
 and RC TC, and passes short circular MAR, the delayed SUBS under BCD
-BEQ at `008e4f`, and CC ALEQ. It stops at `0031d6`, `7f92`
-(WRITA *AR2+) under an active single-instruction repeat, with
-the exposed PC at `31d8`, PMST `ffac` and
+BEQ at `008e4f`, CC ALEQ and repeated `WRITA *AR2+` at `0031d6`.
+It stops at `000e20`, `7722 c008` (immediate STM to BSP control `0022`), with
+the exposed PC at `0e22`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
-loader1 image is at `0x99704`). The backend
+loader1 image is at `0x99704`). The 16 uploaded words at `0e18..0e27`
+also bind uniquely to offset `0x98a70`, including successive BSP control
+writes `c008` and `c0c8`; these are uploaded instructions, not mask-ROM
+contents. The backend
 reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
 upload completion nor handset boot is accepted for this machine.
+
+Repeated short-source WRITA uses a retained logical PAR stream, with each
+program destination translated independently for overlay and address-width
+wrapping. The first source and PAR are captured before retirement; later
+iterations read fresh source data and apply one addressing update each.
+The `rpt-writa` and `rpt-writa16` fixtures cover respectively 38,400 and
+19,200 cases plus save-state replay: five source forms, five count sources,
+eight AR encodings, four counts, overlay crossings and program-address wrap.
+They mutate the captured source, count and accumulator to distinguish
+retention from re-reading. Repeated extended-source, delay/XC and block
+compositions remain excluded. WRITA-specific interrupt-arrival composition
+is not independently established by these fixtures; stream timing is a
+declared core model, not a measured silicon phase claim.
 
 In the standard C54x map, `0028` is SWWSR, not TCR (`0026`). Staged bus
 register admission can use `set_standard_swwsr(true)` independently of the

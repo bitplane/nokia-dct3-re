@@ -18,4 +18,9 @@ emu.register_frame_done(function()
         'rom4_staged_dagen: bk=%04x ar0=%04x ar2=%04x st0=%04x st1=%04x\n',
         cpu.state.BK.value, cpu.state.AR0.value, cpu.state.AR2.value,
         cpu.state.ST0.value, cpu.state.ST1.value))
+    local tail = {}
+    for address = 0x0e18, 0x0e27 do
+        tail[#tail + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
+    end
+    machine:logerror('rom4_staged_uploaded_tail: base=0e18 words=' .. table.concat(tail, ',') .. '\n')
 end)

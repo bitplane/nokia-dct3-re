@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_repeated_writa_requires_retained_par_and_memory_count(self):
+        for profile in ('rpt-writa', 'rpt-writa16'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_signed_calls_require_all_predicates_and_owned_frames(self):
         marker, ending = EXTRA_PROFILES['signed-call']
         text = marker + '\n' + ending + '\n'

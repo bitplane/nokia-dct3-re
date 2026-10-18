@@ -9,8 +9,8 @@ import sys
 
 
 SOURCE_OFFSET = 0x94cf8
-STOP = ('staged WRITA repeat/control-delay composition is unsupported '
-        'instruction=0031d6 word=7f92 repeat=1 delay=0 xc=0 block=0')
+TAIL_SOURCE_OFFSET = 0x98a70
+STOP = 'unsupported staged C54x form 7722 at 000e20'
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -21,9 +21,9 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('31d8', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e22', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
-    if text.count(STOP) != 1 or 'unsupported staged C54x form' in text:
+    if text.count(STOP) != 1 or text.count('unsupported staged C54x form') != 1:
         raise ValueError('missing or ambiguous unsupported instruction')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('2', '71')]:
@@ -36,9 +36,20 @@ def check(text, firmware):
     packed = struct.pack('>40H', *words)
     if firmware.find(packed) != SOURCE_OFFSET or firmware.find(packed, SOURCE_OFFSET + 1) != -1:
         raise ValueError('observed upload does not bind uniquely to the reviewed NSE-1 MCU source')
-    return dict(status='unsupported_staged_repeated_writa', source_offset=SOURCE_OFFSET,
+    tails = re.findall(r'^(?:\[luaengine\] )?rom4_staged_uploaded_tail: base=0e18 words=([0-9a-f,]+)$', text, re.M)
+    if len(tails) != 1 or text.count('rom4_staged_uploaded_tail:') != 1:
+        raise ValueError('missing, malformed or duplicate uploaded tail')
+    tail = [int(word, 16) for word in tails[0].split(',')]
+    if len(tail) != 16 or tail[8:12] != [0x7722, 0xc008, 0x7722, 0xc0c8]:
+        raise ValueError('uploaded BSP control instructions changed')
+    packed_tail = struct.pack('>16H', *tail)
+    if firmware.find(packed_tail) != TAIL_SOURCE_OFFSET or firmware.find(packed_tail, TAIL_SOURCE_OFFSET + 1) != -1:
+        raise ValueError('uploaded tail does not bind uniquely to the reviewed MCU source')
+    return dict(status='unsupported_staged_bsp_control_stm', source_offset=SOURCE_OFFSET,
+                tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=16,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x31d6, instruction=0x7f92, repeat_active=True, completion_strobes=2,
+                instruction_address=0x0e20, instruction=0x7722, destination=0x22,
+                immediate=0xc008, completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,
                 upload_complete_claim=False, fitted_bus_dialect_claim=False)
 
