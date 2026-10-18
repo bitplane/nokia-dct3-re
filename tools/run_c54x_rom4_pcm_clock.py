@@ -126,7 +126,7 @@ def main():
             else:
                 result = check_wire(text) if wire else check(text, clock=clock)
             if machine in ('nse1pin', 'nse1aclk', 'nse1pclk'):
-                result['clocked_boot'] = check_clocked_boot(text)
+                result['clocked_boot'] = check_clocked_boot(text, staged=machine == 'nse1pclk')
                 reference_machine = 'nse1bit' if args.wire else 'nse1pcm'
                 reference_case = ('wire_restore' if args.wire else 'restore') if restoring else ('wire' if args.wire else 'clock')
                 if machine == 'nse1pclk':
@@ -134,7 +134,7 @@ def main():
                     reference_case = 'atomic_pin_restore' if restoring else 'atomic_pin'
                 result['screen'] = paired_screen(case / 'snap' / machine / '0000.png',
                     root / reference_case / 'snap' / reference_machine / '0000.png')
-            result['codec_demand'] = demand_transitions(text)
+            result['codec_demand'] = demand_transitions(text, staged=machine == 'nse1pclk')
             if args.coverage:
                 profile = 'control' if not clock else 'pin_boot' if machine == 'nse1pin' else 'tone'
                 # New frontend/bus combinations are observations, not inherited

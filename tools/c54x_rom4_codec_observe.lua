@@ -17,9 +17,9 @@ for _, kind in ipairs({'data', 'io'}) do
                 -- Preserve its first successful consumption without logging
                 -- every poll or performing an extra BDRR read.
                 if not boot_echo_seen and kind == 'data' and direction == 'read' and
-                    address == 0x20 and value == 0x0aaa and cpu.state['PC'].value == 0x0e5d then
+                    address == 0x20 and value == 0x0aaa then
                     boot_echo_seen = true
-                    machine:logerror(string.format('rom4_codec_boot_echo: value=0aaa pc=0e5d t=%.9f\n', machine.time:as_double()))
+                    machine:logerror(string.format('rom4_codec_boot_echo: value=0aaa pc=%04x t=%.9f\n', cpu.state['PC'].value, machine.time:as_double()))
                 end
                 local phase = machine.time:as_double() >= 7 and 'interactive' or 'boot'
                 local output_key = key .. '_' .. phase

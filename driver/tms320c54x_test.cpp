@@ -52908,11 +52908,14 @@ private:
 		{
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			data.write_word(0x22, 0); data.write_word(0x23, 0);
+			m_clocked_previous_word = data.read_word(0x20);
 			joined_edge(false, false);
 			m_cobba->control_data_w(0x0610); m_cobba->control_select_w(8);
 			expect(m_cobba->codec_serial_loopback(), "Clocked store fixture enables the documented codec test mode");
 			data.write_word(0x0800, 0x7721); // STM #0aaa, BDXR
-			data.write_word(0x0801, 0x0aaa); data.write_word(0x0802, 0xf4e1);
+			data.write_word(0x0801, 0x0aaa);
+			data.write_word(0x0802, 0x4820); // LDM BDRR,A: same adjacent pair as the boot retry.
+			data.write_word(0x0803, 0xf4e1);
 			data.write_word(0x22, 0xc8);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
@@ -52925,7 +52928,7 @@ private:
 		}
 		else if (m_stage == 81)
 		{
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(STATE_GENPC) == 0x0803 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(STATE_GENPC) == 0x0804 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				data.read_word(0x21) == 0x0aaa && !(data.read_word(0x22) & 0xc00) &&
 				!m_cpu->state_int(tms320c54x_device::STATE_IFR) && !m_cobba->codec_serial_loopbacks(),
 				"Native STM loads BDXR but cannot create ready edges or an untimed codec echo");
@@ -52942,10 +52945,10 @@ private:
 		else
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x30 && data.read_word(0x20) == 0x0aaa &&
-				!m_cobba->codec_serial_loopbacks() && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+				!m_cobba->codec_serial_loopbacks() && u16(m_cpu->state_int(tms320c54x_device::STATE_A)) == m_clocked_previous_word &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-				"Clocked native STM preserves accumulators/status and completes only through independent TX/RX sources");
+				"Clocked STM/LDM retains the previous RX word, preserves B/status and completes only through independent TX/RX sources");
 			logerror("[opassert] op=7721\n");
 			if (m_case == 128)
 			{
@@ -53360,6 +53363,7 @@ private:
 	emu_timer *m_timer = nullptr;
 	unsigned m_stage = 0, m_case = 0;
 	u16 m_reset_ifr = 0;
+	u16 m_clocked_previous_word = 0;
 	std::stringstream m_saved;
 };
 

@@ -12,7 +12,7 @@ def reject_native_faults(text):
         raise ValueError('native DSP fault or baseband reset during clocked comparison')
 
 
-def check_clocked_boot(text):
+def check_clocked_boot(text, *, staged=False):
     """Require a pin-completed native self-test, not the untimed word echo."""
     summaries = re.findall(r'native_pcm_fixture_echo_summary: words=(\d+) untimed=(\d+) handset_clock_claim=0', text)
     echoes = re.findall(r'native_pcm_fixture_echo_word: value=([0-9a-f]{4}) t=([0-9.]+)', text)
@@ -21,7 +21,11 @@ def check_clocked_boot(text):
     events = re.compile(r'rom4_serial_audit: space=data direction=(write|read) address=(0021|0020) value=0aaa mask=ffff pc=([0-9a-f]{4}) t=([0-9.]+)')
     writes = [float(time) for direction, address, pc, time in events.findall(text)
               if (direction, address, pc) == ('write', '0021', '0e31')]
-    reads = [float(time) for time in re.findall(r'rom4_codec_boot_echo: value=0aaa pc=0e5d t=([0-9.]+)', text)]
+    # A memory tap reports the frontend's current PC, not necessarily the
+    # instruction owning its retained operand. Keep the observed contexts
+    # explicit instead of interpreting staged e60 as another LDM instruction.
+    read_pc = '0e60' if staged else '0e5d'
+    reads = [float(time) for time in re.findall(r'rom4_codec_boot_echo: value=0aaa pc=' + read_pc + r' t=([0-9.]+)', text)]
     completed = [float(time) for value, time in echoes if value == '0aaa']
     if not writes or len(reads) != 1 or not completed or not writes[0] < completed[0] <= reads[0] or reads[0] - writes[0] < 16e-6 - 2e-9:
         raise ValueError('native self-test did not consume a delayed pin-completed 0aaa word')
@@ -34,9 +38,10 @@ def check_clocked_boot(text):
                 handset_clock_claim=False)
 
 
-def demand_transitions(text):
+def demand_transitions(text, *, staged=False):
     entries = re.compile(r'rom4_codec_demand_entry: hit=(\d+) operation=(acquire|release) mask=([0-9a-f]{4}) previous=([0-9a-f]{4}) t=([0-9.]+)')
-    writes = re.compile(r'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=([0-9a-f]{4}) mask=ffff pc=(00a4c4|00a4e0) t=([0-9.]+)')
+    acquire_pc, release_pc = ('00a4c3', '00a4df') if staged else ('00a4c4', '00a4e0')
+    writes = re.compile(r'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=([0-9a-f]{4}) mask=ffff pc=(' + acquire_pc + '|' + release_pc + r') t=([0-9.]+)')
     totals = re.findall(r'rom4_codec_demand_summary: entries=(\d+) t=([0-9.]+)', text)
     events = sorted([(match.start(), 'entry', match) for match in entries.finditer(text)] +
                     [(match.start(), 'write', match) for match in writes.finditer(text)])
@@ -54,7 +59,7 @@ def demand_transitions(text):
             operation, mask, old = event[2], int(event[3], 16), int(event[4], 16)
             masks[operation].add(mask)
             pending = ((old | mask) if operation == 'acquire' else (old & ~mask),
-                       '00a4c4' if operation == 'acquire' else '00a4e0')
+                       acquire_pc if operation == 'acquire' else release_pc)
         else:
             if pending != (int(event[1], 16), event[2]):
                 raise ValueError('codec demand write does not match entry bitmap operation')

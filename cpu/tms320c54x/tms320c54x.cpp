@@ -2943,13 +2943,23 @@ void tms320c54x_device::pipeline_step()
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		(((staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
 		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
-	if (read_peripheral && write_peripheral)
+	// The boot echo loop can read the previous BDRR while BDXR accepts
+	// another retry. These independent serial endpoints retain one access
+	// wait apiece; neither access synthesizes a serial-ready edge. Other
+	// peripheral conflicts still require their own ordering qualification.
+	bool const serial_retry_pair = read_peripheral && write_peripheral &&
+		m_pipeline_word[4] == 0x7721 && (m_pipeline_word[3] & 0xfeff) == 0x4820;
+	if (read_peripheral && write_peripheral && !serial_retry_pair)
 	{
-		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported\n", machine().describe_context());
+		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported read_pc=%06x read_op=%04x read_address=%04x write_pc=%06x write_op=%04x write_address=%04x read_wait_paid=%u write_wait_paid=%u\n",
+			machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3],
+			unsigned(m_pipeline_address[4]), m_pipeline_word[4],
+			staged_serial_control(m_pipeline_word[4]) ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4],
+			unsigned(m_pipeline_peripheral_wait_paid[3]), unsigned(m_pipeline_peripheral_wait_paid[4]));
 		m_illegal = true;
 		return;
 	}
-	unsigned const access_stage = read_peripheral ? 3 : 4;
+	unsigned const access_stage = serial_retry_pair && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral ? 3 : 4;
 	if ((read_peripheral || write_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
 	{
 		// SPRU172C establishes one extra peripheral-access clock. Holding

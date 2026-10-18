@@ -185,9 +185,24 @@ Execute, using the existing partial peripheral-access model rather than
 DAGEN's early-write path. The backend pin test executes the same store on
 both frontends: no ready/echo without clocks, then the original `0x0aaa`
 word and independent RX/TX sources with accumulators/status preserved.
-The handset fixture next stops at the explicit simultaneous peripheral
-read/write arbitration guard near `0x0e5f`; overlapping accesses remain
-unsupported, and staged key-tone acceptance is not established.
+The boot retry's overlap is specifically older `7721` at `0x0e61` and
+younger `4920` at `0x0e5c` (BDXR write/BDRR read). This independent endpoint
+pair now retains one peripheral-access wait per instruction; other
+overlapping peripheral accesses remain guarded. This is partial stage
+placement, not a recovered silicon arbitration policy. The backend test
+also executes adjacent STM/LDM, checks the retained previous receive word,
+and requires external clocks before the new echo or ready sources appear.
+
+Staged execution now sustains laboratory pin traffic and passes the DTMF
+waveform, delayed boot echo and active partial-word save/load checks.
+The full comparison is still **failing**, at codec-demand accounting:
+program-fetch helper-entry observations contain unmatched release entries
+immediately after acquire commits. Resolve speculative/squashed fetch versus
+missing commit with an execution-owned observation before claiming complete
+staged codec acceptance. The memory-tap PC contexts are frontend-specific:
+boot BDRR consumption `0e5d` atomic / `0e60` staged; demand commits
+`a4c4,a4e0` atomic / `a4c3,a4df` staged. These contexts are not instruction
+ownership claims. No native handset speech is established by these tests.
 Neither profile is an ordinary handset configuration;
 atomic instruction fingerprints are not imposed on the staged observation.
 Isolated native FR and EFR

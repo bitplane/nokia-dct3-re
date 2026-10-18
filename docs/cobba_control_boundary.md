@@ -1585,10 +1585,11 @@ in another profile cannot legitimize an orphan assertion.
 Clocked boot adds `7721` at `0e61`, executed 626 times while retrying the
 test-word store. Its inventory is 643 forms in 111 groups, SHA-256
 `5cb892b2da30d8489a37d0c6a403c4ead9976b0d5ee1aa5765f869ca567a26fd`.
-The native backend conformance fixture executes `STM #0aaa, BDXR` itself,
-requires pending TX with no RX readiness or interrupt before clocks, then
-returns the literal through real pin methods and checks both CPU sources
-and preserved accumulators/status. Its mandatory `clocked store: PASS`
+The native backend conformance fixture executes `STM #0aaa, BDXR` followed
+by `LDM BDRR,A` on atomic and staged frontends. It requires the retained
+previous RX word and pending TX with no new RX readiness or interrupt
+before clocks, then returns the literal through real pin methods and checks
+both CPU sources and preserved B/status. Its mandatory `clocked store: PASS`
 marker and `[opassert] op=7721` follow those checks, not just execution.
 Run `python -m tools.run_c54x_backend_bsp --mame mame/mame --coverage` and
 include its completed `error.log` with another `--additional-fixture-log`
