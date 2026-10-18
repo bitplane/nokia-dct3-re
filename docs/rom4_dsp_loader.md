@@ -2,15 +2,15 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
-host-packet decoder, consumes three host packets, and stops on CALL `f074`
-at `7ff7` inside block `7ff7..7ff8` (reported PC `7ff8`).
+host-packet decoder, consumes three host packets, and stops on MVDD `e59c`
+at `37fb` after a memory-count repeat (reported PC `37fd`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is the CALL/return contract inside a block repeat, without
-bypassing the firmware parser or injecting ring state. The exact-stop checker
+The current staged question is how the retained memory repeat count feeds
+the pipelined copies, without bypassing the firmware parser or injecting ring state. The exact-stop checker
 pins the three committed host-ring positions as well as the instruction stop.
 
 ## Circular MVDK qualification
@@ -25,10 +25,10 @@ reads or writes. Unsupported literal destinations reject in Decode;
 unsupported resolved sources reject in Access. Physical phase timing and
 interrupt/repeat composition remain unvalidated.
 
-The fresh `tmp/mvdk-repeat-native-final/error.log` capture consumes ring positions
+The fresh `tmp/block-near-call-native-final/error.log` capture consumes ring positions
 0→6→11→15, at 0.175900019, 0.175909212 and 0.258977019 seconds. It records
 704 RF sample reads, 32 completion strobes and 27 slot expiries before
-rejecting the block-contained call. No RF control-port writes or transfer expiries
+rejecting the memory-count repeat composition. No RF control-port writes or transfer expiries
 occur; upload completion and native handset boot remain unproved.
 
 The resident sequence `ec05 7192 13d0` at `7f8d..7f8f` is qualified:
@@ -46,11 +46,40 @@ remain unqualified. The overlap tests pin the existing staged order:
 Access(n) samples before Read(n-1) publishes in the same clock; this is not
 a silicon timing measurement.
 
-The next native sequence sets BRC=5 at `7ff3`, establishes the block with
+The native sequence sets BRC=5 at `7ff3`, establishes the block with
 `f072 7ff8` at `7ff5`, then calls `7ffa` with `f074 7ffa` at `7ff7`.
-The call spans the entire two-word block. Supporting it requires qualifying
-call/return and repeat-end bookkeeping together, not removing the general
-block-control guard indiscriminately.
+The call spans the entire two-word block. Its call/return and repeat-end
+bookkeeping is qualified by the near-call profiles below.
+
+## Near calls within block repeats
+
+CALL/CALLD to an outside target is admitted only when the complete call and
+any delay words fit inside the block. RET/RETD restore the caller's repeat
+prediction without changing the ordinary one-word return frame: CALL pushes
+PC+2, CALLD PC+4 (TI SPRU172C page 4-27). The existing 16-bit repeat-end
+comparator, including its cross-page hazard, is unchanged.
+
+`rptb-call` passes 3,456 cases and save-state replays: BRC 0/1/5/15,
+middle/endpoint/whole-block calls, pages 0/2/127, one/two call depths,
+IRQ/NMI controls, CALL/CALLD, RET/RETD and four save points. Ordered data
+copies, frame balance, exact ordinary return addresses, delay effects,
+final BRC/BRAF and a once-only post-loop sentinel are checked. The final
+parking IDLE follows interrupt-drain space: a pending IRQ legitimately
+wakes an adjacent IDLE (SPRU131G section 6.11.1), so that cannot itself
+prove a failed return. Physical phase timing is not a silicon measurement.
+`rptb-call-edge` passes 72 exclusion/replay cases for internal targets,
+spilled delay words and a spilled target literal, with no data reads,
+writes or stack allocation. The existing far-call exclusion profile now
+uses an internal near-call target rather than rejecting all near calls.
+
+The native stop is at `47f8 0008; e59c` (`37f9..37fb`): a memory-sourced
+RPT followed by MVDD. The snapshot shows AL=7, but the current pipelined
+repeat controller accepts only immediate count ownership. Qualifying the
+retained memory count, rather than replacing it with a constant, is next.
+The existing memory-RPT Read guard also admits mapped sources only at
+`0010..0017` (AR0..AR7), not AL at `0008`. Both the count handoff and the
+owned mapped-source Read require qualification; removing the first guard
+alone is insufficient.
 
 ## Staged dual-memory MAC family
 
@@ -355,7 +384,7 @@ Fresh three-second controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 3 | 0 | Three packets consumed; block-contained CALL at `7ff7` is unsupported. |
+| `nse1pipe` | staged | standard | 3 | 0 | Three packets consumed; memory-count MVDD at `37fb` is unsupported. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -773,10 +802,11 @@ store/MAC `d6e1` and SQDST `e210`, no longer encounters an unsupported form
 in the observed prefix. The first incoming host packet is then read twice
 from `0800` as `0a05` at 0.175897519/0.175897808 s. Circular-source MVDK
 `71d2 0015` at `3eee` executes; the ring consumer advances through 6, 11
-and 15. Repeated MVDK `7192` at `7f8e` executes. CALL `f074 7ffa` at
-`7ff7` inside the block `7ff7..7ff8` is then rejected.
-At 0.5 s the exposed PC is `7ff8`, BK `0052`, AR0=10, AR2=`13d9`,
-ST0=`001f`, ST1=`e103`, A=`ffbf982436`, B=`2436bf98`, T=`000b`, AR3=`13d7`, AR4=`1207`,
+and 15. Repeated MVDK `7192` at `7f8e` executes, as does CALL `f074 7ffa`
+at `7ff7` inside block `7ff7..7ff8`. MVDD `e59c` at `37fb` after the
+memory-count repeat is then rejected.
+At 0.5 s the exposed PC is `37fd`, BK `0064`, AR0=1, AR2=`0881`,
+ST0=`081f`, ST1=`6103`, A=7, B=`1074`, T=`000b`, AR3=`1200`, AR4=`0074`,
 PMST `ffac` and ILLEGAL set. The final observation at 3.016666667 s pins
 the same stop, two header reads, three committed packets, 32 completion strobes,
 74 mailbox writes, 704 RF reads and no RF-control writes. Older pending

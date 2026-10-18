@@ -3412,8 +3412,11 @@ void tms320c54x_device::pipeline_step()
 		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
+		bool const block_near_call = staged_call(word) &&
+			m_pipeline_address[2] + (BIT(word, 9) ? 3 : 1) <= m_pipeline_block_end_address &&
+			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
 		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
-		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			staged_immediate_repeat(word) || staged_memory_repeat(word) || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -3441,7 +3444,7 @@ void tms320c54x_device::pipeline_step()
 				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) && (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))) owner = 4;
 				if (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))
 				{
-					logerror("%s: staged pipeline repeat requires an immediate count\n", machine().describe_context()); m_illegal = true; return;
+					logerror("%s: staged pipeline repeat requires an immediate count instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word); m_illegal = true; return;
 				}
 				m_pipeline_repeat_word = word;
 				m_pipeline_repeat_issue_remaining = m_pipeline_immediate[owner];
