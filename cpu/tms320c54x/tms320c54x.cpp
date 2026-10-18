@@ -3478,8 +3478,10 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_address[2] + (BIT(word, 9) ? 3 : 1) <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
 		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
+		bool const internal_memory_repeat = staged_memory_repeat(word) &&
+			m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
-			staged_immediate_repeat(word) || staged_memory_repeat(word) || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || word == 0xf4e1 ||
+			staged_immediate_repeat(word) || (staged_memory_repeat(word) && !internal_memory_repeat) || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
 			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",

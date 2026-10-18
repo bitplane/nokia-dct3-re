@@ -716,6 +716,20 @@ class CoreResultTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_result(bad, 3, profile='rpt-ld')
 
+    def test_memory_repeat_in_block_scope(self):
+        marker, ending = EXTRA_PROFILES['rptb-memory']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='rptb-memory')
+        for old, new in (('restore=3840', 'restore=0'), ('fresh_counts=1', 'fresh_counts=0'),
+                         ('consumed_counts_poisoned=1', 'consumed_counts_poisoned=0'),
+                         ('outer_counts_preserved=1', 'outer_counts_preserved=0'),
+                         ('physical_phase_claim=0', 'physical_phase_claim=1')):
+            with self.subTest(mutation=old), self.assertRaises(ValueError):
+                check_result(output.replace(old, new), 3, profile='rptb-memory')
+        for bad in (marker + '\n' + output, output + 'late output\n'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='rptb-memory')
+
     def test_mapped_t_addm_scope(self):
         marker, ending = EXTRA_PROFILES['addm-t']
         output = marker + '\n' + ending + '\n'

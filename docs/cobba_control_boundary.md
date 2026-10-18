@@ -521,10 +521,11 @@ The paired transmit-side probe is
 ROM paths. `fr-encoder-pipe` loads the same program/DROM as the atomic
 encoder, verifies its entry words and retains exact parameter, preprocessing
 history, full-RAM replay and mute-buffer requirements. Reset and preprocessing
-return, but frame 0's encoding stage remains **failing** at memory-sourced
-`RPT` (`4760` at `fb76`) inside block `fb75..fb83`.
+return, but frame 0's encoding stage remains **failing** at `LD *AR6,T`
+(`3086` at `fac6`) in the delay span of `BANZD` at `fac4`.
 Memory SQUR at `8643`, repeated `SFTA B,-1,B` at `fb60`, and mapped-register
-`ADDM #-3,T` at `fb6a` now execute under their independent qualifications.
+`ADDM #-3,T` at `fb6a`, and memory-sourced `RPT` at `fb76` inside block
+`fb75..fb83` now execute under their independent qualifications.
 No staged parameter or speech acceptance follows
 from passing those preceding routines; the atomic encoder remains the control.
 

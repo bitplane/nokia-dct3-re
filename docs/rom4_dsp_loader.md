@@ -18,6 +18,25 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Memory-counted single repeat inside a block
+
+RPT with a memory count can occur inside an active block when its complete
+header and following body start remain inside the block endpoint. It retains
+RPTC independently of BRC and uses the existing block-resume prediction after
+the final repeated body. Endpoint-overlapping headers remain guarded;
+long-immediate and nested-block setup exclusions are unchanged.
+
+`rptb-memory` passes 3,840 cases plus replay, extending the existing short-RPT
+fixture across DP, SP, plain indirect, post-increment and absolute sources.
+It covers outer/base-inner counts 0/1/2/7, MVDD/ST/NOP bodies at the middle
+or end, two program pages and four checkpoints. Post-increment sources
+alternate base and base+1 counts across outer iterations; consumed words
+are overwritten with `ffff`. It checks one fresh count read and pointer
+update per outer iteration, exact ordered body transactions, independent
+outer completion, and one final fallthrough. IRQ/NMI composition and physical
+bus phases are not newly qualified. SPRU172C's RPTB description explicitly
+permits single-instruction repeat loops inside block repeats.
+
 ## ADDM publication to T
 
 Direct-DP and absolute `ADDM` can write mapped T (`000e`); unrelated low
