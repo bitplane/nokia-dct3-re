@@ -14562,6 +14562,113 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62142;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct circular_move_fixture
+	{
+		indexed_store_fixture memory;
+		u16 destination, word, sp = 0x2200, bk, brc = 0, t = 0xbeef, trn = 0x1357;
+		u64 a = 0x123456789aULL, b = 0xfeabcd9876ULL;
+		std::array<u16, 8> final;
+		bool excluded;
+		unsigned write_clock;
+	};
+	static circular_move_fixture circular_move_case(unsigned variant, bool edge)
+	{
+		circular_move_fixture c{}; auto &f = c.memory;
+		unsigned kind = 0, page = 0, snapshot = 0;
+		static constexpr std::array<u16, 8> words{0, 1, 0x8000, 0xffff, 0x1eff, 0x00d0, 0xabcd, 0xf495};
+		if (!edge && variant < 129024)
+		{
+			unsigned const g = variant % 1024; kind = (variant / 1024) % 21; page = (variant / 21504) % 2; snapshot = variant / 43008;
+			unsigned const encoded = g % 4 + ((g / 4) % 8) * 4 + ((g / 32) % 2) * 32 + ((g / 64) % 4) * 128 + (g / 256) * 512 + ((g / 8 + kind) % 4) * 2048 + ((g ^ kind) % 8) * 8192;
+			f = circular_load_case(encoded);
+		}
+		else
+		{
+			unsigned n = edge ? variant : variant - 129024;
+			unsigned mode = 0x12, compatibility = 0, source = 0x1001, index = 0, position = 0;
+			bool mapped = false;
+			f = circular_load_case(2 + 2 * 4);
+			if (edge)
+			{
+				mode = n % 32; kind = (n / 32) % 77; compatibility = (n / 2464) % 2; page = (n / 4928) % 2; snapshot = n / 9856;
+			}
+			else if (n < 4032)
+			{
+				kind = n % 21; f.word = words[(n / 21) % 8];
+				unsigned const flags = (n / 168) % 4;
+				f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0); f.pmst = flags >> 1;
+				page = (n / 672) % 2; snapshot = n / 1344;
+			}
+			else if (n < 100800)
+			{
+				n -= 4032; mapped = true; source = 8 + n % 18; mode = (n / 18) % 32; compatibility = (n / 576) % 2;
+				kind = (n / 1152) % 21; page = (n / 24192) % 2; snapshot = n / 48384;
+			}
+			else
+			{
+				n -= 100800; mode = n % 32; compatibility = (n / 32) % 2; kind = (n / 64) % 21;
+				index = (n / 1344) % 4; position = (n / 5376) % 2;
+				page = (n / 10752) % 2; snapshot = n / 21504;
+				f.word = words[(mode + kind + index) % 8];
+			}
+			f.mode = 0xc0 | mode; f.ar = mode & 7; f.compatibility = compatibility; f.selected = compatibility && !f.ar ? 4 : f.ar;
+			for (unsigned ar = 0; ar < 8; ++ar) f.initial[ar] = 0x1000 + 0x100 * ar;
+			f.bk = mapped ? 64 : 82;
+			if (!f.selected) f.bk = 0x2000;
+			f.initial[0] = std::array<u16, 4>{1, 0xffff, f.bk, u16(-f.bk)}[index];
+			f.address = mapped ? source : 0x1000 + 0x100 * f.selected + (position ? 81 : 1);
+			f.initial[f.selected] = f.address;
+			unsigned const operation = mode >> 3;
+			s32 const step = operation & 1 ? s32(s16(f.initial[0])) : 1;
+			s32 const delta = operation < 2 ? -step : step;
+			unsigned mask = 1; while (mask <= f.bk) mask <<= 1; --mask;
+			s32 const remainder = (s32(f.address & mask) + delta) % f.bk;
+			f.final_ar = (f.address & ~mask) | u16(remainder < 0 ? remainder + f.bk : remainder);
+			f.st1 = (f.st1 & ~u16(0x20)) | (compatibility ? 0x20 : 0); f.excluded = false;
+			if (mapped)
+			{
+				if (source < 14) { unsigned const part = (source - 8) % 3; f.word = u16((source < 11 ? c.a : c.b) >> (16 * part)) & (part == 2 ? 0xff : 0xffff); }
+				else if (source == 14) f.word = c.t; else if (source == 15) f.word = c.trn;
+				else if (source < 24) f.word = f.initial[source - 16]; else f.word = source == 24 ? c.sp : f.bk;
+			}
+		}
+		f.base = page ? 0x20000 : 0; f.snapshot = snapshot;
+		c.destination = edge ? kind < 8 ? kind : kind + 0x13 : kind < 10 ? 0x10 + kind : kind < 18 ? kind - 2 : kind == 18 ? 0x1a : kind == 19 ? 0x1800 : f.address;
+		c.word = f.word; c.excluded = edge || f.excluded; c.bk = f.bk;
+		c.final = f.initial; if (!c.excluded) c.final[f.selected] = f.final_ar;
+		f.st0 = !c.excluded && f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
+		c.write_clock = c.destination >= 0x10 && c.destination <= 0x1a ? 5 : 6;
+		if (!c.excluded)
+		{
+			unsigned const d = c.destination;
+			if (d >= 8 && d <= 13) { unsigned const part = (d - 8) % 3; u64 &acc = d < 11 ? c.a : c.b; u64 const mask = part == 2 ? 0xff : 0xffff; acc = (acc & ~(mask << (16 * part))) | ((u64(c.word) & mask) << (16 * part)); }
+			else if (d == 14) c.t = c.word; else if (d == 15) c.trn = c.word;
+			else if (d < 24) c.final[d - 16] = c.word; else if (d == 24) c.sp = c.word; else if (d == 25) c.bk = c.word; else if (d == 26) c.brc = c.word;
+		}
+		return c;
+	}
+	void start_circular_move(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const edge = !strcmp(machine().options().bios(), "mvdk-circ-edge"); auto const c = circular_move_case(variant, edge); auto const &f = c.memory;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0x7100 | f.mode); program.write_word(f.base + 0x601, c.destination); program.write_word(f.base + 0x602, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
+		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, f.initial[ar]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2200); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0);
+		if (f.address >= 0x60) data.write_word(f.address, c.word);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "circular_mvdk_sample", [this, c](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!c.excluded && at == c.memory.address && word == c.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Circular MVDK samples its old source once before pointer/destination alias updates"); ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "circular_mvdk_publication", [this, c](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!c.excluded && at == c.destination && word == c.word && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == c.write_clock, "Circular MVDK publishes once at its destination-owned write clock"); ++m_pipeline_store_writes; });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "circular_mvdk_literal", [this, c](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == c.destination, "Circular MVDK retains its destination literal once"); ++m_pipeline_extensions_reads; });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62146;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -17572,6 +17679,7 @@ private:
 		if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
 		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
+		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge")) { start_circular_move(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -48719,6 +48827,43 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62146)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const edge = !strcmp(machine().options().bios(), "mvdk-circ-edge"); auto const c = circular_move_case(variant, edge); auto const &f = c.memory;
+			unsigned const checkpoint = 4 + f.snapshot;
+			// Literal destinations are checked in Decode; resolved source addresses in Access.
+			bool const unsupported_destination = c.destination < 0x60 && (c.destination < 8 || c.destination > 0x1a);
+			unsigned const rejection_tick = unsupported_destination ? 4 : 5;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (c.excluded && tick >= rejection_tick), "Circular MVDK excludes unsupported sources/destinations before side effects");
+			if (tick == 5 && !c.excluded)
+			{
+				for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == c.final[ar], "Circular MVDK samples before source update and aliasing DAGEN publication");
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2200);
+				if (f.address >= 0x60) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, c.word ^ 0xffff); }
+			}
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save circular MVDK around sample and destination publication");
+			}
+			if (tick == 12)
+			{
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !c.excluded && m_pipeline_operand_reads == unsigned(!c.excluded) && m_pipeline_store_writes == unsigned(!c.excluded) && m_pipeline_extensions_reads == 1, "Circular MVDK owns one sample, literal and publication");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == c.a && m_cpu->state_int(tms320c54x_device::STATE_B) == c.b && m_cpu->state_int(tms320c54x_device::STATE_T) == c.t && m_cpu->state_int(tms320c54x_device::STATE_TRN) == c.trn && m_cpu->state_int(tms320c54x_device::STATE_SP) == c.sp && m_cpu->state_int(tms320c54x_device::STATE_BK) == c.bk && m_cpu->state_int(tms320c54x_device::STATE_BRC) == c.brc && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Circular MVDK preserves unselected fields and raw values independently of ALU modes");
+				for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (!c.excluded && ar == f.selected ? 0x2200 : c.final[ar]), "Circular MVDK does not re-read or reapply pointer/destination updates");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore circular MVDK without duplicate reads or writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62147; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant + 1 < (edge ? 19712U : 294336U)) { start_circular_move(variant + 1); return; }
+				if (edge) { osd_printf_info("TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK exclusions complete"); }
+				osd_printf_info("TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62147) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62146; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62144)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = portr_bypass_case(variant);
@@ -52444,6 +52589,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(75, "sqdst", "Square distance with retained operands and old accumulator feedback")
 	ROM_SYSTEM_BIOS(76, "sqdst-edge", "Square distance mapped operand exclusions")
 	ROM_SYSTEM_BIOS(77, "portr-bypass", "PORTR consumers and the native request-mask sequence")
+	ROM_SYSTEM_BIOS(78, "mvdk-circular", "Circular source moves with retained data and mapped publications")
+	ROM_SYSTEM_BIOS(79, "mvdk-circ-edge", "Circular move control and peripheral destination exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

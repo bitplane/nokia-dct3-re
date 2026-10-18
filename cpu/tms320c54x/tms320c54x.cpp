@@ -231,6 +231,11 @@ constexpr bool staged_extended_move(u16 word)
 	return (word & 0xff00) == 0x7100 && u8(word) >= 0xe0 && u8(word) <= 0xf8;
 }
 
+constexpr bool staged_circular_move(u16 word)
+{
+	return (word & 0xff00) == 0x7100 && u8(word) >= 0xc0 && u8(word) <= 0xdf;
+}
+
 constexpr bool staged_direct_mvmd(u16 word)
 {
 	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f || word == 0x7319;
@@ -238,7 +243,7 @@ constexpr bool staged_direct_mvmd(u16 word)
 
 constexpr bool staged_move(u16 word)
 {
-	return staged_direct_mvmd(word) || ((word & 0xff00) == 0x7100 && u8(word) < 0x98) || staged_extended_move(word);
+	return staged_direct_mvmd(word) || ((word & 0xff00) == 0x7100 && u8(word) < 0x98) || staged_extended_move(word) || staged_circular_move(word);
 }
 
 constexpr bool staged_accumulator_destination_move(u16 word, u16 destination)
@@ -3811,9 +3816,9 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (extended && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if ((extended || staged_circular_move(m_pipeline_word[3])) && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
-			logerror("%s: staged long-offset MVDK control/peripheral destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged extended/circular MVDK control/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
 		u16 const source = staged_direct_mvmd(m_pipeline_word[3]) ? mode : extended ? (mode == 0xf8 ? m_pipeline_operand_address[3] :

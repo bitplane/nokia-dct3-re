@@ -2,15 +2,40 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
-host-packet decoder and stops on circular-source MVDK `71d2` at `3eee`.
+host-packet decoder, consumes three host packets, and stops on repeated
+MVDK `7192` at `7f8e` (reported PC `7f91`).
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is how to retain the circular Smem source and
-publish MVDK's mapped destination in the first packet's decode sequence,
-without bypassing the firmware parser or injecting ring state.
+The current staged question is the repeat-body contract for MVDK, without
+bypassing the firmware parser or injecting ring state. The exact-stop checker
+pins the three committed host-ring positions as well as the instruction stop.
+
+## Circular MVDK qualification
+
+Short circular sources `71c0..71df` retain one raw source word, update the
+source pointer using the old BK/index, then publish the destination. Native
+`71d2` uses a +1 circular step, not AR0. The `mvdk-circular` profile passes
+294,336 cases and save-state replays, including 8,064 excluded source cases,
+all 32 encodings, 21 destination kinds, 18 owned mapped sources and native
+BK=82. `mvdk-circ-edge` passes 19,712 exclusion/replay cases with no data
+reads or writes. Unsupported literal destinations reject in Decode;
+unsupported resolved sources reject in Access. Physical phase timing and
+interrupt/repeat composition remain unvalidated.
+
+The fresh `tmp/mvdk-native/error.log` capture consumes ring positions
+0→6→11→15, at 0.175900019, 0.175909212 and 0.258977019 seconds. It records
+704 RF sample reads, 32 completion strobes and 27 slot expiries before
+rejecting the repeated move. No RF control-port writes or transfer expiries
+occur; upload completion and native handset boot remain unproved.
+
+The next resident sequence is `ec05 7192 13d0` at `7f8d..7f8f`:
+`RPT #5; MVDK *AR2+,13d0`. TI SPRU172C page 4-108 specifies six
+copies, incrementing the destination EAR as well as the source's explicit
+postincrement. It becomes single-cycle after the repeat pipeline starts.
+The current snapshot has AR2=`1201`; no repeated copy is yet qualified.
 
 ## Staged dual-memory MAC family
 
@@ -315,7 +340,7 @@ Fresh three-second controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 0 | 0 | First packet read; `71d2` at `3eee` is unimplemented. |
+| `nse1pipe` | staged | standard | 3 | 0 | Three packets consumed; repeated `7192` at `7f8e` is unsupported. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -732,12 +757,13 @@ established by RPTBD at `3245` (end `3268`), including MACR `b736`, parallel
 store/MAC `d6e1` and SQDST `e210`, no longer encounters an unsupported form
 in the observed prefix. The first incoming host packet is then read twice
 from `0800` as `0a05` at 0.175897519/0.175897808 s. Circular-source MVDK
-`71d2 0015` at `3eee` is rejected before the ring consumer advances.
-At 0.5 s the exposed PC is `3ef0`, BK `0052`, AR0=1, AR2=`0801`,
-ST0=`001f`, ST1=`6103`, A=`3ee7`, B=3, T=`000b`, AR3=`06e3`, AR4=`000a`,
+`71d2 0015` at `3eee` executes; the ring consumer advances through 6, 11
+and 15. Repeated MVDK `7192` at `7f8e` is then rejected.
+At 0.5 s the exposed PC is `7f91`, BK `0052`, AR0=10, AR2=`1201`,
+ST0=`001f`, ST1=`6103`, A=`5609`, B=`2b`, T=`000b`, AR3=`b6eb`, AR4=`1201`,
 PMST `ffac` and ILLEGAL set. The final observation at 3.016666667 s pins
-the same stop, two header reads, no committed packet, 12 completion strobes,
-74 mailbox writes, 128 RF reads and no RF-control writes. Older pending
+the same stop, two header reads, three committed packets, 32 completion strobes,
+74 mailbox writes, 704 RF reads and no RF-control writes. Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
