@@ -20,7 +20,7 @@ Parallel-store carry and physical bus phases remain unvalidated.
 
 ## Mapped source in parallel Store/Load
 
-ST||LD may read X addresses `0000..0020` while Y remains ordinary RAM.
+ST||LD may read X addresses `0000..005f` while Y remains ordinary RAM.
 Owned registers use their existing read interfaces; gaps `0002..0005` and
 `001f` delegate to the board map. X is retained in Read, whereas the store
 uses the Execute-live old accumulator before load replacement. Mapped AR
@@ -33,15 +33,16 @@ ASM=0/-1, two pages and three checkpoints. It checks one read and one RAM
 write, exact pointer updates, late accumulator/ASM/T changes and preserved
 carry under the existing explicitly unvalidated policy. IMR/IFR reads do not
 acknowledge interrupt state. Same-pointer aliasing, other ASM values and RAM
-numeric boundaries remain in the separate `stld` matrix. Other peripheral X reads,
-mapped Y writes and mapped single-repeat bodies remain excluded. Physical
+numeric boundaries remain in the separate `stld` matrix. Mapped Y writes and
+mapped single-repeat bodies remain excluded. Physical
 timing and arbitrary block/interrupt composition are not proved here.
 
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
-low-address sequence. The separately qualified BSP receive read at `0020`
-advances it to source `0021` at instruction `d514` (`c8ba`), not to a complete
-EFR result.
+low-address sequence. Qualified peripheral reads let that loop complete;
+the staged EFR frame then stops at square-accumulate word `3892`, owner
+`d0f2`, in the delay span of CALLD `d0f0` (`f274`). No complete staged
+EFR frame has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -56,6 +57,18 @@ parallel source. Destination MMIO, mapped single-repeat bodies and simultaneous
 peripheral arbitration remain separate exclusions. The extra clock is a
 documented instruction cost, not a measured silicon pipeline phase; the
 parallel carry-preservation policy remains unvalidated.
+
+`stld-periph` passes 393,216 cases and cleared-pipeline replays, extending
+the same six-form/eight-selector/two-pattern/mode/page/checkpoint matrix
+across all 64 addresses `0020..005f`. A volatile read fixture checks one
+sample at Read with the extra peripheral clock, one RAM store at Execute,
+and no resampling after the endpoint changes. This is bus-delivery and
+instruction-ordering evidence, not an endpoint-identity claim: the fixture
+supplies the read value even at CPU-owned timer/clock addresses. Actual
+register semantics retain their separate gates. On the handset board,
+`0021` reads BSP transmit data without acknowledging it, `0022` reads BSP
+control, `0024..26` are CPU-owned timer registers, and unowned gaps delegate
+to the board map. The BSP receive side effect is qualified separately above.
 
 ## Rounded memory multiply in delayed controls
 
@@ -1169,7 +1182,7 @@ are retained in Read. The store samples the old accumulator at Execute,
 before replacing an aliased accumulator destination. Loading T publishes
 in Read after older Execute writes; it is not republished at Execute.
 The [mapped-source qualification](#mapped-source-in-parallel-storeload)
-extends X reads below `0020`. Peripheral X and mapped/peripheral Y remain
+extends X reads below `0060`. Mapped/peripheral Y remains
 excluded before pointer changes; single-repeat mapped sources are separately
 excluded.
 
@@ -1180,7 +1193,7 @@ all 32 ASM values across the address cases, eight numeric boundary shifts,
 SXM/SST/OVM/carry combinations, two pages and three snapshots. Source memory,
 ASM, accumulators, pointers and T change after their respective capture
 points. `stld-edge` adds 96 replayed no-read/no-write/no-pointer-change
-peripheral-X/mapped-Y exclusions. The repeated-source exclusion retains
+mapped-Y exclusions. The repeated-source exclusion retains
 owned mapped X cases as well.
 The existing parallel-MAC store-shift path and ordinary-RAM forwarding
 are shared; no DSP reply or firmware state is supplied by this qualification.

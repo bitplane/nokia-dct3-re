@@ -952,6 +952,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged delay MPY: PASS cases=18432 restore=18432 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=short,absolute_RAM,absolute_AR,offset destinations=2 operand_pairs=16 frct_ovm=4 pages=2 snapshots=3 source_reads=1 callee_observes_result=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated delay MPY complete",
     ),
+    "stld-periph": (
+        "TMS320C54x parallel peripheral load: PASS cases=393216 restore=393216 forms=6 addresses=0020..005f selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 volatile_source=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated endpoint_identity_claim=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated parallel peripheral load complete",
+    ),
     "stld-bsp": (
         "TMS320C54x parallel BSP load: PASS cases=6144 restore=6144 forms=6 selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 ready_overrun_ack=1 next_frame_pending=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated parallel BSP load complete",
@@ -1176,7 +1180,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated parallel store/load complete",
     ),
     "stld-edge": (
-        "TMS320C54x parallel store/load exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "TMS320C54x parallel store/load exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated parallel store/load exclusions complete",
     ),
     "stack-page0": (
@@ -2126,7 +2130,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("rptbd-rpt", "rptbd-rpt-edge", "retd-rpt", "stm-st1", "stm-st1-edge", "stm-cpl", "stm-cmpt", "stlm-cpl", "stlm-cmpt", "alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus", "ov-branch-pipe", "shift-alu-delay", "maca-delay", "delay-copy", "delay-copy-ctrl", "xc-ret", "move-brc-delay", "rptbd-square", "mpyr-delay", "mpyr-delay-edge", "stld-map"):
         machine = "tms54xtra"
-    if args.profile == "stld-bsp":
+    if args.profile in ("stld-bsp", "stld-periph"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
