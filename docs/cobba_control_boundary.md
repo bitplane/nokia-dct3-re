@@ -2449,65 +2449,25 @@ acceptance boundaries below; none of these fixtures attaches a handset clock.
 
 ### Independent EFR speech reference
 
-EFR encoder frontend qualification is not shared with FR. The atomic
-encoder passes all 163 frames (9,291 parameters, 326 flags and 2,771 packed
-words), including full-RAM replay. The diagnostic
-`tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms
---efr-encoder --staged` explicitly selects `efr-encoder-pipe` and retains
-those same strict comparison requirements, but currently fails before completing
-the first frame on an explicit staged guard. Reset now returns with balanced
-stack after separately qualified
-[RPTBD](rom4_dsp_loader.md#short-repeat-in-rptbd-delay-words) and
-[RETD](rom4_dsp_loader.md#short-repeat-in-retd-delay-words) short-repeat
-compositions. Both reset traces contain the same 732 executed address/opcode
-pairs; this is not register-state or physical-timing parity. The first frame's
-immediate ST1 write now executes under its
-[isolated qualification](rom4_dsp_loader.md#staged-immediate-status-publication).
-The `a20a` dual SUB at `cc02` reads mapped AR3 and PCM RAM under the
-[mapped dual-ALU qualification](rom4_dsp_loader.md#mapped-dual-memory-arithmetic-operands).
-The `fa60` delayed ANOV branch at `d253` now has an
-[isolated predicate qualification](rom4_dsp_loader.md#overflow-only-conditional-branches).
-The RETD delay operation at `d27d`, `6f17 0e20`, is shifted SUB from B to A
-and now executes under the
-[shifted delay qualification](rom4_dsp_loader.md#shifted-arithmetic-in-control-delay-words).
-The `3562` MACA at `d583`, in RETD `d582`'s delay span, now executes under
-the [accumulator-source delay qualification](rom4_dsp_loader.md#accumulator-source-multiply-in-control-delay-words).
-The `4d6e` DELAY at `d394` now executes under the
-[successor-copy qualification](rom4_dsp_loader.md#staged-successor-memory-copy),
-including its delayed-control composition. The ordinary ST1 write at `befe`
-was not XC-controlled: `XC 1,BEQ` at `d3f6` selected RET at `d3f7`, leaving
-the former sequential protection endpoint `d3f8` unreachable. The
-[near-return protection qualification](rom4_dsp_loader.md#xc-protection-across-a-selected-near-return)
-corrects that bookkeeping without relaxing the status guard. The `7168 001a`
-move to BRC at `ceda` is in the ordinary delayed conditional branch at `ced8`,
-not an RPTBD delay; it now executes under the
-[ordinary delayed-control BRC qualification](rom4_dsp_loader.md#brc-memory-moves-in-ordinary-delayed-controls).
-The `3895` squares owned by `cf61` and `cf62`, in RPTBD `cf5f`'s delay
-span, execute under the
-[delayed-square qualification](rom4_dsp_loader.md#square-arithmetic-in-rptbd-delay-words).
-The low operand of `a0b8` at `d45b` is deliberately initialized AR5, used
-as a postincremented counter/address in both frontends. Its IMR/IFR and
-unowned-board-map reads now execute under the
-[low-address dual-ALU qualification](rom4_dsp_loader.md#low-address-dual-addsub-operands).
-The `2292` MPYR owned by `d35e`, in RETD `d35d`'s delay span, executes
-under the [rounded delayed-multiply qualification](rom4_dsp_loader.md#rounded-memory-multiply-in-delayed-controls).
-The `c8ba` parallel Store/Load at `d50e` uses deliberately incremented AR5
-as its X address/counter, with an ordinary RAM Y destination. Its reads
-through `0000..001f` execute under the
-[mapped parallel-load qualification](rom4_dsp_loader.md#mapped-source-in-parallel-storeload).
-The current guard is the same instruction with source=`0020` and
-destination=`114a` (reported fetch PC `d511`). Qualify the peripheral read's
-endpoint, latency and acknowledgement semantics before admitting it; do not
-replace it with a zero or treat the discarded load result as no read.
-No complete staged EFR frame has passed yet.
-`--trace-efr` (also accepted as `--trace-efr-reset`) retains at most 8,192
-reset and 200,000 first-frame executed instruction/register observations,
-excluding replay. It does not change the comparison requirements or claim
-that snapshot ages match between frontends. Both reset entry words and
-the acquired reset data-table prefix are checked before execution; every
-fixture BIOS must declare both program and data images. No staged EFR
-acceptance gate is promoted. This is independent of the handset's
-unresolved RF/traffic-channel activation boundary.
+EFR encoder qualification is independent of FR. Both atomic and staged
+frontends pass all 163 complete speech frames: 9,291 parameters, 326 VAD/SP
+flags and 2,771 packed words, with full-RAM save/replay of every frame.
+`make check-c54x-rom4-efr-encoder-staged` verifies the acquired ETSI fixture
+and selects `efr-encoder-pipe`; it retains the atomic gate's strict comparison
+requirements. Both BIOSes load the same hashed PCM and expected-vector files,
+not merely the same DSP program/data images.
+
+The [CPU qualifications](rom4_dsp_loader.md) cover the admitted instruction
+compositions and operand-retention rules. First-frame entry snapshots match
+all 65,440 ordinary RAM words after reset and PCM publication. This is not
+physical-pipeline or full register-phase parity. Optional `--trace-efr`
+(`--trace-efr-reset` alias) retains at most 8,192 reset and 200,000
+first-frame instruction observations, excluding replay; tracing cannot weaken
+vector acceptance.
+
+This is an isolated DTX-disabled encoder algorithm gate, not handset speech.
+Staged EFR decoding, DTX/homing variants and native RF/traffic-channel
+activation retain their separate qualification boundaries.
 
 The separately acquired ETSI source archive and its provenance live in
 `roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete

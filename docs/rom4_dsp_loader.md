@@ -40,14 +40,14 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-The staged EFR encoder now returns from frame zero with a balanced stack
-and no unsupported-instruction stop. Its independent reference comparison
-reports 39 aggregate mismatches across parameters, flags and packed output;
-this is not a count of differing parameters alone. No staged EFR frame has
-passed vector acceptance. The next boundary is the first numerical/state
-divergence, not an instruction-admission guard. Atomic EFR still passes all
-163 reference frames; staged FR encoder and decoder pass their separate
-32-frame controls. These isolated codec results do not prove handset speech.
+Both atomic and staged EFR encoders pass all 163 complete reference frames:
+9,291 parameters, 326 VAD/SP flags and 2,771 packed output words, including
+all 65,440 ordinary RAM words on every frame's save/replay. The repeatable
+gate is `make check-c54x-rom4-efr-encoder-staged`; it verifies the independent
+ETSI fixture and retains the atomic comparison requirements. Staged FR
+encoder and decoder retain their separate 32-frame controls. These isolated
+DTX-disabled algorithm results do not prove handset speech, staged EFR
+decoder/DTX/homing coverage or physical bus timing.
 
 Both EFR frontend BIOSes must load the same hashed PCM and reference-vector
 files; program/data ROM coverage alone does not establish codec-fixture
@@ -76,14 +76,17 @@ pipeline phases and arbitrary peripheral/interrupt compositions are not
 claimed. Repeated MVDD deliberately remains outside this bypass: its
 overlapping RAM matrix qualifies Read-before-older-Write ordering separately.
 
-The first ordinary-RAM write-sequence difference is now write 14,105:
-`0fb8=0000` atomic versus `0001` staged, at context `b9b6`.
-Execute-address sequences first differ at observation 104,626 (`bdce`
-versus `bdd5`). These are bounded tracing targets, not a numerical
-root-cause claim. Here ADD `b9b4` (`0013`) reads AR3 after a younger
-parallel store/load changes it. The `0071` copy, `1104` DAGEN and `0fa6`
-shifted-load dependencies are closed. Aggregate output mismatch counts are
-not monotonic while several interacting errors remain.
+Ordinary mapped ADD/SUB must likewise retain the older AR operand before a
+younger Access update. In the acquired case ADD `b9b4` (`0013`) precedes
+parallel store/load `b9b5` (`c8d8`): consuming the incremented AR3 wrongly
+stores `0fb8=1` instead of zero. `addsub-ar-age` passes 18,432 cases and
+cleared-pipeline replays: ADD/SUB, DP/indirect/absolute/offset forms, all
+eight ARs, both accumulators, four boundary words, MAR increment/decrement
+and MVMM writers, both SXM states, two pages and three snapshots. A zero
+initial destination isolates operand age and extension from unrelated ALU
+producer hazards. Absolute ADD's separate decode path is included.
+Carry/TS/shift-16 arithmetic, RMW, logic and dual-read age compositions
+retain their separate contracts; this does not admit them implicitly.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -1085,7 +1088,8 @@ a control-flow or indirect-source census and does not establish that the
 hazard is unreachable. The ordinary-load correction is ISA conformance, not
 an independently observed additional handset blocker.
 
-Read-age qualification is not inferred for RMW, arithmetic/logic, multiply,
+Apart from the separately qualified ordinary ADD/SUB matrix above, read-age
+qualification is not inferred for RMW, other arithmetic/logic, multiply,
 port-transfer or dual-read families. They retain their separate operand,
 forwarding and publication rules; their same-clock AR-age compositions need
 dedicated tests before a broader read-order change.
