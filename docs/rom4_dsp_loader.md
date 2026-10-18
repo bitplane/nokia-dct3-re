@@ -20,7 +20,7 @@ Parallel-store carry and physical bus phases remain unvalidated.
 
 ## Mapped source in parallel Store/Load
 
-ST||LD may read X addresses `0000..001f` while Y remains ordinary RAM.
+ST||LD may read X addresses `0000..0020` while Y remains ordinary RAM.
 Owned registers use their existing read interfaces; gaps `0002..0005` and
 `001f` delegate to the board map. X is retained in Read, whereas the store
 uses the Execute-live old accumulator before load replacement. Mapped AR
@@ -33,14 +33,29 @@ ASM=0/-1, two pages and three checkpoints. It checks one read and one RAM
 write, exact pointer updates, late accumulator/ASM/T changes and preserved
 carry under the existing explicitly unvalidated policy. IMR/IFR reads do not
 acknowledge interrupt state. Same-pointer aliasing, other ASM values and RAM
-numeric boundaries remain in the separate `stld` matrix. Peripheral X reads,
+numeric boundaries remain in the separate `stld` matrix. Other peripheral X reads,
 mapped Y writes and mapped single-repeat bodies remain excluded. Physical
 timing and arbitrary block/interrupt composition are not proved here.
 
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
-low-address sequence. Supporting `0000..001f` advances it to the distinct
-peripheral-source boundary at `0020`, not to a complete EFR result.
+low-address sequence. The separately qualified BSP receive read at `0020`
+advances it to source `0021` at instruction `d514` (`c8ba`), not to a complete
+EFR result.
+
+At `0020` the board endpoint is BSP receive data, whose ordinary read clears
+receive-ready and overrun; debugger reads must not acknowledge either.
+The independent `shift-bsp` control passes 40,960 cases and save/load replays.
+The parallel `stld-bsp` fixture passes 6,144 cases and cleared-pipeline replays:
+six forms, eight distinct X/Y selector pairs, two signed-boundary patterns,
+SXM/SST/OVM, two pages and four checkpoints spanning Access, its extra wait,
+Read and Execute. It checks one acknowledged source read, one RAM store,
+retained ASM, Execute-live accumulator data, Read-owned T publication and a
+second frame left pending. The staged wait classifier now includes this
+parallel source. Destination MMIO, mapped single-repeat bodies and simultaneous
+peripheral arbitration remain separate exclusions. The extra clock is a
+documented instruction cost, not a measured silicon pipeline phase; the
+parallel carry-preservation policy remains unvalidated.
 
 ## Rounded memory multiply in delayed controls
 

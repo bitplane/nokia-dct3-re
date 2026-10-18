@@ -2221,6 +2221,19 @@ class CoreResultTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 check_result(bad, 3, profile='shift-delay')
 
+    def test_parallel_bsp_load_scope(self):
+        marker, ending = EXTRA_PROFILES['stld-bsp']
+        output = marker + '\n' + ending + '\n'
+        check_result(output, 3, profile='stld-bsp')
+        for field in marker.split()[4:]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_result(output.replace(field, field + '_wrong', 1), 3,
+                             profile='stld-bsp')
+        for bad in (ending + '\n', marker + '\n' + output,
+                    output + 'late output\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='stld-bsp')
+
     def test_mapped_parallel_load_scope(self):
         marker, ending = EXTRA_PROFILES['stld-map']
         output = marker + '\n' + ending + '\n'
