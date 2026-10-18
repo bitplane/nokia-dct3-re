@@ -10533,6 +10533,69 @@ private:
 		unsigned const pattern = (variant / 4) % 4;
 		return pattern == 0 ? 0 : pattern == 1 ? 1 : pattern == 2 ? i & 1 : i == block_branch_count(variant) ? 0 : 1;
 	}
+	struct block_exit_fixture
+	{
+		unsigned count, exit, reads, body_writes, writes, checkpoint;
+		u32 base;
+		u16 end;
+		bool b, taken, endpoint_store;
+	};
+	static block_exit_fixture block_exit_case(unsigned v)
+	{
+		unsigned const count = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4], pattern = (v / 4) % 4, form = (v / 16) % 3;
+		unsigned const exit = !form || !pattern ? 0 : pattern == 1 ? count + 1 : pattern == 2 ? count / 2 : count;
+		bool const taken = exit <= count, endpoint_store = !((v / 48) % 2);
+		unsigned const body_writes = taken ? exit : count + 1;
+		return {count, exit, taken ? exit + 1 : count + 1, body_writes,
+			body_writes + unsigned(taken && endpoint_store), std::array<unsigned, 6>{3, 8, 9, 10, 12, 18}[v / 192],
+			(v / 96) % 2 ? 0x20000U : 0, u16(endpoint_store ? 0x606 : 0x609), form == 2, taken, endpoint_store};
+	}
+	void start_block_exit(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		auto const f = block_exit_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 0x120; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, f.end);
+		program.write_word(f.base + 0x602, f.b ? 0x1192 : 0x1092);
+		program.write_word(f.base + 0x603, (variant / 16) % 3 ? f.b ? 0xf84d : 0xf845 : 0xf073);
+		program.write_word(f.base + 0x604, 0x700);
+		program.write_word(f.base + 0x605, 0x7693); program.write_word(f.base + 0x606, 0x1111);
+		program.write_word(f.base + f.end + 1, 0xf4e1);
+		program.write_word(f.base + 0x700, 0x76f8); program.write_word(f.base + 0x701, 0x5200); program.write_word(f.base + 0x702, 0xcccc);
+		program.write_word(f.base + 0x703, 0xf6bf);
+		// SPRU131G 7.5.8.2: do not revisit the old endpoint until six
+		// complete words after software BRAF clear. The branch adds more spacing.
+		program.write_word(f.base + 0x70a, 0xf073); program.write_word(f.base + 0x70b, f.endpoint_store ? 0x605 : f.end);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2345); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5100);
+		for (unsigned i = 0; i <= f.count + 1; ++i) { data.write_word(0x5000 + i, i == f.exit ? 0 : 1); data.write_word(0x5100 + i, 0xaaaa); }
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_exit_read", [this, f](offs_t address, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			unsigned const i = m_pipeline_operand_reads++;
+			expect(i < f.reads && address == 0x5000 + i && value == (i == f.exit ? 0 : 1), "Block exit consumes each selected iteration once without speculative body reads");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == f.count - i && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (i < f.count), "Block exit retains Decode-owned count and final-iteration BRAF");
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_exit_write", [this, f](offs_t address, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			if (address == 0x5200)
+			{
+				expect(f.taken && !m_pipeline_register_writes && value == 0xcccc && m_pipeline_operand_reads == f.reads && m_pipeline_store_writes == f.body_writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == f.count - f.exit && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (f.exit < f.count), "Taken exit annuls its remaining body without automatically clearing BRAF or consuming BRC");
+				++m_pipeline_register_writes; return;
+			}
+			unsigned const i = m_pipeline_store_writes++;
+			expect(i < f.writes && address == 0x5100 + i && value == 0x1111 &&
+				(i < f.body_writes || (m_pipeline_register_writes == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000))), "Only untaken iterations and one deliberate post-clear endpoint store may publish");
+		});
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62064;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_block_branch(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -10583,6 +10646,8 @@ private:
 		unsigned const kind = variant % 8;
 		m_cpu->space(AS_PROGRAM).write_word(base + 0x603, std::array<u16, 8>{0xf073, 0xf073, 0xf273, 0xf845, 0xf845, 0xf945, 0xf072, 0xf880}[kind]);
 		m_cpu->space(AS_PROGRAM).write_word(base + 0x604, kind == 0 || kind == 3 ? 0x601 : kind == 1 || kind == 4 ? 0x700 : 0x60a);
+		if (kind == 1 || kind == 4)
+			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x604); // Branch extension at REA remains unvalidated.
 		if (kind == 2)
 		{
 			// Internal BD is admitted, but its complete delay span must end
@@ -16520,6 +16585,7 @@ private:
 		if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bsp")) { start_stlm_bsp(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-bsp-edge")) { start_stlm_bsp_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rptb-exit")) { start_block_exit(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-map")) { start_pipeline_pmst(); return; }
 		if (!strcmp(machine().options().bios(), "pmst-pop")) { start_pipeline_pmst(); return; }
@@ -47079,7 +47145,7 @@ private:
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded branch without atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254390; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 31) { start_block_branch_edge(variant + 1); return; }
-				osd_printf_info("TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 below_block_targets=1 outside_targets=1 delayed_control=1 conditional_call=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 below_block_targets=1 endpoint_overlap=1 delayed_control=1 conditional_call=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated in-block branch exclusions complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -47852,6 +47918,37 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254060) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254050; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62064)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_exit_case(variant);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Forward block exits and spaced outside BRAF clear are admitted");
+			if (tick == f.checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save block exit with held words, pending endpoint predictions and software-clear state");
+			}
+			if (tick == 256)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == f.reads && m_pipeline_store_writes == f.writes && m_pipeline_register_writes == unsigned(f.taken) &&
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.taken ? f.count - f.exit : 0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
+					m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + f.reads && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5100 + f.writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Exit, explicit BRAF clear and spaced old-endpoint revisit preserve loop registers and exact body effects");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore block exit without lost held tags or duplicated outside publication");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62065; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1151) { start_block_exit(variant + 1); return; }
+				osd_printf_info("TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated forward block exits complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62065) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62064; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62062)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 16;
@@ -51031,6 +51128,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(41, "status-bitf", "Retained ST0 and ST1 bitfield sampling")
 	ROM_SYSTEM_BIOS(42, "stlm-bsp", "Accumulator publication to external BSP transmit register")
 	ROM_SYSTEM_BIOS(43, "stlm-bsp-edge", "Excluded BSP transmit control and repeat compositions")
+	ROM_SYSTEM_BIOS(44, "rptb-exit", "Forward loop exits with explicit outside BRAF clear")
 ROM_END
 
 ROM_START(tms54rom4)

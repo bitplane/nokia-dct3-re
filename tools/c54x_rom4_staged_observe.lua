@@ -33,10 +33,10 @@ emu.register_frame_done(function()
         cpu.state.BK.value, cpu.state.AR0.value, cpu.state.AR2.value,
         cpu.state.ST0.value, cpu.state.ST1.value))
     local tail = {}
-    for address = 0x0e18, 0x0e27 do
+    for address = 0x0e10, 0x0e27 do
         tail[#tail + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))
     end
-    machine:logerror('rom4_staged_uploaded_tail: base=0e18 words=' .. table.concat(tail, ',') .. '\n')
+    machine:logerror('rom4_staged_uploaded_tail: base=0e10 words=' .. table.concat(tail, ',') .. '\n')
     local loop = {}
     for address = 0x0e58, 0x0e6f do
         loop[#loop + 1] = string.format('%04x', cpu.spaces.program:read_u16(address))

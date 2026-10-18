@@ -9,10 +9,10 @@ import sys
 
 
 SOURCE_OFFSET = 0x94cf8
-TAIL_SOURCE_OFFSET = 0x98a70
+TAIL_SOURCE_OFFSET = 0x98a60
 REPEAT_SOURCE_OFFSET = 0x98af0
-STOP = ('staged block control/count modification is unsupported instruction=000e5f '
-        'word=f845 block=000e5c..000e62')
+STOP = ('staged READA control/peripheral destination is unsupported instruction=000e14 '
+        'word=7ef8 destination=001a repeat=0')
 ROW = re.compile(r'rom4_staged_frontier: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) '
                  r'illegal=([01]) pmst=([0-9a-f]{4}) swwsr=([0-9a-f]{4}) '
                  r'bscr=([0-9a-f]{4}) swcr=([0-9a-f]{4}) words=([0-9a-f,]+) t=([0-9.]+)')
@@ -23,7 +23,7 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e62', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('0e19', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU stop changed; reassess the actual frontier')
     if text.count(STOP) != 1 or 'unsupported staged C54x form' in text:
         raise ValueError('missing or ambiguous unsupported instruction')
@@ -48,13 +48,14 @@ def check(text, firmware):
     packed = struct.pack('>40H', *words)
     if firmware.find(packed) != SOURCE_OFFSET or firmware.find(packed, SOURCE_OFFSET + 1) != -1:
         raise ValueError('observed upload does not bind uniquely to the reviewed NSE-1 MCU source')
-    tails = re.findall(r'^(?:\[luaengine\] )?rom4_staged_uploaded_tail: base=0e18 words=([0-9a-f,]+)$', text, re.M)
+    tails = re.findall(r'^(?:\[luaengine\] )?rom4_staged_uploaded_tail: base=0e10 words=([0-9a-f,]+)$', text, re.M)
     if len(tails) != 1 or text.count('rom4_staged_uploaded_tail:') != 1:
         raise ValueError('missing, malformed or duplicate uploaded tail')
     tail = [int(word, 16) for word in tails[0].split(',')]
-    if len(tail) != 16 or tail[8:12] != [0x7722, 0xc008, 0x7722, 0xc0c8]:
-        raise ValueError('uploaded BSP control instructions changed')
-    packed_tail = struct.pack('>16H', *tail)
+    if (len(tail) != 24 or tail[:8] != [0x7683, 1, 0xf020, 0x0e05, 0x7ef8, 0x001a, 0x0083, 0xf072]
+            or tail[16:20] != [0x7722, 0xc008, 0x7722, 0xc0c8]):
+        raise ValueError('uploaded READA/BSP control instructions changed')
+    packed_tail = struct.pack('>24H', *tail)
     if firmware.find(packed_tail) != TAIL_SOURCE_OFFSET or firmware.find(packed_tail, TAIL_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded tail does not bind uniquely to the reviewed MCU source')
     loops = re.findall(r'^(?:\[luaengine\] )?rom4_staged_repeat_tail: base=0e58 words=([0-9a-f,]+)$', text, re.M)
@@ -67,11 +68,11 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_block_exit_branch', source_offset=SOURCE_OFFSET,
-                tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=16,
+    return dict(status='unsupported_staged_reada_brc', source_offset=SOURCE_OFFSET,
+                tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x0e5f, instruction=0xf845, branch_target=0x0e66,
+                instruction_address=0x0e14, instruction=0x7ef8, destination=0x1a, repeat_active=False,
                 bsp_transmit_words=[0x0aaa],
                 bsp_control_writes=[0xc008, 0xc0c8], completion_strobes=2,
                 swwsr=0x2000, boot_claim=False,

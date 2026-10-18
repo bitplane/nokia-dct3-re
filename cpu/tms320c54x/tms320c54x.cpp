@@ -3323,6 +3323,8 @@ void tms320c54x_device::pipeline_step()
 		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
 		bool const internal_block_branch = (word == 0xf073 || (staged_banz(word) && !BIT(word, 9)) || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
 			m_pipeline_address[2] + (staged_extended_banz(word) ? 2 : 1) < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
+		bool const forward_block_exit = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
+			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address;
 		bool const internal_delayed_block_branch = (word == 0xf273 || (staged_accumulator_branch(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
@@ -3333,7 +3335,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
 		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
-		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !internal_delayed_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
+		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
 			staged_immediate_repeat(word) || staged_memory_repeat(word) || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || word == 0xf4e1 ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
@@ -4200,7 +4202,8 @@ void tms320c54x_device::pipeline_step()
 		bool const accumulator_word = destination >= 0x08 && destination <= 0x0d;
 		if (destination < 0x60 && (repeat_body || (!accumulator_word && (destination < 0x10 || destination > 0x17))))
 		{
-			logerror("%s: staged READA control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
+				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;
 		}
 		if (mode != 0xf8 && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_read_a_wait = 4;
@@ -4326,6 +4329,18 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if ((m_op & 0xfcf0) == 0xf4b0)
 		{
+			if (m_op == 0xf6bf && m_pipeline_block_active && !m_pipeline_block_body[5])
+			{
+				// A forward exit annuls its body predictions, but does not clear
+				// architectural BRAF. Outside-body RSBX may retire that predictor
+				// only with no younger body in flight. In-loop six-word latency
+				// (SPRU131G 7.5.8.2) remains outside this bounded composition.
+				for (unsigned stage = 0; stage < 5; ++stage)
+					if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
+					{ logerror("%s: staged outside BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+				m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
+				m_pipeline_block_fetch_remaining = 0;
+			}
 			u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
 			u16 const mask = u16(1) << (m_op & 15);
 			status = BIT(m_op, 8) ? status | mask : status & ~mask;

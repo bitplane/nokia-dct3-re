@@ -286,19 +286,23 @@ Absolute BITF `61f8 0007 0800` at `004615` reads ST1's INTM bit and
 execution passes the following `f7bb` (set INTM). Execution returns from
 this resident routine and executes uploaded `000e30`, `8821`
 (STLM A to BSP transmit register `0021`), publishing `0aaa` once at
-0.133893750 s. It stops at `000e5f`, conditional branch `f845 0e66`
-leaving block `0e5c..0e62`. The exposed PC is `0e62`, PMST `ffac` and
+0.133893750 s. It passes the conditional exit `f845 0e66` from block
+`0e5c..0e62` and the explicit outside BRAF clear. It then stops at
+`000e14`, `7ef8 001a` (absolute READA to BRC), before its program-source
+read or BRC publication. The exposed PC is `0e19`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
-loader1 image is at `0x99704`). The 16 uploaded words at `0e18..0e27`
-also bind uniquely to offset `0x98a70`, including successive BSP control
+loader1 image is at `0x99704`). The 24 uploaded words at `0e10..0e27`
+also bind uniquely to offset `0x98a60`, including the READA-to-BRC
+instruction and successive BSP control
 writes `c008` and `c0c8`; these are uploaded instructions, not mask-ROM
 contents. The 24 observed words at `0e58..0e6f` bind uniquely to MCU file
 offset `0x98af0`: the loop reads BSP receive `0020`, compares it with AR6,
 branches to `0e66` on equality, and otherwise writes another `0aaa` using
-STM `0021`; `0e66` explicitly clears BRAF. The frontier is a staged
-block-exit admission restriction, not evidence of a missing serial reply.
+STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
+default untimed COBBA test echo, not the separately clocked serial-pin
+profile; passing the loop is not new evidence of physical serial timing.
 The backend
 reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
 upload completion nor handset boot is accepted for this machine.
@@ -4402,11 +4406,28 @@ both accumulators, two pages, eight snapshots and IRQ/NMI arrivals at
 model clocks 9/10/12/14, plus uninterrupted controls. Each iteration has
 one source read and selected write, with Decode-owned BRC/BRAF and
 balanced ISR return. A later outside branch changes the held tags before
-restoration. Thirty-two `rptb-br-edges` cases preserve rejection of backward,
-outside, delayed, call, nested and far-branch compositions without a frame
-or body write. Forward branch interrupt composition is covered by these
+restoration. Thirty-two `rptb-br-edges` cases preserve rejection of
+below-block targets, endpoint-overlapping branch words, delayed endpoint
+control, call, nested and far-branch compositions without a frame or body
+write. Forward internal-branch interrupt composition is covered by these
 fixtures; arbitrary control flow, software BRC/BRAF changes and measured
 silicon timing are not.
+
+The separate `rptb-exit` profile admits forward nondelayed near B/BC targets
+beyond REA, with both branch words before the endpoint. Its 1,152 cases
+plus replay cover B/A-equal/B-equal, counts 0/1/2/7, first/middle/last/never
+exit conditions, two endpoint layouts (including a store's literal at REA),
+two pages and six snapshots. Taken exits annul the remaining body while
+preserving BRC and BRAF; final-iteration BRAF clearing still belongs to
+Decode, not the branch. Untaken paths retain their endpoint tags and
+complete all iterations. An outside RSBX BRAF then retires the private
+fetch predictor only when no younger body words are pending. A deliberate
+revisit to the old endpoint after six NOPs and a branch checks that the
+cleared loop cannot restart or consume BRC. RSA/REA remain unchanged.
+This follows SPRU131G 7.5.8.2's software-clear spacing and does not import
+C55x automatic clearing on exit. In-loop software-clear latency, pending-body
+clear arbitration and interrupt composition of these exits remain outside
+this bounded gate; silicon phase timing is not claimed.
 
 The original block has a concrete data oracle: `1386` is
 `LDU *AR6,B`; `f678` is `SFTA B,-8,A`; `f3e8` is
