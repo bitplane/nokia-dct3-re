@@ -2,10 +2,10 @@
 
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend reaches the first organic
-host-packet decoder, records twenty-nine consumer advances across observed
+host-packet decoder, records twenty-two consumer advances across observed
 initialization/service passes. The frame-buffer polling loop, delayed TC
 branch inside block `473c..4777`, conditional delayed return and uploaded
-`ADDM #1,BRC` now execute. Cold runs remain fault-free through thirty seconds;
+`ADDM #1,BRC` now execute. The clean cold-boot and lifecycle gates pass;
 a physical Menu press opens the existing byte-exact Phone book oracle.
 The passive ten-second checkpoint does not by itself prove boot. Physical
 menu access has its own gate; RF acquisition, native calls and speech remain
@@ -42,12 +42,12 @@ counter edits are not newly qualified. Existing mapped-AR ADDM/consumer,
 TC-block, polling-interrupt, RCD and delayed-block exclusion profiles pass.
 
 The native `0a40..0a5f` upload still binds uniquely to MCU offset `958e8`,
-but its ADDM no longer stops execution. A ten-second cold checkpoint has
-ILLEGAL clear, 29 host-consumer advances, 242 RF-control writes and 2,663
-transfer expiries. Thirty seconds retain clear ILLEGAL, with 3,621 completion
-strobes, 1,516 RF-control writes and 18,701 transfer expiries. Continuing
-CPU-issued control writes distinguish this from the earlier frozen-counter
-polling failure; they do not establish valid RF reception or registration.
+but its ADDM no longer stops execution. A ten-second clean cold checkpoint
+has ILLEGAL clear, 22 host-consumer advances, 260 RF-control writes and 2,880
+transfer expiries. Continuing CPU-issued control writes distinguish this from
+the earlier frozen-counter polling failure; they do not establish valid RF
+reception or registration. These counts replace the rejected reset-lifecycle
+baseline, not an independently measured silicon timing contract.
 
 `make verify-5110-menu NSE1_MACHINE=nse1pipe` performs a fresh own-model
 EEPROM boot, presses/releases the physical Menu key at eight seconds and
@@ -64,41 +64,37 @@ input. Its structural check also requires a clear DSP ILLEGAL flag after load. D
 of both gates still test the atomic profile. This validates the running
 idle/radio-service composition and subsequent menu input, not saves inside
 native calls, SMS transactions or every application.
-Both profiles use the native DSP backend, not `nokia_dsp_hle`. Physical menu
-access and the save/load replay were observed, but the earlier staged runs
-did not establish reset-free cold boot: their non-verbose invocation hid the
-reset-reason probe, and shell `! grep` checks did not abort under `set -e`.
-These are now explicit failing branches. The verbose late-input gate exposes a reason-4 reset at
-0.349649 s, called from MCU validator continuation `0x258d3c`. The first
-response object contains `3532 5929 581a 5dae 412b b0a7 11a9`, rather than
-the atomic frontend's accepted wildcard response documented under coherent
-challenge validation. A second validator
-entry occurs at 0.635758 s and continues with `r6=0`. Terminal ILLEGAL is
-clear at 16 s, so it does not detect this semantic failure. The default
-atomic late-input gate passes; staged clean-boot acceptance remains failed.
-Menu and restoration gates now enable verbose tracing so reset rejection
-is observable. This does not establish native calls, registration or speech.
+Both profiles use the native DSP backend, not `nokia_dsp_hle`. Both now pass
+menu, late-input, exact save/replay and short/long physical power gates.
+All enable reset tracing and explicitly fail on resets or DSP faults;
+terminal ILLEGAL alone is insufficient. Native calls, registration and speech
+remain unaccepted.
 
 `NSE1_MACHINE` selects the frontend for menu, restoration, late-input and
 power-lifecycle gates; the former `NSE1_MENU_MACHINE` remains a compatibility
-alias. The staged short/long physical power actions were observed, but do
-not establish clean startup; the power checker also rejects reason-4 resets.
+alias.
 
-The passive `tools/c54x_rom4_challenge_observe.lua` narrows the divergence.
-With fresh independently generated NSE-1 EEPROMs, atomic and staged runs
-have identical `1200..121f` challenge buffers and `13c0..13df` workspace at
-the first observed `7f2d` fetch; serial words are `0016,0010,1281,1d00`.
-The first subsequent response-buffer bus write differs: atomic writes
-`b3da` at `1202` (0.272831673 s), staged writes `6521` at `1201`
-(0.272835442 s), both with PC context `7f7a`. This rules out different
-challenge bytes as the explanation for this transaction, but not differences
-in retained CPU state. Fetch snapshots are not instruction-retirement or
-operand-capture evidence.
+Short postincrement immediate ST (`7690..7697`) now retains its old address
+and updates AR in Access, presents the retained write address in Read, and
+publishes its immediate in Execute. SPRU131G figure 7-1 separates those
+events; SPRU172C 4-116 places MVMM's source read in Decode. Delaying the
+store's AR update until Read made an adjacent `MVMM AR3,AR4` copy a pointer
+one word short. Identical challenge buffers then produced a first bus write
+at `1201` instead of `1202`, a wrong challenge response and MCU reason-4
+reset. The corrected clean run continues with validator `r6=1` at 0.349379 s,
+without that reset. This is a CPU addressing correction, not new provisioning.
 
-Next qualify the caller's indirect immediate-store / `MVMM AR3,AR4`
-composition against TI's documented address-generator update and MVMM
-Decode-read phases. The observed one-word displacement is a candidate
-mechanism, not yet a qualified CPU correction. Run the observer with
+`st-mvmm` passes 1,536 cases plus replay: one/two immediate stores, all eight
+AR sources and destinations (including aliases), zero/one NOP gaps, two
+pages and three snapshots around Decode/Access. It checks each original
+store address/value and Execute clock, the one-time retained MVMM read/write,
+and a following indirect load. The unmodified core fails at the source read.
+These are prototype phase assertions, not measured silicon clocks; other
+immediate-store forms and general interrupt/repeat composition are not newly
+qualified.
+
+The read-only `tools/c54x_rom4_challenge_observe.lua` records buffer writes
+and context snapshots; fetch snapshots are not operand-capture proof. Use
 `-autoboot_delay 0 -autoboot_script <absolute script path> -seconds_to_run 1`
 on each frontend with separate freshly provisioned NVRAM directories.
 It modifies no memory, retains tap handles, and reports write-trace truncation.
@@ -799,7 +795,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 29 | 242 | Ten-second live service checkpoint; separate physical Menu gate passes. |
+| `nse1pipe` | staged | standard | 22 | 260 | Ten-second clean service observation; separate physical Menu/lifecycle gates pass. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The retained atomic controls are three-second observations; the current
@@ -809,18 +805,20 @@ performance or parity comparison. The atomic controls both publish
 and 33 transfer expiries, with `mode_ac=1`. Matching their counters does not
 prove either bus dialect is physically correct. The fixed-standard comparison
 isolated a frontend data hazard; changing SWWSR alone did not explain the
-missing RF controls. The staged checker now requires actual first-header
-reads (`0a05` at contexts `3871/387f`) rather than accepting loop liveness.
-The passive tap counts twenty-nine nonzero consumer advances but logs only the
-first eight. The index restarts between the seventh and eighth observations,
-so these are not twenty-nine packets from one uninterrupted DSP session.
+missing RF controls. The clean trace includes first-header reads (`0a05` at
+contexts `3871/387f`). The passive tap counts twenty-two nonzero consumer
+advances but logs only the first eight. The eighth changes `0033` to `002f`;
+consumer advances are not independently counted packets. The old
+`c54x_rom4_staged_check.py` fingerprints the rejected reset lifecycle and must
+be re-banked before use as a current checkpoint gate. Current clean-boot
+acceptance is the four handset gates.
 The first eighteen RF-control writes include the original six-write burst,
 a later five-write burst, `2813/0030` at `4026`, and another six-write
 burst. Transfer targets include `0884/08d4/0924/0974/0299`, then periodic
 `0032`, then `03e8`, then a second `0884..0299` sequence.
 Later controls include ascending `2727..272f` writes at `4026`. The observer
 logs only the first 32 controls and first 256 transfer expiries; summaries
-count all 242 controls and 2,663 expiries in this ten-second capture.
+count all 260 controls and 2,880 expiries in this ten-second capture.
 CPU ILLEGAL must remain clear. In stopped runs, device timer edges alone
 are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
@@ -1239,23 +1237,20 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
 The final observation at 10.016666667 s has PC `09ac`, ILLEGAL clear,
-eleven reads through the ring-base tap, twenty-nine consumer advances,
-1,603 completion strobes, 74 mailbox writes and final device counters of
-127,232 RF reads, 1,555 slot expiries and 4,003 frame expiries. There are
-242 RF-control writes and 2,663 transfer expiries; only bounded prefixes
-are logged as described above. `mode_aa` is one and `mode_ac` is twelve.
+nine reads through the ring-base tap, twenty-two consumer advances,
+1,639 completion strobes, 74 mailbox writes and final device counters of
+134,656 RF reads, 1,590 slot expiries and 4,237 frame expiries. There are
+260 RF-control writes and 2,880 transfer expiries; only bounded prefixes
+are logged as described above. `mode_aa` is zero and `mode_ac` is twelve.
 The terminal architectural snapshot is A=B=0, T=`5555`, ST0=`081f`,
 ST1=`6103`, BK=`00fa`, AR0=1, AR1=`0332`, AR2=`0060`, AR3=`00ab`.
 This passive snapshot is not, on its own, proof of a healthy interactive UI.
-The ring and RF sample
-counters show reinitialization between the two BSP/upload prefixes; this
-does not establish twenty-nine packets in one uninterrupted session. The
-ring-base tap's legacy `host_headers` name counts memory reads, not packet
+The ring-base tap's legacy `host_headers` name counts memory reads, not packet
 headers: reads include `7fff/0000/7fb2` at PC context `3f4a` and zero at
-`3da3`. Current native artifacts are `tmp/addm-brc-native{,-long}/error.log`;
-the ten-second capture passes the live checker. The independent physical-key
-capture is `tmp/addm-brc-native-menu/`, with the exact Phone book frame.
-The reusable staged-menu gate reproduces that result without firmware writes.
+`3da3`. The clean ten-second artifact is `tmp/st-mvmm-native-10/error.log`.
+It is intentionally not accepted by the obsolete reset-lifecycle fingerprint;
+re-banking that passive checker remains follow-up work. The reusable staged
+menu and lifecycle gates pass without firmware writes or baseband resets.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR
@@ -1271,16 +1266,14 @@ branches to `0e66` on equality, and otherwise writes another `0aaa` using
 STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
-An additional strobe alone does not prove upload completion. Each of the
-two observed BSP sequences publishes TX words `0aaa/ffd5`, reads two
-retained `0aaa` words, and writes `c008/c0c8` followed by four `c008` values.
-The second sequence's initial pair appears at 0.482299596/0.482299654 s.
-A later `c008` write at 1.844339654 s precedes a third F1/F2/gap
-exchange. The snapshot counters at 0.5 s remain reads=8/writes=8/gap=12;
-the endpoint counters are reads=10/writes=9/gap=15. Do not confuse the
-live checkpoint's counts or registers with those at the later stop.
-These are firmware writes, not supplied receive frames. Neither
-upload completion nor handset boot is accepted for this machine.
+An additional strobe alone does not prove upload completion. The observed BSP
+test sequence publishes TX words `0aaa/ffd5`, reads two retained `0aaa`
+words, and writes `c008/c0c8` followed by four `c008` values. It no longer
+repeats after a reason-4 baseband reset. The snapshot counters at 0.5 s are
+reads=4/writes=4/gap=6; the endpoint counters are reads=14/writes=12/gap=9.
+These are firmware writes, not supplied receive frames. Menu/lifecycle
+acceptance is independent of this passive observation and does not establish
+complete RF acquisition or native speech.
 
 Immediate STM `0022` retains its extension and publishes through the normal
 data bus in Execute, paying the modeled peripheral access clock; it does

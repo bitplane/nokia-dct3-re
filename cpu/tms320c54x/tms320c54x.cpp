@@ -4402,6 +4402,15 @@ void tms320c54x_device::pipeline_step()
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_program_move_pending = true;
 	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfff8) == 0x7690)
+	{
+		// SPRU131G figure 7-1 separates Access's AR update from Read's
+		// write-address presentation. MVMM samples its source in Decode
+		// (SPRU172C 4-116), so an adjacent copy must see this increment.
+		u8 const mode = m_pipeline_word[3];
+		m_pipeline_operand_address[3] = basic_address(3, mode);
+		indirect_modify(mode, false, 3);
+	}
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x7600)
 	{
 		u8 const mode = m_pipeline_word[4];
@@ -4416,7 +4425,7 @@ void tms320c54x_device::pipeline_step()
 				m_illegal = true; return;
 			}
 		}
-		else if (mode != 0xf8)
+		else if (mode != 0xf8 && (m_pipeline_word[4] & 0xfff8) != 0x7690)
 		{
 			bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 			if (preincrement) indirect_modify(mode, false, 4);

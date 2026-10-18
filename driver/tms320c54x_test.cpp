@@ -7987,6 +7987,61 @@ private:
 		m_phase = 252710; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_store_mvmm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
+		unsigned const gap = (variant / 128) % 2, read_cycle = 3 + 2 * count + gap;
+		u32 const base = (variant / 256) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		for (unsigned i = 0; i < count; ++i)
+		{
+			program.write_word(base + 0x600 + 2 * i, 0x7690 | source);
+			program.write_word(base + 0x601 + 2 * i, i ? 0 : 0x3532);
+		}
+		program.write_word(base + 0x600 + 2 * count + gap, 0xe700 | (source << 4) | destination);
+		program.write_word(base + 0x601 + 2 * count + gap, 0x1080 | destination);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + source, 0x1200);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		for (unsigned i = 0; i < 3; ++i) m_cpu->space(AS_DATA).write_word(0x1200 + i, 0x55aa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "store_mvmm_read",
+			[this, source, count, read_cycle](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x10 + source)
+				{
+					expect(word == 0x1200 + count && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
+						"MVMM Decode observes preceding immediate-store postincrements"); ++m_pipeline_operand_reads;
+				}
+				else
+				{
+					expect(at == 0x1200 + count && word == 0x55aa && !m_pipeline_extensions_reads,
+						"Following load uses the retained MVMM destination"); ++m_pipeline_extensions_reads;
+				}
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "store_mvmm_write",
+			[this, destination, count, read_cycle](offs_t at, u16 &word, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x10 + destination)
+					expect(word == 0x1200 + count && m_cpu->pipeline_cycles() == read_cycle + 1,
+						"MVMM publishes its retained sample in Access");
+				else
+					expect(at >= 0x1200 && at < 0x1200 + count && word == (at == 0x1200 ? 0x3532 : 0) &&
+						m_cpu->pipeline_cycles() == 7 + 2 * (at - 0x1200), "Immediate stores retain addresses and publish once in Execute");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 600001; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pipeline_mvmm_producer(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -18261,6 +18316,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mcbsp-control")) { start_mcbsp_control_sequence(); return; }
 		if (!strcmp(machine().options().bios(), "rmw-long-periph")) { start_pipeline_long_rmw(); return; }
 		if (!strcmp(machine().options().bios(), "st-long-periph")) { start_pipeline_long_immediate_store(); return; }
+		if (!strcmp(machine().options().bios(), "st-mvmm")) { start_pipeline_store_mvmm(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-st")) { start_preincrement_store(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc")) { start_move_brc(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc-edge")) { start_move_brc_edge(); return; }
@@ -39796,7 +39852,7 @@ private:
 				osd_printf_info("Immediate ST mismatch: form=%u cycle=%llu expected=%llu illegal=%u writes=%u\n", form, (unsigned long long)cycle, (unsigned long long)m_pipeline_expected_cycle, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), m_pipeline_store_writes);
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_store_writes == unsigned(cycle >= write_cycle), "Immediate ST advances without duplicated writes or atomic fallback");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == (form == 3 ? 0x25 : 0x700 + unsigned(form == 1 && cycle >= 6)),
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == (form == 3 ? 0x25 : 0x700 + unsigned(form == 1 && cycle >= 5)),
 				"Immediate ST updates its indirect register once at address ownership, including replay");
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
@@ -44017,6 +44073,47 @@ private:
 		if (m_phase == 252700 || m_phase == 252720)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = m_phase == 252720 ? 252710 : 252690;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 600001)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
+			unsigned const read_cycle = 3 + 2 * count + (variant / 128) % 2;
+			unsigned const checkpoint = read_cycle - 1 + variant / 512;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store/MVMM chain remains supported");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_idle_fixture_saved_tick = tick;
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save store/MVMM chain around Decode and Access");
+			}
+			if (tick == 20)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + source) == 0x1200 + count &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + destination) == 0x1200 + count &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55aa, "Store/MVMM composition preserves each pointer and bus access across replay");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
+					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
+					m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained store/MVMM chain");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 600002; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 1535) { start_pipeline_store_mvmm(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged store MVMM: PASS cases=1536 restore=1536 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 physical_phase_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated store MVMM complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 600002)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 600001;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 252730)
@@ -53750,6 +53847,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(103, "rcd", "Conditional delayed return predicate stack and retained delay words")
 	ROM_SYSTEM_BIOS(104, "addm-brc", "Retained absolute ADDM arithmetic on BRC")
 	ROM_SYSTEM_BIOS(105, "addm-brc-loop", "ADDM BRC publication before separated RPTB and RPTBD consumers")
+	ROM_SYSTEM_BIOS(106, "st-mvmm", "Immediate-store postincrement visibility to MVMM")
 ROM_END
 
 ROM_START(tms54rom4)
