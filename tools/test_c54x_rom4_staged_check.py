@@ -15,12 +15,12 @@ class StagedFrontierTest(unittest.TestCase):
         self.loop = '771a,1388,f072,0e62,4920,4816,f620,f845,0e66,7721,0aaa,76f8,06f9,0001,f6bf,7713,06f9,ff45,7683,0000,e908,f074,4610,f030'
         self.loop_payload = bytes.fromhex(self.loop.replace(',', ''))
         self.image = self.image.ljust(REPEAT_SOURCE_OFFSET, b'\0') + self.loop_payload
-        self.row = ('rom4_staged_frontier: pc=7f91 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
+        self.row = ('rom4_staged_frontier: pc=7ff8 xpc=00 illegal=1 pmst=ffac swwsr=2000 bscr=0000 swcr=0000 '
                     f'words={self.words} t=0.500000000\n')
         self.text = ('rom4_staged_profile: system=nse1pipe\n'
-                     'staged repeat body 7192 at 007f8e is unsupported\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
-                     'rom4_staged_dagen: bk=0052 ar0=000a ar2=1201 st0=001f st1=6103\n'
-                     'rom4_staged_accumulators: a=0000005609 b=000000002b t=000b ar3=b6eb ar4=1201\n'
+                     'staged block control/count modification is unsupported instruction=007ff7 word=f074 block=007ff7..007ff8\n' + self.row + f'rom4_staged_uploaded_tail: base=0e10 words={self.tail}\n'
+                     'rom4_staged_dagen: bk=0052 ar0=000a ar2=13d9 st0=001f st1=e103\n'
+                     'rom4_staged_accumulators: a=ffbf982436 b=002436bf98 t=000b ar3=13d7 ar4=1207\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.133888750\n'
                      'rom4_staged_bsp_write: value=c0c8 mask=ffff t=0.133888808\n'
                      'rom4_staged_bsp_write: value=c008 mask=ffff t=0.134188962\n'
@@ -39,8 +39,8 @@ class StagedFrontierTest(unittest.TestCase):
                      'rom4_staged_host_consume: index=1 previous=0000 next=0006 pc_context=3907 t=0.175900019\n'
                      'rom4_staged_host_consume: index=2 previous=0006 next=000b pc_context=3907 t=0.175909212\n'
                      'rom4_staged_host_consume: index=3 previous=000b next=000f pc_context=3907 t=0.258977019\n'
-                     'rom4_staged_end: pc=7f91 xpc=00 illegal=1 reads=4 writes=4 gap_reads=6 host_consumed=3 host_headers=2 t=3.016666667\n'
-                     'rom4_interface_summary: completion_strobes=32 mailbox_writes=74 slot_expiries=27 frame_expiries=648 rf_reads=704 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=7f91 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0\n')
+                     'rom4_staged_end: pc=7ff8 xpc=00 illegal=1 reads=4 writes=4 gap_reads=6 host_consumed=3 host_headers=2 t=3.016666667\n'
+                     'rom4_interface_summary: completion_strobes=32 mailbox_writes=74 slot_expiries=27 frame_expiries=648 rf_reads=704 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=7ff8 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0\n')
         self.text += ''.join(f'rom4_rf_read: sample={i + 1} pc={pc} frame=30 t={0.162032 + i * 0.0000002:.6f}\n'
                              for i, pc in enumerate(('324e', '3254', '325a', '3260') * 4))
         observations = [
@@ -67,9 +67,9 @@ class StagedFrontierTest(unittest.TestCase):
         result = check(self.text, self.image)
         self.assertEqual(result['source_offset'], SOURCE_OFFSET)
         self.assertEqual(result['observed_words'], 40)
-        self.assertEqual(result['status'], 'unsupported_staged_repeated_move')
-        self.assertEqual(result['instruction'], 0x7192)
-        self.assertEqual(result['instruction_address'], 0x7f8e)
+        self.assertEqual(result['status'], 'unsupported_staged_block_call')
+        self.assertEqual(result['instruction'], 0xf074)
+        self.assertEqual(result['instruction_address'], 0x7ff7)
         self.assertEqual(result['host_header_reads'], 2)
         self.assertEqual(result['host_consumed'], 3)
         self.assertEqual(result['rf_sample_blocks'], 22)
@@ -86,12 +86,12 @@ class StagedFrontierTest(unittest.TestCase):
             self.assertFalse(result[field])
 
     def test_rejects_changed_or_duplicate_frozen_accumulators(self):
-        row = 'rom4_staged_accumulators: a=0000005609 b=000000002b t=000b ar3=b6eb ar4=1201\n'
+        row = 'rom4_staged_accumulators: a=ffbf982436 b=002436bf98 t=000b ar3=13d7 ar4=1207\n'
         for text in (self.text.replace(row, ''), self.text + row,
                      self.text.replace('t=000b', 't=000c'),
-                     self.text.replace('a=0000005609', 'a=0000005608'),
-                     self.text.replace('ar3=b6eb', 'ar3=b6ea'),
-                     self.text.replace('ar4=1201', 'ar4=1202')):
+                     self.text.replace('a=ffbf982436', 'a=ffbf982437'),
+                     self.text.replace('ar3=13d7', 'ar3=13d6'),
+                     self.text.replace('ar4=1207', 'ar4=1208')):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check(text, self.image)
 
@@ -122,9 +122,9 @@ class StagedFrontierTest(unittest.TestCase):
         for text in ('', self.text + self.row,
                      self.text.replace('illegal=1', 'illegal=0'),
                      self.text.replace('7728,2000', '7728,7fff'),
-                     self.text.replace('pc=7f91', 'pc=0f1f'),
+                     self.text.replace('pc=7ff8', 'pc=0f1f'),
                      self.text.replace('st0=001f', 'st0=081f'),
-                     self.text.replace('st1=6103', 'st1=4901'),
+                     self.text.replace('st1=e103', 'st1=4901'),
                      self.text + 'rom4_staged_dagen: malformed\n',
                      self.text + 'rom4_staged_dagen: bk=0010 ar0=0002 ar2=06d3 st0=081f st1=e900\n',
                      self.text.replace('rom4_staged_bsp_rx_count: count=2', 'rom4_staged_bsp_rx_count: count=3'),
@@ -156,7 +156,7 @@ class StagedFrontierTest(unittest.TestCase):
                 check(text, self.image)
 
     def test_requires_bounded_stop_endpoint_and_transport(self):
-        row = 'rom4_staged_end: pc=7f91 xpc=00 illegal=1 reads=4 writes=4 gap_reads=6 host_consumed=3 host_headers=2 t=3.016666667\n'
+        row = 'rom4_staged_end: pc=7ff8 xpc=00 illegal=1 reads=4 writes=4 gap_reads=6 host_consumed=3 host_headers=2 t=3.016666667\n'
         for text in (self.text.replace(row, ''), self.text + row,
                      self.text.replace('t=3.016666667', 't=0.516666667'),
                      self.text.replace('slot_expiries=27', 'slot_expiries=26'),
@@ -183,7 +183,7 @@ class StagedFrontierTest(unittest.TestCase):
                      self.text.replace('0.258977019', '0.175899019'),
                      self.text.replace('rom4_staged_host_consume:', 'missing_consume:'),
                      self.text + 'rom4_staged_host_consume: unexpected\n',
-                     self.text.replace('staged repeat body 7192 at 007f8e is unsupported', 'missing stop')):
+                     self.text.replace('staged block control/count modification is unsupported instruction=007ff7 word=f074 block=007ff7..007ff8', 'missing stop')):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check(text, self.image)
 

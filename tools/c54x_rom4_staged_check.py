@@ -24,14 +24,14 @@ def check(text, firmware):
     if len(rows) != 1 or text.count('rom4_staged_frontier:') != 1:
         raise ValueError('missing, malformed or duplicate staged frontier observation')
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
-    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('7f91', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
+    if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('7ff8', '00', '1', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    if (text.count('staged repeat body 7192 at 007f8e is unsupported') != 1
+    if (text.count('staged block control/count modification is unsupported instruction=007ff7 word=f074 block=007ff7..007ff8') != 1
             or text.count('unsupported') != 1 or 'unimplemented' in text):
         raise ValueError('missing or ambiguous staged host-packet instruction stop')
     ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:8] != ('7f91', '00', '1', '4', '4', '6', '3', '2')
+            or ends[0][:8] != ('7ff8', '00', '1', '4', '4', '6', '3', '2')
             or not 3 <= float(ends[0][8]) <= 3.05):
         raise ValueError('missing or changed bounded execution endpoint')
     end_time = float(ends[0][8])
@@ -46,16 +46,16 @@ def check(text, firmware):
             or not float(headers[-1][4]) < float(consumed[0][4]) < float(consumed[1][4]) < float(consumed[2][4]) < float(timestamp)):
         raise ValueError('missing or changed organic host-ring consumption')
     if (text.count('rom4_staged_dagen:') != 1
-            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0052', '000a', '1201', '001f', '6103')]):
+            or re.findall(r'rom4_staged_dagen: bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4})', text) != [('0052', '000a', '13d9', '001f', 'e103')]):
         raise ValueError('missing, duplicate or changed native status/address-generator observation')
     accumulators = re.findall(r'rom4_staged_accumulators: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) ar3=([0-9a-f]{4}) ar4=([0-9a-f]{4})', text)
     if (text.count('rom4_staged_accumulators:') != 1
-            or accumulators != [('0000005609', '000000002b', '000b', 'b6eb', '1201')]):
+            or accumulators != [('ffbf982436', '002436bf98', '000b', '13d7', '1207')]):
         raise ValueError('missing, malformed or changed frozen accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('32', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=32 mailbox_writes=74 slot_expiries=27 frame_expiries=648 rf_reads=704 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=7f91 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=32 mailbox_writes=74 slot_expiries=27 frame_expiries=648 rf_reads=704 rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0 pc=7ff8 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0000 transfer_expiries=0$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 16
@@ -129,11 +129,11 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_repeated_move', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_block_call', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x7f8e, instruction=0x7192,
+                instruction_address=0x7ff7, instruction=0xf074,
                 host_header_reads=2, host_consumed=3,
                 low_gap_bus_reads=6, rf_sample_reads=704, rf_sample_blocks=22,
                 bsp_transmit_words=[0x0aaa, 0xffd5],

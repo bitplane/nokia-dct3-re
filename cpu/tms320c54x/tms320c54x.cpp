@@ -102,6 +102,11 @@ constexpr bool staged_repeat_data_copy(u16 word)
 	return (word & 0xff00) == 0x7000 && u8(word) < 0xa0;
 }
 
+constexpr bool staged_repeat_destination_copy(u16 word)
+{
+	return (word & 0xff00) == 0x7100 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xdf));
+}
+
 constexpr bool staged_accumulator_stm(u16 word)
 {
 	return word >= 0x7708 && word <= 0x770d;
@@ -109,7 +114,7 @@ constexpr bool staged_accumulator_stm(u16 word)
 
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_repeat_data_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -2980,7 +2985,7 @@ void tms320c54x_device::pipeline_step()
 		// Execute's data write for iteration n-1 in the same clock.
 		m_pipeline_valid[2] = true;
 		m_pipeline_word[2] = m_pipeline_repeat_word;
-		repeated_data_copy = staged_repeat_data_copy(m_pipeline_repeat_word);
+		repeated_data_copy = staged_repeat_data_copy(m_pipeline_repeat_word) || staged_repeat_destination_copy(m_pipeline_repeat_word);
 		if (repeated_data_copy) m_pipeline_immediate[2] = m_pipeline_operand[2] = m_pipeline_repeat_source++;
 		m_pipeline_address[2] = m_pipeline_repeat_address;
 		m_pipeline_block_body[2] = m_pipeline_block_end[2] = m_pipeline_block_first_final[2] = false;
@@ -3433,14 +3438,14 @@ void tms320c54x_device::pipeline_step()
 			if (staged_pipelined_repeat(word))
 			{
 				unsigned owner = 3;
-				if (staged_repeat_data_copy(word) && (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))) owner = 4;
+				if ((staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) && (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))) owner = 4;
 				if (!m_pipeline_valid[owner] || (!staged_short_repeat(m_pipeline_word[owner]) && !staged_immediate_repeat(m_pipeline_word[owner])))
 				{
 					logerror("%s: staged pipeline repeat requires an immediate count\n", machine().describe_context()); m_illegal = true; return;
 				}
 				m_pipeline_repeat_word = word;
 				m_pipeline_repeat_issue_remaining = m_pipeline_immediate[owner];
-				if (staged_repeat_data_copy(word)) m_pipeline_repeat_source = m_pipeline_immediate[2] + 1;
+				if (staged_repeat_data_copy(word) || staged_repeat_destination_copy(word)) m_pipeline_repeat_source = m_pipeline_immediate[2] + 1;
 			}
 			m_pipeline_repeat_body_latched = true;
 			m_pipeline_repeat_address = m_pipeline_address[2];
@@ -3806,6 +3811,10 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[3];
 		bool const extended = staged_extended_move(m_pipeline_word[3]);
 		u16 const destination = m_pipeline_immediate[3];
+		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && destination < 0x60)
+		{
+			logerror("%s: repeated MVDK mapped destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const status = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && destination == 7;
 		bool const brc = destination == 0x1a;
 		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && !status && !brc && destination < 0x60)
@@ -3823,6 +3832,10 @@ void tms320c54x_device::pipeline_step()
 		}
 		u16 const source = staged_direct_mvmd(m_pipeline_word[3]) ? mode : extended ? (mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3)) : basic_address(3, mode);
+		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && source < 0x60)
+		{
+			logerror("%s: repeated MVDK mapped source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (source < 0x60 && (source < 8 || source > 0x19) && !staged_direct_mvmd(m_pipeline_word[3]))
 		{
 			logerror("%s: staged MVDK register/peripheral source is unsupported\n", machine().describe_context());
@@ -5212,7 +5225,7 @@ void tms320c54x_device::pipeline_restore_block_on_return(u32 address)
 void tms320c54x_device::pipeline_resume_after_repeat()
 {
 	u32 const next = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_address +
-		(staged_repeat_data_copy(m_pipeline_repeat_word) ? 2 : staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
+		(staged_repeat_data_copy(m_pipeline_repeat_word) || staged_repeat_destination_copy(m_pipeline_repeat_word) ? 2 : staged_pipelined_repeat(m_pipeline_repeat_word) ? 1 : staged_repeat_body_words(m_pipeline_repeat_word)));
 	// Inner RPT discards undecoded prefetch, including any predicted block
 	// wrap. Rebuild that prediction from Decode-owned BRC, not RPTC. The
 	// outer endpoint was decoded once, never once per repeated body copy.

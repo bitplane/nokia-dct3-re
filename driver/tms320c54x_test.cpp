@@ -14669,6 +14669,99 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62146;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct repeated_mvdk_fixture
+	{
+		u16 opcode, destination, bk, st0, st1;
+		u32 base;
+		unsigned count, snapshot;
+		std::array<u16, 8> initial, final;
+		std::array<u16, 16> sources, values;
+		bool excluded;
+		static u16 seed(u16 address) { return u16((unsigned(address) * 0x3917) ^ 0xa55a); }
+	};
+	static repeated_mvdk_fixture repeated_mvdk_case(unsigned variant, bool edge = false)
+	{
+		repeated_mvdk_fixture f{};
+		if (edge)
+		{
+			unsigned n = variant; u16 const address = std::array<u16, 5>{0, 8, 0x1a, 0x20, 0x5f}[n % 5]; n /= 5;
+			bool const source = n % 2; n /= 2; f.count = n % 2 ? 5 : 0; n /= 2;
+			f.opcode = n % 2 ? 0x71d2 : 0x7192; n /= 2; f.st1 = 0x800 | (n % 2 ? 0x20 : 0); n /= 2;
+			f.base = n % 2 ? 0x20000 : 0; n /= 2; f.snapshot = n;
+			f.initial.fill(0x1040); f.initial[0] = 1; f.initial[2] = source ? address : 0x1040;
+			f.final = f.initial; f.destination = source ? 0x1800 : address; f.bk = 82; f.st0 = 0x8620; f.excluded = true;
+			return f;
+		}
+		unsigned const encoding = variant % 184;
+		unsigned const mode = encoding < 152 ? encoding : encoding + 40;
+		unsigned n = variant / 184;
+		f.count = std::array<unsigned, 4>{0, 1, 5, 15}[n % 4]; n /= 4;
+		unsigned const placement = n % 6; n /= 6;
+		bool const compatibility = n % 2; n /= 2;
+		bool const cpl = n % 2; n /= 2;
+		f.base = n % 2 ? 0x20000 : 0; n /= 2; f.snapshot = n % 3;
+		f.opcode = 0x7100 | mode; f.st0 = 0x8600 | 0x20;
+		f.st1 = 0x800 | (compatibility ? 0x20 : 0) | (cpl ? 0x4000 : 0);
+		for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x1040;
+		f.initial[0] = 1; f.bk = mode >= 0xc0 ? 82 : 0;
+		unsigned const encoded_ar = mode & 7, selected = compatibility && !encoded_ar ? 4 : encoded_ar;
+		if (mode & 0x80) f.initial[selected] = mode >= 0xc0 ? 0x1051 : 0x1040;
+		if ((mode & 0x80) && !selected && f.bk) f.bk = 0x2000;
+		f.final = f.initial;
+		u16 const first_source = mode & 0x80 ? f.initial[selected] : 0x1000 + mode;
+		f.destination = placement == 0 ? 0x1800 : u16(first_source + int(placement) - 3);
+		if (mode & 0x80) if (compatibility && encoded_ar) f.st0 = (f.st0 & 0x1fff) | (encoded_ar << 13);
+		std::map<u16, u16> committed;
+		for (unsigned i = 0; i <= f.count; ++i)
+		{
+			u16 const source = mode & 0x80 ? f.final[selected] : first_source;
+			f.sources[i] = source;
+			f.values[i] = committed.count(source) ? committed[source] : repeated_mvdk_fixture::seed(source);
+			// Access(n) precedes Read(n-1)'s RAM publication in the same clock.
+			if (i) committed[u16(f.destination + i - 1)] = f.values[i - 1];
+			if (mode & 0x80)
+			{
+				unsigned const operation = (mode >> 3) & 15;
+				s32 const step = operation & 1 ? s32(s16(f.final[0])) : 1;
+				s32 delta = operation == 1 ? -1 : operation == 2 ? 1 : operation >= 8 ? (operation < 10 ? -step : step) : 0;
+				if (operation >= 8 && f.bk)
+				{
+					unsigned mask = 1; while (mask <= f.bk) mask <<= 1; --mask;
+					s32 const remainder = (s32(source & mask) + delta) % f.bk;
+					f.final[selected] = (source & ~mask) | u16(remainder < 0 ? remainder + f.bk : remainder);
+				}
+				else f.final[selected] = u16(source + delta);
+			}
+			f.excluded |= source < 0x60;
+		}
+		return f;
+	}
+	void start_repeated_mvdk(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		bool const edge = !strcmp(machine().options().bios(), "mvdk-rpt-edge"); auto f = repeated_mvdk_case(variant, edge);
+		// Self-indexed AR0 can enter mapped memory; that composition is not admitted.
+		while (!edge && f.excluded) f = repeated_mvdk_case(++variant);
+		m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
+		program.write_word(f.base + 0x600, 0xec00 | f.count); program.write_word(f.base + 0x601, f.opcode);
+		program.write_word(f.base + 0x602, f.destination); program.write_word(f.base + 0x603, 0xf4e1);
+		if (!edge) for (unsigned i = 0; i <= f.count; ++i) { data.write_word(f.sources[i], repeated_mvdk_fixture::seed(f.sources[i])); data.write_word(u16(f.destination + i), repeated_mvdk_fixture::seed(u16(f.destination + i))); }
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8620); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeated_mvdk_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_operand_reads++; expect(i <= f.count && at == f.sources[i] && word == f.values[i] && m_cpu->pipeline_cycles() == 6 + i, "Repeated MVDK owns each Access sample and source update"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeated_mvdk_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; expect(i <= f.count && at == u16(f.destination + i) && word == f.values[i] && m_cpu->pipeline_cycles() == 7 + i, "Repeated MVDK increments EAR and publishes each retained sample once"); });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x602, f.base + 0x602, "repeated_mvdk_literal", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Repeated MVDK fetches its destination only once"); ++m_pipeline_extensions_reads; } });
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62148;
+		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -17680,6 +17773,7 @@ private:
 		if (!strcmp(machine().options().bios(), "sqdst") || !strcmp(machine().options().bios(), "sqdst-edge")) { start_sqdst(); return; }
 		if (!strcmp(machine().options().bios(), "portr-bypass")) { start_portr_bypass(); return; }
 		if (!strcmp(machine().options().bios(), "mvdk-circular") || !strcmp(machine().options().bios(), "mvdk-circ-edge")) { start_circular_move(); return; }
+		if (!strcmp(machine().options().bios(), "mvdk-repeat") || !strcmp(machine().options().bios(), "mvdk-rpt-edge")) { start_repeated_mvdk(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-direct")) { start_direct_cmpm(); return; }
@@ -48827,6 +48921,35 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62148)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const edge = !strcmp(machine().options().bios(), "mvdk-rpt-edge"); auto const f = repeated_mvdk_case(variant, edge); unsigned const checkpoint = 5 + f.snapshot;
+			unsigned const rejection_tick = f.destination < 0x60 && (f.destination < 8 || f.destination > 0x1a) ? 5 : 6;
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= rejection_tick), "Repeated MVDK rejects mapped compositions before data or pointer effects");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save repeated MVDK before and during its retained copies");
+			}
+			if (tick == 32)
+			{
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_pipeline_operand_reads == (edge ? 0 : f.count + 1) && m_pipeline_store_writes == (edge ? 0 : f.count + 1) && m_pipeline_extensions_reads == 1, "Repeated MVDK copies count plus one words or rejects before side effects");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef, "Repeated MVDK preserves unselected registers and status");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == f.final[i], "Repeated MVDK updates only its selected pointer once per copy");
+				if (!edge) for (unsigned i = 0; i <= f.count; ++i) { auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(u16(f.destination + i)) == f.values[i], "Repeated MVDK publishes consecutive destination words"); }
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeated MVDK without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62149; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < (edge ? 479U : 105983U)) { start_repeated_mvdk(variant + 1); return; }
+				if (edge) { osd_printf_info("TMS320C54x repeated MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 compatibility_states=2 pages=2 snapshots=3 reads=0 writes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated repeated MVDK exclusions complete"); }
+				osd_printf_info("TMS320C54x repeated MVDK: PASS cases=105696 restore=105696 source_geometries_skipped=288 encodings=184 counts=4 placements=6 compatibility_states=2 cpl_states=2 pages=2 snapshots=3 mapped_access=excluded physical_phase_claim=0 interrupt_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated repeated MVDK complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62149) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62148; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62146)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -52591,6 +52714,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(77, "portr-bypass", "PORTR consumers and the native request-mask sequence")
 	ROM_SYSTEM_BIOS(78, "mvdk-circular", "Circular source moves with retained data and mapped publications")
 	ROM_SYSTEM_BIOS(79, "mvdk-circ-edge", "Circular move control and peripheral destination exclusions")
+	ROM_SYSTEM_BIOS(80, "mvdk-repeat", "Repeated destination-addressed copies with consecutive EAR publication")
+	ROM_SYSTEM_BIOS(81, "mvdk-rpt-edge", "Repeated MVDK mapped-memory composition exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
