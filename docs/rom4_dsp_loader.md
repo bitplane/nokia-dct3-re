@@ -1,5 +1,19 @@
 # ROM4 DSP loader contract
 
+## Staged accumulator saturation
+
+SAT A/B is admitted as a register-only Execute operation. TI SPRU172C,
+page 4-154, specifies signed 32-bit saturation independently of OVM and
+replacement of the selected accumulator's overflow flag. The `sat` core
+profile verifies 3,072 cases and save-state replays: 16 signed 40-bit
+patterns around both clamp boundaries, both accumulators, all initial
+overflow-bit combinations, SXM/OVM combinations, two program pages and
+three snapshots around adjacent Execute publications. A second adjacent
+SAT clears the overflow from a preceding clamp. The other accumulator,
+unrelated status bits and modes remain unchanged. This qualifies the
+declared staged schedule, not measured silicon pipeline phases;
+single-instruction repeat remains rejected by the existing repeat guard.
+
 ## Current result
 
 The current native boundary profiles are distinct: the four-second coherent
@@ -392,8 +406,9 @@ status is subsequently `4900`. It executes resident `003461`,
 A passive read tap observes two firmware reads of BSP's retained test
 word `0aaa`, at 0.133909558 and 0.133937654 s. The second is the newly
 admitted shifted read, not a new serial frame or an injected reply.
-Execution then stops at resident `003473`, `f483` (SAT A). The exposed PC is
-`3475`, ST0 `081f`, PMST `ffac` and
+The staged frontend executes SAT A/B at `3473/3475`, then stops at
+resident `0034d3`, `80d3` (an unsupported accumulator store form).
+The exposed PC is `34d5`, BK `0278`, ST0 `001f`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial

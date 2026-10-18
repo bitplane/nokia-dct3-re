@@ -6269,6 +6269,33 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	static constexpr std::array<u64, 16> sat_inputs = {
+		0, 1, 0x7ffffffeULL, 0x7fffffffULL, 0x80000000ULL, 0x80000001ULL,
+		0xff7fffffffULL, 0xff80000000ULL, 0xff80000001ULL, 0xffffffffffULL,
+		0x7fffffffffULL, 0x8000000000ULL, 0x0100000000ULL, 0xfeffffffffULL,
+		0x007fffff00ULL, 0xff80000100ULL
+	};
+	void start_sat(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		bool const b = variant & 1;
+		u32 const base = (variant / 512) % 2 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x9000 + i, 0xf495);
+		program.write_word(base + 0x9000, b ? 0xf583 : 0xf483);
+		program.write_word(base + 0x9001, b ? 0xf583 : 0xf483);
+		program.write_word(base + 0x9002, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xb824 | (((variant / 32) % 4) << 9));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (((variant / 128) % 4) << 8));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x123456789aULL : sat_inputs[(variant / 2) % 16]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? sat_inputs[(variant / 2) % 16] : 0x123456789aULL);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62124;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_rotate(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -16854,6 +16881,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store")) { start_repeat_store(); return; }
 		if (!strcmp(machine().options().bios(), "rptz")) { start_rptz(); return; }
+		if (!strcmp(machine().options().bios(), "sat")) { start_sat(); return; }
 		if (!strcmp(machine().options().bios(), "rotate")) { start_rotate(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar")) { start_ar_addm(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar-load")) { start_ar_addm_load(); return; }
@@ -19112,6 +19140,47 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == rptz_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = rptz_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 62124)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const b = variant & 1;
+			unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 7}[variant / 1024];
+			u64 const input = sat_inputs[(variant / 2) % 16];
+			// Compare unsigned 40-bit regions, independently of the interpreter's sign extension.
+			bool const negative = input & 0x8000000000ULL;
+			bool const overflow = negative ? input < 0xff80000000ULL : input > 0x7fffffffULL;
+			u64 const result = overflow ? (negative ? 0xff80000000ULL : 0x7fffffffULL) : input;
+			u16 const mask = b ? 0x200 : 0x400;
+			u16 status = 0xb824 | (((variant / 32) % 4) << 9);
+			if (tick >= 6) status = (status & ~mask) | (tick == 6 && overflow ? mask : 0);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged SAT is admitted");
+			expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (tick < 6 ? input : result) &&
+				m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x123456789aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (((variant / 128) % 4) << 8)),
+				"SAT publishes at Execute, clamps independently of OVM and replaces only its own overflow flag");
+			if (tick == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SAT pipeline before or between publications");
+			}
+			if (tick == 16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "SAT pair reaches IDLE");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore adjacent SAT publications");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62125; m_check_timer->enable(true); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 3071) { start_sat(variant + 1); return; }
+				osd_printf_info("TMS320C54x staged SAT: PASS cases=3072 restore=3072 patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated staged SAT complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 62125) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62124; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == rotate_phase)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -51613,6 +51682,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(55, "shift-periph", "Shifted peripheral operand retention and access clock")
 	ROM_SYSTEM_BIOS(56, "shift-bsp", "Shifted BSP receive acknowledgement and pending next frame")
 	ROM_SYSTEM_BIOS(57, "shift-per-edge", "Excluded shifted peripheral control and arithmetic forms")
+	ROM_SYSTEM_BIOS(58, "sat", "Staged signed saturation and overflow publication")
 ROM_END
 
 ROM_START(tms54rom4)
