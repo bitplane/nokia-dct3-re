@@ -1,8 +1,8 @@
 # ROM4 DSP loader contract
 
 The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The prototype currently stops on STM AL `7708` at
-`45b0`; its upload completion and handset boot remain unaccepted. The
+acceptance scopes. The prototype currently stops on absolute ST T `8cf8` at
+`a548`; its upload completion and handset boot remain unaccepted. The
 instruction qualifications below do not promote either claim. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
@@ -91,6 +91,24 @@ Mapped sources/destinations and long-offset/absolute Smem repeat forms
 remain excluded. `rpt-mvkd-edge` checks 32 cases and replays of those exclusions
 before bus or pointer effects. Interrupt composition and physical pipeline phases remain
 unqualified for this new repeated form.
+
+## Immediate accumulator-field publication
+
+STM to AL/AH/AG/BL/BH/BG retains its literal through Decode and writes
+the selected field at Execute, not on DAGEN's early-write path. The other
+fields are preserved from the live accumulator at publication; AG/BG retain
+only eight bits. The mapped-producer ordering rule from SPRU131G section
+7.5.10 also covers this writer, so an adjacent MVDK samples after its mapped
+write rather than treating it as a direct-ALU producer with setup latency.
+
+`stm-acc` verifies 3,456 cases and replays across six fields, six literals,
+four accumulator patterns, SXM/OVM combinations, two program pages and
+three snapshots. It poisons the fetched literal, changes sibling fields
+before Execute, checks every clock's accumulator state and follows the
+write with a mapped MVDK read and RAM publication. Both writes and the
+single read must occur once at their declared stages; flags and modes
+are unchanged. The schedule remains a staged-core model, not a measured
+silicon-phase claim.
 
 ## Current result
 
@@ -488,9 +506,10 @@ The staged frontend executes SAT A/B at `3473/3475` and the circular
 post-increment store `80d3` at `34d3`, then the TC conditional call `f930`
 at `354c`, followed by accumulator-lane CMPM at `0025fe`, `60f8`, whose
 source `000b` is BL. Repeated MVKD `7090` at `3053` copies three words
-from `b706` through post-incrementing AR0, then execution stops on
-STM AL `7708` at `0045b0`. The exposed PC is `45b2`, BK `00fa`,
-AR0 `1987`, AR2 `0060`, ST0 `081f`, ST1 `4108`, PMST `ffac` and
+from `b706` through post-incrementing AR0, and STM AL `7708` at `45b0`
+executes. The next stop is absolute ST T `8cf8` at `00a548`.
+The exposed PC is `a54a`, BK `00fa`, AR0 `1987`, AR2 `06e4`,
+ST0 `081f`, ST1 `6908`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -505,11 +524,11 @@ STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
 The backend
-reports 74 MCU mailbox writes and three completion strobes. The additional
+reports 74 MCU mailbox writes and four completion strobes. An additional
 strobe alone does not prove upload completion. After the two
 retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
-at 0.133940788 s. Two later BSP control writes publish `c008` at
-0.134188962 and 0.134294769 s, in addition to the initial reset/release pair.
+at 0.133940788 s. Three later BSP control writes publish `c008` at
+0.134188962, 0.134294769 and 0.158807577 s, in addition to the initial reset/release pair.
 These are firmware writes, not supplied receive frames. Neither
 upload completion nor handset boot is accepted for this machine.
 
