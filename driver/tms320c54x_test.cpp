@@ -15025,17 +15025,18 @@ private:
 		unsigned read_clock, snapshot;
 		bool extension, late, excluded = false;
 	};
-	static std::array<u64, 2> addc_expected(u64 source, u16 word, u16 st0, u16 st1, bool b)
+	static std::array<u64, 2> addc_expected(u64 source, u16 word, u16 st0, u16 st1, bool b, unsigned family = 0)
 	{
 		s64 const left = source & 0x8000000000ULL ? s64(source) - (s64(1) << 40) : s64(source);
-		u64 const increment = u64(word) + ((st0 >> 11) & 1); s64 const sum = left + s64(increment);
+		u64 const increment = u64(word) + (family ? 0 : (st0 >> 11) & 1);
+		s64 const sum = family == 2 ? left - s64(increment) : left + s64(increment);
 		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-		bool const carry = (source % 0x100000000ULL) + increment >= 0x100000000ULL;
+		bool const carry = family == 2 ? (source % 0x100000000ULL) >= increment : (source % 0x100000000ULL) + increment >= 0x100000000ULL;
 		u16 const status = (st0 & ~u16(0x800)) | (carry ? 0x800 : 0) | (overflow ? b ? 0x200 : 0x400 : 0);
 		u64 const result = u64(overflow && (st1 & 0x200) ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
 		return {result, status};
 	}
-	static addc_fixture addc_case(unsigned v, bool edge)
+	static addc_fixture addc_case(unsigned v, bool edge, unsigned family = 0)
 	{
 		static constexpr std::array<u64, 8> accumulators{0, 0xffffffffULL, 0x7fffffffULL, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffff, 0x123456789aULL};
 		static constexpr std::array<u16, 8> words{0, 1, 0x7fff, 0x8000, 0xffff, 0xaaaa, 0x5555, 0xfffe};
@@ -15081,7 +15082,7 @@ private:
 			f.initial[3] = form == 4 ? 0x1000 : f.address; if (form == 1) f.st1 |= 0x4000; if (form == 5) f.bk = 13;
 		}
 		f.next_ar3 = !mapped && !edge && form == 3 ? 0x1003 : !mapped && !edge && form == 5 ? 0x1000 : f.initial[3];
-		f.opcode = 0x0600 | (destination << 8) | mode; f.read_clock = f.extension ? 6 : 5;
+		f.opcode = (family == 1 ? 0x0200 : family == 2 ? 0x0a00 : 0x0600) | (destination << 8) | mode; f.read_clock = f.extension ? 6 : 5;
 		f.after_a = f.a; f.after_b = f.b;
 		if (mapped && f.address < 14)
 		{
@@ -15092,14 +15093,17 @@ private:
 		if (f.late) (destination ? f.after_b : f.after_a) = accumulators[(pattern + 1) % 8];
 		f.execute_st0 = f.st0 ^ (f.late ? 0x800 : 0);
 		u64 const source = destination ? f.after_b : f.after_a;
-		auto const expected = addc_expected(source, f.word, f.execute_st0, f.st1, destination);
+		auto const expected = addc_expected(source, f.word, f.execute_st0, f.st1, destination, family);
 		f.final_st0 = expected[1]; f.final_a = destination ? f.after_a : expected[0]; f.final_b = destination ? expected[0] : f.after_b;
 		return f;
 	}
 	void start_addc(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const edge = !strcmp(machine().options().bios(), "addc-edge"); auto const f = addc_case(variant, edge);
+		bool const arithmetic = !strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge");
+		bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge");
+		unsigned const extent = edge ? 1920 : 110592;
+		auto const f = addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 		program.write_word(f.base + 0x600, f.opcode); if (f.extension) program.write_word(f.base + 0x601, f.literal);
@@ -15112,9 +15116,9 @@ private:
 		if (f.address >= 0x60 && !edge) data.write_word(f.address, f.word);
 		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "addc_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && !m_pipeline_operand_reads++ && at == f.address && word == f.word && m_cpu->pipeline_cycles() == f.read_clock, "ADDC retains one real unsigned source in Read"); });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "addc_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "ADDC writes no data memory"); } });
-		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "addc_literal", [this, f](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled() && f.extension) { expect(!m_pipeline_extensions_reads++ && word == f.literal, "ADDC fetches its address extension once"); } });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "unsigned_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && !m_pipeline_operand_reads++ && at == f.address && word == f.word && m_cpu->pipeline_cycles() == f.read_clock, "Unsigned arithmetic retains one real source in Read"); });
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "unsigned_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Unsigned arithmetic writes no data memory"); } });
+		m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "unsigned_literal", [this, f](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled() && f.extension) { expect(!m_pipeline_extensions_reads++ && word == f.literal, "Unsigned arithmetic fetches its address extension once"); } });
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62156;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -18308,6 +18312,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-call-edge")) { start_block_near_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-mem-copy") || !strcmp(machine().options().bios(), "rpt-mem-wrap") || !strcmp(machine().options().bios(), "rpt-mem-chain")) { start_memory_copy_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "addc") || !strcmp(machine().options().bios(), "addc-edge")) { start_addc(); return; }
+		if (!strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge")) { start_addc(); return; }
 		if (!strcmp(machine().options().bios(), "addc-chain")) { start_addc_chain(); return; }
 		if (!strcmp(machine().options().bios(), "mvkd-peripheral")) { start_mvkd_peripheral(); return; }
 		if (!strcmp(machine().options().bios(), "cmpm-absolute")) { start_pipeline_bitfield_ar7(); return; }
@@ -49581,32 +49586,40 @@ private:
 		if (m_phase == 62159) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62158; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 62156)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const edge = !strcmp(machine().options().bios(), "addc-edge"); auto const f = addc_case(variant, edge);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+			bool const arithmetic = !strcmp(machine().options().bios(), "unsigned-map") || !strcmp(machine().options().bios(), "unsigned-edge");
+			bool const edge = !strcmp(machine().options().bios(), "addc-edge") || !strcmp(machine().options().bios(), "unsigned-edge");
+			unsigned const extent = edge ? 1920 : 110592; auto const f = addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
 			unsigned const checkpoint = f.read_clock - (edge ? 2 : 1) + f.snapshot;
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_clock - 1), "ADDC rejects unowned mapped/control sources before Read");
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_clock - 1), "Unsigned arithmetic rejects unowned mapped/control sources before Read");
 			if (tick == f.read_clock && !edge)
 			{
-				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.next_ar3, "ADDC resolves and updates its address once before operand mutation");
+				expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.next_ar3, "Unsigned arithmetic resolves and updates its address once before operand mutation");
 				set_repeat_count_source(f.address, 0xa55a);
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, f.after_a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.after_b); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.execute_st0);
 				for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3330 + i);
 			}
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
-				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save ADDC before Read, after capture or after Execute");
+				m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save unsigned arithmetic before Read, after capture or after Execute");
 			}
 			if (tick == 12)
 			{
-				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_pipeline_operand_reads == unsigned(!edge) && !m_pipeline_store_writes && m_pipeline_extensions_reads == unsigned(f.extension), "ADDC owns one source and optional extension but no memory write");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (edge ? f.a : f.final_a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (edge ? f.b : f.final_b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (edge ? f.st0 : f.final_st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "ADDC uses unsigned retained Smem and Execute-live accumulator/carry with sticky overflow and OVM");
-				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (edge ? f.initial[i] : 0x3330 + i), "ADDC never reapplies an auxiliary update after Read or restore");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (!edge && f.address == 14 ? 0xa55a : f.t) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (!edge && f.address == 15 ? 0xa55a : f.trn) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "ADDC preserves unselected registers and does not rewrite a mutated mapped operand");
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_pipeline_operand_reads == unsigned(!edge) && !m_pipeline_store_writes && m_pipeline_extensions_reads == unsigned(f.extension), "Unsigned arithmetic owns one source and optional extension but no memory write");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (edge ? f.a : f.final_a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (edge ? f.b : f.final_b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (edge ? f.st0 : f.final_st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Unsigned arithmetic uses retained Smem and Execute-live accumulator with sticky overflow and OVM");
+				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (edge ? f.initial[i] : 0x3330 + i), "Unsigned arithmetic never reapplies an auxiliary update after Read or restore");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (!edge && f.address == 14 ? 0xa55a : f.t) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (!edge && f.address == 15 ? 0xa55a : f.trn) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unsigned arithmetic preserves unselected registers and does not rewrite a mutated mapped operand");
 				if (!m_pipeline_replay)
 				{
-					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore ADDC without duplicated reads or address updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62157; m_check_timer->enable(true); return;
+					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore unsigned arithmetic without duplicated reads or address updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62157; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (edge ? 1919U : 110591U)) { start_addc(variant + 1); return; }
+				if (variant + 1 < extent * (arithmetic ? 2U : 1U)) { start_addc(variant + 1); return; }
+				if (arithmetic)
+				{
+					if (edge) { osd_printf_info("TMS320C54x unsigned mapped exclusions: PASS cases=3840 restore=3840 operations=ADDS,SUBS addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated unsigned mapped exclusions complete"); }
+					osd_printf_info("TMS320C54x unsigned mapped arithmetic: PASS cases=221184 restore=221184 operations=ADDS,SUBS numeric_cases=147456 mapped_cases=73728 ram_forms=6 mapped_sources=16 accumulators=2 carry_inputs=ignored sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated unsigned mapped arithmetic complete");
+				}
 				if (edge) { osd_printf_info("TMS320C54x ADDC exclusions: PASS cases=1920 restore=1920 addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated ADDC exclusions complete"); }
 				osd_printf_info("TMS320C54x ADDC: PASS cases=110592 restore=110592 numeric_cases=73728 mapped_cases=36864 ram_forms=6 mapped_sources=16 accumulators=2 carry_states=2 sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator_carry=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated ADDC complete");
 			}
@@ -53499,6 +53512,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(94, "stack-page0-edge", "Direct page-zero stack peripheral and indirect exclusions")
 	ROM_SYSTEM_BIOS(95, "stld", "Parallel store with retained Xmem load into accumulator or T")
 	ROM_SYSTEM_BIOS(96, "stld-edge", "Parallel store/load mapped operand exclusions")
+	ROM_SYSTEM_BIOS(97, "unsigned-map", "ADDS and SUBS retained mapped sources and Execute-live arithmetic")
+	ROM_SYSTEM_BIOS(98, "unsigned-edge", "ADDS and SUBS mapped control-source exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -3,18 +3,17 @@
 The native boundary profiles and the staged-frontend prototype have different
 acceptance scopes. The staged frontend now reaches the first organic
 host-packet decoder, records twenty-one consumer advances across two observed
-initialization passes, and stops on absolute ADDS `0af8 000b` at `403e`
-(reported PC `4042`), whose mapped BL source is not yet admitted.
+initialization passes, and stops on CMPM `60f8` at `401a`
+(reported PC `401f`), whose mapped AR2 source is not yet admitted.
 Its upload completion, RF acquisition and handset boot remain unaccepted. The
 instruction qualifications below do not promote these claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the exact prototype stop.
 
-The current staged question is unsigned memory arithmetic's mapped source
-ownership: absolute data address `000b` is BL, not external RAM. The
-STLM suspension, page-zero stack transfers and parallel store/load data
-path now execute. Parallel-store carry and physical bus phases remain
-unvalidated; these results do not establish completed handset boot.
+The current staged question is CMPM's mapped-source capture, immediate
+binding and TC publication. Absolute data address `0012` is AR2, not
+external RAM. Parallel-store carry and physical bus phases remain
+unvalidated.
 
 ## STLM suspension of an interrupted loop
 
@@ -165,6 +164,33 @@ no-write exclusions for control/unowned mapped sources. Interrupt,
 repeat/control composition and physical phase timing remain unqualified.
 The native `07f8 000e` (ADDC T,B) at `4914` executes; no arithmetic result
 is supplied by the observer.
+
+## Unsigned Mapped Arithmetic
+
+ADDS (`02xx/03xx`) adds unsigned Smem; SUBS (`0axx/0bxx`) subtracts
+unsigned Smem. In particular, `0af8 000b` is SUBS from absolute BL, not
+ADDS. Both suppress sign extension regardless of SXM and ignore input C;
+output carry/no-borrow is taken at bit 32, with sticky OVA/OVB and OVM
+saturation (SPRU172C 4-10/4-194; SPRU131G table 4-1).
+
+The staged path admits mapped sources `0008..0017`: six accumulator
+slices, T/TRN and eight auxiliary registers. Sources are actual mapped
+reads retained in Read; the accumulator and arithmetic flags are
+Execute-owned. SP/BK, control and peripheral sources remain excluded.
+`unsigned-map` passes 221,184 cases and save-state replays, including
+147,456 RAM and 73,728 mapped cases across both operations, both
+accumulators, three mapped-address forms, six RAM forms, eight words,
+eight accumulator patterns, SXM/OVM and initial-C combinations, late
+accumulator/status changes, two pages and three snapshots. Source memory,
+mapped words and pointers change after Read, including self-aliasing
+accumulator sources. `unsigned-edge` adds 3,840 replayed exclusions for
+80 addresses and DP/absolute/indirect forms without data access, writes
+or pointer changes. The unchanged core rejects mapped ADDS AL (`0208`).
+The fixture shares address/sample ownership with ADDC but uses operation-specific
+add/subtract expectations. Native `0af8 000b` at `403e` executes
+without an observer-supplied source/result; the RF/host counters do not
+increase at this new endpoint. This does not qualify arbitrary
+interrupt/repeat composition or measured bus phases.
 
 ## Circular MVDK qualification
 
@@ -548,7 +574,7 @@ Three-second reference controls separate frontend and SWWSR selection:
 |---|---|---|---|---|---|
 | `noki5110` | atomic | legacy | 21 | 13 | No illegal instruction. |
 | `nse1astd` | atomic | standard | 21 | 13 | Same end counters as atomic/legacy. |
-| `nse1pipe` | staged | standard | 21 | 11 | Two initialization passes and later RF-control burst; mapped ADDS source stops at `403e`. |
+| `nse1pipe` | staged | standard | 21 | 11 | Two initialization passes and later RF-control burst; mapped CMPM source stops at `401a`. |
 | `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
 
 The atomic controls both publish 639 completion strobes, 19,840 RF reads
@@ -980,21 +1006,21 @@ repeat also executes. The live 0.5-second checkpoint has PC `408d`, BK
 `00fa`, AR0=1, AR2=`06e4`, ST0=`081f`, ST1=`6103`, A=B=0, T=`000b`,
 AR3=`06e3`, AR4=0 and PMST `ffac`, with ILLEGAL clear. These are checkpoint
 registers, not the later stopped instruction's operands.
-The final observation at 3.016666667 s pins the Access guard for unsigned
-arithmetic `0af8` at `403e`, source `000b`, PC `4042`, ILLEGAL set, seven
+The final observation at 3.016666667 s pins the Access guard for CMPM
+`60f8` at `401a`, source `0012`, PC `401f`, ILLEGAL set, seven
 reads through the ring-base tap, twenty-one consumer advances, 354 completion
 strobes, 74 mailbox writes and final device counters of 10,336 RF reads,
 327 slot expiries and 573 frame expiries. Eleven RF-control writes and
 255 transfer expiries occur, with only 31 expiries before the stop;
 `mode_aa` is zero and `mode_ac` is two. The terminal architectural snapshot
-is A=`1413`, B=`0050`, T=`000c`, ST0=`001f`, ST1=`6103`, BK=`0052`,
+is A=B=`302813`, T=`000c`, ST0=`001f`, ST1=`6103`, BK=`0052`,
 AR0=`126d`, AR1=`03e8`, AR2=`0031`, AR3=`0008`. This is an Access-rejection snapshot,
 not proof that older pending instructions have retired.
 The ring and RF sample
 counters show reinitialization between the two BSP/upload prefixes; this
 does not establish twenty-one packets in one uninterrupted session. Both fresh
 captures reproduce these observations in
-`tmp/stld-native-{confirm,final}/error.log`.
+`tmp/unsigned-map-native{,-confirm}/error.log`.
 Older pending
 slots need not retire after Decode rejection. SWWSR has actually retired
 to `2000`; C5416-only BSCR/SWCR

@@ -26,18 +26,18 @@ def check(text, firmware):
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
     if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('408d', '00', '0', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    stop = 'staged unsigned memory arithmetic mapped-register source is unsupported instruction=00403e word=0af8 source=000b'
+    stop = 'staged CMPM mapped-register source is unsupported instruction=00401a word=60f8 source=0012'
     if (text.count(stop) != 1
             or text.count('unsupported') != 1 or 'unimplemented' in text):
         raise ValueError('missing or ambiguous staged host-packet instruction stop')
     ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:8] != ('4042', '00', '1', '14', '12', '15', '21', '7')
+            or ends[0][:8] != ('401f', '00', '1', '14', '12', '15', '21', '7')
             or not 3 <= float(ends[0][8]) <= 3.05):
         raise ValueError('missing or changed bounded execution endpoint')
     end_time = float(ends[0][8])
     terminal = re.findall(r'rom4_staged_end_state: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4}) bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) ar3=([0-9a-f]{4})', text)
-    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000001413', '0000000050', '000c', '001f', '6103', '0052', '126d', '03e8', '0031', '0008')]:
+    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000302813', '0000302813', '000c', '001f', '6103', '0052', '126d', '03e8', '0031', '0008')]:
         raise ValueError('missing or changed terminal architectural snapshot')
     headers = re.findall(r'rom4_staged_host_header: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
     if (text.count('rom4_staged_host_header:') != 7
@@ -65,7 +65,7 @@ def check(text, firmware):
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
     if summaries != [('354', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=354 mailbox_writes=74 slot_expiries=327 frame_expiries=573 rf_reads=10336 rf_port32_writes=11 rf_port38_reads=0 rf_port39_reads=0 pc=4042 pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0002 transfer_expiries=255$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=354 mailbox_writes=74 slot_expiries=327 frame_expiries=573 rf_reads=10336 rf_port32_writes=11 rf_port38_reads=0 rf_port39_reads=0 pc=401f pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0002 transfer_expiries=255$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 32
@@ -167,11 +167,11 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_unsigned_mapped_source', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_cmpm_auxiliary_source', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x403e, instruction=0x0af8, mapped_source=0x000b,
+                instruction_address=0x401a, instruction=0x60f8, mapped_source=0x0012,
                 host_header_reads=7, host_consumed=21,
                 low_gap_bus_reads=15, rf_sample_reads=10336, rf_sample_blocks=323, rf_sample_remainder=0,
                 rf_control_writes=11, transfer_expiries=255, transfer_expiries_before_stop=31, transfer_expiries_after_stop=224,
