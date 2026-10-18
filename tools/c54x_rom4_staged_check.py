@@ -26,23 +26,23 @@ def check(text, firmware):
     pc, xpc, illegal, pmst, swwsr, bscr, swcr, encoded, timestamp = rows[0]
     if (pc, xpc, illegal, pmst, swwsr, bscr, swcr) != ('408d', '00', '0', 'ffac', '2000', '0000', '0000') or not 0.5 <= float(timestamp) <= 1:
         raise ValueError('staged CPU snapshot changed; reassess the actual frontier')
-    stop = 'staged block control/count modification is unsupported instruction=004749 word=fa30 block=00473c..004777'
+    stop = 'unsupported staged C54x form fe44 at 0090eb'
     if (text.count(stop) != 1
             or text.count('unsupported') != 1 or 'unimplemented' in text):
         raise ValueError('missing or ambiguous staged host-packet instruction stop')
     ends = re.findall(r'rom4_staged_end: pc=([0-9a-f]{4}) xpc=([0-9a-f]{2}) illegal=([01]) reads=(\d+) writes=(\d+) gap_reads=(\d+) host_consumed=(\d+) host_headers=(\d+) t=([0-9.]+)', text)
     if (text.count('rom4_staged_end:') != 1 or len(ends) != 1
-            or ends[0][:8] != ('474c', '00', '1', '16', '14', '15', '21', '7')
-            or not 3 <= float(ends[0][8]) <= 3.05):
+            or ends[0][:8] != ('90ed', '00', '1', '18', '16', '15', '28', '10')
+            or not 5 <= float(ends[0][8]) <= 5.05):
         raise ValueError('missing or changed bounded execution endpoint')
     end_time = float(ends[0][8])
     terminal = re.findall(r'rom4_staged_end_state: a=([0-9a-f]{10}) b=([0-9a-f]{10}) t=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=([0-9a-f]{4}) bk=([0-9a-f]{4}) ar0=([0-9a-f]{4}) ar1=([0-9a-f]{4}) ar2=([0-9a-f]{4}) ar3=([0-9a-f]{4})', text)
-    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000001a08', '0000000000', '5555', '081f', 'e103', '0048', '0001', '06b8', '1a04', '1250')]:
+    if text.count('rom4_staged_end_state:') != 1 or terminal != [('0000000000', '000000fc9c', '000b', '081f', '6103', '00fa', '06f3', '0000', '0100', '06e3')]:
         raise ValueError('missing or changed terminal architectural snapshot')
     headers = re.findall(r'rom4_staged_host_header: index=(\d+) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc_context=([0-9a-f]{4}) t=([0-9.]+)', text)
-    if (text.count('rom4_staged_host_header:') != 7
+    if (text.count('rom4_staged_host_header:') != 10
             or [row[:4] for row in headers] != [(str(i + 1), value, 'ffff', context) for i, (value, context) in enumerate([
-                ('0a05', '3871'), ('0a05', '387f'), ('0a05', '3871'), ('0a05', '387f'), ('ff6e', '3b0c'), ('0001', '3c63'), ('354a', '3c67')])]
+                ('0a05', '3871'), ('0a05', '387f'), ('0a05', '3871'), ('0a05', '387f'), ('ff6e', '3b0c'), ('0001', '3c63'), ('354a', '3c67'), ('7fff', '3f4a'), ('0000', '3f4a'), ('7fb2', '3f4a')])]
             or not 0.17 < float(headers[0][4]) < float(headers[1][4]) < float(timestamp) < float(headers[2][4])
             or not all(float(a[4]) < float(b[4]) < end_time for a, b in zip(headers, headers[1:]))):
         raise ValueError('missing or changed organic first host-packet header reads')
@@ -63,9 +63,9 @@ def check(text, firmware):
             or accumulators != [('0000000000', '0000000000', '000b', '06e3', '0000')]):
         raise ValueError('missing, malformed or changed live accumulator snapshot')
     summaries = re.findall(r'^rom4_interface_summary: completion_strobes=(\d+) mailbox_writes=(\d+) ', text, re.M)
-    if summaries != [('357', '74')] or text.count('rom4_interface_summary:') != 1:
+    if summaries != [('945', '74')] or text.count('rom4_interface_summary:') != 1:
         raise ValueError('missing or changed bootstrap completion boundary')
-    if not re.search(r'^rom4_interface_summary: completion_strobes=357 mailbox_writes=74 slot_expiries=329 frame_expiries=573 rf_reads=10688 rf_port32_writes=12 rf_port38_reads=0 rf_port39_reads=0 pc=474c pmst=ffac ifr=0225 imr=035f mode_aa=0000 mode_ac=0001 transfer_expiries=32$', text, re.M):
+    if not re.search(r'^rom4_interface_summary: completion_strobes=945 mailbox_writes=74 slot_expiries=909 frame_expiries=1007 rf_reads=29760 rf_port32_writes=12 rf_port38_reads=0 rf_port39_reads=0 pc=90ed pmst=ffac ifr=0021 imr=035f mode_aa=0000 mode_ac=0001 transfer_expiries=32$', text, re.M):
         raise ValueError('changed bounded RF-loop transport or interrupt state')
     rf = re.findall(r'^rom4_rf_read: sample=(\d+) pc=([0-9a-f]{4}) frame=(\d+) t=([0-9.]+)$', text, re.M)
     if (text.count('rom4_rf_read:') != 32
@@ -73,10 +73,10 @@ def check(text, firmware):
             or not all(0.15 < float(row[3]) < float(timestamp) for row in rf[:16])
             or not all(float(timestamp) < float(row[3]) < end_time for row in rf[16:])
             or not all(float(before[3]) <= float(after[3]) for before, after in zip(rf, rf[1:]))
-            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['10688']):
+            or re.findall(r'^rom4_interface_summary: .* rf_reads=(\d+) ', text, re.M) != ['29760']):
         raise ValueError('missing, malformed or changed native RF provider reads')
     bsp = re.findall(r'rom4_staged_bsp_write: value=([0-9a-f]{4}) mask=([0-9a-f]{4}) t=([0-9.]+)', text)
-    if text.count('rom4_staged_bsp_write:') != 18 or [(value, mask) for value, mask, _ in bsp] != ([('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4) * 2 + [('c008', 'ffff')] * 3 + [('c0c8', 'ffff'), ('c008', 'ffff'), ('c0c8', 'ffff')]:
+    if text.count('rom4_staged_bsp_write:') != 21 or [(value, mask) for value, mask, _ in bsp] != ([('c008', 'ffff'), ('c0c8', 'ffff')] + [('c008', 'ffff')] * 4) * 2 + [('c008', 'ffff')] * 3 + [('c0c8', 'ffff'), ('c008', 'ffff'), ('c0c8', 'ffff'), ('c008', 'ffff'), ('c008', 'ffff'), ('c0c8', 'ffff')]:
         raise ValueError('missing, duplicate or changed native BSP reset/release writes')
     bsp_times = [float(row[2]) for row in bsp]
     if not 0 < bsp_times[0] < bsp_times[11] < float(timestamp) < bsp_times[12] < bsp_times[-1] < end_time or not all(before < after for before, after in zip(bsp_times, bsp_times[1:])):
@@ -97,8 +97,8 @@ def check(text, firmware):
             raise ValueError('native BSP echo order changed')
     expected_low = {
         'low_write': [('00f1', '0000', 'ffff', '0f10'), ('00f2', '0000', 'ffff', '0f10'),
-                      ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5')] * 2 + [('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0000', 'ffff', 'a5b8'), ('00f1', 'b736', 'ffff', 'a5c4'), ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0000', 'ffff', 'a5b8'), ('00f1', 'b71a', 'ffff', 'a5c4')],
-        'low_read': [('00f1', '0000', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] * 5 + [('00f1', 'b736', 'ffff', 'a5ed'), ('00f2', '0000', 'ffff', 'a5ef'), ('00f1', 'b736', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef'), ('00f1', 'b71a', 'ffff', 'a5ed'), ('00f2', '0000', 'ffff', 'a5ef')],
+                      ('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0003', 'ffff', 'a5e5')] * 2 + [('00f2', '0003', 'ffff', 'a5e5'), ('00f2', '0000', 'ffff', 'a5b8'), ('00f1', 'b736', 'ffff', 'a5c4'), ('00f2', '0003', 'ffff', 'a5e5')] + [('00f2', '0000', 'ffff', 'a5b8'), ('00f1', 'b71a', 'ffff', 'a5c4')] * 2,
+        'low_read': [('00f1', '0000', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] * 5 + [('00f1', 'b736', 'ffff', 'a5ed'), ('00f2', '0000', 'ffff', 'a5ef'), ('00f1', 'b736', 'ffff', 'a5ed'), ('00f2', '0003', 'ffff', 'a5ef')] + [('00f1', 'b71a', 'ffff', 'a5ed'), ('00f2', '0000', 'ffff', 'a5ef')] * 2,
         'gap_read': [('0003', '0000', 'ffff', pc) for pc in ('a5f4', 'a5f8', 'a601')] * 5,
     }
     low = {}
@@ -113,7 +113,9 @@ def check(text, firmware):
         ordered.extend([*low['low_write'][w:w + 3], *low['low_read'][r:r + 2], *low['gap_read'][g:g + 3],
                         low['low_write'][w + 3], *low['low_read'][r + 2:r + 4], *low['gap_read'][g + 3:g + 6]])
     ordered.extend([low['low_write'][8], *low['low_read'][8:10], *low['gap_read'][12:]])
-    ordered.extend([*low['low_write'][9:11], *low['low_read'][10:12], low['low_write'][11], *low['low_read'][12:14], *low['low_write'][12:], *low['low_read'][14:]])
+    ordered.extend([*low['low_write'][9:11], *low['low_read'][10:12], low['low_write'][11], *low['low_read'][12:14]])
+    for start in (12, 14):
+        ordered.extend([*low['low_write'][start:start + 2], *low['low_read'][start + 2:start + 4]])
     times = [float(row[4]) for row in ordered]
     if (not all(0 < before < after < end_time for before, after in zip(times, times[1:]))
             or not times[27] < float(timestamp) < bsp_times[12] < times[28]
@@ -168,17 +170,17 @@ def check(text, firmware):
     packed_loop = struct.pack('>24H', *loop)
     if firmware.find(packed_loop) != REPEAT_SOURCE_OFFSET or firmware.find(packed_loop, REPEAT_SOURCE_OFFSET + 1) != -1:
         raise ValueError('uploaded loop does not bind uniquely to the reviewed MCU source')
-    return dict(status='unsupported_staged_delayed_tc_branch_in_block', source_offset=SOURCE_OFFSET,
+    return dict(status='unsupported_staged_delayed_conditional_return', source_offset=SOURCE_OFFSET,
                 tail_source_offset=TAIL_SOURCE_OFFSET, observed_tail_words=24,
                 repeat_source_offset=REPEAT_SOURCE_OFFSET, observed_repeat_words=24,
                 observed_words=40, firmware_sha256=hashlib.sha256(firmware).hexdigest(),
-                instruction_address=0x4749, instruction=0xfa30, block_start=0x473c, block_end=0x4777,
-                host_header_reads=7, host_consumed=21,
-                low_gap_bus_reads=15, rf_sample_reads=10688, rf_sample_blocks=334, rf_sample_remainder=0,
+                instruction_address=0x90eb, instruction=0xfe44,
+                host_header_reads=10, host_consumed=28,
+                low_gap_bus_reads=15, rf_sample_reads=29760, rf_sample_blocks=930, rf_sample_remainder=0,
                 rf_control_writes=12, transfer_expiries=32, transfer_expiries_before_stop=32, transfer_expiries_after_stop=0,
                 bsp_transmit_words=[0x0aaa, 0xffd5] * 2,
                 bsp_receive_words=[0x0aaa] * 4,
-                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8], completion_strobes=357,
+                bsp_control_writes=([0xc008, 0xc0c8] + [0xc008] * 4) * 2 + [0xc008] * 3 + [0xc0c8, 0xc008, 0xc0c8, 0xc008, 0xc008, 0xc0c8], completion_strobes=945,
                 checkpoint_illegal=False, uninterrupted_session_claim=False,
                 swwsr=0x2000, boot_claim=False,
                 preceding_instruction_retirement_claim=False,
