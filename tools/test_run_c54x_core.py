@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_bitt_requires_retained_selector_and_single_read(self):
+        for profile in ('bitt', 'bitt-retd'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending + '\n'
+            check_result(text, 3, profile=profile)
+            for field in marker.split():
+                if '=' in field:
+                    with self.subTest(profile=profile, field=field), self.assertRaises(ValueError):
+                        check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3, profile=profile)
+
     def test_repeated_stores_require_live_source_and_each_write(self):
         for profile in ('rpt-store', 'rpt-store-edge'):
             marker, ending = EXTRA_PROFILES[profile]

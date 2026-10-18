@@ -276,8 +276,9 @@ explicit standard SWWSR option. The MCU organically uploads loader1;
 staged execution executes its mapped-AR ADDM and the initialization routine's
 ROL B, then reaches a replacement upload at `0f00`. Its RPTZ/STL loops
 execute, and the backend observes the first completion strobe. Execution
-reaches resident code and stops at `0031b3`, `34f8` (absolute BITT), with
-the exposed PC at `31b2`, PMST `ffac` and
+reaches resident code, executes the absolute BITT in RETD's delay span,
+and stops at `003190`, `fc30` (RC TC), with
+the exposed PC at `3192`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -2683,6 +2684,21 @@ checks 4,096 cases plus replay for mapped first destinations 0000/0010/
 preincrement wrap. These are implementation exclusions, not claimed silicon
 traps. Direct, indexed, extended, ASM-shift and mapped repeated stores remain
 outside this admitted subset; physical bus phase is not claimed.
+
+BITT consumes retained Smem and T(3..0), setting only TC from bit
+`15-(T&15)` (SPRU172C 4-23). It shares Smem address resolution and the
+single Read-owned bus access, but does not publish T as LD/MPYA do.
+The selector is retained in Read, not re-read at Execute; SPRU131G 7.5.6
+defines T-consumer latency and protected T writers. The `bitt` profile
+checks 6,144 cases plus replay: DP/SP direct, short plain/postdecrement/
+postincrement, absolute and two long-offset forms, all selectors, two
+T-high-bit patterns, complementary data and both initial TC values, two
+pages and three save points. Mutating both operands after Read cannot
+change the result; T, accumulators and other status bits are preserved.
+`bitt-retd` adds 1,536 replay cases with absolute or long-offset BITT
+occupying RETD's two delay words: exactly one stack read, one operand read,
+one extension fetch and target-only continuation. This two-word delay
+admission is limited to RETD; other control owners retain their exclusions.
 
 Short RAM PSHD now retains its source address/value and stack destination.
 SPRU172C page 4-131 places its SP read in Decode and update in Access;
