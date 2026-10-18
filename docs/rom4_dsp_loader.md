@@ -84,6 +84,25 @@ power-lifecycle gates; the former `NSE1_MENU_MACHINE` remains a compatibility
 alias. The staged short/long physical power actions were observed, but do
 not establish clean startup; the power checker also rejects reason-4 resets.
 
+The passive `tools/c54x_rom4_challenge_observe.lua` narrows the divergence.
+With fresh independently generated NSE-1 EEPROMs, atomic and staged runs
+have identical `1200..121f` challenge buffers and `13c0..13df` workspace at
+the first observed `7f2d` fetch; serial words are `0016,0010,1281,1d00`.
+The first subsequent response-buffer bus write differs: atomic writes
+`b3da` at `1202` (0.272831673 s), staged writes `6521` at `1201`
+(0.272835442 s), both with PC context `7f7a`. This rules out different
+challenge bytes as the explanation for this transaction, but not differences
+in retained CPU state. Fetch snapshots are not instruction-retirement or
+operand-capture evidence.
+
+Next qualify the caller's indirect immediate-store / `MVMM AR3,AR4`
+composition against TI's documented address-generator update and MVMM
+Decode-read phases. The observed one-word displacement is a candidate
+mechanism, not yet a qualified CPU correction. Run the observer with
+`-autoboot_delay 0 -autoboot_script <absolute script path> -seconds_to_run 1`
+on each frontend with separate freshly provisioned NVRAM directories.
+It modifies no memory, retains tap handles, and reports write-trace truncation.
+
 ## Conditional delayed returns
 
 The staged frontend admits the twelve signed A/B predicates and TC/NTC for
