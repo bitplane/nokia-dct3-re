@@ -33,6 +33,19 @@ exception. The manual describes suppressed circular modification instead;
 this store extension does not resolve that fitted-silicon discrepancy or claim
 measured physical pipeline timing. Single-instruction repeat is still excluded.
 
+## Staged TC conditional calls
+
+Nondelayed CC with TC/NTC uses the existing retained call transaction.
+SPRU172C page 4-29 assigns condition byte `30` to TC and `20` to NTC;
+the earlier `f930` NTC label was incorrect. `tc-call` verifies 64 cases
+and replays across both predicates, both initial TC values, two program
+pages and four snapshots. After the decision, TC and accumulator values
+are changed and the target literal is overwritten: only the retained
+decision may allocate a frame, the target must stay retained and RET
+must balance the single taken-call write. Untaken calls touch neither
+SP nor stack memory. Delayed TC calls remain unadmitted; this fixture
+does not establish measured silicon pipeline phases.
+
 ## Current result
 
 The current native boundary profiles are distinct: the four-second coherent
@@ -426,8 +439,10 @@ A passive read tap observes two firmware reads of BSP's retained test
 word `0aaa`, at 0.133909558 and 0.133937654 s. The second is the newly
 admitted shifted read, not a new serial frame or an injected reply.
 The staged frontend executes SAT A/B at `3473/3475` and the circular
-post-increment store `80d3` at `34d3`, then stops at resident `00354c`,
-`f930` (CC on NTC). The exposed PC is `354e`, BK `0278`, ST0 `081f`, PMST `ffac` and
+post-increment store `80d3` at `34d3`, then the TC conditional call `f930`
+at `354c`. It stops at `0025fe`, `60f8`, a CMPM whose mapped source is
+`000b`. The exposed PC is `2603`, BK `00fa`, AR2 `0002`, ST0 `181f`,
+ST1 `6102`, PMST `ffac` and
 ILLEGAL set. SWWSR has actually retired to `2000`; C5416-only BSCR/SWCR
 remain zero. The live `0f00..0f27` words bind
 uniquely to the 5110 v5.30 MCU image at file offset `0x94cf8` (the initial
@@ -442,7 +457,9 @@ STM `0021`; `0e66` explicitly clears BRAF. This run uses the existing
 default untimed COBBA test echo, not the separately clocked serial-pin
 profile; passing the loop is not new evidence of physical serial timing.
 The backend
-reports 71 MCU bootstrap-mailbox writes and two completion strobes. Neither
+reports 72 MCU mailbox writes and two completion strobes. After the two
+retained `0aaa` reads, the DSP publishes a second BSP TX word, `ffd5`,
+at 0.133940788 s. This is a firmware write, not a supplied receive frame. Neither
 upload completion nor handset boot is accepted for this machine.
 
 Immediate STM `0022` retains its extension and publishes through the normal

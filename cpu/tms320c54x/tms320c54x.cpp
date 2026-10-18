@@ -107,15 +107,15 @@ constexpr bool staged_immediate_alu(u16 word)
 
 constexpr bool staged_tc_branch(u16 word)
 {
-	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30;
+	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30 || word == 0xf920 || word == 0xf930;
 }
 
 constexpr bool staged_conditional_call(u16 word)
 {
 	// CC and CCD admit the six signed predicates for either 40-bit accumulator.
 	u8 const condition = word;
-	return (word & 0xfd00) == 0xf900 &&
-		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f));
+	return word == 0xf920 || word == 0xf930 || ((word & 0xfd00) == 0xf900 &&
+		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_conditional_return(u16 word)
@@ -3930,7 +3930,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60)
 		{
-			logerror("%s: staged CMPM mapped-register source is unsupported\n", machine().describe_context());
+			logerror("%s: staged CMPM mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source);
 			m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xfe00) == 0x1e00 && m_pipeline_repeat_active && source < 0x60)
