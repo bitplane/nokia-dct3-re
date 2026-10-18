@@ -42,7 +42,7 @@ also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
 The staged EFR encoder now returns from frame zero with a balanced stack
 and no unsupported-instruction stop. Its independent reference comparison
-reports 35 aggregate mismatches across parameters, flags and packed output;
+reports 39 aggregate mismatches across parameters, flags and packed output;
 this is not a count of differing parameters alone. No staged EFR frame has
 passed vector acceptance. The next boundary is the first numerical/state
 divergence, not an instruction-admission guard. Atomic EFR still passes all
@@ -76,11 +76,14 @@ pipeline phases and arbitrary peripheral/interrupt compositions are not
 claimed. Repeated MVDD deliberately remains outside this bypass: its
 overlapping RAM matrix qualifies Read-before-older-Write ordering separately.
 
-The first ordinary-RAM write-sequence difference is now write 14,095:
-`0fa6=0002` atomic versus `0003` staged, at context `b9a0`.
+The first ordinary-RAM write-sequence difference is now write 14,105:
+`0fb8=0000` atomic versus `0001` staged, at context `b9b6`.
 Execute-address sequences first differ at observation 104,626 (`bdce`
 versus `bdd5`). These are bounded tracing targets, not a numerical
-root-cause claim. The `0071` copy and `1104` DAGEN dependencies are closed.
+root-cause claim. Here ADD `b9b4` (`0013`) reads AR3 after a younger
+parallel store/load changes it. The `0071` copy, `1104` DAGEN and `0fa6`
+shifted-load dependencies are closed. Aggregate output mismatch counts are
+not monotonic while several interacting errors remain.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
@@ -1063,6 +1066,18 @@ eight AR sources, A/B destinations, four values, three younger writers,
 SXM states, pages and snapshots as the LDM matrix. One-word loads retain
 Read/Execute at clocks 5/6; two-word forms retain 6/7. The unmodified ordinary
 load path fails the old-register sample despite LDM already being corrected.
+
+`shift16-load-age` adds 9,216 cases and cleared-pipeline replays for
+`LD Smem,16,A/B`, covering the same four addressing forms, eight ARs,
+four boundary values, younger MAR increment/decrement and MVMM, both SXM
+states, two pages and three snapshots. It retains the older Read before
+younger Access and applies sign extension/shift only to that retained word.
+Disabling the shifted-load retention fails the source-read assertion.
+The acquired example is `b99e` (`4413`) followed by parallel `e4d8`:
+the load must retain AR3=2 before the younger instruction increments it,
+otherwise the next parameter-array copy starts with 3. TS-based mapped
+loads remain excluded; other ALU/dual-read families are not admitted by
+this qualification.
 
 A literal adjacency scan of the 65,535 acquired ROM4 program words found no
 direct mapped LD/LDU followed immediately by MAR on the same AR. This is not

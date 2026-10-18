@@ -3669,13 +3669,14 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_intm_follow = intm_bit;
 		}
 	}
-	// Retain the older LDM/zero-shift LD/LDU Read before a younger
+	// Retain the older LDM/zero-or-16-shift LD/LDU Read before a younger
 	// same-clock Access update of that AR (SPRU131G figure 7-1).
 	// Other read families and accumulator/control sources keep their
 	// independently qualified forwarding and latency rules.
 	bool const retained_ar_load_read = m_pipeline_valid[4] &&
 		((m_pipeline_word[4] & 0xfe80) == 0x4800 ||
-		 (staged_memory_load(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xfc00) == 0x1000)) &&
+		 (staged_memory_load(m_pipeline_word[4]) && ((m_pipeline_word[4] & 0xfc00) == 0x1000 ||
+		  (m_pipeline_word[4] & 0xfe00) == 0x4400))) &&
 		m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x17;
 	if (retained_ar_load_read)
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);

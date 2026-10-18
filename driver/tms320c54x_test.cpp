@@ -8220,8 +8220,9 @@ private:
 	void start_pipeline_mapped_load_age(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const mapped = !strcmp(machine().options().bios(), "mapped-load-age");
-		unsigned const fields = mapped ? variant / 8 : variant, form = mapped ? (variant / 2) % 4 : 0;
+		bool const shifted = !strcmp(machine().options().bios(), "shift16-load-age");
+		bool const mapped = shifted || !strcmp(machine().options().bios(), "mapped-load-age");
+		unsigned const fields = shifted ? variant / 4 : mapped ? variant / 8 : variant, form = shifted ? variant%4 : mapped ? (variant / 2) % 4 : 0;
 		unsigned const ar = fields % 8, kind = (fields / 64) % 3, pointer = (ar + 2) % 8;
 		unsigned const words = mapped && form >= 2 ? 2 : 1, read_cycle = 4 + words;
 		bool const destination_b = (fields / 8) % 2, sxm = (fields / 192) % 2;
@@ -8230,7 +8231,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		u16 const mode = form == 0 ? 0x10 + ar : form == 1 ? 0x80 + pointer : form == 2 ? 0xf8 : 0xe0 + pointer;
-		program.write_word(base + 0x600, (mapped ? 0x1000 | (variant % 2 ? 0x200 : 0) : 0x4800) |
+		program.write_word(base + 0x600, (shifted ? 0x4400 : mapped ? 0x1000 | (variant % 2 ? 0x200 : 0) : 0x4800) |
 			(destination_b ? 0x100 : 0) | mode);
 		if (words == 2) program.write_word(base + 0x601, form == 2 ? 0x10 + ar : 0);
 		program.write_word(base + 0x600 + words, kind == 2 ? 0xe700 | (((ar + 1) % 8) << 4) | ar :
@@ -19707,6 +19708,7 @@ private:
 		if (!strcmp(machine().options().bios(), "st-acc-mvmm")) { start_pipeline_store_mvmm(); return; }
 		if (!strcmp(machine().options().bios(), "ldm-ar-age")) { start_pipeline_mapped_load_age(); return; }
 		if (!strcmp(machine().options().bios(), "mapped-load-age")) { start_pipeline_mapped_load_age(); return; }
+		if (!strcmp(machine().options().bios(), "shift16-load-age")) { start_pipeline_mapped_load_age(); return; }
 		if (!strcmp(machine().options().bios(), "preinc-st")) { start_preincrement_store(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc")) { start_move_brc(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc-delay")) { start_move_brc(); return; }
@@ -46002,13 +46004,15 @@ private:
 		if (m_phase == 600010)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const mapped = !strcmp(machine().options().bios(), "mapped-load-age");
-			unsigned const fields = mapped ? variant / 8 : variant, form = mapped ? (variant / 2) % 4 : 0;
+			bool const shifted = !strcmp(machine().options().bios(), "shift16-load-age");
+			bool const mapped = shifted || !strcmp(machine().options().bios(), "mapped-load-age");
+			unsigned const fields = shifted ? variant / 4 : mapped ? variant / 8 : variant, form = shifted ? variant%4 : mapped ? (variant / 2) % 4 : 0;
 			unsigned const ar = fields % 8, kind = (fields / 64) % 3;
 			unsigned const checkpoint = 4 + unsigned(mapped && form >= 2) + fields / 768;
 			bool const destination_b = (fields / 8) % 2, sxm = (fields / 192) % 2;
 			u16 const value = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(fields / 16) % 4];
-			u64 const loaded = mapped && !(variant % 2) && sxm ? u64(s64(s16(value))) & 0xffffffffffULL : value;
+			u64 const extended = mapped && (shifted || !(variant % 2)) && sxm ? u64(s64(s16(value))) & 0xffffffffffULL : value;
+			u64 const loaded = shifted ? (extended<<16)&0xffffffffffULL : extended;
 			u16 const updated = kind == 2 ? 0x3333 : u16(value + (kind ? -1 : 1));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "LDM/younger DAGEN chain stays supported");
 			if (tick == checkpoint && !m_pipeline_replay)
@@ -46032,11 +46036,13 @@ private:
 					m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
 					m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					m_cpu->set_pipeline_frontend(true);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore LDM with one retained old-register sample");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 600011; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (mapped ? 18431 : 2303)) { start_pipeline_mapped_load_age(variant + 1); return; }
+				if (variant < (shifted ? 9215 : mapped ? 18431 : 2303)) { start_pipeline_mapped_load_age(variant + 1); return; }
+				if(shifted) { osd_printf_info("TMS320C54x shifted mapped load age: PASS cases=9216 restore=9216 forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 shift=16 retained_old_AR=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated shifted mapped load age complete"); }
 				if (mapped)
 				{
 					osd_printf_info("TMS320C54x staged mapped load age: PASS cases=18432 restore=18432 loads=LD,LDU forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 physical_phase_claim=0\n");
@@ -56386,6 +56392,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(179, "bitt-ctrl", "Short BITT and T-producer ordering in delayed controls")
 	ROM_SYSTEM_BIOS(180, "mvdd-follow", "Retained MVDD forwarding across adjacency and delayed calls")
 	ROM_SYSTEM_BIOS(181, "st-acc-mvmm", "Pending accumulator-store DAGEN visibility to MVMM")
+	ROM_SYSTEM_BIOS(182, "shift16-load-age", "Shifted mapped AR loads retain the older Read sample")
 ROM_END
 
 ROM_START(tms54rom4)
