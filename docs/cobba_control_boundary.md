@@ -501,12 +501,19 @@ RAM with 1,536 cases plus replay, including changed source values mid-repeat
 and a poisoned fetched destination literal. Other MMR sources, mapped
 destinations and interrupt composition are not newly qualified.
 
-The staged decoder is still **failing** at frame zero: `302c` (`LD …,T`)
-at `8527` is excluded in the delay span of RPTBD at `8524`. The retained
-delay words are `4592,302c`; the next fetched word is `2b93`. Decode that
-specific T-load addressing and delay ownership before broadening admission.
-No PCM comparison or handset speech is established by passing the earlier
-repeat. No CPU instruction or handset state has been forced around a guard.
+The RPTBD delay span at `8524` now executes its `4592,302c` words with the
+original T-load semantics. `rptbd-t-load` qualifies one-word direct and
+short-indirect T loads in either delay position: 9,216 cases plus replay,
+including a multiply as the first loop-body instruction. The staged decoder
+matches all 1,280 PCM samples of frames 0..7 (silence-input group), with
+per-frame replay. This is partial arithmetic acceptance, not full FR decoding
+or handset speech.
+
+Frame 8 is still **failing** at the block-control guard: delayed conditional
+branch `fa4e` at `84c2` targets `84ca`, immediately beyond block
+`84c1..84c9`. Qualify that delayed forward-exit contract, including its delay
+words and repeat ownership, before broadening admission. No CPU instruction
+or handset state has been forced around a guard.
 
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values

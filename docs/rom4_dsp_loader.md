@@ -18,6 +18,23 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## RPTBD delay-owned T load
+
+One-word `LD Smem,T` can occupy either RPTBD delay position while retaining
+the ordinary Read-owned T publication. The admission is limited to direct
+and short-indirect encodings below MOD 3; other control owners and extended
+T-load delay forms are not newly admitted. The first body multiply must see
+the loaded T, rather than an old value or a re-read of changed memory.
+
+`rptbd-t-load` passes 9,216 cases plus replay: counts 0/1/7, four input
+patterns, direct/plain/postincrement/postdecrement addressing, DP/SP modes,
+both delay positions, four SXM/OVM combinations, A/B multiply destinations,
+two program pages and three checkpoints. It verifies one delay read at
+prototype clock 7 or 8, count+1 body products, single delay DAGEN update,
+buffer sentinels and unselected state. Source memory and the fetched opcode
+are poisoned after capture. Interrupt composition and physical stage timing
+are not established.
+
 ## Repeated fixed-accumulator transfer
 
 `MVMD AL/BL, dmad` (`7308/730b`) can repeat into ordinary RAM. Each iteration
