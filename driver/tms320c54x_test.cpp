@@ -15891,11 +15891,13 @@ private:
 	void start_branch_repeat(unsigned variant = 0)
 	{
 		bool const returning = !strcmp(machine().options().bios(), "retd-rpt");
+		bool const calling = !strcmp(machine().options().bios(), "calld-rpt");
 		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case = variant;
 		auto const f = branch_repeat_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base+0x600+i,0xf495);
 		program.write_word(f.base+0x600,0xf273); program.write_word(f.base+0x601,f.target);
+		if (calling) program.write_word(f.base+0x600,0xf274);
 		program.write_word(f.base+0x602,0xec00|f.count); program.write_word(f.base+0x603,f.body()); program.write_word(f.base+0x604,0xf4e1);
 		if (returning)
 		{
@@ -15904,6 +15906,7 @@ private:
 			data.write_word(0x2fff,f.target);
 		}
 		program.write_word(f.base+f.target,0xec00|f.following); program.write_word(f.base+f.target+1,0x8193); program.write_word(f.base+f.target+2,0xf4e1);
+		if (calling) program.write_word(f.base+f.target+2,0xfc00);
 		for (unsigned i = 0; i < 256; ++i) { data.write_word(0x1800+i,u16(f.seed+i*257)); data.write_word(0x1c00+i,0xdead); }
 		for (unsigned i = 0; i < 32; ++i) data.write_word(0x2000+i,0xdead);
 		for (u16 address : {0x17ff,0x1900,0x1bff,0x1d00,0x1fff,0x2020}) data.write_word(address,0x2468);
@@ -15918,19 +15921,21 @@ private:
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+ar,ar == 3 ? 0x2000 : ar == 4 ? 0x1800 : ar == 5 ? 0x1c00 : 0x4000+ar);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_rptbd_counts.reads = 0;
+		m_pipeline_register_writes = 0;
 		m_observed_instructions.clear(); m_saved_observed_instructions.clear(); m_pipeline_replay = false; m_idle_fixture_tick = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"branch_repeat_read",[this,f,returning](offs_t at,u16 &word,u16) {
+		m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"branch_repeat_read",[this,f,returning,calling](offs_t at,u16 &word,u16) {
 			if (machine().side_effects_disabled()) return;
-			if (returning && at == 0x2fff)
+			if ((returning || calling) && at == 0x2fff)
 			{
-				expect(!m_rptbd_counts.reads++ && word == f.target, "RETD samples one original return word before delay execution");
+				expect(!m_rptbd_counts.reads++ && word == (calling ? 0x604 : f.target), "Return samples its owned original continuation once");
 				return;
 			}
 			unsigned const i = m_pipeline_operand_reads++;
 			expect(f.kind == 1 && i <= f.count && at == 0x1800+i && word == u16(f.seed+i*257),"Delay-owned MVDD reads exactly its ordered original source words");
 		});
-		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"branch_repeat_write",[this,f](offs_t at,u16 &word,u16) {
+		m_pipeline_write_tap = data.install_write_tap(0,0xffff,"branch_repeat_write",[this,f,calling](offs_t at,u16 &word,u16) {
 			if (machine().side_effects_disabled()) return;
+			if (calling && at == 0x2fff) { expect(!m_pipeline_register_writes++ && word == 0x604 && !m_pipeline_store_writes && !m_pipeline_extensions_reads, "CALLD publishes one continuation before delay-body and target stores"); return; }
 			if (at >= 0x2000 && at < 0x2020)
 			{
 				unsigned const i = m_pipeline_extensions_reads++;
@@ -15966,7 +15971,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		if (kind == 0) { program.write_word(base+0x602,0xf495); program.write_word(base+0x603,0xec01); }
 		if (kind == 1) program.write_word(base+0x600,0x6e87);
-		if (kind == 2) program.write_word(base+0x600,0xf274);
+		if (kind == 2) { program.write_word(base+0x600,0xf274); program.write_word(base+0x602,0xf495); program.write_word(base+0x603,0xec01); }
 		if (kind == 3) { program.write_word(base+0x600,0xfe00); program.write_word(base+0x601,0xf495); program.write_word(base+0x602,0xec01); }
 		if (kind == 4) program.write_word(base+0x602,0xf070);
 		if (kind == 5) program.write_word(base+0x602,0x4780);
@@ -19684,6 +19689,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt")) { start_branch_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "retd-rpt")) { start_branch_repeat(); return; }
+		if (!strcmp(machine().options().bios(), "calld-rpt")) { start_branch_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-rpt")) { start_block_delay_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "rptbd-rpt-edge")) { start_block_delay_repeat_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt-edge")) { start_branch_repeat_edge(); return; }
@@ -45510,7 +45516,7 @@ private:
 					throw emu_fatalerror(3, "TMS320C54x isolated RPTBD delay repeat exclusions complete");
 				}
 				if (variant < 31) { start_branch_repeat_edge(variant+1); return; }
-				osd_printf_info("TMS320C54x BD delay repeat exclusions: PASS cases=32 restore=32 forms=late,BANZD,CALLD,RETD,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=RETD_stack_only writes=0 ar_changes=0 counter_changes=0 owner_stack=CALLD,RETD reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD delay repeat exclusions complete");
+				osd_printf_info("TMS320C54x BD delay repeat exclusions: PASS cases=32 restore=32 forms=late,BANZD,CALLD_late,RETD,long_count,memory_count,store_spill,copy_spill pages=2 snapshots=2 reads=RETD_stack_only writes=0 ar_changes=0 counter_changes=0 owner_stack=CALLD,RETD reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD delay repeat exclusions complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
 		}
@@ -45518,6 +45524,7 @@ private:
 		if (m_phase == 600040)
 		{
 			bool const returning = !strcmp(machine().options().bios(), "retd-rpt");
+			bool const calling = !strcmp(machine().options().bios(), "calld-rpt");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = branch_repeat_case(variant);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Short RPT in BD's first delay word has independent branch and repeat ownership");
 			if (!returning && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base+0x601,0x620); }
@@ -45527,15 +45534,17 @@ private:
 			{
 				m_recurring_irq_snapshot = {m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_extensions_reads}; m_saved_observed_instructions = m_observed_instructions;
 				m_recurring_irq_snapshot[3] = m_rptbd_counts.reads;
+				m_recurring_irq_snapshot[4] = m_pipeline_register_writes;
 				m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,"Save delayed branch continuation and repeat before, during or after the delay body");
 			}
 			if (tick == f.limit)
 			{
-				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(STATE_GENPC) != f.base+f.target+3)
+				if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(STATE_GENPC) != f.base+(calling ? 0x605 : f.target+3))
 					osd_printf_info("BD repeat mismatch case=%u staged=%u replay=%u pc=%06x reads=%u old_writes=%u target_writes=%u\n",variant,unsigned(f.staged),unsigned(m_pipeline_replay),unsigned(m_cpu->state_int(STATE_GENPC)),m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_extensions_reads);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base+f.target+3 && m_pipeline_operand_reads == (f.kind == 1 ? f.count+1 : 0) && m_pipeline_store_writes == (f.kind == 2 ? 0 : f.count+1) && m_pipeline_extensions_reads == f.following+1,"Delay repeat drains once, then the retained target runs its own complete repeat");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base+(calling ? 0x605 : f.target+3) && m_pipeline_operand_reads == (f.kind == 1 ? f.count+1 : 0) && m_pipeline_store_writes == (f.kind == 2 ? 0 : f.count+1) && m_pipeline_extensions_reads == f.following+1,"Delay repeat drains once, then the retained target runs its own complete repeat");
 				unsigned bodies = 0, target_bodies = 0, branches = 0, headers = 0;
 				if (returning) expect(m_rptbd_counts.reads == 1, "RETD never resamples its poisoned return word");
+				if (calling) expect(m_rptbd_counts.reads == 1 && m_pipeline_register_writes == 1, "CALLD and RET own one balanced continuation frame");
 				for (auto const &[address,word] : m_observed_instructions)
 				{
 					if (address == f.base+(returning ? 0x602 : 0x603)) { expect(word == f.body(),"Repeated delay retains its original opcode"); ++bodies; }
@@ -45560,11 +45569,13 @@ private:
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_observed_instructions = m_saved_observed_instructions;
 					m_rptbd_counts.reads = m_recurring_irq_snapshot[3];
+					m_pipeline_register_writes = m_recurring_irq_snapshot[4];
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); m_cpu->set_pipeline_frontend(f.staged); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE,"Restore pending delayed target after clearing live pipeline state");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase = 600041; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 5759) { start_branch_repeat(variant+1); return; }
+				if (calling) { osd_printf_info("TMS320C54x CALLD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 stack_reads=1 stack_writes=1 balanced_stack=1 target_poison=1 ordered_copies=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated CALLD delay repeat complete"); }
 				if (returning)
 				{
 					osd_printf_info("TMS320C54x RETD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 stack_reads=1 balanced_stack=1 target_poison=1 ordered_copies=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0\n");
@@ -54060,7 +54071,7 @@ private:
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt"))
+	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	if (!strcmp(config.options().bios(), "mpy-mem-imm"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
@@ -56050,6 +56061,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(167, "st-par-mpy", "Parallel store and retained-T memory multiply")
 	ROM_SYSTEM_BIOS(168, "st-mpy-edge", "Parallel multiply mapped operand exclusions")
 	ROM_SYSTEM_BIOS(169, "cond-store-ar", "Conditional stores to mapped auxiliary registers")
+	ROM_SYSTEM_BIOS(170, "calld-rpt", "Short delay repeat completes before a near call and return")
 ROM_END
 
 ROM_START(tms54rom4)

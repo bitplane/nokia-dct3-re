@@ -41,8 +41,8 @@ The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete;
 with ordinary delayed square accumulation, parallel MPY and conditional AR
-stores also qualified, the staged EFR frame stops at short repeat `ec27`,
-owner `b93f`, in CALLD `b93d`'s delay span. No complete staged EFR frame
+stores and near-call delay repeat also qualified, the staged EFR frame stops
+at short T load `307d`, owner `d531`, in RETD `d530`'s delay span. No complete staged EFR frame
 has passed.
 
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
@@ -316,6 +316,24 @@ physical bus arbitration, producer/control hazards or interrupt composition.
 The ROM4 EFR first frame passes its `a20a` mapped-AR3 subtraction but remains
 behind a separate instruction guard; this is not staged EFR acceptance.
 
+## Short repeat in CALLD delay words
+
+Short immediate RPT in near CALLD's first delay word owns the following
+one-word body before the retained call target runs. CALLD writes its normal
+continuation frame once; repeating the delay body must not repeat that push.
+The shared saved redirect mechanism resumes the target after the delay
+repeat drains, and a target-side repeat has an independent count.
+
+`calld-rpt` passes 5,760 cases and cleared-pipeline replays: atomic/staged,
+STL/MVDD/NOP bodies, counts 0/1/8/39/255, target counts 0/2/7, forward/backward
+calls, four patterns, two pages and four checkpoints. The target returns
+with RET to the original caller; one frame write and one return read restore
+SP. Target-literal poisoning, staged body-opcode poisoning, ordered accesses,
+execution observations and buffer guards check continuation ownership.
+Far calls, late-header placement, active outer blocks, arbitrary body/interrupt
+composition and physical pipeline phases remain unqualified. The shared
+exclusion fixture retains CALLD with RPT in the last delay word.
+
 ## Short repeat in RETD delay words
 
 A short immediate RPT in RETD's first delay word retains the return target
@@ -332,8 +350,9 @@ The original return word is read once, then poisoned; the target starts its
 own fresh repeat only after delay writes finish. Tests check balanced SP,
 ordered accesses, pointers, unrelated loop state, status and retained staged
 body opcodes. The shared delay exclusion test retains a negative RETD case
-with RPT in the second delay word. CALLD and other unqualified owners remain
-guarded. Interrupt and physical pipeline timing are not qualified here.
+with RPT in the second delay word. Near CALLD has its separate qualification
+above; other unqualified owners remain guarded. Interrupt and physical
+pipeline timing are not qualified here.
 
 ## Short repeat in RPTBD delay words
 
@@ -358,7 +377,7 @@ TI SPRU131G sections 6.7/6.8 describe the two repeat controllers and RPTBD's
 two delay words. The acquired EFR reset supplies the concrete `f272 c9c9
 ec05 8392` composition. These bounded algorithm and restoration tests do not
 establish silicon pipeline timing or interrupt composition. RETD has the
-separate qualification above; CALLD and other delayed owners remain guarded.
+separate qualification above, as does near CALLD. Other delayed owners remain guarded.
 
 ## Mapped memory logic sources
 
@@ -643,8 +662,8 @@ refetches repeat opcodes. Equal architectural outcomes are not a clock/bus
 equivalence claim. The existing acquired-ROM atomic delayed-repeat fixture
 provides separate BD/RETD corroboration.
 
-`bd-rpt-edge` passes 32 rejection/replay cases: late header, BANZD/CALLD/RETD
-owners, long/memory counts and spilling store/copy bodies, over two pages and
+`bd-rpt-edge` passes 32 rejection/replay cases: late header, BANZD,
+late CALLD/RETD headers, long/memory counts and spilling store/copy bodies, over two pages and
 two checkpoints. No rejected-repeat transaction or address-register/counter
 change occurs. The enclosing CALLD's Decode stack reservation and RETD's one
 return-word Read/SP increment legitimately precede rejection and are retained,
