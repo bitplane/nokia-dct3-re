@@ -54,7 +54,16 @@ EEPROM boot, presses/releases the physical Menu key at eight seconds and
 requires the existing Phone book frame SHA-256
 `d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5`.
 The staged wrapper also requires terminal ILLEGAL clear and no unsupported
-form or reset. The default `verify-5110-menu` still tests the atomic profile.
+form or reset. `make verify-5110-save-state NSE1_MENU_MACHINE=nse1pipe`
+saves the running handset at seven seconds. It compares save-time
+PC/ST0/ST1/SP, I/O `21`, BSP control `22` and emulated time exactly, then
+requires an identical nonempty 160 ms stream of DSP I/O writes and timestamps
+on the reference and restored branches. Trace overflow fails instead of
+accepting a truncated comparison. It then opens the menu through physical
+input. Its structural check also requires a clear DSP ILLEGAL flag after load. Default invocations
+of both gates still test the atomic profile. This validates the running
+idle/radio-service composition and subsequent menu input, not saves inside
+native calls, SMS transactions or every application.
 Both profiles use the native DSP backend, not `nokia_dsp_hle`. This proves
 interactive menu access, not native calls, network registration or speech.
 

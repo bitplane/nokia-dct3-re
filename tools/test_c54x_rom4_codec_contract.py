@@ -261,6 +261,22 @@ class CodecRestoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "harness failed"):
             check_restore(self.trace().replace("result=pass", "result=fail"))
 
+    def test_exact_nonempty_io_replay(self):
+        row = 'rom4_codec_replay: result=pass reference_events=123 restored_events=123 window=0.160000000'
+        check_restore(self.trace() + '\n' + row, require_replay=True)
+        for changed in ('', row + '\n' + row, row.replace('result=pass', 'result=fail'),
+                        row.replace('reference_events=123', 'reference_events=0'),
+                        row.replace('restored_events=123', 'restored_events=122'),
+                        row.replace('window=0.160000000', 'window=0'),
+                        row.replace('window=0.160000000', 'window=1.6'),
+                        row.replace('window=', 'missing=')):
+            with self.subTest(changed=changed), self.assertRaisesRegex(ValueError, 'I/O continuation'):
+                check_restore(self.trace() + '\n' + changed, require_replay=True)
+
+    def test_reported_replay_failure_is_never_ignored(self):
+        with self.assertRaisesRegex(ValueError, 'I/O continuation'):
+            check_restore(self.trace() + '\nrom4_codec_replay: result=fail reference_events=5 restored_events=5 window=0.16')
+
 
 class NativeToneTests(unittest.TestCase):
     def trace(self):

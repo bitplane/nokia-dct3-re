@@ -561,7 +561,7 @@ def check_trace(text: str) -> None:
         raise ValueError("Lua observation failed")
 
 
-def check_restore(text: str) -> None:
+def check_restore(text: str, *, require_replay: bool = False) -> None:
     records = re.findall(
         r"rom4_codec_state: phase=(saved|restored) "
         r"(t=[0-9.]+ pc=[0-9a-f]{4} st0=[0-9a-f]{4} "
@@ -572,6 +572,12 @@ def check_restore(text: str) -> None:
         raise ValueError("native codec word/CPU/time did not restore exactly")
     if "Lua error" in text or "state_roundtrip: result=pass" not in text:
         raise ValueError("native restore harness failed")
+    if require_replay or 'rom4_codec_replay:' in text:
+        replay = re.findall(r'rom4_codec_replay: result=(pass|fail) reference_events=(\d+) restored_events=(\d+) window=([0-9.]+)', text)
+        if (text.count('rom4_codec_replay:') != 1 or len(replay) != 1
+                or replay[0][0] != 'pass' or int(replay[0][1]) <= 0
+                or replay[0][1] != replay[0][2] or not 0 < float(replay[0][3]) < 1):
+            raise ValueError('native DSP I/O continuation did not replay exactly')
 
 
 def check_shared_codec_control(text: str) -> None:
@@ -764,11 +770,15 @@ def main() -> int:
                         help="check a fresh four-second passive codec observer log")
     parser.add_argument("--restore-log", type=Path,
                         help="check exact native I/O-word restoration snapshots")
+    parser.add_argument('--require-restore-replay', action='store_true',
+                        help='also require matching nonempty post-restore DSP I/O traces')
     parser.add_argument("--tone-log", type=Path,
                         help="check physical numeric-key tone delivery and serial totals")
     parser.add_argument('--serial-helper-trace', type=Path,
                         help='check live helper readback at the serial restart; not a completion test')
     args = parser.parse_args()
+    if args.require_restore_replay and args.restore_log is None:
+        parser.error('--require-restore-replay requires --restore-log')
     try:
         image = args.image.read_bytes()
         results = check(image)
@@ -784,7 +794,7 @@ def main() -> int:
         if args.trace is not None:
             check_trace(args.trace.read_text(errors="replace"))
         if args.restore_log is not None:
-            check_restore(args.restore_log.read_text(errors="replace"))
+            check_restore(args.restore_log.read_text(errors="replace"), require_replay=args.require_restore_replay)
         if args.tone_log is not None:
             check_tone(args.tone_log.read_text(errors="replace"))
         if args.serial_helper_trace is not None:
@@ -803,6 +813,8 @@ def main() -> int:
             print("Native echo, receive-ready ISR and three operational control readback cycles: PASS")
     if args.restore_log is not None:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
+        if args.require_restore_replay:
+            print('Native DSP I/O continuation replay: PASS')
     if args.tone_log is not None:
         print("Organic tone initialization: PASS; operational_serial_samples=0 native_audio_claim=0")
     if args.serial_helper_trace is not None:

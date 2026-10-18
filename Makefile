@@ -453,7 +453,7 @@ help:
 	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
 	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses"
-	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu"
+	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (NSE1_MENU_MACHINE=nse1pipe for staged CPU)"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
 	@echo "make verify-3330-frontier complete virgin-PMM setup and reach v4.50 idle"
@@ -1622,36 +1622,39 @@ verify-5110-power-lifecycle: build
 		rm -rf "$$tmp"; \
 	done
 
+verify-5110-save-state: NSE1_MENU_MACHINE ?= noki5110
 verify-5110-save-state: build
-	@set -eu; tmp="$$(mktemp -d -t noki5110-state.XXXXXX)"; \
-		trap 'rm -rf "$$tmp"' EXIT; \
-		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-state.XXXXXX")"; \
+		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native save-state failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
+		mkdir -p "$$tmp/nvram/$(NSE1_MENU_MACHINE)" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
-			--output "$$tmp/nvram/noki5110/eeprom"; \
+			--output "$$tmp/nvram/$(NSE1_MENU_MACHINE)/eeprom"; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=7 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=200 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=menu \
 		NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 \
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
 		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
-		$(abspath $(MAME_DIR))/mame noki5110 \
+		$(abspath $(MAME_DIR))/mame $(NSE1_MENU_MACHINE) \
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
 			-autoboot_script $(abspath tools/c54x_rom4_codec_restore.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
 			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
-			--restore-log error.log; \
+			--restore-log error.log --require-restore-replay; \
 		grep -q 'state_roundtrip: result=pass' error.log; \
 		grep -q 'input-press: .* name=menu' error.log; \
 		! grep -q 'rom4_reset_request' error.log; \
 		! grep -q 'TMS320C54x.*illegal' error.log; \
+		! grep -Eq 'unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
-		echo 'NSE-1 ROM4 C54x save-state round trip: PASS'
+		echo 'NSE-1 ROM4 $(NSE1_MENU_MACHINE) C54x save-state round trip: PASS'
 
 check-c54x-rom4-transform:
 	$(PYTHON) tools/c54x_rom4_transform_check.py $(TRACE) $(DATA_MEMORY)
