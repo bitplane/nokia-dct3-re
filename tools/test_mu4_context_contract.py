@@ -28,6 +28,8 @@ from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapt
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
 from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
+from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
+from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -649,6 +651,19 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_alignment(changed)
+
+    def test_decoder_reset_uses_original_helpers_and_clears_first_header_state(self):
+        words = dict(enumerate(DECODER_RESET_WITNESS, DECODER_RESET_BASE))
+        words.update(enumerate(DECODER_BIT_RESET_WITNESS, DECODER_BIT_RESET_BASE))
+        result = decode_decoder_reset(words)
+        self.assertEqual(result['pinned_words'], 25)
+        self.assertEqual(result['calls'], ['0245d7', '0256cf'])
+        self.assertEqual(result['bit_reader_reset']['pinned_words'], 12)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_reset(changed)
 
     def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
         words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES

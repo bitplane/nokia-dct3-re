@@ -97,6 +97,25 @@ initialize a codec. The subsequent `02a81a` call saves execution context
 (SP, return words and registers), not an AAC header dispatcher. Preserve
 those distinctions when naming the future isolated ABI fixture.
 
+The original local reset entry is `023d41..023d59` (25 pinned words).
+It receives its object pointer in A, preserves it in AR1, calls `0245d7`
+and `0256cf`, clears `ba50` and `ba44`, clears object words +4 and +5,
+and clears the doubleword at +6. Its caller at `023d27` first copies
+three configuration words into object offsets +1..+3. These are original
+state-construction paths to investigate, not authority to transplant a
+captured object. The reset callees' effects, incoming configuration provenance
+and full object extent must be recovered before an isolated ABI run.
+
+`0256cf..0256da` is now independently pinned: it clears reservoir doubleword
+`a858`, remaining-bit count `a854` and word `a85a`, then returns. It neither
+reads media nor supplies external configuration. Disassembly of `0245d7`
+shows scalar defaults (`a8c7=0`, `a85e=1`, `a85f=ffff`, `a89d=1`,
+`a89e=3`, `b333=aaec`), two per-channel resets through pointers at `b335`,
+and a 1024-word zeroing loop covering `af30..b32f`. Those pointers must
+already be valid: calling this reset on an arbitrarily cleared object is
+not yet an established ABI. Pointer construction and its original caller
+remain the next prerequisite, rather than introducing snapshot state.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;

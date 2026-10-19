@@ -678,6 +678,31 @@ DECODER_ALIGNMENT_WITNESS = (
     0x000b,0xf493,0xf77e,0xf773,0x0100,0xf280,0x1100,0xf520,
     0xf640,0xf982,0x510c,0xee02,0xf495,0xf4e4)
 
+DECODER_RESET_BASE = 0x23D41
+DECODER_RESET_WITNESS = (
+    0x4a11,0xeeff,0x8811,0xf982,0x45d7,0xf982,0x56cf,
+    0x76f8,0xba50,0,0x76f8,0xba44,0,0x76e1,4,0,
+    0x76e1,5,0,0xe800,0x4ee1,6,0xee01,0x8a11,0xf4e4)
+DECODER_BIT_RESET_BASE = 0x256CF
+DECODER_BIT_RESET_WITNESS = (0xe800,0x4ef8,0xa858,0x76f8,0xa854,0,
+                           0x76f8,0xa85a,0,0xf495,0xf495,0xf4e4)
+
+
+def decode_decoder_reset(words):
+    for offset, expected in enumerate(DECODER_RESET_WITNESS):
+        if words.get(DECODER_RESET_BASE + offset) != expected:
+            raise ValueError('AA99 decoder reset witness changed or absent')
+    for offset, expected in enumerate(DECODER_BIT_RESET_WITNESS):
+        if words.get(DECODER_BIT_RESET_BASE + offset) != expected:
+            raise ValueError('AA99 bit-reader reset witness changed or absent')
+    return dict(entry='023d41', pinned_words=len(DECODER_RESET_WITNESS),
+                receiver='A -> AR1', calls=['0245d7', '0256cf'],
+                clears=['ba50', 'ba44', 'receiver+4', 'receiver+5',
+                        'doubleword receiver+6'],
+                bit_reader_reset=dict(entry='0256cf', pinned_words=12,
+                                      clears=['doubleword a858', 'a854', 'a85a']),
+                scope='Complete local reset and bit-reader reset; first callee effects, receiver extent and executable external-input ABI remain open')
+
 
 def decode_decoder_alignment(words):
     for offset, expected in enumerate(DECODER_ALIGNMENT_WITNESS):
@@ -1757,6 +1782,7 @@ def contract(source):
     result['decoder_output'] = decode_decoder_output(rel_words)
     result['decoder_framing'] = decode_decoder_framing(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
+    result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
