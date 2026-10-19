@@ -2606,8 +2606,8 @@ end-to-end call. Those transport and physical boundaries remain separate.
 resumptions of speech. This is isolated codec acceptance, not handset audio.
 
 This complete DTX acceptance is currently atomic only. The staged encoder
-stops at a mapped-source memory/immediate MAC in frame zero; the staged
-decoder matches frames 0..50 before unsupported LMS in frame 51. The
+matches frames 0..50 before unsupported control word `fb30` in frame 51;
+the staged decoder matches frames 0..50 before unsupported LMS in frame 51. The
 [loader contract](rom4_dsp_loader.md#mapped-source-in-parallel-storeload)
 records the exact software frontiers. Staged frontend selection does not
 weaken the 518-frame comparisons or nonzero comfort-noise requirements.

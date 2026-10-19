@@ -637,6 +637,10 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "mac-map-imm": (
+        "TMS320C54x mapped memory immediate MAC: PASS cases=786432 restore=786432 sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated mapped memory immediate MAC complete",
+    ),
     "bd-read-a": (
         "TMS320C54x BD READA: PASS cases=512 restore=512 slots=2 forms=DP,plain,postinc,SP values=4 caller_pages=2 source_pages=2 snapshots=4 older_ADD=slot1 retained_PAR=1 retained_destination=1 source_poison=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated BD READA complete",
@@ -1599,7 +1603,7 @@ EXTRA_PROFILES = {
         (
             "TMS320C54x memory immediate MPY: PASS cases=98304 restore=98304 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
             "TMS320C54x memory immediate MAC: PASS cases=262144 restore=262144 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
-            "TMS320C54x memory immediate MAC exclusions: PASS cases=1664 restore=1664 mapped_sources=96 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+            "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated memory immediate MPY complete",
     ),
@@ -2208,7 +2212,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
         machine = "tms54xtra"
-    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a"):
+    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

@@ -61,12 +61,13 @@ steady encoder-homing outputs. Acceptance targets are
 `check-c54x-rom4-efr-homing-encoder-staged` and
 `check-c54x-rom4-efr-homing-decoder-staged`.
 
-Staged DTX is a diagnostic frontier, not accepted: encoding stops in frame
-zero at the memory/immediate MAC mapped-source guard (stop context `fc04`;
-the acquired `fc00` word is `6709`, mapped AH with literal `f38b`). Decoding
-matches frames 0..50 before the unsupported LMS `e109` at `cbf4` in frame
-51. These need independent mapped-MAC and LMS ordering/numerical
-qualifications; the atomic 518-frame conversation remains the control.
+Staged DTX is a diagnostic frontier, not accepted: encoding matches frames
+0..50 before unsupported `fb30` at `cd7f` in frame 51. Decoding matches
+frames 0..50 before unsupported LMS `e109` at `cbf4` in frame 51. These
+need independent control-form and LMS ordering/numerical qualifications;
+the atomic 518-frame conversation remains the control. The mapped AH
+multiply-accumulate at `fc00` (`6709`, literal `f38b`) is now covered by
+the mapped memory/immediate MAC contract below.
 Short staged BIOS aliases preserve MAME's sixteen-character limit. Fixture
 parity tests require identical hashes in paired atomic/staged regions, and
 the runner rejects MAME driver-validity errors even if a completion marker
@@ -156,6 +157,33 @@ SP change; BCD's second delay position uses the existing prototype control
 timing helper, not a newly measured silicon phase. The mapped/peripheral,
 extended-address and arbitrary interrupt/producer compositions are not
 qualified by this RAM fixture.
+
+## Mapped memory/immediate MAC
+
+Memory/immediate MAC admits mapped accumulator fields `0008..000d`,
+T/TRN and AR0..AR7. Read retains the mapped word and publishes it to T;
+Execute combines that retained word and literal with the live selected
+accumulator. Source and destination accumulator selectors remain independent.
+SMUL clamps the fractional product before accumulation only in its existing
+fractional-overflow mode; result saturation and sticky OVA/OVB remain
+destination-owned. No data-memory write is synthesized.
+
+`mac-map-imm` passes 786,432 cases and cleared-pipeline replays: all sixteen
+mapped addresses, DP/plain-indirect/absolute/offset forms, four source-word
+patterns (guard fields retain their eight-bit width), eight literals, all
+FRCT/OVM/SXM/SMUL combinations, four accumulator selectors, two pages and
+three snapshots. A/B change after Read to distinguish retained memory data
+from the Execute-live addend, including same-accumulator source aliases.
+T, TRN, pointers and literals are poisoned after their ownership boundaries.
+The fixture checks exact product/accumulation/saturation/status results,
+one source read, no bus write and no duplicate extension fetch. Restoring
+the old MAC mapped-source guard makes it fail.
+
+The existing `mpy-mem-imm` RAM/MPY controls retain their matrices. Their
+negative MAC fixture now excludes the remaining eighty low/control/peripheral
+addresses and eight write-only MOD=3 forms: 1,408 cases/replays across all
+selectors, two pages and two snapshots. Producer, control, repeat and
+interrupt compositions are not newly qualified, nor are physical bus phases.
 
 ## Parallel Store/Multiply
 

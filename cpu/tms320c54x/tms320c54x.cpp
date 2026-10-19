@@ -4355,8 +4355,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
-		// Mapped-source ownership is validated for MPY, not yet for memory MAC.
-		if (source < 0x60 && ((m_pipeline_word[3] & 0xfc00) == 0x6400 || source < 8 || source > 0x17))
+		// Only accumulator fields, T/TRN and ARs have mapped-source coverage.
+		if (source < 0x60 && (source < 8 || source > 0x17))
 		{
 			logerror("%s: staged memory/immediate MPY control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

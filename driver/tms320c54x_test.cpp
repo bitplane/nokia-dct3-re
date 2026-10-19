@@ -11307,16 +11307,79 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254340;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct mapped_immediate_mac_fixture
+	{
+		memory_immediate_fixture f;
+		unsigned pointer, pattern;
+		u64 late_a() const { return std::array<u64,4>{0,1,0x7fffffff,0xff80000000ULL}[pattern]; }
+		u64 late_b() const { return std::array<u64,4>{0xffffffffffULL,0x0080000000ULL,0xff80000001ULL,0x123456789aULL}[pattern]; }
+	};
+	static mapped_immediate_mac_fixture mapped_immediate_mac_case(unsigned v)
+	{
+		mapped_immediate_mac_fixture out{}; auto &f=out.f;
+		f.address=8+v%16; v/=16; f.form=v%4; v/=4; out.pattern=v%4; v/=4;
+		f.word=std::array<u16,4>{0,0x7fff,0x8000,0xffff}[out.pattern];
+		f.literal=std::array<u16,8>{0,1,0xffff,0x8000,0x7fff,0x012c,0xf495,0xf38b}[v%8]; v/=8;
+		unsigned const flags=v%16; v/=16; unsigned const selectors=v%4; v/=4;
+		f.bdst=selectors&1; f.bsrc=selectors&2; f.accumulate=true;
+		f.base=v%2 ? 0x20000 : 0; v/=2;
+		out.pointer=f.address==0x17 ? 6 : 7;
+		f.mode=f.form==0 ? f.address : f.form==1 ? 0x80+out.pointer : f.form==2 ? 0xf8 : 0xe0+out.pointer;
+		f.words=f.form>=2 ? 3 : 2; f.access=f.words==3 ? 6 : 5; f.read=f.access+1;
+		f.extension=f.form==2 ? f.address : 0;
+		f.checkpoint=std::array<unsigned,3>{3,f.read,f.read+1}[v];
+		f.st0=0x1000|(out.pattern&1 ? 0x800 : 0);
+		f.st1=0x800|(flags&1 ? 0x40 : 0)|(flags&2 ? 0x200 : 0)|(flags&4 ? 0x100 : 0); f.pmst=flags&8 ? 2 : 0;
+		f.a=0x123456789aULL; f.b=0xfedcba9876ULL;
+		if(f.address==0x0a || f.address==0x0d) f.word&=0xff;
+		if(f.address<=0x0d)
+		{
+			u64 &acc=f.address>=0x0b ? f.b : f.a;
+			unsigned const shift=((f.address-8)%3)*16;
+			u64 const mask=u64(shift==32 ? 0xff : 0xffff)<<shift;
+			acc=(acc&~mask)|(u64(f.word)<<shift);
+		}
+		s64 product=s64(s16(f.word))*s16(f.literal)*(flags&1 ? 2 : 1);
+		if((flags&11)==11) product=std::clamp<s64>(product,-2147483648LL,2147483647LL);
+		u64 const source=f.bsrc ? out.late_b() : out.late_a();
+		s64 const total=product+(source&0x8000000000ULL ? s64(source)-0x10000000000LL : s64(source));
+		bool const overflow=total < -2147483648LL || total > 2147483647LL;
+		f.result=u64(overflow && (flags&2) ? std::clamp<s64>(total,-2147483648LL,2147483647LL) : total)&0xffffffffffULL;
+		f.result_st0=f.st0|(overflow ? f.bdst ? 0x200 : 0x400 : 0);
+		return out;
+	}
+	void start_mapped_immediate_mac(unsigned variant=0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case=variant;
+		auto const c=mapped_immediate_mac_case(variant); auto const &f=c.f; auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
+		for(unsigned i=0;i<12;++i) program.write_word(f.base+0x600+i,0xf495);
+		program.write_word(f.base+0x600,0x6400|(f.bsrc ? 0x200 : 0)|(f.bdst ? 0x100 : 0)|f.mode);
+		program.write_word(f.base+0x601,f.words==3 ? f.extension : f.literal);
+		if(f.words==3) program.write_word(f.base+0x602,f.literal);
+		program.write_word(f.base+0x600+f.words,0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.pmst);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T,0x9abc); m_cpu->set_state_int(tms320c54x_device::STATE_TRN,0x7bad);
+		for(unsigned i=0;i<8;++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+i,0x4000+i);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0+c.pointer,f.address); data.write_word(f.address,f.word);
+		m_pipeline_operand_reads=m_pipeline_extensions_reads=0;
+		m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"mapped_memory_mac_read",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(at==f.address && word==f.word && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles()==f.read,"Mapped MAC samples its original register field once in Read"); });
+		m_pipeline_write_tap=data.install_write_tap(0,0xffff,"mapped_memory_mac_no_write",[this](offs_t,u16 &,u16) { if(!machine().side_effects_disabled()) expect(false,"Mapped MAC has no data-bus write"); });
+		m_pipeline_fetch_tap=program.install_read_tap(f.base+0x601,f.base+0x600+f.words-1,"mapped_memory_mac_literal",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; unsigned const i=m_pipeline_extensions_reads++; expect(i<f.words-1 && at==f.base+0x601+i && word==(f.words==3 && !i ? f.extension : f.literal),"Mapped MAC retains each address/immediate extension once"); });
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=mapped_immediate_mac_phase;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	void start_memory_immediate_mac_exclusion(unsigned variant = 0)
 	{
 		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
-		unsigned const form = variant % 104, selectors = (variant / 104) % 4;
-		u32 const base = (variant / 416) % 2 ? 0x20000 : 0;
+		unsigned const form = variant % 88, selectors = (variant / 88) % 4;
+		u32 const base = (variant / 352) % 2 ? 0x20000 : 0;
+		unsigned const excluded_source = form < 8 ? form : form+16;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(base + 0x600, 0x6400 | (selectors << 8) | (form < 96 ? 0xf8 : 0x98 + form - 96));
-		program.write_word(base + 0x601, form < 96 ? form : 9);
-		program.write_word(base + 0x602, form < 96 ? 9 : 0xf4e1);
+		program.write_word(base + 0x600, 0x6400 | (selectors << 8) | (form < 80 ? 0xf8 : 0x98 + form - 80));
+		program.write_word(base + 0x601, form < 80 ? excluded_source : 9);
+		program.write_word(base + 0x602, form < 80 ? 9 : 0xf4e1);
 		program.write_word(base + 0x603, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1028); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
@@ -19792,6 +19855,7 @@ private:
 		if (!strcmp(machine().options().bios(), "plain-branch")) { start_pipeline_plain_branch(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
+		if (!strcmp(machine().options().bios(), "mac-map-imm")) { start_mapped_immediate_mac(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }
@@ -51350,6 +51414,33 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 310610) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310600; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if(m_phase==mapped_immediate_mac_phase)
+		{
+			auto const c=mapped_immediate_mac_case(m_pipeline_peripheral_case); auto const &f=c.f; unsigned const tick=++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_PMST)==f.pmst && m_cpu->state_int(tms320c54x_device::STATE_ST1)==f.st1,"Mapped MAC preserves execution modes without fallback");
+			u64 const a=tick>f.read ? (f.bdst ? c.late_a() : f.result) : f.a, b=tick>f.read ? (f.bdst ? f.result : c.late_b()) : f.b;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A)==a && m_cpu->state_int(tms320c54x_device::STATE_B)==b && m_cpu->state_int(tms320c54x_device::STATE_ST0)==(tick>f.read ? f.result_st0 : f.st0),"Mapped MAC combines a retained source/literal with the Execute-live accumulator and publishes sticky overflow only at Execute");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_T)==unsigned(tick>f.read ? 0x5a5a : tick==f.read || f.address==0x0e ? f.word : 0x9abc),"Mapped MAC publishes T at Read without overwriting a younger value");
+			if(tick==3 || (f.words==3 && tick==4)) { auto const disable=machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x5fe + tick,0xf495); }
+			if(tick==f.access) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+c.pointer,0x7000+c.pointer);
+			if(tick==f.read)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A,c.late_a()); m_cpu->set_state_int(tms320c54x_device::STATE_B,c.late_b()); m_cpu->set_state_int(tms320c54x_device::STATE_T,0x5a5a); m_cpu->set_state_int(tms320c54x_device::STATE_TRN,0xdead);
+				for(unsigned i=0;i<8;++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+i,0x7000+i);
+			}
+			if(tick==f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_extensions_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save mapped MAC across literal, Read and Execute ownership"); }
+			if(tick==16)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC)==f.base+0x601+f.words && m_pipeline_operand_reads==1 && m_pipeline_extensions_reads==f.words-1 && m_cpu->state_int(tms320c54x_device::STATE_TRN)==0xdead,"Mapped MAC retains its address and literal, with one read and no data write");
+				for(unsigned i=0;i<8;++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0+i)==0x7000+i,"Mapped MAC never recomputes a poisoned pointer");
+				if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint; m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads=m_recurring_irq_snapshot[1]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore mapped MAC after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=mapped_immediate_mac_phase+1; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if(m_pipeline_peripheral_case<786431) { start_mapped_immediate_mac(m_pipeline_peripheral_case+1); return; }
+				osd_printf_info("TMS320C54x mapped memory immediate MAC: PASS cases=786432 restore=786432 sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated mapped memory immediate MAC complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if(m_phase==mapped_immediate_mac_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=mapped_immediate_mac_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == 254340)
 		{
 			auto const f = memory_immediate_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
@@ -51376,7 +51467,7 @@ private:
 		if (m_phase == 254350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 254351)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant / 832 ? 5 : 3;
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant / 704 ? 5 : 3;
 			expect(!m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1028, "Excluded memory MAC has no operand, accumulator or status side effects");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Excluded memory MAC preserves all address registers");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded memory MAC before its operand read"); }
@@ -51385,8 +51476,8 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Unvalidated mapped sources and write-only short MOD3 remain rejected");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay excluded MAC without memory side effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254352; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 1663) { start_memory_immediate_mac_exclusion(variant + 1); return; }
-				osd_printf_info("TMS320C54x memory immediate MAC exclusions: PASS cases=1664 restore=1664 mapped_sources=96 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+				if (variant < 1407) { start_memory_immediate_mac_exclusion(variant + 1); return; }
+				osd_printf_info("TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated memory immediate MPY complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -54408,6 +54499,7 @@ private:
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;
 	static constexpr unsigned bd_read_a_phase = 1'000'040;
+	static constexpr unsigned mapped_immediate_mac_phase = 1'000'050;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
@@ -56479,6 +56571,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(182, "shift16-load-age", "Shifted mapped AR loads retain the older Read sample")
 	ROM_SYSTEM_BIOS(183, "addsub-ar-age", "Mapped ADD SUB retains the older AR Read sample")
 	ROM_SYSTEM_BIOS(184, "bd-read-a", "Retained READA transfers in unconditional BD delay spans")
+	ROM_SYSTEM_BIOS(185, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
 ROM_END
 
 ROM_START(tms54rom4)
