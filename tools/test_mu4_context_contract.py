@@ -16,6 +16,7 @@ from tools.mu4_context_contract import REL_AR_STORE_BASE, REL_AR_STORE_WITNESS, 
 from tools.mu4_context_contract import REL_COPY_ENTRY_BASE, REL_COPY_ENTRY_WITNESS, REL_COPY_BASE, REL_COPY_WITNESS, decode_rel_copy_loop, rel_copy_destination
 from tools.mu4_context_contract import REL_COPY_DEPENDENCY_BASE, REL_COPY_DEPENDENCY_WITNESS
 from tools.mu4_context_contract import REL_CLEANUP_BASE, REL_CLEANUP_WITNESS, REL_RELOAD_API, decode_rel_cleanup, rel_cleanup_route
+from tools.mu4_context_contract import RESIDENT_RESTART_WITNESS, decode_resident_cleanup_restart, resident_cleanup_restart
 from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
 from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
@@ -1562,6 +1563,34 @@ class ContextContractTest(unittest.TestCase):
             del words[address]
             with self.assertRaisesRegex(ValueError, f'{address:06x}'):
                 decode_worker_copy(words)
+
+
+class ResidentCleanupRestartTests(unittest.TestCase):
+    def test_pinned_restart_and_reject_every_changed_word(self):
+        words = {address + offset: value
+                 for address, block in RESIDENT_RESTART_WITNESS.items()
+                 for offset, value in enumerate(block)}
+        self.assertEqual(decode_resident_cleanup_restart(words)['single_track_example']['track'], 1)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_resident_cleanup_restart(changed)
+
+    def test_valid_track_wrap_and_nonadvance_mode(self):
+        for total in range(1, 129):
+            for current in range(1, total+1):
+                result = resident_cleanup_restart(2, 0, current, total)
+                self.assertEqual(result['track'], current % total + 1)
+                self.assertEqual(result['continuation'], 6)
+                held = resident_cleanup_restart(4, 3, current, total)
+                self.assertEqual(held['track'], current)
+                self.assertFalse(held['index_advanced'])
+                self.assertEqual(held['continuation'], 4)
+        self.assertEqual(resident_cleanup_restart(2, 0, 0xffff, 0xffff)['track'], 1)
+        for args in ((2, 0, 0, 1), (2, 0, 2, 1), (2, 0, 1, 0), (0x10000, 0, 1, 1)):
+            with self.assertRaises(ValueError):
+                resident_cleanup_restart(*args)
 
 
 if __name__ == '__main__':

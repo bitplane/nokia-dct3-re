@@ -1007,6 +1007,27 @@ Run the RAM snapshot observer separately: it and the ingress observer install
 breakpoint actions at the same address `02956f`, and composing them does not
 produce the snapshot. Refill and ingress use independent debugger counters.
 
+The original AA22 resident explains a deliberate restart route. The 70-word
+source-pinned `resident_cleanup_restart` contract in `mu4_context_contract.py`
+covers the state dispatcher and `03a987..03a9b6`: lifecycle 5 selects this
+branch, preserves continuation 4 (otherwise writes 6), then tests mode word
+`3740` against 3. In other modes it notifies with 9, increments track index
+`3765`, and wraps it to 1 when it exceeds track count `3768` by one. For a
+valid one-track catalogue this selects track 1 again. Mode 3 instead calls
+`03999f` and notifies with `0d`, without advancing the index. Both paths clear
+`3732` bit 4 and write lifecycle 7. These are decoded operations, not semantic
+names for user repeat settings or evidence that mode 3 means stop.
+
+The runtime continuation write at `03a98c` and lifecycle write at `03a9b2`
+agree with that resident branch. The capture does not yet identify the actual
+mode-3 comparison outcome or every track-index access, so the source contract
+explains an available wrap path rather than proving the current repeat policy.
+Tests pin every recovered word, check index advancement for all valid indices
+in catalogues of sizes 1 through 128, and cover the 16-bit maximum wrap. The
+next discriminator is the actual mode/index/count at resident restart, followed
+by the separately captured encoded buffer at cleanup; neither calls for
+changing playback samples or synthesizing completion.
+
 ### Decoded-Bank Copy Correspondence
 
 `mu4_pcm_copy_observe.lua` captures actual copy-helper source reads from

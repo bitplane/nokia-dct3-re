@@ -2250,6 +2250,52 @@ def decode_words(words):
     }
 
 
+RESIDENT_RESTART_WITNESS = {
+    0x3a92b: (0x7212,0x373e,0xf7b8,0x4812,0x11f8,8,0xf310,6,0xf84e,0xa94f),
+    0x3a935: (0x11f8,8,0xf310,5,0xf84a,0xa95b),
+    0x3a95b: (0x10f8,0x12,0xf010,5,0xf845,0xa987),
+    0x3a987: (0x60f8,0x3762,4,0xf830,0xa98f,0x76f8,0x3762,6,
+               0x60f8,0x3740,3,0xf830,0xa9aa,0xe809,0xf982,0x921f,
+               0x6bf8,0x3765,1,0x44f8,0x3765,0x40f8,0x3768,0x82f8,0x12,
+               0xf495,0xf495,0x6ce2,0xffff,0xa9af,0x76f8,0x3765,1,
+               0xf073,0xa9af,0xf983,0x999f,0xe80d,0xf982,0x921f,
+               0x68f8,0x3732,0xffef,0x76f8,0x373e,7,0xf073,0xaacc),
+}
+
+
+def resident_cleanup_restart(continuation, mode, current, total):
+    """State-5 branch only; valid track indices, not track-media acceptance."""
+    if (any(not 0 <= value <= 0xffff for value in (continuation, mode, current, total))
+            or not 1 <= current <= total):
+        raise ValueError('restart model requires word fields and a valid track index')
+    next_track = (current + 1) & 0xffff
+    # STH of the shifted subtraction, then BANZ *AR2(-1), without modifying AR2.
+    if ((next_track - total - 1) & 0xffff) == 0:
+        next_track = 1
+    return {'continuation': 4 if continuation == 4 else 6,
+            'track': current if mode == 3 else next_track,
+            'index_advanced': mode != 3, 'lifecycle': 7,
+            'notification': 0x0d if mode == 3 else 9,
+            'extra_call': '03999f' if mode == 3 else None}
+
+
+def decode_resident_cleanup_restart(words):
+    for address, witness in RESIDENT_RESTART_WITNESS.items():
+        for offset, expected in enumerate(witness):
+            if words.get(address + offset) != expected:
+                raise ValueError(f'resident restart witness changed at {address+offset:06x}')
+    return {'segment': 'aa22', 'pinned_words': sum(map(len, RESIDENT_RESTART_WITNESS.values())),
+            'lifecycle_field': '373e', 'selected_lifecycle': 5,
+            'entry': '03a987', 'mode_field': '3740', 'nonadvance_mode': 3,
+            'continuation_field': '3762', 'preserved_continuation': 4,
+            'other_continuation': 6, 'track_index_field': '3765', 'track_count_field': '3768',
+            'advance': 'increment index; wrap to 1 when increment equals track count + 1',
+            'tail': 'clear 3732 bit 4; lifecycle <- 7; branch 03aacc',
+            'single_track_example': resident_cleanup_restart(2, 0, 1, 1),
+            'scope': 'Pinned resident state-5 control path and valid-index arithmetic; '
+                     'not runtime mode ownership, repeat-setting semantics, tail disposition or audio completion'}
+
+
 def rel_cleanup_route(lifecycle, control):
     """Pinned AA99 branch arithmetic; not a codec result or EOF classification."""
     if not 0 <= lifecycle <= 0xFFFF or not 0 <= control <= 0xFFFF:
@@ -2339,6 +2385,7 @@ def contract(source):
     result['full_worker'] = decode_full_worker(words)
     result['timer_wrapper'] = decode_timer_wrapper(words)
     result['idle_lifecycle'] = decode_idle_contract(words)
+    result['resident_cleanup_restart'] = decode_resident_cleanup_restart(words)
     bootstrap_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa55')
     result['bootstrap_repeat'] = decode_bootstrap_repeat(bootstrap_words)
     result['boot_memory_shift'] = decode_boot_memory_shift(bootstrap_words)
