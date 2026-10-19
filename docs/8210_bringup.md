@@ -2130,17 +2130,33 @@ no bundled executable was run or source transplanted. This is bounded
 archive coverage, not proof that a preserved Blacksphere/nlib specification
 or an independent mode-4 trace does not exist elsewhere.
 
-The separately hosted material is a substantive source lead, not another
-name for the SDK archives: Harald Welte's
-[2009 Blacksphere assessment](https://laforge.gnumonks.org/blog/20091203-rediscovering_blacksphere_mados_dct3/)
-explicitly identifies MCU/DSP L1/L2 interface research and nlib, and links
-to `nokix.pasjagsm.pl/help/blacksphere/sub_050main.htm`. The alternate
-`nokix.sourceforge.net/help/blacksphere/sub_050main.htm` endpoint currently
-returns HTTP 404. Neither that assessment nor the public mode-3 examples
-establishes NSM-3 mode-4 eligibility, response family or cadence. Recovering
-the original protocol pages or an independent mode-4 exchange remains a
-valid software-only evidence path; their current unavailability is not an
-absence proof and does not justify substituting a mode-3 response.
+The original wumpus/Blacksphere
+[NMEAS page](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd/sub_11.htm)
+is recovered separately from those SDK archives. It corroborates the
+12-byte instruction layout, including the two-byte carrier at payload
+`+6`, but lists modes 1 through 5 without defining their semantics. It
+does not establish mode-4 eligibility, cancellation, response family or
+cadence. The recovered receive index names `8b` as an RSSI-results family
+but gives neither a schedule nor request pairing. These are historical
+cross-product descriptions, not an NSM-3 protocol specification.
+
+The three original HTML references are retained under
+`roms/reference-docs/blacksphere-mdi/` (not shipped emulator assets):
+
+| File | SHA-256 |
+| --- | --- |
+| `blacksphere-nmeas-20160119.html` | `e38d37b913004b9d1061758cee7728386dadfd50051d7118623692f661570ee1` |
+| `blacksphere-typestxd-20160119.html` | `d58f713139ee3009c2c3961a2e58e03e19d902399b0e92c116a6f34db61e7230` |
+| `blacksphere-typesrxd-20160119.html` | `433c797df1a0403f8a877dbcb10a92861d8ef8f792b117f7008802a385fd6e7b` |
+
+The original [Osmocom DCT3-GSMTAP decoder](https://github.com/osmocom/dct3-gsmtap/blob/dcbe73ad77b67a09ac0b88775efb8fc84e9c4615/src/main.c)
+at commit `dcbe73ad77b67a09ac0b88775efb8fc84e9c4615` supplied the exact
+historical page paths. Its transmit decoder handles RACH and GSM L2, not
+type `11`; its receive decoder handles type `80`, not `8b`. It therefore
+does not fill the missing measurement lifecycle contract. No reference
+source was transplanted or executable run. An independent mode-4 exchange
+or its DSP implementation remains the discriminating evidence, rather
+than substituting the available mode-3 examples.
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
