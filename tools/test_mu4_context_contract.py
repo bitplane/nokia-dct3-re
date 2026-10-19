@@ -33,6 +33,7 @@ from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET
 from tools.mu4_context_contract import DECODER_POINTER_RECORD_BASE, DECODER_POINTER_RECORD_WITNESS, decode_decoder_pointer_records
 from tools.mu4_context_contract import DECODER_CHANNEL_RESET_BASE, DECODER_CHANNEL_RESET_WITNESS, decode_decoder_channel_reset
 from tools.mu4_context_contract import DECODER_CONSTRUCTOR_BASE, DECODER_CONSTRUCTOR_WITNESS, decode_decoder_constructor
+from tools.mu4_context_contract import DECODER_CONFIGURATION_WITNESSES, decode_decoder_configuration
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -703,6 +704,18 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_constructor(changed)
+
+    def test_decoder_configuration_is_original_upload_not_a_host_profile(self):
+        words = {base+i:value for base,witness in DECODER_CONFIGURATION_WITNESSES
+                 for i,value in enumerate(witness)}
+        result = decode_decoder_configuration(words)
+        self.assertEqual(result['pinned_words'], len(words))
+        self.assertEqual(result['resulting_object_fields']['aaae'], 'e800')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_configuration(changed)
 
     def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
         words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES

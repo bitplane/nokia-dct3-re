@@ -130,8 +130,7 @@ A read-only `bootplaystage` snapshot at 1.116666667 seconds reproduces all
 eight values. This is initialization-plus-runtime agreement, not proof that
 no indirect writer can change them later. The original loader can supply
 these records for a future decoder bench; copied live RAM is unnecessary.
-Remaining ABI prerequisites are the caller's configuration fields, input
-buffer/refill ownership.
+Remaining ABI prerequisites are compressed-input buffer/refill ownership.
 
 The complete `0245d7..02460f` reset helper is pinned as 57 original words.
 It makes 1034 data writes: six scalar defaults, four channel-state clears,
@@ -156,9 +155,18 @@ then source values `d43c=0,d446=e800,d44b=f000`. The latter two match the
 subsequent raw sample buffers, not compressed-media parameters. No semantic
 name is yet assigned to object[1]. Raw PC-only captures from before the
 AA99 overlay contain different instructions at these same addresses and
-must not be interpreted as constructor execution. Literal inspection finds
-the supplying `d43d/d43b` call setup near `02786d`; decoding that caller
-and its original buffer descriptors is the next configuration boundary.
+must not be interpreted as constructor execution.
+
+That call setup and configuration are now pinned together (30 words).
+`02786b` places object `aaac` in A, stack arguments `d43d,0000,d43b`,
+and calls wrapper `029870`, which selects virtual method 6. Words
+`d43b..d44b` are direct original AA99 upload data, not C-initialization
+records or host-generated settings. Their source values reproduce the
+constructor's copied fields `aaad=0, aaae=e800, aaaf=f000`.
+A completed passive write capture sees those configuration words populated
+by the original loader near 0.81497 seconds, before constructor use.
+The earlier configuration-provenance question is therefore closed at this
+boundary; compressed-input and refill construction remain open.
 
 ## Next Acceptance Boundary
 

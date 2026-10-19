@@ -704,6 +704,24 @@ DECODER_CONSTRUCTOR_WITNESS = (
     0x4a11,0xeeff,0xf495,0x7104,0x12,0x7106,0x13,0x8811,
     0x10e3,1,0x80e1,1,0x10e2,9,0x80e1,2,0x10e2,14,
     0x80e1,3,0x4811,0xf982,0x3d41,0xee01,0x8a11,0xf4e4)
+DECODER_CONFIGURATION_WITNESSES = (
+    (0xd43b, (2,0,10,0,2,1,0xaaac,10,0,2,1,0xe800,10,0,2,1,0xf000)),
+    (0x2786b, (0xf020,0xaaac,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,0xf982,0x9870)),
+    (0x29870, (0xe906,0xf882,0x98b8)),
+)
+
+
+def decode_decoder_configuration(words):
+    for base, witness in DECODER_CONFIGURATION_WITNESSES:
+        for offset, expected in enumerate(witness):
+            if words.get(base+offset) != expected:
+                raise ValueError('AA99 original decoder configuration changed or absent')
+    return dict(pinned_words=30, object='aaac',
+                original_upload_configuration=['d43b..d44b'],
+                caller='02786b -> wrapper 029870 -> virtual method 6',
+                stack_arguments=['d43d', '0000', 'd43b'],
+                resulting_object_fields={'aaad':'0000','aaae':'e800','aaaf':'f000'},
+                scope='Original configuration bytes and call setup; not all caller branches, input refill or complete isolated decoder execution')
 
 
 def decode_decoder_constructor(words):
@@ -1847,6 +1865,7 @@ def contract(source):
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
     result['decoder_channel_reset'] = decode_decoder_channel_reset(rel_words)
     result['decoder_constructor'] = decode_decoder_constructor(rel_words)
+    result['decoder_configuration'] = decode_decoder_configuration(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
