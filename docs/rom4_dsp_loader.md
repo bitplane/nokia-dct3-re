@@ -2173,10 +2173,16 @@ at approximately 9.755, 9.755 and 9.773 seconds; the DSP reads those same
 values at data word `0854` (read-time PC context `27f2`). The preceding digit
 keys publish the distinct `920c/920f` tone-control dialogue. An empty-input
 control instead publishes `8406/8002/900f` at approximately 11.73 seconds.
-Thus the call-attempt controls cross the mailbox; zero codec entries cannot
-be attributed simply to their loss in transport. Their complete semantic
-effect and any dependence on RF acquisition remain unresolved. The read-time
-PC context is not an instruction-retirement or physical-timing claim.
+DSP I/O write taps then observe `2d=0626,2c=0008` for `8626`,
+`2d=0204,2c=0009` for `9204`, and `2d=0ec4,2c=0009` for `9ec4`.
+The first two also bracket a register-8 read (`2c=0018`) and rewrite of
+`0626`. These are the recovered COBBA control-data/select transactions,
+not a speech-channel assignment. Thus the call-attempt controls cross the
+mailbox and reach the codec-control device; zero speech-wrapper entries
+cannot be attributed simply to their loss in transport. Analog meanings of
+the register bits and the prerequisites for speech-channel activation remain
+unresolved. Read-time PC context is not an instruction-retirement or
+physical-timing claim.
 
 The current native boundary profiles are distinct: the four-second coherent
 boot observes thirteen ordered RF control writes, including the firmware-owned
