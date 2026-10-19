@@ -8960,8 +8960,39 @@ and conditionally invokes it. Callback `020981` sets `12f8=1` and executes
 literal `aa7e` references in the mapped AA99 image are retained in the report;
 computed aliases and runtime replacement are not closed. This is not evidence
 that a missing external HPI interrupt explains the final pending request.
-Live message identity and the input-16 argument's upstream producer remain
-separate questions.
+Those source fragments do not close live message ownership or the input-16
+argument's upstream producer.
+
+The bounded native playback fixture now observes 402 complete software
+notification groups: publication `0292c1`, callback `020981`, vector
+`022064`, wrapper `020742`, and request-frame read `020780`. All groups
+retain the mailbox value and callback `0002:0981`; flag `12f8` follows
+`0,0,1,1,0` across those entries. Request IDs are `12` (375), `04/05`
+(11 each), `19` (2), and `14/02/15` (one each). Neither request `16/17`
+nor their selected handlers occurs in this first-session observation.
+This is fixture/window evidence, not an all-producer absence proof.
+
+Use `tools/mu4_notification_observe.lua` with the isolated `bootplaystage`
+NAND/ROM setup, `-debug -debugger none`, and a ten-second stop bound; the
+observer starts debugger execution itself. Check the log with
+`python3 tools/mu4_notification_check.py RUN/error.log`. It rejects censored
+chains, changed scope, opcode/address disagreement, truncated captures,
+unverified overlays and out-of-session entries. Program-word guards must
+retain the upper page above `8000`; only the lower 32K uses OVLY's shared
+backing. The observer logs the actual opcode rather than hiding a mismatch
+behind a per-site opcode predicate.
+
+The 2,010-event capture completes at 10.016667 seconds, below its 4,096-event
+cap, with `illegal=0` and verified first-session completion. Its 1,536,000-byte
+returned-sample file retains SHA256
+`1871f924d9c12dca42bcced964dfe1ee0a42165574f5d4e424fbf284fdfb26dc`.
+The ten-second observation does not satisfy the separate twenty-second
+whole-playback terminal or establish retired operand ownership, annulment,
+physical interrupt latency or audio completion. Ordinary software
+notification is functioning here; resolving end-of-input policy still needs
+the legitimate control lifecycle, not a synthetic HPI edge.
+Retain this observer while cleanup policy is unresolved; retire its PC hooks
+when a smaller accepted boundary regression can replace them.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
