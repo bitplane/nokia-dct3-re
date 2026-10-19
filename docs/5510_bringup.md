@@ -27,7 +27,11 @@ and formal-conformance requirements live in the [AAC validation contract](aac_va
 Recording ingress is separately bound through native transport and the
 sample-repack ABI to original-word reads within each processing call;
 a same-endpoint host projection also carries the captured input signal.
-Complete native encoder-output and playback acceptance remain distinct.
+Full recording-transform coverage validates 4539 calls and 4498 contiguous
+data windows. Their plaintext contains 386 host-decodable packets, but the
+independently extracted file diverges after 143360 matching data bytes.
+Tail persistence, codec conformance and complete native playback remain open;
+the [AAC contract](aac_validation.md#full-recording-transform) owns the evidence.
 
 Every captured channel-3 source read binds to an owned DXR bus write, and
 every completed TX callback pairs with the next codec DIN sample. Reset-aware

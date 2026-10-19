@@ -35,8 +35,12 @@ Recording dataflow is independently bound from peripheral receive words
 through DMA, workspace copies and a stack-local repack ABI to actual reads
 within the next processing call. A same-endpoint host projection also carries
 the captured input's signal content; see [consumed PCM and recorded content](#consumed-pcm-and-recorded-content).
-Full native transform-state coverage, codec conformance and tail completion
-remain distinct from that result and from handset speech acceptance.
+Full-lifecycle transform observation now validates all 4539 calls in the
+recording fixture, including initialization and 4498 data windows. Native
+plaintext contains 386 complete host-decodable packets; stored bytes match
+only the first 143360 native bytes (385 packets plus 140 bytes). The remaining
+stored suffix diverges. Codec conformance, tail persistence/completion and
+handset speech acceptance remain unproven; see [full recording transform](#full-recording-transform).
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -785,9 +789,10 @@ Use the transform checker with `--output-projected-aac NEW_PATH
 --comparison-prefix PLAYBACK/observed.aac` to enforce fixed-origin byte equality.
 The supplied prefix's provenance is checked separately by the packet-session
 checker; this comparison alone does not establish it. The projection remains
-host-only and must never become emulation input. Native transform state beyond
-the observed coverage, intended sample extent, recorder flushing and playback
-draining remain distinct unvalidated contracts.
+host-only and must never become emulation input. This bounded-prefix control
+does not establish later state; the full recording observation below does.
+Intended sample extent, recorder flushing and playback draining remain
+distinct unvalidated contracts.
 
 ### Recorder Stop Frontend
 
@@ -1215,6 +1220,61 @@ the volume/trace qualification explicitly leaves host projection derivation
 unvalidated. NumPy supplies FFT correlation; FFmpeg/FFprobe and 7-Zip remain
 external independent readers. No signal comparison changes the native media
 or weakens the existing rejecting completion checks.
+
+### Full Recording Transform
+
+`mu4_recorder_full_transform_check.py` checks every entry to original AA88
+routine `03f0fd`, its actual initial operand reads (`03f102/03f106`), final
+stores (`03f45e/03f462`) and caller return. Entry SP is recovered from the
+PSHM's retained stack destination, not the live pipeline register. Each call
+has its own captured 82-word state; nonfinal state writes, lost identities,
+unreturned calls and capped records are rejected. Source pinning covers the
+original transform routine, and the independent forward model must match
+both actual output words. The output-only bench is not save-state qualified.
+
+The 20-second `tmp/native-gates/mu4-full-transform-retained` run has:
+
+| Scope | Result |
+| --- | --- |
+| Entry/return/model coverage | 4539/4539; zero bad, unadmitted or dropped calls |
+| Initialization callers | `03f820`: 9 calls/states; `03f847`: 32 calls/states |
+| Data caller `03ee95` | 4498 contiguous 32-byte windows from cursor zero; one state |
+| Total state variants | 42, including the final recording state |
+| Captured native plaintext | 143936 bytes, SHA256 `bf03b9dfccf4ac54d3105c33f024c1d51aaca5a8d0abc9d29e61fed850a2526f` |
+| Complete native ADTS prefix | 386 packets / 143592 bytes; SHA256 `56185de0c0b4cf42578a8c5653382b311e31b95b2c5816d61832144f3ee4e7bb` |
+| Native partial packet 387 | 344 of its declared 372 bytes captured in complete transform windows |
+
+FFmpeg with `-xerror` decodes the complete native prefix without diagnostics
+to 395264 stereo frames / 1581056 s16le bytes, SHA256
+`c29bdde1b26a8af68ca60082a2afe810464242295899acd018fe7a6bfbd3f9bf`.
+This is a host decode of observed native plaintext, not inverse extrapolation.
+It is not formal codec conformance or completed native playback.
+
+The immutable seed, endpoint NAND, extracted `TEST` and captured input PCM
+retain the hashes documented above. Independent 7-Zip extraction from this
+endpoint anchors the first actual encrypted data window uniquely at byte 622.
+All 143360 subsequent bytes equal actual native output. The first difference
+is at data offset 143360 / file offset 143982. The extracted data region is
+143570 bytes long: its final 210 bytes therefore cannot be accepted as the
+continuation of the observed native stream. Native windows contain another
+576 bytes beyond the equal prefix, including a complete packet 386; this
+does not establish where or whether they were committed to NAND.
+
+Default file checking rejects this divergence. `--inventory-divergence`
+explicitly reports it while keeping `stored_file_correspondence_validated`,
+`whole_file_validated` and `tail_completion_validated` false. Exported
+`--output-native-plain` bytes are actual captured pre-transform windows,
+never replacement media or a firmware input. The next persistence boundary
+is the final writer/buffer lifecycle, not an assumed later transform-state
+change. Intended packet/sample extent and the missing final 28 bytes remain
+unresolved.
+
+```sh
+.venv/bin/python tools/mu4_recorder_full_transform_check.py RUN/error.log \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --stored-file READBACK/TEST --inventory-divergence \
+  --output-native-plain NEW_NATIVE_PLAIN
+```
 
 ### Metadata Overwrite Accounting
 

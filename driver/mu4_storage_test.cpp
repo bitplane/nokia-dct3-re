@@ -49,6 +49,7 @@ public:
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			if (recorder_ac_profile() && m_recorder_overlay_checked) observe_recorder_ingress(address,opcode);
+			if (recorder_ac_profile() && m_recorder_overlay_checked) observe_recording_transform(address,opcode);
 			if (measurement_profile() && (address == 0x3b021 || address == 0x3b02a || address == 0x3b034 || address == 0x3b038))
 			{
 				auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
@@ -477,6 +478,120 @@ private:
 	std::ofstream m_ac_pcm_capture;
 	u64 m_ac_pcm_words = 0, m_ac_pcm_bad_order = 0, m_ac_pcm_dropped = 0;
 	u32 m_ac_pcm_hash = 2166136261U;
+	struct recording_transform_context
+	{
+		bool active = false, window = false;
+		u64 ordinal = 0;
+		u32 caller = 0, cursor = 0, position = 0;
+		u16 sp = 0, source = 0;
+		std::array<u16,2> pointers{}, expected{}, inputs{}, outputs{};
+		std::array<u16,82> state{};
+		std::array<u16,6> arguments{};
+		std::array<u16,32> plain{};
+		unsigned reads = 0, writes = 0, state_other_writes = 0, source_writes = 0;
+		double start = 0;
+	};
+	recording_transform_context m_record_transform;
+	struct recording_transform_store { bool valid = false; unsigned side = 0; u32 instruction = 0; u16 address = 0, value = 0; };
+	recording_transform_store m_record_transform_store;
+	std::map<u32,u64> m_record_transform_callers;
+	u64 m_record_transform_entries = 0, m_record_transform_returns = 0, m_record_transform_unadmitted = 0;
+	u64 m_record_transform_bad = 0, m_record_transform_dropped = 0;
+	void observe_recording_transform(offs_t address,u16 opcode)
+	{
+		if (m_record_transform_store.valid) { ++m_record_transform_bad; m_record_transform_store.valid = false; }
+		auto &c = m_record_transform;
+		if (c.active && address == c.caller)
+		{
+			++m_record_transform_returns;
+			if (c.reads != 3 || c.writes != 3) ++m_record_transform_bad;
+			if (c.ordinal <= 8192)
+			{
+				auto words = [](auto const &values) {
+					std::string text;
+					for (u16 word : values) { if (!text.empty()) text += ','; text += util::string_format("%04x",word); }
+					return text;
+				};
+				std::string plain = "none";
+				if (c.window) { plain.clear(); for (u16 byte : c.plain) plain += util::string_format("%02x",byte); }
+				logerror("mu4_record_full_block: ordinal=%llu caller=%06x sp=%04x pointers=%04x,%04x input=%04x,%04x output=%04x,%04x state=%s reads=%u writes=%u state_other_writes=%u source_writes=%u domain=%s source=%04x position=%08x cursor=%08x arguments=%s plain=%s start=%.9f end=%.9f identity=Execute_entry_and_bus observer_writes=0\n",
+					static_cast<unsigned long long>(c.ordinal),c.caller,c.sp,c.pointers[0],c.pointers[1],c.inputs[0],c.inputs[1],c.outputs[0],c.outputs[1],words(c.state).c_str(),c.reads,c.writes,c.state_other_writes,c.source_writes,c.window ? "aligned32" : "other",c.source,c.position,c.cursor,words(c.arguments).c_str(),plain.c_str(),c.start,machine().time().as_double());
+			}
+			else ++m_record_transform_dropped;
+			c.active = false;
+		}
+		if (address == 0x3f0fd && opcode == 0x4a11)
+		{
+			if (c.active) ++m_record_transform_bad;
+			c = {}; c.ordinal = ++m_record_transform_entries;
+			// Younger FRAME can have changed live SP; PSHM retains its own slot.
+			u16 pushed = 0, saved = 0;
+			if (!m_cpu->observe_execute_memory_store(address,opcode,pushed,saved)) { ++m_record_transform_unadmitted; return; }
+			c.sp = u16(pushed+1);
+			auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+			if (c.sp < 0x80 || c.sp > 0xfffc) { ++m_record_transform_unadmitted; return; }
+			c.caller = (u32(data.read_word(c.sp))<<16) | data.read_word(c.sp+1);
+			if (!m_record_transform_callers.count(c.caller) && m_record_transform_callers.size() >= 128) ++m_record_transform_dropped;
+			else ++m_record_transform_callers[c.caller];
+			c.pointers = {u16(m_cpu->state_int(tms320c54x_device::STATE_A)),data.read_word(c.sp+2)};
+			if (c.caller > 0x7fffff || c.pointers[0] < 0x80 || c.pointers[1] < 0x80)
+			{
+				++m_record_transform_unadmitted;
+				logerror("mu4_record_full_unadmitted: ordinal=%llu caller=%06x pointers=%04x,%04x observer_writes=0\n",static_cast<unsigned long long>(c.ordinal),c.caller,c.pointers[0],c.pointers[1]);
+				return;
+			}
+			for (unsigned side=0;side<2;++side) c.expected[side] = data.read_word(c.pointers[side]);
+			for (unsigned index=0;index<82;++index) c.state[index] = data.read_word(0xfc6c+index);
+			if (c.caller == 0x3ee95)
+			{
+				u16 const outer = c.sp+2;
+				for (unsigned index=0;index<6;++index) c.arguments[index] = data.read_word(u16(outer+0x16+index));
+				c.source = data.read_word(u16(outer+2));
+				c.position = (u32(data.read_word(u16(outer+4)))<<16) | data.read_word(u16(outer+5));
+				u16 const cursor = c.arguments[2];
+				c.window = c.pointers[0] == u16(outer+0x10) && c.pointers[1] == u16(outer+0x11) &&
+					c.arguments[0] == 0 && c.arguments[1] == 32 && c.arguments[3] == 0 && c.arguments[4] == 28 && c.arguments[5] == 4 &&
+					c.position == 0 && c.source >= 0x80 && c.source <= 0xffe0 && cursor >= 0x80 && cursor < 0xffff;
+				if (c.window)
+				{
+					c.cursor = (u32(data.read_word(cursor))<<16) | data.read_word(cursor+1);
+					for (unsigned index=0;index<32;++index) { c.plain[index] = data.read_word(c.source+index); if (c.plain[index] > 255) c.window = false; }
+				}
+			}
+			c.active = true; c.start = machine().time().as_double();
+		}
+		else if (c.active && (address == 0x3f45e || address == 0x3f462))
+		{
+			unsigned const side = address == 0x3f45e;
+			u16 destination = 0, value = 0;
+			if (opcode != 0x8081 || !m_cpu->observe_execute_memory_store(address,opcode,destination,value) || destination != c.pointers[side]) ++m_record_transform_bad;
+			m_record_transform_store = {true,side,u32(address),destination,value};
+		}
+	}
+	void observe_transform_read(offs_t address,u16 value)
+	{
+		auto &c = m_record_transform;
+		if (!c.active) return;
+		u32 instruction = 0; u16 opcode = 0;
+		if (!m_cpu->observe_staged_data_read(address,instruction,opcode) || (instruction != 0x3f102 && instruction != 0x3f106)) return;
+		unsigned const side = instruction == 0x3f106;
+		if (opcode != 0x1081 || address != c.pointers[side] || value != c.expected[side] || BIT(c.reads,side)) ++m_record_transform_bad;
+		c.inputs[side] = value; c.reads |= 1U<<side;
+	}
+	void observe_transform_write(offs_t address,u16 value,u16 mask)
+	{
+		auto &c = m_record_transform;
+		if (!c.active) return;
+		bool const final = m_record_transform_store.valid;
+		if (address >= 0xfc6c && address <= 0xfcbd && !final) ++c.state_other_writes;
+		if (c.window && address >= c.source && address < c.source+32) ++c.source_writes;
+		if (!final) return;
+		auto const store = m_record_transform_store; m_record_transform_store.valid = false;
+		u16 destination = 0, observed = 0;
+		if (mask != 0xffff || address != store.address || value != store.value || BIT(c.writes,store.side) ||
+			!m_cpu->observe_execute_memory_store(store.instruction,0x8081,destination,observed) || destination != address || observed != value) ++m_record_transform_bad;
+		c.outputs[store.side] = value; c.writes |= 1U<<store.side;
+	}
 	void finish_recorder_consumer()
 	{
 		if (!m_ac_consumer_active) { ++m_ac_consumer_bad; return; }
@@ -562,7 +677,9 @@ private:
 	{
 		m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"mu4_recorder_consumer_read",
 			[this](offs_t address,u16 &value,u16) {
-				if (machine().side_effects_disabled() || !m_ac_consumer_active) return;
+				if (machine().side_effects_disabled()) return;
+				observe_transform_read(address,value);
+				if (!m_ac_consumer_active) return;
 				u16 const offset = u16(address-m_ac_consumer_base);
 				if (offset >= 2048) return;
 				auto &word = m_ac_consumer_words[offset]; auto &c = m_ac_consumer_current;
@@ -628,6 +745,7 @@ private:
 		m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"mu4_recorder_copy_destination",
 			[this](offs_t address,u16 &value,u16 mask) {
 				if (machine().side_effects_disabled()) return;
+				observe_transform_write(address,value,mask);
 				if (m_ac_consumer_active)
 				{
 					u16 const offset = u16(address-m_ac_consumer_base);
@@ -3383,6 +3501,9 @@ private:
 		m_ac_consumer_words.fill({}); m_ac_consumer_current = {}; m_ac_consumer_total = {};
 		m_ac_consumer_readers.fill(0); m_ac_consumer_instructions.clear(); m_ac_consumer_entries = m_ac_consumer_returns = 0;
 		m_ac_consumer_bad = m_ac_consumer_dropped = 0; m_ac_consumer_base = 0; m_ac_consumer_active = false;
+		m_record_transform = {}; m_record_transform_store = {}; m_record_transform_callers.clear();
+		m_record_transform_entries = m_record_transform_returns = m_record_transform_unadmitted = 0;
+		m_record_transform_bad = m_record_transform_dropped = 0;
 		if (m_ac_pcm_capture.is_open()) m_ac_pcm_capture.close();
 		m_ac_pcm_capture.clear(); m_ac_pcm_words = m_ac_pcm_bad_order = m_ac_pcm_dropped = 0; m_ac_pcm_hash = 2166136261U;
 		if (recorder_ac_profile())
@@ -3976,6 +4097,10 @@ private:
 				m_ac_pcm_capture.close();
 				logerror("mu4_recorder_input_pcm: file=mu4_recorder_input.pcm words=%llu fnv1a=%08x bad_order=%llu dropped=%llu cap=1048576 channels=2 format=s16le_interleaved source=staged_operand_read save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 					static_cast<unsigned long long>(m_ac_pcm_words),m_ac_pcm_hash,static_cast<unsigned long long>(m_ac_pcm_bad_order),static_cast<unsigned long long>(m_ac_pcm_dropped));
+				for (auto const &[caller,count] : m_record_transform_callers)
+					logerror("mu4_record_full_caller: caller=%06x calls=%llu observer_writes=0\n",caller,static_cast<unsigned long long>(count));
+				logerror("mu4_record_full_terminal: entries=%llu returns=%llu unadmitted=%llu bad=%llu dropped=%llu active=%u pending_write=%u cap=8192 caller_cap=128 stop=%.9f save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+					static_cast<unsigned long long>(m_record_transform_entries),static_cast<unsigned long long>(m_record_transform_returns),static_cast<unsigned long long>(m_record_transform_unadmitted),static_cast<unsigned long long>(m_record_transform_bad),static_cast<unsigned long long>(m_record_transform_dropped),unsigned(m_record_transform.active),unsigned(m_record_transform_store.valid),machine().time().as_double());
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)
