@@ -8630,6 +8630,33 @@ All these headers specify one raw block, and every call produces one complete
 stereo conversion block. This closes input-packet correspondence for the
 375-call prefix, not retained operand or complete output-store ownership.
 
+The passive linked-buffer instrument `mu4_buffer_flow_observe.lua` observes
+three initialized descriptors from 0.825 through ten seconds: producer
+`1622` -> transform `1616` -> decoder input `160a`. Their upstream/downstream
+links agree with the complete source-pinned refresh routine. One fresh run
+records 43772 bus writes and 20766 changed values without caps or CPU faults;
+identical full-word writes are counted but deduplicated from the event log.
+`mu4_buffer_flow_check.py RUN --source-a00 .../InitData_R060.a00` checks the
+scope, topology, domains, write order and complete observation terminal.
+
+There are 376 pending-request changes at `15e0` in context `02068e`, versus
+375 clears in context `02088b`. The last request is `00ba` at 9.700572343s.
+The preceding source-node advances and consumer compaction remain live
+through all 375 decoder calls; this is not a generally absent refill peer.
+At the subsequent existing Execute-entry gate capture, decoder input is
+`162e..1d46` (1816 words, above the `0400` admission threshold), but both
+activity fields are zero. The remaining boundary is software end/drain
+ordering, not lack of buffered input. Context PCs on data writes remain
+correlations, not retained instruction ownership.
+
+Later writes of `ffff` to `12fb/12fc` at about 9.859s have low-PC contexts
+`002faf/002fb2`; do not reinterpret those reused addresses as new AA99
+control messages. The observation closes at ten seconds, while the original
+twenty-second diagnostic still ends with its mandatory audio-completion
+failure. This capture does not extend audio acceptance. Use a unique run
+directory and confirm child-process termination before reusing evidence
+paths; the checker rejects NUL-corrupted logs and incomplete terminals.
+
 The 142,849-byte reference retains 3,348 unconsumed bytes with nine complete
 ADTS headers. Header completeness is not payload validity: the strict host
 reference has eight further decoded blocks and rejects its final packet.
