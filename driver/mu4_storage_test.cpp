@@ -1299,8 +1299,8 @@ private:
 			}
 			if (m_playback_processing[0] <= 8) logerror("mu4_processing_entry: call=%u sp=%04x caller_sp=%04x a=%010llx base=%04x index=%04x remaining=%04x reservoir=%04x%04x window_start=%04x window=%s st1=%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
 				m_playback_processing[0],sp,m_playback_processing_sp,(unsigned long long)a,base,index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),start,window.c_str(),unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),machine().time().as_double());
-			logerror("mu4_decoder_call: call=%u phase=entry index=%04x remaining=%04x reservoir=%04x%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
-				m_playback_processing[0],index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),machine().time().as_double());
+			logerror("mu4_decoder_call: call=%u phase=entry base=%04x index=%04x remaining=%04x reservoir=%04x%04x t=%.9f identity=Execute_entry context_only=1 observer_writes=0\n",
+				m_playback_processing[0],base,index,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859),machine().time().as_double());
 		}
 		else if (address == 0x23de7 && m_playback_processing_pending)
 		{

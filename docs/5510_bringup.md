@@ -31,8 +31,9 @@ the first eight packet-bound calls match source-derived integer arithmetic;
 their conversions match later RAM. Whole-session chronological comparison
 against a host-decoded projection has maximum sample difference 13 and RMS
 1.24083, without fitted gain or alignment. These are measurements, not a
-codec tolerance. Detailed arithmetic and packet/store binding remain
-bounded to eight calls; other media and independent conformance criteria
+codec tolerance. Consumed-input byte coverage extends across all 375 calls;
+detailed arithmetic and output-store binding remain bounded to eight calls.
+Other media and independent conformance criteria
 remain open. See [processing contracts](#processing-and-conversion) and
 [reference comparison](#independent-reference-comparison).
 
@@ -8604,6 +8605,51 @@ processing corruption is corrected; the remaining small fixed-point/float
 residual needs broader coverage and independent acceptance criteria, not
 a guessed serial phase.
 
+##### Native session input coverage
+
+`mu4_packet_reads_observe.lua` captures actual data-bus reads in the original
+bit-reader context over 0.8--10 seconds, bounded to `162e..1e2d` and 131,072
+records. `mu4_decoder_call` entries additionally expose the existing input
+base snapshot; the eight-call detailed arithmetic budget is unchanged.
+`mu4_packet_session_check.py` composes the complete session/capture and
+eight-call arithmetic checks with the existing reservoir/bus-byte proof.
+It starts at reference offset zero, requires each call's net byte consumption
+to equal the next declared ADTS packet length, and requires coverage of every
+consumed byte. It never searches for a favorable offset or supplies missing
+bus bytes from the reference.
+
+All 375 native calls match the first 139,501 projected reference bytes,
+SHA256 `e94a84480d87edbb2a00ed57366cf4a1a6c6ec5dde621a17199933964b46c729`.
+The closed capture has 73,381 reads, of which 69,750 are within the checked
+calls; the other 3,631 are explicitly reported outside-call observations.
+Reservoir prefixes and actual reads cover every byte of the checked packets.
+All these headers specify one raw block, and every call produces one complete
+stereo conversion block. This closes input-packet correspondence for the
+375-call prefix, not retained operand or complete output-store ownership.
+
+The 142,849-byte reference retains 3,348 unconsumed bytes with nine complete
+ADTS headers. Header completeness is not payload validity: the strict host
+reference has eight further decoded blocks and rejects its final packet.
+The tail remains outside native processing acceptance. The existing maximum
+sample difference 13 / RMS 1.24083 is unchanged and is not a selected codec
+tolerance. No native whole-file, analog-audio or speech claim follows.
+
+Run the isolated `bootplaystage` diagnostic with
+`-autoboot_script <absolute-path>/tools/mu4_packet_reads_observe.lua` through
+its twenty-second terminal, then:
+
+```sh
+python3 tools/mu4_packet_session_check.py RUN_DIR \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-aac PROJECTED_REFERENCE.aac --reference-pcm STRICT_HOST_PREFIX.s16le
+```
+
+The diagnostic's deliberate audio-completion failure remains mandatory;
+packet-prefix validation is separate. Wrong bytes, missing reads, changed
+scope, caps, failed calls and partial terminals fail closed. Retain this
+bounded instrument until end-of-input policy is understood; do not expand
+the arithmetic snapshot budget or inject a completion to consume the tail.
+
 ##### Native session return coverage
 
 The compact observation follows at most 512 processing calls in the first
@@ -8626,14 +8672,15 @@ arithmetic snapshots; the bounded coefficient/transform checks still pass.
 
 Against the first 375 blocks of the 383-packet host reference, 391,341 of
 768,000 signed samples differ, maximum absolute difference 13 and RMS
-1.2408299054. These are unfitted ordinal diagnostics, not complete later
-packet binding or a chosen audio tolerance. No nonzero processing status
+1.2408299054. The consumed-input proof above now binds this packet prefix;
+these remain unfitted numerical diagnostics, not a chosen audio tolerance
+or complete later output-store binding. No nonzero processing status
 occurs before termination, so the rejected host packet 384 does not directly
 explain this session ending at 375 calls. The host reference has eight
 additional blocks; do not silently truncate that discrepancy or call it a
-decoder failure. Next identify the original wrapper, stream-length or
-lifecycle decision that stops invoking the decoder after these successful
-blocks, then extend packet/store binding where it earns evidence.
+decoder failure. The mapped input-length cleanup still needs its legitimate
+end-of-input lifecycle classified; whole-file completion, output-store binding
+beyond the detailed prefix and independent codec criteria remain open.
 
 ```sh
 python3 tools/mu4_decoder_session_check.py RUN_DIR \
