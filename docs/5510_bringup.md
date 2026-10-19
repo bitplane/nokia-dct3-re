@@ -10,6 +10,12 @@ mapped repeat bodies retain their exclusion. The firmware-free
 `move-rpt-owner` profile qualifies both cases with cleared-pipeline replay.
 This is separate from the older atomic timer-starvation observation and
 does not establish playback, MA4 boot or physical pipeline timing.
+`make check-mu4-recorder-persistence` composes fresh original initialization,
+retained six-file readback, staged metadata save and a separate cold-open
+process. It uses the saved endpoint as its reopening input, verifies the
+original scanner/ID3 title and preserves the source NAND. Evidence is isolated
+under `tmp/native-gates/mu4-recorder-persistence.*`; successful metadata or
+catalogue checks must not be presented as playback acceptance.
 
 The acquired v3.53 PPM C service package is normalized and statically
 validated. The `nmp5stage` research fixture executes its own verifier and

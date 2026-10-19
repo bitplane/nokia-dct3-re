@@ -1182,6 +1182,24 @@ check-mu4-retained-original:
 		done; \
 		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"
 
+.PHONY: check-mu4-recorder-persistence
+# Fresh original provisioning, native metadata save, then a separate process
+# reopening that exact NAND. This is not playback or MA4 handset acceptance.
+check-mu4-recorder-persistence: build
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
+		run=$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-recorder-persistence.XXXXXX"); \
+		run=$$(cd "$$run" && pwd); echo "MU4 recorder persistence evidence: $$run"; \
+		$(MAKE) -o build check-mu4-retained-original MU4_RETAINED_RUN_DIR="$$run/source"; \
+		$(MAKE) -o build check-mu4-bootstrap-original \
+			MU4_BOOTSTRAP_SOURCE_RUN="$$run/source" MU4_BOOTSTRAP_RUN_DIR="$$run/save" \
+			MU4_BOOTSTRAP_INPUT_NAND="$$run/source/nvram/mu4nand_13/nand" \
+			MU4_BOOTSTRAP_BIOS=bootrecmeta; \
+		$(MAKE) -o build check-mu4-bootstrap-original \
+			MU4_BOOTSTRAP_SOURCE_RUN="$$run/source" MU4_BOOTSTRAP_RUN_DIR="$$run/reopen" \
+			MU4_BOOTSTRAP_INPUT_NAND="$$run/save/mu4_recorder_endpoint.nand" \
+			MU4_BOOTSTRAP_BIOS=bootopenstage; \
+		echo "MU4 native recorder persistence: PASS (metadata/catalogue only; no playback claim)"
+
 .PHONY: check-mu4-bootstrap-original
 check-mu4-bootstrap-original: build
 	@set -eu; source="$(abspath $(MU4_BOOTSTRAP_SOURCE_RUN))"; \
