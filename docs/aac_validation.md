@@ -33,8 +33,10 @@ and physical analog output remain separate obligations.
 
 Recording dataflow is independently bound from peripheral receive words
 through DMA, workspace copies and a stack-local repack ABI to actual reads
-within the next processing call. See [stack sample consumers](#stack-sample-consumers);
-this does not establish complete encoder-output or handset speech acceptance.
+within the next processing call. A same-endpoint host projection also carries
+the captured input's signal content; see [consumed PCM and recorded content](#consumed-pcm-and-recorded-content).
+Full native transform-state coverage, codec conformance and tail completion
+remain distinct from that result and from handset speech acceptance.
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -1109,10 +1111,10 @@ unchanged. This binds actual peripheral-origin words through the workspace
 and repack stores to a real pointer argument, rather than inferring sample
 consumption from frame counts.
 
-The remaining boundary is what `039852` and its callees do with this local
-buffer during each call's stack lifetime. Follow the dynamic pointer, not
-one frequent address. Repack/call acceptance is not a complete encoder-output, physical
-ADC, GSM speech or end-to-end call claim.
+The call's stack lifetime bounds downstream provenance: follow the dynamic
+pointer, not one frequent address. Repack/call acceptance is separate from
+callee arithmetic, complete encoder-output, physical ADC, GSM speech and
+end-to-end call acceptance.
 
 ### Stack Sample Consumers
 
@@ -1146,9 +1148,65 @@ Both words match AA88. Their MVDD forms read successive words through AR5
 and select separate AR2/AR3 destinations, a source-level deinterleave pair.
 Actual destination writes and subsequent arithmetic are not inferred from
 these read counts or opcode matches. The native metadata result and both
-NAND hashes in the DRR section remain unchanged. The next independent
-acceptance question is whether decoded recorded audio carries the actual
-input content, not merely whether another copy instruction ran.
+NAND hashes in the DRR section remain unchanged. Signal-content correspondence
+is qualified separately below; these reads alone do not establish encoder
+output or sample timing.
+
+### Consumed PCM And Recorded Content
+
+The research bench writes `mu4_recorder_input.pcm` from actual known-word
+reads at the native deinterleave pair. Every call must read offsets
+`0..2047` in order with alternating captured instruction identities. The
+output is interleaved stereo signed 16-bit little-endian data, not an
+emulation input. Its terminal records count, FNV-1a, ordering failures and
+cap; the checker binds the entire file to the preceding consumer/repack
+proof and requires original metadata completion. It does not assign a
+measured ADC sample rate to the capture.
+
+The 20-second `tmp/native-gates/mu4-recorder-pcm` run produces 792576 words,
+396288 stereo frames and 1585152 bytes, SHA256
+`ea777e1f8fb86622776a5960ae1c0015074a3b6e0953c0b8973ef9e75fa0872a`.
+Ordering/drop counts are zero and both NAND hashes above are unchanged.
+Its independently extracted `TEST` has SHA256
+`515e2c2c6f7c759d11870ae06879ae3f26036efd4b9cfca89ec4464cb7e59f48`.
+
+The optional comparison uses the complete-packet host inverse projection,
+not modified media fed back into MAME. Qualification re-exports the exact
+fixture volume from this endpoint, checks its hash, independently extracts
+`TEST` through 7-Zip, and recomputes the inverse projection with the existing
+3072-byte native-prefix proof. The resulting AAC has SHA256
+`b7e7b5d30eba38099e26d701b3db49e0d2f586c0cb16be834b1adae6f2b4257f`:
+385 complete AAC-LC stereo packets declaring 44100 Hz. FFmpeg 8.0.1 decodes
+all 394240 stereo frames without errors. Later native transform-state
+evolution is **not** established by recomputing the host projection.
+
+The fixed comparison excludes 4096 frames at each end of the common extent,
+uses 386048 frames per channel pair, and reports all four input/output
+combinations. Its integer-lag search is bounded to +/-4096; affine gain and
+alignment fits are diagnostic, not model parameters or acceptance thresholds.
+
+| Logical lane | Input RMS | Decoded RMS | Unfitted zero-lag correlation |
+| --- | ---: | ---: | ---: |
+| 0 | 8192 | 8104.46 | 0.994630 |
+| 1 | 4096 | 4031.84 | 0.991619 |
+
+Zero-lag cross-channel correlation magnitudes are below `0.000001`.
+The periodic signals have hundreds of near-equivalent fitted offsets;
+neither best-fit delay nor polarity establishes physical latency/routing.
+This is content correspondence for the qualified host-projected recording,
+not formal encoder conformance, measured analog behavior, native speech,
+or proof that recording/playback tail policies are complete.
+
+```sh
+.venv/bin/python tools/mu4_recorder_pcm_check.py RUN --source-a00 SOURCE \
+  --projected-aac PROJECTED --fixture-volume VOLUME --projection-trace TRACE
+```
+
+Omitting the projection arguments checks only capture integrity. Omitting
+the volume/trace qualification explicitly leaves host projection derivation
+unvalidated. NumPy supplies FFT correlation; FFmpeg/FFprobe and 7-Zip remain
+external independent readers. No signal comparison changes the native media
+or weakens the existing rejecting completion checks.
 
 ### Metadata Overwrite Accounting
 

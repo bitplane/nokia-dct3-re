@@ -26,7 +26,8 @@ checks. The authoritative quantities, source identities, host-comparison limits
 and formal-conformance requirements live in the [AAC validation contract](aac_validation.md).
 Recording ingress is separately bound through native transport and the
 sample-repack ABI to original-word reads within each processing call;
-complete encoder-output acceptance remains distinct.
+a same-endpoint host projection also carries the captured input signal.
+Complete native encoder-output and playback acceptance remain distinct.
 
 Every captured channel-3 source read binds to an owned DXR bus write, and
 every completed TX callback pairs with the next codec DIN sample. Reset-aware

@@ -474,6 +474,9 @@ private:
 	u64 m_ac_consumer_bad = 0, m_ac_consumer_dropped = 0;
 	u16 m_ac_consumer_base = 0;
 	bool m_ac_consumer_active = false;
+	std::ofstream m_ac_pcm_capture;
+	u64 m_ac_pcm_words = 0, m_ac_pcm_bad_order = 0, m_ac_pcm_dropped = 0;
+	u32 m_ac_pcm_hash = 2166136261U;
 	void finish_recorder_consumer()
 	{
 		if (!m_ac_consumer_active) { ++m_ac_consumer_bad; return; }
@@ -580,6 +583,15 @@ private:
 					if (found != m_ac_consumer_instructions.end()) ++found->second;
 					else if (m_ac_consumer_instructions.size() < 256) m_ac_consumer_instructions.emplace(key,1);
 					else ++m_ac_consumer_dropped;
+					if (offset != c.known-1 || instruction != 0x3d9c8+(offset&1) || opcode != 0xe5b8+(offset&1)) ++m_ac_pcm_bad_order;
+					if (m_ac_pcm_words >= 512U*2048) ++m_ac_pcm_dropped;
+					else
+					{
+						char const bytes[]{char(value),char(value>>8)};
+						m_ac_pcm_capture.write(bytes,sizeof(bytes));
+						for (char byte : bytes) m_ac_pcm_hash = (m_ac_pcm_hash^u8(byte))*16777619U;
+						++m_ac_pcm_words;
+					}
 				}
 			});
 		m_cpu->space(AS_DATA).install_read_tap(0x7000,0x7fff,"mu4_recorder_workspace_read",
@@ -3371,6 +3383,13 @@ private:
 		m_ac_consumer_words.fill({}); m_ac_consumer_current = {}; m_ac_consumer_total = {};
 		m_ac_consumer_readers.fill(0); m_ac_consumer_instructions.clear(); m_ac_consumer_entries = m_ac_consumer_returns = 0;
 		m_ac_consumer_bad = m_ac_consumer_dropped = 0; m_ac_consumer_base = 0; m_ac_consumer_active = false;
+		if (m_ac_pcm_capture.is_open()) m_ac_pcm_capture.close();
+		m_ac_pcm_capture.clear(); m_ac_pcm_words = m_ac_pcm_bad_order = m_ac_pcm_dropped = 0; m_ac_pcm_hash = 2166136261U;
+		if (recorder_ac_profile())
+		{
+			m_ac_pcm_capture.open("mu4_recorder_input.pcm",std::ios::binary|std::ios::trunc);
+			if (!m_ac_pcm_capture) fatalerror("MU4 recorder input capture could not be opened");
+		}
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3952,6 +3971,11 @@ private:
 				auto const &consumer = m_ac_consumer_total;
 				logerror("mu4_recorder_consumer_terminal: entries=%u returns=%u origins=%llu known_reads=%llu read_epochs=%llu retired_unread=%llu unread_return=%llu unknown_reads=%llu writes=%llu alias_writes=%llu missing_data_identity=%llu bad=%llu dropped=%llu active=%u cap=256 frame_cap=512 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					m_ac_consumer_entries,m_ac_consumer_returns,static_cast<unsigned long long>(consumer.origins),static_cast<unsigned long long>(consumer.known),static_cast<unsigned long long>(consumer.epochs),static_cast<unsigned long long>(consumer.retired),static_cast<unsigned long long>(consumer.unread),static_cast<unsigned long long>(consumer.unknown),static_cast<unsigned long long>(consumer.writes),static_cast<unsigned long long>(consumer.alias_writes),static_cast<unsigned long long>(consumer.missing),static_cast<unsigned long long>(m_ac_consumer_bad),static_cast<unsigned long long>(m_ac_consumer_dropped),unsigned(m_ac_consumer_active));
+				m_ac_pcm_capture.flush();
+				if (!m_ac_pcm_capture) fatalerror("MU4 recorder input capture write failed");
+				m_ac_pcm_capture.close();
+				logerror("mu4_recorder_input_pcm: file=mu4_recorder_input.pcm words=%llu fnv1a=%08x bad_order=%llu dropped=%llu cap=1048576 channels=2 format=s16le_interleaved source=staged_operand_read save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+					static_cast<unsigned long long>(m_ac_pcm_words),m_ac_pcm_hash,static_cast<unsigned long long>(m_ac_pcm_bad_order),static_cast<unsigned long long>(m_ac_pcm_dropped));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

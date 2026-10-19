@@ -1,4 +1,5 @@
 capstone==5.0.9
+numpy==2.4.6
 pip==25.1.1
 unicorn==2.1.4
 websockets==15.0.1
