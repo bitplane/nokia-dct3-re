@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_store_observation_requires_retained_address_and_restore_scope(self):
+        marker,ending = EXTRA_PROFILES['store-observe']
+        text = marker+'\n'+ending
+        check_result(text,3,profile='store-observe')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_result(text.replace(field,field.split('=')[0]+'=invalid'),3,profile='store-observe')
+
     def test_program_multiply_mod3_requires_full_scope(self):
         marker, ending = EXTRA_PROFILES['pmac-mod3-edge']
         text = marker + '\n' + ending

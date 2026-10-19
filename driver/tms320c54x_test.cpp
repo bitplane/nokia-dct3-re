@@ -2565,6 +2565,12 @@ private:
 					0xffff, 0xffff, 0xffff, 0xffff, 0, 0, 0x8000, 0x8000};
 				expect(m_cpu->pipeline_cycles() == 6 && value == results[m_pipeline_store_case],
 					"Direct STL/STH writes once in Execute with existing saturation semantics");
+				u16 destination = 0, observed = 0;
+				u16 const opcode = 0x8020+(m_pipeline_store_case%4)*0x100;
+				expect(m_cpu->observe_execute_memory_store(0x600,opcode,destination,observed) && destination == 0x420 && observed == value,
+					"Store inspection retains Read address and exact Execute value");
+				expect(!m_cpu->observe_execute_memory_store(0x601,opcode,destination,observed) && !m_cpu->observe_execute_memory_store(0x600,opcode^0x100,destination,observed),
+					"Store inspection rejects other instruction identities");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251070;
@@ -20120,6 +20126,7 @@ private:
 		if (!strcmp(machine().options().bios(), "arith-mod3-edge")) { start_short_read_mod3_edge(11008); return; }
 		if (!strcmp(machine().options().bios(), "mul-mod3-edge")) { start_short_read_mod3_edge(46848); return; }
 		if (!strcmp(machine().options().bios(), "pmac-mod3-edge")) { start_short_read_mod3_edge(58112); return; }
+		if (!strcmp(machine().options().bios(), "store-observe")) { start_pipeline_store_case(); return; }
 		if (!strcmp(machine().options().bios(), "mul-t-sources")) { start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "memory-alu")) { start_pipeline_memory_arithmetic(); return; }
@@ -41367,6 +41374,11 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_store_case < 11) { start_pipeline_store_case(m_pipeline_store_case + 1); return; }
 				osd_printf_info("TMS320C54x staged stores: PASS cases=12 address=Read write=Execute writes_per_leg=1 pending_store_restore=12\n");
+				if (!strcmp(machine().options().bios(), "store-observe"))
+				{
+					osd_printf_info("TMS320C54x store observation: PASS cases=12 restore=12 retained_address=1 exact_value=1 rejected_other_identity=1 observer_writes=0\n");
+					throw emu_fatalerror(0,"TMS320C54x isolated store observation complete");
+				}
 				start_pipeline_indirect_case();
 				return;
 			}
@@ -57004,6 +57016,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(198, "shifted-bk", "Read-owned extended ADD/SUB from mapped BK")
 	ROM_SYSTEM_BIOS(199, "shift-bk-edge", "Excluded shifted BK and adjacent register compositions")
 	ROM_SYSTEM_BIOS(200, "pmac-mod3-edge", "Write-only short-preincrement program multiply source exclusions")
+	ROM_SYSTEM_BIOS(201, "store-observe", "Retained accumulator-store inspection across pending write restore")
 ROM_END
 
 ROM_START(tms54rom4)
