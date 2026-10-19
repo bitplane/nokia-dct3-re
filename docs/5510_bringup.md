@@ -2270,7 +2270,7 @@ The fresh runtime snapshot is erased in the critical regions.
 | Self-test record | Own check | Observed erased result |
 | --- | --- | --- |
 | `13fbf2`, code `12` at `24c7dc` | `3510ba -> 2a058c`: sum16 of `0000..011b` compared with big-endian u32 at `011c` | `1ae4 != ffffffff` |
-| `13fbec`, code `0c` at `24c858` | `24c612`: sum16 of `0120..0255`, excluding `0154..0155`, compared with u16 at `0256`; sum OR u16 at `0170` must also be nonzero | `32cc != ffff` |
+| `13fbec`, code `0c` at `24c85a` | `24c612`: sum16 of `0120..0255`, excluding `0154..0155`, compared with u16 at `0256`; sum OR u16 at `0170` must also be nonzero | `32cc != ffff` |
 
 `36a1b0` is an additive byte sum, not CRC32. `33689c` supplies the excluded
 `0154` word. The latter failure explicitly clears status flag bit 6 at
@@ -2314,6 +2314,47 @@ extend the NV audit command with `--flash <nvram/nmp5hle/flash>`. The shared
 journal decoder retains NSE-5 version-1/8 KiB defaults; NPM-5 explicitly
 selects version 3, a 64 KiB sector and a `3800`-byte cache. No records are
 generated or borrowed by the checker.
+
+### Logical NV request inventory
+
+Own reader `2fd578` takes logical byte offset in R0, destination in R1 and
+count in R2. Wrapper `3ac638` saves R4/R5/R6/LR, acquires mutex 5, calls the
+reader at `3ac64c`, releases the mutex and returns its status. At reader
+entry, the wrapper's saved caller is at SP+12. This is an ABI/context
+observation, not proof of copy retirement or the returned bytes. The decoded
+range test covers the observed nonwrapping requests; it is not a proof of
+behavior for arbitrary overflowing 32-bit arguments.
+
+`noki5510_nv_reads_observe.lua` inventories reader entries and captures the
+unchanged logical cache through the existing self-test observer. In a fresh
+eight-second hybrid boot it records 132 requests, 121 distinct ranges and
+2926 unique requested bytes out of the 14336-byte cache. All observed callers
+match 30 direct Thumb-BL sites. The source census covers all 1736703 aligned
+halfword pairs in the pinned 3473408-byte image: 75 direct wrapper-call
+candidates, one odd wrapper pointer, and one direct low-level reader call
+from the wrapper. The other 45 direct candidates are unobserved, not absent
+or unnecessary. Computed/ARM calls, direct cache accesses and code/data
+classification remain outside that census.
+
+The ordered requests include `0000+0120` from return `2a05a5`,
+`0120+0136` from `24c671`, exclusion word `0154+2` from `3368b3`, stored
+sum `0256+2` from `24c82f`, and guard `0170+2` from `24c83d`. The two
+checksum failures and literal CONTACT SERVICE frame reproduce. Failure code
+`0c` is stored by `STRB` at `24c85a`; `24c858` is the preceding register
+move and must not be used as that store's identity.
+
+Validate with `noki5510_nv_reads_check.py RUN --firmware
+roms/5510-npm5-v353/5510f353c.fls`. Its JSON contains the complete range and
+caller inventory, source hash and quantified encoded-reference coverage.
+Use the fresh eight-second debug/verbose composition from the hybrid frontier
+with this observer. The existing `noki5510_bootstrap_check.py --runtime`
+also passes on that capture; its transport evidence requires `-verbose`.
+It rejects capped/malformed captures, changed wrapper ABI, out-of-domain
+requests, missing ordered checksum consumers and changed erased-NV controls.
+This narrows the field-contract investigation; it does not assign semantic
+names to the other ranges, certify valid provisioning, or authorize filling
+unknown identity/security/calibration fields. No checksum or NV value is
+modified by the observer or checker.
 
 ## Input consumer boundary
 

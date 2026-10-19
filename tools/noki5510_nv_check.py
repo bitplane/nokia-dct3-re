@@ -33,7 +33,7 @@ def verify_erased_frontier(text, cache):
     if report['security']['valid'] or report['configuration']['valid']:
         raise ValueError('not the documented erased-NV negative control')
     for event in ('pc=0024c7dc address=0013fbf2 data=00000012',
-                  'pc=0024c858 address=0013fbec data=0000000c',
+                  'pc=0024c85a address=0013fbec data=0000000c',
                   '5510_selftest_return: command=0d flags=88 records=ffff00ff/00ffff00/00ffff00/0cff0000/00001200'):
         if event not in text:
             raise ValueError('missing own NV-failure consumer: ' + event)

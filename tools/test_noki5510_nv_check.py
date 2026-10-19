@@ -1,9 +1,17 @@
 import struct
 import unittest
-from tools.noki5510_nv_check import assess
+from tools.noki5510_nv_check import assess, verify_erased_frontier
 
 
 class NvCheckTest(unittest.TestCase):
+    def test_erased_frontier_requires_actual_store_address(self):
+        text = ('pc=0024c7dc address=0013fbf2 data=00000012\n'
+                'pc=0024c85a address=0013fbec data=0000000c\n'
+                '5510_selftest_return: command=0d flags=88 records=ffff00ff/00ffff00/00ffff00/0cff0000/00001200')
+        verify_erased_frontier(text, b'\xff' * 0x3800)
+        with self.assertRaises(ValueError):
+            verify_erased_frontier(text.replace('24c85a', '24c858'), b'\xff' * 0x3800)
+
     def test_erased_checksums_fail(self):
         report = assess(b'\xff' * 0x3800)
         self.assertEqual(report['security']['sum'], 0x1ae4)
