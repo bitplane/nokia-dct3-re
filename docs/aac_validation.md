@@ -782,3 +782,43 @@ partial output block before reporting completion? Neither the codec-control
 helper nor the selected completion consumer answers this. The 512-byte file
 granularity alone is not grounds to add padding, modify the file extent or
 invent a flush reply.
+
+`recorder_stop_mailbox` adds 233 pinned AA88 words for publication, callback
+initialization, software interrupt dispatch and selected deferred/reset paths.
+The sender waits for bit 15 at mailbox `0080`, zero-extends its record to 16
+words using descending stores, then invokes the callback at `efe6`. The
+original initializer selects `038c13`, which sets `05cd` and executes `INTR 25`;
+the uploaded vector at `2064` branches to `038ad2`. This is a software path,
+not a request awaiting an unmodeled external processor. The initialization
+selection alone does not prove pointer immutability over the whole lifecycle.
+
+Selector 3 stores `(argument==0)` at `05eb` and, when that flag is set,
+sets `05f3`. The common reply marks selector 3 as `8003`, not `8009`.
+The selected `05eb` processing branch invokes `0389cf(0)` and reset/cleanup
+helpers. Inside the pinned counter-update helper, `05f0==0 && 05eb!=0`
+clears `05ed`, `05ee` and `05eb`; buffer units and the deeper cleanup helper's
+file ownership remain unclassified.
+
+`mu4_recorder_stop_observe.lua` records changed RAM writes in an explicitly
+bounded 0.8--15-second window. The fresh control observes 4159 changes out of
+25299 writes, uncapped, with no illegal instruction:
+
+| Observation | Emulated time |
+| --- | ---: |
+| Zero-extended `[3,0,0,1]` published | 10.100594552 |
+| `05eb=1`, then `05f3=1` | 10.100595994 / 10.100596061 |
+| Immediate `8003` acknowledgement | 10.100598703 |
+| `05ed` and `05ee` each change `0120 -> 0000` | 10.101587232 / 10.101587257 |
+| `05eb` cleared | 10.101587282 |
+| Later `8009` copied to completion record, status 1 | 10.838815382 |
+| Lifecycle `373e=2` | 10.838815965 |
+
+Check with `mu4_recorder_stop_check.py LOG --source-a00 SOURCE`. Context PCs
+are not retained writer identities. The before-metadata NAND remains exactly
+`9832d2309e352dc3afb4f8f6ddcfbf7744fe191ee8633027f19dba46bcdea5e0`,
+matching the encoder/publication capture. Thus the selected buffer reset
+precedes completion; neither a missing stop acknowledgement nor a decoder
+failure explains this recording boundary. This short observation still is
+not the twenty-second finalized-recording acceptance gate. Final post-metadata
+file extent and the deeper processing cleanup/flush policy must be checked
+before calling the remaining partial packet a hardware defect.

@@ -874,6 +874,54 @@ def decode_recorder_stop_frontend(words):
         scope='Complete stop helper stubs plus selected dispatch/completion blocks; not closure over the processing worker or file-flush policy')
 
 
+RECORDER_STOP_MAILBOX = {
+    0x395ac: (0x8812,0xf495,0x7713,0x0080,0xec0f,0xe598,0xf495,0xf495,0xf4e4),
+    0x395b5: (0x4a11,0xeeff,0xf495,0x7104,0x0014,0x1105,0x8813,0xf300,0x000f,
+              0x8911,0xe80f,0x771a,0x000f,0xf072,0x95d7,0xf7b8,0x11f8,0x0008,
+              0x09f8,0x0014,0xf84b,0x95ce,0xe900,0xf073,0x95d4,0x4913,0xf500,
+              0x8912,0xf495,0xf495,0x1182,0x8181,0x6d89,0xf010,1,0xee01,0x8a11,0xf4e4),
+    0x395e6: (0x4a11,0x4a16,0xeefe,0xf495,0x7106,0x0016,0x8811,0xf073,0x95f1,
+              0xf982,0x1f2f,0xf982,0x1f24,0x61f8,0x0080,0x8000,0xf820,0x95ef,
+              0xf020,0x0080,0x7000,0x0016,0x8001,0x4811,0xf983,0x95b5,0x56f8,
+              0xefe6,0xf845,0x9605,0xf4e7,0xf982,0x1f2f,0xee02,0x8a16,0x8a11,0xf4e4),
+    0x3962f: (0x4ef8,0xefe6,0xe801,0xf495,0xf495,0xf4e4),
+    0x708a: (0xf062,3,0xf040,0x8c13,0xf983,0x962f,0xf495,0xf495,0xf4e4),
+    0x2064: (0x4a1e,0xf495,0xf883,0x8ad2),
+    0x38c13: (0x76f8,0x05cd,1,0xf7d9,0xf495,0xf495,0xf4e4),
+    0x38b0d: (0x7102,0x0012,0x10f8,0x0012,0xf010,0x0012,0xf846,0x8b2c,
+              0x10f8,0x0012,0xf010,0x0012,0xf845,0x8b74,0x7710,2,0xf4aa,0xf830,
+              0x8bd8,0x7710,3,0xf4aa,0xf830,0x8bbf),
+    0x38bbf: (0x76f8,0x05ea,0,0x76f8,0x05ce,0,0x1003,0xe900,0xf844,0x8bca,
+              0xe901,0x81f8,0x05eb,0x10f8,0x05eb,0xf845,0x8bd3,0x76f8,0x05f3,1,
+              0x76f8,0x05f0,0,0xf073,0x8be4),
+    0x38be4: (0x6902,0x8000,0x4818,0x7000,0x0011,0xf000,2,0xf982,0x9736),
+    0x38a66: (0x10f8,0x05f3,0xf844,0x8a9b),
+    0x38a9b: (0x10f8,0x05f1,0xf844,0x8aa4,0x76f8,0x05f2,1,0xf073,0x8acf,
+              0x7602,0x0016,0x7603,0,0x76f8,0x05f3,0,0x7711,2,0xf073,0x8ac6),
+    0x389ef: (0x10f8,0x05f0,0xf844,0x8a09,0x10f8,0x05eb,0xf844,0x89fe,0xf7b8,
+              0xf020,0x02f8,0x08f8,0x05ed,0xf842,0x8a09,0x76f8,0x05ed,0,0x76f8,
+              0x05ee,0,0x76f8,0x05eb,0,0xf073,0x8a13),
+    0x38f52: (0x10f8,0x05eb,0xf844,0x8ff7),
+    0x38ff7: (0xe800,0xf983,0x89cf,0xf020,0x05e6,0xf983,0x9766,0x10f8,0x05f4,0xf983,0xe30c),
+}
+
+
+def decode_recorder_stop_mailbox(words):
+    for base, witness in RECORDER_STOP_MAILBOX.items():
+        if any(words.get(base+offset) != value for offset, value in enumerate(witness)):
+            raise ValueError('recorder stop mailbox source changed or absent')
+    return dict(pinned_words=sum(map(len, RECORDER_STOP_MAILBOX.values())),
+        publication='0395e6 waits for 0080 bit15, writes a zero-extended 16-word record through 0395b5 in descending address order, then calls nonzero EFE6',
+        initialization='AA88 00708a selects 038c13 through setter 03962f; this is an initialization selection, not lifetime pointer immutability',
+        notification='038c13 sets 05cd=1 and INTR 25; vector 2064 branches to 038ad2',
+        selector3='038bbf clears 05ea/05ce/05f0; stores (argument == 0) at 05eb; when 05eb!=0 sets 05f3=1',
+        immediate_reply='038be4 ORs selector with 8000; selector 3 acknowledgement is 8003, distinct from asynchronous 8009',
+        deferred='038a66 tests 05f3; selected 038a9b tail waits on 05f1 or prepares selector 16/argument 0 and clears 05f3',
+        buffer_reset='When 05f0==0 and 05eb!=0, 0389ef..038a08 clears 05ed,05ee,05eb; buffer units and file-flush ownership unclassified',
+        processing_gate='038f52 branches on 05eb to 038ff7: helper 0389cf(0), reset helper 039766(05e6), cleanup helper 03e30c(05f4)',
+        scope='Selected original-source mailbox/stop paths; no live callback identity, final-flush policy, asynchronous completion producer or intended sample extent proof')
+
+
 def decode_pocp_buffer_count(rel_words, resident_words):
     for marker,words in (('aa99',rel_words),('aa22',resident_words)):
         if any(words.get(address) != value for address,value in pocp_count_words(marker).items()):
@@ -2236,6 +2284,7 @@ def contract(source):
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
+    result['recorder_stop_mailbox'] = decode_recorder_stop_mailbox(recorder_words)
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
     result['recording_header_writer'] = decode_recording_header_writer(recorder_words)

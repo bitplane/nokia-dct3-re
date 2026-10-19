@@ -34,6 +34,7 @@ from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BU
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
 from tools.mu4_context_contract import pocp_count_words, decode_pocp_buffer_count
 from tools.mu4_context_contract import RECORDER_STOP_FRONTEND, decode_recorder_stop_frontend
+from tools.mu4_context_contract import RECORDER_STOP_MAILBOX, decode_recorder_stop_mailbox
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -758,6 +759,23 @@ class ContextContractTest(unittest.TestCase):
                 decode_recorder_stop_frontend(changed)
         with self.assertRaises(ValueError):
             decode_recorder_stop_frontend({})
+
+    def test_recorder_stop_mailbox_distinguishes_acknowledgement_and_completion(self):
+        words = {base+offset: value for base, witness in RECORDER_STOP_MAILBOX.items()
+                 for offset, value in enumerate(witness)}
+        result = decode_recorder_stop_mailbox(words)
+        self.assertEqual(result['pinned_words'],233)
+        self.assertIn('8003',result['immediate_reply'])
+        self.assertIn('8009',result['immediate_reply'])
+        self.assertIn('INTR 25',result['notification'])
+        self.assertIn('unclassified',result['buffer_reset'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_recorder_stop_mailbox(changed)
+        with self.assertRaises(ValueError):
+            decode_recorder_stop_mailbox({})
 
     def test_pocp_count_is_bound_to_writer_argument_in_both_overlays(self):
         rel,resident = pocp_count_words('aa99'),pocp_count_words('aa22')
