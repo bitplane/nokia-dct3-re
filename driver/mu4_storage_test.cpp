@@ -5122,6 +5122,7 @@ private:
 	unsigned m_expected_calls = 1, m_captured = 0;
 	std::array<unsigned,8> m_capture_sites{};
 	unsigned m_input_offset = 0;
+	unsigned m_source_bytes = 0;
 	unsigned m_window_bytes = 2048;
 	std::array<u16,2> m_sources{};
 	unsigned m_input_reads = 0;
@@ -5150,7 +5151,7 @@ private:
 				if (2*index+2 > m_window_bytes)
 				{
 					logerror("mu4_aac_input_exhausted: completed_calls=%u source_byte=%u file_bytes=%u window_source=%u window_bytes=%u address=%04x context_pc=%06x padding_supplied=0 decoder_state_writes=0\n",
-						m_captured,m_input_offset+2*index,unsigned(m_input.length()),m_input_offset,m_window_bytes,unsigned(address),unsigned(m_cpu->pc()));
+						m_captured,m_input_offset+2*index,m_source_bytes,m_input_offset,m_window_bytes,unsigned(address),unsigned(m_cpu->pc()));
 					fatalerror("MU4 AAC input exhausted at a word not wholly inside the source");
 				}
 				u16 const expected = (u16(m_input[m_input_offset+2*index]) << 8) | m_input[m_input_offset+2*index+1];
@@ -5168,8 +5169,8 @@ private:
 	void load_input_window()
 	{
 		auto &data = m_cpu->space(AS_DATA);
-		if (m_input_offset >= m_input.length()) fatalerror("MU4 AAC input window exceeds source");
-		m_window_bytes = std::min(2048U,unsigned(m_input.length())-m_input_offset) & ~1U;
+		if (m_input_offset >= m_source_bytes) fatalerror("MU4 AAC input window exceeds source");
+		m_window_bytes = std::min(2048U,m_source_bytes-m_input_offset) & ~1U;
 		for (unsigned i = 0; i < m_window_bytes/2; ++i)
 			data.write_word(0x162e + i, (u16(m_input[m_input_offset+2*i]) << 8) | m_input[m_input_offset+2*i+1]);
 		data.write_word(0x1400, 0x162e);
@@ -5218,12 +5219,15 @@ private:
 		if (cursor != 0x27692 || initializers != 228) fatalerror("MU4 AAC initialization coverage changed cursor=%06x records=%u",cursor,initializers);
 		// Original input descriptor shape, with the first 2048 source bytes.
 		m_input_offset = 0;
+		// ROM-region allocation includes other BIOS extents, never treat it as source padding.
+		m_source_bytes = system_bios() == 7 ? 65785 : system_bios() == 1 ? 61912 : 65339;
+		if (m_source_bytes > m_input.length()) fatalerror("MU4 AAC source exceeds ROM region");
 		load_input_window();
 		std::vector<u16> wrapper = {
 			0x7718,0x9000,0xf7be,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,
 			0xf020,0xaaac,0xf982,0x3d27
 		};
-		m_expected_calls = system_bios() == 6 ? 174 : system_bios() == 5 ? 32 : system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
+		m_expected_calls = system_bios() >= 6 ? 174 : system_bios() == 5 ? 32 : system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
 		m_captured = 0;
 		data.write_word(0x1403,m_expected_calls);
 		for (unsigned call = 0; call < (m_expected_calls > 8 ? 1 : m_expected_calls); ++call)
@@ -5304,15 +5308,17 @@ ROM_START(mu4aac)
 	ROM_SYSTEM_BIOS(3, "mpeg2refill", "Generated MPEG-2 AAC-LC eight-call input refill probe")
 	ROM_SYSTEM_BIOS(4, "mpeg2stream", "Generated MPEG-2 AAC-LC 32-call repeated refill probe")
 	ROM_SYSTEM_BIOS(5, "mpeg2eof", "Generated MPEG-2 AAC-LC strict source exhaustion probe")
+	ROM_SYSTEM_BIOS(6, "mpeg2lookahead", "Generated MPEG-2 AAC-LC 174-packet prefix with declared packet lookahead")
 	ROM_REGION(741916, "container", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
-	ROM_REGION(65339, "input", 0)
+	ROM_REGION(65785, "input", 0)
 	ROMX_LOAD("al00_44-remux.adts", 0, 61912, CRC(ca68dd78) SHA1(372ec00b9683403e2db6ffe2dc9119b8c07a48b7), ROM_BIOS(0))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(1))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(2))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(3))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(4))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(5))
+	ROMX_LOAD("generated-mpeg2-lookahead.aac", 0, 65785, CRC(6941fc04) SHA1(b17123beca2a658f69c57056c53197d1b5461bbd), ROM_BIOS(6))
 ROM_END
 
 ROM_START(mu4nand)

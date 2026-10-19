@@ -7,6 +7,20 @@ and FFmpeg comparison are diagnostic evidence, not decoder conformance or
 native handset speech acceptance. All 375 observed decoder calls have consumed
 input-byte coverage; detailed arithmetic and output-store binding cover eight.
 
+The separate `mu4aac` ABI controls execute the original decoder with its
+original initialization and explicit caller-owned input:
+
+| Control | Verified coverage | Remaining boundary |
+| --- | --- | --- |
+| Generated original stream, strict extent | 172 successful packets, then native `ffff` short-input return | Original end-buffer/drain policy |
+| Same original prefix plus declared packet lookahead | All 174 original packets, 178176 stereo frames, exact post-return sample conversion | Caller stops before suffix; not EOF completion |
+| One/four/eight/32-call controls | Initialization, reservoir continuity and repeated caller refills | Bounded regressions, not handset playback |
+
+The independent generated-stream comparison has maximum four s16 units of
+host-reference difference over the complete original prefix. Neither these
+diagnostics nor the captured recording establish formal codec conformance,
+per-store ownership for every frame, or analog output.
+
 ## Independent procedure
 
 The [MPEG audio-conformance page](https://www.mpeg.org/standards/MPEG-4/26/)
@@ -514,3 +528,39 @@ writer. Forty-five source words pin this chain. This establishes the selected
 initial table, not its lifetime immutability or absence of indirect writers.
 The five mapped `1310` literals are retained in the contract report; none
 justifies treating a write to that flag as a legitimate end-of-input action.
+
+### Declared Packet-Lookahead Control
+
+`tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and
+appends a copy of existing packet 173 (source offset 64879, 446 bytes). This
+is a declared longer encoded stream, not recovered storage padding or an EOF
+fix. It contains 175 packets; the native caller deliberately stops after the
+original 174. FFmpeg decodes the longer stream without errors, and its first
+712704 PCM bytes are identical to the unextended stream's complete reference.
+
+The 65785-byte fixture has SHA256
+`f49ce61bc5d665bffac8c5fc238d93a3ee2c89bf7af306cb07d5f1a30d5e3fa2`.
+`mu4aac -bios mpeg2lookahead -seconds_to_run 46` completes all 174 original
+calls with no illegal instruction, consuming exactly 65339 bytes. All 356352
+raw-to-s16 conversions match. Against the original host reference, 172752
+samples differ, maximum four s16 units. The checker uses the original
+reference, not a fitted or extended comparison interval:
+
+```sh
+.venv/bin/python tools/mu4_aac_abi_check.py RUN --lookahead \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-pcm tmp/mu4-generated-aac-control-final/host-reference.s16 \
+  --input-aac tmp/aac-conformance/roms/mu4aac/generated-mpeg2-lookahead.aac
+```
+
+The final refill now supplies 902 bytes, and the reserve limit becomes 443
+words instead of 220. Original candidate 221 therefore passes unchanged.
+The final successful return retains 24 bits and stops with public cursor
+`1714`, base `170d` and index seven. Input reads include the declared suffix;
+there is no claim that the decoder works without lookahead. Source extents
+are tracked separately from the larger MAME ROM allocation so the strict
+unextended `mpeg2eof` probe cannot consume its allocation's zero-filled tail.
+
+This closes arithmetic/conversion coverage of the complete generated packet
+prefix, not the original caller's EOF/drain policy, formal conformance,
+original REL playback completion, or handset/analog audio.

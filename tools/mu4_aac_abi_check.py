@@ -1,4 +1,4 @@
-"""Check one native AAC ABI capture; waveform errors remain diagnostics."""
+"""Check bounded native AAC ABI captures; waveform errors remain diagnostics."""
 import argparse
 import hashlib
 import json
@@ -8,9 +8,11 @@ import struct
 import sys
 
 if __package__:
+    from .mu4_aac_lookahead_fixture import append_lookahead
     from .mu4_context_contract import contract, reference_pcm_conversion
     from .mu4_recorder_media_inventory import adts_header
 else:
+    from mu4_aac_lookahead_fixture import append_lookahead
     from mu4_context_contract import contract, reference_pcm_conversion
     from mu4_recorder_media_inventory import adts_header
 
@@ -64,11 +66,16 @@ def check_input(text, encoded, session=False):
                 scope='Actual input-window reads and contiguous consumed-prefix coverage; context PCs are not retained instruction ownership or an all-address exclusion proof')
 
 
-def check_session(text, raw, converted, reference, encoded, *, refill=False, stream=False, eof_boundary=False):
+def check_session(text, raw, converted, reference, encoded, *, refill=False, stream=False, eof_boundary=False, lookahead=False):
     """Original calls sharing a constructor/reservoir; optional public-input refill."""
     try:
-        return _check_session(text,raw,converted,reference,encoded,refill=refill or stream or eof_boundary,
-                              calls=172 if eof_boundary else 32 if stream else 8 if refill else 4,boundary=eof_boundary)
+        if lookahead and append_lookahead(encoded[:65339])[0] != encoded:
+            raise ValueError('lookahead is not the declared original-packet suffix')
+        result = _check_session(text,raw,converted,reference,encoded,refill=refill or stream or eof_boundary or lookahead,
+                               calls=174 if lookahead else 172 if eof_boundary else 32 if stream else 8 if refill else 4,boundary=eof_boundary)
+        if lookahead:
+            result['status'] = 'original_174_packet_prefix_with_declared_lookahead_not_eof'
+        return result
     except (KeyError,TypeError) as error:
         raise ValueError('incomplete session fields') from error
 
@@ -86,7 +93,7 @@ def _check_session(text, raw, converted, reference, encoded, *, refill, calls, b
                       isolated_abi='1',handset_boot='0',conformance='0')]:
         raise ValueError('session setup changed')
     refills = rows(text,'mu4_aac_session_refill')
-    if len(refills) != (calls//4-int(not boundary) if refill else 0):
+    if len(refills) != ((calls-1+int(boundary))//4 if refill else 0):
         raise ValueError('unexpected or missing public-input refill')
     markers = ['mu4_aac_abi_'+name for name in ('setup','header','sources','capture','result','input_end')]
     markers += ['mu4_aac_session_return','mu4_aac_session_refill','mu4_aac_wrapper_early_return']
@@ -269,6 +276,7 @@ def main():
     mode.add_argument('--refill', action='store_true', help='check eight calls with one public-input refill')
     mode.add_argument('--stream', action='store_true', help='check 32 calls with repeated public-input refills')
     mode.add_argument('--eof-boundary', action='store_true', help='check 172 successful calls followed by native short-input return, not full EOF success')
+    mode.add_argument('--lookahead', action='store_true', help='check the original 174-packet prefix with a declared existing-packet suffix, not EOF')
     args = parser.parse_args()
     try:
         contract(args.source_a00.read_bytes())
@@ -277,9 +285,10 @@ def main():
                                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
                                (args.run/'mu4_aac_abi_converted.s16le').read_bytes(),
                                args.reference_pcm.read_bytes())
-        session = args.four_calls or args.refill or args.stream or args.eof_boundary
-        result = check_session(*capture_args,encoded,refill=args.refill,stream=args.stream,eof_boundary=args.eof_boundary) if session else check_capture(*capture_args)
-        if hashlib.sha256(encoded).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
+        session = args.four_calls or args.refill or args.stream or args.eof_boundary or args.lookahead
+        result = check_session(*capture_args,encoded,refill=args.refill,stream=args.stream,eof_boundary=args.eof_boundary,lookahead=args.lookahead) if session else check_capture(*capture_args)
+        original = encoded[:65339] if args.lookahead else encoded
+        if hashlib.sha256(original).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
             raise ValueError('expected the independently generated MPEG-2 control')
         if not session:
             result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
