@@ -259,12 +259,27 @@ it is not an untouched official MPEG-2 conformance vector. No native block,
 sample accuracy, full input-read bound or complete fixture ABI is accepted
 from this failed probe. Preserve this distinction when adding further tests.
 
+BIOS `mpeg2` uses the independently generated MPEG-2 AAC-LC stereo tone
+control from `mu4_generated_aac_fixture.py`, not a relabelled official
+vector. The 65339-byte input has SHA-256
+`6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c`.
+It reaches the original ADTS parser with sync `fff`, ID 1, layer 0,
+protection absent, LC profile, 44.1 kHz, two channels, frame length `0134`
+and one raw block. Processing then stops at original `025593`:
+`6ff8 0019 0d00`, `ADD *($0019),0,A,B`. This reads mapped BK, not a
+missing peripheral. The staged CPU's generic diagnostic calls this family
+"shifted load", but the operation here is ADD. The neighboring source
+`02558f..025598` (10 words) pins AR6/BK additions and AR2/AR1 publication.
+No CPU admission is made until Read ownership, pending BK writers and replay
+are covered by an executable core fixture. The probe reports `illegal=1`
+and exits 3; successful header parsing is not a successful decoded block.
+
 Reproduce after `make build`, placing the original normalized
 `mu4_initdata_container.bin` and the identified `al00_44-remux.adts` in an
 isolated ROM search directory's `mu4aac/` subdirectory:
 
 ```sh
-PATH_TO_MAME mu4aac -rompath PRIVATE_ROM_DIRECTORY \
+PATH_TO_MAME mu4aac -bios mpeg4 -rompath PRIVATE_ROM_DIRECTORY \
   -video none -sound none -nothrottle -debugger none -log \
   -nonvram_save -seconds_to_run 1
 ```

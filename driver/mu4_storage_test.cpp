@@ -5168,10 +5168,13 @@ private:
 };
 
 ROM_START(mu4aac)
+	ROM_SYSTEM_BIOS(0, "mpeg4", "Official-derived MPEG-4 transport negative control")
+	ROM_SYSTEM_BIOS(1, "mpeg2", "Generated MPEG-2 AAC-LC ABI control")
 	ROM_REGION(741916, "container", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
-	ROM_REGION(61912, "input", 0)
-	ROM_LOAD("al00_44-remux.adts", 0, 61912, CRC(ca68dd78) SHA1(372ec00b9683403e2db6ffe2dc9119b8c07a48b7))
+	ROM_REGION(65339, "input", 0)
+	ROMX_LOAD("al00_44-remux.adts", 0, 61912, CRC(ca68dd78) SHA1(372ec00b9683403e2db6ffe2dc9119b8c07a48b7), ROM_BIOS(0))
+	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(1))
 ROM_END
 
 ROM_START(mu4nand)

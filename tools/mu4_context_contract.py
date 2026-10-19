@@ -724,6 +724,22 @@ DECODER_SYNC_WITNESS = (0xe80f,0xf982,0x510c,0xf7b8,0x11f8,0x11,0xf300,0xf,
                         0x4f02,0xf468,0xf478,0xf010,0x7ffc,0xf845,0x4486)
 
 
+DECODER_MAPPED_ALU_BASE = 0x2558F
+DECODER_MAPPED_ALU_WITNESS = (0x6ff8,0x16,0x0d00,0x8912,
+                            0x6ff8,0x19,0x0d00,0x8911,0x7314,0x0e)
+
+
+def decode_decoder_mapped_alu(words):
+    for offset, expected in enumerate(DECODER_MAPPED_ALU_WITNESS):
+        if words.get(DECODER_MAPPED_ALU_BASE+offset) != expected:
+            raise ValueError('AA99 mapped-register arithmetic witness changed or absent')
+    return dict(entry='02558f', pinned_words=10,
+                first='ADD *($0016),0,A,B; STLM B,AR2',
+                second='ADD *($0019),0,A,B; STLM B,AR1',
+                register_names={'0016':'AR6','0019':'BK'},
+                scope='Original arithmetic operands and pointer publication; not admitted staged BK ownership or decoded audio')
+
+
 def native_adts_sync_word(word):
     if not isinstance(word, int) or not 0 <= word <= 0xffff:
         raise ValueError('expected unsigned first ADTS word')
@@ -1909,6 +1925,7 @@ def contract(source):
     result['decoder_constructor'] = decode_decoder_constructor(rel_words)
     result['decoder_configuration'] = decode_decoder_configuration(rel_words)
     result['decoder_sync'] = decode_decoder_sync(rel_words)
+    result['decoder_mapped_alu'] = decode_decoder_mapped_alu(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

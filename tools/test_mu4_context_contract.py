@@ -36,6 +36,7 @@ from tools.mu4_context_contract import DECODER_CONSTRUCTOR_BASE, DECODER_CONSTRU
 from tools.mu4_context_contract import DECODER_CONFIGURATION_WITNESSES, decode_decoder_configuration
 from tools.mu4_context_contract import CATALOGUE_MEDIA_WITNESSES, decode_catalogue_media_admission
 from tools.mu4_context_contract import DECODER_SYNC_BASE, DECODER_SYNC_WITNESS, decode_decoder_sync, native_adts_sync_word
+from tools.mu4_context_contract import DECODER_MAPPED_ALU_BASE, DECODER_MAPPED_ALU_WITNESS, decode_decoder_mapped_alu
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -706,6 +707,15 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_constructor(changed)
+
+    def test_decoder_pointer_arithmetic_reads_bk_not_external_memory(self):
+        words = dict(enumerate(DECODER_MAPPED_ALU_WITNESS, DECODER_MAPPED_ALU_BASE))
+        self.assertEqual(decode_decoder_mapped_alu(words)['register_names']['0019'], 'BK')
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_mapped_alu(changed)
 
     def test_native_adts_sync_requires_mpeg2_id_without_testing_crc_flag(self):
         words = dict(enumerate(DECODER_SYNC_WITNESS, DECODER_SYNC_BASE))
