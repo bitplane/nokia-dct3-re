@@ -2,7 +2,7 @@ import unittest
 
 from tools.noki5510_identity_contract import (wire_identity, display_identity,
     check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture,
-    record_reply_nibble_filter)
+    record_reply_nibble_filter, record_reply_slot_binding)
 
 
 def decode_mobile_identity(data):
@@ -25,6 +25,26 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_record_reply_binding_uses_nv_slot_not_identity_offset(self):
+        cache = bytearray(b'\xff'*0x3800)
+        for slot in range(10):
+            cache[0x20+24*slot:0x38+24*slot] = bytes(range(slot,slot+24))
+        for slot in range(10):
+            message = bytearray(0x3e)
+            message[0x24:0x3c] = cache[0x20+24*slot:0x38+24*slot]
+            self.assertTrue(record_reply_slot_binding(message,cache,slot))
+            message[0x0c:0x24] = b'\xab'*24
+            self.assertTrue(record_reply_slot_binding(message,cache,slot))
+            for index in range(0x24,0x3c):
+                changed = bytearray(message)
+                changed[index] ^= 1
+                self.assertFalse(record_reply_slot_binding(changed,cache,slot))
+            self.assertFalse(record_reply_slot_binding(message,cache,(slot+1)%10))
+        for message,nv,slot in [(b'',cache,0),(bytes(62),cache[:-1],0),
+                                (bytes(62),cache,-1),(bytes(62),cache,10)]:
+            with self.assertRaises(ValueError):
+                record_reply_slot_binding(message,nv,slot)
+
     def test_record_nibble_filter_is_not_decimal_identity_validation(self):
         allowed = set(range(12)) | {15}
         self.assertTrue(record_reply_nibble_filter(bytes.fromhex('abffffffffffffff')))

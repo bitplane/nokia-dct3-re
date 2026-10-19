@@ -2405,6 +2405,16 @@ pass this isolated filter despite being nondecimal equipment digits. The
 host reference tests every byte value at all eight positions (2,048 cases).
 This does not demonstrate acceptance of an erased record: entry eligibility,
 other product/state tests and encoded-record comparisons are independent.
+In particular, reply offset `0c` must not be identified with NV offset
+`000c` merely because the numbers match. The source-qualified slot-binding
+path at `2a02aa..2a02e8` reads 24 bytes from NV `0020 + 24 * index`
+and compares its first and second halves with reply offsets `24` and `30`
+using the zero-on-equality helper `3aea44`. A separate 24-byte reply body
+begins at `0c`. The host binding reference covers all ten slots and rejects
+each changed byte in the returned halves; changing the separate body does
+not affect this isolated equality result. This is not a cryptographic
+authenticity test, a mapping of that body to equipment identity, or full
+reply acceptance: the original branch has prior state/feature conditions.
 
 Run `noki5510_identity_contract.py RUN --firmware
 roms/5510-npm5-v353/5510f353c.fls` to check the source hash, bounded NV

@@ -43,6 +43,15 @@ def record_reply_nibble_filter(packed):
     return not (packed[7] >= 0xc0 and packed[7] >> 4 != 15)
 
 
+def record_reply_slot_binding(message, cache, record_index):
+    """2a02aa..2a02e8 equality only, after its state/feature preconditions."""
+    if len(message) < 0x3c or len(cache) != 0x3800 or not 0 <= record_index < 10:
+        raise ValueError('requires complete reply, logical cache and slot 0..9')
+    offset = 0x20 + 24*record_index
+    return (message[0x24:0x30] == cache[offset:offset+12]
+            and message[0x30:0x3c] == cache[offset+12:offset+24])
+
+
 def check_record_capture(text, flash_word=None):
     """Qualify the observed erased-NV frontier, not a general reply protocol."""
     scopes = records(text, '5510_records_scope')
@@ -154,7 +163,8 @@ def identity_contract(firmware):
                                    (0x3ad490,0x3ad542),(0x24c9d2,0x24cafc),
                                    (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c),
                                    (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e),
-                                   (0x39cc20,0x39cc4e),(0x39ce0e,0x39ce14))},
+                                   (0x39cc20,0x39cc4e),(0x39ce0e,0x39ce14),
+                                   (0x2a02aa,0x2a02ea),(0x3aea44,0x3aeabc))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 
