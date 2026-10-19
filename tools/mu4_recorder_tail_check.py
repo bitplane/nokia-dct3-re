@@ -25,7 +25,24 @@ SOURCE_RANGES = (
     (0x3e76f, 0x3e7f9, '8809c82c5cebea077eadee73f9df6155d6801800b91e6cf2f5a0aea088e13b22'),
     (0x3e918, 0x3e92b, '8ae5379cfb94db36a94dfde1bd0cadd1895f06613b2c9433b53dd360919e4657'),
     (0x38ff7, 0x39001, '8d084b9df84f2471410aa22c0d58bada6c0657f11bd31105fc2f09fbbff1ca32'),
+    (0x567e, 0x569b, 'b55c341e1939fe35c5825f1ac5b34183566a6521f51d5b59e567d1724beb8df9'),
+    (0x2dcee, 0x2dcf9, '5d766a4446216c903def4aee270de3b48523ea57f942e939468d7583c43776ab'),
+    (0x70d6, 0x70e1, '9815f8f2aa7eb3f69bdd3287160dda255a3e0cb1764ed3e0f4679bf7b702f02b'),
 )
+
+
+def adapter_methods(words):
+    """Selected original table, not a recovered universal interface ABI."""
+    # Slot zero is not classified as a callable entry.
+    slots = {slot: (words[0x567e+2*slot]<<16)|words[0x567f+2*slot]
+             for slot in range(1,15)}
+    methods = {slot: target for slot,target in slots.items() if target}
+    if methods != {6: 0x3e6f5, 14: 0x3e76f}:
+        raise ValueError('original adapter method inventory changed')
+    return dict(table='567e', classified_slots=list(range(1,15)),
+                nonzero_methods={f'{slot:02x}': f'{target:06x}' for slot,target in methods.items()},
+                stop_slot='0c', stop_target='000000',
+                scope='Original slots 1..14 only; slot zero and dynamic table replacements not closed')
 
 
 def source_contract(source):
@@ -38,7 +55,10 @@ def source_contract(source):
             raise ValueError('recorder tail source changed')
     return dict(pinned_words=sum(end-start+1 for start,end,_ in SOURCE_RANGES),
                 source_sha256=SOURCE_SHA256,
-                scope='Buffer compaction/reset, selected stop tail, virtual dispatch, process adapter and output forwarder; no flush guarantee')
+                adapter=adapter_methods(words),
+                carry_literal_sites=[f'{address:06x}' for address,value in sorted(words.items()) if value == 0xfd70],
+                carry_census_scope='Literal-word references only, not an exhaustive indirect-writer proof',
+                scope='Buffer compaction/reset, selected stop tail, dispatch, adapter, forwarder and initial configuration; no flush guarantee')
 
 
 def pending_tail(text, encoded, plain, persisted):

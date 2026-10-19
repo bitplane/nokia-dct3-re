@@ -1283,10 +1283,11 @@ below; intended persisted packet/sample extent remains unresolved.
 
 ### Pending Stop Buffers
 
-`mu4_recorder_tail_check.py` pins 307 original AA88 words across compaction
+`mu4_recorder_tail_check.py` pins 361 original AA88 words across compaction
 helper `0389cf..038a30`, selected stop tail `038ff7..039001`, virtual dispatcher
 `03e30c..03e332`, processing adapter `03e76f..03e7f9` and output forwarder
-`03e918..03e92b`. The adapter unpacks groups of 16 source words into 32
+`03e918..03e92b`, the original method table and initial object selection.
+The adapter unpacks groups of 16 source words into 32
 byte-valued words for the transform/output path, then retains a shorter group
 at `fd4e` with count `fd70`. Compaction uses buffer base `05e6+36=061c` and
 fields `05ed/05ee`; the selected stop branch calls this helper with zero,
@@ -1299,6 +1300,20 @@ run reproduces metadata success, all 4539 transform calls, the original input
 PCM and the endpoint NAND hash. The selected object is `eed6`, table `567e`:
 method `0e` selects `03e76f`, but finish method `0c` is null. This is observed
 at the stop boundary, not inferred to be immutable throughout the recording.
+
+The original table at `567e..569b` independently agrees: among slots `01..0e`,
+only `06 -> 03e6f5` and `0e -> 03e76f` are nonzero. Slot zero is not classified
+as a callable method. Initialization records `02dcee..02dcf9` select
+`eed6 -> 567e` and initialize `fd70=0`; startup `0070d6..0070e1` selects this
+object through `05f4` and calls its initializer. The selected stop dispatch
+therefore has no default finalizer to invoke. This is a bounded source/table
+result, not an exhaustive proof over mutable/alternative objects.
+
+A literal-word scan finds eight `fd70` references in the uploaded AA88 image:
+one initializer destination and seven operands in `03e76f..03e7f9`. No extra
+carry consumer appears in that census. Indirect accesses, bulk copies and
+other images are outside this absence claim; do not promote it to "no flush
+exists anywhere" or invent a new command from it.
 
 At 10.100595994 seconds, `05ed=05ee=0120` and `fd70=000e`:
 

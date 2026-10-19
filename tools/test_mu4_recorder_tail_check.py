@@ -1,7 +1,7 @@
 from pathlib import Path
 import unittest
 
-from tools.mu4_recorder_tail_check import pending_tail, source_contract
+from tools.mu4_recorder_tail_check import adapter_methods, pending_tail, source_contract
 
 
 def fixture():
@@ -46,11 +46,24 @@ class RecorderTailTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             source_contract(b'unrelated source')
 
+    def test_adapter_methods_do_not_invent_a_stop_target(self):
+        words = dict.fromkeys(range(0x567e,0x569c),0)
+        for slot,target in ((6,0x3e6f5),(14,0x3e76f)):
+            words[0x567e+2*slot] = target>>16
+            words[0x567f+2*slot] = target&0xffff
+        self.assertEqual(adapter_methods(words)['stop_target'], '000000')
+        words[0x5697] = 1
+        with self.assertRaises(ValueError):
+            adapter_methods(words)
+
     def test_original_source_ranges(self):
         source = Path(__file__).resolve().parents[1]/'roms/5510-mu4-reference/InitData_R060.a00'
         if not source.exists():
             self.skipTest('original research asset not installed')
-        self.assertEqual(source_contract(source.read_bytes())['pinned_words'], 307)
+        report = source_contract(source.read_bytes())
+        self.assertEqual(report['pinned_words'], 361)
+        self.assertEqual(report['carry_literal_sites'], ['02dcf8','03e780','03e784','03e78d',
+                                                       '03e795','03e79b','03e7e5','03e7ea'])
 
 
 if __name__ == '__main__':
