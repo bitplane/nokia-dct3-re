@@ -30,7 +30,7 @@ def rows(text, marker):
     return result
 
 
-def check_input(text, encoded):
+def check_input(text, encoded, session=False):
     reads, ends = rows(text,'mu4_aac_abi_input_read'), rows(text,'mu4_aac_abi_input_end')
     if not 0 < len(reads) <= 4096 or len(ends) != 1 or len(encoded) < 2048:
         raise ValueError('missing, capped or incomplete input observation')
@@ -55,12 +55,53 @@ def check_input(text, encoded):
         raise ValueError('incomplete input-read fields') from error
     if seen != set(range(max(seen)+1)) or not set(range(155)).issubset(seen):
         raise ValueError('input coverage omits consumed or retained reservoir bytes')
-    if text.rfind('mu4_aac_abi_input_read:') > text.index('mu4_aac_abi_sources:'):
+    boundary = text.rfind('mu4_aac_abi_sources:') if session else text.index('mu4_aac_abi_sources:')
+    if text.rfind('mu4_aac_abi_input_read:') > boundary:
         raise ValueError('input observation extends past decoder return')
     return dict(reads=len(reads),unique_words=len(seen),consumed_frame_bytes=308,
                 observed_prefix_bytes=2*len(seen),lookahead_bytes=2*len(seen)-308,
                 consumed_sha256=hashlib.sha256(encoded[:308]).hexdigest(),
                 scope='Actual input-window reads and contiguous consumed-prefix coverage; context PCs are not retained instruction ownership or an all-address exclusion proof')
+
+
+def check_session(text, raw, converted, reference, encoded):
+    """Four original calls sharing one constructor, input descriptor and reservoir."""
+    returns = rows(text, 'mu4_aac_session_return')
+    headers = rows(text, 'mu4_aac_abi_header')
+    sources = rows(text, 'mu4_aac_abi_sources')
+    if len(returns) != 4 or len(headers) != 4 or len(sources) != 4:
+        raise ValueError('requires four complete native calls')
+    base, consumed = 0x162e, 0
+    for call, (result, header, source) in enumerate(zip(returns, headers, sources), 1):
+        packet = adts_header(encoded, consumed)
+        if not packet or packet['frame_bytes'] % 2:
+            raise ValueError('unsupported session packet extent')
+        length = packet['frame_bytes']
+        index = length//2 + (call == 1)
+        expected = dict(call=str(call),descriptor=f'{base+index:04x}',base=f'{base:04x}',
+                        index=f'{index:04x}',remaining='0010',result='0000',observer_writes='0')
+        if result != expected or int(header['frame_length'],16) != length:
+            raise ValueError('native descriptor/reservoir continuity changed')
+        if source != dict(left='f000',right='e800',sp='8fe8',result='0000',identity='Execute_entry',observer_writes='0'):
+            raise ValueError('session output source changed')
+        base += index
+        consumed += length
+    terminal = rows(text, 'mu4_aac_abi_result')
+    if len(terminal) != 1 or terminal[0]['returned'] != '1' or terminal[0]['illegal'] != '0':
+        raise ValueError('missing successful session terminal')
+    if 'Fatal error:' in text or 'unsupported instruction' in text:
+        raise ValueError('faulted session')
+    if len(raw) != 32768 or len(converted) != 16384 or len(reference) < 16384:
+        raise ValueError('incomplete session PCM')
+    values = struct.unpack('<8192i', raw)
+    actual = struct.unpack('<8192h', converted)
+    wanted = struct.unpack('<8192h', reference[:16384])
+    if any(reference_pcm_conversion(x & 0xffffffff)['word'] != (y & 0xffff) for x,y in zip(values,actual)):
+        raise ValueError('session conversion mismatch')
+    check_input(text,encoded,session=True)
+    return dict(calls=4,frames=4096,consumed_bytes=consumed,
+                differing_samples=sum(x != y for x,y in zip(actual,wanted)),
+                max_error=max(abs(x-y) for x,y in zip(actual,wanted)),conformance=False)
 
 
 def check_capture(text, raw, converted, reference):
@@ -119,17 +160,20 @@ def main():
     parser.add_argument('--source-a00', required=True, type=Path)
     parser.add_argument('--reference-pcm', required=True, type=Path)
     parser.add_argument('--input-aac', required=True, type=Path)
+    parser.add_argument('--four-calls', action='store_true')
     args = parser.parse_args()
     try:
         contract(args.source_a00.read_bytes())
-        result = check_capture((args.run/'error.log').read_text(),
+        encoded = args.input_aac.read_bytes()
+        capture_args = ((args.run/'error.log').read_text(),
                                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
                                (args.run/'mu4_aac_abi_converted.s16le').read_bytes(),
                                args.reference_pcm.read_bytes())
-        encoded = args.input_aac.read_bytes()
+        result = check_session(*capture_args,encoded) if args.four_calls else check_capture(*capture_args)
         if hashlib.sha256(encoded).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
             raise ValueError('expected the independently generated MPEG-2 control')
-        result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
+        if not args.four_calls:
+            result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
     except (OSError, ValueError) as error:
         print(f'MU4 AAC ABI: {error}', file=sys.stderr)
         return 1

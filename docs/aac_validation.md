@@ -388,3 +388,24 @@ It refuses unequal intervals, incomplete channel frames and non-normalized
 samples; it performs no delay search, gain fitting or automatic trimming.
 Its criterion result is not a conformance verdict until the obligations above
 are met. `test_aac_reference_metrics.py` is included by tool-test discovery.
+## Four-call isolated continuity control
+
+The `mu4aac -bios mpeg2four` ABI fixture calls the original constructor once
+and decoder four times, preserving all decoder state. The original wrapper,
+not the synthetic caller, advances descriptor `1400`. Packet lengths are
+308, 378, 362 and 286 bytes (1334 total). Returned descriptor/base/index
+triples are `16c9/162e/009b`, `1786/16c9/00bd`, `183b/1786/00b5`, and
+`18ca/183b/008f`; each return retains 16 reservoir bits and reports success.
+
+The bounded run captures 4096 stereo frames through the returned pointers,
+with all 8192 raw-to-s16 conversions exact. The generated control's host
+reference differs at 3139 samples, maximum four s16 units; these are
+diagnostic differences, not an acceptance tolerance or conformance claim.
+There are 700 observed input reads covering 669 contiguous words, including
+lookahead. Run `tools/mu4_aac_abi_check.py` with `--four-calls` and the same
+source/input/reference arguments as the single-call control. The one-second
+deadline is a bench bound, not a recovered decoder timing requirement.
+
+This proves four calls without decoder reset or input-pointer intervention;
+it does not cover input-window refill, EOF, full-stream playback or handset
+boot. Those remain separate requirements.

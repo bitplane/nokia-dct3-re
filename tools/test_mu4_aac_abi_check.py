@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from mu4_aac_abi_check import check_capture, check_input
+from mu4_aac_abi_check import check_capture, check_input, check_session
 
 
 TEXT = '''mu4_aac_abi_setup: original_upload_words=49843 original_initializers=228 input_bytes=2048 output_base=7000 output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0
@@ -13,6 +13,10 @@ mu4_aac_abi_capture: frames=1024 channels=2 raw_bytes=8192 converted_bytes=4096 
 
 
 class AbiCheckTest(unittest.TestCase):
+    def test_session_requires_four_returns_and_complete_audio(self):
+        with self.assertRaises(ValueError):
+            check_session(TEXT,bytes(32768),bytes(16384),bytes(16384),bytes(2048))
+
     def input_fixture(self):
         encoded = bytes.fromhex('fff95080269ffc') + bytes(2048-7)
         events = '\n'.join(f'mu4_aac_abi_input_read: ordinal={i+1} index={i} address={0x162e+i:04x} value={int.from_bytes(encoded[2*i:2*i+2],"big"):04x} mask=ffff context_pc=025129 observer_writes=0'
