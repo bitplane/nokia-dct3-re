@@ -2439,6 +2439,17 @@ question is how this own firmware consumes the corresponding DSP replies and
 which algorithms/material those replies require; request ordering alone does
 not prove that missing replies cause either observed NV-checksum failure.
 
+The own reply dispatcher reads message byte `08`. Its explicit `34` branch
+at `24c9d8` reaches the call at `24cadc` to `29fdc4`; the `35` branch at
+`24c9fc` reaches `24cad4` calling `29ffe8`. The `34` consumer copies 13
+bytes from message offset `0b` to state offset `20`, then sets state byte
+`03` to 1. It does not itself authenticate those bytes or write NV. The
+`35` consumer begins with state-dependent acceptance: one path accepts
+length byte `32`, while length `34` has a halfword-sum check over the message
+body against its trailing word. Its later branches still need complete
+qualification before defining a DSP encoder. The source report records these
+entry points and code hashes; no corresponding reply execution is claimed.
+
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,
 inside a command dispatcher; this census does not classify computed/ARM

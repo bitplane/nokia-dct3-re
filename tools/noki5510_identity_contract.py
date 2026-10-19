@@ -57,10 +57,22 @@ def identity_contract(firmware):
             'software_version_decimal': 6,
             'formatter': '002a05cc', 'imei_reader': '002a066a', 'imeisv_reader': '002a0640',
             'display_formatter': '0029fc00',
+            'factory_record_reply_dispatch': {
+                'selector_offset': 8,
+                '34': {'branch': '0024c9d8', 'call': '0024cadc',
+                       'consumer': '0029fdc4', 'source_offset': 11,
+                       'copy_bytes': 13, 'destination_state_offset': 32,
+                       'receipt_flag_offset': 3},
+                '35': {'branch': '0024c9fc', 'call': '0024cad4',
+                       'consumer': '0029ffe8',
+                       'scope': 'Entry mapped; full state-dependent validation not yet qualified'},
+                'scope': 'Own MCU dispatcher; not executed replies or a qualified DSP encoder'},
             'division_abi': '003ad490: R0 remainder, R1 quotient; positive decimal operands here',
             'code_sha256': {f'{first:08x}..{last:08x}': hashlib.sha256(
                 firmware[first-0x200000:last-0x200000]).hexdigest()
-                for first,last in ((0x2a05cc,0x2a0692),(0x29fc00,0x29fd14),(0x3ad490,0x3ad542))},
+                for first,last in ((0x2a05cc,0x2a0692),(0x29fc00,0x29fd14),
+                                   (0x3ad490,0x3ad542),(0x24c9d2,0x24cafc),
+                                   (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 
