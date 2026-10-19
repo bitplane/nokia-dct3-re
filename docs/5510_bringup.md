@@ -2449,6 +2449,16 @@ length byte `32`, while length `34` has a halfword-sum check over the message
 body against its trailing word. Its later branches still need complete
 qualification before defining a DSP encoder. The source report records these
 entry points and code hashes; no corresponding reply execution is claimed.
+The bounded entry reference `record_reply_entry_eligible` covers only
+`29ffe8..2a005c`: initialize eligibility from record index `< 10`; state 1
+bypasses the remaining entry checks; otherwise length `32` preserves it,
+and length `34` requires the sum of 25 big-endian halfwords at offsets
+`0a..3b`, modulo 65536 and XOR `ffff`, to equal the halfword at `3c`.
+Other lengths clear eligibility. Passing this reference is not full record
+acceptance: later code can reject identity nibbles, compare both 12-byte
+encoded halves at offsets `24`/`30` against the current NV slot, update RAM
+state, or launch another record transaction. Tests exercise checksum failure,
+both bypasses and the index boundary without injecting handset messages.
 
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,

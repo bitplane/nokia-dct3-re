@@ -1,6 +1,7 @@
 import unittest
 
-from tools.noki5510_identity_contract import wire_identity, display_identity, check_formatting, identity_contract
+from tools.noki5510_identity_contract import (wire_identity, display_identity,
+    check_formatting, identity_contract, record_reply_entry_eligible)
 
 
 def decode_mobile_identity(data):
@@ -23,6 +24,26 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_record_reply_entry_checksum_and_bypasses(self):
+        message = bytearray(0x3e)
+        message[9] = 0x34
+        message[10:60] = bytes(range(50))
+        total = sum(int.from_bytes(message[i:i+2], 'big') for i in range(10,60,2)) & 65535
+        message[60:62] = (total ^ 65535).to_bytes(2,'big')
+        self.assertTrue(record_reply_entry_eligible(message,9,2))
+        message[60] ^= 1
+        self.assertFalse(record_reply_entry_eligible(message,9,2))
+        self.assertTrue(record_reply_entry_eligible(message,9,1))
+        message[9] = 0x32
+        self.assertTrue(record_reply_entry_eligible(message,9,2))
+        message[9] = 0x33
+        self.assertFalse(record_reply_entry_eligible(message,9,2))
+        self.assertTrue(record_reply_entry_eligible(message,9,1))
+        for state in (0,1,2,255):
+            self.assertFalse(record_reply_entry_eligible(message,10,state))
+        with self.assertRaises(ValueError):
+            record_reply_entry_eligible(message[:12],0,0)
+
     def test_independent_identity_value_decode(self):
         packed = bytes.fromhex('12345678901234ff')
         self.assertEqual(wire_identity(packed,1).hex(),'1a32547698103204')

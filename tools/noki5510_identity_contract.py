@@ -17,6 +17,19 @@ def equipment_nibbles(packed):
     return [nibble for byte in packed[:7] for nibble in (byte >> 4, byte & 15)]
 
 
+def record_reply_entry_eligible(message, record_index, state):
+    """29ffe8..2a005c only: not the later record acceptance decision."""
+    if len(message) < 0x3e or not 0 <= record_index <= 255 or not 0 <= state <= 255:
+        raise ValueError('requires a complete inspected message and byte state')
+    eligible = record_index < 10
+    if state == 1 or not eligible or message[9] == 0x32:
+        return eligible
+    if message[9] != 0x34:
+        return False
+    total = sum(struct.unpack_from('>25H', message, 10)) & 0xffff
+    return struct.unpack_from('>H', message, 0x3c)[0] == (total ^ 0xffff)
+
+
 def wire_identity(packed, selector, svn=6):
     """Original byte operations, including malformed NV; no decimal validation."""
     equipment_nibbles(packed)
