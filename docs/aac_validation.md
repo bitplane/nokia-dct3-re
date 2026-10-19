@@ -58,6 +58,23 @@ AL00 is a baseline sine-sweep candidate: the acquired MP4 is AAC-LC, mono,
 unresolved delay/trimming contract, not permission to search for a best fit.
 Neither file has yet been executed through the native decoder.
 
+The MP4 AudioSpecificConfig bytes are `12 00 05 04 00 00 00 00`:
+audio object type 2, sampling index 4, channel configuration zero. The
+decoded mono layout therefore must not be substituted for a fixed channel
+configuration of one when preparing input. FFprobe's container trace reports
+323 samples of duration 1024, no edit-list atom, and initial padding zero;
+these container observations do not explain the reference's shorter length.
+
+The existing native bench selects original `RELSI16 .BIN`, not `AACSI16`.
+Its earlier externally authored ADTS experiment reached the bit reader only
+after native processing had transformed the input bytes, then failed with an
+out-of-domain width in the program-configuration-like parser. Consequently
+replacing `TEST.REL` with this MP4 or a remuxed ADTS stream would not be an
+independent decoder test. Recover the original REL preprocessing and library
+configuration, or construct a separately identified decoder-ABI bench; do not
+cancel the transformation by pre-adjusting the payload. See the
+[native media boundary](5510_bringup.md#generated-aac-external-media-control).
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;
