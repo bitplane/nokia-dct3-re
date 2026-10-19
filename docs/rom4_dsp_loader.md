@@ -2184,6 +2184,19 @@ the register bits and the prerequisites for speech-channel activation remain
 unresolved. Read-time PC context is not an instruction-retirement or
 physical-timing claim.
 
+Reproduce this passive instrument with
+`.venv/bin/python tools/run_c54x_rom4_call_observe.py --machine nse1astd`;
+use `nse1pipe` for staged/standard execution and `--keys ''` for an empty-input
+control. Each run has isolated generated storage, input/binary/observer hashes,
+its launch command, console, bus log and snapshots under `tmp/native-call-*`.
+Inherited DCT3 fixture/backend settings are removed. This is a manual research
+instrument, not a connected-call gate: a zero process exit is not acceptance.
+Require a healthy final CPU record, inspect the physical-input/screen evidence,
+and reject truncated bus captures (each kind reports its total and 512 cap).
+Both standard-bus frontends reproduce 68 post-boot host writes, 18 payload
+reads and 75 COBBA writes for this dial fixture, with zero codec entries and
+active mode zero. Equal counts do not establish physical timing parity.
+
 The current native boundary profiles are distinct: the four-second coherent
 boot observes thirteen ordered RF control writes, including the firmware-owned
 `0041/0040` queue item released by TX-completion FIQ1. The 30-second RF
