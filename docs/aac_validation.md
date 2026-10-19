@@ -963,10 +963,49 @@ epoch pairing and decoder-to-DMA provenance are not established by that result.
 The native twenty-second run still exits through the deliberate negative audio
 completion diagnostic (exit 3), with zero illegal instructions. This is a
 record/save/reopen and consumed-prefix validation milestone, not whole-track
-draining, audible output, handset boot or GSM speech acceptance. The next
-transport target is active DMA consumption and codec-slot epochs for the copied
-banks, without fitting sample offsets or treating post-mute serial activity as
-audible music. The bounded memory-copy correspondence is established below.
+draining, handset boot or GSM speech acceptance. Subsequent sections establish
+bounded DMA/codec provenance and ideal headphone output separately; neither makes
+post-cleanup serial activity proof that the first track drained.
+
+### Finalized EOF and Lifecycle Restart
+
+A twelve-second cold run of the same finalized NAND reaches first-session
+cleanup without a decoder failure. The extent model agrees with all 377
+input-11 requests: 376 take successor `0294ca`; the last takes `0294fd` and
+`029500 -> 02956f`. At that last request, 72020 of 72096 file words have
+been requested, leaving 76 words against a 186-word request. Finalization
+changes the boundary numerically but does not bypass short-request cleanup.
+
+Actual lifecycle writes and resident entry establish:
+
+| Event | Emulated seconds |
+| --- | --- |
+| Lifecycle 4, first playback | 0.837819684 |
+| Lifecycle 5 after cleanup ingress | 9.724472811 |
+| Resident entry `026d62` | 9.892753474 |
+| Lifecycle 7 | 9.913133926 |
+| Lifecycle 3 | 9.927637877 |
+| Lifecycle 4, restarted playback | 10.115552110 |
+
+This rules out the twenty-second bench cutoff as the reason the first session
+ends. Continuing output after this boundary must be attributed to its session,
+not counted as draining the first session. Whether restart is the intended
+repeat/next-track policy, and whether buffered encoded data should be decoded
+before cleanup, remain unresolved. No firmware or media change is justified.
+The copied NAND remains byte-identical to the finalized source.
+
+Use `mu4_finalized_cleanup_observe.lua` with the cold `bootplaystage` bench,
+`-debug -debugger none -seconds_to_run 12`, then run
+`mu4_cleanup_ingress_check.py RUN/error.log --first-resident-only
+--lifecycle-restart --input-file EXTRACTED_TEST`.
+
+The first session contains 1886 ingress events; 405 later events are explicitly
+excluded from the uncapped 2291-event capture. The lifecycle option checks all
+captured lifecycle-write ordinals, ordered `4 -> 5 -> 7 -> 3 -> 4` values and
+intervening resident entry, not buffered-tail contents or audio completion.
+Run the RAM snapshot observer separately: it and the ingress observer install
+breakpoint actions at the same address `02956f`, and composing them does not
+produce the snapshot. Refill and ingress use independent debugger counters.
 
 ### Decoded-Bank Copy Correspondence
 

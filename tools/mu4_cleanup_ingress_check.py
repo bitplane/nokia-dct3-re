@@ -3,6 +3,8 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import math
+import re
 from pathlib import Path
 import sys
 
@@ -138,6 +140,53 @@ def check(text, media=None, *, first_resident_only=False):
     return result
 
 
+def check_lifecycle_restart(text):
+    """Require ordered bus writes and resident re-entry, not EOF acceptance."""
+    writes = [row for row in rows(text, 'mu4_playback_lifecycle_write')
+              if row['address'] == '373e']
+    terminals = rows(text, 'mu4_playback_lifecycle_terminal')
+    # This legacy driver entry record predates observer_writes-tagged rows.
+    residents = list(re.finditer(
+        r'mu4_playback_execute_entry: address=026d62 opcode=fd00 t=([0-9.]+)\b', text))
+    if len(terminals) != 1 or len(residents) < 2 or not writes:
+        raise ValueError('missing lifecycle or resident restart evidence')
+    terminal = terminals[0]
+    if (terminal.get('illegal') != '0' or terminal.get('observer_writes') != '0'
+            or terminal.get('audio_acceptance') != '0'
+            or int(terminal['lifecycle_writes']) != len(writes)):
+        raise ValueError('incomplete lifecycle write census')
+    previous = -1.0
+    for ordinal, row in enumerate(writes, 1):
+        time = float(row['t'])
+        if (int(row['ordinal']) != ordinal or not math.isfinite(time) or time <= previous
+                or row.get('mask') != 'ffff' or row.get('observer_writes') != '0'):
+            raise ValueError('invalid lifecycle bus chronology')
+        previous = time
+    starts = [index for index, row in enumerate(writes) if row['value'] == '0005']
+    if len(starts) != 1 or starts[0] == 0:
+        raise ValueError('expected one observed cleanup lifecycle')
+    index = starts[0]
+    sequence = writes[index-1:index+4]
+    if [row['value'] for row in sequence] != ['0004', '0005', '0007', '0003', '0004']:
+        raise ValueError('incomplete cleanup/restart sequence')
+    resident_time = float(residents[1].group(1))
+    if not float(sequence[1]['t']) < resident_time < float(sequence[2]['t']):
+        raise ValueError('resident return does not separate cleanup and restart')
+    cleanup = rows(text, 'mu4_cleanup_ingress')
+    cleanup = [row for row in cleanup if row['address'] == '02956f']
+    first_cleanup = text.index('mu4_cleanup_ingress: ordinal=' + cleanup[0]['ordinal'] + ' ') if cleanup else -1
+    cleanup_write = next(line for line in text.splitlines()
+                         if 'mu4_playback_lifecycle_write:' in line
+                         and 'address=373e value=0005 ' in line)
+    if first_cleanup < 0 or first_cleanup >= text.index(cleanup_write):
+        raise ValueError('missing ingress before cleanup lifecycle write')
+    return {'lifecycle_values': [row['value'] for row in sequence],
+            'times': [float(row['t']) for row in sequence],
+            'resident_return_time': resident_time,
+            'scope': 'Observed cleanup, resident re-entry and playback lifecycle restart; '
+                     'not buffered-tail disposition, repeat policy or complete audio acceptance'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -145,10 +194,16 @@ def main():
                         help='Compare the bounded source model with an independently extracted input file')
     parser.add_argument('--first-resident-only',action='store_true',
                         help='explicitly select the complete first session before a second resident entry')
+    parser.add_argument('--lifecycle-restart', action='store_true',
+                        help='also require the observed cleanup/resident/playback restart chronology')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text(), args.input_file.read_bytes() if args.input_file else None,
-                               first_resident_only=args.first_resident_only), indent=2))
+        text = args.log.read_text()
+        result = check(text, args.input_file.read_bytes() if args.input_file else None,
+                       first_resident_only=args.first_resident_only)
+        if args.lifecycle_restart:
+            result['lifecycle_restart'] = check_lifecycle_restart(text)
+        print(json.dumps(result, indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'cleanup ingress check: {error}', file=sys.stderr)
         return 1

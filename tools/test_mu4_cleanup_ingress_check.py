@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_cleanup_ingress_check import check, reference_input_extent
+from tools.mu4_cleanup_ingress_check import check, check_lifecycle_restart, reference_input_extent
 
 
 def fixture(sites=None):
@@ -103,6 +103,37 @@ class CleanupIngressTest(unittest.TestCase):
         text = text.replace('address=0294fd opcode=60f8', 'address=029471 opcode=1005')
         with self.assertRaisesRegex(ValueError, 'unresolved length'):
             check(text)
+
+
+class LifecycleRestartTests(unittest.TestCase):
+    def fixture(self):
+        lines = ['mu4_playback_execute_entry: address=026d62 opcode=fd00 t=0.2']
+        for ordinal, (time, value) in enumerate(((1, '0004'), (9, '0005'),
+                                                (10, '0007'), (10.1, '0003'),
+                                                (10.2, '0004')), 1):
+            if ordinal == 2:
+                lines.append('mu4_cleanup_ingress: ordinal=42 address=02956f observer_writes=0')
+            if ordinal == 3:
+                lines.append('mu4_playback_execute_entry: address=026d62 opcode=fd00 t=9.5')
+            lines.append(f'mu4_playback_lifecycle_write: address=373e value={value} '
+                         f'mask=ffff ordinal={ordinal} t={time} observer_writes=0')
+        lines.append('mu4_playback_lifecycle_terminal: illegal=0 lifecycle_writes=5 '
+                     'observer_writes=0 audio_acceptance=0')
+        return '\n'.join(lines)
+
+    def test_ordered_restart(self):
+        result = check_lifecycle_restart(self.fixture())
+        self.assertEqual(result['resident_return_time'], 9.5)
+        self.assertEqual(result['lifecycle_values'], ['0004', '0005', '0007', '0003', '0004'])
+
+    def test_reject_missing_or_misordered_evidence(self):
+        for before, after in [('lifecycle_writes=5', 'lifecycle_writes=6'),
+                              ('value=0007', 'value=0005'), ('t=9.5', 't=10.5'),
+                              ('t=10.1', 't=nan'), ('mask=ffff', 'mask=00ff'),
+                              ('observer_writes=0', 'observer_writes=1'),
+                              ('address=02956f', 'address=029500')]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_lifecycle_restart(self.fixture().replace(before, after))
 
 
 if __name__ == '__main__':
