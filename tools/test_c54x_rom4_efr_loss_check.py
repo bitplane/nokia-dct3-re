@@ -27,6 +27,14 @@ def fixture(changes=True):
 
 
 class EfrLossObservationTests(unittest.TestCase):
+    def test_verbose_teardown_is_explicit_and_bounded(self):
+        text, reference, serial = fixture()
+        tail = '\nEnter sdlwindow_exit\nLeave sdlwindow_exit'
+        characterize(text + tail, 3, reference, serial, verbose_teardown=True)
+        for bad, enabled in ((text + tail, False), (text + tail + '\nextra', True)):
+            with self.subTest(enabled=enabled), self.assertRaises(ValueError):
+                characterize(bad, 3, reference, serial, verbose_teardown=enabled)
+
     def test_staged_selection_does_not_promote_characterization(self):
         text, reference, serial = fixture()
         marker = 'ROM4 EFR erasure decoder frontend: staged handset_audio_claim=0'

@@ -640,7 +640,7 @@ constexpr bool staged_xc(u16 word)
 
 constexpr bool staged_rmw(u16 word)
 {
-	return (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x6b00;
+	return (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x6b00 || word == 0x6af8;
 }
 
 constexpr bool staged_extended_rmw(u16 word)
@@ -3281,9 +3281,10 @@ void tms320c54x_device::pipeline_step()
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
 			bool const delay_multiply = ((word & 0xfc00) == 0x2000 || (word & 0xf800) == 0x2800) &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
-			// Short MPYA/MASA/MACA/MACAR publish Smem to T in Read;
+			// MPYA/MASA/MACA/MACAR publish Smem to T in Read;
 			// their independently owned B result retires before redirect.
-			bool const delay_accumulator_multiply = ((word & 0xf9ff) == (0x3100 | u8(word))) && u8(word) < 0x98;
+			bool const delay_accumulator_multiply = ((word & 0xf9ff) == (0x3100 | u8(word))) &&
+				(u8(word) < 0x98 || (m_pipeline_control_word == 0xf273 && ((word & 0xf8) == 0xe0 || u8(word) == 0xf8)));
 			bool delay_compare = false;
 			bool delay_bitt = staged_bitt(word) && u8(word) < 0x98;
 			bool delay_arithmetic = false;
@@ -3333,7 +3334,7 @@ void tms320c54x_device::pipeline_step()
 					logerror("staged_control_delay_slot: stage=%u valid=%u address=%06x word=%04x\n", stage, unsigned(m_pipeline_valid[stage]), m_pipeline_address[stage], m_pipeline_word[stage]);
 				m_illegal = true; return;
 			}
-			unsigned const words = staged_absolute_add(word) || delay_store || delay_load || delay_dld || delay_shift || delay_compare || (delay_bitt && u8(word) >= 0xe0) || delay_arithmetic || ((delay_multiply || delay_asm) && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
+			unsigned const words = staged_absolute_add(word) || delay_store || delay_load || delay_dld || delay_shift || delay_compare || (delay_bitt && u8(word) >= 0xe0) || delay_arithmetic || ((delay_multiply || delay_asm || delay_accumulator_multiply) && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			bool const delay_read_a = staged_read_a(word) && u8(word) < 0x98 && m_pipeline_control_word == 0xf273;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0x7707 || staged_block_repeat(word) || staged_port_read(word) || staged_port_write(word) || staged_memory_repeat(word) || staged_banz(word) || (staged_read_a(word) && !delay_read_a) || staged_immediate_repeat(word) || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
@@ -4963,7 +4964,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc += staged_extended_rmw(m_op) || u8(m_op) == 0xf8 ? 2 : 1;
 			data_write(m_pipeline_operand_address[5], (m_op & 0xff00) == 0x6b00
-				? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : BIT(m_op, 8)
+				? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : m_op == 0x6af8
+				? m_pipeline_operand[5] ^ m_pipeline_immediate[5] : BIT(m_op, 8)
 				? m_pipeline_operand[5] | m_pipeline_immediate[5]
 				: m_pipeline_operand[5] & m_pipeline_immediate[5]);
 		}
@@ -5502,6 +5504,11 @@ void tms320c54x_device::pipeline_step()
 			(m_pipeline_word[3] & 0xfcf8) == 0x8090 &&
 			indirect_ar(u8(m_pipeline_word[3]), 3) == source && m_ar[source] >= 0x60;
 		m_pipeline_operand[2] = postincrement ? u16(m_ar[source] + 1) : data_read(0x10 + source);
+		// A preceding PSHM still owns its Read allocation. MVMM's Decode
+		// view includes that older decrement without allocating the stack twice.
+		if (source == 8 && (m_pipeline_word[2] & 15) < 8 &&
+			m_pipeline_valid[3] && staged_direct_push(m_pipeline_word[3]))
+			--m_pipeline_operand[2];
 	}
 	if (m_pipeline_valid[2] && staged_block_repeat(m_pipeline_word[2]))
 	{
@@ -5759,7 +5766,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 	{
 		u16 const value = m_pipeline_operand[5], immediate = m_pipeline_immediate[5];
 		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
-			BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
+			m_pipeline_word[5] == 0x6af8 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
 	}
 	return m_data.read_word(address);
 }

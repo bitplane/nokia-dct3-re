@@ -1808,13 +1808,50 @@ timing and additional compositions are not inferred from this matrix.
 
 The active-speech erasure bench organically reaches `6b84 0001` at `c38c`,
 with AR4=`0010` selecting AR0 in both frontends. Its staged continuation
-currently stops at `31e2 eb08` in the `f273` branch delay at `c3b4` during
-frame 8. Both `observe-c54x-rom4-efr-loss-staged` and the strict staged erasure
-comparison remain rejecting until that composition is independently qualified.
+completes all 163 frames with the same PCM hash as atomic execution. The
+recovery-policy reference differences remain characterized, not accepted as
+conformance; the strict staged erasure comparison still rejects them.
 `efr-loss-pipe` and `efr-erasure-pipe` load the same hashed inputs as their
 atomic controls. Observation requires its own staged marker, full frame/RAM
 replay and a valid driver; a completed characterization cannot satisfy the
 strict conformance checker.
+
+## BD long accumulator multiply
+
+`bd-maca-long` qualifies stationary long-offset and absolute
+MPYA/MASA/MACA/MACAR to B within BD's two delay words: 98,304 cases and
+cleared-pipeline replays cover eight addressing ARs, three address forms,
+four operations, eight numeric patterns, sixteen arithmetic-mode combinations,
+two pages and four checkpoints. Smem and T are Read-owned; accumulator inputs
+remain Execute-owned. `bd-maca-edge` rejects sixteen final-delay-word spill
+cases and their replays. Other long addressing modes and control owners are
+not newly admitted.
+
+## Pending stack allocation and MVMM
+
+A directly preceding PSHM's pending stack decrement participates in MVMM's
+Decode view of SP when the destination is AR0..AR7. Actual stack allocation
+remains at Read and the stack write remains at Execute; forwarding must not
+allocate twice. `push-mvmm-sp` checks 2,304 cases and cleared-pipeline replays:
+one/two pushes, AR2/ST0/ST1/SP source families, three gaps, eight destinations,
+normal/wrapping stacks, two pages and three checkpoints, with exact bus events.
+This does not qualify SP-to-SP composition or other push families.
+
+The original EFR decoder wrapper reads its return address using MVMM SP,AR2
+after PSHM AR2 and PSHM ST0. A stale SP selects a different wrapper despite
+identical entry registers and 65,440 ordinary RAM words. Frame completion alone
+therefore does not establish correct decoder execution.
+
+## Absolute XORM
+
+Staged `6af8` retains its absolute address, immediate and Read sample, publishes
+one XOR result at Execute and leaves status unchanged. The same XOR result
+feeds pending-write forwarding. `xorm-absolute` checks 4,096 cases and restores:
+four addresses, 64 value/status combinations, compatibility modes, two pages
+and four checkpoints. An adjacent load must consume the XOR result without a
+second bus read; later literal, pointer and RAM changes cannot replace retained
+operands. Other XORM addressing forms remain unqualified. These are emulator
+phase contracts, not measured silicon timing.
 
 ## Staged LMS
 

@@ -198,6 +198,7 @@ def main():
     parser.add_argument('--staged', action='store_true', help='run FR/EFR speech or EFR lifecycle vectors on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
+    parser.add_argument('--trace-efr-loss', action='store_true', help='capture loss-frame-8 entry RAM and bounded execution/data traces without conformance promotion')
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder or
                            args.efr_dtx_encoder or args.efr_dtx_decoder or args.efr_homing_encoder or args.efr_homing_decoder or args.efr_invalid_sid or
@@ -207,6 +208,8 @@ def main():
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
     if args.trace_efr_reset and not args.efr_encoder:
         parser.error('--trace-efr requires --efr-encoder')
+    if args.trace_efr_loss and not args.efr_erasure_observe:
+        parser.error('--trace-efr-loss requires --efr-erasure-observe')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -246,7 +249,7 @@ def main():
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
                "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
-    if args.trace_fr or args.trace_efr_reset:
+    if args.trace_fr or args.trace_efr_reset or args.trace_efr_loss:
         command.append('-verbose')
     root = Path(__file__).resolve().parents[1]
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
@@ -288,6 +291,8 @@ def main():
     if args.efr_erasure_observe:
         evidence['comparison_scope'] = 'characterization'
         evidence['frontend'] = 'staged' if args.staged else 'atomic'
+        if args.trace_efr_loss:
+            evidence['trace_scope'] = 'loss_frame8_entry_and_execution'
     if args.trace_fr:
         evidence['trace_scope'] = 'encoder_frame0_encoding' if args.fr_encoder else 'decoder_frame8'
     if args.efr_homing_errors:
@@ -308,7 +313,8 @@ def main():
                 from c54x_rom4_efr_loss_check import characterize
             report, pcm = characterize(text, result.returncode,
                 (args.rompath / 'tms54rom4/erasure.out').read_bytes(),
-                (args.rompath / 'tms54rom4/erasure.dec').read_bytes())
+                (args.rompath / 'tms54rom4/erasure.dec').read_bytes(),
+                verbose_teardown=args.trace_efr_loss)
             (run / 'characterization.json').write_text(json.dumps(report, indent=2) + '\n')
             (run / 'native.pcm').write_bytes(pcm)
             print(f"ROM4 EFR loss characterized: frames={report['frames']} differing_frames={report['differing_frames']} mismatches={report['mismatches']} conformance_claim=0")

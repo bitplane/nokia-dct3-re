@@ -17,12 +17,14 @@ def lost(frame):
     return frame == 8 or 32 <= frame < 35 or 80 <= frame < 88 or 120 <= frame < 136
 
 
-def characterize(text, returncode, reference, serial):
+def characterize(text, returncode, reference, serial, verbose_teardown=False):
     if re.search(r'^Driver .+: [1-9]\d* errors?,', text, re.MULTILINE):
         raise ValueError('MAME driver validity errors invalidate codec characterization')
     if len(reference) != FRAMES * SAMPLES * 2 or len(serial) != FRAMES * 494:
         raise ValueError('incomplete EFR reference or serial input')
     lines = text.splitlines()
+    if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:
+        lines = lines[:-2]
     if lines and re.fullmatch(r'Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)', lines[-1]):
         lines.pop()
     if returncode != 3 or not lines or lines[-1] != COMPLETE:

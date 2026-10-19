@@ -2751,13 +2751,16 @@ production clock or reference PCM was altered to obtain agreement.
 
 ### Native EFR active-speech erasures
 
-The atomic reference comparison and staged execution have distinct frontiers.
-`observe-c54x-rom4-efr-loss-staged` currently matches frames 0..7, then
-rejects long-offset `MPYA` (`31e2 eb08`) in a BD delay at `c3b4` during
-the first erased frame (8). Its short mapped-AR ADDM predecessor is
-independently qualified; see [the loader contract](rom4_dsp_loader.md#short-mapped-ar-addm).
-The staged observation is incomplete, not a passing recovery comparison.
-The strict `check-c54x-rom4-efr-erasure-decoder-staged` remains rejecting too.
+Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
+RAM words per frame. Both produce native PCM SHA256
+`a3d282aa7387a59283a9b82cea688e43b7e17b45eba603e1fdd8d626b5025515`,
+with 2,874 reference differences in 26 recovery frames (first at frame 9).
+`observe-c54x-rom4-efr-loss-staged` characterizes that result; it is not a
+passing recovery comparison. The strict
+`check-c54x-rom4-efr-erasure-decoder-staged` remains rejecting.
+The staged path has independently qualified BD-delay long accumulator
+multiply, pending-PSHM SP forwarding into MVMM, and absolute XORM; see
+[the loader contract](rom4_dsp_loader.md#short-mapped-ar-addm).
 Staged/atomic profiles share hashed program/data and vectors; selection
 markers and driver-validity checks cannot be bypassed by characterization.
 
