@@ -67,6 +67,53 @@ def check_destinations(text,owners):
                 scope='Bus destination ranges only; not contiguous coverage, persistent buffer ownership or encoder consumption')
 
 
+def check_buffers(text,destinations):
+    ends = rows(text,'mu4_recorder_buffer_terminal')
+    if len(ends) != 1 or ends[0] != dict(bad='0',dropped='0',context_cap='256',
+            context_pc='not_instruction_owner',save_restore='unsupported',observer_writes='0',encoder_consumption='0'):
+        raise ValueError('incomplete or inconsistent recorder buffer observation')
+    if destinations is None:
+        raise ValueError('buffer observation requires DMA destination pairing')
+    expected = [0,0]
+    for row in destinations['destinations']:
+        low,high = int(row['minimum'],16),int(row['maximum'],16)
+        bank = (low-0x1800)//256
+        if row['space'] != 'data' or bank not in (0,1) or not 0x1800+bank*256 <= low <= high < 0x1900+bank*256:
+            raise ValueError('DMA destinations escape observed recorder buffers')
+        expected[bank] += row['writes']
+    summaries,readers,contexts = {},{},{}
+    for row in rows(text,'mu4_recorder_buffer'):
+        bank = int(row['bank'])
+        writes,epochs,retired,pending,unknown = (int(row[key]) for key in
+            ('writes','read_epochs','retired_unread','pending_unread','unknown_reads'))
+        if (bank not in (0,1) or bank in summaries or min(writes,epochs,retired,pending,unknown) < 0
+                or pending > 256 or writes != expected[bank] or writes != epochs+retired+pending
+                or row['observer_writes'] != '0'):
+            raise ValueError('recorder buffer write lifetimes do not reconcile')
+        summaries[bank] = dict(writes=writes,read_epochs=epochs,retired_unread=retired,
+                               pending_unread=pending,unknown_reads=unknown)
+    for row in rows(text,'mu4_recorder_buffer_reader'):
+        bank,mask,count = int(row['bank']),int(row['dma_mask'],16),int(row['reads'])
+        if bank not in (0,1) or not 0 <= mask < 64 or count <= 0 or (bank,mask) in readers or row['observer_writes'] != '0':
+            raise ValueError('invalid buffer reader histogram')
+        readers[bank,mask] = count
+    for row in rows(text,'mu4_recorder_buffer_context'):
+        bank,pc,count = int(row['bank']),int(row['context_pc'],16),int(row['reads'])
+        if bank not in (0,1) or not 0 <= pc <= 0x7fffff or count <= 0 or (bank,pc) in contexts or row['observer_writes'] != '0':
+            raise ValueError('invalid buffer read context histogram')
+        contexts[bank,pc] = count
+    if set(summaries) != {0,1} or len(contexts) > 256:
+        raise ValueError('missing or capped buffer lifetime census')
+    for bank,summary in summaries.items():
+        count = sum(value for (owner,_),value in readers.items() if owner == bank)
+        if count < summary['read_epochs'] or sum(value for (owner,_),value in contexts.items() if owner == bank) != readers.get((bank,0),0):
+            raise ValueError('buffer read epochs/contexts do not reconcile')
+        summary['known_reads'] = count
+        summary['readers'] = {f'{mask:02x}':value for (owner,mask),value in readers.items() if owner == bank}
+        summary['unowned_contexts'] = {f'{pc:06x}':value for (owner,pc),value in contexts.items() if owner == bank}
+    return dict(banks=summaries,scope='Observed bus read lifetimes, not instruction ownership, copy semantics or encoder consumption')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -104,7 +151,8 @@ def check(text,require_fresh=False):
     elif require_fresh:
         raise ValueError('DRR publication observation required')
     destinations = check_destinations(text,owners) if rows(text,'mu4_recorder_destination_terminal') else None
-    return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,
+    buffers = check_buffers(text,destinations) if rows(text,'mu4_recorder_buffer_terminal') else None
+    return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -118,11 +166,14 @@ def main():
     parser.add_argument('log',type=Path)
     parser.add_argument('--fresh',action='store_true',help='require publication/read/reset reconciliation')
     parser.add_argument('--destinations',action='store_true',help='require exact DMA read/write pairing')
+    parser.add_argument('--buffers',action='store_true',help='require receive-buffer write/read lifetimes')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
         if args.destinations and result['dma_destinations'] is None:
             raise ValueError('DMA destination observation required')
+        if args.buffers and result['buffer_lifetimes'] is None:
+            raise ValueError('recorder buffer lifetime observation required')
         print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')

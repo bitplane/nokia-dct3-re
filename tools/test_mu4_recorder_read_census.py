@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check
+from tools.mu4_recorder_read_census import check,check_buffers
 
 
 def fixture():
@@ -16,6 +16,28 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_buffer_lifetimes_distinguish_read_retired_and_pending_epochs(self):
+        text = '\n'.join([
+            'mu4_recorder_buffer: bank=0 writes=4 read_epochs=2 retired_unread=1 pending_unread=1 unknown_reads=5 observer_writes=0',
+            'mu4_recorder_buffer: bank=1 writes=3 read_epochs=1 retired_unread=2 pending_unread=0 unknown_reads=0 observer_writes=0',
+            'mu4_recorder_buffer_reader: bank=0 dma_mask=00 reads=3 observer_writes=0',
+            'mu4_recorder_buffer_reader: bank=1 dma_mask=02 reads=2 observer_writes=0',
+            'mu4_recorder_buffer_context: bank=0 context_pc=029000 reads=3 observer_writes=0',
+            'mu4_recorder_buffer_terminal: bad=0 dropped=0 context_cap=256 context_pc=not_instruction_owner save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        destinations = dict(destinations=[dict(space='data',minimum='001800',maximum='0018ff',writes=4),
+                                          dict(space='data',minimum='001900',maximum='0019ff',writes=3)])
+        result = check_buffers(text,destinations)
+        self.assertEqual(result['banks'][0]['known_reads'],3)
+        self.assertEqual(result['banks'][1]['read_epochs'],1)
+        for before,after in [('read_epochs=2','read_epochs=3'),('bad=0','bad=1'),
+                             ('dropped=0','dropped=1'),('context_pc=029000 reads=3','context_pc=029000 reads=2'),
+                             ('bank=1 dma_mask=02 reads=2','bank=1 dma_mask=02 reads=0'),
+                             ('pending_unread=1','pending_unread=257')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_buffers(text.replace(before,after),destinations)
+        with self.assertRaises(ValueError):
+            check_buffers(text,None)
+
     def test_destination_pairing_rejects_missing_changed_and_duplicate_writes(self):
         text = fixture()+'\n'+'\n'.join([
             'mu4_recorder_destination: channel=1 space=0 writes=2 minimum=020000 maximum=020001 observer_writes=0',

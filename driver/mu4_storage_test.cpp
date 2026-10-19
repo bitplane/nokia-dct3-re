@@ -426,6 +426,48 @@ private:
 	std::array<u64,18> m_ac_dma_writes{};
 	std::array<u32,18> m_ac_dma_first{}, m_ac_dma_last{};
 	u64 m_ac_dma_bad = 0;
+	std::array<u16,512> m_ac_buffer_word{};
+	std::array<bool,512> m_ac_buffer_valid{}, m_ac_buffer_read{};
+	std::array<u64,2> m_ac_buffer_writes{}, m_ac_buffer_consumed{}, m_ac_buffer_unread{}, m_ac_buffer_unknown{};
+	std::array<u64,128> m_ac_buffer_readers{};
+	std::map<u32,u64> m_ac_buffer_contexts;
+	u64 m_ac_buffer_bad = 0, m_ac_buffer_dropped = 0;
+	void install_recorder_buffer_observers()
+	{
+		m_cpu->space(AS_DATA).install_write_tap(0x1800,0x19ff,"mu4_recorder_buffer_write",
+			[this](offs_t address,u16 &value,u16 mask) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const slot = address-0x1800, bank = slot/256;
+				if (m_ac_buffer_valid[slot] && !m_ac_buffer_read[slot]) ++m_ac_buffer_unread[bank];
+				unsigned owner = 0;
+				for (unsigned channel=0;channel<6;++channel)
+					if (m_dma->destination_write_matches(channel,AS_DATA,address) && m_dma->source_matches(channel,AS_DATA,0x21)) ++owner;
+				if (owner > 1 || (owner && mask != 0xffff)) ++m_ac_buffer_bad;
+				m_ac_buffer_valid[slot] = owner == 1 && mask == 0xffff;
+				m_ac_buffer_read[slot] = false; m_ac_buffer_word[slot] = value;
+				if (m_ac_buffer_valid[slot]) ++m_ac_buffer_writes[bank];
+			});
+		m_cpu->space(AS_DATA).install_read_tap(0x1800,0x19ff,"mu4_recorder_buffer_read",
+			[this](offs_t address,u16 &value,u16) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const slot = address-0x1800, bank = slot/256;
+				if (!m_ac_buffer_valid[slot]) { ++m_ac_buffer_unknown[bank]; return; }
+				if (value != m_ac_buffer_word[slot]) ++m_ac_buffer_bad;
+				if (!m_ac_buffer_read[slot]) { ++m_ac_buffer_consumed[bank]; m_ac_buffer_read[slot] = true; }
+				u8 owners = 0;
+				for (unsigned channel=0;channel<6;++channel)
+					if (m_dma->source_read_matches(channel,AS_DATA,address)) owners |= 1U << channel;
+				++m_ac_buffer_readers[bank*64+owners];
+				if (!owners)
+				{
+					u32 const key = (bank<<24) | m_cpu->state_int(STATE_GENPC);
+					auto found = m_ac_buffer_contexts.find(key);
+					if (found != m_ac_buffer_contexts.end()) ++found->second;
+					else if (m_ac_buffer_contexts.size() < 256) m_ac_buffer_contexts.emplace(key,1);
+					else ++m_ac_buffer_dropped;
+				}
+			});
+	}
 	void observe_recorder_rx(offs_t event,u16 word)
 	{
 		if (!recorder_ac_profile()) return;
@@ -2522,6 +2564,7 @@ private:
 			if (playback_profile()) machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&mu4_storage_test_state::report_playback_parent, this));
 			if (recorder_ac_profile())
 			{
+				install_recorder_buffer_observers();
 				// Pair bus transactions by active DMA channel, never by sample similarity.
 				int const spaces[] = {AS_PROGRAM,AS_DATA,AS_IO};
 				for (unsigned index=0;index<3;++index)
@@ -3062,6 +3105,9 @@ private:
 		m_ac_read_owners.fill(0); m_ac_unowned_contexts.clear();
 		m_ac_dma_pending.fill(false); m_ac_dma_word.fill(0); m_ac_dma_writes.fill(0);
 		m_ac_dma_first.fill(0); m_ac_dma_last.fill(0); m_ac_dma_bad = 0;
+		m_ac_buffer_word.fill(0); m_ac_buffer_valid.fill(false); m_ac_buffer_read.fill(false);
+		m_ac_buffer_writes.fill(0); m_ac_buffer_consumed.fill(0); m_ac_buffer_unread.fill(0); m_ac_buffer_unknown.fill(0);
+		m_ac_buffer_readers.fill(0); m_ac_buffer_contexts.clear(); m_ac_buffer_bad = m_ac_buffer_dropped = 0;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3599,6 +3645,22 @@ private:
 						slot/3,slot%3,static_cast<unsigned long long>(m_ac_dma_writes[slot]),m_ac_dma_first[slot],m_ac_dma_last[slot]);
 				logerror("mu4_recorder_destination_terminal: bad=%llu pending=%u save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					static_cast<unsigned long long>(m_ac_dma_bad),unsigned(std::count(m_ac_dma_pending.begin(),m_ac_dma_pending.end(),true)));
+				for (unsigned bank=0;bank<2;++bank)
+				{
+					unsigned pending = 0;
+					for (unsigned slot=bank*256;slot<(bank+1)*256;++slot)
+						if (m_ac_buffer_valid[slot] && !m_ac_buffer_read[slot]) ++pending;
+					logerror("mu4_recorder_buffer: bank=%u writes=%llu read_epochs=%llu retired_unread=%llu pending_unread=%u unknown_reads=%llu observer_writes=0\n",
+						bank,static_cast<unsigned long long>(m_ac_buffer_writes[bank]),static_cast<unsigned long long>(m_ac_buffer_consumed[bank]),
+						static_cast<unsigned long long>(m_ac_buffer_unread[bank]),pending,static_cast<unsigned long long>(m_ac_buffer_unknown[bank]));
+					for (unsigned mask=0;mask<64;++mask)
+						if (m_ac_buffer_readers[bank*64+mask]) logerror("mu4_recorder_buffer_reader: bank=%u dma_mask=%02x reads=%llu observer_writes=0\n",
+							bank,mask,static_cast<unsigned long long>(m_ac_buffer_readers[bank*64+mask]));
+				}
+				for (auto const &[key,count] : m_ac_buffer_contexts)
+					logerror("mu4_recorder_buffer_context: bank=%u context_pc=%06x reads=%llu observer_writes=0\n",key>>24,key&0xffffff,static_cast<unsigned long long>(count));
+				logerror("mu4_recorder_buffer_terminal: bad=%llu dropped=%llu context_cap=256 context_pc=not_instruction_owner save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					static_cast<unsigned long long>(m_ac_buffer_bad),static_cast<unsigned long long>(m_ac_buffer_dropped));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

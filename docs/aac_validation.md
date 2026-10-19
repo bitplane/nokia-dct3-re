@@ -947,6 +947,30 @@ which subsequent reads consume these writes and how they feed the encoder;
 the two DMA channels must not be assigned microphone/channel semantics from
 address ranges alone.
 
+`--buffers` adds latest-write lifetimes in these two data ranges. Each
+full-word DRR-sourced DMA destination write starts an epoch; any subsequent
+write retires it, and side-effect-disabled reads are excluded. The
+20-second `tmp/native-gates/mu4-recorder-buffers` capture reconciles:
+
+| Data range | DMA writes | Epochs read at least once | Retired unread | Unread at endpoint |
+| --- | ---: | ---: | ---: | ---: |
+| `1800..18ff` | 905064 | 904744 | 320 | 0 |
+| `1900..19ff` | 801990 | 0 | 801734 | 256 |
+
+The first range has 1699328 reads of known DMA-written values, all without
+an active DMA source owner, plus 24 reads without a retained DMA-write
+assignment. Its bounded CPU-context histogram contains `038eb4..038eb6`,
+`038ed9..038edb` and `03faa6..03faa9`; those remain contexts, not proven
+instruction ownership or overlay identity. The second range has no observed
+reads. No value mismatch or dropped context occurs, and both NAND hashes
+above remain unchanged with native metadata success.
+
+In particular, the square-symbol counts selected on channel 2 do **not**
+establish encoder input: that channel writes the unread `1900` range in
+this fixture. The live downstream investigation must follow the channel-3
+`1800` range. These bus lifetimes alone prove neither conversion/FIFO loss
+nor copy/filter semantics, encoder consumption or decoded audio.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected
