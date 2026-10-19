@@ -993,8 +993,11 @@ after two seconds once its bounded window is closed. Check with
 `mu4_pcm_copy_check.py RUN --source-a00 SOURCE`. This is a short memory-copy
 observation, not the twenty-second playback gate. Register/PC snapshots remain
 context, not retained instruction ownership. The profile aliases program-space
-`2000..7fff` onto data RAM; this observer does not tap those program-space
-writes. Its last-writer result therefore covers data-space traffic, not an
-exhaustive physical-bank writer census. It also does not establish
+`2000..7fff` onto data RAM through `shared_daram_w`, which forwards writes through
+`AS_DATA.write_word`. A repeat capture also taps program-space `7000..7fff`:
+it observes zero alias writes in the bounded window, with all counts and sample
+correspondence above unchanged. Older captures without that counter report its
+coverage as unknown, not zero. This closes the mapped program-alias caveat for
+this window, not the unvalidated physical DA150 RAM extent. It does not establish
 downstream DMA read epochs, codec pin/reset ownership, whole-track playback,
 analog sound or GSM speech.

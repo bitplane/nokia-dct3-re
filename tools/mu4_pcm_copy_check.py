@@ -136,6 +136,9 @@ def check(text, *, frames=8):
             raise ValueError('copy/census terminal totals differ')
         if text.index('mu4_pcm_copy_terminal:') < text.rindex('mu4_pcm_copy_bus:'):
             raise ValueError('copy terminal precedes bus observations')
+        alias_writes = int(end['program_alias_writes']) if 'program_alias_writes' in end else None
+        if alias_writes is not None and not 0 <= alias_writes <= int(end['source_writes']):
+            raise ValueError('invalid forwarded program-alias write count')
     except (KeyError,TypeError,OverflowError) as error:
         raise ValueError('incomplete copy/conversion observation fields') from error
     return dict(blocks=frames,covered_words=len(covered),chunks=len(chunks),
@@ -143,7 +146,8 @@ def check(text, *, frames=8):
         writes_outside_selected_blocks=other,right_censored_reads=len(pending),
         source_writes_tracked=int(end['source_writes']),destination_writes_counted=int(end['destination_writes']),
         destination_contexts=len(census),fitted_alignment=False,native_audio_validated=False,
-        scope='Converted-word correspondence to last observed data-space bank writes and chronological copy reads/writes; program-space aliases not observed; '
+        program_alias_writes=alias_writes,
+        scope='Converted-word correspondence to last observed data-space bank writes and chronological copy reads/writes; '
               'not retained instruction ownership, downstream DMA epochs, pin ownership, whole-track or analog audio acceptance')
 
 

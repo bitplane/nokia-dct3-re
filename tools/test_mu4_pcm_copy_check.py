@@ -67,6 +67,16 @@ class PcmCopyTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check(text.replace('last_write_t=1.011','last_write_t=unobserved'),frames=1)
 
+    def test_program_alias_count_is_explicit_and_bounded(self):
+        text = fixture()
+        self.assertIsNone(check(text,frames=1)['program_alias_writes'])
+        for count in (0,1,2048):
+            observed = text.replace('contexts=1 closed=',f'program_alias_writes={count} contexts=1 closed=')
+            self.assertEqual(check(observed,frames=1)['program_alias_writes'],count)
+        for count in (-1,2049):
+            with self.assertRaises(ValueError):
+                check(text.replace('contexts=1 closed=',f'program_alias_writes={count} contexts=1 closed='),frames=1)
+
 
 if __name__ == '__main__':
     unittest.main()
