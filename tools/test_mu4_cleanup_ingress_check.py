@@ -23,6 +23,26 @@ def fixture(sites=None):
 
 
 class CleanupIngressTest(unittest.TestCase):
+    def test_explicit_first_session_excludes_later_capture_cap(self):
+        text = fixture()
+        later = ('mu4_cleanup_ingress: ordinal=4 address=029438 opcode=1004 cycles=104 '
+                 'sp=d6f4 f4=0011 f5=162e f6=0000 f7=0000 f8=0000 f9=0000 '
+                 'control=0001 ar1=0000 ar2=0000 identity=debugger_Execute_hook '
+                 'operands=context_only observer_writes=0\n')
+        text = text.replace('mu4_cleanup_ingress_terminal:', later+'mu4_cleanup_ingress_terminal:')
+        text = text.replace('events=3 cap=4096', 'events=4 cap=4')
+        with self.assertRaises(ValueError):
+            check(text)
+        result = check(text, first_resident_only=True)
+        self.assertEqual(result['events'], 3)
+        self.assertEqual(result['capture_selection']['excluded_later_events'], 1)
+        self.assertTrue(result['capture_selection']['global_cap_reached'])
+        with self.assertRaises(ValueError):
+            check(fixture().replace('cap=4096', 'cap=3'), first_resident_only=True)
+        with self.assertRaises(ValueError):
+            check(text.replace('address=026d62 opcode=fd00 t=9.86',
+                               'address=026d63 opcode=fd00 t=9.86'), first_resident_only=True)
+
     def test_media_extent_must_agree_with_executed_length_successors(self):
         text = fixture(((0x29438, 0x1004), (0x294c3, 0xf84a), (0x294fd, 0x60f8),
                         (0x29500, 0xf830), (0x2956f, 0x60f8))).replace('f7=0000', 'f7=0006')

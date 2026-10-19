@@ -672,3 +672,30 @@ this prefix without errors into 375 stereo blocks (1536000 bytes). Comparison
 with native returned s16 output gives maximum difference 11, RMS 1.220189855
 over 768000 channel samples. This is a cross-decoder diagnostic, not bit-exact
 codec conformance, physical audio, whole-file completion or speech acceptance.
+
+For a reproducible comparison, use `mu4_context_contract.py SOURCE
+--recording-session-log ENCODER/error.log --recording-session-reference
+PLAYBACK/observed.aac --recording-session-reference-prefix`. The explicit
+prefix mode requires a nonempty sequence ending at a declared packet boundary,
+compares from byte zero and reports all unmatched publications. Default mode
+still requires every published header and is not relaxed by this option.
+
+The fresh recording's cleanup observation independently reproduces 376 input-11
+requests and the length successors `0294ca` (375) then `0294fd` (one), followed
+by `029500 -> 02956f` with control context one. The extracted file's 143982-byte
+extent gives a 71991-word limit: 71834 words requested before the last 186-word
+request, leaving 157 words. This matches the observed boundary; the live final
+AR1 snapshot is `009d` (157). Unlike the older recording's six-word remainder,
+this establishes that the larger fresh extent participates in the same branch,
+not that a stale old-file size caused this stop. No decoder call fails.
+
+The twenty-second debugger capture also contains later resident activity.
+`mu4_cleanup_ingress_check.py LOG --first-resident-only --input-file FILE`
+explicitly selects the first session between its two resident-entry markers:
+1881 events, with 2041 later events excluded from 3922 captured, uncapped.
+The option refuses a missing closing boundary or a selected session that reaches
+the global capture cap; default checking still rejects mixed sessions. This
+proves the selected source policy against a second file extent, not that its
+buffered tail is intentionally disposable. The unresolved contract is whether
+the native caller must drain already-buffered data before this cleanup or the
+recording format declares that data outside its intended output extent.

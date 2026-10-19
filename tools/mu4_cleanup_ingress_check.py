@@ -37,7 +37,7 @@ def reference_input_extent(byte_length, requests):
     return records
 
 
-def check(text, media=None):
+def check(text, media=None, *, first_resident_only=False):
     events = rows(text, 'mu4_cleanup_ingress')
     scopes = rows(text, 'mu4_cleanup_ingress_scope')
     ends = rows(text, 'mu4_cleanup_ingress_terminal')
@@ -49,7 +49,8 @@ def check(text, media=None):
             or len(ends) != 1 or len(stops) != 1 or len(parents) != 1):
         raise ValueError('missing or changed ingress scope/terminal')
     end, stop, parent = ends[0], stops[0], parents[0]
-    if (not 0 < len(events) == int(end['events']) < int(end['cap'])
+    if (not 0 < len(events) == int(end['events']) <= int(end['cap'])
+            or (len(events) == int(end['cap']) and not first_resident_only)
             or end['audio_acceptance'] != '0' or stop['audio_acceptance'] != '0'
             or stop['illegal'] != '0' or float(stop['t']) < 9.86
             or any(parent.get(key) != value for key, value in {
@@ -60,8 +61,19 @@ def check(text, media=None):
     if text.count(overlay) != 1 or text.index(overlay) > text.index('mu4_cleanup_ingress:'):
         raise ValueError('missing original AA99 verification before ingress')
     residents = [line for line in text.splitlines() if 'mu4_playback_execute_entry: address=026d62' in line]
+    total_events = len(events)
+    if first_resident_only:
+        if len(residents) < 2:
+            raise ValueError('missing first resident-session closing boundary')
+        first, last = text.index(residents[0]), text.index(residents[1])
+        events = rows(text[first:last], 'mu4_cleanup_ingress')
+        if not events or int(events[-1]['ordinal']) >= int(end['cap']):
+            raise ValueError('first resident session may have reached the capture cap')
+        selected_last = first + text[first:last].rindex('mu4_cleanup_ingress:')
+    else:
+        selected_last = text.rindex('mu4_cleanup_ingress:')
     if len(residents) < 2 or not (text.index(residents[0]) < text.index('mu4_cleanup_ingress:')
-                                < text.rindex('mu4_cleanup_ingress:') < text.index(residents[1])):
+                                < selected_last < text.index(residents[1])):
         raise ValueError('ingress outside first resident session')
     previous = -1
     inputs, paths, length_paths = [], Counter(), Counter()
@@ -104,6 +116,10 @@ def check(text, media=None):
             'cleanup': cleanup, 'scope': 'Debugger hook at staged Execute entry; '
             'live snapshots/annulment are unclaimed, no retained operand, EOF, '
             'message producer ownership or audio acceptance proof'}
+    if first_resident_only:
+        result['capture_selection'] = dict(scope='First closed resident session only',
+            captured_events=total_events, excluded_later_events=total_events-len(events),
+            global_cap_reached=total_events == int(end['cap']), selected_session_uncapped=True)
     if media is not None:
         if any(row['f4'] != '0011' for row in inputs):
             raise ValueError('extent model does not cover other input selectors')
@@ -127,9 +143,12 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('--input-file', type=Path,
                         help='Compare the bounded source model with an independently extracted input file')
+    parser.add_argument('--first-resident-only',action='store_true',
+                        help='explicitly select the complete first session before a second resident entry')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text(), args.input_file.read_bytes() if args.input_file else None), indent=2))
+        print(json.dumps(check(args.log.read_text(), args.input_file.read_bytes() if args.input_file else None,
+                               first_resident_only=args.first_resident_only), indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'cleanup ingress check: {error}', file=sys.stderr)
         return 1

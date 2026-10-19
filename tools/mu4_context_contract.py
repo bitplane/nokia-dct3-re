@@ -149,7 +149,9 @@ def recording_header_observations(text, frames=8, *, session=False):
             'scope': 'Data-read-selected caller contexts and scalar header model; not retained CPU arguments, encoded payload or native audio'}
 
 
-def recording_session_observations(text, reference=None):
+def recording_session_observations(text, reference=None, *, complete_reference_prefix=False):
+    if complete_reference_prefix and not reference:
+        raise ValueError('complete-prefix comparison requires nonempty observed bytes')
     counts = re.findall(r'mu4_record_session_closed: arguments=\d+ counts=([0-9,]+)',text)
     if len(counts) != 1:
         raise ValueError('missing encoder session counts')
@@ -159,23 +161,32 @@ def recording_session_observations(text, reference=None):
     result = recording_header_observations(text,int(fields[0]),session=True)
     frames = result['frames']
     headers = [bytes.fromhex(frame['header_hex']) for frame in frames]
-    offset = 0
+    offset, matched = 0, 0
     for frame,header in zip(frames,headers):
         length = frame['values'][12]
         if length < 7:
             raise ValueError('encoder declared an incomplete fixed header')
-        if reference is not None and reference[offset:offset+7] != header:
-            raise ValueError(f'encoder header {frame["ordinal"]} differs from reference at byte {offset}')
+        if reference is not None and not (complete_reference_prefix and offset >= len(reference)):
+            if reference[offset:offset+7] != header:
+                raise ValueError(f'encoder header {frame["ordinal"]} differs from reference at byte {offset}')
+            if complete_reference_prefix and offset + length > len(reference):
+                raise ValueError('observed prefix ends inside a declared packet')
+            matched += 1
         offset += length
     report = dict(publications=len(frames),argument_records=result['argument_records'],
                   declared_packet_bytes=offset,first_header=headers[0].hex(),last_header=headers[-1].hex(),
                   headers_sha256=hashlib.sha256(b''.join(headers)).hexdigest(),
                   scope='Complete bounded header-argument sequence; not committed encoded payload, intended sample count or audio completion')
     if reference is not None:
-        report['reference'] = dict(bytes=len(reference),matched_headers=len(frames),
+        if complete_reference_prefix and len(reference) > offset:
+            raise ValueError('observed prefix extends beyond encoder publications')
+        report['reference'] = dict(bytes=len(reference),matched_headers=matched,
                                    sha256=hashlib.sha256(reference).hexdigest(),
                                    declared_tail_shortfall=max(0,offset-len(reference)),
                                    trailing_bytes=max(0,len(reference)-offset),payload_validated=False)
+        if complete_reference_prefix:
+            report['reference']['unmatched_publications'] = len(frames)-matched
+            report['reference']['comparison'] = 'Complete packet prefix only; not whole recording'
     return report
 
 
@@ -2208,10 +2219,14 @@ def main():
     parser.add_argument('--playback-poly-log', type=Path,
                         help='check one bounded native three-step polynomial bus observation')
     parser.add_argument('--recording-session-log',type=Path,help='check the complete bounded encoder header-argument sequence')
-    parser.add_argument('--recording-session-reference',type=Path,help='compare those headers against an independently projected AAC stream')
+    parser.add_argument('--recording-session-reference',type=Path,help='compare headers against separately supplied AAC bytes; no payload validation')
+    parser.add_argument('--recording-session-reference-prefix',action='store_true',
+                        help='compare only a complete observed packet prefix, report unmatched publications')
     args = parser.parse_args()
     if args.recording_session_reference and not args.recording_session_log:
         parser.error('--recording-session-reference requires --recording-session-log')
+    if args.recording_session_reference_prefix and not args.recording_session_reference:
+        parser.error('--recording-session-reference-prefix requires --recording-session-reference')
     try:
         result = contract(args.source.read_bytes())
         if args.recording_header_log:
@@ -2220,7 +2235,9 @@ def main():
             result['playback_polynomial_observation'] = playback_poly_observation(args.playback_poly_log.read_text())
         if args.recording_session_log:
             reference = args.recording_session_reference.read_bytes() if args.recording_session_reference else None
-            result['recording_session_observation'] = recording_session_observations(args.recording_session_log.read_text(),reference)
+            result['recording_session_observation'] = recording_session_observations(
+                args.recording_session_log.read_text(),reference,
+                complete_reference_prefix=args.recording_session_reference_prefix)
     except (OSError, ValueError) as error:
         print(f'MU4 context contract: {error}', file=sys.stderr)
         return 1

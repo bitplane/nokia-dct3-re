@@ -273,6 +273,18 @@ class ContextContractTest(unittest.TestCase):
             with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
                 recording_session_observations(bad)
 
+    def test_header_session_explicit_complete_prefix(self):
+        text, encoded = self.session_header_fixture()
+        first = recording_header_observations(self.header_observation_fixture())['frames'][0]['values'][12]
+        report = recording_session_observations(text, encoded[:first], complete_reference_prefix=True)
+        self.assertEqual(report['reference']['matched_headers'], 1)
+        self.assertEqual(report['reference']['unmatched_publications'], 7)
+        for bad in (b'', encoded[:first-1], encoded + b'x', b'x' + encoded[1:first]):
+            with self.subTest(length=len(bad)), self.assertRaises(ValueError):
+                recording_session_observations(text, bad, complete_reference_prefix=True)
+        with self.assertRaises(ValueError):
+            recording_session_observations(text, encoded[:first])
+
     def test_header_observations_reject_missing_malformed_and_wrong_scope(self):
         text = self.header_observation_fixture()
         lines = text.splitlines()
