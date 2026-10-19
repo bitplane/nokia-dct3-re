@@ -5,6 +5,8 @@ local machine, cpu = manager.machine, manager.machine.devices[':maincpu']
 machine.debugger:command('temp4=0;temp5=0')
 machine:logerror('5510_records_scope: reply34=0029fdc4 reply35=0029ffe8 state=001204dc cap=16 observer_writes=0\n')
 local handles = {}
+handles[#handles+1] = cpu.debug:bpset(0x29f92e, nil,
+    'logerror "5510_records_word: value=%08x flash_header=%08x flash_tail=%08x observer_writes=0\\n",r0,d@200038,d@54fffc;g')
 for _, item in ipairs({{0x29fdc4,'temp4','34'},{0x29ffe8,'temp5','35'}}) do
     local address, counter, command = item[1], item[2], item[3]
     handles[#handles+1] = cpu.debug:bpset(address, counter .. '<10',

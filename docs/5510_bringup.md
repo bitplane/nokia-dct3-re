@@ -2424,7 +2424,7 @@ The first two payload bytes are a subcommand and its following byte count:
 
 | Subcommand | Data bytes | Own MCU data source |
 | --- | --- | --- |
-| `13` | 4 | platform word: `39cc20(0)` selects MMIO `200038` or getter `39ce0e` |
+| `13` | 4 | flash word: `39cc20(0)` selects flash `200038` or getter `39ce0e` reading flash `54fffc` |
 | `14` | 12 | NV `0014..001f` |
 | `15` | 20 | NV `0000..000b`, then `000c..0013` |
 | `16` | 24 | NV `0020..0037` |
@@ -2447,6 +2447,17 @@ record authentication, reply generation or valid provisioning. The remaining
 question is how this own firmware consumes the corresponding DSP replies and
 which algorithms/material those replies require; request ordering alone does
 not prove that missing replies cause either observed NV-checksum failure.
+Both candidate sources for subcommand `13` are flash, not peripheral MMIO
+or an established chip-ID register. The own image contains `19aff258` at
+`200038` and `c71bbe68` at its final word `54fffc`; the latter matches the
+observed request. Getter `39ce0e` is a literal-address load followed by a
+word read. No checksum algorithm or semantic meaning for that word is
+established solely by this equality.
+The extended observer confirms the constructor's R0 value at `29f92e` is
+`c71bbe68`, with live flash reads `200038=19aff258` and
+`54fffc=c71bbe68`, in a fresh eight-second capture at
+`tmp/native-gates/npm5-record-flash-word`. This capture also reproduces
+zero reply-consumer entries and passes the bootstrap and identity/NV gates.
 
 The own reply dispatcher reads message byte `08`. Its explicit `34` branch
 at `24c9d8` reaches the call at `24cadc` to `29fdc4`; the `35` branch at
@@ -2479,11 +2490,14 @@ outbound requests are observed without these reply consumers executing in
 the captured interval; there is no observed failing reply to decode. This
 does not establish that they must precede graphical boot or that supplying
 them would repair the independently observed erased-NV checksum failures.
-Use the identity checker with `--records` for this observer: it additionally
+Use the identity checker with `--records` for the extended observer: it additionally
 requires four ordered, matching HLE/transport request observations, erased
 record payloads, zero consumer entries and the qualified terminal state.
 It rejects incomplete, duplicate or changed evidence rather than treating
 a missing trace as proof of absence.
+It also requires the constructor-word observation and its match to the own
+image's final word; the earlier capture without that marker remains useful
+historical evidence but does not satisfy this extended gate.
 
 The continuation constructor `29ecf8..29ede4` emits type `70`, subcommand
 `17`, body length `30` (48 bytes), through send call `29edd6` with

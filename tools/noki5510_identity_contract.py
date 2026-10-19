@@ -43,7 +43,7 @@ def record_reply_nibble_filter(packed):
     return not (packed[7] >= 0xc0 and packed[7] >> 4 != 15)
 
 
-def check_record_capture(text):
+def check_record_capture(text, flash_word=None):
     """Qualify the observed erased-NV frontier, not a general reply protocol."""
     scopes = records(text, '5510_records_scope')
     ends = records(text, '5510_records_terminal')
@@ -55,25 +55,32 @@ def check_record_capture(text):
         raise ValueError('capture differs from the qualified no-reply frontier')
     expected = [(6,'1304',4),(14,'140c',12),(22,'1514',20),(26,'1618',24)]
     streams = []
-    for prefix, extra in [('dsp_hle: TX packet','words=\\d+ radio_phase=\\S+'),
-                          ('dspif_transport: TX consume','words=\\d+ consumer=[0-9a-f]+')]:
-        rows = re.findall(re.escape(prefix) + r' type=70 payload=(\d+) ' + extra +
+    for prefix, extra in [('dsp_hle: TX packet','radio_phase=\\S+'),
+                          ('dspif_transport: TX consume','consumer=[0-9a-f]+')]:
+        rows = re.findall(re.escape(prefix) + r' type=70 payload=(\d+) words=(\d+) ' + extra +
                           r' data=([0-9a-f]+) t=(\d+\.\d+)', text)
-        selected = [(int(n),data,float(t)) for n,data,t in rows if data[:4] in
+        selected = [(int(n),int(words),data,float(t)) for n,words,data,t in rows if data[:4] in
                     {item[1] for item in expected}]
         if len(selected) != 4:
             raise ValueError('missing or repeated factory-record request')
-        for (length,data,t),(wanted,header,count) in zip(selected,expected):
-            if length != wanted or len(data) != length*2 or not data.startswith(header):
+        for (length,words,data,t),(wanted,header,count) in zip(selected,expected):
+            if (length != wanted or words != (length+2)//2
+                    or len(data) != length*2 or not data.startswith(header)):
                 raise ValueError('factory-record request order or size changed')
             if header != '1304' and data[4:] != 'ff'*count:
                 raise ValueError('factory-record payload is not the qualified erased NV')
-        if any(a[2] >= b[2] for a,b in zip(selected,selected[1:])):
+        if any(a[3] >= b[3] for a,b in zip(selected,selected[1:])):
             raise ValueError('factory-record request times not increasing')
         streams.append(selected)
     if streams[0] != streams[1]:
         raise ValueError('HLE and transport factory-record observations disagree')
-    return {'requests': [{'payload':data,'time':t} for _,data,t in streams[0]],
+    if flash_word is not None:
+        words = records(text,'5510_records_word')
+        if (len(words) != 1 or words[0].get('value') != flash_word
+                or words[0].get('flash_tail') != flash_word
+                or streams[0][0][2] != '1304'+flash_word):
+            raise ValueError('record request word differs from the own flash-tail observation')
+    return {'requests': [{'payload':data,'words':words,'time':t} for _,words,data,t in streams[0]],
             'reply34_entries':0,'reply35_entries':0,
             'scope':'Bounded erased-NV capture; not reply necessity or boot acceptance'}
 
@@ -118,6 +125,12 @@ def identity_contract(firmware):
             'software_version_decimal': 6,
             'formatter': '002a05cc', 'imei_reader': '002a066a', 'imeisv_reader': '002a0640',
             'display_formatter': '0029fc00',
+            'factory_request13_sources': {
+                'selector':'0039cc20', 'fallback_flash_address':'00200038',
+                'fallback_flash_word':firmware[0x38:0x3c].hex(),
+                'alternate_getter':'0039ce0e', 'alternate_flash_address':'0054fffc',
+                'alternate_flash_word':firmware[-4:].hex(),
+                'scope':'Flash-derived words, not a recovered chip-ID register'},
             'factory_record_continuation': {
                 'constructor':'0029ecf8', 'type':'70', 'subcommand':'17',
                 'body_bytes':48, 'send_call':'0029edd6', 'destination_argument':3,
@@ -140,7 +153,8 @@ def identity_contract(firmware):
                 for first,last in ((0x2a05cc,0x2a0692),(0x29fc00,0x29fd14),
                                    (0x3ad490,0x3ad542),(0x24c9d2,0x24cafc),
                                    (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c),
-                                   (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e))},
+                                   (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e),
+                                   (0x39cc20,0x39cc4e),(0x39ce0e,0x39ce14))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 
@@ -202,7 +216,8 @@ def main():
         inventory = check_reads(text,(args.directory/'npm5_nv_cache.bin').read_bytes(),contract['nv_contract'])
         result = check_formatting(text,contract)
         if args.records:
-            result['record_capture'] = check_record_capture(text)
+            result['record_capture'] = check_record_capture(text,
+                contract['factory_request13_sources']['alternate_flash_word'])
         result.update(source_contract=contract,nv_requests=inventory['requests'],
                       valid_product_nv=False, unobserved_selector_execution_claim=False)
         print(json.dumps(result,indent=2))

@@ -43,13 +43,20 @@ class IdentityContractTests(unittest.TestCase):
         lines = ['5510_records_scope: reply34=0029fdc4 reply35=0029ffe8 state=001204dc cap=16 observer_writes=0']
         for index,(header,count) in enumerate([('1304',4),('140c',12),('1514',20),('1618',24)]):
             data = header + ('12345678' if index == 0 else 'ff'*count)
-            body = f'type=70 payload={count+2} words=1 '
+            body = f'type=70 payload={count+2} words={(count+4)//2} '
             lines.append('dsp_hle: TX packet ' + body + f'radio_phase=inactive data={data} t=1.{index}00000')
             lines.append('dspif_transport: TX consume ' + body + f'consumer=01 data={data} t=1.{index}00000')
         lines.append('5510_records_terminal: reply34=0 reply35=0 state=02 index=00 receipt34=00 cap=16 observer_writes=0')
         text = '\n'.join(lines)
         self.assertEqual(len(check_record_capture(text)['requests']),4)
+        word_text = text + '\n5510_records_word: value=12345678 flash_header=00000000 flash_tail=12345678 observer_writes=0'
+        self.assertEqual(len(check_record_capture(word_text,'12345678')['requests']),4)
+        for changed in [text,word_text.replace('flash_tail=12345678','flash_tail=87654321'),
+                        word_text.replace('value=12345678','value=87654321')]:
+            with self.assertRaises(ValueError):
+                check_record_capture(changed,'12345678')
         for changed in [text.replace('receipt34=00','receipt34=01'),
+                        text.replace('words=4','words=1'),
                         text.replace('reply35=0','reply35=16'),
                         text.replace('140cffff','140c00ff'),
                         text.replace('t=1.200000','t=1.000000'),
