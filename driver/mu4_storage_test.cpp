@@ -457,13 +457,49 @@ private:
 	u32 m_ac_ingress_frames = 0, m_ac_ingress_entries = 0;
 	u64 m_ac_ingress_bad = 0, m_ac_ingress_dropped = 0;
 	bool m_ac_ingress_call = false;
+	struct recorder_consumer_counts
+	{
+		u64 origins = 0, known = 0, epochs = 0, retired = 0, unread = 0, unknown = 0, writes = 0, alias_writes = 0, missing = 0;
+		void add(recorder_consumer_counts const &other)
+		{
+			origins += other.origins; known += other.known; epochs += other.epochs; retired += other.retired;
+			unread += other.unread; unknown += other.unknown; writes += other.writes; alias_writes += other.alias_writes; missing += other.missing;
+		}
+	};
+	std::array<recorder_workspace_word,2048> m_ac_consumer_words{};
+	recorder_consumer_counts m_ac_consumer_current, m_ac_consumer_total;
+	std::array<u64,128> m_ac_consumer_readers{};
+	std::map<u64,u64> m_ac_consumer_instructions;
+	u32 m_ac_consumer_entries = 0, m_ac_consumer_returns = 0;
+	u64 m_ac_consumer_bad = 0, m_ac_consumer_dropped = 0;
+	u16 m_ac_consumer_base = 0;
+	bool m_ac_consumer_active = false;
+	void finish_recorder_consumer()
+	{
+		if (!m_ac_consumer_active) { ++m_ac_consumer_bad; return; }
+		for (auto const &word : m_ac_consumer_words) if (word.valid && !word.read) ++m_ac_consumer_current.unread;
+		auto const &c = m_ac_consumer_current;
+		++m_ac_consumer_returns;
+		if (m_ac_consumer_returns <= 512)
+			logerror("mu4_recorder_consumer_frame: ordinal=%u base=%04x origins=%llu known_reads=%llu read_epochs=%llu retired_unread=%llu unread_return=%llu unknown_reads=%llu writes=%llu alias_writes=%llu missing_data_identity=%llu observer_writes=0\n",
+				m_ac_consumer_returns,m_ac_consumer_base,static_cast<unsigned long long>(c.origins),static_cast<unsigned long long>(c.known),static_cast<unsigned long long>(c.epochs),static_cast<unsigned long long>(c.retired),static_cast<unsigned long long>(c.unread),static_cast<unsigned long long>(c.unknown),static_cast<unsigned long long>(c.writes),static_cast<unsigned long long>(c.alias_writes),static_cast<unsigned long long>(c.missing));
+		else ++m_ac_consumer_dropped;
+		m_ac_consumer_total.add(c); m_ac_consumer_active = false; m_ac_consumer_words.fill({});
+	}
 	void observe_recorder_ingress(offs_t address,u16 opcode)
 	{
 		if (m_ac_ingress_store.valid) { ++m_ac_ingress_bad; m_ac_ingress_store.valid = false; }
 		if (m_ac_ingress_call)
 		{
 			if (address != 0x39852 || opcode != 0x4a11 || u16(m_cpu->state_int(tms320c54x_device::STATE_A)) != m_ac_ingress_destination_base[0]) ++m_ac_ingress_bad;
-			else ++m_ac_ingress_entries;
+			else
+			{
+				++m_ac_ingress_entries;
+				if (m_ac_consumer_active) ++m_ac_consumer_bad;
+				m_ac_consumer_active = true; ++m_ac_consumer_entries;
+				m_ac_consumer_base = m_ac_ingress_destination_base[0]; m_ac_consumer_current = {};
+				for (auto const &word : m_ac_consumer_words) if (word.valid) ++m_ac_consumer_current.origins;
+			}
 			m_ac_ingress_call = false;
 		}
 		if (address == 0x39825 || address == 0x3982d)
@@ -491,6 +527,11 @@ private:
 			else ++m_ac_ingress_dropped;
 			m_ac_ingress_frame_stores.fill(0); m_ac_ingress_frame_known.fill(0);
 		}
+		else if (address == 0x3983d)
+		{
+			if (opcode != 0xf7b8) ++m_ac_consumer_bad;
+			finish_recorder_consumer();
+		}
 	}
 	void observe_recorder_ingress_write(offs_t address,u16 value,u16 mask)
 	{
@@ -503,6 +544,8 @@ private:
 		++m_ac_ingress_stores[lane];
 		if (store.known)
 		{
+			if (m_ac_consumer_active || index >= 1024) ++m_ac_consumer_bad;
+			else m_ac_consumer_words[2*index+lane] = {value,true,false};
 			if (!m_ac_ingress_frame_known[lane])
 			{
 				m_ac_ingress_source_base[lane] = 0x7000+((store.source-0x7000-index)&0xfff);
@@ -514,6 +557,31 @@ private:
 	}
 	void install_recorder_buffer_observers()
 	{
+		m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"mu4_recorder_consumer_read",
+			[this](offs_t address,u16 &value,u16) {
+				if (machine().side_effects_disabled() || !m_ac_consumer_active) return;
+				u16 const offset = u16(address-m_ac_consumer_base);
+				if (offset >= 2048) return;
+				auto &word = m_ac_consumer_words[offset]; auto &c = m_ac_consumer_current;
+				if (!word.valid) { ++c.unknown; return; }
+				++c.known;
+				if (word.value != value) ++m_ac_consumer_bad;
+				if (!word.read) { word.read = true; ++c.epochs; }
+				u8 owners = 0;
+				for (unsigned channel=0;channel<6;++channel)
+					if (m_dma->source_read_matches(channel,m_ac_daram_read_alias ? AS_PROGRAM : AS_DATA,address)) owners |= 1U << channel;
+				++m_ac_consumer_readers[unsigned(m_ac_daram_read_alias)*64+owners];
+				if (!owners && !m_ac_daram_read_alias)
+				{
+					u32 instruction = 0; u16 opcode = 0;
+					if (!m_cpu->observe_staged_data_read(address,instruction,opcode)) { ++c.missing; return; }
+					u64 const key = (u64(instruction)<<16) | opcode;
+					auto found = m_ac_consumer_instructions.find(key);
+					if (found != m_ac_consumer_instructions.end()) ++found->second;
+					else if (m_ac_consumer_instructions.size() < 256) m_ac_consumer_instructions.emplace(key,1);
+					else ++m_ac_consumer_dropped;
+				}
+			});
 		m_cpu->space(AS_DATA).install_read_tap(0x7000,0x7fff,"mu4_recorder_workspace_read",
 			[this](offs_t address,u16 &value,u16) {
 				if (machine().side_effects_disabled()) return;
@@ -548,6 +616,17 @@ private:
 		m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"mu4_recorder_copy_destination",
 			[this](offs_t address,u16 &value,u16 mask) {
 				if (machine().side_effects_disabled()) return;
+				if (m_ac_consumer_active)
+				{
+					u16 const offset = u16(address-m_ac_consumer_base);
+					if (offset < 2048)
+					{
+						auto &word = m_ac_consumer_words[offset];
+						if (word.valid && !word.read) ++m_ac_consumer_current.retired;
+						word = {}; ++m_ac_consumer_current.writes;
+						m_ac_consumer_current.alias_writes += unsigned(m_ac_daram_write_alias);
+					}
+				}
 				observe_recorder_ingress_write(address,value,mask);
 				if (address >= 0x7000 && address <= 0x7fff)
 				{
@@ -3289,6 +3368,9 @@ private:
 		m_ac_ingress_store = {}; m_ac_ingress_loads.fill(0); m_ac_ingress_stores.fill(0); m_ac_ingress_known.fill(0);
 		m_ac_ingress_frame_stores.fill(0); m_ac_ingress_frame_known.fill(0); m_ac_ingress_source_base.fill(0); m_ac_ingress_destination_base.fill(0);
 		m_ac_ingress_frames = m_ac_ingress_entries = 0; m_ac_ingress_bad = m_ac_ingress_dropped = 0; m_ac_ingress_call = false;
+		m_ac_consumer_words.fill({}); m_ac_consumer_current = {}; m_ac_consumer_total = {};
+		m_ac_consumer_readers.fill(0); m_ac_consumer_instructions.clear(); m_ac_consumer_entries = m_ac_consumer_returns = 0;
+		m_ac_consumer_bad = m_ac_consumer_dropped = 0; m_ac_consumer_base = 0; m_ac_consumer_active = false;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3863,6 +3945,13 @@ private:
 					static_cast<unsigned long long>(m_ac_workspace_known),static_cast<unsigned long long>(m_ac_workspace_unknown),static_cast<unsigned long long>(m_ac_workspace_bad),static_cast<unsigned long long>(m_ac_workspace_dropped),static_cast<unsigned long long>(m_ac_workspace_missing));
 				logerror("mu4_recorder_ingress_terminal: frames=%u entries=%u loads=%llu,%llu stores=%llu,%llu known=%llu,%llu pending_reads=%u pending_write=%u pending_call=%u partial=%u,%u bad=%llu dropped=%llu frame_cap=512 queue_cap=4 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					m_ac_ingress_frames,m_ac_ingress_entries,static_cast<unsigned long long>(m_ac_ingress_loads[0]),static_cast<unsigned long long>(m_ac_ingress_loads[1]),static_cast<unsigned long long>(m_ac_ingress_stores[0]),static_cast<unsigned long long>(m_ac_ingress_stores[1]),static_cast<unsigned long long>(m_ac_ingress_known[0]),static_cast<unsigned long long>(m_ac_ingress_known[1]),unsigned(m_ac_ingress_reads[0].size()+m_ac_ingress_reads[1].size()),unsigned(m_ac_ingress_store.valid),unsigned(m_ac_ingress_call),m_ac_ingress_frame_stores[0],m_ac_ingress_frame_stores[1],static_cast<unsigned long long>(m_ac_ingress_bad),static_cast<unsigned long long>(m_ac_ingress_dropped));
+				for (unsigned slot=0;slot<128;++slot)
+					if (m_ac_consumer_readers[slot]) logerror("mu4_recorder_consumer_reader: program_alias=%u dma_mask=%02x reads=%llu observer_writes=0\n",slot/64,slot%64,static_cast<unsigned long long>(m_ac_consumer_readers[slot]));
+				for (auto const &[key,count] : m_ac_consumer_instructions)
+					logerror("mu4_recorder_consumer_instruction: instruction=%06x opcode=%04x reads=%llu observer_writes=0\n",unsigned(key>>16),unsigned(key&0xffff),static_cast<unsigned long long>(count));
+				auto const &consumer = m_ac_consumer_total;
+				logerror("mu4_recorder_consumer_terminal: entries=%u returns=%u origins=%llu known_reads=%llu read_epochs=%llu retired_unread=%llu unread_return=%llu unknown_reads=%llu writes=%llu alias_writes=%llu missing_data_identity=%llu bad=%llu dropped=%llu active=%u cap=256 frame_cap=512 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					m_ac_consumer_entries,m_ac_consumer_returns,static_cast<unsigned long long>(consumer.origins),static_cast<unsigned long long>(consumer.known),static_cast<unsigned long long>(consumer.epochs),static_cast<unsigned long long>(consumer.retired),static_cast<unsigned long long>(consumer.unread),static_cast<unsigned long long>(consumer.unknown),static_cast<unsigned long long>(consumer.writes),static_cast<unsigned long long>(consumer.alias_writes),static_cast<unsigned long long>(consumer.missing),static_cast<unsigned long long>(m_ac_consumer_bad),static_cast<unsigned long long>(m_ac_consumer_dropped),unsigned(m_ac_consumer_active));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

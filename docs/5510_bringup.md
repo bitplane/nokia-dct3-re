@@ -2,14 +2,6 @@
 
 ## Current boundary
 
-Current `bootrecmeta` revalidation passes original metadata completion using
-fresh firmware-created NAND. Its `710f 0012` at `02:9cb5` is an ordinary
-`MVDK TRN,AR2` before a younger repeat header, not a repeated mapped move.
-The CPU guard now requires the latched repeat body's own address; genuine
-mapped repeat bodies retain their exclusion. The firmware-free
-`move-rpt-owner` profile qualifies both cases with cleared-pipeline replay.
-This is separate from the older atomic timer-starvation observation and
-does not establish playback, MA4 boot or physical pipeline timing.
 `make check-mu4-recorder-persistence` composes fresh original initialization,
 retained six-file readback, staged metadata save and a separate cold-open
 process. It uses the saved endpoint as its reopening input, verifies the
@@ -32,6 +24,9 @@ decoder arithmetic and decoded-bank copying cover eight calls; signed output
 scaling and the configured five-section processing kernel have bounded operand
 checks. The authoritative quantities, source identities, host-comparison limits
 and formal-conformance requirements live in the [AAC validation contract](aac_validation.md).
+Recording ingress is separately bound through native transport and the
+sample-repack ABI to original-word reads within each processing call;
+complete encoder-output acceptance remains distinct.
 
 Every captured channel-3 source read binds to an owned DXR bus write, and
 every completed TX callback pairs with the next codec DIN sample. Reset-aware
@@ -283,6 +278,13 @@ fails this fixture with an operand transaction. The corrected behavior is
 unsupported-form rejection, not a hardware exception specification.
 
 ### Single-repeat transfer boundary
+
+The coherent `bootrecmeta` metadata path includes `710f 0012` at `02:9cb5`:
+an ordinary `MVDK TRN,AR2` before a younger repeat header, not a repeated
+mapped move. The guard requires the latched repeat body's own address;
+genuine mapped repeat bodies retain their exclusion. The firmware-free
+`move-rpt-owner` profile qualifies both cases with cleared-pipeline replay.
+This qualifies instruction admission, not physical pipeline timing.
 
 SPRU131G sections 5.2.4 and 5.5.3.2 exclude absolute and long-offset
 Smem operands from single-instruction repeats. This restricts the repeated

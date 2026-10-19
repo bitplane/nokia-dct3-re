@@ -247,13 +247,13 @@ def check_workspace(text,copies):
 
 def decode_ingress_loop(words):
     if any(words.get(base+index) != word for base,witness in
-           ((INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE),(INGRESS_BASE,INGRESS_WORDS)) for index,word in enumerate(witness)):
+           ((INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE),(INGRESS_BASE,INGRESS_WORDS)) for index,word in enumerate(witness)) or words.get(0x3983d) != 0xf7b8:
         raise ValueError('original AA88 sample-repack loop changed or absent')
-    return dict(first=f'{INGRESS_PROLOGUE_BASE:06x}',pinned_words=len(INGRESS_PROLOGUE)+len(INGRESS_WORDS),iterations=1024,
+    return dict(first=f'{INGRESS_PROLOGUE_BASE:06x}',pinned_words=len(INGRESS_PROLOGUE)+len(INGRESS_WORDS)+1,iterations=1024,
                 stereo_source_separation=1024,destination_stride=2,
                 stack_reserve_words=2051,buffer_offset=2,buffer_words=2048,callee_argument='A low word = SP + 2',
                 load_sites=['039823','03982b'],store_sites=['039825','03982d'],
-                call='03983b',callee='039852',scope='Selected stereo repack arm, not complete callee or encoder-output semantics')
+                call='03983b',callee='039852',return_site='03983d',scope='Selected stereo repack arm, not complete callee or encoder-output semantics')
 
 
 def check_ingress(text,workspace):
@@ -304,6 +304,57 @@ def check_ingress(text,workspace):
                 scope='Actual known-word loads, equal-value stores, stereo geometry and next callee entry; not encoder output or speech')
 
 
+def check_consumer(text,ingress):
+    ends = rows(text,'mu4_recorder_consumer_terminal')
+    if len(ends) != 1 or ingress is None:
+        raise ValueError('stack consumer requires validated repack ABI and one terminal')
+    end = ends[0]
+    for key,value in dict(bad='0',dropped='0',active='0',cap='256',frame_cap='512',
+            save_restore='unsupported',observer_writes='0',encoder_consumption='0').items():
+        if end[key] != value:
+            raise ValueError('incomplete or inconsistent stack consumer observation')
+    names = ('origins','known_reads','read_epochs','retired_unread','unread_return',
+             'unknown_reads','writes','alias_writes','missing_data_identity')
+    totals = {key:int(end[key]) for key in names}
+    frames = rows(text,'mu4_recorder_consumer_frame')
+    inputs = rows(text,'mu4_recorder_ingress_frame')
+    count = ingress['frames']
+    if (int(end['entries']) != count or int(end['returns']) != count or len(frames) != count
+            or len(inputs) != count or totals['origins'] != ingress['paired_stores'] or min(totals.values()) < 0):
+        raise ValueError('stack consumer lifetimes do not match repack calls')
+    sums = dict.fromkeys(names,0)
+    for ordinal,(row,source) in enumerate(zip(frames,inputs),1):
+        values = {key:int(row[key]) for key in names}
+        if (int(row['ordinal']) != ordinal or int(source['ordinal']) != ordinal
+                or int(row['base'],16) != int(source['argument'],16) or row['observer_writes'] != '0'
+                or min(values.values()) < 0 or values['origins'] != 2048
+                or values['origins'] != values['read_epochs']+values['retired_unread']+values['unread_return']
+                or values['known_reads'] < values['read_epochs'] or values['writes'] < values['retired_unread']
+                or values['alias_writes'] > values['writes'] or values['missing_data_identity'] > values['known_reads']):
+            raise ValueError('invalid stack sample lifetime frame')
+        for key,value in values.items():
+            sums[key] += value
+    if sums != totals:
+        raise ValueError('stack sample lifetime totals do not reconcile')
+    readers,seen,instructions = {},set(),[]
+    for row in rows(text,'mu4_recorder_consumer_reader'):
+        alias,mask,count = int(row['program_alias']),int(row['dma_mask'],16),int(row['reads'])
+        if alias not in (0,1) or not 0 <= mask < 64 or count <= 0 or (alias,mask) in readers or row['observer_writes'] != '0':
+            raise ValueError('invalid stack sample reader histogram')
+        readers[alias,mask] = count
+    for row in rows(text,'mu4_recorder_consumer_instruction'):
+        address,opcode,count = int(row['instruction'],16),int(row['opcode'],16),int(row['reads'])
+        if not 0 <= address <= 0x7fffff or not 0 <= opcode <= 0xffff or count <= 0 or (address,opcode) in seen or row['observer_writes'] != '0':
+            raise ValueError('invalid stack sample instruction histogram')
+        seen.add((address,opcode)); instructions.append(dict(instruction=f'{address:06x}',opcode=f'{opcode:04x}',reads=count))
+    if (len(seen) > 256 or sum(readers.values()) != totals['known_reads']
+            or sum(row['reads'] for row in instructions)+totals['missing_data_identity'] != readers.get((0,0),0)):
+        raise ValueError('stack sample readers/identities do not reconcile')
+    return dict(totals,frames=ingress['frames'],readers=[dict(program_alias=alias,dma_mask=f'{mask:02x}',reads=count)
+                                                     for (alias,mask),count in sorted(readers.items())],instructions=instructions,
+                scope='Original stack sample bus reads within each callee lifetime; not forwarded operands, post-write derived values or complete encoder output')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -346,11 +397,13 @@ def check(text,require_fresh=False):
     copies = check_copies(text,identities) if rows(text,'mu4_recorder_copy_terminal') else None
     workspace = check_workspace(text,copies) if rows(text,'mu4_recorder_workspace_terminal') else None
     ingress = check_ingress(text,workspace) if rows(text,'mu4_recorder_ingress_terminal') else None
+    consumer = check_consumer(text,ingress) if rows(text,'mu4_recorder_consumer_terminal') else None
     return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
             'read_instructions':identities,
             'copy_destinations':copies,
             'copied_workspace':workspace,
             'sample_repack':ingress,
+            'stack_consumer':consumer,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -370,6 +423,7 @@ def main():
     parser.add_argument('--copies',action='store_true',help='require instruction/source/value paired MVDD writes')
     parser.add_argument('--workspace',action='store_true',help='require alias-aware copied-workspace read lifetimes')
     parser.add_argument('--ingress',action='store_true',help='require sample-repack load/store and callee-entry closure')
+    parser.add_argument('--consumer',action='store_true',help='require per-call stack sample read lifetimes')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
@@ -385,6 +439,8 @@ def main():
             raise ValueError('copied-workspace observation required')
         if args.ingress and result['sample_repack'] is None:
             raise ValueError('sample-repack observation required')
+        if args.consumer and result['stack_consumer'] is None:
+            raise ValueError('stack sample consumer observation required')
         if args.source_a00:
             source = args.source_a00.read_bytes()
             if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
@@ -395,6 +451,12 @@ def main():
                 result['workspace_source'] = pin_read_instructions(result['copied_workspace'],words)
             if result['sample_repack'] is not None:
                 result['sample_repack_source'] = decode_ingress_loop(words)
+            if result['stack_consumer'] is not None:
+                candidates = [dict(row,aa88_word=f'{words[int(row["instruction"],16)]:04x}' if int(row['instruction'],16) in words else None,
+                                   opcode_matches=words.get(int(row['instruction'],16)) == int(row['opcode'],16))
+                              for row in result['stack_consumer']['instructions']]
+                result['stack_consumer_source_candidates'] = dict(instructions=candidates,
+                    scope='AA88 source-word comparisons only, not full routine or overlay identity')
         print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')

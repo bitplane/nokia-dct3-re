@@ -14,9 +14,11 @@ the upstream signed scaling stage matches an independent Q12 model for 3456
 actual operand/output pairs. Independent fixed-point equations also match one
 64-word block through each of the ten configured filter sections. Arbitrary
 coefficient settings, complete playback and codec analogue routing remain open.
-A bounded 64-stereo-frame block is traced through actual shift loads/completions
-to codec DIN. An ideal control-gated DAC/headphone contribution now renders
-through MAME speakers; this is not a physical analog/filter model. The protected
+A bounded 64-stereo-frame block has decoded-sample attribution through actual
+shift loads/completions to codec DIN. Full-session serial and ideal control-gated
+DAC/headphone accounting additionally cover EOF cleanup and restart; detailed
+decoded-sample arithmetic remains bounded. This is not a physical analog/filter
+model. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -25,8 +27,14 @@ missing external completion is not the current boundary.
 
 The metadata size increase is explained by the original writer's unconditional
 byte accounting, including in-place metadata writes. The open lifecycle
-questions are the processing worker's partial-buffer policy and playback draining. Formal codec conformance,
-Full-session DMA/codec epoch accounting and analog output remain separate obligations.
+questions are the processing worker's partial-buffer policy and playback
+draining. Formal codec conformance, full-session decoded-sample attribution
+and physical analog output remain separate obligations.
+
+Recording dataflow is independently bound from peripheral receive words
+through DMA, workspace copies and a stack-local repack ABI to actual reads
+within the next processing call. See [stack sample consumers](#stack-sample-consumers);
+this does not establish complete encoder-output or handset speech acceptance.
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -1057,8 +1065,8 @@ success and both NAND hashes above reproduce unchanged.
 
 `mu4_recorder_read_census.py RUN/error.log --ingress --source-a00 SOURCE`
 checks the AA88 wrapper at `0397f9` through its call at `03983b`. The
-source contract pins 68 original words, including the stack-frame prologue
-and selected stereo loop. The wrapper saves three registers, reserves
+source contract pins 69 original words, including the stack-frame prologue,
+selected stereo loop and return site. The wrapper saves three registers, reserves
 `0803` stack words, and uses `SP+2` for a 2048-word local sample buffer.
 It performs 1024 iterations: load the next word through AR3, store at AR2,
 load AR3+1024 for the second lane, store at AR2+1, then advance AR2 by two.
@@ -1105,6 +1113,42 @@ The remaining boundary is what `039852` and its callees do with this local
 buffer during each call's stack lifetime. Follow the dynamic pointer, not
 one frequent address. Repack/call acceptance is not a complete encoder-output, physical
 ADC, GSM speech or end-to-end call claim.
+
+### Stack Sample Consumers
+
+`--consumer` follows the repacked words only from actual entry at `039852`
+until return to `03983d`, using each invocation's measured buffer pointer.
+Origins are seeded by the validated repack writes, not a later memory
+snapshot or waveform match. Writes through either shared-memory address
+space invalidate the overwritten origin. At return, all remaining tags
+expire even if the stack bytes physically persist; a later reuse of that
+address is not part of the same sample-processing call.
+
+The checker binds every consumer lifetime to its corresponding repack call,
+reconciles read/replaced-unread/unread-at-return epochs, and separately
+counts program aliases, DMA ownership and missing staged read identities.
+Forwarded operands and values derived after a write remain outside the
+original-word bus-read claim. Source-word comparisons are candidates only;
+an opcode match alone does not establish an entire routine's semantics.
+
+The 20-second `tmp/native-gates/mu4-recorder-consumer` capture closes all
+387 call lifetimes. All 792576 original words are read exactly once during
+their corresponding call: no replaced-unread words, unread words at return,
+unknown reads, in-buffer writes or missing data-read identities occur.
+All reads are data-space and have no active DMA source owner.
+
+| Actual original-word read site | Captured opcode | Reads |
+| --- | --- | ---: |
+| `03d9c8` | `e5b8` | 396288 |
+| `03d9c9` | `e5b9` | 396288 |
+
+Both words match AA88. Their MVDD forms read successive words through AR5
+and select separate AR2/AR3 destinations, a source-level deinterleave pair.
+Actual destination writes and subsequent arithmetic are not inferred from
+these read counts or opcode matches. The native metadata result and both
+NAND hashes in the DRR section remain unchanged. The next independent
+acceptance question is whether decoded recorded audio carries the actual
+input content, not merely whether another copy instruction ran.
 
 ### Metadata Overwrite Accounting
 

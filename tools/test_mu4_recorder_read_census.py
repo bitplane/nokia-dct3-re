@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies,check_workspace,check_ingress,decode_ingress_loop,INGRESS_BASE,INGRESS_WORDS,INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE
+from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies,check_workspace,check_ingress,check_consumer,decode_ingress_loop,INGRESS_BASE,INGRESS_WORDS,INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE
 
 
 def fixture():
@@ -16,6 +16,24 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_stack_consumer_binds_each_dynamic_call_and_retires_origins(self):
+        text = '\n'.join([
+            'mu4_recorder_ingress_frame: ordinal=1 argument=2000 observer_writes=0',
+            'mu4_recorder_ingress_frame: ordinal=2 argument=2100 observer_writes=0',
+            'mu4_recorder_consumer_frame: ordinal=1 base=2000 origins=2048 known_reads=2048 read_epochs=1024 retired_unread=512 unread_return=512 unknown_reads=8 writes=600 alias_writes=2 missing_data_identity=1 observer_writes=0',
+            'mu4_recorder_consumer_frame: ordinal=2 base=2100 origins=2048 known_reads=2048 read_epochs=2048 retired_unread=0 unread_return=0 unknown_reads=4 writes=0 alias_writes=0 missing_data_identity=0 observer_writes=0',
+            'mu4_recorder_consumer_reader: program_alias=0 dma_mask=00 reads=4092 observer_writes=0',
+            'mu4_recorder_consumer_reader: program_alias=1 dma_mask=02 reads=4 observer_writes=0',
+            'mu4_recorder_consumer_instruction: instruction=03c123 opcode=a493 reads=4091 observer_writes=0',
+            'mu4_recorder_consumer_terminal: entries=2 returns=2 origins=4096 known_reads=4096 read_epochs=3072 retired_unread=512 unread_return=512 unknown_reads=12 writes=600 alias_writes=2 missing_data_identity=1 bad=0 dropped=0 active=0 cap=256 frame_cap=512 save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        ingress = dict(frames=2,paired_stores=4096)
+        self.assertEqual(check_consumer(text,ingress)['read_epochs'],3072)
+        for before,after in [('returns=2','returns=1'),('active=0','active=1'),('bad=0','bad=1'),
+                             ('base=2100','base=2200'),('retired_unread=512','retired_unread=511'),
+                             ('alias_writes=2','alias_writes=601'),('reads=4092','reads=4091')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_consumer(text.replace(before,after),ingress)
+
     def test_sample_repack_binds_complete_known_frames_and_source_geometry(self):
         text = '\n'.join([
             'mu4_recorder_ingress_frame: ordinal=1 stores=1024,1024 known=1024,1024 source_base=7000,7400 destination_base=2000,2001 argument=2000 identity=Execute_entry observer_writes=0',
@@ -30,6 +48,7 @@ class RecorderReadCensusTests(unittest.TestCase):
                 check_ingress(text.replace(before,after),workspace)
         words = {INGRESS_BASE+index:word for index,word in enumerate(INGRESS_WORDS)}
         words.update({INGRESS_PROLOGUE_BASE+index:word for index,word in enumerate(INGRESS_PROLOGUE)})
+        words[0x3983d] = 0xf7b8
         self.assertEqual(decode_ingress_loop(words)['iterations'],1024)
         words[0x3982c] ^= 1
         with self.assertRaises(ValueError):
