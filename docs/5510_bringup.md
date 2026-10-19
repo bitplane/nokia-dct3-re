@@ -45,7 +45,9 @@ ownership of unmatched DIN intervals remain unvalidated. See the
 and [transport provenance](#dma-source-to-dxr-ownership).
 The [codec control/startup contract](aac_validation.md#codec-routing-and-startup-phase)
 accounts for the initial discarded DMA word and paired headphone volume/mute
-writes. Converted DAC/analog output is not yet implemented.
+writes. An [ideal DAC/headphone contribution](aac_validation.md#ideal-dac-to-headphone-output)
+now renders native music-DSP samples through MAME speakers; converter filters,
+analog mixing/electrical behavior and whole-handset audio remain unimplemented.
 
 For the protected 143680-byte recording, termination is a firmware file-length path, not an established
 missing DSP event: 375 refill completions supply 71,834 words; the next
@@ -3325,7 +3327,9 @@ clocks. Registers, clock phase and pending timer state are saved. Isolated tests
 verify inactive silence, control decoding, 11.9952 MHz BCLK, the 272-clock frame
 divider, reset defaults and pending-edge replay. The digital DIN decoder samples
 on rising BCLK; DOUT serializes explicitly supplied, already-converted stereo
-samples. There is no analog ADC/DAC conversion, filtering or sound output.
+samples. An ideal control-gated DAC/headphone contribution supplies MAME sound;
+analog ADC conversion, analog mixing/electrical behavior and converter filters
+remain unimplemented. See the [DAC output scope](aac_validation.md#ideal-dac-to-headphone-output).
 An enabled ADC requires an explicit converted-sample callback, not an implicit
 silence source. Related AIC23B figures 2-2 and 3-8 place master frame and DOUT
 changes after falling BCLK: the clock callback therefore precedes those pin

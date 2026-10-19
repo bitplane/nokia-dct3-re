@@ -9,6 +9,7 @@
 #include "tms320c54x_dma.h"
 #include "tms320c54x_mcbsp.h"
 #include "tlv320aic23.h"
+#include "speaker.h"
 #include <array>
 #include <vector>
 #include <sstream>
@@ -322,6 +323,10 @@ public:
 		m_mcbsp0->rx_event_cb().set([this](int state) { m_dma->sync_w(1, state); });
 		m_mcbsp0->rx_irq_cb().set([this](int state) { if (state) ++m_rx_irqs; m_cpu->set_input_line(4, state); });
 		TLV320AIC23(config, "codec", 11'995'200);
+		SPEAKER(config, "headphone_left").front_left();
+		SPEAKER(config, "headphone_right").front_right();
+		subdevice<tlv320aic23_device>("codec")->add_route(0, "headphone_left", 1.0);
+		subdevice<tlv320aic23_device>("codec")->add_route(1, "headphone_right", 1.0);
 		subdevice<tlv320aic23_device>("codec")->bclk_cb().set([this](int state) {
 			if (playback_profile() && m_playback_overlay_checked && state) ++m_playback_audio_clocks;
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
@@ -345,6 +350,17 @@ public:
 			{
 				capture_playback_slot(channel);
 				observe_playback_audio(value, true);
+				double const time = machine().time().as_double();
+				if (channel == 1 && time >= 1.06 && time <= 1.10)
+				{
+					++m_playback_dac_frames;
+					if (m_playback_dac_frames <= 4096)
+					{
+						auto const &codec = *subdevice<tlv320aic23_device>("codec");
+						logerror("mu4_dac_frame: ordinal=%u ns=%llu left_code=%04x right_code=%04x left_volume=%02x right_volume=%02x left_level=%.12f right_level=%.12f observer_writes=0 analog_filter=0 audio_acceptance=0\n",
+							m_playback_dac_frames,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),u16(codec.dac_sample(0)),u16(codec.dac_sample(1)),codec.headphone_volume(0),codec.headphone_volume(1),codec.headphone_dac_level(0),codec.headphone_dac_level(1));
+					}
+				}
 			}
 			if (m_phase == 30 && system_bios() == 20 && m_stream_words)
 			{
@@ -480,6 +496,7 @@ private:
 	bool m_playback_capture_finished = false;
 	u32 m_playback_tx_lifecycle_events = 0;
 	u32 m_playback_tx_startup_events = 0, m_playback_startup_frames = 0;
+	u32 m_playback_dac_frames = 0;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
@@ -945,6 +962,12 @@ private:
 		if (receive_status() & 6) fatalerror("MU4 McBSP receiver reset did not clear RFULL/RRDY");
 		logerror("mu4_mcbsp_overrun: PASS three_word_threshold=1 drr_retained=1 rbr_retained=1 rsr_loss=1 peek=1 read_clear=1 frame_recovery=1 reset=1\n");
 	}
+	void check_headphone_level(unsigned channel, double expected)
+	{
+		double const actual = subdevice<tlv320aic23_device>("codec")->headphone_dac_level(channel);
+		if (!std::isfinite(actual) || std::abs(actual-expected) > 1e-9)
+			fatalerror("MU4 ideal headphone DAC level mismatch channel=%u actual=%.12f expected=%.12f",channel,actual,expected);
+	}
 	static constexpr std::array<char const *,3> PLAYBACK_CAPTURE_FILES{
 		"mu4_playback_tx.le16", "mu4_playback_din.le16", "mu4_playback_dma.le16"};
 	void capture_playback_word(unsigned boundary, u16 value)
@@ -1021,6 +1044,8 @@ private:
 			m_playback_tx_lifecycle_events,unsigned(m_playback_tx_lifecycle_events>100000),machine().time().as_double());
 		logerror("mu4_tx_startup_terminal: events=%u frames=%u first=0.817000000 last=0.824000000 capped=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
 			m_playback_tx_startup_events,m_playback_startup_frames,unsigned(m_playback_tx_startup_events>4096),machine().time().as_double());
+		logerror("mu4_dac_terminal: frames=%u first=1.060000000 last=1.100000000 capped=%u t=%.9f observer_writes=0 analog_filter=0 audio_acceptance=0\n",
+			m_playback_dac_frames,unsigned(m_playback_dac_frames>4096),machine().time().as_double());
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -2965,6 +2990,7 @@ private:
 		m_playback_capture_finished = false;
 		m_playback_tx_lifecycle_events = 0;
 		m_playback_tx_startup_events = m_playback_startup_frames = 0;
+		m_playback_dac_frames = 0;
 		m_playback_buffer_writes.fill(playback_buffer_write{});
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
@@ -3376,6 +3402,38 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase >= 119 && m_phase <= 121)
+		{
+			auto &codec = *subdevice<tlv320aic23_device>("codec");
+			if (m_phase == 119 || m_phase == 120)
+			{
+				if (u16(codec.dac_sample(0)) != 0xeca9 || u16(codec.dac_sample(1)) != 0x6421 || codec.headphone_volume(0) || codec.headphone_volume(1))
+					fatalerror("MU4 headphone zero-cross sample/mute mismatch");
+				check_headphone_level(0,0); check_headphone_level(1,0);
+				if (m_phase == 119)
+				{
+					m_saved_dma.clear(); m_saved_dma.seekg(0);
+					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 pending headphone gain restore failed");
+					if (u16(codec.dac_sample(0)) != 0x1357 || codec.headphone_volume(0) != 0x73 || codec.headphone_volume(1))
+						fatalerror("MU4 pending headphone gain/sample state was not restored");
+					m_phase = 120;
+					m_check->adjust(m_codec_snapshot_time + attotime::from_usec(50) - machine().time()); return;
+				}
+				codec.control_word_w(0x0e73); codec.control_word_w(0x0579);
+				m_phase = 121; m_check->adjust(attotime::from_usec(50)); return;
+			}
+			if (u16(codec.dac_sample(0)) != 0x6421 || u16(codec.dac_sample(1)) != 0xeca9)
+				fatalerror("MU4 codec DAC LRSWAP mismatch");
+			check_headphone_level(0,double(s16(0x6421))/32768.0);
+			check_headphone_level(1,double(s16(0xeca9))/32768.0);
+			codec.control_word_w(0x1200); codec.control_word_w(0x1e00);
+			if (codec.reg(7) != 1 || codec.reg(9)) fatalerror("MU4 codec reset defaults mismatch");
+			check_headphone_level(0,0); check_headphone_level(1,0);
+			logerror("mu4_codec_dac: PASS stereo_latch=1 power=1 digital_mute=1 selected_route=1 nominal_gain=1 zero_cross_pending=1 pending_restore=1 lrswap=1 ideal_headphone_only=1 analog_filter=0\n");
+			logerror("mu4_codec_clock: PASS inactive=1 controls=1 bclk_mclk=1 frame_divider=272 pending_restore=1 reset=1\n");
+			logerror("mu4_codec_duplex: PASS post_clock_pins=1 din_stereo=1 dout_converted_fixture=1 dma=2,3 mid_word_restore=1\n");
+			m_phase = 58; machine().schedule_soft_reset(); return;
+		}
 		if (original_bootstrap_profile())
 		{
 			if (playback_profile()) finish_playback_capture();
@@ -3659,12 +3717,28 @@ private:
 			if (m_codec_din_words != m_codec_saved_din || m_rx_dma_completions != m_codec_rx_snapshot_count + 1 ||
 				m_cpu->space(AS_DATA).read_word(0x6400) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x6401) != 0x5678)
 				fatalerror("MU4 codec mid-word duplex replay mismatch");
-			codec.control_word_w(0x1200);
-			codec.control_word_w(0x1e00);
-			if (codec.reg(7) != 1 || codec.reg(9)) fatalerror("MU4 codec reset defaults mismatch");
-			logerror("mu4_codec_clock: PASS inactive=1 controls=1 bclk_mclk=1 frame_divider=272 pending_restore=1 reset=1\n");
-			logerror("mu4_codec_duplex: PASS post_clock_pins=1 din_stereo=1 dout_converted_fixture=1 dma=2,3 mid_word_restore=1\n");
-			m_phase = 58; machine().schedule_soft_reset(); return;
+			if (u16(codec.dac_sample(0)) != 0x1357 || u16(codec.dac_sample(1)) != 0x9bdf)
+				fatalerror("MU4 codec complete stereo DAC latch mismatch");
+			check_headphone_level(0,0); check_headphone_level(1,0);
+			codec.control_word_w(0x0810); codec.control_word_w(0x0c07);
+			check_headphone_level(0,double(s16(0x1357))/32768.0);
+			check_headphone_level(1,double(s16(0x9bdf))/32768.0);
+			codec.control_word_w(0x0a09);
+			check_headphone_level(0,0); check_headphone_level(1,0);
+			codec.control_word_w(0x0a01); codec.control_word_w(0x0c0f);
+			check_headphone_level(0,0); check_headphone_level(1,0);
+			codec.control_word_w(0x0c07); codec.control_word_w(0x0800);
+			check_headphone_level(0,0); check_headphone_level(1,0);
+			codec.control_word_w(0x0810); codec.control_word_w(0x0573);
+			check_headphone_level(0,double(s16(0x1357))/32768.0*0.5011872336272722);
+			codec.control_word_w(0x0580);
+			if (codec.headphone_volume(0) != 0x73 || codec.headphone_volume(1)) fatalerror("MU4 headphone pending zero-cross update mismatch");
+			auto &data = m_cpu->space(AS_DATA);
+			data.write_word(0x6000,0xeca9); data.write_word(0x6001,0x6421);
+			if (!machine().scheduler().can_save()) fatalerror("MU4 pending headphone gain checkpoint is not stable");
+			m_saved_dma.str({}); m_saved_dma.clear(); m_codec_snapshot_time = machine().time();
+			if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 pending headphone gain save failed");
+			m_phase = 119; m_check->adjust(attotime::from_usec(50)); return;
 		}
 		if (m_phase >= 31 && m_phase <= 37)
 		{
@@ -5450,6 +5524,6 @@ ROM_START(mu4nand)
 ROM_END
 } // anonymous namespace
 CONS(2026, mu4nand, 0, 0, test, mu4_storage_test, mu4_storage_test_state, empty_init,
-		"Test", "MU4 original NAND routine boundary", MACHINE_NO_SOUND_HW)
+		"Test", "MU4 original NAND routine boundary", MACHINE_IMPERFECT_SOUND)
 CONS(2026, mu4aac, 0, 0, test, mu4_storage_test, mu4_aac_test_state, empty_init,
 		"Test", "MU4 original AAC isolated ABI probe", MACHINE_NO_SOUND_HW)

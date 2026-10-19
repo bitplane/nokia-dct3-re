@@ -15,7 +15,8 @@ actual operand/output pairs. Independent fixed-point equations also match one
 64-word block through each of the ten configured filter sections. Arbitrary
 coefficient settings, complete playback and codec analogue routing remain open.
 A bounded 64-stereo-frame block is traced through actual shift loads/completions
-to codec DIN. The protected
+to codec DIN. An ideal control-gated DAC/headphone contribution now renders
+through MAME speakers; this is not a physical analog/filter model. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -1209,7 +1210,43 @@ independent controls. Executable tests cover independent writes, simultaneous
 mute and right-to-left updates. Clock/framing and all seven binary captures
 remain unchanged.
 
-The next software boundary is a control-gated converted-DAC/output model for the
-recovered mode. Analog filtering, effective zero-cross behavior, physical channel
-routing and the cause of the initialization reset timing remain distinct from
-the already-proved digital sample delivery. Whole-track draining remains open.
+The ideal DAC/headphone contribution below implements the recovered control
+path. Measured analog filtering/zero-cross thresholds, physical channel routing
+and the cause of the initialization reset timing remain distinct from the
+already-proved digital sample delivery. Whole-track draining remains open.
+
+### Ideal DAC-to-Headphone Output
+
+`tlv320aic23_device` now exposes two MAME sound outputs for the **DAC contribution**
+to the headphones. It latches both 16-bit DSP slots together after the second
+word, applies DAC LRSWAP, active/DAC-select/power/digital-mute gates, output power
+and nominal one-dB headphone gain steps. Programmed volume and effective volume
+are separate state: an enabled zero-cross update waits for an ideal digital
+zero/sign change, with no timeout. This is explicitly not the measured analog
+detector threshold. The sample pair, effective codes and pending updates are
+saved. The audio stream is an oversampled zero-order hold, not a simulated
+delta-sigma clock or interpolation filter.
+
+Executable pin/DMA fixtures check complete stereo latching, selected route,
+power and digital mute, nominal -6-dB gain, deferred volume across a real sample
+sign change, pending-update/sample save/restore, and DAC LRSWAP. Existing digital
+clock, receive, transmit and packing checks remain green. Analog ADC conversion,
+bypass/sidetone/FM mixing, line-output pins, converter filters/group delay and
+electrical rails are not modeled by these outputs. Do not add a fitted filter
+delay to the current renderer or call its waveform physically accurate.
+
+A finalized-NAND native run renders `headphone.wav` with `-samplerate 48000
+-wavwrite headphone.wav`, using the same two-second operand observer. All seven
+digital capture files remain byte-identical. `mu4_dac_output_check.py RUN --wav
+RUN/headphone.wav` independently reconstructs the control and input-frame
+history without assuming an uncaptured early zero crossing. All 1764 DAC frames
+over 1.06--1.10 seconds match their actual DIN codes, effective volume and ideal
+normalized levels (maximum decimal-rounding error `4.995e-13`). There are 3280
+nonzero channel samples. The same run retains the 128-word digital source-epoch
+proof and the decoder/copy/scalar/filter checks.
+
+The host render contains 96001 stereo frames at 48 kHz, with nonzero counts
+44957/44971 and peaks 642/1147. These are integration diagnostics, not fitted
+waveform tolerances or a full playback oracle. The isolated MU4 bench is now
+marked imperfect sound rather than no sound hardware. Whole-track completion,
+physical analog acceptance, main-handset audio and GSM speech remain unproved.
