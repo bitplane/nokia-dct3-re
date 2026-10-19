@@ -183,6 +183,11 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
+With these assertions, the full default core gate reproduces all 292 required
+markers exactly once, including the legal MACP/MACD examples. The separate
+program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
+suite also pass. These are executable emulator regressions, not all-ISA or
+physical pipeline conformance.
 
 ### Standalone staged MVDP
 
