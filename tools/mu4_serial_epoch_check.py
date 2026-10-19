@@ -86,6 +86,11 @@ def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
             if not shift_known:
                 shift = (None,word)
                 shift_known = True
+        elif kind == 'wait_frame':
+            if (shift_known and shift is not None) or (buffer_known and buffer is not None):
+                raise ValueError('frame wait contradicts active shift or buffered word')
+            if retained is not None and retained[1] != word:
+                raise ValueError('frame wait differs from retained DXR word')
         elif kind == 'complete':
             if time not in tx_by_time or tx_by_time[time] != word:
                 raise ValueError('lifecycle completion lacks exact completed-TX callback')
@@ -134,6 +139,32 @@ def codec_control_history(text):
     return history
 
 
+def frame_wait_din(events,din,slots):
+    """Bounded observed underrun-to-next-load intervals, not analog pin proof."""
+    if len(slots) != 9*len(din):
+        raise ValueError('frame-wait DIN metadata extent mismatch')
+    intervals, pending = [], None
+    for row in events:
+        kind,when = row['kind'],int(row['ns'])
+        if kind == 'wait_frame':
+            if pending is not None:
+                raise ValueError('duplicate wait without intervening frame load')
+            pending = (when,0xffff if int(row['word'],16)&1 else 0)
+        elif kind in ('load_fresh','load_repeat','reset') and pending is not None:
+            intervals.append((pending[0],when,pending[1]))
+            pending = None
+    times = [when for when,slot in struct.iter_unpack('<QB',slots)]
+    count = 0
+    for first,last,expected in intervals:
+        for index in range(bisect_left(times,first),bisect_left(times,last)):
+            if din[index] != expected:
+                raise ValueError('codec DIN during frame wait differs from held final bit')
+            count += 1
+    return {'closed_intervals':len(intervals),'din_words':count,
+            'open_endpoint_interval':pending is not None,
+            'scope':'Observed frame-wait intervals only; not whole-session or silicon acceptance'}
+
+
 def startup_report(text,writes,tx,times,din,slots):
     events,ends = rows(text,'mu4_tx_startup'),rows(text,'mu4_tx_startup_terminal')
     if not events and not ends:
@@ -168,6 +199,7 @@ def startup_report(text,writes,tx,times,din,slots):
     if sink == len(sink_records) or sink_records[sink][0]-first_time > 84 or din[sink] != first_word:
         raise ValueError('startup completion lacks chronological DIN pair')
     report.update(first_completed_source=first_source,first_completed_slot=sink_records[sink][1],
+                  frame_wait=frame_wait_din(events,din,slots),
                   frame_edges=len(frames),scope='Actual startup reset/write/load/completion identities; '
                   'does not decide whether the firmware sequence or emulated timing matches silicon')
     return report

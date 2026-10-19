@@ -1280,6 +1280,23 @@ filter arithmetic checks pass on this same run. This proves a bounded native
 decoded-sample path to digital codec ingress, not DAC activation, analogue sound,
 whole-track draining, full-session epoch accounting, handset boot or GSM speech.
 
+The McBSP diagnostic `wait_frame` transition now exposes the existing
+external-clock underrun branch: after the active word completes with no fresh
+DXR, transmission waits for the next frame rather than publishing another
+word completion. The event carries retained DXR and does not change serial
+timing or output. The lifecycle checker rejects it with an active shift or
+full buffer, and checks retained-word consistency where known.
+
+A fresh finalized-input capture at `tmp/native-gates/mu4-wait-frame` records
+142 closed wait-to-next-load/reset intervals in the startup window. Ninety-three
+codec DIN callbacks in those intervals equal the held final-bit level of the
+observed retained word. This qualifies those bounded intervals; it does not
+close all 367 additional callbacks or establish measured pin timing. The seven
+TX/DIN/DMA/slot/time/DXR/decoded-return binary streams are byte-identical to
+`mu4-dac-native`. The setup fixture separately retains its underrun recovery,
+packing and save/restore checks. The remaining unmatched intervals and
+whole-session ownership still require their own observations.
+
 ### Codec Routing and Startup Phase
 
 The early transition capture brackets 0.817--0.824 seconds and includes actual

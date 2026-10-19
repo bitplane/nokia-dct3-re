@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from tools.mu4_serial_epoch_check import bind_lifecycle, codec_control_history, startup_report
+from tools.mu4_serial_epoch_check import bind_lifecycle, codec_control_history, startup_report, frame_wait_din
 
 
 BASE = 1_000_000_000
@@ -24,6 +24,30 @@ def fixture(specification):
 
 
 class SerialEpochTest(unittest.TestCase):
+    def test_frame_wait_din_uses_final_bit_not_sample_matching(self):
+        events = [{'kind':'wait_frame','ns':'10','word':'1235'},
+                  {'kind':'accept','ns':'11','word':'0000'},
+                  {'kind':'load_fresh','ns':'20','word':'0000'}]
+        slots = b''.join(struct.pack('<QB',time,0) for time in (9,10,19,20))
+        self.assertEqual(frame_wait_din(events,[7,65535,65535,8],slots)['din_words'],2)
+        with self.assertRaises(ValueError):
+            frame_wait_din(events,[7,0,65535,8],slots)
+        self.assertTrue(frame_wait_din(events[:1],[],b'')['open_endpoint_interval'])
+
+    def test_wait_frame_observes_underrun_without_a_completion(self):
+        result,completed = bind_lifecycle(*fixture([
+            ('accept',1,0x1234,1),('load_fresh',2,0x1234,0),
+            ('complete',3,0x1234,0),('wait_frame',4,0x1234,0),
+            ('accept',5,0x5678,2),('load_fresh',6,0x5678,0),
+            ('complete',7,0x5678,0)]))
+        self.assertEqual(set(completed),{1,2})
+        for specification in [
+            [('accept',1,1,1),('wait_frame',2,1,0)],
+            [('accept',1,1,1),('load_fresh',2,1,0),('wait_frame',3,1,0)],
+            [('accept',1,1,1),('load_fresh',2,1,0),('complete',3,1,0),('wait_frame',4,2,0)]]:
+            with self.assertRaises(ValueError):
+                bind_lifecycle(*fixture(specification))
+
     def test_actual_load_completion_and_retained_repeat(self):
         data = fixture([('accept',10,0x1234,1),('load_fresh',11,0x1234,0),
                         ('complete',20,0x1234,0),('load_repeat',21,0x1234,0),

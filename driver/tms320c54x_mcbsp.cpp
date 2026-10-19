@@ -492,6 +492,7 @@ void tms320c54x_mcbsp_device::tx_clock_w(int state)
 			// (SPRU302B 2.3.7.4), even if DXR is refilled before that sync.
 			m_xempty = false;
 			m_frame_words = 0;
+			m_tx_observer_cb(TX_WAIT_FRAME, m_buffer);
 			return;
 		}
 		load_shift(true, false);

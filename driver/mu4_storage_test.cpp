@@ -991,7 +991,7 @@ private:
 		double const time = machine().time().as_double();
 		bool const startup = time >= 0.817 && time <= 0.824;
 		if (!playback_profile() || (!startup && (time < 1.0 || time > 1.25))) return;
-		static constexpr std::array<char const *,8> names{"reset","ignore","accept","overwrite","load_fresh","load_repeat","complete","restart"};
+		static constexpr std::array<char const *,9> names{"reset","ignore","accept","overwrite","load_fresh","load_repeat","complete","restart","wait_frame"};
 		if (event >= names.size()) fatalerror("MU4 invalid McBSP diagnostic transition");
 		u32 &counter = startup ? m_playback_tx_startup_events : m_playback_tx_lifecycle_events;
 		++counter;
