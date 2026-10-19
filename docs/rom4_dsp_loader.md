@@ -18,6 +18,21 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## Mapped move and younger repeat ownership
+
+Decode can arm an RPT header while an older MVDK remains in Access. A global
+repeat-active flag does not make that older instruction a repeated body.
+The mapped-source/destination MVDK exclusions apply only when the body is
+latched and the instruction's full program address matches that body.
+They still reject genuinely repeated mapped moves before source/pointer or
+destination effects. No new mapped-repeat execution semantics are admitted.
+
+`run_c54x_core.py --profile move-rpt-owner` checks 64 cases and cleared-pipeline
+save/restores: `MVDK TRN,AR2` before short/long RPT, the same move as the rejected
+body, counts 0/3, two values/pages and two checkpoints. The pre-fix core rejects
+the ordinary predecessor before any body is latched. The fixture establishes
+instruction ownership, not physical pipeline-phase accuracy.
+
 ## Mapped source in parallel Store/Load
 
 ST||LD may read X addresses `0000..005f` while Y remains ordinary RAM.

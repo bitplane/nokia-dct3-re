@@ -12217,6 +12217,27 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255620;
 		m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_move_repeat_owner(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 2 ? 0x20000 : 0;
+		u16 const value = variant & 4 ? 0x5aa5 : 0x1400, count = variant & 8 ? 3 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		unsigned cursor = 0x600;
+		auto move = [&]() { program.write_word(base + cursor++, 0x710f); program.write_word(base + cursor++, 0x12); };
+		auto repeat = [&]() { program.write_word(base + cursor++, variant & 16 ? 0xf070 : 0xec00 | count); if (variant & 16) program.write_word(base + cursor++, count); };
+		if (!(variant & 1)) move();
+		repeat();
+		if (variant & 1) move(); else program.write_word(base + cursor++, 0xf495);
+		program.write_word(base + cursor, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TRN, value); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x3333);
+		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 299000;
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_move_brc_edge(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -20016,6 +20037,7 @@ private:
 		if (!strcmp(machine().options().bios(), "move-brc")) { start_move_brc(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc-delay")) { start_move_brc(); return; }
 		if (!strcmp(machine().options().bios(), "move-brc-edge")) { start_move_brc_edge(); return; }
+		if (!strcmp(machine().options().bios(), "move-rpt-owner")) { start_move_repeat_owner(); return; }
 		if (!strcmp(machine().options().bios(), "block-xc-irq") || !strcmp(machine().options().bios(), "block-xc-end-irq")) { start_block_xc_irq(); return; }
 		if (!strcmp(machine().options().bios(), "block-xc")) { start_block_xc(); return; }
 		if (!strcmp(machine().options().bios(), "block-xc-edge")) { start_block_xc_edge(); return; }
@@ -51983,6 +52005,24 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 255670) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255660; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 299000)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 32 ? 7 : 4;
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save mapped move alongside independent repeat header"); }
+			if (tick == 40)
+			{
+				bool const rejected = variant & 1;
+				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == rejected && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (rejected ? 0x3333 : variant & 4 ? 0x5aa5 : 0x1400), "Repeat guard belongs to its body, not an older mapped move");
+				if (!rejected) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Independent repeat and its continuation finish");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore repeat ownership after clearing live pipeline"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 299010; m_check_timer->enable(true); return; }
+				m_cpu->set_pipeline_frontend(false);
+				if (variant < 63) { start_move_repeat_owner(variant + 1); return; }
+				osd_printf_info("TMS320C54x mapped move repeat ownership: PASS cases=64 restore=64 before_header=1 repeated_body_rejected=1 headers=short,long pages=2 values=2 counts=0,3 snapshots=2 physical_phase_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated repeat ownership complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 299010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 299000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255640)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / 8;
@@ -56898,6 +56938,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(194, "push-mvmm-sp", "MVMM SP view includes preceding pending stack allocations")
 	ROM_SYSTEM_BIOS(195, "xorm-absolute", "Staged absolute immediate XORM retained read and publication")
 	ROM_SYSTEM_BIOS(196, "mvdm-t", "MVDM T TRN source capture and adjacent mapped consumer")
+	ROM_SYSTEM_BIOS(197, "move-rpt-owner", "Mapped move precedes an independent repeat header")
 ROM_END
 
 ROM_START(tms54rom4)

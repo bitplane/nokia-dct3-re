@@ -94,11 +94,11 @@ project-wide bootstrap blocker:
   Matching mask/product identity and COBBA inputs remain unresolved; the
   compatibility instrument is not normal 7110 support. See
   [7110 bring-up](7110_bringup.md).
-- NPM-5's isolated native MU4 recorder has retained metadata-save and cold-open
-  evidence, but current staged `bootrecmeta` revalidation stops at the repeated
-  mapped-destination MVDK guard (`02:9cb5`). Its current acceptance is not green.
-  Fresh original initialization, complete readback and retained storage pass.
-  The older atomic save fixture's timer/interrupt stall is a separate boundary.
+- NPM-5's isolated native MU4 staged recorder has metadata-save and cold-open
+  evidence. Fresh original initialization, complete readback, retained storage
+  and `bootrecmeta` pass after correcting repeat-guard instruction ownership.
+  Genuine repeated mapped moves remain excluded. The older atomic save
+  fixture's timer/interrupt stall is a separate boundary.
   File/audio completeness, native playback and MA4 handset boot retain their
   separately stated scope; see [5510 bring-up](5510_bringup.md).
 

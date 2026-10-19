@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_move_repeat_ownership_requires_full_scope(self):
+        marker, ending = EXTRA_PROFILES['move-rpt-owner']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='move-rpt-owner')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'),
+                                 3, profile='move-rpt-owner')
+        for bad in (marker, text + '\n' + marker, text + '\nunexpected'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='move-rpt-owner')
+
     def test_staged_overflow_branch_scope(self):
         marker, ending = EXTRA_PROFILES['ov-branch-pipe']
         text = marker + '\n' + ending

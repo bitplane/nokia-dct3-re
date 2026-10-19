@@ -2,15 +2,14 @@
 
 ## Current boundary
 
-Current `bootrecmeta` revalidation does not reproduce the retained staged
-metadata acceptance below: execution stops at `02:9cb5` with the CPU guard
-`repeated MVDK mapped destination is unsupported`. Original recorder startup
-and its first two replies are observed, but metadata completion is not.
-Fresh `check-mu4-retained-original` initialization, six-file readback and
-fresh-process retained storage pass. Keep this staged instruction boundary
-separate from the older atomic timer starvation. Recover the exact repeated
-move operands and qualify their generic CPU semantics before changing the
-guard; neither timer tuning nor synthetic metadata success is justified.
+Current `bootrecmeta` revalidation passes original metadata completion using
+fresh firmware-created NAND. Its `710f 0012` at `02:9cb5` is an ordinary
+`MVDK TRN,AR2` before a younger repeat header, not a repeated mapped move.
+The CPU guard now requires the latched repeat body's own address; genuine
+mapped repeat bodies retain their exclusion. The firmware-free
+`move-rpt-owner` profile qualifies both cases with cleared-pipeline replay.
+This is separate from the older atomic timer-starvation observation and
+does not establish playback, MA4 boot or physical pipeline timing.
 
 The acquired v3.53 PPM C service package is normalized and statically
 validated. The `nmp5stage` research fixture executes its own verifier and

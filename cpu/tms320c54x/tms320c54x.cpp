@@ -4019,9 +4019,15 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[3];
 		bool const extended = staged_extended_move(m_pipeline_word[3]);
 		u16 const destination = m_pipeline_immediate[3];
-		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && destination < 0x60)
+		// Decode may arm a younger RPT while this older move is in Access.
+		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched &&
+			m_pipeline_address[3] == m_pipeline_repeat_address;
+		if (repeat_body && staged_repeat_destination_copy(m_pipeline_word[3]) && destination < 0x60)
 		{
-			logerror("%s: repeated MVDK mapped destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			logerror("%s: repeated MVDK mapped destination is unsupported (word=%04x destination=%04x repeat_word=%04x repeat_source=%04x)\n",
+					machine().describe_context(), m_pipeline_word[3], destination,
+					m_pipeline_repeat_word, m_pipeline_repeat_source);
+			m_illegal = true; return;
 		}
 		bool const status = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && destination == 7;
 		bool const brc = destination == 0x1a;
@@ -4040,7 +4046,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		u16 const source = staged_direct_mvmd(m_pipeline_word[3]) ? mode : extended ? (mode == 0xf8 ? m_pipeline_operand_address[3] :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3)) : basic_address(3, mode);
-		if (m_pipeline_repeat_active && staged_repeat_destination_copy(m_pipeline_word[3]) && source < 0x60 && !staged_direct_mvmd(m_pipeline_word[3]))
+		if (repeat_body && staged_repeat_destination_copy(m_pipeline_word[3]) && source < 0x60 && !staged_direct_mvmd(m_pipeline_word[3]))
 		{
 			logerror("%s: repeated MVDK mapped source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
