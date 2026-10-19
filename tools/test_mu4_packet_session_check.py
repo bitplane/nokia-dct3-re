@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from tools.mu4_packet_session_check import check_packets, extract_observed_packets
+from tools.mu4_packet_session_check import check_packets, extract_observed_packets, verify_observed_prefix
 
 
 def fixture():
@@ -16,6 +19,30 @@ def fixture():
 
 
 class PacketSessionTest(unittest.TestCase):
+    def test_composed_prefix_rejects_scope_mismatch(self):
+        text, _ = fixture()
+        session = dict(calls=1, converted_blocks=1, failed_calls=[],
+                       native_blocks_not_compared=0, reference_blocks_not_compared=0)
+        with TemporaryDirectory() as name:
+            directory = Path(name)
+            (directory/'error.log').write_text(text)
+            (directory/'mu4_decoded_returns.le16').write_bytes(b'fixture')
+            with patch('tools.mu4_packet_session_check.contract'), \
+                 patch('tools.mu4_packet_session_check.recording_session_observations', return_value={}), \
+                 patch('tools.mu4_packet_session_check.check_session', return_value=session), \
+                 patch('tools.mu4_packet_session_check.verify_arithmetic',
+                       return_value={'coefficient_publication_validated': True}):
+                result = verify_observed_prefix(directory,b'source','encoder',b'pcm',window_last=10)
+                self.assertFalse(result['transport_gate_validated'])
+                self.assertFalse(result['independent_encoded_reference'])
+                for key, value in (('calls',2), ('converted_blocks',2), ('failed_calls',[1]),
+                                   ('native_blocks_not_compared',1), ('reference_blocks_not_compared',1)):
+                    previous = session[key]
+                    session[key] = value
+                    with self.subTest(key=key), self.assertRaises(ValueError):
+                        verify_observed_prefix(directory,b'source','encoder',b'pcm',window_last=10)
+                    session[key] = previous
+
     def test_extracts_only_observed_bytes(self):
         text, packet = fixture()
         data, report = extract_observed_packets(text)

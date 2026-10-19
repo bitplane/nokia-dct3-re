@@ -11,11 +11,17 @@ if __package__:
     from .mu4_processing_check import match_packets
     from .mu4_recorder_media_inventory import adts_header
     from .mu4_decoder_session_check import verify as verify_session
+    from .mu4_decoder_session_check import check_session, FILE
+    from .mu4_context_contract import contract, recording_session_observations
+    from .mu4_coefficient_check import verify as verify_arithmetic
 else:
     from mu4_playback_frame_check import rows
     from mu4_processing_check import match_packets
     from mu4_recorder_media_inventory import adts_header
     from mu4_decoder_session_check import verify as verify_session
+    from mu4_decoder_session_check import check_session, FILE
+    from mu4_context_contract import contract, recording_session_observations
+    from mu4_coefficient_check import verify as verify_arithmetic
 
 
 def check_packets(text, aac, *, window_last=10.0):
@@ -148,6 +154,29 @@ def verify(directory, source, aac, pcm):
     return result
 
 
+def verify_observed_prefix(directory, source, encoder_text, pcm, *, window_last=12.0):
+    """Compose same-recording checks without inheriting the protected track's title."""
+    contract(source)
+    text = (directory/'error.log').read_text()
+    data, packets = extract_observed_packets(text, window_last=window_last)
+    encoder = recording_session_observations(encoder_text, data, complete_reference_prefix=True)
+    session = check_session(text, (directory/FILE).read_bytes(), pcm)
+    arithmetic = verify_arithmetic(directory, source)
+    if (session['failed_calls'] or session['calls'] != packets['calls'] or
+            session['converted_blocks'] != packets['calls'] or
+            session['native_blocks_not_compared'] or session['reference_blocks_not_compared'] or
+            not packets['single_raw_block_packets'] or not arithmetic['coefficient_publication_validated']):
+        raise ValueError('observed packet, encoder, arithmetic and PCM prefix scopes disagree')
+    return dict(calls=packets['calls'], consumed_prefix_bytes=len(data),
+                consumed_prefix_sha256=packets['consumed_prefix_sha256'],
+                encoder=encoder, session={key: value for key, value in session.items() if key != 'frame_metrics'},
+                bounded_eight_call_arithmetic_validated=True,
+                independent_encoded_reference=False, transport_gate_validated=False,
+                native_audio_validated=False,
+                scope='Same-recording consumed prefix and bounded arithmetic; host PCM diagnostic only; '
+                      'not protected-title transport gate, whole-file completion, analog audio or speech')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
@@ -157,9 +186,16 @@ def main():
     parser.add_argument('--export-observed-aac',type=Path,
                         help='exclusive new host-diagnostic artifact; never emulation input')
     parser.add_argument('--window-last',type=float,choices=(10.0,12.0),default=10.0)
+    parser.add_argument('--encoder-log',type=Path,
+                        help='verify observed prefix against its own encoder and host PCM, not whole-file acceptance')
     args = parser.parse_args()
     try:
-        if args.export_observed_aac:
+        if args.encoder_log:
+            if not args.source_a00 or not args.reference_pcm or args.reference_aac or args.export_observed_aac:
+                raise ValueError('encoder-prefix verification requires source and host PCM only')
+            result = verify_observed_prefix(args.directory,args.source_a00.read_bytes(),
+                args.encoder_log.read_text(),args.reference_pcm.read_bytes(),window_last=args.window_last)
+        elif args.export_observed_aac:
             if any((args.source_a00,args.reference_aac,args.reference_pcm)):
                 raise ValueError('observed extraction is not independent-reference verification')
             data, result = extract_observed_packets((args.directory/'error.log').read_text(),
@@ -170,7 +206,7 @@ def main():
             if not all((args.source_a00,args.reference_aac,args.reference_pcm)) or args.window_last != 10.0:
                 raise ValueError('reference verification requires all three inputs and the original window')
             result = verify(args.directory,args.source_a00.read_bytes(),args.reference_aac.read_bytes(),args.reference_pcm.read_bytes())
-    except (ValueError,OSError) as error:
+    except (ValueError,OSError,KeyError) as error:
         parser.exit(1,f'MU4 packet session: {error}\n')
     print(json.dumps(result,indent=2))
 

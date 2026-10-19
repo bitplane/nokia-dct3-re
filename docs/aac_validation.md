@@ -673,6 +673,30 @@ with native returned s16 output gives maximum difference 11, RMS 1.220189855
 over 768000 channel samples. This is a cross-decoder diagnostic, not bit-exact
 codec conformance, physical audio, whole-file completion or speech acceptance.
 
+The same capture also passes the source-pinned coefficient/transform-tail,
+history-continuity and converter-input checks across its first eight calls.
+Those include 30 observed transform windows with 128- and 1024-component
+spans, including the early short-window transition. The complete returned PCM
+file has SHA256
+`60515c08ae555eff67d689cafe07394d36654e54f62626242a3dceca1b87549e`;
+the host-decoded observed prefix has SHA256
+`641f0c2ac42727cd6b75f72ace229095ba80e889517559eb247c21fb4b890fc8`.
+
+Compose these checks without the protected fixture's `MAME` title requirement:
+
+```sh
+.venv/bin/python tools/mu4_packet_session_check.py PLAYBACK \
+  --window-last 12 --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --encoder-log ENCODER/error.log --reference-pcm PLAYBACK/host.s16le
+```
+
+This mode requires exact agreement of packet/call/block counts and full ordinal
+host-PCM comparison coverage, while retaining the host comparison as diagnostic.
+It does not bypass or claim the existing protected-title transport acceptance
+gate. Nor does a host decode of observed bytes provide an independently
+generated encoded input; the separately generated MPEG-2 ABI controls above
+remain the independent-input evidence.
+
 For a reproducible comparison, use `mu4_context_contract.py SOURCE
 --recording-session-log ENCODER/error.log --recording-session-reference
 PLAYBACK/observed.aac --recording-session-reference-prefix`. The explicit
