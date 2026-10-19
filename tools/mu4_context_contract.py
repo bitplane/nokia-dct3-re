@@ -582,6 +582,33 @@ DECODER_DISPATCH_WITNESSES = (
     (0x29F2B, (0xE90C,0xF882,0x98B8)),
 )
 
+PLAYBACK_INFO_QUERY_WITNESSES = (
+    (0x20973,(0xeefe,0x76f8,0x130f,0,0xf020,0x1307,0x8000,0x10f8,0x15ea,0xf982,0x9882,0xee02,0xf495,0xf4e4)),
+    (0x29882,(0xe90b,0xf882,0x98b8)),
+    (0x27823,(0x76f8,0x15eb,0xaaac,0x76f8,0x15ea,0x9cf8)),
+    (0x2744b,(1,0x9cf8,0xc738)),
+    (0xc738,(0xc738,)),
+    (0xc744,(2,0x9c84)),
+    (0xc74e,(0,0)),
+    (0x298b8,(0x8812,0xf845,0x98c4,0xf741,0x0182,0x8912,0xf495,0xf495,0x5782,0xf84d,0x98c4,0xf5e6,0xf020,0xffff)),
+)
+
+
+def decode_playback_info_query(words):
+    for base,witness in PLAYBACK_INFO_QUERY_WITNESSES:
+        for offset,value in enumerate(witness):
+            if words.get(base+offset) != value:
+                raise ValueError(f'playback information query witness changed at {base+offset:06x}')
+    refs = sorted(address for address,value in words.items() if value == 0x1310)
+    return dict(pinned_words=sum(len(w) for _,w in PLAYBACK_INFO_QUERY_WITNESSES),
+                query='020973 clears 130f, passes destination 1307 to method 11 through 15ea',
+                selected_object='027823 sets 15eb=aaac and 15ea=9cf8',
+                initial_table='original C-init 02744b sets object 9cf8 table to c738',
+                method_11='c738 + 2*11 = c74e: zero far pointer',
+                missing_method='0298b8 returns ffff for zero far pointer; it does not call a metadata writer',
+                flag_literals=[f'{address:06x}' for address in refs],
+                scope='Selected initial table and local query/dispatcher spans; not table immutability, indirect writer closure, metadata layout or an EOF operation')
+
 
 def decode_decoder_dispatch(words):
     for base,witness in DECODER_DISPATCH_WITNESSES:
@@ -1957,6 +1984,7 @@ def contract(source):
     result['decoder_framing'] = decode_decoder_framing(rel_words)
     result['decoder_input_descriptor'] = decode_decoder_input_descriptor(rel_words)
     result['decoder_input_reserve'] = decode_decoder_input_reserve(rel_words)
+    result['playback_info_query'] = decode_playback_info_query(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)

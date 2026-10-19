@@ -503,3 +503,14 @@ or a different admission path. The observed rejection precedes a read of
 the final partial word, so fixing odd-byte packing alone is not established
 as sufficient. Do not patch the reserve predicate, modify framing flags or
 append unlabelled bytes to turn this into an EOF claim.
+
+The original caller's `1310`-dependent input threshold is not an established
+EOF signal. Query `020973..020980` clears `130f` and passes destination
+`1307` to virtual method 11 through object reference `15ea`. Setup `027823`
+selects decoder `aaac` and transform `9cf8`; original C-init record `02744b`
+sets the latter's table to `c738`. Its method-11 far pointer at `c74e` is
+zero, so the generic dispatcher returns `ffff` without calling a metadata
+writer. Forty-five source words pin this chain. This establishes the selected
+initial table, not its lifetime immutability or absence of indirect writers.
+The five mapped `1310` literals are retained in the contract report; none
+justifies treating a write to that flag as a legitimate end-of-input action.
