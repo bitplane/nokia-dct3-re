@@ -8932,8 +8932,8 @@ The remaining policy question needs the legitimate producer/consumer
 contract or an independent handset playback reference, not another guessed
 peripheral response.
 
-`playback_pending_control` pins 147 further AA99 words around the controller
-and input-16 receiver. Controller `020769` enables CPL and loads request
+`playback_pending_control` pins 215 further AA99 words around the controller,
+notification and input-16 receiver. Controller frame setup `020769` enables CPL and loads request
 frame word 2 into AR1. Its input `17` branch at `0207f5` stores **one** to
 `12fc`, independent of the parameter; it is not a zero-valued input-17
 producer. Input `16` at `0207fa` instead sets `12fa/15db` and copies frame
@@ -8949,6 +8949,19 @@ closed. These source fragments distinguish a reply-copy control from an
 established EOF/drain operation. Next resolve the input-16 argument producer
 and original controller's end-of-input protocol before changing cleanup.
 Every pinned word has a mutation test; no message or state is injected.
+
+The verified vector target, not that frame setup, identifies the wrapper
+entrance: AA99 vector `022064` saves XPC and branches to `02:0742`, whose
+register-save prefix precedes the local frame. Initializer `0278cd` supplies
+far callback `02:0981` to setter `0292f0`, which stores it at `aa7e`.
+Publisher `0292a7` copies its frame to mailbox `0080`, loads that pointer
+and conditionally invokes it. Callback `020981` sets `12f8=1` and executes
+`INTR 25`, completing a source-owned software notification chain. The three
+literal `aa7e` references in the mapped AA99 image are retained in the report;
+computed aliases and runtime replacement are not closed. This is not evidence
+that a missing external HPI interrupt explains the final pending request.
+Live message identity and the input-16 argument's upstream producer remain
+separate questions.
 
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

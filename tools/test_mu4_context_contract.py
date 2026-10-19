@@ -119,6 +119,10 @@ class ContextContractTest(unittest.TestCase):
         self.assertEqual(result['pinned_words'], len(words))
         self.assertIn('12fc <- 1', result['controller']['input17'])
         self.assertIn('frame word 3', result['controller']['input16'])
+        self.assertEqual(result['controller']['entry'], '020742')
+        self.assertEqual(result['controller']['frame_setup'], '020769')
+        self.assertIn('INTR 25', result['notification']['callback'])
+        self.assertIn('02:0742', result['notification']['vector'])
         self.assertEqual(result['receiver16']['reply'], '8016')
         self.assertIn('nine words', result['receiver16']['copy'])
         for address in words:

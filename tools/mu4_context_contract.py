@@ -910,6 +910,16 @@ def reference_refill_control(reply, pending16, pending17):
 
 
 PLAYBACK_PENDING_CONTROL = {
+    0x22064: (0x4a1e,0xf495,0xf882,0x0742),
+    0x20742: (0xf495,0x4a08,0x4a09,0x4a0a,0x4a0b),
+    0x20981: (0x76f8,0x12f8,1,0xf7d9,0xf495,0xf495,0xf4e4),
+    0x278cd: (0xf062,2,0xf040,0x0981,0xf982,0x92f0,0xf495,0xf495,0xf4e4),
+    0x292f0: (0x4ef8,0xaa7e,0xe801,0xf495,0xf495,0xf4e4),
+    0x292a7: (0x4a11,0x4a16,0xeefe,0xf495,0x7106,0x0016,0x8811,0xf073,
+              0x92b2,0xf982,0x042f,0xf982,0x0424,0x61f8,0x0080,0x8000,
+              0xf820,0x92b0,0xf020,0x0080,0x7000,0x0016,0x8001,0x4811,
+              0xf982,0x9276,0x56f8,0xaa7e,0xf845,0x92c6,0xf4e7,0xf982,
+              0x042f,0xee02,0x8a16,0x8a11,0xf4e4),
     0x20769: (0x4a08,0xeeed,0x7211,0x12f7,0xf495,0x6c81,0x0952,
               0x76f8,0x12f7,1,0x76f8,0x12f8,0,0x4818,0xf000,2,
               0xf982,0x960c,0x7716,1,0x7717,0,0xf7b8,0x7102,0x0011),
@@ -940,7 +950,7 @@ def decode_playback_pending_control(words):
             if words.get(base + offset) != expected:
                 raise ValueError(f'pending-control witness changed at {base + offset:06x}')
     return dict(pinned_words=sum(map(len, PLAYBACK_PENDING_CONTROL.values())),
-                controller=dict(entry='020769', request='CPL frame word 2 -> AR1',
+                controller=dict(entry='020742', frame_setup='020769', request='CPL frame word 2 -> AR1',
                                 input17='0207f5: pending 12fc <- 1',
                                 input16='0207fa: 12fa <- 1; 15db <- 1; 12fb <- frame word 3'),
                 receiver16=dict(entry='029458', reply='8016',
@@ -949,6 +959,11 @@ def decode_playback_pending_control(words):
                                 continuation='A += 3708; frame[1] <- 9; frame[0] <- low(A); CALL 0299cc; send through 02929c',
                                 copy='0299cc: nine words from 3708 + parameter to reply frame word 5',
                                 copy_direction='source AR4 > destination AR0: forward; otherwise backward; zero count skips body'),
+                notification=dict(initializer='0278cd: callback 02:0981 -> setter 0292f0',
+                                  pointer='aa7e', publisher='0292a7: copy to mailbox 0080; call nonzero aa7e',
+                                  callback='020981: 12f8 <- 1; INTR 25',
+                                  vector='022064: PSHM XPC; NOP; FB 02:0742',
+                                  pointer_literal_references=[f'{address:06x}' for address, value in sorted(words.items()) if value == 0xaa7e]),
                 scope='Pinned source fragments, not live message ownership, runtime execution or '
                       'hook immutability, an EOF/drain command or an all-producer closure')
 
