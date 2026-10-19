@@ -4,8 +4,17 @@
 
 The MU4 bench executes the 5510's separate music DSP. Its captured recording
 and FFmpeg comparison are diagnostic evidence, not decoder conformance or
-native handset speech acceptance. All 375 observed decoder calls have consumed
-input-byte coverage; detailed arithmetic and output-store binding cover eight.
+native handset speech acceptance. Both the protected and fresh recording
+captures contain 375 successful decoder calls with consumed input-byte coverage;
+detailed arithmetic and output-store binding cover eight calls in each.
+The fresh stored-file projection has 385 complete host-decodable packets, an
+incomplete packet 386 and no packet 387 in the projection. The native stop path
+acknowledges its software request, resets buffer counters, then completes;
+missing external completion is not the current boundary.
+
+The open lifecycle questions are the metadata writer's erased-tail size increase,
+the processing worker's partial-buffer policy and playback draining. Formal codec conformance,
+DMA/codec epoch pairing and analog output remain separate obligations.
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -385,10 +394,12 @@ captures and raw-to-converted disagreement.
 
 ## Next Acceptance Boundary
 
-1. Recover the native decoder initialization and input framing contract;
-   distinguish raw access units, ADTS and recording-container transport.
-2. Establish supported LC tools and a fixture transport preserving original
-   compressed payload bytes. Do not transplant another decoder's state.
+1. Preserve the recovered original initialization and MPEG-2 ADTS ABI controls;
+   complete the native recording finalization/drain contract before claiming
+   whole-track playback. The generated controls are not recording containers.
+2. Inventory supported LC tools and add independent conformance fixtures using
+   the established caller-owned transport, preserving original compressed
+   payload bytes. Do not transplant another decoder's state.
 3. Derive delay/trimming and pre-quantization output scaling from independent
    procedure and native code, without fitted offset, gain or tolerance.
 4. Run the official baseline and retain per-channel errors and complete input,
@@ -819,6 +830,42 @@ are not retained writer identities. The before-metadata NAND remains exactly
 matching the encoder/publication capture. Thus the selected buffer reset
 precedes completion; neither a missing stop acknowledgement nor a decoder
 failure explains this recording boundary. This short observation still is
-not the twenty-second finalized-recording acceptance gate. Final post-metadata
-file extent and the deeper processing cleanup/flush policy must be checked
-before calling the remaining partial packet a hardware defect.
+not the twenty-second finalized-recording acceptance gate. The finalized
+extent is measured separately below; the deeper cleanup/flush and size-update
+policies remain unresolved, not established hardware defects.
+
+### Finalized Recording Extent
+
+The complete unmodified `bootrecac` twenty-second run reaches native metadata
+success, lifecycle 2/mode 0/continuation 0 and one accepted track. Resident
+comparison checks 48261 program and 3656 data words; the converted-input checker
+observes 871742 generated stereo frames and DMA symbol counts
+`200486,200509,200499,200496`. Encoder consumption is not inferred from these
+source statistics. The before-metadata NAND reproduces the preceding captures
+exactly. The final NAND SHA256 is
+`f09e3e8c1049a563a073fa40040c9d400e2d6212ba1a223ce44045303104277d`.
+
+Independent fixture-volume export and 7-Zip extraction yield named file `TEST`,
+144192 bytes, SHA256
+`515e2c2c6f7c759d11870ae06879ae3f26036efd4b9cfca89ec4464cb7e59f48`.
+Relative to the same run's 143982-byte `REL_001.REL` snapshot:
+
+- 33 common bytes change, all in metadata ranges `[17,18)`, `[21,41)`, `[44,56)`;
+- title becomes `MAME`, artist `TEST`, with the same 100-byte ID3 payload and no `TLEN`;
+- all existing bytes after those ranges, including the recorded body, are unchanged;
+- 210 bytes are appended, every one `ff`.
+
+The raw NAND delta affects pages 288, 352 and 127008, with no spare-page change.
+These facts do not establish that erased bytes are intended format padding or
+that the new file size is correct. In particular, finalization does not recover
+a further complete encoded packet. Constant-state host projection still yields
+the same 385 complete packets and the same 143220-byte AAC prefix hash. It then
+has 332 projected bytes of the next 372-byte packet, with 18 final bytes outside
+the complete-window model. No additional complete AAC packet is recovered.
+
+Reproduce the byte/tag comparison with
+`mu4_recorder_media_inventory.py BEFORE_FILE FINAL_FILE --extracted-files
+--id3-tags`; use the existing transform checker with the fresh native observed
+prefix for fixed-origin correspondence. The next finalization question is the
+original metadata/file-size writer that exposes this 210-byte erased extension,
+not whether an unobserved later save operation flushes the encoded tail.
