@@ -3330,9 +3330,10 @@ void tms320c54x_device::pipeline_step()
 			}
 			unsigned const words = staged_absolute_add(word) || delay_store || delay_load || delay_dld || delay_shift || delay_compare || (delay_bitt && u8(word) >= 0xe0) || delay_arithmetic || ((delay_multiply || delay_asm) && u8(word) >= 0xe0) || word == 0x46f8 || staged_two_word_data_copy(word) ? 2 : ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) ? 3 :
 				(staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) || staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0x7707 || staged_block_repeat(word) || staged_port_read(word) || staged_port_write(word) || staged_memory_repeat(word) || staged_banz(word) || staged_read_a(word) || staged_immediate_repeat(word) || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
+			bool const delay_read_a = staged_read_a(word) && u8(word) < 0x98 && m_pipeline_control_word == 0xf273;
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0x7707 || staged_block_repeat(word) || staged_port_read(word) || staged_port_write(word) || staged_memory_repeat(word) || staged_banz(word) || (staged_read_a(word) && !delay_read_a) || staged_immediate_repeat(word) || staged_program_move(word) || word == 0xf4e1 || staged_far_call(word) || staged_far_branch(word) || staged_call(word) || staged_conditional_branch(word) || word == 0xfc00 || word == 0xf4eb || word == 0xfe00 || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
-				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
+				logerror("%s: unsupported staged control delay form %04x instruction=%06x control=%06x owner=%04x remaining=%u\n", machine().describe_context(), word, unsigned(m_pipeline_address[2]), unsigned(m_pipeline_control_address), m_pipeline_control_word, m_pipeline_delay_decode_words);
 				m_illegal = true;
 				return;
 			}
@@ -4554,9 +4555,11 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] : basic_address(4, mode);
 		u16 const destination = m_pipeline_operand_address[4];
 		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[4] == m_pipeline_repeat_address;
+		bool const bd_delay = m_pipeline_control_words && m_pipeline_control_word == 0xf273 &&
+			(m_pipeline_address[4] == m_pipeline_control_address+2 || m_pipeline_address[4] == m_pipeline_control_address+3);
 		bool const accumulator_word = destination >= 0x08 && destination <= 0x0d;
 		bool const brc_word = destination == 0x1a && !m_pipeline_block_active;
-		if (destination < 0x60 && (repeat_body || (!accumulator_word && !brc_word && (destination < 0x10 || destination > 0x17))))
+		if (destination < 0x60 && (repeat_body || bd_delay || (!accumulator_word && !brc_word && (destination < 0x10 || destination > 0x17))))
 		{
 			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
 				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;

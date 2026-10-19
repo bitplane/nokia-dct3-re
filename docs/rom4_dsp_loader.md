@@ -47,7 +47,11 @@ gate is `make check-c54x-rom4-efr-encoder-staged`; it verifies the independent
 ETSI fixture and retains the atomic comparison requirements. Staged FR
 encoder and decoder retain their separate 32-frame controls. These isolated
 DTX-disabled algorithm results do not prove handset speech, staged EFR
-decoder/DTX/homing coverage or physical bus timing.
+DTX/homing coverage or physical bus timing. The staged decoder separately
+passes 163 clean speech frames and all 26,080 PCM samples, with full-RAM
+replays, through `make check-c54x-rom4-efr-decoder-staged`. Its existing
+ten-case delayed-repeat preflight remains atomic; decoder reset and every
+speech frame run on the staged frontend with an explicit selection marker.
 
 Both EFR frontend BIOSes must load the same hashed PCM and reference-vector
 files; program/data ROM coverage alone does not establish codec-fixture
@@ -396,8 +400,28 @@ ST0 rather than newly admitted T; multiply/square negatives are unchanged.
 
 This qualifies the declared operand-age/register/arithmetic model, not
 physical bus arbitration, producer/control hazards or interrupt composition.
-The ROM4 EFR first frame passes its `a20a` mapped-AR3 subtraction but remains
-behind a separate instruction guard; this is not staged EFR acceptance.
+The acquired EFR encoder uses this contract for `a20a` mapped-AR3 subtraction.
+Its complete vector acceptance is established by the separate codec gate,
+not by this instruction matrix alone.
+
+## READA in unconditional BD delay words
+
+Short RAM-destination READA may occupy either BD delay word. Its existing
+four-clock program-bus hold retains the program source after older ALU
+publication, then retains the sampled word for the real RAM write. The
+acquired decoder case is BD `ca2e`, ADD `ca30`, READA `ca31` (`7e40`).
+
+`bd-read-a` passes 512 cases and cleared-pipeline replays: both delay slots,
+DP/plain/postincrement/SP destinations, four boundary words, two caller
+pages, two program-source pages and four snapshots spanning the held
+transfer. The second-slot cases use an ordinary first-slot ADD to produce
+the program address. Changing A after capture, changing AR3 after Read and
+poisoning the program word after its sample cannot retarget or duplicate
+the transfer. The destination update occurs once at Read; program sampling
+and the RAM write retain their existing held-clock placement. Disabling
+the BD admission fails the fixture. Physical timing, mapped destinations,
+absolute/extended forms, interrupts and other control owners are not
+qualified by this matrix and retain guards.
 
 ## Short repeat in accumulator-conditional BCD delay words
 

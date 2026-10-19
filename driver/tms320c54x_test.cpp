@@ -6487,6 +6487,42 @@ private:
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = delay_bitt_phase;
 		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 	}
+	struct bd_read_a_fixture
+	{
+		unsigned slot, form, pattern, snapshot;
+		u32 base, source;
+		u16 value() const { return std::array<u16,4>{0,1,0x8000,0xffff}[pattern]; }
+		unsigned read() const { return 7+slot; }
+		unsigned checkpoint() const { return std::array<unsigned,4>{3,read(),read()+1,read()+4}[snapshot]; }
+	};
+	static bd_read_a_fixture bd_read_a_case(unsigned v)
+	{
+		bd_read_a_fixture f{};
+		f.slot=v%2; v/=2; f.form=v%4; v/=4; f.pattern=v%4; v/=4;
+		f.base=v%2 ? 0x20000 : 0; v/=2; f.source=(v%2 ? 0x20000 : 0)+0x2700; v/=2; f.snapshot=v;
+		return f;
+	}
+	void start_bd_read_a(unsigned variant=0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case=variant;
+		auto const f=bd_read_a_case(variant); auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
+		for(unsigned i=0;i<16;++i) program.write_word(f.base+0x600+i,0xf495);
+		program.write_word(f.base+0x600,0xf273); program.write_word(f.base+0x601,0x700); program.write_word(f.base+0x700,0xf4e1);
+		if(f.slot) program.write_word(f.base+0x602,0x0084);
+		program.write_word(f.base+0x602+f.slot,0x7e00|(f.form==0 || f.form==3 ? 0x20 : f.form==1 ? 0x83 : 0x93));
+		program.write_word(f.source,f.value()); data.write_word(0x4020,0xdead); data.write_word(0x5100,5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0x1080); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x900|(f.form==3 ? 0x4000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,f.source-5*f.slot); m_cpu->set_state_int(tms320c54x_device::STATE_B,0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T,0x5aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x4020); m_cpu->set_state_int(tms320c54x_device::STATE_AR4,0x5100);
+		m_pipeline_operand_reads=m_pipeline_store_writes=m_port_reads=0;
+		m_pipeline_fetch_tap=program.install_read_tap(f.source,f.source,"bd_read_a_source",[this,f](offs_t,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(word==f.value() && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles()==f.read()+4,"BD READA samples its retained program address once after the four held clocks"); auto const disable=machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.source,u16(~f.value())); });
+		m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"bd_read_a_data",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(f.slot && at==0x5100 && word==5 && !m_port_reads++,"The first delay word supplies READA's address through ordinary ADD"); });
+		m_pipeline_write_tap=data.install_write_tap(0,0xffff,"bd_read_a_write",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(at==0x4020 && word==f.value() && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles()==f.read()+5,"BD READA commits one retained program word to its original RAM destination"); });
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=bd_read_a_phase;
+		m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
+	}
 	struct mvdd_follow_fixture
 	{
 		unsigned pattern, modifier, consumer, gap, layout, snapshot;
@@ -19661,6 +19697,7 @@ private:
 		if (!strcmp(machine().options().bios(), "bitt-retd")) { start_bitt_retd(); return; }
 		if (!strcmp(machine().options().bios(), "bitt-ctrl")) { start_delay_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "mvdd-follow")) { start_mvdd_follow(); return; }
+		if (!strcmp(machine().options().bios(), "bd-read-a")) { start_bd_read_a(); return; }
 		if (!strcmp(machine().options().bios(), "bitt")) { start_bitt(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store-edge")) { start_repeat_store_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-store")) { start_repeat_store(); return; }
@@ -20059,7 +20096,7 @@ private:
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				!strcmp(machine().options().bios(), "efr-decoder"))
+				(!strcmp(machine().options().bios(), "efr-decoder") || !strcmp(machine().options().bios(), "efr-decoder-pipe")))
 		{
 			start_rom4_delayed_repeat(0);
 			return;
@@ -22088,6 +22125,25 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == bitt_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = bitt_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == bd_read_a_phase)
+		{
+			auto const f=bd_read_a_case(m_pipeline_peripheral_case); unsigned const tick=++m_idle_fixture_tick;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Short READA in BD delay spans is admitted");
+			if(tick==f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR3)==unsigned(f.form==2 ? 0x4021 : 0x4020),"READA owns exactly one destination update at Read"); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x7000); }
+			if(tick==f.read()+1) { expect(m_cpu->state_int(tms320c54x_device::STATE_A)==f.source,"READA's program address includes the older ADD result"); m_cpu->set_state_int(tms320c54x_device::STATE_A,0x5a5a); }
+			if(tick==f.checkpoint() && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save BD READA before or across retained program transfer"); }
+			if(tick==32)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC)==f.base+0x701 && m_cpu->state_int(tms320c54x_device::STATE_SP)==0x4000 && m_cpu->state_int(tms320c54x_device::STATE_A)==0x5a5a && m_cpu->state_int(tms320c54x_device::STATE_B)==0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T)==0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST0)==0x1080 && m_cpu->state_int(tms320c54x_device::STATE_ST1)==(0x900|(f.form==3 ? 0x4000 : 0)),"BD READA retains the branch path, program source, modes and sibling registers");
+				expect(m_pipeline_operand_reads==1 && m_pipeline_store_writes==1 && m_port_reads==f.slot && m_cpu->state_int(tms320c54x_device::STATE_AR3)==0x7000 && m_cpu->state_int(tms320c54x_device::STATE_AR4)==0x5100,"READA neither resamples poisoned addresses nor duplicates transfers");
+				if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint(); m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_port_reads=m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore BD READA after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=bd_read_a_phase+1; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if(m_pipeline_peripheral_case<511) { start_bd_read_a(m_pipeline_peripheral_case+1); return; }
+				osd_printf_info("TMS320C54x BD READA: PASS cases=512 restore=512 slots=2 forms=DP,plain,postinc,SP values=4 caller_pages=2 source_pages=2 snapshots=4 older_ADD=slot1 retained_PAR=1 retained_destination=1 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD READA complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if(m_phase==bd_read_a_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=bd_read_a_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == mvdd_follow_phase)
 		{
 			auto const f=mvdd_follow_case(m_pipeline_peripheral_case); unsigned const tick=++m_idle_fixture_tick;
@@ -53392,6 +53448,13 @@ private:
 			}
 			if (index < 9) { start_rom4_delayed_repeat(index + 1); return; }
 			osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
+			if(!strcmp(machine().options().bios(),"efr-decoder-pipe"))
+			{
+				// The existing delayed-repeat preflight is atomic; the acquired
+				// decoder reset and every frame below use the staged frontend.
+				m_cpu->set_pipeline_frontend(true);
+				osd_printf_info("ROM4 EFR decoder frontend: staged handset_audio_claim=0\n");
+			}
 			start_rom4_efr_decoder(0, true); return;
 		}
 		if (m_phase >= 525000 && m_phase < 525128)
@@ -54330,6 +54393,7 @@ private:
 	static constexpr unsigned mmr_long_phase = 1'000'010;
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;
+	static constexpr unsigned bd_read_a_phase = 1'000'040;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
@@ -56400,6 +56464,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(181, "st-acc-mvmm", "Pending accumulator-store DAGEN visibility to MVMM")
 	ROM_SYSTEM_BIOS(182, "shift16-load-age", "Shifted mapped AR loads retain the older Read sample")
 	ROM_SYSTEM_BIOS(183, "addsub-ar-age", "Mapped ADD SUB retains the older AR Read sample")
+	ROM_SYSTEM_BIOS(184, "bd-read-a", "Retained READA transfers in unconditional BD delay spans")
 ROM_END
 
 ROM_START(tms54rom4)
@@ -56426,7 +56491,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(20, "fr-decoder-pipe", "Isolated acquired ROM FR decoder on staged CPU")
 	ROM_SYSTEM_BIOS(21, "fr-encoder-pipe", "Isolated acquired ROM FR encoder on staged CPU")
 	ROM_SYSTEM_BIOS(22, "efr-encoder-pipe", "Isolated acquired ROM EFR encoder on staged CPU")
+	ROM_SYSTEM_BIOS(23, "efr-decoder-pipe", "Isolated acquired ROM EFR decoder on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(23))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(22))
@@ -56497,6 +56566,9 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(23))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(22))
@@ -56604,8 +56676,10 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("spch_dos.cod", 0, 80196, CRC(f4d761a3) SHA1(49bd709881e15e018632567bedabf6ed3b94c479), ROM_BIOS(22))
 	ROM_REGION(80522, "efr_reference_input", 0)
 	ROMX_LOAD("spch_dos.dec", 0, 80522, CRC(cdaa4997) SHA1(e93d62943336e4327e7bab5905dee73a58b7ce4b), ROM_BIOS(9))
+	ROMX_LOAD("spch_dos.dec", 0, 80522, CRC(cdaa4997) SHA1(e93d62943336e4327e7bab5905dee73a58b7ce4b), ROM_BIOS(23))
 	ROM_REGION(52160, "efr_reference_pcm", 0)
 	ROMX_LOAD("spch_dos.out", 0, 52160, CRC(bbfe268c) SHA1(d738d872bbb4bcf84bc68031166a8981003eea94), ROM_BIOS(9))
+	ROMX_LOAD("spch_dos.out", 0, 52160, CRC(bbfe268c) SHA1(d738d872bbb4bcf84bc68031166a8981003eea94), ROM_BIOS(23))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

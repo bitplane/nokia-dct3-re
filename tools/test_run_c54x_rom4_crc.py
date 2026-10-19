@@ -25,6 +25,21 @@ from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_decoder_frontends_load_the_same_vectors(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
+        bios = dict((name, int(number)) for number, name in
+                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
+        for region, filename in (('efr_reference_input', 'spch_dos.dec'),
+                                 ('efr_reference_pcm', 'spch_dos.out')):
+            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
+            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
+                               r'"(.*), ROM_BIOS\((\d+)\)\)', content)
+            by_bios = {int(number): payload for payload, number in loads}
+            self.assertEqual(len(loads), 2, region)
+            self.assertEqual(by_bios[bios['efr-decoder']],
+                             by_bios[bios['efr-decoder-pipe']], region)
+
     def test_efr_encoder_frontends_load_the_same_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
@@ -177,6 +192,17 @@ class Rom4HelperResultTest(unittest.TestCase):
         frames = "\n".join(f"ROM4 EFR decoder comparison: frame={frame} mismatches=0" for frame in range(163))
         text = DELAYED_REPEAT_PASS + "\n" + frames + "\n" + EFR_DECODER_REPLAY + "\n" + EFR_DECODER_PASS + "\n" + EFR_DECODER_COMPLETE
         check_result(text, 3, efr_decoder=True)
+
+        frontend = 'ROM4 EFR decoder frontend: staged handset_audio_claim=0'
+        staged = frontend + '\n' + text
+        check_result(staged, 3, efr_decoder=True, staged=True)
+        for invalid in (text, staged.replace('EFR decoder frontend', 'EFR encoder frontend'),
+                        frontend + '\n' + staged,
+                        staged.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
+                        staged.replace(EFR_DECODER_REPLAY, ''),
+                        staged.replace(DELAYED_REPEAT_PASS, '')):
+            with self.subTest(staged=invalid[-200:]), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_decoder=True, staged=True)
         check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_decoder=True)
         for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
                         text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),

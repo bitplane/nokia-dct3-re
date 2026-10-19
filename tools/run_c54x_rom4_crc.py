@@ -67,7 +67,7 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
     if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:
         lines = lines[:-2]
     if staged:
-        kind = 'FR decoder' if fr_decoder else 'FR encoder' if fr_encoder else 'EFR encoder' if efr_encoder else None
+        kind = 'FR decoder' if fr_decoder else 'FR encoder' if fr_encoder else 'EFR encoder' if efr_encoder else 'EFR decoder' if efr_decoder else None
         if kind is None or lines.count(f'ROM4 {kind} frontend: staged handset_audio_claim=0') != 1:
             raise ValueError('missing unique staged codec frontend selection')
     if (efr_decoder or efr_encoder or efr_dtx_decoder or efr_dtx_encoder or efr_erasure_decoder or efr_homing_decoder or efr_homing_encoder or efr_invalid_sid) and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
@@ -185,12 +185,12 @@ def main():
     mode.add_argument('--efr-homing-errors', action='store_true', help='compare the full native homing/error PCM and reset sequence against the reference')
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
-    parser.add_argument('--staged', action='store_true', help='run FR encoder/decoder or EFR encoder vectors on the staged CPU, not a handset speech claim')
+    parser.add_argument('--staged', action='store_true', help='run FR/EFR encoder or decoder speech vectors on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
     args = parser.parse_args()
-    if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder):
-        parser.error('--staged currently requires --fr-decoder, --fr-encoder or --efr-encoder')
+    if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder):
+        parser.error('--staged currently requires --fr-decoder, --fr-encoder, --efr-encoder or --efr-decoder')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
     if args.trace_efr_reset and not args.efr_encoder:
@@ -225,7 +225,7 @@ def main():
     if args.efr_homing_encoder:
         bios = "efr-enc-homing"
     if args.staged:
-        bios = 'fr-decoder-pipe' if args.fr_decoder else 'fr-encoder-pipe' if args.fr_encoder else 'efr-encoder-pipe'
+        bios = 'fr-decoder-pipe' if args.fr_decoder else 'fr-encoder-pipe' if args.fr_encoder else 'efr-encoder-pipe' if args.efr_encoder else 'efr-decoder-pipe'
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",

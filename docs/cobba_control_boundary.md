@@ -2466,8 +2466,9 @@ first-frame instruction observations, excluding replay; tracing cannot weaken
 vector acceptance.
 
 This is an isolated DTX-disabled encoder algorithm gate, not handset speech.
-Staged EFR decoding, DTX/homing variants and native RF/traffic-channel
-activation retain their separate qualification boundaries.
+The staged clean-speech decoder has its separate acceptance gate below;
+staged DTX/homing variants and native RF/traffic-channel activation retain
+their separate qualification boundaries.
 
 The separately acquired ETSI source archive and its provenance live in
 `roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete
@@ -2497,6 +2498,14 @@ boundary and re-executed after restore; every ordinary data-space word
 (`0060..ffff`, 65,440 words) must reproduce, not just the 160 output samples.
 The native routines are unchanged; synthetic return sentinels and CPU
 microtests occupy separate fixture program addresses.
+
+`make check-c54x-rom4-efr-decoder-staged` uses the same hashed input/PCM
+and the same 163-frame, 26,080-sample and full-RAM replay requirements.
+Its ten-case delayed-repeat preflight remains atomic, then an explicit
+frontend marker precedes staged decoder reset and all speech frames.
+The required [BD READA composition](rom4_dsp_loader.md#reada-in-unconditional-bd-delay-words)
+has its own 512-case cleared-pipeline replay matrix. This is algorithm and
+ordering evidence, not measured physical bus timing.
 
 The accepted input has BFI=0 and SID=0 throughout, with six TAF=1 frames.
 This is not bad-frame/comfort-noise conformance, native EFR encoding, handset
