@@ -755,3 +755,30 @@ checker; this comparison alone does not establish it. The projection remains
 host-only and must never become emulation input. Native transform state beyond
 the observed coverage, intended sample extent, recorder flushing and playback
 draining remain distinct unvalidated contracts.
+
+### Recorder Stop Frontend
+
+`recorder_stop_frontend` pins 155 original AA88 words across the selected
+control/completion blocks and four complete helper stubs:
+
+| Boundary | Recovered contract |
+| --- | --- |
+| `0285dc..0285ef` | Clear mode `3750`; continuation `0008` becomes `000a`, otherwise `0009`; call `0384fc` and `0386ec` |
+| `0384fc..038509`, `0392ae..0392c6` | Clear `edc3`; build `[3,0,0,1]` at `fd85..fd88`; submit four words through `0395e6` |
+| `0386ec..0386fb`, `0388ad..0388c9` | Transmit encoded codec words `0580`, `0a09` via serial control/status `0048/0049` and transmit register `0043` |
+| `039443..039475` | Selected completion `fd85==8009 && fd86==1` clears mode, updates continuation, sets lifecycle `373e=2`, mutes codec and calls API `2082` then loader `2080` |
+
+The related B-revision [TI SLWS106H](https://www.ti.com/lit/ds/slws106h/slws106h.pdf)
+register definitions identify `0580` as a simultaneous headphone mute/zero-cross
+update, and `0a09` as DAC soft mute plus ADC high-pass disable. These are codec
+controls, not file flushes; their analog effects are not validated here. The
+local reference and revision qualification are recorded in the 5510 bring-up
+document. The source helper ORs register/data arguments into the transmitted
+word and polls status bit 1 on each side of the write.
+
+The source-level next boundary is the processing request downstream of
+`0395e6` and the producer of completion `8009/1`: does that worker commit its
+partial output block before reporting completion? Neither the codec-control
+helper nor the selected completion consumer answers this. The 512-byte file
+granularity alone is not grounds to add padding, modify the file extent or
+invent a flush reply.

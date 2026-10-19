@@ -836,6 +836,44 @@ def pocp_count_words(marker):
     return expected
 
 
+RECORDER_STOP_FRONTEND = {
+    0x285dc: (0x76f8,0x3750,0,0x60f8,0x3762,8,0xf820,0x85e7,0xe80a,0xf073,
+              0x85e8,0xe809,0x80f8,0x3762,0x7105,0x3763,0xf983,0x84fc,0xf983,0x86ec),
+    0x384fc: (0xeefe,0x76f8,0xedc3,0,0xe800,0x7600,0,0x7601,1,0xf983,0x92ae,0xee02,0xf495,0xf4e4),
+    0x386ec: (0xeefe,0xf020,0x0500,0x7600,0x0080,0xf983,0x88ad,0x7600,9,0xf020,0x0a00,
+              0xf983,0x88ad,0xee02,0xf495,0xf4e4),
+    0x388ad: (0x4a11,0xeeff,0xf495,0x1104,0x7711,0x0048,0x7681,1,0x61e1,1,2,
+              0xf820,0x88b5,0xf1a0,0x7712,0x0043,0x8182,0xf020,0x0218,0xf983,0x9333,
+              0x61e1,1,2,0xf820,0x88c2,0xee01,0x8a11,0xf4e4),
+    0x392ae: (0x4a11,0xeefd,0xf495,0x1106,0x7107,0x0012,0x7711,0xfd85,0x7681,3,
+              0x80e1,1,0x81e1,2,0x70e1,3,0x0012,0x4811,0x7600,4,0xf983,0x95e6,
+              0xee03,0x8a11,0xf4e4),
+    0x39443: (0x7711,0xfd85,0x6081,0x8009,0xf830,0x944c,0x4811,0xf073,0x947f,
+              0x60f8,0xfd86,1,0xf820,0x9476,0x76f8,0x3750,0,0xf7b8,0x7211,0x3762,
+              0x10f8,0x0011,0xf010,8,0xf845,0x9465,0x6ce1,0xfff9,0x9468,0x76f8,
+              0x3762,0x0010,0xf073,0x9468,0x76f8,0x3762,0x0011,0x76f8,0x373e,2,
+              0xf983,0x86ec,0x7600,1,0xf020,0x3aea,0xf980,0x2082,0xe800,0xf980,0x2080),
+}
+
+
+def decode_recorder_stop_frontend(words):
+    for base, witness in RECORDER_STOP_FRONTEND.items():
+        if any(words.get(base+offset) != value for offset, value in enumerate(witness)):
+            raise ValueError('recorder stop frontend source changed or absent')
+    return dict(pinned_words=sum(map(len, RECORDER_STOP_FRONTEND.values())),
+        control_case='0285dc: clear 3750; continuation 0008 becomes 000a, otherwise 0009; call 0384fc then 0386ec',
+        processing_request=dict(builder='0392ae', words=[3,0,0,1], buffer='fd85..fd88',
+                                send='0395e6 with four words; downstream processing not closed'),
+        codec_control=dict(helper='0386ec', words=['0580','0a09'],
+            transport='0388ad ORs register/data arguments, polls 0049 bit 1 and writes encoded word to 0043',
+            meaning='AIC23-family headphone mute/zero-cross simultaneous update; DAC mute and ADC high-pass disable',
+            scope='Control words and related B-revision register definitions; not analog behavior or a file flush'),
+        completion_consumer=dict(case='039443', predicate='fd85 == 8009 and fd86 == 1',
+            action='clear mode 3750; update continuation; state 373e <- 2; codec mute; API 2082 then loader 2080',
+            scope='Selected consumer block only; producer and successful recording extent not established'),
+        scope='Complete stop helper stubs plus selected dispatch/completion blocks; not closure over the processing worker or file-flush policy')
+
+
 def decode_pocp_buffer_count(rel_words, resident_words):
     for marker,words in (('aa99',rel_words),('aa22',resident_words)):
         if any(words.get(address) != value for address,value in pocp_count_words(marker).items()):
@@ -2197,6 +2235,7 @@ def contract(source):
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
+    result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
     result['recording_prefix_transform'] = decode_recording_prefix_transform(recorder_words)
     result['recording_header_writer'] = decode_recording_header_writer(recorder_words)
