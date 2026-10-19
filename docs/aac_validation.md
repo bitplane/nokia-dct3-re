@@ -6,7 +6,7 @@ The MU4 bench executes the 5510's separate music DSP. Its captured recording
 and FFmpeg comparison are diagnostic evidence, not decoder conformance or
 native handset speech acceptance. The coherent fresh record/save/cold-reopen
 control reaches 376 successful decoder calls with consumed input-byte coverage;
-detailed arithmetic and output-store binding cover eight calls. The protected
+detailed arithmetic and actual decoded-bank copy correspondence cover eight calls. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -954,6 +954,47 @@ The native twenty-second run still exits through the deliberate negative audio
 completion diagnostic (exit 3), with zero illegal instructions. This is a
 record/save/reopen and consumed-prefix validation milestone, not whole-track
 draining, audible output, handset boot or GSM speech acceptance. The next
-transport target is actual decoded-buffer copy/read/write ownership through
-DMA to codec slots, without fitting sample offsets or treating post-mute serial
-activity as audible music.
+transport target is active DMA consumption and codec-slot epochs for the copied
+banks, without fitting sample offsets or treating post-mute serial activity as
+audible music. The bounded memory-copy correspondence is established below.
+
+### Decoded-Bank Copy Correspondence
+
+`mu4_pcm_copy_observe.lua` captures actual copy-helper source reads from
+`7000..7fff` and destination writes in a 1.0--1.25-second window, selecting the
+mapped `13e0/1460` object contexts. It also tracks source-bank **data-space** writes
+in that window, retaining the last observed write per address, and aggregates all
+writes in `1000..137f` by context PC. This range includes processing/control
+state as well as sample banks; a DMA minimum/maximum address is not evidence
+that every intervening address is an audio buffer.
+
+The uncapped capture has 19712 reads and 19712 selected copy writes, with
+446846 source writes tracked and 449214 destination-range writes across 55
+context PCs counted. An in-order read/write comparison leaves no pending read
+and has no word mismatch. For the first eight complete converted blocks:
+
+- all 16384 channel samples match their actual last observed conversion write,
+  subsequent source read and destination write;
+- every sample is copied exactly once, across 256 fixed 64-word chunks;
+- actual destination addresses preserve channel/chunk geometry in
+  `1000/1040/1080/10c0`, with no bank change within a chunk;
+- producer/copy chronology, word values and addresses determine correspondence;
+  no waveform delay, gain or sample-value alignment is fitted.
+
+The 3328 later copied words are outside the detailed eight-block conversion
+proof and are reported separately. The existing first-eight-call arithmetic
+checks also pass. Source reads at the end of each chunk have GENPC contexts
+`02a368..02a36a`, although the MVDD word is `02a366`; narrowing the read tap to
+that instruction's PC would miss real bus reads. The source-pinned helper
+interval, rather than a guessed single-PC owner, is deliberate.
+
+Run the observer on the finalized NAND with original `bootplaystage`; it exits
+after two seconds once its bounded window is closed. Check with
+`mu4_pcm_copy_check.py RUN --source-a00 SOURCE`. This is a short memory-copy
+observation, not the twenty-second playback gate. Register/PC snapshots remain
+context, not retained instruction ownership. The profile aliases program-space
+`2000..7fff` onto data RAM; this observer does not tap those program-space
+writes. Its last-writer result therefore covers data-space traffic, not an
+exhaustive physical-bank writer census. It also does not establish
+downstream DMA read epochs, codec pin/reset ownership, whole-track playback,
+analog sound or GSM speech.
