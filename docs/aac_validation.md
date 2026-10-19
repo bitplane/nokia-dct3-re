@@ -463,3 +463,43 @@ has 174 packets and an odd 65339-byte extent; its final packet is 14 bytes.
 The public descriptor expresses word pointers, so final partial-word and
 lookahead handling must be established rather than silently zero-padding
 the input or dropping its last byte.
+
+### Strict Tail Boundary
+
+`mpeg2eof` attempts all 174 generated packets, loading only complete words
+inside the source. The last refill, after call 172, starts at byte 64882
+and supplies 456 bytes with descriptor `162e..1712`; the final unmatched
+source byte is not fabricated into a complete word. Any read outside the
+declared window fails immediately, before comparing or recording its value.
+
+The original wrapper returns `ffff` before decoding packet 173. It has
+completed 172 calls, 176128 stereo frames and 64879 encoded bytes, with no
+illegal instruction or out-of-window read. Every one of 352256 sample
+conversions matches; the host reference differs at 170790 samples, maximum
+four s16 units. This is successful-prefix evidence, not full-file playback.
+
+The source-pinned skip helper `024425..024437` computes a candidate word
+index and compares it unsigned against `b330-8`. When the candidate exceeds
+that limit it rolls back the word-index increment and returns zero instead
+of consuming residual bits. This reserves eight words when the input extent
+is at least eight; smaller extents have unsigned-wrap behavior and are not
+covered by this contract. On the rejected candidate the Execute-entry
+observation is `AR2=00dd` (221), `AR0=00dc` (220), `b330=00e4` (228).
+An earlier check in the same invocation has candidate zero and passes.
+The wrapper subsequently returns with cursor/base `162e`, index zero and
+remaining count zero. Do not retry it as though it preserved all entry state.
+
+Reproduce with `-bios mpeg2eof -seconds_to_run 46` in an isolated directory;
+MAME exits **3**, reporting `MU4 AAC wrapper returned without a new decoded
+block`. The ABI checker option `--eof-boundary` verifies all 172 successful
+groups, their source-byte/reservoir accounting and the specific reserve/
+early-return observations. Its successful check means the negative boundary
+reproduced, not that EOF completed. The eight-second `mpeg2stream` control
+remains the clean successful repeated-refill gate.
+
+The immediate unknown is the original caller's end-buffer and drain policy:
+whether it supplies storage-block padding, an explicit final-input operation,
+or a different admission path. The observed rejection precedes a read of
+the final partial word, so fixing odd-byte packing alone is not established
+as sufficient. Do not patch the reserve predicate, modify framing flags or
+append unlabelled bytes to turn this into an EOF claim.

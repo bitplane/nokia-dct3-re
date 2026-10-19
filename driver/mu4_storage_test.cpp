@@ -5052,6 +5052,12 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_aac_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_aac_test_state::data_map);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (address == 0x2442f && m_expected_calls == 174 && m_captured == 172)
+			{
+				auto const disable = machine().disable_side_effects();
+				logerror("mu4_aac_tail_reserve: opcode=%04x candidate_index=%04x reserve_limit=%04x extent=%04x remaining=%04x identity=Execute_entry observer_writes=0\n",
+					opcode,u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),u16(m_cpu->state_int(tms320c54x_device::STATE_AR0)),m_cpu->space(AS_DATA).read_word(0xb330),m_cpu->space(AS_DATA).read_word(0xa854));
+			}
 			if (address == 0x23de7)
 			{
 				auto const disable = machine().disable_side_effects();
@@ -5078,9 +5084,15 @@ public:
 			}
 			if (m_expected_calls > 1 && m_captured < m_expected_calls && address == m_capture_sites[m_expected_calls > 8 ? 0 : m_captured])
 			{
-				if (opcode != 0xf495 || m_sources_seen != m_captured+1) fatalerror("MU4 AAC session return boundary changed");
+				if (opcode != 0xf495) fatalerror("MU4 AAC session return opcode changed");
 				auto const disable = machine().disable_side_effects();
 				auto &data = m_cpu->space(AS_DATA);
+				if (m_sources_seen != m_captured+1)
+				{
+					logerror("mu4_aac_wrapper_early_return: completed_calls=%u headers=%u sources=%u result=%04x cursor=%04x end=%04x base=%04x index=%04x remaining=%04x input_source=%u window_bytes=%u illegal=%u observer_writes=0\n",
+						m_captured,m_headers,m_sources_seen,data.read_word(0x1402),data.read_word(0x1400),data.read_word(0x1401),data.read_word(0xb332),data.read_word(0xb331),data.read_word(0xa854),m_input_offset,m_window_bytes,unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+					fatalerror("MU4 AAC wrapper returned without a new decoded block");
+				}
 				if (data.read_word(0x1402)) fatalerror("MU4 AAC session decode failed");
 				capture_output(m_captured != 0);
 				logerror("mu4_aac_session_return: call=%u descriptor=%04x base=%04x index=%04x remaining=%04x result=%04x observer_writes=0\n",
@@ -5092,8 +5104,8 @@ public:
 					if (cursor < 0x162e || cursor > 0x1a2e) fatalerror("MU4 AAC refill cursor bounds");
 					m_input_offset += 2*(cursor-0x162e);
 					load_input_window();
-					logerror("mu4_aac_session_refill: after_call=%u source_byte=%u old_cursor=%04x cursor=162e end=1a2e bytes=2048 remaining=%04x reservoir_high=%04x reservoir_low=%04x fixture_input=1 decoder_state_writes=0\n",
-						m_captured,m_input_offset,cursor,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859));
+					logerror("mu4_aac_session_refill: after_call=%u source_byte=%u old_cursor=%04x cursor=162e end=%04x bytes=%u remaining=%04x reservoir_high=%04x reservoir_low=%04x fixture_input=1 decoder_state_writes=0\n",
+						m_captured,m_input_offset,cursor,0x162e + m_window_bytes/2,m_window_bytes,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859));
 				}
 			}
 		});
@@ -5110,6 +5122,7 @@ private:
 	unsigned m_expected_calls = 1, m_captured = 0;
 	std::array<unsigned,8> m_capture_sites{};
 	unsigned m_input_offset = 0;
+	unsigned m_window_bytes = 2048;
 	std::array<u16,2> m_sources{};
 	unsigned m_input_reads = 0;
 	std::array<bool,1024> m_input_seen{};
@@ -5134,6 +5147,12 @@ private:
 			[this](offs_t address, u16 &value, u16 mask) {
 				if (machine().side_effects_disabled()) return;
 				unsigned const index = address - 0x162e;
+				if (2*index+2 > m_window_bytes)
+				{
+					logerror("mu4_aac_input_exhausted: completed_calls=%u source_byte=%u file_bytes=%u window_source=%u window_bytes=%u address=%04x context_pc=%06x padding_supplied=0 decoder_state_writes=0\n",
+						m_captured,m_input_offset+2*index,unsigned(m_input.length()),m_input_offset,m_window_bytes,unsigned(address),unsigned(m_cpu->pc()));
+					fatalerror("MU4 AAC input exhausted at a word not wholly inside the source");
+				}
 				u16 const expected = (u16(m_input[m_input_offset+2*index]) << 8) | m_input[m_input_offset+2*index+1];
 				if (++m_input_reads > std::max(4096U,m_expected_calls*1024) || mask != 0xffff || value != expected)
 					fatalerror("MU4 AAC ABI changed, partial or capped input read");
@@ -5149,11 +5168,12 @@ private:
 	void load_input_window()
 	{
 		auto &data = m_cpu->space(AS_DATA);
-		if (m_input_offset+2048 > m_input.length()) fatalerror("MU4 AAC input window exceeds source");
-		for (unsigned i = 0; i < 1024; ++i)
+		if (m_input_offset >= m_input.length()) fatalerror("MU4 AAC input window exceeds source");
+		m_window_bytes = std::min(2048U,unsigned(m_input.length())-m_input_offset) & ~1U;
+		for (unsigned i = 0; i < m_window_bytes/2; ++i)
 			data.write_word(0x162e + i, (u16(m_input[m_input_offset+2*i]) << 8) | m_input[m_input_offset+2*i+1]);
 		data.write_word(0x1400, 0x162e);
-		data.write_word(0x1401, 0x1a2e);
+		data.write_word(0x1401, 0x162e + m_window_bytes/2);
 	}
 	virtual void machine_reset() override
 	{
@@ -5203,7 +5223,7 @@ private:
 			0x7718,0x9000,0xf7be,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,
 			0xf020,0xaaac,0xf982,0x3d27
 		};
-		m_expected_calls = system_bios() == 5 ? 32 : system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
+		m_expected_calls = system_bios() == 6 ? 174 : system_bios() == 5 ? 32 : system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
 		m_captured = 0;
 		data.write_word(0x1403,m_expected_calls);
 		for (unsigned call = 0; call < (m_expected_calls > 8 ? 1 : m_expected_calls); ++call)
@@ -5233,7 +5253,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
 		m_cpu->set_state_int(STATE_GENPC, 0x1000);
 		m_cpu->set_pipeline_frontend(true);
-		m_check->adjust(attotime::from_msec(m_expected_calls > 8 ? 8000 : m_expected_calls > 1 ? 2000 : 250));
+		m_check->adjust(attotime::from_msec(m_expected_calls > 32 ? 45000 : m_expected_calls > 8 ? 8000 : m_expected_calls > 1 ? 2000 : 250));
 		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 output_base=%04x output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers,OUTPUT_BASE);
 	}
 	TIMER_CALLBACK_MEMBER(check)
@@ -5283,6 +5303,7 @@ ROM_START(mu4aac)
 	ROM_SYSTEM_BIOS(2, "mpeg2four", "Generated MPEG-2 AAC-LC four-call continuity probe")
 	ROM_SYSTEM_BIOS(3, "mpeg2refill", "Generated MPEG-2 AAC-LC eight-call input refill probe")
 	ROM_SYSTEM_BIOS(4, "mpeg2stream", "Generated MPEG-2 AAC-LC 32-call repeated refill probe")
+	ROM_SYSTEM_BIOS(5, "mpeg2eof", "Generated MPEG-2 AAC-LC strict source exhaustion probe")
 	ROM_REGION(741916, "container", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION(65339, "input", 0)
@@ -5291,6 +5312,7 @@ ROM_START(mu4aac)
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(2))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(3))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(4))
+	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(5))
 ROM_END
 
 ROM_START(mu4nand)

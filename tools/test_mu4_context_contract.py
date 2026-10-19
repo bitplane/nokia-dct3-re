@@ -28,6 +28,7 @@ from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapt
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
 from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
 from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decode_decoder_input_descriptor
+from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT_RESERVE_WITNESS, decode_decoder_input_reserve
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -647,6 +648,15 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=hex(address)), self.assertRaises(ValueError):
                 decode_decoder_input_descriptor(changed)
+
+    def test_short_input_reserve_compare_and_rollback_are_pinned(self):
+        words = {DECODER_INPUT_RESERVE_BASE+i:value for i,value in enumerate(DECODER_INPUT_RESERVE_WITNESS)}
+        self.assertEqual(decode_decoder_input_reserve(words)['pinned_words'],19)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_decoder_input_reserve(changed)
 
     def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
         words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))

@@ -669,6 +669,22 @@ DECODER_INPUT_DESCRIPTOR_WITNESSES = (
     (0x23def,(0x10f8,0xb331,0x8010)),
     (0x23e59,(0x710d,0x0011,0x1010,0x0081,0x8081,0x100f,0xee13,0x8a17,0x8a16,0x8a11,0xf4e4)),
 )
+DECODER_INPUT_RESERVE_BASE = 0x24425
+DECODER_INPUT_RESERVE_WITNESS = (
+    0x6ff8,0xb331,0x0d00,0x81f8,0xb331,0x7210,0xb330,0x8912,
+    0x6de8,0xfff8,0xf6aa,0xf820,0x4438,0xf520,0x81f8,0xb331,
+    0xe800,0xf073,0x443c)
+
+
+def decode_decoder_input_reserve(words):
+    for offset,value in enumerate(DECODER_INPUT_RESERVE_WITNESS):
+        if words.get(DECODER_INPUT_RESERVE_BASE+offset) != value:
+            raise ValueError('decoder input reserve witness changed or absent')
+    return dict(entry='024425',pinned_words=19,
+                predicate='unsigned candidate index > ((b330 - 8) & ffff)',
+                rejected='subtract the skipped-word count back out of b331, return zero',
+                accepted='branch to 024438, consume residual bits through 02510c',
+                scope='Local skip helper reserves eight words for extents >= 8; not a general EOF or short-buffer protocol')
 
 
 def decode_decoder_input_descriptor(words):
@@ -1940,6 +1956,7 @@ def contract(source):
     result['decoder_output'] = decode_decoder_output(rel_words)
     result['decoder_framing'] = decode_decoder_framing(rel_words)
     result['decoder_input_descriptor'] = decode_decoder_input_descriptor(rel_words)
+    result['decoder_input_reserve'] = decode_decoder_input_reserve(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)

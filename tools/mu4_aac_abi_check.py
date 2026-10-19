@@ -64,15 +64,16 @@ def check_input(text, encoded, session=False):
                 scope='Actual input-window reads and contiguous consumed-prefix coverage; context PCs are not retained instruction ownership or an all-address exclusion proof')
 
 
-def check_session(text, raw, converted, reference, encoded, *, refill=False, stream=False):
+def check_session(text, raw, converted, reference, encoded, *, refill=False, stream=False, eof_boundary=False):
     """Original calls sharing a constructor/reservoir; optional public-input refill."""
     try:
-        return _check_session(text,raw,converted,reference,encoded,refill=refill or stream,calls=32 if stream else 8 if refill else 4)
+        return _check_session(text,raw,converted,reference,encoded,refill=refill or stream or eof_boundary,
+                              calls=172 if eof_boundary else 32 if stream else 8 if refill else 4,boundary=eof_boundary)
     except (KeyError,TypeError) as error:
         raise ValueError('incomplete session fields') from error
 
 
-def _check_session(text, raw, converted, reference, encoded, *, refill, calls):
+def _check_session(text, raw, converted, reference, encoded, *, refill, calls, boundary=False):
     returns = rows(text, 'mu4_aac_session_return')
     headers = rows(text, 'mu4_aac_abi_header')
     sources = rows(text, 'mu4_aac_abi_sources')
@@ -85,17 +86,17 @@ def _check_session(text, raw, converted, reference, encoded, *, refill, calls):
                       isolated_abi='1',handset_boot='0',conformance='0')]:
         raise ValueError('session setup changed')
     refills = rows(text,'mu4_aac_session_refill')
-    if len(refills) != (calls//4-1 if refill else 0):
+    if len(refills) != (calls//4-int(not boundary) if refill else 0):
         raise ValueError('unexpected or missing public-input refill')
     markers = ['mu4_aac_abi_'+name for name in ('setup','header','sources','capture','result','input_end')]
-    markers += ['mu4_aac_session_return','mu4_aac_session_refill']
+    markers += ['mu4_aac_session_return','mu4_aac_session_refill','mu4_aac_wrapper_early_return']
     observed = [marker for line in text.splitlines() for marker in markers if marker+':' in line]
     expected_order = ['mu4_aac_abi_setup']
     for call in range(1,calls+1):
         expected_order += ['mu4_aac_abi_header','mu4_aac_abi_sources','mu4_aac_abi_capture','mu4_aac_session_return']
-        if refill and call % 4 == 0 and call < calls:
+        if refill and call % 4 == 0 and (call < calls or boundary):
             expected_order.append('mu4_aac_session_refill')
-    expected_order += ['mu4_aac_abi_result','mu4_aac_abi_input_end']
+    expected_order += ['mu4_aac_wrapper_early_return'] if boundary else ['mu4_aac_abi_result','mu4_aac_abi_input_end']
     if observed != expected_order:
         raise ValueError('session event order changed')
     base, consumed, window_offset = 0x162e, 0, 0
@@ -123,20 +124,35 @@ def _check_session(text, raw, converted, reference, encoded, *, refill, calls):
         if captures[call-1] != dict(frames='1024',channels='2',raw_bytes='8192',converted_bytes='4096',
                                     source='decoder_return_pointers',memory='post_wrapper_return',conformance='0'):
             raise ValueError('session capture scope changed')
-        if refill and call % 4 == 0 and call < calls:
+        if refill and call % 4 == 0 and (call < calls or boundary):
             window_offset += 2*(cursor-0x162e)
+            window_bytes = min(2048,len(encoded)-window_offset) & ~1
             if refills[call//4-1] != dict(after_call=str(call),source_byte=str(window_offset),old_cursor=f'{cursor:04x}',
-                                  cursor='162e',end='1a2e',bytes='2048',remaining=f'{remaining:04x}',
+                                  cursor='162e',end=f'{0x162e+window_bytes//2:04x}',bytes=str(window_bytes),remaining=f'{remaining:04x}',
                                   reservoir_high=encoded[window_offset-4:window_offset-2].hex(),
                                   reservoir_low=encoded[window_offset-2:window_offset].hex(),fixture_input='1',decoder_state_writes='0'):
                 raise ValueError('refill changed private decoder state or source offset')
             base = 0x162e
     terminal = rows(text, 'mu4_aac_abi_result')
-    if terminal != [dict(returned='1',result='0000',base=result['base'],index=result['index'],
+    if boundary:
+        reserve = rows(text,'mu4_aac_tail_reserve')
+        expected_reserve = [dict(opcode='f6aa',candidate_index=index,reserve_limit='00dc',extent='00e4',
+                                 remaining=remaining,identity='Execute_entry',observer_writes='0')
+                            for index,remaining in [('0000','0008'),('00dd','0000')]]
+        if reserve != expected_reserve:
+            raise ValueError('missing eight-word tail-reserve boundary')
+        if terminal or rows(text,'mu4_aac_input_exhausted') or rows(text,'mu4_aac_wrapper_early_return') != [dict(
+                completed_calls=str(calls),headers=str(calls),sources=str(calls),result='ffff',cursor='162e',
+                end=f'{0x162e+window_bytes//2:04x}',base='162e',index='0000',remaining='0000',
+                input_source=str(window_offset),window_bytes=str(window_bytes),illegal='0',observer_writes='0')]:
+            raise ValueError('short-input boundary changed or read beyond source')
+    elif terminal != [dict(returned='1',result='0000',base=result['base'],index=result['index'],
                          remaining=result['remaining'],illegal='0',pc='001023' if calls > 8 else '001076' if refill else '001042',
                          isolated_abi='1',conformance='0')]:
         raise ValueError('missing successful session terminal')
-    if 'Fatal error:' in text or 'unsupported instruction' in text:
+    fatal_messages = [line.split('Fatal error:',1)[1].strip() for line in text.splitlines() if 'Fatal error:' in line]
+    if (any(not boundary or message != 'MU4 AAC wrapper returned without a new decoded block' for message in fatal_messages)
+            or 'unsupported instruction' in text):
         raise ValueError('faulted session')
     words = calls*2048
     if len(raw) != words*4 or len(converted) != words*2 or len(reference) < words*2:
@@ -147,23 +163,25 @@ def _check_session(text, raw, converted, reference, encoded, *, refill, calls):
     if any(reference_pcm_conversion(x & 0xffffffff)['word'] != (y & 0xffff) for x,y in zip(values,actual)):
         raise ValueError('session conversion mismatch')
     if refill:
-        check_refill_input(text,encoded,consumed,calls)
+        check_refill_input(text,encoded,consumed,calls,boundary=boundary)
     else:
         check_input(text,encoded,session=True)
     return dict(calls=calls,frames=calls*1024,consumed_bytes=consumed,
                 differing_samples=sum(x != y for x,y in zip(actual,wanted)),
-                max_error=max(abs(x-y) for x,y in zip(actual,wanted)),conformance=False)
+                max_error=max(abs(x-y) for x,y in zip(actual,wanted)),conformance=False,
+                status='native_short_input_boundary_not_eof_completion' if boundary else 'bounded_continuity')
 
 
-def check_refill_input(text, encoded, consumed, calls=8):
+def check_refill_input(text, encoded, consumed, calls=8, *, boundary=False):
     reads = rows(text,'mu4_aac_session_input_read')
     if not 0 < len(reads) <= max(4096,calls*1024) or rows(text,'mu4_aac_abi_input_read'):
         raise ValueError('missing, mixed or capped session input')
     source_words, indices = set(), set()
-    window_offset, ordinal = 0, 0
+    window_offset, ordinal, window_bytes = 0, 0, 2048
     for line in text.splitlines():
         if 'mu4_aac_session_refill:' in line:
-            window_offset = int(rows(line,'mu4_aac_session_refill')[0]['source_byte'])
+            record = rows(line,'mu4_aac_session_refill')[0]
+            window_offset,window_bytes = int(record['source_byte']),int(record['bytes'])
         entries = rows(line,'mu4_aac_session_input_read')
         if not entries:
             continue
@@ -171,7 +189,7 @@ def check_refill_input(text, encoded, consumed, calls=8):
         ordinal += 1
         index = int(read['index'])
         offset = window_offset+2*index
-        if not 0 <= index < 1024 or offset+2 > len(encoded):
+        if not 0 <= index < window_bytes//2 or offset+2 > len(encoded):
             raise ValueError('session input outside window/source')
         if read != dict(ordinal=str(ordinal),index=str(index),source_byte=str(offset),
                         address=f'{0x162e+index:04x}',value=f'{int.from_bytes(encoded[offset:offset+2],"big"):04x}',
@@ -181,10 +199,12 @@ def check_refill_input(text, encoded, consumed, calls=8):
         indices.add(index)
     if source_words != set(range(max(source_words)+1)) or 2*len(source_words) < consumed:
         raise ValueError('session input omits consumed prefix')
-    if rows(text,'mu4_aac_abi_input_end') != [dict(reads=str(len(reads)),unique_words=str(len(indices)),
-                                                  highest_index=str(max(indices)),complete='1',observer_writes='0')]:
+    expected_end = [] if boundary else [dict(reads=str(len(reads)),unique_words=str(len(indices)),
+                                           highest_index=str(max(indices)),complete='1',observer_writes='0')]
+    if rows(text,'mu4_aac_abi_input_end') != expected_end:
         raise ValueError('session input summary changed')
-    if text.rfind('mu4_aac_session_input_read:') > text.rfind('mu4_aac_abi_sources:'):
+    final_marker = 'mu4_aac_wrapper_early_return:' if boundary else 'mu4_aac_abi_sources:'
+    if text.rfind('mu4_aac_session_input_read:') > text.rfind(final_marker):
         raise ValueError('session input after final decoder return')
 
 
@@ -248,6 +268,7 @@ def main():
     mode.add_argument('--four-calls', action='store_true')
     mode.add_argument('--refill', action='store_true', help='check eight calls with one public-input refill')
     mode.add_argument('--stream', action='store_true', help='check 32 calls with repeated public-input refills')
+    mode.add_argument('--eof-boundary', action='store_true', help='check 172 successful calls followed by native short-input return, not full EOF success')
     args = parser.parse_args()
     try:
         contract(args.source_a00.read_bytes())
@@ -256,10 +277,11 @@ def main():
                                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
                                (args.run/'mu4_aac_abi_converted.s16le').read_bytes(),
                                args.reference_pcm.read_bytes())
-        result = check_session(*capture_args,encoded,refill=args.refill,stream=args.stream) if args.four_calls or args.refill or args.stream else check_capture(*capture_args)
+        session = args.four_calls or args.refill or args.stream or args.eof_boundary
+        result = check_session(*capture_args,encoded,refill=args.refill,stream=args.stream,eof_boundary=args.eof_boundary) if session else check_capture(*capture_args)
         if hashlib.sha256(encoded).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
             raise ValueError('expected the independently generated MPEG-2 control')
-        if not args.four_calls and not args.refill and not args.stream:
+        if not session:
             result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
     except (OSError, ValueError) as error:
         print(f'MU4 AAC ABI: {error}', file=sys.stderr)

@@ -13,10 +13,10 @@ mu4_aac_abi_capture: frames=1024 channels=2 raw_bytes=8192 converted_bytes=4096 
 
 
 class AbiCheckTest(unittest.TestCase):
-    def session_fixture(self, calls=8):
-        lengths = [308,378,362,286,324,348,349,365]*(calls//8)
-        remaining_counts = [16,16,16,16,32,16,24,16]*(calls//8)
-        encoded = bytearray(max(4096,sum(lengths)+2048))
+    def session_fixture(self, calls=8, boundary=False):
+        lengths = ([308,378,362,286,324,348,349,365]*((calls+7)//8))[:calls]
+        remaining_counts = ([16,16,16,16,32,16,24,16]*((calls+7)//8))[:calls]
+        encoded = bytearray(sum(lengths)+remaining_counts[-1]//8+457 if boundary else max(4096,sum(lengths)+2048))
         offset = 0
         for length in lengths:
             header = bytearray.fromhex('fff95080269ffc')
@@ -45,12 +45,18 @@ class AbiCheckTest(unittest.TestCase):
                       f'mu4_aac_session_return: call={call} descriptor={cursor:04x} base={base:04x} index={cursor-base:04x} remaining={remaining:04x} result=0000 observer_writes=0']
             last_base, last_index = base, cursor-base
             base = cursor
-            if call % 4 == 0 and call < calls:
+            if call % 4 == 0 and (call < calls or boundary):
                 window += 2*(cursor-0x162e)
-                lines.append(f'mu4_aac_session_refill: after_call={call} source_byte={window} old_cursor={cursor:04x} cursor=162e end=1a2e bytes=2048 remaining={remaining:04x} reservoir_high={encoded[window-4:window-2].hex()} reservoir_low={encoded[window-2:window].hex()} fixture_input=1 decoder_state_writes=0')
+                available = min(2048,len(encoded)-window) & ~1
+                lines.append(f'mu4_aac_session_refill: after_call={call} source_byte={window} old_cursor={cursor:04x} cursor=162e end={0x162e+available//2:04x} bytes={available} remaining={remaining:04x} reservoir_high={encoded[window-4:window-2].hex()} reservoir_low={encoded[window-2:window].hex()} fixture_input=1 decoder_state_writes=0')
                 base = 0x162e
-                next_count = (sum(lengths[call:call+4])+remaining_counts[call+3]//8-remaining//8)//2+1
+                next_count = 3 if call == calls else (sum(lengths[call:call+4])+remaining_counts[call+3]//8-remaining//8)//2+1
                 reads(window,next_count)
+        if boundary:
+            lines += [f'mu4_aac_tail_reserve: opcode=f6aa candidate_index={index} reserve_limit=00dc extent=00e4 remaining={remaining} identity=Execute_entry observer_writes=0'
+                      for index,remaining in [('0000','0008'),('00dd','0000')]]
+            lines.append(f'mu4_aac_wrapper_early_return: completed_calls={calls} headers={calls} sources={calls} result=ffff cursor=162e end=1712 base=162e index=0000 remaining=0000 input_source={window} window_bytes=456 illegal=0 observer_writes=0')
+            return '\n'.join(lines),bytes(encoded)
         pc = '001023' if calls > 8 else '001076'
         lines += [f'mu4_aac_abi_result: returned=1 result=0000 base={last_base:04x} index={last_index:04x} remaining=0010 illegal=0 pc={pc} isolated_abi=1 conformance=0',
                   f'mu4_aac_abi_input_end: reads={ordinal} unique_words={len(indices)} highest_index={max(indices)} complete=1 observer_writes=0']
@@ -66,6 +72,18 @@ class AbiCheckTest(unittest.TestCase):
                         text.replace('pc=001023','pc=001076'),
                         text.replace('context_pc=025129','context_pc=000000',1)):
             with self.subTest(changed=changed[-100:]), self.assertRaises(ValueError):
+                check(changed)
+
+    def test_eof_boundary_is_not_clean_completion_or_padding_permission(self):
+        text,encoded = self.session_fixture(172,boundary=True)
+        def check(value):
+            return check_session(value,bytes(172*8192),bytes(172*4096),bytes(172*4096),encoded,eof_boundary=True)
+        self.assertEqual(check(text)['status'],'native_short_input_boundary_not_eof_completion')
+        for changed in (text.replace('result=ffff','result=0000'),
+                        text.replace('candidate_index=00dd','candidate_index=00dc'),
+                        text.replace('window_bytes=456','window_bytes=458'),
+                        text.replace('illegal=0','illegal=1')):
+            with self.subTest(changed=changed[-120:]), self.assertRaises(ValueError):
                 check(changed)
 
     def test_refill_session_and_mutated_continuity(self):
