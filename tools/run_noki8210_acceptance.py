@@ -150,7 +150,11 @@ def main():
                         help='supported PIN fixture physical entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
                         help='test supported scenarios on DCS1800 carriers 823/824; late-PIN recovery remains unproved')
+    parser.add_argument('--phase-observe', action='store_true',
+                        help='passively observe the DCS PIN continuation; does not relax registration acceptance')
     args = parser.parse_args()
+    if args.phase_observe and (args.scenario != 'registration' or not args.pin_enabled or not args.dcs1800):
+        parser.error('--phase-observe requires registration with --pin-enabled --dcs1800')
     if args.pin_start is not None and (
             not args.pin_enabled or args.scenario not in PIN_SCENARIOS or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
@@ -199,6 +203,8 @@ def main():
             if args.pin_start is not None:
                 environment['NOKIA_DCT3_8210_PIN_START'] = str(args.pin_start)
         script, seconds, checker = SCENARIOS[args.scenario]
+        if args.phase_observe:
+            script = 'phase_input'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-noreadconfig', '-debug', '-debugger', 'none',

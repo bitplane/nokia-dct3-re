@@ -398,6 +398,10 @@ def verify(image):
             ('beq', '#0x21c4ee'), ('cmp', 'r0, #4'),
             ('beq', '#0x21c434'), ('b', '#0x21bf86')]:
         raise ValueError('initial request completion phase dispatch differs')
+    if instructions(0x21c348, 2) != [('str', 'r0, [r4, #0xc]')]:
+        raise ValueError('completion phase common store differs')
+    if [int.from_bytes(read(address,4),'big') for address in (0x21bbd4,0x21f7f4)] != [0x138038,0x138038]:
+        raise ValueError('receive/phase context root literals differ')
     if instructions(0x21bf86, 14) != [
             ('cmp', 'r0, #0'), ('bne', '#0x21c01c'),
             ('adr', 'r0, #0x24c'), ('bl', '#0x2d5dcc'),

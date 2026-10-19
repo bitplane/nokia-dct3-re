@@ -1936,16 +1936,51 @@ by these stores. Fresh completion evidence:
 `tmp/noki8210_manual_queue_fields/error.log`, SHA-256
 `262cff505f7b459bdc28e718751965f41585136fa94bacc230b2f7b5c6795755`.
 
-The initial-request completion publisher has a separate phase gate worth
-observing. Continuation `21c41c` reads its caller context word `+0c`:
+The initial-request completion publisher has a separate phase dispatch.
+Continuation `21c41c` reads its caller context word `+0c`:
 2 branches to `21c5e0`, 5 to `21c5be`, 3 to `21c4ee`, and 4 to
 `21c434`; other values branch to `21bf86`. There, only zero proceeds
 through helper `2a1d44` toward the already observed `21bffa -> 2a21a4`
 publication; nonzero branches to `21c01c`. The pinned checker verifies
-both dispatch and zero gate. This context word is not the request queue's
-`137f58+0c` pointer: its runtime owner/value and the event selecting this
-continuation remain unresolved. Observe those before treating this as
-an available drain entrance or changing peer timing.
+both dispatch and zero gate, common store `21c348` and both ROM literals
+selecting root `138038`. Its phase word is `138044`, not the request queue's
+`137f58+0c` pointer.
+
+Paired fresh DCS/PIN runs with the passive phase observer establish a bounded
+negative result for this gate. Physical PIN begins at seven/eight seconds;
+both accept VERIFY CHV. The seven-second control passes the full registration,
+release, paging and persisted-EF_LOCI check. Its first phase continuation has
+receive state 15, input `1802` and phase zero, then reaches `21bffa`. A later
+state-7 `1802` continuation stores phase `0a` and takes the nonzero exit.
+The eight-second run visits none of these five observed boundaries through
+46.016667 seconds. It finishes in receive state 13 with phase **already zero**.
+Thus a wrong value at this phase gate is not the observed late-PIN blocker:
+the continuation is not entered. These are site-bounded observations, not
+closure over every writer of the phase word or proof of late-PIN recovery.
+
+`noki8210_phase_check.py` verifies per-site ordinal/cap/horizon integrity,
+continued late receive-loop activity near the horizon and the paired physical
+PIN timings; it also independently requires the early
+registration contract. Its observer uses `temp0,temp2..temp5`, leaving
+`temp1,temp6..temp9` to the existing startup/physical fixture. Shared-counter
+or short-horizon captures are rejected. `--phase-observe` does not relax the
+ordinary registration checker, so the late run is still an expected failure,
+not a promoted acceptance profile:
+
+```sh
+.venv/bin/python tools/run_noki8210_acceptance.py EARLY --scenario registration \
+  --pin-enabled --pin-start 7 --dcs1800 --phase-observe
+.venv/bin/python tools/run_noki8210_acceptance.py LATE --scenario registration \
+  --pin-enabled --pin-start 8 --dcs1800 --phase-observe
+# LATE currently returns nonzero after preserving the completed capture.
+.venv/bin/python tools/noki8210_phase_check.py \
+  roms/noki8210/8210_5.31ppm_c.fls EARLY LATE
+```
+
+The open boundary remains state 13's post-acquisition measurement/request
+continuation lifetime, not an available phase-gate entrance. Do not write
+phase zero, replay the successful state-15 acknowledgement or adjust peer
+timing to manufacture that transition.
 
 The paired runtime control resolves that immediate question. With the
 acceptance runner's GSM ARFCN4/5 PIN topology, context `138038` enters

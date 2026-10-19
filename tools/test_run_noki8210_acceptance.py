@@ -9,6 +9,19 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_phase_observer_is_limited_to_its_characterized_pin_composition(self):
+        for options in ([], ['--pin-enabled'], ['--pin-enabled','--dcs1800','--scenario','idle-state']):
+            with self.subTest(options=options), patch('sys.argv',['runner','unused','--phase-observe']+options), \
+                    patch('sys.stderr',new_callable=io.StringIO), patch.object(runner,'prepare_run') as prepare, \
+                    self.assertRaises(SystemExit):
+                runner.main()
+            prepare.assert_not_called()
+        with patch('sys.argv',['runner','unused','--phase-observe','--pin-enabled','--dcs1800']), \
+                patch.object(runner.Path,'read_bytes',return_value=b''), \
+                patch.object(runner,'prepare_run',side_effect=RuntimeError('admitted')), \
+                self.assertRaisesRegex(RuntimeError,'admitted'):
+            runner.main()
+
     def test_cold_sms_status_admits_own_dcs_pin_profile(self):
         self.assertIn('host-sms-status', runner.PIN_SCENARIOS)
         self.assertIn('host-sms-status', runner.DCS_SCENARIOS)

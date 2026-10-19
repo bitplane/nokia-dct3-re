@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_late_pin_is_blocked_at_nonzero_completion_phase",
+      "status": "disproven",
+      "hypothesis": "Late-PIN DCS recovery reaches completion dispatch 21c41c but is blocked by a nonzero phase word, requiring its legitimate zero setter",
+      "conclusion": "The own-ROM store and literals identify phase 138038+0c=138044, distinct from the request queue. Paired fresh physical PIN runs at seven/eight seconds both accept VERIFY CHV. Early PIN registers and reaches state-15 input 1802 with phase zero, publishing through 21bffa; a later state-7 input takes the nonzero phase-0a exit. Late PIN visits none of the five observed store/dispatch/gate/publication boundaries through 46.016667 seconds, continues its receive loop near the horizon, and ends in state 13 with phase already zero. This excludes that phase comparison as the observed immediate blocker, not other phase-word uses or all writers. The state-13 post-acquisition measurement/request continuation remains unresolved; do not inject phase zero or replay the early acknowledgement.",
+      "evidence": ["docs/8210_bringup.md", "tools/noki8210_radio_contract.py", "tools/noki8210_phase_observe.lua", "tools/noki8210_phase_check.py", "tools/test_noki8210_phase_check.py"]
+    },
+    {
       "id": "nse1_packed_parameter_as_peripheral_request_bitmap",
       "status": "disproven",
       "hypothesis": "Directly aliasing packed MCU parameter 100a8/0854 onto DSP port-1 requests and clearing its bits on acceptance is necessary for ordinary native 5110 boot and correctly delivers codec controls",
