@@ -153,6 +153,42 @@ def pin_read_instructions(identities,words):
                 scope='Original source opcode matches actual staged bus-read identity; not copy destination, full routine identity or encoder consumption')
 
 
+def check_copies(text,identities):
+    ends = rows(text,'mu4_recorder_copy_terminal')
+    if len(ends) != 1 or identities is None:
+        raise ValueError('copy pairing requires read identity and one terminal')
+    end = ends[0]
+    for key,value in dict(pending='0',bad='0',dropped='0',pending_cap='64',site_cap='256',
+            identity='staged_read_write',save_restore='unsupported',observer_writes='0',encoder_consumption='0').items():
+        if end[key] != value:
+            raise ValueError('incomplete or inconsistent staged copy pairing')
+    expected = {(row['bank'],int(row['instruction'],16),int(row['opcode'],16)):row['reads']
+                for row in identities['instructions'] if int(row['opcode'],16)&0xff00 == 0xe500}
+    seen,known,unknown,result = set(),{},0,[]
+    for row in rows(text,'mu4_recorder_copy_destination'):
+        bank,address,opcode = int(row['bank']),int(row['instruction'],16),int(row['opcode'],16)
+        key = bank,address,opcode
+        new,old = int(row['known_writes']),int(row['unknown_writes'])
+        low,high,dest_low,dest_high = (int(row[field],16) for field in
+            ('source_min','source_max','destination_min','destination_max'))
+        if (bank not in (0,1) or not 0 <= address <= 0x7fffff or not 0 <= opcode <= 0xffff
+                or opcode&0xff00 != 0xe500 or key in seen or min(new,old) < 0 or new+old <= 0
+                or not 0x1800+bank*256 <= low <= high < 0x1900+bank*256
+                or not 0 <= dest_low <= dest_high <= 0xffff or row['observer_writes'] != '0'):
+            raise ValueError('invalid copy destination histogram')
+        seen.add(key); unknown += old
+        if new:
+            known[key] = new
+        result.append(dict(bank=bank,instruction=f'{address:06x}',opcode=f'{opcode:04x}',
+                           known_writes=new,unknown_writes=old,source_min=f'{low:04x}',
+                           source_max=f'{high:04x}',destination_min=f'{dest_low:04x}',destination_max=f'{dest_high:04x}'))
+    if (len(seen) > 256 or known != expected or sum(known.values()) != int(end['known_reads'])
+            or unknown != int(end['unknown_reads']) or sum(known.values())+unknown != int(end['writes'])):
+        raise ValueError('copy destination writes do not reconcile with operand reads')
+    return dict(destinations=result,paired_words=int(end['writes']),
+                scope='Instruction/source/value paired actual MVDD bus writes; ranges are not contiguous coverage or encoder consumption')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -192,8 +228,10 @@ def check(text,require_fresh=False):
     destinations = check_destinations(text,owners) if rows(text,'mu4_recorder_destination_terminal') else None
     buffers = check_buffers(text,destinations) if rows(text,'mu4_recorder_buffer_terminal') else None
     identities = check_read_identity(text,buffers) if rows(text,'mu4_recorder_buffer_identity_terminal') else None
+    copies = check_copies(text,identities) if rows(text,'mu4_recorder_copy_terminal') else None
     return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
             'read_instructions':identities,
+            'copy_destinations':copies,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -210,6 +248,7 @@ def main():
     parser.add_argument('--buffers',action='store_true',help='require receive-buffer write/read lifetimes')
     parser.add_argument('--instructions',action='store_true',help='require staged operand read identities')
     parser.add_argument('--source-a00',type=Path,help='pin captured read opcodes to original R060 AA88 upload')
+    parser.add_argument('--copies',action='store_true',help='require instruction/source/value paired MVDD writes')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
@@ -219,6 +258,8 @@ def main():
             raise ValueError('recorder buffer lifetime observation required')
         if args.instructions and result['read_instructions'] is None:
             raise ValueError('staged buffer read instruction observation required')
+        if args.copies and result['copy_destinations'] is None:
+            raise ValueError('MVDD read/write pairing required')
         if args.source_a00:
             source = args.source_a00.read_bytes()
             if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:

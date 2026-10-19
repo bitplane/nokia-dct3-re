@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions
+from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies
 
 
 def fixture():
@@ -16,6 +16,21 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_copy_pairing_requires_exact_known_and_unknown_source_counts(self):
+        text = '\n'.join([
+            'mu4_recorder_copy_destination: bank=0 instruction=038eb5 opcode=e598 known_writes=10 unknown_writes=2 source_min=1800 source_max=18ff destination_min=0db5 destination_max=0e34 observer_writes=0',
+            'mu4_recorder_copy_terminal: known_reads=10 unknown_reads=2 writes=12 pending=0 bad=0 dropped=0 pending_cap=64 site_cap=256 identity=staged_read_write save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        identities = dict(instructions=[dict(bank=0,instruction='038eb5',opcode='e598',reads=10)])
+        self.assertEqual(check_copies(text,identities)['paired_words'],12)
+        for before,after in [('known_writes=10','known_writes=9'),('writes=12','writes=11'),
+                             ('unknown_reads=2','unknown_reads=1'),('pending=0','pending=1'),
+                             ('bad=0','bad=1'),('dropped=0','dropped=1'),
+                             ('opcode=e598','opcode=f495'),('source_min=1800','source_min=1700')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_copies(text.replace(before,after),identities)
+        with self.assertRaises(ValueError):
+            check_copies(text+'\n'+text.splitlines()[0],identities)
+
     def test_read_instruction_identity_requires_exact_bus_coverage(self):
         text = '\n'.join([
             'mu4_recorder_buffer_instruction: bank=0 instruction=038eb5 opcode=e598 reads=10 observer_writes=0',

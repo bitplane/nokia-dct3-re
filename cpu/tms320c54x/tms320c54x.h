@@ -47,6 +47,8 @@ public:
 	// Valid only inside an actual staged operand bus read, not forwarded values,
 	// debugger peeks, DMA reads or Execute/retirement. Never accesses guest memory.
 	bool observe_staged_data_read(u16 address, u32 &instruction, u16 &opcode) const;
+	// Actual MVDD destination bus write; source is the retained operand address.
+	bool observe_staged_mvdd_write(u16 address, u32 &instruction, u16 &opcode, u16 &source) const;
 
 	enum : unsigned
 	{
@@ -289,6 +291,7 @@ private:
 	devcb_write32 m_system_clock_cb;
 	devcb_write16 m_instruction_observer_cb;
 	bool m_observed_data_read = false;
+	bool m_observed_mvdd_write = false;
 	u16 m_observed_data_address = 0, m_observed_data_opcode = 0;
 	u32 m_observed_data_instruction = 0;
 	bool m_pll_locked = false;

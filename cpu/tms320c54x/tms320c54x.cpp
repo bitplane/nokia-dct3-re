@@ -5044,7 +5044,11 @@ void tms320c54x_device::pipeline_step()
 			accumulator(BIT(m_op, 8)) = multiply_result(result, BIT(m_op, 8));
 		}
 		else if (staged_mvdd(m_op))
+		{
+			m_observed_mvdd_write = true;
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+			m_observed_mvdd_write = false;
+		}
 		else if (staged_sqdst(m_op))
 		{
 			// SQDST squares old A before the vector subtraction replaces it.
@@ -5752,6 +5756,13 @@ bool tms320c54x_device::observe_staged_data_read(u16 address, u32 &instruction, 
 {
 	if (!m_observed_data_read || address != m_observed_data_address || machine().side_effects_disabled()) return false;
 	instruction = m_observed_data_instruction; opcode = m_observed_data_opcode;
+	return true;
+}
+
+bool tms320c54x_device::observe_staged_mvdd_write(u16 address, u32 &instruction, u16 &opcode, u16 &source) const
+{
+	if (!m_observed_mvdd_write || address != m_pipeline_operand_address[5] || machine().side_effects_disabled()) return false;
+	instruction = m_pipeline_address[5]; opcode = m_pipeline_word[5]; source = m_pipeline_immediate[5];
 	return true;
 }
 

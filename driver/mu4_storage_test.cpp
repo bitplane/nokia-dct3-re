@@ -434,8 +434,33 @@ private:
 	u64 m_ac_buffer_bad = 0, m_ac_buffer_dropped = 0;
 	std::map<u64,u64> m_ac_buffer_instructions;
 	u64 m_ac_buffer_identity_missing = 0, m_ac_buffer_identity_dropped = 0;
+	struct recorder_copy_read { u32 instruction; u16 opcode, source, value; bool known; };
+	std::vector<recorder_copy_read> m_ac_copy_pending;
+	std::map<u64,std::array<u64,6>> m_ac_copy_destinations;
+	std::array<u64,2> m_ac_copy_reads{};
+	u64 m_ac_copy_writes = 0, m_ac_copy_bad = 0, m_ac_copy_dropped = 0;
 	void install_recorder_buffer_observers()
 	{
+		m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"mu4_recorder_copy_destination",
+			[this](offs_t address,u16 &value,u16 mask) {
+				if (machine().side_effects_disabled()) return;
+				u32 instruction = 0; u16 opcode = 0, source = 0;
+				if (!m_cpu->observe_staged_mvdd_write(address,instruction,opcode,source) || source < 0x1800 || source > 0x19ff) return;
+				auto found = std::find_if(m_ac_copy_pending.begin(),m_ac_copy_pending.end(),
+					[instruction,opcode,source](auto const &read) { return read.instruction == instruction && read.opcode == opcode && read.source == source; });
+				if (found == m_ac_copy_pending.end()) { ++m_ac_copy_bad; return; }
+				if (mask != 0xffff || value != found->value) ++m_ac_copy_bad;
+				u64 const key = (u64((source-0x1800)/256)<<48) | (u64(instruction)<<16) | opcode;
+				if (!m_ac_copy_destinations.count(key) && m_ac_copy_destinations.size() >= 256) ++m_ac_copy_dropped;
+				else
+				{
+					auto &row = m_ac_copy_destinations[key];
+					if (!row[0] && !row[1]) { row[2] = row[3] = source; row[4] = row[5] = address; }
+					else { row[2] = std::min(row[2],u64(source)); row[3] = std::max(row[3],u64(source)); row[4] = std::min(row[4],u64(address)); row[5] = std::max(row[5],u64(address)); }
+					++row[unsigned(found->known)];
+				}
+				++m_ac_copy_writes; m_ac_copy_pending.erase(found);
+			});
 		m_cpu->space(AS_DATA).install_write_tap(0x1800,0x19ff,"mu4_recorder_buffer_write",
 			[this](offs_t address,u16 &value,u16 mask) {
 				if (machine().side_effects_disabled()) return;
@@ -453,6 +478,13 @@ private:
 			[this](offs_t address,u16 &value,u16) {
 				if (machine().side_effects_disabled()) return;
 				unsigned const slot = address-0x1800, bank = slot/256;
+				u32 copy_instruction = 0; u16 copy_opcode = 0;
+				if (m_cpu->observe_staged_data_read(address,copy_instruction,copy_opcode) && (copy_opcode&0xff00) == 0xe500)
+				{
+					++m_ac_copy_reads[unsigned(m_ac_buffer_valid[slot])];
+					if (m_ac_copy_pending.size() >= 64) ++m_ac_copy_dropped;
+					else m_ac_copy_pending.push_back({copy_instruction,copy_opcode,u16(address),value,m_ac_buffer_valid[slot]});
+				}
 				if (!m_ac_buffer_valid[slot]) { ++m_ac_buffer_unknown[bank]; return; }
 				if (value != m_ac_buffer_word[slot]) ++m_ac_buffer_bad;
 				if (!m_ac_buffer_read[slot]) { ++m_ac_buffer_consumed[bank]; m_ac_buffer_read[slot] = true; }
@@ -3121,6 +3153,8 @@ private:
 		m_ac_buffer_writes.fill(0); m_ac_buffer_consumed.fill(0); m_ac_buffer_unread.fill(0); m_ac_buffer_unknown.fill(0);
 		m_ac_buffer_readers.fill(0); m_ac_buffer_contexts.clear(); m_ac_buffer_bad = m_ac_buffer_dropped = 0;
 		m_ac_buffer_instructions.clear(); m_ac_buffer_identity_missing = m_ac_buffer_identity_dropped = 0;
+		m_ac_copy_pending.clear(); m_ac_copy_destinations.clear(); m_ac_copy_reads.fill(0);
+		m_ac_copy_writes = m_ac_copy_bad = m_ac_copy_dropped = 0;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3679,6 +3713,11 @@ private:
 						unsigned(key>>48),unsigned((key>>16)&0x7fffff),unsigned(key&0xffff),static_cast<unsigned long long>(count));
 				logerror("mu4_recorder_buffer_identity_terminal: missing=%llu dropped=%llu cap=256 identity=staged_operand_bus_read save_restore=unsupported observer_writes=0 retirement=0\n",
 					static_cast<unsigned long long>(m_ac_buffer_identity_missing),static_cast<unsigned long long>(m_ac_buffer_identity_dropped));
+				for (auto const &[key,row] : m_ac_copy_destinations)
+					logerror("mu4_recorder_copy_destination: bank=%u instruction=%06x opcode=%04x known_writes=%llu unknown_writes=%llu source_min=%04x source_max=%04x destination_min=%04x destination_max=%04x observer_writes=0\n",
+						unsigned(key>>48),unsigned((key>>16)&0x7fffff),unsigned(key&0xffff),static_cast<unsigned long long>(row[1]),static_cast<unsigned long long>(row[0]),unsigned(row[2]),unsigned(row[3]),unsigned(row[4]),unsigned(row[5]));
+				logerror("mu4_recorder_copy_terminal: known_reads=%llu unknown_reads=%llu writes=%llu pending=%u bad=%llu dropped=%llu pending_cap=64 site_cap=256 identity=staged_read_write save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					static_cast<unsigned long long>(m_ac_copy_reads[1]),static_cast<unsigned long long>(m_ac_copy_reads[0]),static_cast<unsigned long long>(m_ac_copy_writes),unsigned(m_ac_copy_pending.size()),static_cast<unsigned long long>(m_ac_copy_bad),static_cast<unsigned long long>(m_ac_copy_dropped));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

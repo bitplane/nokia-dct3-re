@@ -997,6 +997,33 @@ and expiry before the destination write. The native buffer lifetimes and
 both NAND hashes above remain unchanged. Follow these three copy sites to
 their actual writes before assigning encoder-buffer semantics.
 
+`--copies` adds instruction/source/value pairing with actual staged MVDD
+destination bus writes. A bounded queue preserves read order for each
+instruction/source identity; values validate the pair rather than selecting
+it. The write query exposes the retained source address only during the
+real MVDD write and excludes other destinations and peeks. The peripheral
+MVDD fixture validates this query across 1536 cases and their save/restore
+replays, including source pointers changed before the write.
+
+The 20-second `tmp/native-gates/mu4-recorder-copy` capture pairs all 1699328
+known-value reads with writes, with no value mismatch, missing pair, capped
+site or pending read. There are no additional unknown-source copy pairs.
+
+| Instruction | Paired words | Observed source range | Observed destination range |
+| --- | ---: | --- | --- |
+| `038eb5` | 452352 | `1800..187f` | `0db5..0e34` |
+| `038eda` | 452352 | `1880..18ff` | `0e35..0eb4` |
+| `03faa5` | 794624 | `1800..18ff` | `7000..7fff` |
+
+These are actual paired-write counts and minimum/maximum addresses, not
+proof of contiguous coverage or a fixed source-to-destination offset.
+Native metadata success, buffer lifetime counts and both NAND hashes above
+reproduce unchanged. The encoder-consumption boundary now lies downstream
+of these copies; in particular, follow the `7000..7fff` writes with proper
+shared program/data DARAM alias accounting before assigning encoder input
+semantics. This still does not establish decoded audio or complete ADC/FIFO
+delivery.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected
