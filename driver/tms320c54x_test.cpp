@@ -20293,7 +20293,7 @@ private:
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				(rom4_codec_is("efr-dtx-decoder") || rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ||
-				 rom4_codec_is("efr-homing") || !strcmp(machine().options().bios(), "efr-home-errors") || rom4_codec_is("efr-invalid-sid")))
+				 rom4_codec_is("efr-homing") || rom4_codec_is("efr-home-errors") || rom4_codec_is("efr-invalid-sid")))
 		{
 			enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
 			start_rom4_efr_decoder(0, true);
@@ -21447,6 +21447,7 @@ private:
 		else if(bios=="efr-ehome") bios="efr-enc-homing";
 		else if(bios=="efr-isid") bios="efr-invalid-sid";
 		else if(bios=="efr-loss") bios="efr-loss-observe";
+		else if(bios=="efr-herr") bios="efr-home-errors";
 		return bios==name;
 	}
 	void enable_rom4_codec_pipeline(char const *kind)
@@ -21516,12 +21517,11 @@ private:
 	};
 	efr_decoder_fixture rom4_efr_decoder_fixture() const
 	{
-		char const *const bios = machine().options().bios();
 		if (rom4_codec_is("efr-dtx-decoder")) return { "efr_dtx_input", "efr_dtx_pcm", " DTX", 518 };
 		if (rom4_codec_is("efr-invalid-sid")) return { "efr_invalid_sid_input", "efr_invalid_sid_pcm", " invalid SID", 518 };
 		if (rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe")) return { "efr_erasure_input", "efr_erasure_pcm", " erasure", 163 };
 		if (rom4_codec_is("efr-homing")) return { "efr_homing_input", "efr_homing_pcm", " homing", 46 };
-		if (!strcmp(bios, "efr-home-errors")) return { "efr_homing_error_input", "efr_homing_error_pcm", " homing error", 49 };
+		if (rom4_codec_is("efr-home-errors")) return { "efr_homing_error_input", "efr_homing_error_pcm", " homing error", 49 };
 		return { "efr_reference_input", "efr_reference_pcm", "", 163 };
 	}
 	void start_rom4_efr_decoder(unsigned frame, bool initialize)
@@ -54103,7 +54103,7 @@ private:
 			bool const observing = rom4_codec_is("efr-loss-observe");
 			bool const erasure = observing || rom4_codec_is("efr-erasure");
 			bool const homing = rom4_codec_is("efr-homing");
-			bool const homing_errors = !strcmp(machine().options().bios(), "efr-home-errors");
+			bool const homing_errors = rom4_codec_is("efr-home-errors");
 			auto const fixture = rom4_efr_decoder_fixture();
 			unsigned const frames = fixture.frames;
 			expect(m_phase <= 302000 + frames, "EFR decoder phase stays within the selected reference input");
@@ -55072,7 +55072,7 @@ void tms320c54x_test_state::rom4(machine_config &config)
 			if (machine().options().verbose() && m_phase == 302009 && !m_rom4_codec_replay && ++m_rom4_fr_trace_count <= 200000)
 				trace_rom4_fr_state("efr_loss_execute",address,opcode);
 		});
-	if (!strcmp(config.options().bios(), "efr-home-errors"))
+	if (!strcmp(config.options().bios(), "efr-home-errors") || !strcmp(config.options().bios(), "efr-herr-pipe"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			// Original recovery may edit an input parameter before the full DHF
 			// comparison. Observe it; never repair the parameter or reset flag.
@@ -56837,7 +56837,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(28, "efr-isid-pipe", "Isolated acquired ROM EFR invalid SID decoder on staged CPU")
 	ROM_SYSTEM_BIOS(29, "efr-erasure-pipe", "Strict acquired ROM EFR erasure comparison on staged CPU")
 	ROM_SYSTEM_BIOS(30, "efr-loss-pipe", "Characterize staged EFR loss differences without conformance promotion")
+	ROM_SYSTEM_BIOS(31, "efr-herr-pipe", "Characterize staged EFR homing error reset and PCM differences")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(31))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(29))
@@ -56934,6 +56938,9 @@ ROM_START(tms54rom4)
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(31))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(29))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
@@ -57027,8 +57034,10 @@ ROM_START(tms54rom4)
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION(24206, "efr_homing_error_input", 0)
 	ROMX_LOAD("homing_error.dec", 0, 24206, CRC(f04d25bf) SHA1(e232a2cbc161fbacb185758001677c1e462bf0ca), ROM_BIOS(18))
+	ROMX_LOAD("homing_error.dec", 0, 24206, CRC(f04d25bf) SHA1(e232a2cbc161fbacb185758001677c1e462bf0ca), ROM_BIOS(31))
 	ROM_REGION(15680, "efr_homing_error_pcm", 0)
 	ROMX_LOAD("homing_error.out", 0, 15680, CRC(f1f822a8) SHA1(fbdf3d13761497e798baadc21b5dd8ac327ca593), ROM_BIOS(18))
+	ROMX_LOAD("homing_error.out", 0, 15680, CRC(f1f822a8) SHA1(fbdf3d13761497e798baadc21b5dd8ac327ca593), ROM_BIOS(31))
 	ROM_REGION(255892, "efr_invalid_sid_input", 0)
 	ROMX_LOAD("invalid_sid.dec", 0, 255892, CRC(1f747e55) SHA1(a26dfa2a8406406114ffb47092d98c5fdd78e758), ROM_BIOS(17))
 	ROMX_LOAD("invalid_sid.dec", 0, 255892, CRC(1f747e55) SHA1(a26dfa2a8406406114ffb47092d98c5fdd78e758), ROM_BIOS(28))

@@ -13,7 +13,11 @@ OBSERVED = 'TMS320C54x ROM4 EFR homing error observation: COMPLETE frames=49 sam
 COMPLETE = 'Fatal error: TMS320C54x ROM4 EFR homing error complete'
 
 
-def check(text, returncode, reference, strict=False):
+def check(text, returncode, reference, strict=False, staged=False):
+    if re.search(r'^Driver .+: [1-9]\d* errors?,', text, re.MULTILINE):
+        raise ValueError('MAME driver validity errors invalidate homing/error characterization')
+    if staged and text.splitlines().count('ROM4 EFR homing decoder frontend: staged handset_audio_claim=0') != 1:
+        raise ValueError('missing unique staged homing/error frontend selection')
     if len(reference) != FRAMES * 320:
         raise ValueError('incomplete independent homing/error PCM')
     lines = text.splitlines()
@@ -66,7 +70,7 @@ def check(text, returncode, reference, strict=False):
         raise ValueError('missing or changed original recovery parameter observations')
     if strict and (total or reset_differences):
         raise ValueError(f'strict homing/error reference differs: samples={total} reset_frames={reset_differences}')
-    return dict(schema=1, status='characterized', frames=FRAMES,
+    return dict(schema=1, status='characterized', frames=FRAMES, frontend='staged' if staged else 'atomic',
                 native_pcm_sha256=hashlib.sha256(native).hexdigest(),
                 total_mismatches=total, full_reference_equal=not total,
                 reference_reset_equal=not reset_differences,

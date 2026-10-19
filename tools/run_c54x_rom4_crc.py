@@ -202,7 +202,7 @@ def main():
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder or
                            args.efr_dtx_encoder or args.efr_dtx_decoder or args.efr_homing_encoder or args.efr_homing_decoder or args.efr_invalid_sid or
-                           args.efr_erasure_decoder or args.efr_erasure_observe):
+                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors):
         parser.error('--staged requires FR/EFR speech or a supported EFR lifecycle mode')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
@@ -244,6 +244,7 @@ def main():
                 'efr-dtx-decoder': 'efr-dtx-dec-pipe',
                 'efr-enc-homing': 'efr-ehome-pipe',
                 'efr-invalid-sid': 'efr-isid-pipe',
+                'efr-home-errors': 'efr-herr-pipe',
                 'efr-loss-observe': 'efr-loss-pipe'}.get(bios, bios + '-pipe')
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
@@ -324,11 +325,11 @@ def main():
             except ModuleNotFoundError:
                 from c54x_rom4_efr_homing_error_check import check as check_homing_errors
             reference = (args.rompath / 'tms54rom4/homing_error.out').read_bytes()
-            report = check_homing_errors(text, result.returncode, reference)
+            report = check_homing_errors(text, result.returncode, reference, staged=args.staged)
             report['strict_reference_required'] = not args.observe_homing_errors
             (run / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')
             if not args.observe_homing_errors:
-                check_homing_errors(text, result.returncode, reference, strict=True)
+                check_homing_errors(text, result.returncode, reference, strict=True, staged=args.staged)
             print(f"ROM4 EFR homing/error characterized: total_mismatches={report['total_mismatches']} reset_mismatch_frames={report['reset_mismatch_frames']} conformance_claim=0")
         else:
             check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr or args.trace_efr_reset)

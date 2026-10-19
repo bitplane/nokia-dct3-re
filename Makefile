@@ -1365,6 +1365,15 @@ observe-c54x-rom4-efr-homing-errors: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --observe-homing-errors
 
+.PHONY: observe-c54x-rom4-efr-homing-errors-staged check-c54x-rom4-efr-homing-errors-staged
+observe-c54x-rom4-efr-homing-errors-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --observe-homing-errors --staged
+
+check-c54x-rom4-efr-homing-errors-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --staged
+
 check-c54x-rom4-efr-dtx-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-decoder

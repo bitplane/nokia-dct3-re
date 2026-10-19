@@ -2671,8 +2671,10 @@ profile checks 1,024 cases/restores over DP, SP/CPL, indirect, increment,
 decrement, circular, long preincrement and absolute RAM addresses; source and
 literal boundary patterns; SXM/OVM combinations; and snapshots before/after
 the single read/write transaction. Decoder text also checks literal/address
-ordering. This adds atomic execution, not staged timing, peripheral ownership,
-repeat legality or interrupt composition for the instruction.
+ordering. This fixture adds atomic execution, not staged timing, peripheral
+ownership, repeat legality or interrupt composition. The separate staged
+`xorm-absolute` qualification covers retained operands and adjacent forwarding
+for absolute RAM; see [the loader contract](rom4_dsp_loader.md#absolute-xorm).
 
 The load-bearing CPU contract is XC's Access-stage predicate visibility
 ([SPRU131G 7.1.4, example 7-13](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)):
@@ -2956,10 +2958,23 @@ above.
 ### Native EFR homing with bad frames
 
 **Unresolved conformance boundary:** `check-c54x-rom4-efr-homing-errors`
-rejects the acquired decoder's reset sequence and PCM. The separate
+and its `-staged` counterpart reject the acquired decoder's reset sequence
+and PCM. The separate
 `observe-c54x-rom4-efr-homing-errors` captures every output and reset entry,
 independently recomputes PCM differences and requires all 49 full-RAM frame
 replays. A completed observation is not a conformance pass.
+
+`observe-c54x-rom4-efr-homing-errors-staged` selects `efr-herr-pipe` with the
+same hash-pinned program, cold data and vectors as the atomic bench. Both
+frontends reproduce all 49 frames, 7,840 PCM samples and 65,440 ordinary RAM
+words per frame. Their comparison reports differ only in the frontend label:
+native PCM SHA256 is
+`6175d3a503c0cd2fe6da74b6ae2fcf7bb850cfe4a0963dd999dec84761368b3b`,
+with identical observed reset entries and 512 reference differences. Staged
+acceptance requires exactly one frontend marker; validity errors, missing
+replay, changed recovery observations or incomplete output invalidate the
+characterization. The strict staged gate still rejects the reference reset
+differences at frames 1, 24 and 47; parity is not conformance.
 
 The generated input uses three canonical DHFs, speech20, three DHFs,
 the same speech20 and three final DHFs. Only the first DHF in each triplet

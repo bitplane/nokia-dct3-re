@@ -30,6 +30,24 @@ def capture(mismatches=None):
 
 
 class HomingErrorCheckTest(unittest.TestCase):
+    def test_staged_selection_is_unique_and_does_not_relax_reference(self):
+        marker = 'ROM4 EFR homing decoder frontend: staged handset_audio_claim=0'
+        text = marker + '\n' + capture({1: 17})
+        self.assertEqual(checker.check(text, 3, REFERENCE, staged=True)['frontend'], 'staged')
+        for invalid in (capture(), marker + '\n' + text,
+                        text.replace('homing decoder frontend', 'decoder frontend')):
+            with self.subTest(invalid=invalid[:100]), self.assertRaisesRegex(ValueError, 'frontend selection'):
+                checker.check(invalid, 3, REFERENCE, staged=True)
+        with self.assertRaisesRegex(ValueError, 'strict homing/error'):
+            checker.check(text, 3, REFERENCE, staged=True, strict=True)
+
+    def test_driver_validity_failure_invalidates_characterization(self):
+        for staged in (False, True):
+            marker = 'ROM4 EFR homing decoder frontend: staged handset_audio_claim=0\n' if staged else ''
+            with self.subTest(staged=staged), self.assertRaisesRegex(ValueError, 'validity errors'):
+                checker.check('Driver tms54rom4: 1 errors, 0 warnings\n' + marker + capture(),
+                              3, REFERENCE, staged=staged)
+
     def test_exact_sequence(self):
         result = checker.check(capture(), 3, REFERENCE, strict=True)
         self.assertTrue(result['full_reference_equal'])
