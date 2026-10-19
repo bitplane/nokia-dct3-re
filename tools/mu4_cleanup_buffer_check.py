@@ -122,6 +122,8 @@ def inspect_ram(data, pointer, cursor, limit):
             'file_buffer_object': file_object,
             'mailbox_first_words': {'0080': f'{word(0x80):04x}', '0090': f'{word(0x90):04x}'},
             'cursor': f'{cursor:04x}', 'limit': f'{limit:04x}', 'available_words': limit-cursor,
+            'resident_selection': {'mode': word(0x3740), 'track': word(0x3765),
+                                   'count': word(0x3768), 'continuation': word(0x3762)},
             'bit_reader': {'remaining': word(0xa854),
                            'reservoir': f'{(word(0xa858)<<16)|word(0xa859):08x}',
                            'index': word(0xb331), 'base': f'{word(0xb332):04x}'},

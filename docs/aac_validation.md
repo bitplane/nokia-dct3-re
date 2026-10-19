@@ -1019,14 +1019,33 @@ valid one-track catalogue this selects track 1 again. Mode 3 instead calls
 names for user repeat settings or evidence that mode 3 means stop.
 
 The runtime continuation write at `03a98c` and lifecycle write at `03a9b2`
-agree with that resident branch. The capture does not yet identify the actual
-mode-3 comparison outcome or every track-index access, so the source contract
-explains an available wrap path rather than proving the current repeat policy.
+agree with that resident branch. A separate cleanup-buffer/restart capture
+establishes mode 0, track 1, count 1 and continuation 2 in the cleanup snapshot.
+Ordered contexts at `03a98f`, `03a9a2`, `03a9a5`, `03a9af` then show
+continuation 6 and track `1 -> 2 -> 2 -> 1`, with wrap-test AR2 equal to 1.
+Thus this run takes the source-pinned index-advance/wrap path, not mode 3's
+nonadvance path. This identifies the selected mechanism, not the meaning or
+correct default of a user repeat setting.
 Tests pin every recovered word, check index advancement for all valid indices
 in catalogues of sizes 1 through 128, and cover the 16-bit maximum wrap. The
-next discriminator is the actual mode/index/count at resident restart, followed
-by the separately captured encoded buffer at cleanup; neither calls for
-changing playback samples or synthesizing completion.
+cleanup snapshot also identifies object `160a`, buffer `162e..1d4c` (1822 words),
+and a 32-bit reservoir `fff95080` with reader index 186. At captured decoder
+ordinal 376, the reservoir plus remaining buffer exactly matches the final
+projection's remaining 3348 bytes (nine complete 372-byte packets); 300 later
+buffer bytes remain outside that comparison. No byte-offset fitting is used.
+Those packets are present at cleanup but are not decoded in the first session.
+This rules out unavailable buffered bytes as their explanation, not that they
+must be decoded: intended priming/padding, refill lookahead and drain policy
+remain distinct questions. Do not feed these bytes artificially or replace
+the original caller's EOF result to make a completion gate pass.
+
+Reproduce with `mu4_restart_tail_observe.lua` on the same cold twelve-second
+bench, then `mu4_restart_tail_check.py RUN --source-a00 SOURCE
+--reference-aac FINAL_PROJECTION.aac`. It validates the original source hash
+and 70-word contract, cleanup RAM and projection correspondence, and all four
+restart contexts against the snapshot-derived source model. The NAND copy
+remains unchanged. The observer owns only the cleanup-buffer breakpoint plus
+distinct resident sites, avoiding the ingress/snapshot breakpoint collision.
 
 ### Decoded-Bank Copy Correspondence
 
