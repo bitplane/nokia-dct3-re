@@ -3,7 +3,7 @@ import unittest
 from tools.noki5510_identity_contract import (wire_identity, display_identity,
     check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture,
     record_reply_nibble_filter, record_reply_slot_binding, record_scan_tail,
-    factory_request_word_source)
+    factory_request_word_source, phone_code_from_nv, check_phone_code_capture)
 
 
 def decode_mobile_identity(data):
@@ -26,6 +26,36 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_phone_code_capture_requires_owned_read_and_exact_return(self):
+        text = '\n'.join([
+            '5510_phone_code_entry: ordinal=1 destination=001292c0 sp=001292b0 observer_writes=0',
+            '5510_nv_read: offset=00000110 bytes=00000003 owner=0029f88f observer_writes=0',
+            '5510_phone_code_return: ordinal=1 destination=001292c0 sp=0012929c stored_valid=0 output=3132333435 terminator=00 observer_writes=0'])
+        self.assertFalse(check_phone_code_capture(text,b'\xff'*0x3800)['stored_digits_valid'])
+        for old,new in [('owner=0029f88f','owner=0029f88d'),('terminator=00','terminator=ff'),
+                        ('sp=0012929c','sp=001292a0'),('output=3132333435','output=0000000000'),
+                        ('stored_valid=0','stored_valid=1'),('offset=00000110','offset=0000000c')]:
+            with self.assertRaises(ValueError):
+                check_phone_code_capture(text.replace(old,new),b'\xff'*0x3800)
+
+    def test_phone_code_fallback_and_unchecked_sixth_nibble(self):
+        self.assertEqual(phone_code_from_nv(b'\xff'*3),
+                         {'code':'12345','stored_digits_valid':False})
+        for last in range(16):
+            self.assertEqual(phone_code_from_nv(bytes([0x12,0x34,0x50|last])),
+                             {'code':'12345','stored_digits_valid':True})
+        for digit in range(5):
+            for value in range(16):
+                nibbles = [9]*6
+                nibbles[digit] = value
+                packed = bytes((nibbles[i]<<4)|nibbles[i+1] for i in range(0,6,2))
+                result = phone_code_from_nv(packed)
+                self.assertEqual(result['stored_digits_valid'],value < 10)
+                if value >= 10:
+                    self.assertEqual(result['code'],'12345')
+        with self.assertRaises(ValueError):
+            phone_code_from_nv(bytes(2))
+
     def test_factory_word_selection_is_ppm_probe_not_chip_id(self):
         flash = bytearray(b'\xff'*0x350000)
         flash[0x24d34c:0x24d350] = (0x490000).to_bytes(4,'big')

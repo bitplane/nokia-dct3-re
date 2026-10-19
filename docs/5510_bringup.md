@@ -2559,6 +2559,28 @@ validity or a connection to DSP replies `34`/`35`.
 
 ## Input consumer boundary
 
+### Phone-code storage consumer
+
+The own getter `29f876..29f8e2` reads three bytes at logical NV `0110`
+through call `29f88a`. It expands six nibbles to characters, validates only
+the first five using the own character table at `447e61` (digit mask 4),
+and replaces invalid digits with ROM literal `12345` at `29fbf4`. It then
+NUL-terminates at output byte 5 and returns whether the stored first five
+digits were valid. The sixth stored nibble is neither validated nor returned.
+The neighboring setter `2a0548` packs six input characters into three bytes
+and uses the checksum-maintaining NV update path; its caller input contract
+is not qualified here.
+
+The fresh eight-second capture `tmp/native-gates/npm5-phone-code-contract`
+observes one entry, its exact `0110+3` NV request and paired return:
+`stored_valid=0`, output `3132333435`, terminator `00`. Existing erased-NV,
+identity, record-transport and hybrid-bootstrap checks reproduce. The
+identity checker's `--phone-code` option checks the frame, request ownership
+and result against `phone_code_from_nv`; its byte-domain tests cover all
+sixth-nibble values and each validated position. This is an organic
+default-code fallback, not an injected code, physical unlock acceptance,
+valid factory provisioning or a reason to bypass the MU4 input boundary.
+
 ### Physical MU4 ownership
 
 Nokia's [MU4 technical description](https://www.eserviceinfo.com/preview_html.php?fileid=26142&previewid=12780)

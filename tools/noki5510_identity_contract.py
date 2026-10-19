@@ -18,6 +18,44 @@ def equipment_nibbles(packed):
     return [nibble for byte in packed[:7] for nibble in (byte >> 4, byte & 15)]
 
 
+def phone_code_from_nv(packed):
+    """29f876 first-five-digit validation; sixth nibble is not validated."""
+    if len(packed) != 3:
+        raise ValueError('expected three phone-code NV bytes at 0110')
+    digits = [n for byte in packed for n in (byte >> 4,byte & 15)][:5]
+    valid = all(n < 10 for n in digits)
+    return {'code':''.join(map(str,digits)) if valid else '12345',
+            'stored_digits_valid':valid}
+
+
+def check_phone_code_capture(text, cache):
+    if len(cache) != 0x3800:
+        raise ValueError('expected complete logical NV cache')
+    entries = records(text,'5510_phone_code_entry')
+    ends = records(text,'5510_phone_code_return')
+    if not 0 < len(entries) == len(ends) < 16:
+        raise ValueError('missing, unmatched or capped phone-code calls')
+    expected = phone_code_from_nv(cache[0x110:0x113])
+    previous = -1
+    for ordinal,(entry,end) in enumerate(zip(entries,ends),1):
+        start = text.index(f'5510_phone_code_entry: ordinal={ordinal} ')
+        finish = text.index(f'5510_phone_code_return: ordinal={ordinal} ')
+        reads = records(text[start:finish],'5510_nv_read')
+        if (not previous < start < finish or len(reads) != 1
+                or reads[0]['offset'] != '00000110' or reads[0]['bytes'] != '00000003'
+                or reads[0]['owner'] != '0029f88f'
+                or entry['ordinal'] != str(ordinal) or end['ordinal'] != str(ordinal)
+                or entry['destination'] != end['destination']
+                or int(entry['sp'],16) != int(end['sp'],16)+20
+                or end['stored_valid'] != str(int(expected['stored_digits_valid']))
+                or end['output'] != expected['code'].encode('ascii').hex()
+                or end['terminator'] != '00'):
+            raise ValueError('phone-code read/frame/result differs from own source')
+        previous = finish
+    return {'calls':len(entries),**expected,
+            'scope':'Observed firmware getter, not code entry, unlock or valid product NV'}
+
+
 def factory_request_word_source(firmware):
     """Own 39cc20(0)/39ce0e source equations, not a general PPM validator."""
     if len(firmware) != 0x350000:
@@ -160,11 +198,19 @@ def identity_contract(firmware):
     pointer = struct.unpack_from('>I',firmware,0xa06a8)[0]
     if pointer != 0x44d844 or firmware[pointer-0x200000] != 6:
         raise ValueError('own software-version source changed')
+    if firmware[0x9fbf4:0x9fbfa] != b'12345\0':
+        raise ValueError('own phone-code fallback changed')
+    character_table = struct.unpack_from('>I',firmware,0x1b03d8)[0]-0x200000
+    if [bool(firmware[character_table+i] & 4) for i in range(0x30,0x40)] != [True]*10+[False]*6:
+        raise ValueError('own digit classifier domain changed')
     return {'nv_contract': contract, 'nv_offset': '000c', 'nv_read_bytes': 8,
             'equipment_digits': 14, 'software_version_address': f'{pointer:08x}',
             'software_version_decimal': 6,
             'formatter': '002a05cc', 'imei_reader': '002a066a', 'imeisv_reader': '002a0640',
             'display_formatter': '0029fc00',
+            'phone_code': {'nv_offset':'0110','nv_bytes':3,'getter':'0029f876',
+                           'fallback_address':'0029fbf4','fallback':'12345',
+                           'validated_digits':5,'sixth_nibble_validated':False},
             'factory_request13_sources': {
                 'selector':'0039cc20', 'fallback_flash_address':'00200038',
                 'fallback_flash_word':firmware[0x38:0x3c].hex(),
@@ -197,7 +243,8 @@ def identity_contract(firmware):
                                    (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e),
                                    (0x39cc20,0x39cc4e),(0x39ce0e,0x39ce14),
                                    (0x2a02aa,0x2a02ea),(0x3aea44,0x3aeabc),
-                                   (0x2a04ba,0x2a053a))},
+                                   (0x2a04ba,0x2a053a),(0x29f876,0x29f8e4),
+                                   (0x3b03cc,0x3b03dc))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 
@@ -252,6 +299,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--firmware',type=Path,required=True)
     parser.add_argument('--records',action='store_true',help='require bounded factory-record capture')
+    parser.add_argument('--phone-code',action='store_true',help='require original phone-code getter capture')
     args = parser.parse_args()
     try:
         contract = identity_contract(args.firmware.read_bytes())
@@ -261,6 +309,9 @@ def main():
         if args.records:
             result['record_capture'] = check_record_capture(text,
                 contract['factory_request13_sources']['source_selection']['selected_word'])
+        if args.phone_code:
+            result['phone_code_capture'] = check_phone_code_capture(text,
+                (args.directory/'npm5_nv_cache.bin').read_bytes())
         result.update(source_contract=contract,nv_requests=inventory['requests'],
                       valid_product_nv=False, unobserved_selector_execution_claim=False)
         print(json.dumps(result,indent=2))
