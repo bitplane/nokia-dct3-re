@@ -351,6 +351,26 @@ public:
 				capture_playback_slot(channel);
 				observe_playback_audio(value, true);
 				double const time = machine().time().as_double();
+				if (channel == 1 && m_playback_dac_capture.is_open() && ++m_playback_dac_capture_frames <= PLAYBACK_DAC_FRAME_CAP)
+				{
+					auto const &codec = *subdevice<tlv320aic23_device>("codec");
+					u64 const ns = machine().time().as_ticks(1'000'000'000);
+					char bytes[32]{};
+					for (unsigned i=0;i<8;++i) bytes[i] = char(ns >> (8*i));
+					for (unsigned side=0;side<2;++side)
+					{
+						u16 const code = u16(codec.dac_sample(side));
+						bytes[8+2*side] = char(code); bytes[9+2*side] = char(code >> 8);
+						bytes[12+side] = char(codec.headphone_volume(side));
+						double const level = codec.headphone_dac_level(side);
+						u64 bits;
+						static_assert(sizeof(bits) == sizeof(level) && std::numeric_limits<double>::is_iec559);
+						std::memcpy(&bits,&level,sizeof(bits));
+						for (unsigned i=0;i<8;++i) bytes[16+8*side+i] = char(bits >> (8*i));
+					}
+					m_playback_dac_capture.write(bytes,sizeof(bytes));
+					for (char byte : bytes) m_playback_dac_capture_hash = (m_playback_dac_capture_hash ^ u8(byte))*16777619U;
+				}
 				if (channel == 1 && time >= 1.06 && time <= 1.10)
 				{
 					++m_playback_dac_frames;
@@ -500,6 +520,9 @@ private:
 	u32 m_playback_tx_lifecycle_events = 0;
 	u32 m_playback_tx_startup_events = 0, m_playback_startup_frames = 0;
 	u32 m_playback_dac_frames = 0;
+	std::ofstream m_playback_dac_capture;
+	u32 m_playback_dac_capture_frames = 0, m_playback_dac_capture_hash = 2166136261U;
+	static constexpr u32 PLAYBACK_DAC_FRAME_CAP = 2'000'000;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
@@ -1056,6 +1079,11 @@ private:
 		if (!m_playback_tx_event_capture || event_bytes != std::streamoff(captured_events)*16) fatalerror("MU4 playback TX event observation is incomplete");
 		logerror("mu4_tx_event_capture: records=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			captured_events,captured_events*16,m_playback_tx_event_hash,unsigned(m_playback_tx_events>PLAYBACK_TX_EVENT_CAP));
+		m_playback_dac_capture.flush(); auto const dac_bytes=m_playback_dac_capture.tellp(); m_playback_dac_capture.close();
+		u32 const captured_dac = std::min(m_playback_dac_capture_frames,PLAYBACK_DAC_FRAME_CAP);
+		if (!m_playback_dac_capture || dac_bytes != std::streamoff(captured_dac)*32) fatalerror("MU4 full DAC observation is incomplete");
+		logerror("mu4_dac_capture: frames=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_i16left_i16right_u8lvol_u8rvol_u16reserved_f64left_f64right file=mu4_headphone.frames save_restore=unsupported observer_writes=0 analog_filter=0 audio_acceptance=0\n",
+			captured_dac,captured_dac*32,m_playback_dac_capture_hash,unsigned(m_playback_dac_capture_frames>PLAYBACK_DAC_FRAME_CAP));
 		m_playback_decoded_capture.flush(); auto const decoded_bytes=m_playback_decoded_capture.tellp(); m_playback_decoded_capture.close();
 		if (!m_playback_decoded_capture || decoded_bytes != std::streamoff(m_playback_decoded_words)*2) fatalerror("MU4 decoded-return observation is incomplete");
 		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
@@ -3015,6 +3043,7 @@ private:
 		m_playback_tx_lifecycle_events = 0;
 		m_playback_tx_startup_events = m_playback_startup_frames = 0;
 		m_playback_dac_frames = 0;
+		m_playback_dac_capture_frames = 0; m_playback_dac_capture_hash = 2166136261U;
 		m_playback_buffer_writes.fill(playback_buffer_write{});
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
@@ -3042,6 +3071,8 @@ private:
 		m_playback_tx_event_capture.clear();
 		if (m_playback_decoded_capture.is_open()) m_playback_decoded_capture.close();
 		m_playback_decoded_capture.clear();
+		if (m_playback_dac_capture.is_open()) m_playback_dac_capture.close();
+		m_playback_dac_capture.clear();
 		if (playback_profile())
 		{
 			m_playback_slot_capture.open("mu4_playback_din.slots",std::ios::binary|std::ios::trunc);
@@ -3054,6 +3085,8 @@ private:
 			if (!m_playback_tx_event_capture) fatalerror("MU4 playback TX event observation could not be opened");
 			m_playback_decoded_capture.open("mu4_decoded_returns.le16",std::ios::binary|std::ios::trunc);
 			if (!m_playback_decoded_capture) fatalerror("MU4 decoded-return observation could not be opened");
+			m_playback_dac_capture.open("mu4_headphone.frames",std::ios::binary|std::ios::trunc);
+			if (!m_playback_dac_capture) fatalerror("MU4 full DAC observation could not be opened");
 		}
 		m_playback_parent = {}; m_playback_parent_mismatch = 0;
 		m_playback_switch_samples = 0;

@@ -1461,3 +1461,39 @@ The host render contains 96001 stereo frames at 48 kHz, with nonzero counts
 waveform tolerances or a full playback oracle. The isolated MU4 bench is now
 marked imperfect sound rather than no sound hardware. Whole-track completion,
 physical analog acceptance, main-handset audio and GSM speech remain unproved.
+
+### Full Lifecycle DAC Controls
+
+The native research bench additionally records every post-overlay stereo
+DAC latch in `mu4_headphone.frames`: little-endian timestamp, two signed
+16-bit codes, two effective volume bytes, zero reserved word and two IEEE-754
+binary64 normalized levels (32 bytes total). Count, FNV-1a, cap and observation
+scope are explicit in its terminal. This is diagnostic output, not saved
+hardware state. `mu4_dac_output_check.py RUN --full --wav RUN/headphone.wav`
+requires the full serial capture, independently replays DIN/control epochs,
+and checks every stereo latch rather than selecting only nonzero samples or
+a favorable window. Missing frames, altered levels, reserved fields and
+non-finite outputs are rejected. The default bounded checker remains separate.
+
+The fresh finalized-input run `tmp/native-gates/mu4-session-dac` reaches the
+same 11.016666667-second cleanup/restart endpoint. All 449,756 stereo frames
+match their independently reconstructed codes, effective gains and ideal
+levels, with zero normalized-level error. The source-/AAC-pinned restart-tail
+check passes on the same run, and all seven pre-existing digital captures are
+byte-identical to `mu4-session-serial`.
+
+| Observed digital-mute epoch | Stereo frames | Nonzero channel levels |
+| --- | ---: | ---: |
+| Initial mute | 876 | 0 |
+| First unmuted session | 391901 | 763969 |
+| EOF/restart mute | 17247 | 0 |
+| Restarted unmuted output | 39732 | 69874 |
+
+The EOF mute's observed frames span 9.724632709--10.115698468 seconds;
+unmuted restarted output begins at 10.115721144 seconds. These are actual
+DAC-latch observations correlated with recorded controls, not a waveform lag
+fit or a claim that encoded buffered tails were drained. The 48-kHz host WAV
+contains 528001 stereo frames, nonzero counts 452865/452946 and peaks 642/1149.
+Those host-render quantities establish integration/non-silence, not analog
+waveform conformance or exact host-sample timing. The converter-filter,
+electrical, whole-track and handset-speech exclusions remain unchanged.

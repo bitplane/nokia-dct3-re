@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 import wave
 
-from tools.mu4_dac_output_check import check_frames, check_wav
+from tools.mu4_dac_output_check import check_frames, check_wav, check_full_capture
 
 
 def fixture(extra=None,levels=(0.5,-0.5),volume=0x79):
@@ -26,6 +26,28 @@ def fixture(extra=None,levels=(0.5,-0.5),volume=0x79):
 
 
 class DacOutputTest(unittest.TestCase):
+    def test_full_frame_values_are_bound_to_every_din_pair(self):
+        text,din,slots = fixture()
+        data = struct.pack('<QhhBBHdd',1_070_001_334,0x4000,-0x4000,0x79,0x79,0,0.5,-0.5)
+        self.assertEqual(check_frames(text,din,slots,data)['frames'],1)
+        extended_slots = slots + struct.pack('<QBQB',1_070_022_675,0,1_070_024_009,1)
+        with self.assertRaises(ValueError):
+            check_frames(text,din+din,extended_slots,data)
+        checksum = 2166136261
+        for value in data:
+            checksum = ((checksum^value)*16777619)&0xffffffff
+        terminal = (f'mu4_dac_capture: frames=1 bytes=32 fnv1a={checksum:08x} capped=0 '
+            'encoding=le64ns_i16left_i16right_u8lvol_u8rvol_u16reserved_f64left_f64right '
+            'file=mu4_headphone.frames save_restore=unsupported observer_writes=0 analog_filter=0 audio_acceptance=0')
+        self.assertEqual(check_full_capture(terminal,data)['frames'],1)
+        for changed in (terminal.replace('capped=0','capped=1'),terminal.replace('frames=1','frames=2')):
+            with self.assertRaises(ValueError):
+                check_full_capture(changed,data)
+        for level,reserved in ((0.4,0),(float('nan'),0),(0.5,1)):
+            changed = struct.pack('<QhhBBHdd',1_070_001_334,0x4000,-0x4000,0x79,0x79,reserved,level,-0.5)
+            with self.assertRaises(ValueError):
+                check_frames(text,din,slots,changed)
+
     def test_independent_stereo_codes_and_nominal_gain(self):
         result = check_frames(*fixture())
         self.assertEqual(result['frames'],1)
@@ -40,6 +62,9 @@ class DacOutputTest(unittest.TestCase):
             with self.subTest(command=command):
                 result = check_frames(*fixture(extra=command,levels=(0,0)))
                 self.assertEqual(result['nonzero_channel_samples'],0)
+                if command == 0x0a08:
+                    self.assertTrue(result['digital_mute_epochs'][0]['digital_mute'])
+                    self.assertEqual(result['digital_mute_epochs'][0]['nonzero_channel_samples'],0)
 
     def test_changed_values_volume_scope_and_missing_pair_fail(self):
         text,din,slots = fixture()
