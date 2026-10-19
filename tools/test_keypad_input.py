@@ -35,6 +35,11 @@ class KeypadInputTest(unittest.TestCase):
             self.assertIn(f"key_fields.{alias} = key_fields.c", self.harness)
         self.assertIn("key_fields.hash = key_fields.minus", self.harness)
 
+    def test_nse1_research_aliases_inherit_their_declared_input_family(self):
+        self.assertIn('machine.system.parent == "noki5110"', self.harness)
+        for alias in ('nse1astd', 'nse1plg'):
+            self.assertRegex(self.driver, rf'SYST\([^\n]*\b{alias},\s*noki5110,')
+
     def test_scripted_sequences_support_emulation_time_waits(self):
         self.assertIn('string.match(name, "^wait(%d+)$")', self.harness)
         self.assertIn("emu.wait(tonumber(wait_ms) / 1000)", self.harness)

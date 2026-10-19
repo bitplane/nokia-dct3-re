@@ -2158,6 +2158,16 @@ counts and reload/selector requirements.
 
 ## Current result
 
+The shared physical-input harness selects NSE-1 keypad/LCD handling from the
+declared `noki5110` parent, including research aliases. The atomic standard-bus
+profile (`nse1astd`) passes the unassisted Phone book menu gate. This does not
+extend to staged/legacy `nse1plg`, whose existing loader guard remains open.
+On `nse1astd`, physical `1,1,2,Navi` reaches the firmware's "Attempting emergency
+call" screen. An isolated 18-second run and an empty-input control both record
+zero entries to codec wrappers `9c4f/9cb9`, active mode `1836=0`, and no DSP
+illegal-instruction flag. This is call-attempt presentation, not registration,
+speech activation or a connected call; no external network backend is enabled.
+
 The current native boundary profiles are distinct: the four-second coherent
 boot observes thirteen ordered RF control writes, including the firmware-owned
 `0041/0040` queue item released by TX-completion FIQ1. The 30-second RF
