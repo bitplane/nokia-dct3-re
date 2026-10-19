@@ -42,6 +42,31 @@ def check_fresh(text,owners):
             'scope':'Observed DRR publication/read readiness and retained-word equality; not ADC conversion, FIFO loss or encoder consumption'}
 
 
+def check_destinations(text,owners):
+    ends = rows(text,'mu4_recorder_destination_terminal')
+    if len(ends) != 1 or ends[0] != dict(bad='0',pending='0',save_restore='unsupported',
+            observer_writes='0',encoder_consumption='0'):
+        raise ValueError('incomplete or inconsistent DMA destination pairing')
+    expected = {channel:sum(count for mask,count in owners.items() if mask&(1<<channel))
+                for channel in range(6)}
+    observed = dict.fromkeys(range(6),0)
+    destinations,seen = [],set()
+    for row in rows(text,'mu4_recorder_destination'):
+        channel,space,count = (int(row[key]) for key in ('channel','space','writes'))
+        low,high = (int(row[key],16) for key in ('minimum','maximum'))
+        if (not 0 <= channel < 6 or not 0 <= space < 3 or (channel,space) in seen
+                or count <= 0 or not 0 <= low <= high <= (0x7fffff if space == 0 else 0xffff)
+                or row['observer_writes'] != '0'):
+            raise ValueError('invalid DMA destination histogram')
+        seen.add((channel,space)); observed[channel] += count
+        destinations.append(dict(channel=channel,space=('program','data','io')[space],
+                                 writes=count,minimum=f'{low:06x}',maximum=f'{high:06x}'))
+    if observed != expected or not destinations:
+        raise ValueError('DMA source reads and destination writes do not reconcile')
+    return dict(destinations=destinations,paired_values_validated=True,
+                scope='Bus destination ranges only; not contiguous coverage, persistent buffer ownership or encoder consumption')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -78,7 +103,8 @@ def check(text,require_fresh=False):
         freshness = check_fresh(text,owners)
     elif require_fresh:
         raise ValueError('DRR publication observation required')
-    return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,
+    destinations = check_destinations(text,owners) if rows(text,'mu4_recorder_destination_terminal') else None
+    return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -91,9 +117,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log',type=Path)
     parser.add_argument('--fresh',action='store_true',help='require publication/read/reset reconciliation')
+    parser.add_argument('--destinations',action='store_true',help='require exact DMA read/write pairing')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text(),args.fresh),indent=2))
+        result = check(args.log.read_text(),args.fresh)
+        if args.destinations and result['dma_destinations'] is None:
+            raise ValueError('DMA destination observation required')
+        print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')
 

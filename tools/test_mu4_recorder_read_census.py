@@ -16,6 +16,22 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_destination_pairing_rejects_missing_changed_and_duplicate_writes(self):
+        text = fixture()+'\n'+'\n'.join([
+            'mu4_recorder_destination: channel=1 space=0 writes=2 minimum=020000 maximum=020001 observer_writes=0',
+            'mu4_recorder_destination: channel=2 space=1 writes=40 minimum=001000 maximum=001027 observer_writes=0',
+            'mu4_recorder_destination_terminal: bad=0 pending=0 save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        result = check(text)['dma_destinations']
+        self.assertTrue(result['paired_values_validated'])
+        self.assertEqual(result['destinations'][1]['space'],'data')
+        for before,after in [('writes=40','writes=39'),('pending=0','pending=1'),
+                             ('bad=0','bad=1'),('channel=1','channel=2'),
+                             ('minimum=001000','minimum=002000'),('space=1','space=3')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check(text.replace(before,after))
+        with self.assertRaises(ValueError):
+            check(text+'\nmu4_recorder_destination: channel=2 space=1 writes=40 minimum=001000 maximum=001027 observer_writes=0')
+
     def test_publication_freshness_reconciles_every_owner_and_pending_epoch(self):
         text = fixture()+'\n'+'\n'.join([
             'mu4_recorder_rx_owner: dma_mask=00 fresh=0 stale=3 observer_writes=0',

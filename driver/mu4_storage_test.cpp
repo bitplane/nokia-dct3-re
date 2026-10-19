@@ -421,6 +421,11 @@ private:
 	u64 m_ac_rx_bad = 0, m_ac_rx_unknown_stale = 0;
 	bool m_ac_rx_pending = false, m_ac_rx_known = false;
 	u16 m_ac_rx_word = 0;
+	std::array<bool,6> m_ac_dma_pending{};
+	std::array<u16,6> m_ac_dma_word{};
+	std::array<u64,18> m_ac_dma_writes{};
+	std::array<u32,18> m_ac_dma_first{}, m_ac_dma_last{};
+	u64 m_ac_dma_bad = 0;
 	void observe_recorder_rx(offs_t event,u16 word)
 	{
 		if (!recorder_ac_profile()) return;
@@ -2517,6 +2522,22 @@ private:
 			if (playback_profile()) machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&mu4_storage_test_state::report_playback_parent, this));
 			if (recorder_ac_profile())
 			{
+				// Pair bus transactions by active DMA channel, never by sample similarity.
+				int const spaces[] = {AS_PROGRAM,AS_DATA,AS_IO};
+				for (unsigned index=0;index<3;++index)
+					m_cpu->space(spaces[index]).install_write_tap(0,index ? 0xffff : 0x7fffff,"mu4_recorder_dma_destination",
+						[this,index,space=spaces[index]](offs_t address,u16 &value,u16 mask) {
+							if (machine().side_effects_disabled()) return;
+							for (unsigned channel=0;channel<6;++channel)
+							{
+								if (!m_ac_dma_pending[channel] || !m_dma->destination_write_matches(channel,space,address)) continue;
+								if (mask != 0xffff || value != m_ac_dma_word[channel]) ++m_ac_dma_bad;
+								unsigned const slot = channel*3+index;
+								if (!m_ac_dma_writes[slot]) m_ac_dma_first[slot] = m_ac_dma_last[slot] = address;
+								else { m_ac_dma_first[slot] = std::min(m_ac_dma_first[slot],u32(address)); m_ac_dma_last[slot] = std::max(m_ac_dma_last[slot],u32(address)); }
+								++m_ac_dma_writes[slot]; m_ac_dma_pending[channel] = false;
+							}
+						});
 				logerror("mu4_recorder_read_scope: address=0021 context_cap=128 dma_identity=active_source_read context_pc=not_instruction_owner side_effects_disabled=excluded observer_writes=0\n");
 				m_cpu->space(AS_DATA).install_read_tap(0x21, 0x21, "mu4_recorder_ac_receive",
 					[this](offs_t address, u16 &value, u16) {
@@ -2525,6 +2546,12 @@ private:
 						for (unsigned channel=0;channel<6;++channel)
 							if (m_dma->source_read_matches(channel,AS_DATA,address)) owners |= 1U << channel;
 						++m_ac_read_total; ++m_ac_read_owners[owners];
+						for (unsigned channel=0;channel<6;++channel)
+							if (BIT(owners,channel))
+							{
+								if (m_ac_dma_pending[channel]) ++m_ac_dma_bad;
+								m_ac_dma_pending[channel] = true; m_ac_dma_word[channel] = value;
+							}
 						if (!owners)
 						{
 							u32 const pc = m_cpu->state_int(STATE_GENPC);
@@ -3033,6 +3060,8 @@ private:
 		m_rx_dma_completions = m_rx_irqs = 0;
 		m_ac_generated = {}; m_ac_received = {}; m_ac_other = m_ac_other_owners = 0;
 		m_ac_read_owners.fill(0); m_ac_unowned_contexts.clear();
+		m_ac_dma_pending.fill(false); m_ac_dma_word.fill(0); m_ac_dma_writes.fill(0);
+		m_ac_dma_first.fill(0); m_ac_dma_last.fill(0); m_ac_dma_bad = 0;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3565,6 +3594,11 @@ private:
 					if (m_ac_read_owners[mask]) logerror("mu4_recorder_read_owner: dma_mask=%02x reads=%llu observer_writes=0\n",mask,static_cast<unsigned long long>(m_ac_read_owners[mask]));
 				for (auto const &[pc,count] : m_ac_unowned_contexts)
 					logerror("mu4_recorder_read_context: context_pc=%06x reads=%llu observer_writes=0\n",pc,static_cast<unsigned long long>(count));
+				for (unsigned slot=0;slot<18;++slot)
+					if (m_ac_dma_writes[slot]) logerror("mu4_recorder_destination: channel=%u space=%u writes=%llu minimum=%06x maximum=%06x observer_writes=0\n",
+						slot/3,slot%3,static_cast<unsigned long long>(m_ac_dma_writes[slot]),m_ac_dma_first[slot],m_ac_dma_last[slot]);
+				logerror("mu4_recorder_destination_terminal: bad=%llu pending=%u save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					static_cast<unsigned long long>(m_ac_dma_bad),unsigned(std::count(m_ac_dma_pending.begin(),m_ac_dma_pending.end(),true)));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

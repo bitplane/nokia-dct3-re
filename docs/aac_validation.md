@@ -932,6 +932,21 @@ before publication, destination-buffer ownership or encoder consumption.
 The optional observer does not alter receive timing, FIFO or interrupt behavior;
 its diagnostic accounting is fresh-run only, without save/restore support.
 
+Adding `--destinations` requires active-channel read/write pairing across
+program, data and I/O spaces. In the 20-second
+`tmp/native-gates/mu4-recorder-destination` run, all 801990 channel-2 reads
+pair with full-word, equal-value writes in data `1900..19ff`; all 905064
+channel-3 reads pair with writes in data `1800..18ff`. No pair is overwritten,
+mismatched or pending at the endpoint. The freshness counts and both NAND
+hashes above reproduce unchanged. Observation belongs to the research bench,
+not product-specific logic in the generic DMA device.
+
+These are observed minimum/maximum destination addresses, not a proof of
+contiguous coverage or buffer lifetime. The next unvalidated boundary is
+which subsequent reads consume these writes and how they feed the encoder;
+the two DMA channels must not be assigned microphone/channel semantics from
+address ranges alone.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected
