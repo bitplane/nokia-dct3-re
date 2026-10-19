@@ -148,7 +148,9 @@ def pin_read_instructions(identities,words):
         address,opcode = int(row['instruction'],16),int(row['opcode'],16)
         if words.get(address) != opcode:
             raise ValueError('captured read opcode does not match original AA88 source')
-        result.append(dict(row,operation='MVDD Xmem,Ymem' if opcode&0xff00 == 0xe500 else 'unclassified'))
+        operation = ('MVDD Xmem,Ymem' if opcode&0xff00 == 0xe500 else
+                     f'LD Smem,{"B" if opcode&0x100 else "A"}' if opcode&0xfe00 == 0x1000 else 'unclassified')
+        result.append(dict(row,operation=operation))
     return dict(segment='aa88',instructions=result,
                 scope='Original source opcode matches actual staged bus-read identity; not copy destination, full routine identity or encoder consumption')
 
@@ -187,6 +189,48 @@ def check_copies(text,identities):
         raise ValueError('copy destination writes do not reconcile with operand reads')
     return dict(destinations=result,paired_words=int(end['writes']),
                 scope='Instruction/source/value paired actual MVDD bus writes; ranges are not contiguous coverage or encoder consumption')
+
+
+def check_workspace(text,copies):
+    ends = rows(text,'mu4_recorder_workspace_terminal')
+    if len(ends) != 1 or copies is None:
+        raise ValueError('workspace provenance requires paired copy writes and one terminal')
+    end = ends[0]
+    for key,value in dict(bad='0',dropped='0',cap='256',save_restore='unsupported',observer_writes='0',encoder_consumption='0').items():
+        if end[key] != value:
+            raise ValueError('incomplete or inconsistent workspace provenance')
+    names = ('origin_writes','total_writes','alias_writes','read_epochs','retired_unread',
+             'pending_unread','known_reads','unknown_reads','missing_data_identity')
+    counts = {key:int(end[key]) for key in names}
+    expected = 0
+    for row in copies['destinations']:
+        low,high = int(row['destination_min'],16),int(row['destination_max'],16)
+        if low <= 0x7fff and high >= 0x7000:
+            if low < 0x7000 or high > 0x7fff:
+                raise ValueError('copy range crosses workspace observation boundary')
+            expected += row['known_writes']
+    if (min(counts.values()) < 0 or counts['origin_writes'] != expected
+            or counts['total_writes'] < expected or counts['alias_writes'] > counts['total_writes']
+            or counts['pending_unread'] > 4096 or counts['read_epochs'] > counts['known_reads']
+            or expected != counts['read_epochs']+counts['retired_unread']+counts['pending_unread']):
+        raise ValueError('workspace write lifetimes do not reconcile')
+    readers,seen,instructions = {},set(),[]
+    for row in rows(text,'mu4_recorder_workspace_reader'):
+        alias,mask,count = int(row['program_alias']),int(row['dma_mask'],16),int(row['reads'])
+        if alias not in (0,1) or not 0 <= mask < 64 or count <= 0 or (alias,mask) in readers or row['observer_writes'] != '0':
+            raise ValueError('invalid workspace read owner histogram')
+        readers[alias,mask] = count
+    for row in rows(text,'mu4_recorder_workspace_instruction'):
+        address,opcode,count = int(row['instruction'],16),int(row['opcode'],16),int(row['reads'])
+        if not 0 <= address <= 0x7fffff or not 0 <= opcode <= 0xffff or count <= 0 or (address,opcode) in seen or row['observer_writes'] != '0':
+            raise ValueError('invalid workspace instruction histogram')
+        seen.add((address,opcode)); instructions.append(dict(instruction=f'{address:06x}',opcode=f'{opcode:04x}',reads=count))
+    if (len(seen) > 256 or sum(readers.values()) != counts['known_reads']
+            or sum(row['reads'] for row in instructions)+counts['missing_data_identity'] != readers.get((0,0),0)):
+        raise ValueError('workspace readers/identities do not reconcile')
+    return dict(counts,readers=[dict(program_alias=alias,dma_mask=f'{mask:02x}',reads=count)
+                               for (alias,mask),count in sorted(readers.items())],instructions=instructions,
+                scope='Latest copied-word bus read lifetimes with shared program/data invalidation; not forwarded operands, derived values or encoder consumption')
 
 
 def check(text,require_fresh=False):
@@ -229,9 +273,11 @@ def check(text,require_fresh=False):
     buffers = check_buffers(text,destinations) if rows(text,'mu4_recorder_buffer_terminal') else None
     identities = check_read_identity(text,buffers) if rows(text,'mu4_recorder_buffer_identity_terminal') else None
     copies = check_copies(text,identities) if rows(text,'mu4_recorder_copy_terminal') else None
+    workspace = check_workspace(text,copies) if rows(text,'mu4_recorder_workspace_terminal') else None
     return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
             'read_instructions':identities,
             'copy_destinations':copies,
+            'copied_workspace':workspace,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -249,6 +295,7 @@ def main():
     parser.add_argument('--instructions',action='store_true',help='require staged operand read identities')
     parser.add_argument('--source-a00',type=Path,help='pin captured read opcodes to original R060 AA88 upload')
     parser.add_argument('--copies',action='store_true',help='require instruction/source/value paired MVDD writes')
+    parser.add_argument('--workspace',action='store_true',help='require alias-aware copied-workspace read lifetimes')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
@@ -260,12 +307,16 @@ def main():
             raise ValueError('staged buffer read instruction observation required')
         if args.copies and result['copy_destinations'] is None:
             raise ValueError('MVDD read/write pairing required')
+        if args.workspace and result['copied_workspace'] is None:
+            raise ValueError('copied-workspace observation required')
         if args.source_a00:
             source = args.source_a00.read_bytes()
             if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
                 raise ValueError('expected original R060 InitData source')
             words = uploaded_word_image(bytes.fromhex(source.decode('ascii')),'aa88')
             result['read_source'] = pin_read_instructions(result['read_instructions'],words)
+            if result['copied_workspace'] is not None:
+                result['workspace_source'] = pin_read_instructions(result['copied_workspace'],words)
         print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')

@@ -1024,6 +1024,36 @@ shared program/data DARAM alias accounting before assigning encoder input
 semantics. This still does not establish decoded audio or complete ADC/FIFO
 delivery.
 
+`--workspace` tracks latest-copy lifetimes in data `7000..7fff`. Every write
+invalidates the previous origin, including program-space writes forwarded
+through the shared DARAM handler. The nested data-space access is counted
+once and tagged with its program origin; known program reads are not
+silently classified as data operands. Only equal-value, full-word paired
+copies from known receive-buffer words establish a new origin.
+
+The 20-second `tmp/native-gates/mu4-recorder-workspace` run observes 802277
+workspace writes, including 2430 through the program alias. Its 794624
+sample-origin writes reconcile as 792576 epochs read exactly once, zero
+retired unread, and 2048 still unread at the endpoint. All 792576 known-word
+reads are data-space, non-DMA operand reads; there are no known-word program
+alias reads. Another 62650 reads have no current sample-origin assignment
+and must not inherit an overwritten origin. There are no value mismatches,
+missing data-read identities or dropped sites.
+
+| Actual workspace read instruction | Captured opcode | Reads |
+| --- | --- | ---: |
+| `039823` | `10eb` (`LD Smem,A`) | 396288 |
+| `03982b` | `10e3` (`LD Smem,A`) | 396288 |
+
+Both opcodes match the original AA88 source under `--source-a00`. Each count
+equals 387 times 1024, but numerical agreement with an encoder-frame size
+does not establish the calling/processing contract. Decode the surrounding
+routine and follow the loaded values to their stores before assigning
+encoder-ingress semantics. Internally forwarded operands and values derived
+after an overwrite are outside this bus-lifetime observation; an unread
+epoch is not by itself evidence of lost conversion data. Native metadata
+success and both NAND hashes above reproduce unchanged.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected

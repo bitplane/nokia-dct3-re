@@ -439,17 +439,60 @@ private:
 	std::map<u64,std::array<u64,6>> m_ac_copy_destinations;
 	std::array<u64,2> m_ac_copy_reads{};
 	u64 m_ac_copy_writes = 0, m_ac_copy_bad = 0, m_ac_copy_dropped = 0;
+	struct recorder_workspace_word { u16 value = 0; bool valid = false, read = false; };
+	std::array<recorder_workspace_word,4096> m_ac_workspace{};
+	std::array<u64,128> m_ac_workspace_readers{};
+	std::map<u64,u64> m_ac_workspace_instructions;
+	u64 m_ac_workspace_writes = 0, m_ac_workspace_alias_writes = 0, m_ac_workspace_origins = 0;
+	u64 m_ac_workspace_epochs_read = 0, m_ac_workspace_retired = 0, m_ac_workspace_known = 0, m_ac_workspace_unknown = 0;
+	u64 m_ac_workspace_bad = 0, m_ac_workspace_dropped = 0, m_ac_workspace_missing = 0;
+	bool m_ac_daram_read_alias = false, m_ac_daram_write_alias = false;
 	void install_recorder_buffer_observers()
 	{
+		m_cpu->space(AS_DATA).install_read_tap(0x7000,0x7fff,"mu4_recorder_workspace_read",
+			[this](offs_t address,u16 &value,u16) {
+				if (machine().side_effects_disabled()) return;
+				auto &word = m_ac_workspace[address-0x7000];
+				if (!word.valid) { ++m_ac_workspace_unknown; return; }
+				++m_ac_workspace_known;
+				if (word.value != value) ++m_ac_workspace_bad;
+				if (!word.read) { word.read = true; ++m_ac_workspace_epochs_read; }
+				u8 owners = 0;
+				for (unsigned channel=0;channel<6;++channel)
+					if (m_dma->source_read_matches(channel,m_ac_daram_read_alias ? AS_PROGRAM : AS_DATA,address)) owners |= 1U << channel;
+				++m_ac_workspace_readers[unsigned(m_ac_daram_read_alias)*64+owners];
+				if (!owners && !m_ac_daram_read_alias)
+				{
+					u32 instruction = 0; u16 opcode = 0;
+					if (!m_cpu->observe_staged_data_read(address,instruction,opcode)) { ++m_ac_workspace_missing; return; }
+					u64 const key = (u64(instruction)<<16) | opcode;
+					auto found = m_ac_workspace_instructions.find(key);
+					if (found != m_ac_workspace_instructions.end()) ++found->second;
+					else if (m_ac_workspace_instructions.size() < 256) m_ac_workspace_instructions.emplace(key,1);
+					else ++m_ac_workspace_dropped;
+				}
+			});
 		m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"mu4_recorder_copy_destination",
 			[this](offs_t address,u16 &value,u16 mask) {
 				if (machine().side_effects_disabled()) return;
+				if (address >= 0x7000 && address <= 0x7fff)
+				{
+					auto &word = m_ac_workspace[address-0x7000];
+					if (word.valid && !word.read) ++m_ac_workspace_retired;
+					word = {};
+					++m_ac_workspace_writes; m_ac_workspace_alias_writes += unsigned(m_ac_daram_write_alias);
+				}
 				u32 instruction = 0; u16 opcode = 0, source = 0;
 				if (!m_cpu->observe_staged_mvdd_write(address,instruction,opcode,source) || source < 0x1800 || source > 0x19ff) return;
 				auto found = std::find_if(m_ac_copy_pending.begin(),m_ac_copy_pending.end(),
 					[instruction,opcode,source](auto const &read) { return read.instruction == instruction && read.opcode == opcode && read.source == source; });
 				if (found == m_ac_copy_pending.end()) { ++m_ac_copy_bad; return; }
 				if (mask != 0xffff || value != found->value) ++m_ac_copy_bad;
+				if (address >= 0x7000 && address <= 0x7fff && found->known && mask == 0xffff && value == found->value)
+				{
+					m_ac_workspace[address-0x7000] = {value,true,false};
+					++m_ac_workspace_origins;
+				}
 				u64 const key = (u64((source-0x1800)/256)<<48) | (u64(instruction)<<16) | opcode;
 				if (!m_ac_copy_destinations.count(key) && m_ac_copy_destinations.size() >= 256) ++m_ac_copy_dropped;
 				else
@@ -2313,11 +2356,19 @@ private:
 	bool recorder_save_profile() const { return system_bios() == 25 || staged_recorder_profile(); }
 	u16 shared_daram_r(offs_t offset)
 	{
-		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
+		// Forward once through data space; tag the program origin for observation.
+		bool const previous = m_ac_daram_read_alias;
+		m_ac_daram_read_alias = true;
+		u16 const value = m_cpu->space(AS_DATA).read_word(0x2000 + offset);
+		m_ac_daram_read_alias = previous;
+		return value;
 	}
 	void shared_daram_w(offs_t offset, u16 value)
 	{
+		bool const previous = m_ac_daram_write_alias;
+		m_ac_daram_write_alias = true;
 		m_cpu->space(AS_DATA).write_word(0x2000 + offset, value);
+		m_ac_daram_write_alias = previous;
 	}
 	void observe_bootstrap_resident_memory()
 	{
@@ -3155,6 +3206,11 @@ private:
 		m_ac_buffer_instructions.clear(); m_ac_buffer_identity_missing = m_ac_buffer_identity_dropped = 0;
 		m_ac_copy_pending.clear(); m_ac_copy_destinations.clear(); m_ac_copy_reads.fill(0);
 		m_ac_copy_writes = m_ac_copy_bad = m_ac_copy_dropped = 0;
+		m_ac_workspace.fill({}); m_ac_workspace_readers.fill(0); m_ac_workspace_instructions.clear();
+		m_ac_workspace_writes = m_ac_workspace_alias_writes = m_ac_workspace_origins = 0;
+		m_ac_workspace_epochs_read = m_ac_workspace_retired = m_ac_workspace_known = m_ac_workspace_unknown = 0;
+		m_ac_workspace_bad = m_ac_workspace_dropped = m_ac_workspace_missing = 0;
+		m_ac_daram_read_alias = m_ac_daram_write_alias = false;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3718,6 +3774,15 @@ private:
 						unsigned(key>>48),unsigned((key>>16)&0x7fffff),unsigned(key&0xffff),static_cast<unsigned long long>(row[1]),static_cast<unsigned long long>(row[0]),unsigned(row[2]),unsigned(row[3]),unsigned(row[4]),unsigned(row[5]));
 				logerror("mu4_recorder_copy_terminal: known_reads=%llu unknown_reads=%llu writes=%llu pending=%u bad=%llu dropped=%llu pending_cap=64 site_cap=256 identity=staged_read_write save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					static_cast<unsigned long long>(m_ac_copy_reads[1]),static_cast<unsigned long long>(m_ac_copy_reads[0]),static_cast<unsigned long long>(m_ac_copy_writes),unsigned(m_ac_copy_pending.size()),static_cast<unsigned long long>(m_ac_copy_bad),static_cast<unsigned long long>(m_ac_copy_dropped));
+				for (unsigned slot=0;slot<128;++slot)
+					if (m_ac_workspace_readers[slot]) logerror("mu4_recorder_workspace_reader: program_alias=%u dma_mask=%02x reads=%llu observer_writes=0\n",slot/64,slot%64,static_cast<unsigned long long>(m_ac_workspace_readers[slot]));
+				for (auto const &[key,count] : m_ac_workspace_instructions)
+					logerror("mu4_recorder_workspace_instruction: instruction=%06x opcode=%04x reads=%llu observer_writes=0\n",unsigned(key>>16),unsigned(key&0xffff),static_cast<unsigned long long>(count));
+				unsigned workspace_pending = 0;
+				for (auto const &word : m_ac_workspace) if (word.valid && !word.read) ++workspace_pending;
+				logerror("mu4_recorder_workspace_terminal: origin_writes=%llu total_writes=%llu alias_writes=%llu read_epochs=%llu retired_unread=%llu pending_unread=%u known_reads=%llu unknown_reads=%llu bad=%llu dropped=%llu missing_data_identity=%llu cap=256 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					static_cast<unsigned long long>(m_ac_workspace_origins),static_cast<unsigned long long>(m_ac_workspace_writes),static_cast<unsigned long long>(m_ac_workspace_alias_writes),static_cast<unsigned long long>(m_ac_workspace_epochs_read),static_cast<unsigned long long>(m_ac_workspace_retired),workspace_pending,
+					static_cast<unsigned long long>(m_ac_workspace_known),static_cast<unsigned long long>(m_ac_workspace_unknown),static_cast<unsigned long long>(m_ac_workspace_bad),static_cast<unsigned long long>(m_ac_workspace_dropped),static_cast<unsigned long long>(m_ac_workspace_missing));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

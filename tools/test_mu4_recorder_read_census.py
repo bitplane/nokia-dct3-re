@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies
+from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies,check_workspace
 
 
 def fixture():
@@ -16,6 +16,24 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_workspace_accounts_alias_reads_writes_and_missing_operand_identity(self):
+        text = '\n'.join([
+            'mu4_recorder_workspace_reader: program_alias=0 dma_mask=00 reads=6 observer_writes=0',
+            'mu4_recorder_workspace_reader: program_alias=1 dma_mask=02 reads=2 observer_writes=0',
+            'mu4_recorder_workspace_instruction: instruction=03a000 opcode=e598 reads=5 observer_writes=0',
+            'mu4_recorder_workspace_terminal: origin_writes=10 total_writes=20 alias_writes=3 read_epochs=7 retired_unread=2 pending_unread=1 known_reads=8 unknown_reads=12 bad=0 dropped=0 missing_data_identity=1 cap=256 save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        copies = dict(destinations=[dict(destination_min='7000',destination_max='7fff',known_writes=10)])
+        result = check_workspace(text,copies)
+        self.assertEqual(result['read_epochs'],7)
+        self.assertEqual(result['missing_data_identity'],1)
+        for before,after in [('origin_writes=10','origin_writes=11'),('alias_writes=3','alias_writes=21'),
+                             ('bad=0','bad=1'),('dropped=0','dropped=1'),('known_reads=8','known_reads=9'),
+                             ('missing_data_identity=1','missing_data_identity=0'),('retired_unread=2','retired_unread=1')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_workspace(text.replace(before,after),copies)
+        with self.assertRaises(ValueError):
+            check_workspace(text+'\n'+text.splitlines()[0],copies)
+
     def test_copy_pairing_requires_exact_known_and_unknown_source_counts(self):
         text = '\n'.join([
             'mu4_recorder_copy_destination: bank=0 instruction=038eb5 opcode=e598 known_writes=10 unknown_writes=2 source_min=1800 source_max=18ff destination_min=0db5 destination_max=0e34 observer_writes=0',
@@ -39,6 +57,8 @@ class RecorderReadCensusTests(unittest.TestCase):
         self.assertEqual(check_read_identity(text,buffers)['instructions'][0]['opcode'],'e598')
         identities = check_read_identity(text,buffers)
         self.assertEqual(pin_read_instructions(identities,{0x38eb5:0xe598})['instructions'][0]['operation'],'MVDD Xmem,Ymem')
+        loads = dict(instructions=[dict(instruction='039823',opcode='10eb',reads=1)])
+        self.assertEqual(pin_read_instructions(loads,{0x39823:0x10eb})['instructions'][0]['operation'],'LD Smem,A')
         for words in ({},{0x38eb5:0xf495}):
             with self.assertRaises(ValueError):
                 pin_read_instructions(identities,words)
