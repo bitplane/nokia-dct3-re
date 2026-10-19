@@ -405,13 +405,44 @@ coverage boundary, not an RF-input verdict.
 
 The Lua program-read probes are not instruction-entry probes on staged
 execution: prefetch can sample a different live accumulator and can count
-unretired instructions. The runner therefore rejects staged score
-observation/acceptance explicitly. Its other DSP program-fetch-derived fields
-remain diagnostic, not validated staged routing or tuning contracts. Actual
-port access counts and the CPU illegal flag are separate observations. Next
-establish execution-owned score/caller observations, then compare matched
-SWWSR compositions before attributing a difference to the CPU frontend or RF.
-Do not interpret staged fetch-snapshot scores as physical signal measurements.
+unretired instructions. Their staged score values are explicitly rejected.
+`--execution-probes` instead selects `c54x_rom4_rf_execute.lua`; this is
+automatic for staged machines. Read-only debugger breakpoints at `0ad1`,
+`0add` and `0ae4` capture the score input, second-comparison entry and
+accepted-store entry. The DSP is explicitly the debugger's visible CPU:
+otherwise `a` can parse as hexadecimal 10 rather than the DSP accumulator.
+The observer never writes firmware registers or RAM.
+
+The execution parser requires a unique probe marker, complete source summary
+and ordered result/second/store records. It derives score counts and maxima
+from those entries, not fetch snapshots; the shared summary contributes only
+the mathematical input mode and actual port-read count. It preserves the same
+zero/DC negative control and strict rotating-input criterion. Instruction-entry
+observation is not proof that a store subsequently completed or that a physical
+signal was acquired.
+
+A fresh matched standard-SWWSR comparison uses `--machine nse1astd
+--execution-probes --repeats 1` and `--machine nse1pipe --repeats 1`.
+Recorded binary, observer, generator and loose-ROM hashes are identical; only
+the machine/frontend profile differs. Each case consumes 991,360 input words
+over 60 emulated seconds and ends with the illegal flag clear.
+
+| Input | Atomic entries | Staged entries | Every observed score, both frontends | Second/store entries |
+| --- | ---: | ---: | --- | --- |
+| Zero | 4,887 | 4,885 | `0000` | 0 / 0 |
+| Rotating | 4,887 | 4,885 | `0538` | 0 / 0 |
+
+Thus the staged zero-score anomaly from fetch snapshots is excluded, and the
+rotating stimulus remains below `0574` on both frontends. The entry-count
+difference is not hidden or treated as timing parity. The rotating score gate
+still fails. This establishes neither a valid physical stimulus nor acquisition.
+
+Other DSP program-fetch-derived fields remain diagnostic, not validated staged
+routing or tuning contracts. Actual port access counts and the CPU illegal flag
+are separate observations. Convert those remaining caller/publication probes
+before interpreting a failed staged delivery/tuning check as missing firmware
+activity. Neither score agreement nor matched SWWSR selections establishes
+physical sample timing or the fitted bus dialect.
 
 The retained arithmetic audit used binary SHA-256
 `67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`.

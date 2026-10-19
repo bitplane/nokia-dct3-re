@@ -13,12 +13,12 @@ import tempfile
 try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
-    from tools.c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window
+    from tools.c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window, observe_execution, check_execution
     from tools.c54x_rom4_rf_consumption_check import check as check_consumption
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
-    from c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window
+    from c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window, observe_execution, check_execution
     from c54x_rom4_rf_consumption_check import check as check_consumption
 
 
@@ -69,7 +69,7 @@ def input_provenance(paths):
     return result
 
 
-def inspect_case(text, console, mode, machine='noki5110'):
+def inspect_case(text, console, mode, machine='noki5110', execution_probes=False):
     """Keep independent evidence even when an acceptance boundary fails."""
     report = dict(mode=mode, failures={}, checks={})
 
@@ -84,15 +84,15 @@ def inspect_case(text, console, mode, machine='noki5110'):
             return None
 
     def score_operation(operation):
-        if MACHINES[machine][0] == 'staged':
+        if MACHINES[machine][0] == 'staged' and not execution_probes:
             raise ValueError('staged RF scores require execution-owned observation, not program-fetch snapshots')
         return operation(text)
 
     capture('observer_health', lambda: check_observer_health(console))
     capture('cpu_health', lambda: check_cpu_health(text, machine))
-    score = capture('score_observation', lambda: score_operation(observe_score))
+    score = capture('score_observation', lambda: score_operation(observe_execution if execution_probes else observe_score))
     capture('window_observation', lambda: check_window(text))
-    capture('score_acceptance', lambda: score_operation(check_score))
+    capture('score_acceptance', lambda: score_operation(check_execution if execution_probes else check_score))
     capture('consumption', lambda: check_consumption(text))
     capture('scan_consumption', lambda: check_consumption(text, scan=True))
     delivery = capture('delivery', lambda: check_delivery(text))
@@ -123,14 +123,18 @@ def main():
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument('--machine', choices=tuple(MACHINES), default='noki5110',
                         help='explicit CPU frontend/bus research composition; no physical dialect claim')
+    parser.add_argument('--execution-probes', action='store_true',
+                        help='observe scores at debugger instruction entry (automatic for staged CPUs)')
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats must be positive")
     root = Path(__file__).resolve().parent.parent
+    execution_probes = args.execution_probes or MACHINES[args.machine][0] == 'staged'
+    observer = root / 'tools' / ('c54x_rom4_rf_execute.lua' if execution_probes else 'c54x_rom4_rf_score.lua')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_rom4_rf_delivery_", dir=args.output_root))
     print(f"Native RF delivery evidence: {run}", flush=True)
-    paths = dict(binary=args.mame, observer=root / 'tools/c54x_rom4_rf_score.lua',
+    paths = dict(binary=args.mame, observer=observer, shared_observer=root / 'tools/c54x_rom4_rf_score.lua',
                  generator=root / 'tools/make_5110_eeprom_profile.py')
     for name in ('nse1_rom4_dsp_program.bin', 'nse1_rom4_dsp_data.bin',
                  '5110f530.fls', 'nse-1.bin', 'nse1_rom4_boot.bin'):
@@ -143,7 +147,8 @@ def main():
         acquisition_claim=False, profile=machine_profile(args.machine)), indent=2) + '\n')
     observations = []
     summary = dict(schema=2, status='running', cases=observations,
-                   fresh_storage=True, acquisition_claim=False, profile=machine_profile(args.machine))
+                   fresh_storage=True, acquisition_claim=False, profile=machine_profile(args.machine),
+                   score_observation='instruction_entry' if execution_probes else 'atomic_fetch')
     (run / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     for mode in ("zero", "tone"):
         for repeat in range(args.repeats):
@@ -158,7 +163,9 @@ def main():
             command = [str(args.mame.resolve()), args.machine, "-rompath", str(args.rompath.resolve()),
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
                        "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "60",
-                       "-autoboot_script", str(root / "tools/c54x_rom4_rf_score.lua")]
+                       "-autoboot_script", str(observer)]
+            if execution_probes:
+                command += ['-debug', '-debugger', 'none', '-autoboot_delay', '0']
             (case / 'invocation.json').write_text(json.dumps(dict(
                 command=command, cwd=str(case.resolve()), mode=mode,
                 generated_storage=input_provenance({'eeprom': nvram / 'eeprom'})),
@@ -177,7 +184,7 @@ def main():
             except OSError as error:
                 text = ''
                 execution_errors['trace_read'] = str(error)
-            report = inspect_case(text, (case / 'console.log').read_text(), mode, args.machine)
+            report = inspect_case(text, (case / 'console.log').read_text(), mode, args.machine, execution_probes)
             report.update(repeat=repeat, returncode=returncode)
             report['failures'].update(execution_errors)
             if returncode:

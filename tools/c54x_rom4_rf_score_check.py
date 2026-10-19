@@ -24,8 +24,41 @@ def observe(text):
                 maximum=maximum, second=second, accepted=accepted)
 
 
-def check(text):
-    sample = observe(text)
+def observe_execution(text):
+    """Count execution entries; fetch-summary score values are not used."""
+    marker = 'rom4_rf_execution_probe: points=0ad1,0add,0ae4 phase=instruction_entry'
+    if text.count(marker) != 1:
+        raise ValueError('missing or duplicate execution-owned RF probe')
+    source = observe(text)
+    sample = dict(mode=source['mode'], reads=source['reads'], results=0,
+                  nonzero=0, maximum=0, second=0, accepted=0)
+    phase = 0
+    rows = [line.split('rom4_rf_execute: ', 1)[1] for line in text.splitlines()
+            if 'rom4_rf_execute: ' in line]
+    for row in rows:
+        match = re.fullmatch(r'pc=(0ad1|0add|0ae4) a=([0-9a-f]{10})', row)
+        if not match:
+            raise ValueError('malformed execution-owned RF record')
+        pc, value = match[1], int(match[2], 16)
+        if pc == '0ad1':
+            sample['results'] += 1
+            sample['nonzero'] += bool(value)
+            sample['maximum'] = max(sample['maximum'], value)
+            phase = 1
+        elif pc == '0add' and phase == 1:
+            sample['second'] += 1
+            phase = 2
+        elif pc == '0ae4' and phase == 2:
+            sample['accepted'] += 1
+            phase = 3
+        else:
+            raise ValueError('unordered execution-owned RF continuation')
+    if not rows:
+        raise ValueError('missing execution-owned RF entries')
+    return sample
+
+
+def check_sample(sample):
     mode, reads, results, nonzero, maximum, second, accepted = (
         sample[key] for key in ('mode', 'reads', 'results', 'nonzero', 'maximum', 'second', 'accepted'))
     if reads < 1000 or results < 1000 or not 0 <= accepted <= second <= results or not 0 <= nonzero <= results:
@@ -35,6 +68,14 @@ def check(text):
     if mode == "tone" and (nonzero != results or maximum <= 0x574 or second == 0 or accepted == 0):
         raise ValueError("rotating input did not reach native accepted-value store")
     return mode, results, accepted
+
+
+def check(text):
+    return check_sample(observe(text))
+
+
+def check_execution(text):
+    return check_sample(observe_execution(text))
 
 
 def check_window(text):

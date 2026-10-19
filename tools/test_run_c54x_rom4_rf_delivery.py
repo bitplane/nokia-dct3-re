@@ -58,6 +58,15 @@ class RepeatTests(unittest.TestCase):
         self.assertNotIn('score', report)
         self.assertEqual(report['checks']['delivery']['status'], 'pass')
 
+    def test_staged_execution_probes_use_the_separate_score_parser(self):
+        sample = dict(mode='tone', reads=900000, results=5000, nonzero=5000,
+                      maximum=0x7fff, second=400, accepted=8)
+        with self.case_checks(observe_execution=lambda text: sample,
+                              check_execution=lambda text: ('tone', 5000, 8)):
+            report = inspect_case(TONE, '', 'tone', 'nse1pipe', execution_probes=True)
+        self.assertEqual(report['status'], 'pass')
+        self.assertEqual(report['score'], sample)
+
     def test_passing_case_keeps_all_checks(self):
         with self.case_checks():
             report = inspect_case(TONE, '', 'tone')

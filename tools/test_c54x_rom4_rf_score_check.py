@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_score_check import check, observe, check_window
+from tools.c54x_rom4_rf_score_check import check, observe, check_window, observe_execution, check_execution
 
 
 ZERO = "rom4_rf_score_summary: mode=zero reads=900000 results=5000 nonzero=0 maximum=0000000000 second=0 accepted=0 acquisition_claim=0"
@@ -8,6 +8,38 @@ TONE = "rom4_rf_score_summary: mode=tone reads=900000 results=5000 nonzero=5000 
 
 
 class ScoreTests(unittest.TestCase):
+    def execution(self, mode='tone', value=0x7fff, advance=True):
+        rows = ['rom4_rf_execution_probe: points=0ad1,0add,0ae4 phase=instruction_entry']
+        for _ in range(1000):
+            rows.append(f'rom4_rf_execute: pc=0ad1 a={value:010x}')
+            if advance:
+                rows += ['rom4_rf_execute: pc=0add a=0000000000', 'rom4_rf_execute: pc=0ae4 a=0000000000']
+        return '\n'.join(rows + [TONE if mode == 'tone' else ZERO])
+
+    def test_execution_uses_entries_not_fetch_snapshot_scores(self):
+        text = self.execution()
+        sample = observe_execution(text)
+        self.assertEqual((sample['results'], sample['second'], sample['accepted']), (1000, 1000, 1000))
+        self.assertEqual(check_execution(text), ('tone', 1000, 1000))
+        self.assertEqual(check_execution(self.execution('zero', 0, False)), ('zero', 1000, 0))
+
+    def test_execution_rejects_missing_duplicate_malformed_and_unordered(self):
+        text = self.execution()
+        marker = 'rom4_rf_execution_probe: points=0ad1,0add,0ae4 phase=instruction_entry'
+        for bad in (TONE, text + '\n' + marker, text.replace('pc=0ad1', 'pc=ffff', 1),
+                    text.replace('pc=0ad1', 'pc=0ae4', 1),
+                    text.replace('pc=0add', 'pc=0ad1', 1)):
+            with self.subTest(bad=bad[:120]), self.assertRaises(ValueError):
+                observe_execution(bad)
+
+    def test_execution_characterization_does_not_relax_acceptance(self):
+        text = self.execution(value=0x538, advance=False)
+        self.assertEqual(observe_execution(text)['maximum'], 0x538)
+        with self.assertRaisesRegex(ValueError, 'accepted-value store'):
+            check_execution(text)
+        with self.assertRaisesRegex(ValueError, 'silent/DC'):
+            check_execution(self.execution('zero', value=10, advance=False))
+
     def test_window_observation_does_not_require_or_promote_acceptance(self):
         text = TONE.replace('0000007fff', '0000000538').replace('second=400', 'second=0').replace('accepted=8', 'accepted=0')
         text += '\nrom4_rf_window_summary: writes=5 transitions=2 reads_on=800000 reads_off=100000 physical_gate_claim=0'
