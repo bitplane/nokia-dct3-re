@@ -11,7 +11,9 @@ calls. A bounded actual DMA capture identifies intervening processing writes at
 context `02a2ea`, rather than direct consumption of copy-helper output. Its
 five-pass kernel is source-pinned and bounded nonzero output epochs match DMA;
 the upstream signed scaling stage matches an independent Q12 model for 3456
-actual operand/output pairs. Independent filter arithmetic remains open. The protected
+actual operand/output pairs. Independent fixed-point equations also match one
+64-word block through each of the ten configured filter sections. Arbitrary
+coefficient settings, complete playback and codec delivery remain open. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -1061,8 +1063,8 @@ The earlier copy proof also reproduces unchanged. Check the chain with
 `mu4_output_processing_check.py RUN/error.log`, alongside the copy and DMA
 epoch checkers. Do not extend the result to serial/codec delivery or whole-track
 audio. The scalar contract below closes the `029fee` input/write link in the
-bounded window. Independent filter arithmetic remains open; direct copy-to-DMA
-provenance remains false.
+bounded window. The configured filter's bounded arithmetic proof follows below;
+direct copy-to-DMA provenance remains false.
 
 ### Signed Output Scaling
 
@@ -1092,6 +1094,42 @@ pass on this same run. This explains the amplitude change through original
 instructions and observed coefficient data, not fitted gain or waveform delay.
 
 Check with `mu4_output_scale_check.py RUN/error.log --source-a00 SOURCE`, alongside
-the copy, processing and DMA checkers. The result establishes bounded
-decoded-copy/scalar/processing dataflow, not independent five-pass filter
-arithmetic, complete-track consumption, serial/codec delivery or audible output.
+the copy, processing and DMA checkers. The scalar checker alone establishes
+bounded decoded-copy/scalar/processing dataflow, not filter arithmetic,
+complete-track consumption, serial/codec delivery or audible output.
+
+### Bounded Filter State Equations
+
+`mu4_filter_operands_observe.lua` captures actual helper reads/writes over
+1.061--1.062 seconds, including the configured section-state objects beyond
+`137f`. `mu4_filter_arithmetic_check.py` evaluates the pinned kernel independently
+using signed 40-bit accumulator arithmetic, unsigned-by-signed MACSU products,
+arithmetic right shifts and signed store saturation. Its supported mode is
+SXM=1/OVM=0/SST=1, with explicit FRCT handling. The instruction semantics are in
+TI SPRU172C; the same-location pending-write bypass is described by SPRU131G
+section 7.3.2. This is a bounded application-kernel check, not general CPU or
+codec conformance.
+
+One iteration has 25 actual memory reads and four checked writes: current-input
+history, low feedback state, high feedback state and output sample. The adjacent
+MPY high-state operand is forwarded from the pending store and produces no
+separate RAM read. The reference derives that value and checks the actual
+published state; it does **not** claim to have bus-observed the forwarded operand.
+Operand addresses must match the source-derived circular-state/coefficient
+geometry, and dependent memory reads must follow their state publications.
+
+The uncapped, zero-illegal capture validates 640 iterations/2560 writes against
+16000 actual operand reads. All iterations have nonzero feedback state. Five
+section-state objects (`1318/1328/1338/1348/1358`) each cover consecutive samples
+`1000..103f`; five (`1370/1380/1390/13a0/13b0`) each cover `1040..107f`.
+These are 64 stereo sample frames through five sections, **not** 640 audio frames.
+All direct coefficients are `1000`, and the computed outputs match the neutral
+sample values already observed. Eleven explicit DMA reads are excluded from CPU
+operands; ten separately counted boundary-context reads occur before section
+iterations. Ambiguous ownership or unmatched traffic fails the checker.
+
+Check with `mu4_filter_arithmetic_check.py RUN/error.log --source-a00 SOURCE`.
+The copy, scalar and processing checks also pass on this same run. This closes
+the configured kernel's bounded state/sample arithmetic, not arbitrary equalizer
+settings, every block's arithmetic, complete-track draining or analog sound.
+The next boundary is accepted DMA/DXR/serial/codec delivery of these sample epochs.
