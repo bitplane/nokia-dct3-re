@@ -144,6 +144,22 @@ write order. The tap uses bus-context PC to select the routine; this is
 write-footprint evidence, not an instruction-retirement or timing claim.
 No reset memory outside the stated footprint was inferred from a snapshot.
 
+Constructor `023d27..023d40` is now pinned with its table pointers (30
+words total). Table `c686` method 6 selects this constructor; method 11
+selects reset `023d41`. In the constructor's local stack frame, SP+4
+supplies AR2 and SP+6 supplies AR3. It copies `AR3[1]` to object[1],
+`AR2[9]` to object[2] and `AR2[14]` to object[3], then calls the original
+reset with the object pointer in A.
+
+A narrowed passive read tap observes configuration pointers `d43d,d43b`,
+then source values `d43c=0,d446=e800,d44b=f000`. The latter two match the
+subsequent raw sample buffers, not compressed-media parameters. No semantic
+name is yet assigned to object[1]. Raw PC-only captures from before the
+AA99 overlay contain different instructions at these same addresses and
+must not be interpreted as constructor execution. Literal inspection finds
+the supplying `d43d/d43b` call setup near `02786d`; decoding that caller
+and its original buffer descriptors is the next configuration boundary.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;

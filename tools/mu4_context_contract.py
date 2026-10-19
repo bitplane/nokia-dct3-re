@@ -699,6 +699,26 @@ DECODER_CHANNEL_RESET_WITNESS = (
     0x7681,0,0x7192,0x13,0x76e3,3,0,0x6de9,6,
     0x7711,0xaf2f,0x771a,0x1ff,0xf072,0x460b,
     0x7699,0,0x76e1,0x200,0,0xe800,0xee01,0x8a11,0xf4e4)
+DECODER_CONSTRUCTOR_BASE = 0x23D27
+DECODER_CONSTRUCTOR_WITNESS = (
+    0x4a11,0xeeff,0xf495,0x7104,0x12,0x7106,0x13,0x8811,
+    0x10e3,1,0x80e1,1,0x10e2,9,0x80e1,2,0x10e2,14,
+    0x80e1,3,0x4811,0xf982,0x3d41,0xee01,0x8a11,0xf4e4)
+
+
+def decode_decoder_constructor(words):
+    for offset, expected in enumerate(DECODER_CONSTRUCTOR_WITNESS):
+        if words.get(DECODER_CONSTRUCTOR_BASE + offset) != expected:
+            raise ValueError('AA99 decoder constructor witness changed or absent')
+    for address, target in ((0xc692,0x3d27),(0xc69c,0x3d41)):
+        if (words.get(address),words.get(address+1)) != (2,target):
+            raise ValueError('AA99 decoder constructor/reset table pointer changed or absent')
+    return dict(entry='023d27', pinned_words=30,
+                method_table='c686', constructor_method=6, reset_method=11,
+                object='A -> AR1', configuration_pointers=['local SP+4 -> AR2', 'local SP+6 -> AR3'],
+                copies=['object[1] = AR3[1]', 'object[2] = AR2[9]', 'object[3] = AR2[14]'],
+                tail='call original 023d41 with object in A',
+                scope='Pinned local constructor ABI and table entries; configuration field meaning and upstream producer remain open')
 
 
 def decode_decoder_channel_reset(words):
@@ -1826,6 +1846,7 @@ def contract(source):
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
     result['decoder_channel_reset'] = decode_decoder_channel_reset(rel_words)
+    result['decoder_constructor'] = decode_decoder_constructor(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
