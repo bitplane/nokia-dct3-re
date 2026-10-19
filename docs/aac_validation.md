@@ -1046,13 +1046,65 @@ missing data-read identities or dropped sites.
 | `03982b` | `10e3` (`LD Smem,A`) | 396288 |
 
 Both opcodes match the original AA88 source under `--source-a00`. Each count
-equals 387 times 1024, but numerical agreement with an encoder-frame size
-does not establish the calling/processing contract. Decode the surrounding
-routine and follow the loaded values to their stores before assigning
-encoder-ingress semantics. Internally forwarded operands and values derived
+equals 387 times 1024. The sample-repack contract below binds these reads
+to actual stores and the following call; numerical agreement alone would
+not establish that contract. Internally forwarded operands and values derived
 after an overwrite are outside this bus-lifetime observation; an unread
 epoch is not by itself evidence of lost conversion data. Native metadata
 success and both NAND hashes above reproduce unchanged.
+
+### Sample Repack Ingress
+
+`mu4_recorder_read_census.py RUN/error.log --ingress --source-a00 SOURCE`
+checks the AA88 wrapper at `0397f9` through its call at `03983b`. The
+source contract pins 68 original words, including the stack-frame prologue
+and selected stereo loop. The wrapper saves three registers, reserves
+`0803` stack words, and uses `SP+2` for a 2048-word local sample buffer.
+It performs 1024 iterations: load the next word through AR3, store at AR2,
+load AR3+1024 for the second lane, store at AR2+1, then advance AR2 by two.
+It passes `SP+2` in A to `039852`.
+
+The destination is **stack-local**, not a fixed hardware bank or an
+independently inferred heap allocation. Stack position varies with caller
+context; observing `66d8` repeatedly does not justify hardcoding it.
+The two lanes describe the selected memory layout, not an independently
+validated electrical ADC-channel mapping.
+
+Read/store pairing uses actual staged operand identity and retained store
+address/value inspection, followed by the real data-bus write. A word match
+validates an already selected pair rather than selecting a source by sample
+value. The isolated `store-observe` CPU profile checks all twelve direct
+STL/STH variants and their pending-write save/restore replays, including
+saturation, retained destination after DP changes, and rejection of other
+instruction identities. Observation is read-only and the native recording
+diagnostics remain fresh-run only.
+
+The 20-second `tmp/native-gates/mu4-recorder-ingress-abi` capture validates
+387 complete invocations. Each has 1024 known-source loads and equal-value
+stores per lane, with no pending read, store, call, partial loop, mismatch or
+capped observation. Both actual writes preserve the decoded stride, and
+all 387 calls reach `039852` with A's low word equal to the written buffer
+base. The `7000/7400` source pair occurs 194 times and `7800/7c00` 193 times.
+The 792576 paired stores use these observed lane bases:
+
+| Destination bases | Invocations |
+| --- | ---: |
+| `651a/651b` | 6 |
+| `651c/651d` | 1 |
+| `651e/651f` | 11 |
+| `6520/6521` | 4 |
+| `65fa/65fb` | 2 |
+| `66d8/66d9` | 363 |
+
+Native metadata success and both NAND hashes in the DRR section reproduce
+unchanged. This binds actual peripheral-origin words through the workspace
+and repack stores to a real pointer argument, rather than inferring sample
+consumption from frame counts.
+
+The remaining boundary is what `039852` and its callees do with this local
+buffer during each call's stack lifetime. Follow the dynamic pointer, not
+one frequent address. Repack/call acceptance is not a complete encoder-output, physical
+ADC, GSM speech or end-to-end call claim.
 
 ### Metadata Overwrite Accounting
 

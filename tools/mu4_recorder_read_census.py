@@ -6,6 +6,18 @@ import json
 from pathlib import Path
 import sys
 
+INGRESS_BASE = 0x39817
+INGRESS_PROLOGUE_BASE = 0x397f9
+INGRESS_PROLOGUE = (0x4a11,0x4a16,0x4a17,0x6bf8,0x0018,0xf7fd,0xf495,0xf495,
+                    0xe787,0x8811,0xf495,0x71e7,0x0808,0x0016,0x1081,0x80e7,
+                    0x0802,0x10f8,0xef96,0xf845,0x9817,0x71e1,0x0002,0xef92,
+                    0x1086,0xf983,0x9945,0x76f8,0xef96,0x0000)
+INGRESS_WORDS = (0x10e7,0x0802,0xf010,0x0001,0x8813,0xe782,0x6dea,0x0002,
+                 0x771a,0x03ff,0xf072,0x9830,0x10eb,0x0001,0x8082,0x60e1,
+                 0x0002,0x0002,0xf820,0x982f,0x10e3,0x0400,0x80e2,0x0001,
+                 0x6dea,0x0002,0x1186,0x30f8,0xef92,0x20e1,0x0001,0x8001,
+                 0x4818,0x8100,0xf000,0x0002,0xf983,0x9852)
+
 if __package__:
     from .mu4_playback_frame_check import rows
     from .noki5510_bootstrap_check import verify_recorder_input
@@ -233,6 +245,65 @@ def check_workspace(text,copies):
                 scope='Latest copied-word bus read lifetimes with shared program/data invalidation; not forwarded operands, derived values or encoder consumption')
 
 
+def decode_ingress_loop(words):
+    if any(words.get(base+index) != word for base,witness in
+           ((INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE),(INGRESS_BASE,INGRESS_WORDS)) for index,word in enumerate(witness)):
+        raise ValueError('original AA88 sample-repack loop changed or absent')
+    return dict(first=f'{INGRESS_PROLOGUE_BASE:06x}',pinned_words=len(INGRESS_PROLOGUE)+len(INGRESS_WORDS),iterations=1024,
+                stereo_source_separation=1024,destination_stride=2,
+                stack_reserve_words=2051,buffer_offset=2,buffer_words=2048,callee_argument='A low word = SP + 2',
+                load_sites=['039823','03982b'],store_sites=['039825','03982d'],
+                call='03983b',callee='039852',scope='Selected stereo repack arm, not complete callee or encoder-output semantics')
+
+
+def check_ingress(text,workspace):
+    ends = rows(text,'mu4_recorder_ingress_terminal')
+    if len(ends) != 1 or workspace is None:
+        raise ValueError('sample repack requires workspace provenance and one terminal')
+    end = ends[0]
+    for key,value in dict(pending_reads='0',pending_write='0',pending_call='0',partial='0,0',
+            bad='0',dropped='0',frame_cap='512',queue_cap='4',save_restore='unsupported',observer_writes='0',encoder_consumption='0').items():
+        if end[key] != value:
+            raise ValueError('incomplete or inconsistent sample repack observation')
+    count = int(end['frames'])
+    def pair(row,key,base=10):
+        values = tuple(int(value,base) for value in row[key].split(','))
+        if len(values) != 2 or min(values) < 0:
+            raise ValueError('invalid sample repack pair')
+        return values
+    totals = [count*1024]*2
+    observed = {row['instruction']:row for row in workspace['instructions']}
+    expected = []
+    for instruction,opcode in (('039823','10eb'),('03982b','10e3')):
+        row = observed.get(instruction)
+        if row is None or row['opcode'] != opcode:
+            raise ValueError('sample repack source identities absent')
+        expected.append(row['reads'])
+    if (not 0 < count <= 512 or int(end['entries']) != count or expected != totals
+            or sum(expected) != workspace['known_reads'] or pair(end,'loads') != tuple(totals)
+            or pair(end,'stores') != tuple(totals) or pair(end,'known') != tuple(totals)):
+        raise ValueError('sample repack loops do not cover known workspace reads')
+    frames = rows(text,'mu4_recorder_ingress_frame')
+    sources,destinations = {},{}
+    if len(frames) != count:
+        raise ValueError('missing or repeated sample repack frame')
+    for ordinal,row in enumerate(frames,1):
+        source,destination = pair(row,'source_base',16),pair(row,'destination_base',16)
+        if (int(row['ordinal']) != ordinal or pair(row,'stores') != (1024,1024)
+                or pair(row,'known') != (1024,1024) or row['identity'] != 'Execute_entry' or row['observer_writes'] != '0'
+                or not all(0x7000 <= value <= 0x7fff for value in source)
+                or source[1] != 0x7000+((source[0]-0x7000+1024)&0xfff)
+                or max(destination) > 0xffff or destination[1] != (destination[0]+1)&0xffff
+                or int(row['argument'],16) != destination[0]):
+            raise ValueError('sample repack frame geometry changed or incomplete')
+        for histogram,values in ((sources,source),(destinations,destination)):
+            key = ','.join(f'{value:04x}' for value in values)
+            histogram[key] = histogram.get(key,0)+1
+    return dict(frames=count,samples_per_lane=1024,paired_stores=sum(totals),
+                source_bases=sources,destination_bases=destinations,call='03983b',callee='039852',
+                scope='Actual known-word loads, equal-value stores, stereo geometry and next callee entry; not encoder output or speech')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -274,10 +345,12 @@ def check(text,require_fresh=False):
     identities = check_read_identity(text,buffers) if rows(text,'mu4_recorder_buffer_identity_terminal') else None
     copies = check_copies(text,identities) if rows(text,'mu4_recorder_copy_terminal') else None
     workspace = check_workspace(text,copies) if rows(text,'mu4_recorder_workspace_terminal') else None
+    ingress = check_ingress(text,workspace) if rows(text,'mu4_recorder_ingress_terminal') else None
     return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
             'read_instructions':identities,
             'copy_destinations':copies,
             'copied_workspace':workspace,
+            'sample_repack':ingress,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -296,6 +369,7 @@ def main():
     parser.add_argument('--source-a00',type=Path,help='pin captured read opcodes to original R060 AA88 upload')
     parser.add_argument('--copies',action='store_true',help='require instruction/source/value paired MVDD writes')
     parser.add_argument('--workspace',action='store_true',help='require alias-aware copied-workspace read lifetimes')
+    parser.add_argument('--ingress',action='store_true',help='require sample-repack load/store and callee-entry closure')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
@@ -309,6 +383,8 @@ def main():
             raise ValueError('MVDD read/write pairing required')
         if args.workspace and result['copied_workspace'] is None:
             raise ValueError('copied-workspace observation required')
+        if args.ingress and result['sample_repack'] is None:
+            raise ValueError('sample-repack observation required')
         if args.source_a00:
             source = args.source_a00.read_bytes()
             if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
@@ -317,6 +393,8 @@ def main():
             result['read_source'] = pin_read_instructions(result['read_instructions'],words)
             if result['copied_workspace'] is not None:
                 result['workspace_source'] = pin_read_instructions(result['copied_workspace'],words)
+            if result['sample_repack'] is not None:
+                result['sample_repack_source'] = decode_ingress_loop(words)
         print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')

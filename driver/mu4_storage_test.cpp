@@ -48,6 +48,7 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (recorder_ac_profile() && m_recorder_overlay_checked) observe_recorder_ingress(address,opcode);
 			if (measurement_profile() && (address == 0x3b021 || address == 0x3b02a || address == 0x3b034 || address == 0x3b038))
 			{
 				auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
@@ -447,6 +448,70 @@ private:
 	u64 m_ac_workspace_epochs_read = 0, m_ac_workspace_retired = 0, m_ac_workspace_known = 0, m_ac_workspace_unknown = 0;
 	u64 m_ac_workspace_bad = 0, m_ac_workspace_dropped = 0, m_ac_workspace_missing = 0;
 	bool m_ac_daram_read_alias = false, m_ac_daram_write_alias = false;
+	std::array<std::vector<std::pair<u16,u16>>,2> m_ac_ingress_reads;
+	struct recorder_ingress_store { bool valid = false, known = false; unsigned lane = 0; u16 source = 0, destination = 0, value = 0, opcode = 0; u32 instruction = 0; };
+	recorder_ingress_store m_ac_ingress_store;
+	std::array<u64,2> m_ac_ingress_loads{}, m_ac_ingress_stores{}, m_ac_ingress_known{};
+	std::array<u32,2> m_ac_ingress_frame_stores{}, m_ac_ingress_frame_known{};
+	std::array<u16,2> m_ac_ingress_source_base{}, m_ac_ingress_destination_base{};
+	u32 m_ac_ingress_frames = 0, m_ac_ingress_entries = 0;
+	u64 m_ac_ingress_bad = 0, m_ac_ingress_dropped = 0;
+	bool m_ac_ingress_call = false;
+	void observe_recorder_ingress(offs_t address,u16 opcode)
+	{
+		if (m_ac_ingress_store.valid) { ++m_ac_ingress_bad; m_ac_ingress_store.valid = false; }
+		if (m_ac_ingress_call)
+		{
+			if (address != 0x39852 || opcode != 0x4a11 || u16(m_cpu->state_int(tms320c54x_device::STATE_A)) != m_ac_ingress_destination_base[0]) ++m_ac_ingress_bad;
+			else ++m_ac_ingress_entries;
+			m_ac_ingress_call = false;
+		}
+		if (address == 0x39825 || address == 0x3982d)
+		{
+			unsigned const lane = address == 0x3982d;
+			u16 destination = 0, value = 0;
+			if (opcode != (lane ? 0x80e2 : 0x8082) || !m_cpu->observe_execute_memory_store(address,opcode,destination,value)) { ++m_ac_ingress_bad; return; }
+			bool const known = !m_ac_ingress_reads[lane].empty();
+			u16 source = 0;
+			if (known)
+			{
+				source = m_ac_ingress_reads[lane].front().first;
+				if (value != m_ac_ingress_reads[lane].front().second) ++m_ac_ingress_bad;
+				m_ac_ingress_reads[lane].erase(m_ac_ingress_reads[lane].begin());
+			}
+			m_ac_ingress_store = {true,known,lane,source,destination,value,opcode,u32(address)};
+		}
+		else if (address == 0x3983b)
+		{
+			if (opcode != 0xf983) ++m_ac_ingress_bad;
+			++m_ac_ingress_frames; m_ac_ingress_call = true;
+			if (m_ac_ingress_frames <= 512)
+				logerror("mu4_recorder_ingress_frame: ordinal=%u stores=%u,%u known=%u,%u source_base=%04x,%04x destination_base=%04x,%04x argument=%04x identity=Execute_entry observer_writes=0\n",
+					m_ac_ingress_frames,m_ac_ingress_frame_stores[0],m_ac_ingress_frame_stores[1],m_ac_ingress_frame_known[0],m_ac_ingress_frame_known[1],m_ac_ingress_source_base[0],m_ac_ingress_source_base[1],m_ac_ingress_destination_base[0],m_ac_ingress_destination_base[1],u16(m_cpu->state_int(tms320c54x_device::STATE_A)));
+			else ++m_ac_ingress_dropped;
+			m_ac_ingress_frame_stores.fill(0); m_ac_ingress_frame_known.fill(0);
+		}
+	}
+	void observe_recorder_ingress_write(offs_t address,u16 value,u16 mask)
+	{
+		if (!m_ac_ingress_store.valid) return;
+		auto const store = m_ac_ingress_store; m_ac_ingress_store.valid = false;
+		u16 destination = 0, observed = 0;
+		if (mask != 0xffff || address != store.destination || value != store.value ||
+			!m_cpu->observe_execute_memory_store(store.instruction,store.opcode,destination,observed) || destination != address || observed != value) ++m_ac_ingress_bad;
+		unsigned const lane = store.lane, index = m_ac_ingress_frame_stores[lane]++;
+		++m_ac_ingress_stores[lane];
+		if (store.known)
+		{
+			if (!m_ac_ingress_frame_known[lane])
+			{
+				m_ac_ingress_source_base[lane] = 0x7000+((store.source-0x7000-index)&0xfff);
+				m_ac_ingress_destination_base[lane] = u16(address-2*index);
+			}
+			if (store.source != 0x7000+((m_ac_ingress_source_base[lane]-0x7000+index)&0xfff) || address != u16(m_ac_ingress_destination_base[lane]+2*index)) ++m_ac_ingress_bad;
+			++m_ac_ingress_known[lane]; ++m_ac_ingress_frame_known[lane];
+		}
+	}
 	void install_recorder_buffer_observers()
 	{
 		m_cpu->space(AS_DATA).install_read_tap(0x7000,0x7fff,"mu4_recorder_workspace_read",
@@ -465,6 +530,14 @@ private:
 				{
 					u32 instruction = 0; u16 opcode = 0;
 					if (!m_cpu->observe_staged_data_read(address,instruction,opcode)) { ++m_ac_workspace_missing; return; }
+					if (instruction == 0x39823 || instruction == 0x3982b)
+					{
+						unsigned const lane = instruction == 0x3982b;
+						if (opcode != (lane ? 0x10e3 : 0x10eb)) ++m_ac_ingress_bad;
+						++m_ac_ingress_loads[lane];
+						if (m_ac_ingress_reads[lane].size() >= 4) ++m_ac_ingress_dropped;
+						else m_ac_ingress_reads[lane].emplace_back(address,value);
+					}
 					u64 const key = (u64(instruction)<<16) | opcode;
 					auto found = m_ac_workspace_instructions.find(key);
 					if (found != m_ac_workspace_instructions.end()) ++found->second;
@@ -475,6 +548,7 @@ private:
 		m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"mu4_recorder_copy_destination",
 			[this](offs_t address,u16 &value,u16 mask) {
 				if (machine().side_effects_disabled()) return;
+				observe_recorder_ingress_write(address,value,mask);
 				if (address >= 0x7000 && address <= 0x7fff)
 				{
 					auto &word = m_ac_workspace[address-0x7000];
@@ -3211,6 +3285,10 @@ private:
 		m_ac_workspace_epochs_read = m_ac_workspace_retired = m_ac_workspace_known = m_ac_workspace_unknown = 0;
 		m_ac_workspace_bad = m_ac_workspace_dropped = m_ac_workspace_missing = 0;
 		m_ac_daram_read_alias = m_ac_daram_write_alias = false;
+		for (auto &reads : m_ac_ingress_reads) reads.clear();
+		m_ac_ingress_store = {}; m_ac_ingress_loads.fill(0); m_ac_ingress_stores.fill(0); m_ac_ingress_known.fill(0);
+		m_ac_ingress_frame_stores.fill(0); m_ac_ingress_frame_known.fill(0); m_ac_ingress_source_base.fill(0); m_ac_ingress_destination_base.fill(0);
+		m_ac_ingress_frames = m_ac_ingress_entries = 0; m_ac_ingress_bad = m_ac_ingress_dropped = 0; m_ac_ingress_call = false;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3783,6 +3861,8 @@ private:
 				logerror("mu4_recorder_workspace_terminal: origin_writes=%llu total_writes=%llu alias_writes=%llu read_epochs=%llu retired_unread=%llu pending_unread=%u known_reads=%llu unknown_reads=%llu bad=%llu dropped=%llu missing_data_identity=%llu cap=256 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					static_cast<unsigned long long>(m_ac_workspace_origins),static_cast<unsigned long long>(m_ac_workspace_writes),static_cast<unsigned long long>(m_ac_workspace_alias_writes),static_cast<unsigned long long>(m_ac_workspace_epochs_read),static_cast<unsigned long long>(m_ac_workspace_retired),workspace_pending,
 					static_cast<unsigned long long>(m_ac_workspace_known),static_cast<unsigned long long>(m_ac_workspace_unknown),static_cast<unsigned long long>(m_ac_workspace_bad),static_cast<unsigned long long>(m_ac_workspace_dropped),static_cast<unsigned long long>(m_ac_workspace_missing));
+				logerror("mu4_recorder_ingress_terminal: frames=%u entries=%u loads=%llu,%llu stores=%llu,%llu known=%llu,%llu pending_reads=%u pending_write=%u pending_call=%u partial=%u,%u bad=%llu dropped=%llu frame_cap=512 queue_cap=4 save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					m_ac_ingress_frames,m_ac_ingress_entries,static_cast<unsigned long long>(m_ac_ingress_loads[0]),static_cast<unsigned long long>(m_ac_ingress_loads[1]),static_cast<unsigned long long>(m_ac_ingress_stores[0]),static_cast<unsigned long long>(m_ac_ingress_stores[1]),static_cast<unsigned long long>(m_ac_ingress_known[0]),static_cast<unsigned long long>(m_ac_ingress_known[1]),unsigned(m_ac_ingress_reads[0].size()+m_ac_ingress_reads[1].size()),unsigned(m_ac_ingress_store.valid),unsigned(m_ac_ingress_call),m_ac_ingress_frame_stores[0],m_ac_ingress_frame_stores[1],static_cast<unsigned long long>(m_ac_ingress_bad),static_cast<unsigned long long>(m_ac_ingress_dropped));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

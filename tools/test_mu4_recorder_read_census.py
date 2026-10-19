@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies,check_workspace
+from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions,check_copies,check_workspace,check_ingress,decode_ingress_loop,INGRESS_BASE,INGRESS_WORDS,INGRESS_PROLOGUE_BASE,INGRESS_PROLOGUE
 
 
 def fixture():
@@ -16,6 +16,25 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_sample_repack_binds_complete_known_frames_and_source_geometry(self):
+        text = '\n'.join([
+            'mu4_recorder_ingress_frame: ordinal=1 stores=1024,1024 known=1024,1024 source_base=7000,7400 destination_base=2000,2001 argument=2000 identity=Execute_entry observer_writes=0',
+            'mu4_recorder_ingress_frame: ordinal=2 stores=1024,1024 known=1024,1024 source_base=7800,7c00 destination_base=2000,2001 argument=2000 identity=Execute_entry observer_writes=0',
+            'mu4_recorder_ingress_terminal: frames=2 entries=2 loads=2048,2048 stores=2048,2048 known=2048,2048 pending_reads=0 pending_write=0 pending_call=0 partial=0,0 bad=0 dropped=0 frame_cap=512 queue_cap=4 save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        workspace = dict(known_reads=4096,instructions=[dict(instruction='039823',opcode='10eb',reads=2048),dict(instruction='03982b',opcode='10e3',reads=2048)])
+        self.assertEqual(check_ingress(text,workspace)['paired_stores'],4096)
+        for before,after in [('entries=2','entries=1'),('bad=0','bad=1'),('pending_write=0','pending_write=1'),
+                             ('known=1024,1024','known=1024,1023'),('7000,7400','7000,7401'),
+                             ('2000,2001','2000,2002'),('partial=0,0','partial=1,0'),('argument=2000','argument=2001')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_ingress(text.replace(before,after),workspace)
+        words = {INGRESS_BASE+index:word for index,word in enumerate(INGRESS_WORDS)}
+        words.update({INGRESS_PROLOGUE_BASE+index:word for index,word in enumerate(INGRESS_PROLOGUE)})
+        self.assertEqual(decode_ingress_loop(words)['iterations'],1024)
+        words[0x3982c] ^= 1
+        with self.assertRaises(ValueError):
+            decode_ingress_loop(words)
+
     def test_workspace_accounts_alias_reads_writes_and_missing_operand_identity(self):
         text = '\n'.join([
             'mu4_recorder_workspace_reader: program_alias=0 dma_mask=00 reads=6 observer_writes=0',
