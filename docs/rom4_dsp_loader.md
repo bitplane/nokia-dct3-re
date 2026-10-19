@@ -1853,6 +1853,22 @@ second bus read; later literal, pointer and RAM changes cannot replace retained
 operands. Other XORM addressing forms remain unqualified. These are emulator
 phase contracts, not measured silicon timing.
 
+## MVDM to T and TRN
+
+Staged `720e/720f` use the existing Class-19A absolute-source transfer:
+retain one address literal, read the source once and publish the encoded
+mapped register at clock 6. This follows the MVDM operation in SPRU172C
+4-110; the clock placement remains an emulator pipeline contract, not a
+measured Lead bus phase. Source ownership and repeat exclusions are unchanged.
+
+`mvdm-t` checks 12,288 cases and cleared-pipeline replays: T/TRN destinations,
+RAM/AR4/AR1 sources, eight values, sixteen status combinations, zero/one-gap
+mapped LDM consumers, two pages and four checkpoints. Literal changes after
+Decode and source changes after Read cannot replace the retained transfer.
+The consumer reads the new unsigned word; status, the opposite T/TRN register
+and B remain unchanged. No additional mapped/peripheral sources, repeat or
+interrupt compositions are qualified by this fixture.
+
 ## Staged LMS
 
 `LMS Xmem,Ymem` (`e1xx`, TI SPRU172C page 4-80) retains both RAM samples

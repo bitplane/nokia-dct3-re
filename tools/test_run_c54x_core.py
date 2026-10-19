@@ -2302,7 +2302,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(bad, 3, profile=profile)
 
     def test_bd_long_accumulator_multiply_scope(self):
-        for profile in ('bd-maca-long', 'bd-maca-edge', 'push-mvmm-sp', 'xorm-absolute'):
+        for profile in ('bd-maca-long', 'bd-maca-edge', 'push-mvmm-sp', 'xorm-absolute', 'mvdm-t'):
             marker, ending = EXTRA_PROFILES[profile]
             output = marker + '\n' + ending + '\n'
             check_result(output, 3, profile=profile)

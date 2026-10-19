@@ -328,7 +328,7 @@ constexpr bool staged_t_register_move(u16 word, u16 destination)
 
 constexpr bool staged_direct_mvdm(u16 word)
 {
-	return (word & 0xfff8) == 0x7210 || (word >= 0x7208 && word <= 0x720d);
+	return (word & 0xfff8) == 0x7210 || (word >= 0x7208 && word <= 0x720f);
 }
 
 constexpr bool staged_direct_push(u16 word)
@@ -3949,7 +3949,8 @@ void tms320c54x_device::pipeline_step()
 		else if (!extended) m_pipeline_operand_address[3] = staged_direct_mvdm(m_pipeline_word[3]) ? mode : basic_address(3, mode);
 		u16 const destination = m_pipeline_operand_address[3];
 		bool const accumulator_destination = staged_direct_mvdm(m_pipeline_word[3]) && destination >= 8 && destination <= 0x0d;
-		if (destination < 0x20 && !accumulator_destination && (destination < 0x10 || destination > 0x17))
+		bool const t_destination = staged_direct_mvdm(m_pipeline_word[3]) && (destination == 0x0e || destination == 0x0f);
+		if (destination < 0x20 && !accumulator_destination && !t_destination && (destination < 0x10 || destination > 0x17))
 		{
 			logerror("%s: staged MVKD control/peripheral destination is unsupported instruction=%06x word=%04x source=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source, destination); m_illegal = true; return;
 		}
