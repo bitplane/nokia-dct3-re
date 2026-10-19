@@ -723,3 +723,35 @@ proves the selected source policy against a second file extent, not that its
 buffered tail is intentionally disposable. The unresolved contract is whether
 the native caller must drain already-buffered data before this cleanup or the
 recording format declares that data outside its intended output extent.
+
+### Fresh Stored-Tail Inventory
+
+A short `bootrecac` replay from the same unchanged formatted NAND, using
+`mu4_recorder_transform_observe.lua`, provides 96 complete 32-byte transform
+observations before two seconds. All match the independently extracted fresh
+file at its unique origin 622, with one captured state. This short replay is
+not the recorder acceptance gate. Constant-state host projection of the file's
+remaining 143360 bytes (280 times 512) produces:
+
+| Boundary | Result |
+| --- | --- |
+| Native consumed prefix | 375 packets, 139500 bytes; every byte equals the projection from byte zero |
+| Complete projected packet chain | 385 packets, 143220 bytes; SHA256 `b7e7b5d30eba38099e26d701b3db49e0d2f586c0cb16be834b1adae6f2b4257f` |
+| Remaining stored projection | 140 bytes of declared 372-byte packet 386 |
+| Encoder-only tail | Remaining 232 bytes of packet 386 and all 372 bytes of packet 387 are outside the stored projection |
+| Host decoding | FFmpeg reports no errors for the 385-packet prefix and produces 1576960 PCM bytes; its first 1536000 bytes equal the host decode of the observed native prefix |
+
+All 385 complete headers also match the fresh encoder publication trace at
+successive declared offsets. The 512-byte granularity is a file-size
+observation, not yet an established recorder-flush contract. In particular,
+387 header publications must not be described as 387 committed complete
+packets, and the ten complete projected packets beyond native playback must
+not be confused with the incomplete recording tail.
+
+Use the transform checker with `--output-projected-aac NEW_PATH
+--comparison-prefix PLAYBACK/observed.aac` to enforce fixed-origin byte equality.
+The supplied prefix's provenance is checked separately by the packet-session
+checker; this comparison alone does not establish it. The projection remains
+host-only and must never become emulation input. Native transform state beyond
+the observed coverage, intended sample extent, recorder flushing and playback
+draining remain distinct unvalidated contracts.

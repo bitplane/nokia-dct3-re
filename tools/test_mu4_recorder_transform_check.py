@@ -59,6 +59,25 @@ class RecorderTransformCheckTest(unittest.TestCase):
         for limit in (0,-1,5):
             with self.assertRaises(ValueError):
                 checker.project_complete_windows(text,saved,2,limit)
+        matched,_ = checker.project_complete_windows(text,saved,2,comparison_prefix=plain[:96])
+        self.assertEqual(matched['supplied_prefix_correspondence']['bytes'],96)
+        self.assertFalse(matched['native_beyond_prefix_validated'])
+        for bad in (b'', b'x'+plain[1:96], plain+b'x'):
+            with self.assertRaises(ValueError):
+                checker.project_complete_windows(text,saved,2,comparison_prefix=bad)
+
+    def test_truncated_frame_extent_is_not_complete_payload(self):
+        packet = bytes.fromhex('fff95080041ffc')+bytes(25)
+        plain = packet+bytes.fromhex('fff95080041ffc')+bytes([1])*25
+        text,saved,_ = fixture(plaintext=plain)
+        # One complete transformed window contains half of the next packet.
+        longer_header = bytes.fromhex('fff95080081ffc')+bytes(25)
+        saved = saved[:-4]+reference_recording_windows(longer_header,list(range(82)),reverse=False)
+        report, payload = checker.project_complete_windows(text,saved,2)
+        self.assertEqual(payload,plain)
+        self.assertEqual(report['stop_reason'],'truncated_frame')
+        self.assertEqual(report['partial_next_frame_bytes'],32)
+        self.assertEqual(report['next_frame_declared_bytes'],64)
 
     def test_projection_rejects_nonconstant_or_inconsistent_prefix_and_non_aac(self):
         text,saved,_ = fixture(True)

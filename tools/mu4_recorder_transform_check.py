@@ -118,7 +118,7 @@ def verify(text, saved, samples=96):
     return report, bytes(plain)
 
 
-def project_complete_windows(text, saved, samples=96, packet_limit=None):
+def project_complete_windows(text, saved, samples=96, packet_limit=None, *, comparison_prefix=None):
     """Host-only extension of one captured state; later native state is unknown."""
     proof, observed = verify(text,saved,samples)
     if not proof['consistent'] or proof['state_variants'] != 1:
@@ -129,6 +129,10 @@ def project_complete_windows(text, saved, samples=96, packet_limit=None):
     projected = reference_recording_windows(saved[origin:origin+extent],state)
     if projected[:len(observed)] != observed:
         raise ValueError('host inverse projection disagrees with captured plaintext')
+    if comparison_prefix is not None and (not comparison_prefix or
+            len(comparison_prefix) > len(projected) or
+            projected[:len(comparison_prefix)] != comparison_prefix):
+        raise ValueError('supplied comparison prefix differs at fixed byte-zero origin')
     cursor, headers = 0, []
     stop = 'exact_projection_end'
     while cursor < len(projected):
@@ -150,7 +154,7 @@ def project_complete_windows(text, saved, samples=96, packet_limit=None):
         raise ValueError('projection packet limit exceeds the complete header chain')
     selected = len(headers) if packet_limit is None else packet_limit
     output = payload[:sum(header['frame_bytes'] for header in headers[:selected])]
-    return {'captured_prefix_bytes':len(observed), 'projected_window_bytes':extent,
+    report = {'captured_prefix_bytes':len(observed), 'projected_window_bytes':extent,
         'complete_packets':len(headers), 'packet_bytes':cursor,
         'packet_sha256':hashlib.sha256(payload).hexdigest(),
         'output_packets':selected, 'output_bytes':len(output),
@@ -159,7 +163,15 @@ def project_complete_windows(text, saved, samples=96, packet_limit=None):
         'stop_reason':stop, 'configurations':[dict(zip(fields,values)) for values in configurations],
         'state_sha256':hashlib.sha256(b''.join(word.to_bytes(2,'big') for word in state)).hexdigest(),
         'native_beyond_prefix_validated':False, 'native_audio_validated':False,
-        'scope':'Host-only constant-state projection over complete 32-byte windows; headers are not payload/CRC or later native-state validation'}, output
+        'scope':'Host-only constant-state projection over complete 32-byte windows; headers are not payload/CRC or later native-state validation'}
+    if stop == 'truncated_frame':
+        report['partial_next_frame_bytes'] = len(projected)-cursor
+        report['next_frame_declared_bytes'] = header['frame_bytes']
+    if comparison_prefix is not None:
+        report['supplied_prefix_correspondence'] = dict(bytes=len(comparison_prefix),
+            sha256=hashlib.sha256(comparison_prefix).hexdigest(), fitted_alignment=False,
+            scope='Byte-zero equality only; supplied prefix provenance must be validated separately')
+    return report, output
 
 
 def main(argv=None):
@@ -171,18 +183,25 @@ def main(argv=None):
     parser.add_argument('--output-projected-aac',type=Path,
                         help='create a new host-only complete-packet projection; never an emulation input')
     parser.add_argument('--project-packet-limit',type=int,help='explicit output prefix; report still inventories the complete header chain')
+    parser.add_argument('--comparison-prefix',type=Path,
+                        help='require byte-zero equality with separately supplied bytes; does not validate their provenance')
     args = parser.parse_args(argv)
     try:
-        if args.project_packet_limit is not None and args.output_projected_aac is None:
-            raise ValueError('projection packet limit requires an explicit output path')
+        if (args.project_packet_limit is not None or args.comparison_prefix) and args.output_projected_aac is None:
+            raise ValueError('projection options require an explicit output path')
         source = args.source_a00.read_bytes()
         contract(source)
         result, _ = verify(args.log.read_text(), args.extracted_file.read_bytes(), args.samples)
         result['source_a00_sha256'] = hashlib.sha256(source).hexdigest()
         if args.output_projected_aac is not None:
-            if args.output_projected_aac.resolve() in (args.log.resolve(),args.extracted_file.resolve(),args.source_a00.resolve()):
+            inputs = [args.log,args.extracted_file,args.source_a00]
+            if args.comparison_prefix:
+                inputs.append(args.comparison_prefix)
+            if args.output_projected_aac.resolve() in [path.resolve() for path in inputs]:
                 raise ValueError('projection output must not replace input evidence')
-            projection,payload = project_complete_windows(args.log.read_text(),args.extracted_file.read_bytes(),args.samples,args.project_packet_limit)
+            projection,payload = project_complete_windows(args.log.read_text(),args.extracted_file.read_bytes(),
+                args.samples,args.project_packet_limit,
+                comparison_prefix=args.comparison_prefix.read_bytes() if args.comparison_prefix else None)
             with args.output_projected_aac.open('xb') as output:
                 output.write(payload)
             result['host_projection'] = projection
