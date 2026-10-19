@@ -183,10 +183,17 @@ by its container offset/size with each ADTS payload finds:
 - All ADTS declared extents account for the complete derived file.
 
 The added prefix is the remuxer's program-configuration insertion for the
-zero-channel-configuration source. Its derivation from AudioSpecificConfig
-still needs an independent bit-level check before using the adapter as an
-acceptance fixture. In particular, do not describe the remux as preserving
-every compressed byte unchanged or silently discard the extra prefix.
+zero-channel-configuration source. `aac_transport_contract.py` independently
+parses the original AAC-LC AudioSpecificConfig/PCE fields and relocates them
+behind an in-band ID_PCE, recomputing alignment before the comment field.
+It derives exactly `a0a08000000000` from `1200050400000000`; the first
+remuxed packet is exactly that prefix plus the original six-byte payload.
+The syntax boundary is cross-checked against the primary
+[FFmpeg PCE parser documentation](https://www.ffmpeg.org/doxygen/trunk/libavcodec_2aac_2aacdec_8c.html).
+Tests cover alignment with preserved comments, truncation, unexpected tails
+and unsupported/conflicting configurations. This checks the configuration
+relocation, not decoded audio. Do not describe the remux as preserving every
+compressed byte unchanged or silently discard the extra prefix.
 
 The pinned bit reader `02510c` refills directly from `b332+b331` whenever
 `a854 <= 16`; it has no storage callback or input-length check. Thus an
