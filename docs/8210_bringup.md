@@ -2140,7 +2140,7 @@ cadence. The recovered receive index names `8b` as an RSSI-results family
 but gives neither a schedule nor request pairing. These are historical
 cross-product descriptions, not an NSM-3 protocol specification.
 
-The three original HTML references are retained under
+The original HTML references are retained under
 `roms/reference-docs/blacksphere-mdi/` (not shipped emulator assets):
 
 | File | SHA-256 |
@@ -2148,6 +2148,18 @@ The three original HTML references are retained under
 | `blacksphere-nmeas-20160119.html` | `e38d37b913004b9d1061758cee7728386dadfd50051d7118623692f661570ee1` |
 | `blacksphere-typestxd-20160119.html` | `d58f713139ee3009c2c3961a2e58e03e19d902399b0e92c116a6f34db61e7230` |
 | `blacksphere-typesrxd-20160119.html` | `433c797df1a0403f8a877dbcb10a92861d8ef8f792b117f7008802a385fd6e7b` |
+| `blacksphere-config-20160119.html` | `e0a1eba4f084dd1adca6ee98a01d051256ca9b0b6a314b163c6c1e6dfb3bdb5a` |
+| `blacksphere-neighbour-20160119.html` | `085b8344ac5ecd8ce3bcc0351f053056a4e1e978b3faa611860e330c09d67e18` |
+| `blacksphere-dsp-20160119.html` | `84c2bac599ad90dbe2a9f7070f92c88ab11baec4ba200dc22de2d7452455489a` |
+| `blacksphere-dsp-memmap-20160119.html` | `c412e6e8fffb6bbf8bc3460eaa5dab6001705dc16769e0bdbee1d227ba85e391` |
+
+The sibling transmit pages (`sub_typestxd/sub_02.htm` and `sub_0F.htm`)
+describe channel-change confirmation and a 32-halfword neighbour list,
+respectively, but not cancellation of pending measurements on channel
+change or mode-4 list-membership requirements. The DSP overview and its
+explicitly partial memory map do not define RF sample-port encoding or
+SCU tuning. Thus these recovered pages do not authorize the currently
+unvalidated measurement cancellation or resolve the native RF boundary.
 
 The original [Osmocom DCT3-GSMTAP decoder](https://github.com/osmocom/dct3-gsmtap/blob/dcbe73ad77b67a09ac0b88775efb8fc84e9c4615/src/main.c)
 at commit `dcbe73ad77b67a09ac0b88775efb8fc84e9c4615` supplied the exact
