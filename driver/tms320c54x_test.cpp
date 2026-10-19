@@ -20077,21 +20077,17 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				(!strcmp(machine().options().bios(), "efr-dtx-decoder") || !strcmp(machine().options().bios(), "efr-erasure") || !strcmp(machine().options().bios(), "efr-loss-observe") ||
-				 !strcmp(machine().options().bios(), "efr-homing") || !strcmp(machine().options().bios(), "efr-home-errors") || !strcmp(machine().options().bios(), "efr-invalid-sid")))
+				(rom4_codec_is("efr-dtx-decoder") || !strcmp(machine().options().bios(), "efr-erasure") || !strcmp(machine().options().bios(), "efr-loss-observe") ||
+				 rom4_codec_is("efr-homing") || !strcmp(machine().options().bios(), "efr-home-errors") || !strcmp(machine().options().bios(), "efr-invalid-sid")))
 		{
+			enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : "EFR homing decoder");
 			start_rom4_efr_decoder(0, true);
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				(!strcmp(machine().options().bios(), "efr-encoder") || !strcmp(machine().options().bios(), "efr-encoder-pipe") || !strcmp(machine().options().bios(), "efr-dtx-encoder") ||
-				 !strcmp(machine().options().bios(), "efr-enc-homing")))
+				(rom4_codec_is("efr-encoder") || rom4_codec_is("efr-dtx-encoder") || rom4_codec_is("efr-enc-homing")))
 		{
-			if (!strcmp(machine().options().bios(), "efr-encoder-pipe"))
-			{
-				m_cpu->set_pipeline_frontend(true);
-				osd_printf_info("ROM4 EFR encoder frontend: staged handset_audio_claim=0\n");
-			}
+			enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-encoder") ? "EFR DTX encoder" : rom4_codec_is("efr-enc-homing") ? "EFR homing encoder" : "EFR encoder");
 			start_rom4_efr_encoder(0, true);
 			return;
 		}
@@ -21227,11 +21223,29 @@ private:
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
 
+	bool rom4_codec_is(char const *name) const
+	{
+		std::string_view bios(machine().options().bios());
+		if(bios.size()>5 && bios.substr(bios.size()-5)=="-pipe") bios.remove_suffix(5);
+		if(bios=="efr-dtx-enc") bios="efr-dtx-encoder";
+		else if(bios=="efr-dtx-dec") bios="efr-dtx-decoder";
+		else if(bios=="efr-ehome") bios="efr-enc-homing";
+		return bios==name;
+	}
+	void enable_rom4_codec_pipeline(char const *kind)
+	{
+		std::string_view const bios(machine().options().bios());
+		if(bios.size()>5 && bios.substr(bios.size()-5)=="-pipe")
+		{
+			m_cpu->set_pipeline_frontend(true);
+			osd_printf_info("ROM4 %s frontend: staged handset_audio_claim=0\n",kind);
+		}
+	}
 	void start_rom4_efr_encoder(unsigned frame, bool initialize)
 	{
 		auto &data = m_cpu->space(AS_DATA);
-		bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
-		bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
+		bool const dtx = rom4_codec_is("efr-dtx-encoder");
+		bool const homing = rom4_codec_is("efr-enc-homing");
 		u16 *const program = &memregion("dspprg")->as_u16();
 		if (initialize)
 		{
@@ -21286,10 +21300,10 @@ private:
 	efr_decoder_fixture rom4_efr_decoder_fixture() const
 	{
 		char const *const bios = machine().options().bios();
-		if (!strcmp(bios, "efr-dtx-decoder")) return { "efr_dtx_input", "efr_dtx_pcm", " DTX", 518 };
+		if (rom4_codec_is("efr-dtx-decoder")) return { "efr_dtx_input", "efr_dtx_pcm", " DTX", 518 };
 		if (!strcmp(bios, "efr-invalid-sid")) return { "efr_invalid_sid_input", "efr_invalid_sid_pcm", " invalid SID", 518 };
 		if (!strcmp(bios, "efr-erasure") || !strcmp(bios, "efr-loss-observe")) return { "efr_erasure_input", "efr_erasure_pcm", " erasure", 163 };
-		if (!strcmp(bios, "efr-homing")) return { "efr_homing_input", "efr_homing_pcm", " homing", 46 };
+		if (rom4_codec_is("efr-homing")) return { "efr_homing_input", "efr_homing_pcm", " homing", 46 };
 		if (!strcmp(bios, "efr-home-errors")) return { "efr_homing_error_input", "efr_homing_error_pcm", " homing error", 49 };
 		return { "efr_reference_input", "efr_reference_pcm", "", 163 };
 	}
@@ -53719,8 +53733,8 @@ private:
 		}
 		if (m_phase >= 304000 && m_phase < 304519)
 		{
-			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-encoder");
-			bool const homing = !strcmp(machine().options().bios(), "efr-enc-homing");
+			bool const dtx = rom4_codec_is("efr-dtx-encoder");
+			bool const homing = rom4_codec_is("efr-enc-homing");
 			unsigned const frames = dtx ? 518 : homing ? 46 : 163;
 			expect(m_phase <= 304000 + frames, "EFR encoder phase stays within the selected reference input");
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
@@ -53777,11 +53791,11 @@ private:
 		}
 		if (m_phase >= 302000 && m_phase < 302519)
 		{
-			bool const dtx = !strcmp(machine().options().bios(), "efr-dtx-decoder");
+			bool const dtx = rom4_codec_is("efr-dtx-decoder");
 			bool const invalid_sid = !strcmp(machine().options().bios(), "efr-invalid-sid");
 			bool const observing = !strcmp(machine().options().bios(), "efr-loss-observe");
 			bool const erasure = observing || !strcmp(machine().options().bios(), "efr-erasure");
-			bool const homing = !strcmp(machine().options().bios(), "efr-homing");
+			bool const homing = rom4_codec_is("efr-homing");
 			bool const homing_errors = !strcmp(machine().options().bios(), "efr-home-errors");
 			auto const fixture = rom4_efr_decoder_fixture();
 			unsigned const frames = fixture.frames;
@@ -56492,7 +56506,23 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(21, "fr-encoder-pipe", "Isolated acquired ROM FR encoder on staged CPU")
 	ROM_SYSTEM_BIOS(22, "efr-encoder-pipe", "Isolated acquired ROM EFR encoder on staged CPU")
 	ROM_SYSTEM_BIOS(23, "efr-decoder-pipe", "Isolated acquired ROM EFR decoder on staged CPU")
+	ROM_SYSTEM_BIOS(24, "efr-dtx-enc-pipe", "Isolated acquired ROM EFR DTX encoder on staged CPU")
+	ROM_SYSTEM_BIOS(25, "efr-dtx-dec-pipe", "Isolated acquired ROM EFR DTX decoder on staged CPU")
+	ROM_SYSTEM_BIOS(26, "efr-ehome-pipe", "Isolated acquired ROM EFR encoder homing on staged CPU")
+	ROM_SYSTEM_BIOS(27, "efr-homing-pipe", "Isolated acquired ROM EFR decoder homing on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(24))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(25))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(26))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(27))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(23))
@@ -56566,6 +56596,18 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(24))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(25))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(26))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(27))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(23))
@@ -56648,12 +56690,16 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("invalid_sid.out", 0, 165760, CRC(e9d2e42a) SHA1(ccd15ebb216d99c0ff7bd9a54f250f816d52b779), ROM_BIOS(17))
 	ROM_REGION(14720, "efr_homing_encoder_pcm", 0)
 	ROMX_LOAD("homing_enc.inp", 0, 14720, CRC(b1c8352b) SHA1(2aef5f790d2fad7ee3acd529bfca4656b44d9165), ROM_BIOS(15))
+	ROMX_LOAD("homing_enc.inp", 0, 14720, CRC(b1c8352b) SHA1(2aef5f790d2fad7ee3acd529bfca4656b44d9165), ROM_BIOS(26))
 	ROM_REGION(22632, "efr_homing_encoder_serial", 0)
 	ROMX_LOAD("homing_enc.cod", 0, 22632, CRC(7457992e) SHA1(10aee87b5da40ac216c96306fa7ad7616e2cceda), ROM_BIOS(15))
+	ROMX_LOAD("homing_enc.cod", 0, 22632, CRC(7457992e) SHA1(10aee87b5da40ac216c96306fa7ad7616e2cceda), ROM_BIOS(26))
 	ROM_REGION(22724, "efr_homing_input", 0)
 	ROMX_LOAD("homing.dec", 0, 22724, CRC(7935ce74) SHA1(8d28790270a6897f04f9ac4bf19d8c5c0aeaf170), ROM_BIOS(14))
+	ROMX_LOAD("homing.dec", 0, 22724, CRC(7935ce74) SHA1(8d28790270a6897f04f9ac4bf19d8c5c0aeaf170), ROM_BIOS(27))
 	ROM_REGION(14720, "efr_homing_pcm", 0)
 	ROMX_LOAD("homing.out", 0, 14720, CRC(45ad424d) SHA1(d006cdaa2cbfb6b65c1c7954ed22442491ef990a), ROM_BIOS(14))
+	ROMX_LOAD("homing.out", 0, 14720, CRC(45ad424d) SHA1(d006cdaa2cbfb6b65c1c7954ed22442491ef990a), ROM_BIOS(27))
 	ROM_REGION(80522, "efr_erasure_input", 0)
 	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(13))
 	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(16))
@@ -56662,12 +56708,16 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(16))
 	ROM_REGION(165760, "efr_dtx_encoder_pcm", 0)
 	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(12))
+	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(24))
 	ROM_REGION(254856, "efr_dtx_encoder_serial", 0)
 	ROMX_LOAD("dtx.cod", 0, 254856, CRC(6b2a679f) SHA1(00c8972a74dd4e06843058d7a1899e0d5d957bdc), ROM_BIOS(12))
+	ROMX_LOAD("dtx.cod", 0, 254856, CRC(6b2a679f) SHA1(00c8972a74dd4e06843058d7a1899e0d5d957bdc), ROM_BIOS(24))
 	ROM_REGION(255892, "efr_dtx_input", 0)
 	ROMX_LOAD("dtx.dec", 0, 255892, CRC(8bb21b82) SHA1(464b9f354aa4cd2828c3f80e812b18af170f7624), ROM_BIOS(11))
+	ROMX_LOAD("dtx.dec", 0, 255892, CRC(8bb21b82) SHA1(464b9f354aa4cd2828c3f80e812b18af170f7624), ROM_BIOS(25))
 	ROM_REGION(165760, "efr_dtx_pcm", 0)
 	ROMX_LOAD("dtx.out", 0, 165760, CRC(a2bc82da) SHA1(44ea0a4b98623d3282f8bdafb0a068287a879f47), ROM_BIOS(11))
+	ROMX_LOAD("dtx.out", 0, 165760, CRC(a2bc82da) SHA1(44ea0a4b98623d3282f8bdafb0a068287a879f47), ROM_BIOS(25))
 	ROM_REGION(52352, "efr_encoder_pcm", 0)
 	ROMX_LOAD("spch_dos.inp", 0, 52352, CRC(36fb2ba9) SHA1(3d4abd66d2d033de929175f1d84e970f78007628), ROM_BIOS(10))
 	ROMX_LOAD("spch_dos.inp", 0, 52352, CRC(36fb2ba9) SHA1(3d4abd66d2d033de929175f1d84e970f78007628), ROM_BIOS(22))

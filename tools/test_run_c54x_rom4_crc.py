@@ -25,6 +25,51 @@ from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_efr_lifecycle_frontends_load_the_same_vectors(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
+        bios = dict((name, int(number)) for number, name in
+                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
+        cases = (
+            ('efr-dtx-encoder', 'efr-dtx-enc-pipe', (('efr_dtx_encoder_pcm', 'dtx.inp'), ('efr_dtx_encoder_serial', 'dtx.cod'))),
+            ('efr-dtx-decoder', 'efr-dtx-dec-pipe', (('efr_dtx_input', 'dtx.dec'), ('efr_dtx_pcm', 'dtx.out'))),
+            ('efr-enc-homing', 'efr-ehome-pipe', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
+            ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
+        )
+        self.assertTrue(all(len(name) <= 16 for name in bios))
+        for name, staged, regions in cases:
+            for region, filename in regions:
+                with self.subTest(profile=name, region=region):
+                    content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
+                    loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
+                                       r'"(.*), ROM_BIOS\((\d+)\)\)', content)
+                    by_bios = {int(number): payload for payload, number in loads}
+                    self.assertEqual(len(loads), 2)
+                    self.assertEqual(by_bios[bios[name]], by_bios[bios[staged]])
+
+    def test_staged_efr_lifecycle_requires_its_own_frontend_and_full_result(self):
+        cases = (
+            ('EFR DTX encoder', dict(efr_dtx_encoder=True), 518, EFR_DTX_ENCODER_REPLAY, EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLETE),
+            ('EFR DTX decoder', dict(efr_dtx_decoder=True), 518, EFR_DTX_DECODER_REPLAY, EFR_DTX_DECODER_PASS, EFR_DTX_DECODER_COMPLETE),
+            ('EFR homing encoder', dict(efr_homing_encoder=True), 46, EFR_ENCODER_HOMING_REPLAY, EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE),
+            ('EFR homing decoder', dict(efr_homing_decoder=True), 46, EFR_HOMING_REPLAY, EFR_HOMING_PASS, EFR_HOMING_COMPLETE),
+        )
+        for kind, mode, count, replay, marker, complete in cases:
+            frontend = f'ROM4 {kind} frontend: staged handset_audio_claim=0'
+            frames = '\n'.join(f'ROM4 {kind} comparison: frame={i} mismatches=0' for i in range(count))
+            result = '\n'.join((frames, replay, marker, complete))
+            output = frontend + '\n' + result
+            with self.subTest(kind=kind):
+                check_result(output, 3, staged=True, **mode)
+                for bad in (result, frontend + '\n' + output,
+                            'Driver tms54rom4 (file tms320c54x_test.cpp): 3 errors, 0 warnings\n' + output,
+                            output.replace(frontend, 'ROM4 EFR encoder frontend: staged handset_audio_claim=0'),
+                            output.replace(replay, ''),
+                            output.replace(f'frame={count-1} mismatches=0', f'frame={count-1} mismatches=1'),
+                            output + '\ntrailer'):
+                    with self.assertRaises(ValueError):
+                        check_result(bad, 3, staged=True, **mode)
+
     def test_efr_decoder_frontends_load_the_same_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]

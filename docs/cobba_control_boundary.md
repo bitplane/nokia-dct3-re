@@ -2466,9 +2466,9 @@ first-frame instruction observations, excluding replay; tracing cannot weaken
 vector acceptance.
 
 This is an isolated DTX-disabled encoder algorithm gate, not handset speech.
-The staged clean-speech decoder has its separate acceptance gate below;
-staged DTX/homing variants and native RF/traffic-channel activation retain
-their separate qualification boundaries.
+The staged clean-speech decoder and homing suites have separate acceptance
+gates below. Staged DTX and native RF/traffic-channel activation retain
+their separate, unaccepted boundaries.
 
 The separately acquired ETSI source archive and its provenance live in
 `roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete
@@ -2604,6 +2604,13 @@ end-to-end call. Those transport and physical boundaries remain separate.
 **Accepted boundary:** native encoding and decoding reproduce the complete
 518-frame nonzero-background conversation, including SID updates and two
 resumptions of speech. This is isolated codec acceptance, not handset audio.
+
+This complete DTX acceptance is currently atomic only. The staged encoder
+stops at a mapped-source memory/immediate MAC in frame zero; the staged
+decoder matches frames 0..50 before unsupported LMS in frame 51. The
+[loader contract](rom4_dsp_loader.md#mapped-source-in-parallel-storeload)
+records the exact software frontiers. Staged frontend selection does not
+weaken the 518-frame comparisons or nonzero comfort-noise requirements.
 
 `make check-c54x-rom4-efr-dtx-encoder` and
 `make check-c54x-rom4-efr-dtx-decoder` use a generated reference conversation:
@@ -2882,6 +2889,10 @@ conversation. Each frame replays all 65,440 ordinary RAM words after restore.
 This is clean decoder-homing acceptance, not error/homing combinations,
 the separate encoder-homing result below or handset speech transport.
 
+The paired `make check-c54x-rom4-efr-homing-decoder-staged` gate passes
+the same complete fixture and full-RAM replays on the staged frontend.
+It uses the same hashed reference input/PCM, not a separate relaxed oracle.
+
 After verifying the original installation vectors, the unmodified reference
 encoder processes two frames of the EHF sample pattern (`0008`). Its second
 encoded frame supplies the canonical DHF; no pattern table is copied into
@@ -2950,6 +2961,11 @@ conformance vector and proves no handset audio transport.
 Every frame replays all 65,440 ordinary RAM words from its pre-preprocessing
 checkpoint. This is isolated encoder reset/restart coverage, not handset
 speech, DTX/homing combinations or a physical microphone calibration.
+
+The paired `make check-c54x-rom4-efr-homing-encoder-staged` gate passes
+the same parameters, flags, packed output and full-RAM replays. The atomic
+and staged modes share the codec fixture contract; only frontend selection
+differs.
 
 The generated PCM conversation contains two EHF frames (`0008` samples),
 the first 20 complete installation speech frames, two EHF frames, the same

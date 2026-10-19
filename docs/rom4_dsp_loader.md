@@ -47,11 +47,30 @@ gate is `make check-c54x-rom4-efr-encoder-staged`; it verifies the independent
 ETSI fixture and retains the atomic comparison requirements. Staged FR
 encoder and decoder retain their separate 32-frame controls. These isolated
 DTX-disabled algorithm results do not prove handset speech, staged EFR
-DTX/homing coverage or physical bus timing. The staged decoder separately
+DTX coverage or physical bus timing. The staged decoder separately
 passes 163 clean speech frames and all 26,080 PCM samples, with full-RAM
 replays, through `make check-c54x-rom4-efr-decoder-staged`. Its existing
 ten-case delayed-repeat preflight remains atomic; decoder reset and every
 speech frame run on the staged frontend with an explicit selection marker.
+
+Both staged EFR homing suites also pass their independent 46-frame fixtures
+with full-RAM replays: encoder 2,622 parameters, 92 flags and 782 packed
+words; decoder 7,360 PCM samples. Their reference includes six homing frames
+and two matching twenty-frame speech segments. The decoder additionally checks four
+steady encoder-homing outputs. Acceptance targets are
+`check-c54x-rom4-efr-homing-encoder-staged` and
+`check-c54x-rom4-efr-homing-decoder-staged`.
+
+Staged DTX is a diagnostic frontier, not accepted: encoding stops in frame
+zero at the memory/immediate MAC mapped-source guard (stop context `fc04`;
+the acquired `fc00` word is `6709`, mapped AH with literal `f38b`). Decoding
+matches frames 0..50 before the unsupported LMS `e109` at `cbf4` in frame
+51. These need independent mapped-MAC and LMS ordering/numerical
+qualifications; the atomic 518-frame conversation remains the control.
+Short staged BIOS aliases preserve MAME's sixteen-character limit. Fixture
+parity tests require identical hashes in paired atomic/staged regions, and
+the runner rejects MAME driver-validity errors even if a completion marker
+is printed afterward.
 
 Both EFR frontend BIOSes must load the same hashed PCM and reference-vector
 files; program/data ROM coverage alone does not establish codec-fixture
