@@ -686,6 +686,24 @@ DECODER_RESET_WITNESS = (
 DECODER_BIT_RESET_BASE = 0x256CF
 DECODER_BIT_RESET_WITNESS = (0xe800,0x4ef8,0xa858,0x76f8,0xa854,0,
                            0x76f8,0xa85a,0,0xf495,0xf495,0xf4e4)
+DECODER_POINTER_RECORD_BASE = 0x273DB
+DECODER_POINTER_RECORD_WITNESS = (
+    2,0xb333,0xaaec,0xaaec,2,0xb335,0xac36,0xacc1,
+    2,0xb337,0xad4c,0xae3e,2,0xb339,0xab64,0xabcd)
+
+
+def decode_decoder_pointer_records(words):
+    for offset, expected in enumerate(DECODER_POINTER_RECORD_WITNESS):
+        if words.get(DECODER_POINTER_RECORD_BASE + offset) != expected:
+            raise ValueError('AA99 decoder pointer initialization records changed or absent')
+    rows = []
+    for offset in range(0, len(DECODER_POINTER_RECORD_WITNESS), 4):
+        count, destination, *values = DECODER_POINTER_RECORD_WITNESS[offset:offset+4]
+        rows.append(dict(source=f'{DECODER_POINTER_RECORD_BASE+offset:06x}',
+                         count=count, destination=f'{destination:04x}',
+                         values=[f'{value:04x}' for value in values]))
+    return dict(segment='aa99', pinned_words=16, records=rows,
+                scope='Original count/destination/data records; not all indirect writers or object lifetime ownership')
 
 
 def decode_decoder_reset(words):
@@ -1783,6 +1801,7 @@ def contract(source):
     result['decoder_framing'] = decode_decoder_framing(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
+    result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

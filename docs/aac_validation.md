@@ -113,8 +113,25 @@ shows scalar defaults (`a8c7=0`, `a85e=1`, `a85f=ffff`, `a89d=1`,
 `a89e=3`, `b333=aaec`), two per-channel resets through pointers at `b335`,
 and a 1024-word zeroing loop covering `af30..b32f`. Those pointers must
 already be valid: calling this reset on an arbitrarily cleared object is
-not yet an established ABI. Pointer construction and its original caller
-remain the next prerequisite, rather than introducing snapshot state.
+not yet an established ABI without the original initialization records.
+
+Those records are now pinned as 16 words at `0273db..0273ea`:
+
+| Original record | Data destination | Values |
+| --- | --- | --- |
+| `0273db` | `b333..b334` | `aaec,aaec` |
+| `0273df` | `b335..b336` | `ac36,acc1` |
+| `0273e3` | `b337..b338` | `ad4c,ae3e` |
+| `0273e7` | `b339..b33a` | `ab64,abcd` |
+
+Each is a two-word count/destination/data record in the original AA99
+C-initialization region, not instructions constructing pointers dynamically.
+A read-only `bootplaystage` snapshot at 1.116666667 seconds reproduces all
+eight values. This is initialization-plus-runtime agreement, not proof that
+no indirect writer can change them later. The original loader can supply
+these records for a future decoder bench; copied live RAM is unnecessary.
+Remaining ABI prerequisites are the caller's configuration fields, input
+buffer/refill ownership and the complete reset-helper memory footprint.
 
 ## Next Acceptance Boundary
 
