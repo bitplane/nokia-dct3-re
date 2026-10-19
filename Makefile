@@ -1354,6 +1354,11 @@ check-c54x-rom4-efr-dtx-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-decoder
 
+.PHONY: check-c54x-rom4-efr-dtx-decoder-staged
+check-c54x-rom4-efr-dtx-decoder-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-decoder --staged
+
 .PHONY: check-c54x-rom4-efr-dtx-encoder
 check-c54x-rom4-efr-dtx-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4

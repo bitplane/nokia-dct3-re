@@ -817,6 +817,14 @@ EXTRA_PROFILES = {
         "TMS320C54x repeated square exclusions: PASS cases=64 restore=64 operations=4 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated repeated square exclusions complete",
     ),
+    "lms": (
+        "TMS320C54x staged LMS: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated",
+        "Fatal error: TMS320C54x isolated LMS complete",
+    ),
+    "lms-edge": (
+        "TMS320C54x LMS exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated LMS exclusions complete",
+    ),
     "tmac-rpt-edge": (
         "TMS320C54x repeated T MAC exclusions: PASS cases=64 restore=64 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated repeated T MAC exclusions complete",
@@ -2224,7 +2232,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
         machine = "tms54xtra"
-    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge"):
+    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

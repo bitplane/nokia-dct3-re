@@ -2605,13 +2605,14 @@ end-to-end call. Those transport and physical boundaries remain separate.
 518-frame nonzero-background conversation, including SID updates and two
 resumptions of speech. This is isolated codec acceptance, not handset audio.
 
-Both directions pass atomically. The staged encoder additionally
-matches all 518 frames (29,526 parameters, 1,036 flags and 8,806 packed words),
-including full-RAM replay; acceptance target
-`check-c54x-rom4-efr-dtx-encoder-staged`. The staged decoder still matches
-frames 0..50 before unsupported LMS in frame 51. The
-[loader contract](rom4_dsp_loader.md#mapped-source-in-parallel-storeload)
-records the exact software frontiers. Staged frontend selection does not
+Both directions pass with either atomic or staged execution. Staged encoding
+matches 29,526 parameters, 1,036 flags and 8,806 packed words; staged decoding
+matches 82,880 PCM samples, eight SID frames, 135 erased frames and 46 nonzero
+comfort-noise frames. Both include full-RAM replay. Acceptance targets are
+`check-c54x-rom4-efr-dtx-encoder-staged` and
+`check-c54x-rom4-efr-dtx-decoder-staged`. The
+[loader contract](rom4_dsp_loader.md#staged-lms) records instruction ownership
+and remaining composition limits. Staged frontend selection does not
 weaken the 518-frame comparisons or nonzero comfort-noise requirements.
 
 `make check-c54x-rom4-efr-dtx-encoder` and

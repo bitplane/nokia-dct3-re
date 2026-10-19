@@ -61,12 +61,13 @@ steady encoder-homing outputs. Acceptance targets are
 `check-c54x-rom4-efr-homing-encoder-staged` and
 `check-c54x-rom4-efr-homing-decoder-staged`.
 
-Staged DTX encoding passes all 518 frames: 29,526 parameters, 1,036 flags
-and 8,806 packed words match, with full 65,440-word RAM replay for every frame.
-Acceptance target: `check-c54x-rom4-efr-dtx-encoder-staged`.
-Staged DTX decoding remains diagnostic: frames 0..50 match before unsupported
-LMS `e109` at `cbf4` in frame 51. LMS needs independent ordering/numerical
-qualification; the atomic 518-frame conversation remains the control. The mapped AH
+Staged DTX encoding and decoding pass all 518 frames: 29,526 parameters,
+1,036 flags and 8,806 packed words match on encoding; 82,880 PCM samples,
+eight SID frames, 135 erased frames and 46 nonzero comfort-noise frames match
+on decoding. Both check full 65,440-word RAM replay for every frame.
+Acceptance targets: `check-c54x-rom4-efr-dtx-encoder-staged` and
+`check-c54x-rom4-efr-dtx-decoder-staged`. Atomic runs remain controls.
+The mapped AH
 multiply-accumulate at `fc00` (`6709`, literal `f38b`) is now covered by
 the mapped memory/immediate MAC contract below.
 Short staged BIOS aliases preserve MAME's sixteen-character limit. Fixture
@@ -1779,6 +1780,28 @@ BK=0 retains the pre-existing linear-update behavior as an explicit legacy
 exception. The manual describes suppressed circular modification instead;
 this store extension does not resolve that fitted-silicon discrepancy or claim
 measured physical pipeline timing. Single-instruction repeat is still excluded.
+
+## Staged LMS
+
+`LMS Xmem,Ymem` (`e1xx`, TI SPRU172C page 4-80) retains both RAM samples
+at Read and uses the live A/B accumulators at Execute. A adds SXM-extended
+X shifted sixteen bits plus `8000`; B accumulates the signed X/Y product,
+with FRCT and PMST.SMUL product saturation. A owns carry, and overflow flags
+remain sticky and independently destination-owned. Neither calculation
+publishes T. Address capture and X-priority alias modification use the
+existing dual-operand path; low-page sources reject before either read or
+pointer update.
+
+`lms` passes 9,216 addressing cases plus 393,216 numerical cases, each
+with cleared-pipeline replay. The fixture covers all 256 encodings, three
+pointer layouts, linear/circular updates, 64 sample pairs, eight old-A and
+eight old-B patterns, 32 arithmetic flag configurations and three snapshots.
+It changes A/B after Read to distinguish Execute-owned feedback, poisons
+source words and pointers after capture, and checks exact paired reads,
+carry/overflow, no writes and unchanged newer T. `lms-edge` passes sixteen
+rejection cases and replays without data or register effects. Physical bank
+conflicts, measured silicon phases and repeat/interrupt compositions are
+not established by these fixtures.
 
 ## Staged repeated T-based MAC
 
@@ -9113,10 +9136,9 @@ and has been removed. Exact `6f82`/`6f83` fixtures check shifted ADD/SUB;
 two-cycle indirect costs. Exact ROM4 `6f8b` additionally checks SXM extension,
 postdecrement, extension consumption, and the two-cycle cost. Other shift, flag, and long-offset variants remain
 unasserted.
-TI SPRU307A's opcode table assigns `LMS Xmem,Ymem` to `E1xx`, one word and
-one cycle. The detailed opcode diagram in SPRU172C prints an `F0`-shaped
-pattern, which conflicts with that table and live `F0xx` control/ALU
-encodings; the decoder uses `E1xx`. Fixture-only `e13a` checks TI's LMS
+TI SPRU307A's opcode table and the locally retained SPRU172C page 4-80
+assign `LMS Xmem,Ymem` to `E1xx`, one word and one cycle.
+Atomic fixture `e13a` checks TI's LMS
 example values for A and B, unchanged T, dual-address update, and one-cycle
 cost. No observed 5110 trace executes this family, so this is instruction
 coverage, not evidence about the ROM4 boot path.

@@ -15845,7 +15845,7 @@ private:
 		u64 a, b, result_a, result_b;
 		u16 result_st0;
 	};
-	static sqdst_fixture sqdst_case(unsigned variant, bool edge)
+	static sqdst_fixture sqdst_case(unsigned variant, bool edge, bool lms = false)
 	{
 		bool const numeric = !edge && variant >= 9216;
 		unsigned const n = numeric ? variant - 9216 : variant;
@@ -15876,16 +15876,29 @@ private:
 		c.result_a = u64((f.flags & 2) ? std::clamp(difference, s64(-2147483648LL), s64(2147483647LL)) : difference) & 0xffffffffffULL;
 		c.result_b = u64((f.flags & 2) ? std::clamp(sum, s64(-2147483648LL), s64(2147483647LL)) : sum) & 0xffffffffffULL;
 		c.result_st0 = (f.st0 & ~0x800) | (f.xword >= f.yword ? 0x800 : 0) | (ova ? 0x400 : 0) | (ovb ? 0x200 : 0);
+		if (lms)
+		{
+			s64 const operand = s64(f.flags & 8 ? s16(f.xword) : s32(f.xword)) * 65536 + 32768;
+			s64 const a = (c.a & 0x8000000000ULL ? s64(c.a)-0x10000000000LL : s64(c.a)) + operand;
+			s64 product = s64(s16(f.xword)) * s16(f.yword) * (f.flags & 1 ? 2 : 1);
+			if ((f.flags & 7) == 7) product = std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
+			s64 const b = (c.b & 0x8000000000ULL ? s64(c.b)-0x10000000000LL : s64(c.b)) + product;
+			bool const carry = u64(u32(c.a)) + u32(operand) > 0xffffffffULL;
+			c.result_st0 = (f.st0 & ~0x800) | (carry ? 0x800 : 0) | (a < -2147483648LL || a > 2147483647LL ? 0x400 : 0) | (b < -2147483648LL || b > 2147483647LL ? 0x200 : 0);
+			c.result_a = u64(f.flags & 2 ? std::clamp(a,s64(-2147483648LL),s64(2147483647LL)) : a) & 0xffffffffffULL;
+			c.result_b = u64(f.flags & 2 ? std::clamp(b,s64(-2147483648LL),s64(2147483647LL)) : b) & 0xffffffffffULL;
+		}
 		return c;
 	}
 	void start_sqdst(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		bool const edge = !strcmp(machine().options().bios(), "sqdst-edge");
-		auto const c = sqdst_case(variant, edge); auto const &f = c.memory;
+		bool const lms = !strncmp(machine().options().bios(), "lms", 3);
+		bool const edge = !strcmp(machine().options().bios(), "sqdst-edge") || !strcmp(machine().options().bios(), "lms-edge");
+		auto const c = sqdst_case(variant, edge, lms); auto const &f = c.memory;
 		auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, 0xe200 | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (lms ? 0xe100 : 0xe200) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -20053,6 +20066,7 @@ private:
 		if (!strcmp(machine().options().bios(), "sqacc-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "tmac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mac-rpt")) { start_poly(); return; }
+		if (!strcmp(machine().options().bios(), "lms") || !strcmp(machine().options().bios(), "lms-edge")) { start_sqdst(); return; }
 		if (!strcmp(machine().options().bios(), "mac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt")) { start_branch_repeat(); return; }
 		if (!strcmp(machine().options().bios(), "retd-rpt")) { start_branch_repeat(); return; }
@@ -52739,8 +52753,9 @@ private:
 		if (m_phase == 62142)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			bool const edge = !strcmp(machine().options().bios(), "sqdst-edge");
-			auto const c = sqdst_case(variant, edge); auto const &f = c.memory;
+			bool const lms = !strncmp(machine().options().bios(), "lms", 3);
+			bool const edge = !strcmp(machine().options().bios(), "sqdst-edge") || !strcmp(machine().options().bios(), "lms-edge");
+			auto const c = sqdst_case(variant, edge, lms); auto const &f = c.memory;
 			unsigned const checkpoint = 3 + f.snapshot;
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "SQDST rejects mapped operands before effects");
 			u64 const mask = !edge && tick <= 5 ? 0xffffffffffULL : 0;
@@ -52768,10 +52783,16 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					if (lms) m_cpu->set_pipeline_frontend(true);
 					m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore SQDST without duplicate reads or publications"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62143; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant + 1 < (edge ? 16U : 402432U)) { start_sqdst(variant + 1); return; }
+				if (lms)
+				{
+					if (edge) { osd_printf_info("TMS320C54x LMS exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated LMS exclusions complete"); }
+					osd_printf_info("TMS320C54x staged LMS: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3,"TMS320C54x isolated LMS complete");
+				}
 				if (edge) { osd_printf_info("TMS320C54x SQDST exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST exclusions complete"); }
 				osd_printf_info("TMS320C54x staged SQDST: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST complete");
 			}
@@ -56607,6 +56628,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(186, "tc-delay-call", "TC NTC delayed conditional calls retain their Read decision")
 	ROM_SYSTEM_BIOS(187, "tmac-repeat", "Repeated RAM T-based MAC retains operands and accumulator feedback")
 	ROM_SYSTEM_BIOS(188, "tmac-rpt-edge", "Repeated T-based MAC mapped and peripheral exclusions")
+	ROM_SYSTEM_BIOS(189, "lms", "Paired LMS samples and dual accumulator Execute ownership")
+	ROM_SYSTEM_BIOS(190, "lms-edge", "LMS mapped and peripheral operand exclusions")
 ROM_END
 
 ROM_START(tms54rom4)
