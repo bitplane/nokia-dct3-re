@@ -79,6 +79,7 @@ def assess_input(flash):
         (0x2f5f8a, 0x2f5f96, '90e325967de387da34abf3f518eada587225ef542bb2b8f8b9a0dffe3b5a2623'),
         (0x318ecc, 0x318ff2, 'fb2562b392ec242983e3f7b44f0d8207a1ea6b18b279834a029eb722892e180e'),
         (0x335a50, 0x335a90, '0df79525061ab2f1080b177fcb0817343a568a1ff6d6a055044b0a40a1fecbb1'),
+        (0x335aae, 0x335aec, 'f619f02ab6ad8e3c85fba320b38beb0f5ee02de15bbd25a4e0d98b1439051710'),
         (0x399f12, 0x399fbc, 'aaecae63c7ef8b402d2ac3a4e3d81d76300742c184c8ebbfadddaa56a3811500'),
         (0x362958, 0x3629f8, '1d0af13bd9abda0829fff7deb63ee3d8f2a31521f4d68b2472a3c99eb616ad52'),
         (0x2f5dc0, 0x2f5dfa, '84d2390db818ac1efee99e109299c98bdb64f5f8d68cc1e7689cabce87a9b1c6'),
@@ -106,10 +107,14 @@ def assess_input(flash):
     if [row for row in routes if row['class'] == 0xd2] != [
             {'class': 0xd2, 'destination': 29}]:
         raise ValueError('candidate serial class route mismatch')
-    references = thumb_reference_census(flash, (0x2f5760, 0x399fbc))
+    references = thumb_reference_census(flash, (0x2f5760, 0x399fbc, 0x335a50, 0x335aae))
     if references['direct_calls'] != {0x2f5760: [0x2f5caa],
-                                       0x399fbc: [0x2f58ac, 0x2f5994, 0x3841e2]}:
+                                       0x399fbc: [0x2f58ac, 0x2f5994, 0x3841e2],
+                                       0x335a50: [0x335adc, 0x335d78],
+                                       0x335aae: [0x335b0c]}:
         raise ValueError('serial receive direct-reference census mismatch')
+    if any(references['thumb_pointers'][target] for target in (0x335a50,0x335aae)):
+        raise ValueError('MU4 outgoing Thumb-pointer census mismatch')
     if struct.unpack_from('>I', flash, 0x219d20 + 8 * 12)[0] != 0x2f5c8d:
         raise ValueError('sequenced receive task descriptor mismatch')
     if struct.unpack_from('>I', flash, 0x219d20 + 4 * 12)[0] != 0x3a52b5:
@@ -178,6 +183,14 @@ def assess_input(flash):
                              'dsp_packet_type': '05', 'queue': '125ae0',
                              'queue_writer': '3849ee', 'queue_drain': '2f51fc',
                              'destination_task': 3, 'post': '2ce7a4',
+                             'constructor_callers': [
+                                 {'call': '335adc', 'role': 'self-test request 47/02 from 335aae'},
+                                 {'call': '335d78', 'role': 'context-matched forwarding of an existing message'}],
+                             'selftest_request_callers': ['335b0c'],
+                             'outgoing_thumb_pointers': 0,
+                             'census_aligned_pairs': references['aligned_pairs_scanned'],
+                             'census_exclusions': references['exclusions'],
+                             'normal_music_stop_sequence_validated': False,
                              'physical_serial_backend_validated': False},
             'local_class_router': {'consumer': '362958', 'table': '437ca4',
                                    'records': routes, 'decoded_records': 39,

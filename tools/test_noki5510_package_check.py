@@ -6,6 +6,17 @@ from tools.extract_dct3_wintesla import decode_records
 
 
 class PackageCheckTest(unittest.TestCase):
+    def test_own_mu4_constructor_callers_do_not_claim_the_missing_sender(self):
+        source = Path(__file__).resolve().parents[1]/'roms/5510-npm5-v353/5510f353c.fls'
+        if not source.exists():
+            self.skipTest('original research asset not installed')
+        transmit = checker.assess_input(source.read_bytes())['mu4_transmit']
+        self.assertEqual([row['call'] for row in transmit['constructor_callers']], ['335adc','335d78'])
+        self.assertEqual(transmit['selftest_request_callers'], ['335b0c'])
+        self.assertEqual(transmit['outgoing_thumb_pointers'], 0)
+        self.assertIn('computed calls', transmit['census_exclusions'])
+        self.assertFalse(transmit['normal_music_stop_sequence_validated'])
+
     def test_dsp_rx_router_uses_big_endian_addresses_and_full_type_extent(self):
         table = bytes.fromhex('003a53b2') * 13
         routes = checker.decode_dsp_rx_routes(table)

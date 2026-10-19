@@ -1399,6 +1399,17 @@ replayed into firmware. This explains the exercised immediate stop; it does
 not establish which stop/drain lifecycle a normal product caller intends or
 justify changing device timing to retain the suffix.
 
+The acquired MA4 ARM image does not independently close that caller policy.
+Its recovered EXT_UI constructor has only a self-test builder and an
+existing-message forwarder in the bounded aligned-Thumb census, not a
+recovered normal recording-finalization builder. The immediate peer of the
+music DSP is the separate MSP430, whose program and normal-operation
+transcript are absent. The MA4 service envelope is not the standalone DSP
+command envelope. See the source-pinned sender census and explicit scan
+exclusions in [5510 firmware consumers](5510_bringup.md#mu4-specific-receive-contract).
+Resume the caller-policy branch on that missing evidence; keep independent
+codec/CPU validation separate instead of inventing a drain command.
+
 ```sh
 .venv/bin/python tools/mu4_recorder_delivery_check.py RUN/error.log READBACK/TEST \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00

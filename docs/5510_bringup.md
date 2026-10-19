@@ -10016,6 +10016,26 @@ with its local node and calls router `362958`; remote `1c/1e` objects go
 through `2f5dc0`, which copies and posts them to task 8. This is distinct
 from the local class-`d2` route to task 29.
 
+The own-image aligned Thumb census covers all 1736703 halfword pairs and
+finds only two direct callers of constructor `335a50`: `335adc`, in the
+source-pinned `335aae` builder of self-test `47/02`, and `335d78`, which
+forwards an existing message after matching its routing context. The builder
+has one direct caller, `335b0c`, and neither constructor has a recovered odd
+Thumb pointer. These are not two independent music-control producers.
+Computed calls, ARM instructions, unaligned/even pointers and code/data
+classification remain outside the scan's closure. The package checker
+retains these bounds rather than asserting no other producer exists.
+
+In particular, this MA4 envelope does not recover the MSP430-to-music-DSP
+stop sequence. The immediate music-DSP peer is the separate MU4 controller,
+not the ARM directly. The native `mu4nand` bench's legal receiver requests
+prove DSP-side behavior, not that a normal handset uses that complete
+sequence. Resolving its intended drain/finalization policy requires the
+missing controller program or a normal-operation transcript/specification;
+do not infer another packet from the service envelope or its shared `1e`
+prefix. The acquisition exclusions in Software-accessible MU4 references
+apply to this boundary too.
+
 Task 8's `2f52aa` fragments the frame into type-`05` DSP objects, appends
 count/sequence bytes and queues them through `3849ee` at `125ae0`.
 Drain `2f51fc` posts copies to task 3 through `2ce7a4`. These code extents
