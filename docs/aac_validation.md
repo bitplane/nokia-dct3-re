@@ -325,16 +325,23 @@ converted signed-16 memory (`8192` and `4096` bytes respectively).
 capture extents and all 2048 rounded-shift/clamp conversions. Every native
 converted word matches the independent source-derived conversion.
 
+The output allocation is part of the ABI: use the original playback's
+`7000..77ff` workspace. The decoder borrows this as raw working memory
+before its final copy/conversion. An allocation at `8000` overlaps the
+coefficient-recurrence working state at `80de`; passive writes prove that
+state is copied into a sample. That invalid fixture is rejected by the
+checker, not treated as a decoder accuracy failure. The writer's SP is
+`8f88`, so it is not evidence of a stack collision.
+
 Against the unfitted first 1024 frames of the generated control's host s16
-reference, the left channel has 937 differing samples, maximum 398 and RMS
-14.0775266937; the right has four differences of one, RMS 0.0625. The
-largest left difference is at sample 111 (native 402, host 4). These remain
-unresolved waveform diagnostics, not a chosen codec tolerance. Raw capture
-SHA-256 is `9695c578720d12b711818933fe47157f499acc09ea641a12226e63fcb8d67506`;
+reference, the left channel has five one-unit differences, RMS
+0.0698771243; the right has four one-unit differences, RMS 0.0625. These
+remain waveform diagnostics, not a chosen codec tolerance. Raw capture
+SHA-256 is `13d2355308b88874511f5100f01a6dbf84bb11199af28748b383d5c791e2bf58`;
 converted capture SHA-256 is
-`5ea624a1cc5cac4cb6653daed578146ff9cc6c6380b07cf51aeb144c03e48374`.
+`d82f9703e1bffa46aa5d330c7935f9fc7e0720f7ab0b7eee19bc6d87bd2063a6`.
 Per-store ownership, raw output normalization, actual input-read binding and
-the cause of the asymmetric error remain open.
+broader media accuracy remain open.
 
 ```sh
 python3 tools/mu4_aac_abi_check.py PRIVATE_RUN_DIRECTORY \

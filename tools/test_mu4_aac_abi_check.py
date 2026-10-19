@@ -4,7 +4,7 @@ import unittest
 from mu4_aac_abi_check import check_capture
 
 
-TEXT = '''mu4_aac_abi_setup: original_upload_words=49843 original_initializers=228 input_bytes=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0
+TEXT = '''mu4_aac_abi_setup: original_upload_words=49843 original_initializers=228 input_bytes=2048 output_base=7000 output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0
 mu4_aac_abi_header: ordinal=1 sync=0fff id=0001 layer=0000 protection=0001 profile=0001 frequency=0004 channels=0002 frame_length=0134 blocks=0001 identity=Execute_entry observer_writes=0
 mu4_aac_abi_sources: left=f000 right=e800 sp=8fe8 result=0000 identity=Execute_entry observer_writes=0
 mu4_aac_abi_result: returned=1 result=0000 base=162e index=009b remaining=0010 illegal=0 pc=001018 isolated_abi=1 conformance=0
@@ -25,7 +25,8 @@ class AbiCheckTest(unittest.TestCase):
         for text in (TEXT.replace('left=f000','left=e800'), TEXT.replace('illegal=0','illegal=1'),
                      TEXT.replace('returned=1','returned=0'), TEXT+TEXT,
                      TEXT+'Fatal error: incomplete', TEXT.replace('frames=1024','frames=1023'),
-                     TEXT.replace('frequency=0004','frequency=0003')):
+                     TEXT.replace('frequency=0004','frequency=0003'),
+                     TEXT.replace('output_base=7000','output_base=8000')):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 check_capture(text,bytes(8192),bytes(4096),bytes(4096))
 

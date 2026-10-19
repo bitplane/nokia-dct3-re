@@ -37,6 +37,7 @@ def check_capture(text, raw, converted, reference):
     if any(len(group) != 1 for group in (setup, headers, sources, results, captures)):
         raise ValueError('requires one setup, source, result and completed capture')
     if setup[0] != dict(original_upload_words='49843',original_initializers='228',input_bytes='2048',
+                        output_base='7000',output_words='2048',
                         constructor='023d27',process='023d5d',isolated_abi='1',handset_boot='0',conformance='0'):
         raise ValueError('ABI setup scope changed')
     if headers[0] != dict(ordinal='1',sync='0fff',id='0001',layer='0000',protection='0001',

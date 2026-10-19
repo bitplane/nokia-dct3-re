@@ -5078,6 +5078,8 @@ public:
 		});
 	}
 private:
+	// Original playback workspace; 8000 aliases live coefficient state at 80de.
+	static constexpr u16 OUTPUT_BASE = 0x7000;
 	required_device<tms320c54x_device> m_cpu;
 	required_region_ptr<u8> m_container, m_input;
 	emu_timer *m_check = nullptr;
@@ -5152,7 +5154,7 @@ private:
 		u16 const wrapper[] = {
 			0x7718,0x9000,0xf7be,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,
 			0xf020,0xaaac,0xf982,0x3d27,
-			0x7600,0x1400,0x7601,0x8000,0xf020,0xaaac,0xf982,0x3d5d,
+			0x7600,0x1400,0x7601,OUTPUT_BASE,0xf020,0xaaac,0xf982,0x3d5d,
 			0x80f8,0x1402,0xf4e1
 		};
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1000+i, wrapper[i]);
@@ -5166,7 +5168,7 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x1000);
 		m_cpu->set_pipeline_frontend(true);
 		m_check->adjust(attotime::from_msec(250));
-		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers);
+		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 output_base=%04x output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers,OUTPUT_BASE);
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
@@ -5187,7 +5189,7 @@ private:
 				u16 const source = m_sources[channel] + 2*sample;
 				u32 const value = (u32(data.read_word(source)) << 16) | data.read_word(source ^ 1);
 				for (unsigned byte = 0; byte < 4; ++byte) raw.put(char(value >> (8*byte)));
-				u16 const word = data.read_word(0x8000 + channel*1024 + sample);
+				u16 const word = data.read_word(OUTPUT_BASE + channel*1024 + sample);
 				converted.put(char(word)); converted.put(char(word >> 8));
 			}
 		raw.close(); converted.close();
