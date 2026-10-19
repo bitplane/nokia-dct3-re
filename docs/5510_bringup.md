@@ -2463,6 +2463,14 @@ or an established chip-ID register. The own image contains `19aff258` at
 observed request. Getter `39ce0e` is a literal-address load followed by a
 word read. No checksum algorithm or semantic meaning for that word is
 established solely by this equality.
+The selector is also source-resolved: `39cc20(0)` loads the descriptor at
+`44d34c`, whose first word points to PPM `490000`, and scans 36 bytes
+starting at PPM offset 4 for a non-`ff` byte. Finding one returns the probe
+address, selecting `39ce0e`; an entirely erased probe returns zero and
+selects flash `200038`. The acquired own PPM is nonerased in that range.
+`factory_request_word_source` checks this selection and the report binds the
+observed request to its selected word. This is neither a full PPM-validity
+test nor evidence for a hardware identity register.
 The extended observer confirms the constructor's R0 value at `29f92e` is
 `c71bbe68`, with live flash reads `200038=19aff258` and
 `54fffc=c71bbe68`, in a fresh eight-second capture at

@@ -2,7 +2,8 @@ import unittest
 
 from tools.noki5510_identity_contract import (wire_identity, display_identity,
     check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture,
-    record_reply_nibble_filter, record_reply_slot_binding, record_scan_tail)
+    record_reply_nibble_filter, record_reply_slot_binding, record_scan_tail,
+    factory_request_word_source)
 
 
 def decode_mobile_identity(data):
@@ -25,6 +26,22 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_factory_word_selection_is_ppm_probe_not_chip_id(self):
+        flash = bytearray(b'\xff'*0x350000)
+        flash[0x24d34c:0x24d350] = (0x490000).to_bytes(4,'big')
+        flash[0x38:0x3c] = bytes.fromhex('12345678')
+        flash[-4:] = bytes.fromhex('abcdef01')
+        self.assertEqual(factory_request_word_source(flash)['selected_word'],'12345678')
+        for offset in (0,35):
+            changed = bytearray(flash)
+            changed[0x290004+offset] = 0
+            self.assertEqual(factory_request_word_source(changed)['selected_word'],'abcdef01')
+        flash[0x290004+36] = 0
+        self.assertEqual(factory_request_word_source(flash)['selected_word'],'12345678')
+        flash[0x24d34c:0x24d350] = bytes(4)
+        with self.assertRaises(ValueError):
+            factory_request_word_source(flash)
+
     def test_bounded_record_scan_tail_and_terminal_sentinel(self):
         state = {'stored_index':0,'armed':1}
         requests = []

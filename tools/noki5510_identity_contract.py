@@ -18,6 +18,23 @@ def equipment_nibbles(packed):
     return [nibble for byte in packed[:7] for nibble in (byte >> 4, byte & 15)]
 
 
+def factory_request_word_source(firmware):
+    """Own 39cc20(0)/39ce0e source equations, not a general PPM validator."""
+    if len(firmware) != 0x350000:
+        raise ValueError('expected complete NPM-5 logical flash extent')
+    pointer = struct.unpack_from('>I',firmware,0x24d34c)[0]
+    start = pointer-0x200000+4
+    if not 0 <= start <= len(firmware)-36:
+        raise ValueError('PPM selector probe outside acquired image')
+    nonerased = any(value != 255 for value in firmware[start:start+36])
+    address = 0x54fffc if nonerased else 0x200038
+    return {'ppm_pointer':f'{pointer:08x}', 'probe_bytes':36,
+            'probe_has_nonerased_byte':nonerased,
+            'selected_flash_address':f'{address:08x}',
+            'selected_word':firmware[address-0x200000:address-0x200000+4].hex(),
+            'scope':'Own source selector, not PPM checksum validity or chip identity'}
+
+
 def record_reply_entry_eligible(message, record_index, state):
     """29ffe8..2a005c only: not the later record acceptance decision."""
     if len(message) < 0x3e or not 0 <= record_index <= 255 or not 0 <= state <= 255:
@@ -153,6 +170,7 @@ def identity_contract(firmware):
                 'fallback_flash_word':firmware[0x38:0x3c].hex(),
                 'alternate_getter':'0039ce0e', 'alternate_flash_address':'0054fffc',
                 'alternate_flash_word':firmware[-4:].hex(),
+                'source_selection':factory_request_word_source(firmware),
                 'scope':'Flash-derived words, not a recovered chip-ID register'},
             'factory_record_continuation': {
                 'constructor':'0029ecf8', 'type':'70', 'subcommand':'17',
@@ -242,7 +260,7 @@ def main():
         result = check_formatting(text,contract)
         if args.records:
             result['record_capture'] = check_record_capture(text,
-                contract['factory_request13_sources']['alternate_flash_word'])
+                contract['factory_request13_sources']['source_selection']['selected_word'])
         result.update(source_contract=contract,nv_requests=inventory['requests'],
                       valid_product_nv=False, unobserved_selector_execution_claim=False)
         print(json.dumps(result,indent=2))
