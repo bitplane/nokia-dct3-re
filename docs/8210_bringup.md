@@ -2130,6 +2130,18 @@ no bundled executable was run or source transplanted. This is bounded
 archive coverage, not proof that a preserved Blacksphere/nlib specification
 or an independent mode-4 trace does not exist elsewhere.
 
+The separately hosted material is a substantive source lead, not another
+name for the SDK archives: Harald Welte's
+[2009 Blacksphere assessment](https://laforge.gnumonks.org/blog/20091203-rediscovering_blacksphere_mados_dct3/)
+explicitly identifies MCU/DSP L1/L2 interface research and nlib, and links
+to `nokix.pasjagsm.pl/help/blacksphere/sub_050main.htm`. The alternate
+`nokix.sourceforge.net/help/blacksphere/sub_050main.htm` endpoint currently
+returns HTTP 404. Neither that assessment nor the public mode-3 examples
+establishes NSM-3 mode-4 eligibility, response family or cadence. Recovering
+the original protocol pages or an independent mode-4 exchange remains a
+valid software-only evidence path; their current unavailability is not an
+absence proof and does not justify substituting a mode-3 response.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
