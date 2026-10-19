@@ -1274,8 +1274,9 @@ observed slot labels, not yet a physical left/right polarity verdict. The startu
 reset accounting below explains the one-word phase shift in this bench.
 
 Across the complete short capture, 105345 TX completions pair with DIN without
-mismatch or missing TX. The 367 additional DIN callbacks are consistent with
-held-zero levels but still lack pin/reset ownership proof. The copy, scalar and
+mismatch or missing TX. The 367 additional DIN callbacks cannot be assigned
+from word completions alone; bounded transition accounting below identifies
+their held-level intervals in the emulated model. The copy, scalar and
 filter arithmetic checks pass on this same run. This proves a bounded native
 decoded-sample path to digital codec ingress, not DAC activation, analogue sound,
 whole-track draining, full-session epoch accounting, handset boot or GSM speech.
@@ -1294,8 +1295,25 @@ observed retained word. This qualifies those bounded intervals; it does not
 close all 367 additional callbacks or establish measured pin timing. The seven
 TX/DIN/DMA/slot/time/DXR/decoded-return binary streams are byte-identical to
 `mu4-dac-native`. The setup fixture separately retains its underrun recovery,
-packing and save/restore checks. The remaining unmatched intervals and
-whole-session ownership still require their own observations.
+packing and save/restore checks.
+
+The additional `nonshifting_din` check starts a held-level interval only after
+a known TX completion has established its final output bit and no younger
+shift has begun. `wait_frame` and reset-with-no-active-shift delimit that
+interval; loading/restarting another shift ends it. A reset during an active
+word deliberately invalidates pin knowledge rather than inferring it from
+the word value or the reset event's zero payload. Chronological TX/DIN
+pairing is retained separately, and a claimed nonshifting interval cannot
+contain a TX completion. This is consistent with the current McBSP reset
+implementation, which does not emit a new output bit.
+
+On the same fresh capture, all 367 unpaired callbacks are now accounted for:
+93 in frame waits and 274 in reset-held intervals, with zero uncovered words.
+The validator also rejects incorrect held levels; its negative fixture keeps
+an interrupted zero-valued shift unknown even when DIN is zero. This closes
+the short capture's emulated nonshifting-word accounting, not measured reset
+electrical behavior, physical pin timing, full-session decoded ownership or
+whole-track audio acceptance.
 
 ### Codec Routing and Startup Phase
 

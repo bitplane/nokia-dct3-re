@@ -1,7 +1,8 @@
 import struct
 import unittest
 
-from tools.mu4_serial_epoch_check import bind_lifecycle, codec_control_history, startup_report, frame_wait_din
+from tools.mu4_serial_epoch_check import (bind_lifecycle, codec_control_history,
+    startup_report, frame_wait_din, nonshifting_din)
 
 
 BASE = 1_000_000_000
@@ -24,6 +25,24 @@ def fixture(specification):
 
 
 class SerialEpochTest(unittest.TestCase):
+    def test_nonshifting_ownership_needs_completion_not_zero_matching(self):
+        events = [dict(kind=kind,ns=str(time),word=f'{word:04x}') for kind,time,word in [
+            ('load_fresh',5,0x1235),('complete',10,0x1235),('wait_frame',11,0x1235),
+            ('reset',15,0),('accept',16,0),('reset',17,0),
+            ('load_fresh',30,0x1234),('complete',40,0x1234)]]
+        slots = b''.join(struct.pack('<QB',time,0) for time in (10,12,16,20,40))
+        result = nonshifting_din(events,[10,40],[0x1235,65535,65535,65535,0x1234],slots)
+        self.assertEqual(result['covered_by_transition'],{'wait_frame':1,'reset':2})
+        self.assertEqual(result['uncovered_words'],0)
+        with self.assertRaises(ValueError):
+            nonshifting_din(events,[10,40],[0x1235,65535,0,65535,0x1234],slots)
+        unknown = [dict(kind='load_fresh',ns='1',word='0000'),
+                   dict(kind='reset',ns='2',word='0000'),
+                   dict(kind='load_fresh',ns='5',word='0000')]
+        result = nonshifting_din(unknown,[],[0],struct.pack('<QB',3,0))
+        self.assertEqual(result['uncovered_words'],1)
+        self.assertEqual(result['covered_by_transition'],{})
+
     def test_frame_wait_din_uses_final_bit_not_sample_matching(self):
         events = [{'kind':'wait_frame','ns':'10','word':'1235'},
                   {'kind':'accept','ns':'11','word':'0000'},

@@ -165,6 +165,76 @@ def frame_wait_din(events,din,slots):
             'scope':'Observed frame-wait intervals only; not whole-session or silicon acceptance'}
 
 
+def nonshifting_din(events,tx_times,din,slots,max_delay_ns=84):
+    """Qualify held levels only after a known completion, never by zero matching."""
+    if len(slots) != 9*len(din):
+        raise ValueError('nonshifting DIN metadata extent mismatch')
+    if not isinstance(max_delay_ns,int) or max_delay_ns < 0:
+        raise ValueError('nonshifting callback bound must be nonnegative')
+    intervals, pending, active, held = [], None, None, None
+    previous = -1
+    for row in events:
+        when,kind = int(row['ns']),row['kind']
+        if when < previous:
+            raise ValueError('nonmonotonic transmitter observation')
+        previous = when
+        if kind in ('load_fresh','load_repeat','restart','reset'):
+            if pending is not None:
+                first,word,reason = pending
+                intervals.append((first,when,word,reason))
+                pending = None
+            if kind == 'reset':
+                # Reset does not publish a TX bit in this model. A partial
+                # shift's last pin value is not recoverable from word events.
+                if active is False and held is not None:
+                    pending = (when,held,'reset')
+                else:
+                    held = None
+                active = False
+            else:
+                active = True
+        elif kind == 'complete':
+            held,active = 0xffff if int(row['word'],16)&1 else 0,False
+        elif kind == 'wait_frame':
+            if active is not False or held is None or pending is not None:
+                raise ValueError('frame wait lacks a unique completed-word pin predecessor')
+            if held != (0xffff if int(row['word'],16)&1 else 0):
+                raise ValueError('frame wait retained word disagrees with completed final bit')
+            pending = (when,held,'wait_frame')
+    sink_times = [when for when,slot in struct.iter_unpack('<QB',slots)]
+    if any(a >= b for a,b in zip(sink_times,sink_times[1:])):
+        raise ValueError('nonincreasing codec callback times')
+    if any(a >= b for a,b in zip(tx_times,tx_times[1:])):
+        raise ValueError('nonincreasing transmitter callback times')
+    paired, cursor = set(),0
+    for when in tx_times:
+        while cursor < len(sink_times) and sink_times[cursor] < when:
+            cursor += 1
+        if cursor < len(sink_times) and sink_times[cursor]-when <= max_delay_ns:
+            paired.add(cursor)
+            cursor += 1
+    starts = [first for first,last,word,kind in intervals]
+    covered,uncovered = Counter(),[]
+    for index,when in enumerate(sink_times):
+        if index in paired:
+            continue
+        interval = bisect_left(starts,when+1)-1
+        if interval < 0 or when >= intervals[interval][1]:
+            uncovered.append(index)
+            continue
+        first,last,word,kind = intervals[interval]
+        if din[index] != word:
+            raise ValueError('unpaired codec word contradicts known held pin level')
+        completion = bisect_left(tx_times,first)
+        if completion < len(tx_times) and tx_times[completion] < last:
+            raise ValueError('claimed nonshifting interval contains a TX completion')
+        covered[kind] += 1
+    return {'paired_words':len(paired),'unpaired_words':len(din)-len(paired),
+            'covered_by_transition':dict(covered),'uncovered_words':len(uncovered),
+            'first_uncovered_indices':uncovered[:8],
+            'scope':'Bounded emulated completion/reset/wait ownership; not physical pin timing or native audio conformance'}
+
+
 def startup_report(text,writes,tx,times,din,slots):
     events,ends = rows(text,'mu4_tx_startup'),rows(text,'mu4_tx_startup_terminal')
     if not events and not ends:
@@ -200,6 +270,7 @@ def startup_report(text,writes,tx,times,din,slots):
         raise ValueError('startup completion lacks chronological DIN pair')
     report.update(first_completed_source=first_source,first_completed_slot=sink_records[sink][1],
                   frame_wait=frame_wait_din(events,din,slots),
+                  nonshifting_din=nonshifting_din(events,times,din,slots),
                   frame_edges=len(frames),scope='Actual startup reset/write/load/completion identities; '
                   'does not decide whether the firmware sequence or emulated timing matches silicon')
     return report
