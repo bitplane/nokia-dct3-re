@@ -30,6 +30,7 @@ from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WIT
 from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decode_decoder_input_descriptor
 from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT_RESERVE_WITNESS, decode_decoder_input_reserve
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
+from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -139,6 +140,9 @@ class ContextContractTest(unittest.TestCase):
         self.assertIn('02:0742', result['notification']['vector'])
         self.assertEqual(result['receiver16']['reply'], '8016')
         self.assertIn('nine words', result['receiver16']['copy'])
+        self.assertIn('fixed 3708..3710',result['receiver16']['copy'])
+        self.assertIn('LD #3708',result['receiver16']['continuation'])
+        self.assertIn('destination A',result['receiver16']['copy_abi'])
         for address in words:
             changed = dict(words)
             changed[address] ^= 1
@@ -667,6 +671,19 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=hex(address)), self.assertRaises(ValueError):
                 decode_playback_info_query(changed)
+
+    def test_refresh_payload_moves_are_not_invented_tail_padding(self):
+        words = {PLAYBACK_BUFFER_REFRESH_BASE+i:value for i,value in enumerate(PLAYBACK_BUFFER_REFRESH_WITNESS)}
+        words.update({0x299cc+i:value for i,value in enumerate(PLAYBACK_PENDING_CONTROL[0x299cc])})
+        result = decode_playback_buffer_refresh(words)
+        self.assertEqual(result['pinned_words'],194)
+        self.assertEqual(result['downstream']['copy'],'R[5] -> D[1], count R[6]-R[5]')
+        self.assertIn('no payload zero-fill',result['payload_operations'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_playback_buffer_refresh(changed)
 
     def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
         words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))

@@ -529,6 +529,26 @@ initial table, not its lifetime immutability or absence of indirect writers.
 The five mapped `1310` literals are retained in the contract report; none
 justifies treating a write to that flag as a legitimate end-of-input action.
 
+The complete input-buffer refresh `0296ac..02973b` is 144 words, with two
+conditional calls to the 50-word overlap-safe copy helper `0299cc`. The
+copy ABI is destination in A, source in caller frame word 0 and count in
+word 1. For receiver R, downstream D=`R[9]` and upstream U=`R[8]`:
+
+- If D exists and unsigned `R[5] > D[1]`, copy `R[6]-R[5]` words from
+  `R[5]` to `D[1]` and adjust the receiver's pointers.
+- If U exists, synchronize matching receiver/upstream extents; conditionally
+  preserve the upstream's two-word metadata when the receiver is empty.
+- If the signed compaction predicate passes, move the unread span starting
+  at `R[0]` to `R[6]+R[7]` and adjust cursor/end fields. The contract report
+  retains the precise sign-extension expression rather than assuming all
+  16-bit differences are interchangeable.
+
+Neither payload path synthesizes zeros or adds extra lookahead. These 194
+pinned source words establish local movement and metadata updates, not every
+upstream producer, file-byte padding or live descriptor ownership. The
+input-16 reply path likewise copies fixed record `3708..3710`, not a region
+indexed by its argument. Neither operation supplies a missing EOF mechanism.
+
 ### Declared Packet-Lookahead Control
 
 `tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and

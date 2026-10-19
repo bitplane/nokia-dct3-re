@@ -593,6 +593,50 @@ PLAYBACK_INFO_QUERY_WITNESSES = (
     (0x298b8,(0x8812,0xf845,0x98c4,0xf741,0x0182,0x8912,0xf495,0xf495,0x5782,0xf84d,0x98c4,0xf5e6,0xf020,0xffff)),
 )
 
+PLAYBACK_BUFFER_REFRESH_BASE = 0x296ac
+PLAYBACK_BUFFER_REFRESH_WITNESS = (
+    0x4a11,0x4a16,0x4a17,0xeefd,0x8816,0xf495,0xf495,0x71e6,
+    0x0008,0x0017,0x71e6,0x0009,0x0011,0x4811,0xf845,0x96e1,
+    0x71e1,0x0001,0x0011,0x71e6,0x0005,0x0013,0xe710,0xf6ab,
+    0xf820,0x96e1,0x4911,0x4813,0xf620,0x8002,0x4913,0x10e6,
+    0x0006,0x71e6,0x0005,0x0012,0xf620,0x7000,0x0012,0x8001,
+    0xfb82,0x99cc,0xf495,0x4811,0x1102,0x10e6,0x0006,0xf620,
+    0x80e6,0x0006,0x70e6,0x0005,0x0011,0x4817,0xf845,0x9737,
+    0x71e6,0x0001,0x0012,0xf6b8,0x4812,0x08e7,0x0005,0xf844,
+    0x96ff,0x7186,0x0010,0xf7aa,0xf830,0x96f6,0x56e7,0x000a,
+    0x4ee6,0x000a,0x71e7,0x0006,0x0012,0x70e7,0x0005,0x0012,
+    0x70e6,0x0001,0x0012,0x71e6,0x0007,0x0011,0x71e6,0x0006,
+    0x0014,0x7186,0x0013,0xe737,0x4914,0x4817,0xf620,0x8817,
+    0xf7b8,0x10f8,0x0017,0x08f8,0x0011,0xf847,0x9737,0x4911,
+    0x4817,0xf620,0x8817,0x4814,0x00f8,0x0011,0x8811,0x4913,
+    0x4812,0x7186,0x0014,0xf620,0x8812,0x7000,0x0014,0x7001,
+    0x0012,0xfb82,0x99cc,0xf495,0x4811,0xf495,0x70e6,0x0003,
+    0x0011,0x7086,0x0011,0x4917,0x10e6,0x0001,0xf620,0x80e6,
+    0x0001,0x80e6,0x0004,0xee03,0x8a17,0x8a16,0x8a11,0xf4e4,
+)
+
+
+def decode_playback_buffer_refresh(words):
+    for offset,value in enumerate(PLAYBACK_BUFFER_REFRESH_WITNESS):
+        if words.get(PLAYBACK_BUFFER_REFRESH_BASE+offset) != value:
+            raise ValueError('playback buffer refresh witness changed or absent')
+    copy = PLAYBACK_PENDING_CONTROL[0x299cc]
+    if any(words.get(0x299cc+i) != value for i,value in enumerate(copy)):
+        raise ValueError('playback refresh copy-helper ABI changed or absent')
+    return dict(entry='0296ac',last_word='02973b',pinned_words=144+len(copy),
+                receiver='R in A -> AR6; U=R[8], D=R[9]',
+                copy_abi='0299cc: destination A, source caller SP[0], count caller SP[1]',
+                downstream=dict(guard='D != 0 and unsigned R[5] > D[1]',
+                                copy='R[5] -> D[1], count R[6]-R[5]',
+                                updates='R[6] -= R[5]-D[1]; R[5] = D[1]'),
+                upstream=dict(guard='U != 0',
+                              synchronization='if R[1] == U[5]: optionally copy U[10..11], then R[1] = U[6] and U[5] = U[6]',
+                              compact_guard='SXM=1: sign_extend16((R[0]-R[6]) & ffff) - sign_extend16(R[7]) > 0',
+                              copy='R[0] -> R[6]+R[7], count updated R[1]-R[0]',
+                              updates='R[0] and R[3] become R[6]+R[7]; subtract excess from R[1] and copy it to R[4]'),
+                payload_operations='Two conditional memmove calls at 0296d4 and 029725; no payload zero-fill',
+                scope='Complete local refresh and copy-helper source; not live descriptor ownership, all upstream writers, physical storage padding or EOF/drain policy')
+
 
 def decode_playback_info_query(words):
     for base,witness in PLAYBACK_INFO_QUERY_WITNESSES:
@@ -1221,9 +1265,10 @@ def decode_playback_pending_control(words):
                                 input16='0207fa: 12fa <- 1; 15db <- 1; 12fb <- frame word 3'),
                 receiver16=dict(entry='029458', reply='8016',
                                 argument='frame word 5 -> A; CALL 0291d3',
-                                source_hook='0291d3: NOP; NOP; RET',
-                                continuation='A += 3708; frame[1] <- 9; frame[0] <- low(A); CALL 0299cc; send through 02929c',
-                                copy='0299cc: nine words from 3708 + parameter to reply frame word 5',
+                                source_hook='0291d3: NOP; NOP; FRET',
+                                continuation='LD #3708,A; frame[1] <- 9; frame[0] <- A; A <- AR1 (frame+5); CALL 0299cc; send through 02929c',
+                                copy='0299cc: nine words from fixed 3708..3710 to reply frame words 5..13',
+                                copy_abi='destination A -> AR3/AR0; source caller frame[0] -> AR4; count caller frame[1]',
                                 copy_direction='source AR4 > destination AR0: forward; otherwise backward; zero count skips body'),
                 notification=dict(initializer='0278cd: callback 02:0981 -> setter 0292f0',
                                   pointer='aa7e', publisher='0292a7: copy to mailbox 0080; call nonzero aa7e',
@@ -1985,6 +2030,7 @@ def contract(source):
     result['decoder_input_descriptor'] = decode_decoder_input_descriptor(rel_words)
     result['decoder_input_reserve'] = decode_decoder_input_reserve(rel_words)
     result['playback_info_query'] = decode_playback_info_query(rel_words)
+    result['playback_buffer_refresh'] = decode_playback_buffer_refresh(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
