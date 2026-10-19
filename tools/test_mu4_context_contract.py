@@ -26,6 +26,7 @@ from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RE
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
+from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -626,6 +627,18 @@ class ContextContractTest(unittest.TestCase):
         for values in ((1,2,1,0),(-1,0,1,0),(32768,0,1,0),(1,0,1,2)):
             with self.assertRaises(ValueError):
                 reference_copy_adapter(*values)
+
+    def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
+        words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))
+        result = decode_decoder_framing(words)
+        self.assertEqual(result['pinned_words'], 45)
+        self.assertEqual(result['adif_signature'], ['4144', '4946'])
+        self.assertEqual(result['adif_flags'], {'ba4f': 0, 'ba4e': 1})
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_framing(changed)
 
     def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
         words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES

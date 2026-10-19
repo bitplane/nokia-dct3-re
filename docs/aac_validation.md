@@ -75,6 +75,17 @@ configuration, or construct a separately identified decoder-ABI bench; do not
 cancel the transformation by pre-adjusting the payload. See the
 [native media boundary](5510_bringup.md#generated-aac-external-media-control).
 
+The AA99 wrapper at `023d73..023d9f` has a source-pinned 45-word framing
+branch. It initializes `b332` from the input receiver and clears cursor
+`b331`. With `ba50` zero it defaults `ba4f=1, ba4e=0`, then recognizes words
+`4144 4946` (`ADIF`) and reverses those flags. For ADIF with `ba44` zero it
+calls `0241f2`, then `02542b`, and sets `ba44=1`. A nonzero `ba50` bypasses
+this detection. This proves a local ADIF-recognition/initialization path,
+not complete format support or permission to construct its private state.
+`mu4_context_contract.py` verifies every word against the original AA99 upload;
+mutation tests reject changes at all 45 positions. The next source boundary
+is the pair of original initialization callees and their input requirements.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;

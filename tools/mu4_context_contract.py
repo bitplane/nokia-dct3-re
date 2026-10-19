@@ -662,6 +662,31 @@ def decode_pcm_conversion(words):
             'scope':'Argument-14 source contract only, not other shift arguments, decoder sample correctness or native audio acceptance'}
 
 
+DECODER_FRAMING_BASE = 0x23D73
+DECODER_FRAMING_WITNESS = (
+    0x710d,0x0011,0x7181,0xb332,0x76f8,0xb331,0x0000,
+    0x10f8,0xba50,0xf844,0x3da0,0x76f8,0xba4f,0x0001,
+    0x76f8,0xba4e,0x0000,0x7181,0x0011,0x6081,0x4144,
+    0xf820,0x3da0,0x60e1,0x0001,0x4946,0xf820,0x3da0,
+    0x76f8,0xba4e,0x0001,0x76f8,0xba4f,0x0000,
+    0x10f8,0xba44,0xf844,0x3da0,0xf982,0x41f2,
+    0xf982,0x542b,0x76f8,0xba44,0x0001)
+
+
+def decode_decoder_framing(words):
+    for offset, expected in enumerate(DECODER_FRAMING_WITNESS):
+        if words.get(DECODER_FRAMING_BASE + offset) != expected:
+            raise ValueError('AA99 decoder framing witness changed or absent')
+    return dict(segment='aa99', entry='023d73', pinned_words=len(DECODER_FRAMING_WITNESS),
+                input_base='receiver dereference -> b332; b331 reset to zero',
+                bypass='ba50 nonzero skips detection to 023da0',
+                default_flags={'ba4f': 1, 'ba4e': 0},
+                adif_signature=['4144', '4946'],
+                adif_flags={'ba4f': 0, 'ba4e': 1},
+                adif_initialization='if ba44 is zero: call 0241f2, call 02542b, set ba44=1',
+                scope='Pinned local framing branch; not complete ADIF support, initializer ABI or external REL packaging')
+
+
 def decode_decoder_output(words):
     for base,witness in DECODER_OUTPUT_WITNESSES:
         for offset,expected in enumerate(witness):
@@ -1714,6 +1739,7 @@ def contract(source):
     result['playback_control_literals'] = playback_control_literal_census(rel_words)
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['decoder_output'] = decode_decoder_output(rel_words)
+    result['decoder_framing'] = decode_decoder_framing(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
