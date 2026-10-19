@@ -10,8 +10,10 @@ import tempfile
 
 try:
     from tools.run_c54x_rom4_rf_delivery import input_provenance, MACHINES
+    from tools.c54x_rom4_call_observe_check import inspect
 except ModuleNotFoundError:
     from run_c54x_rom4_rf_delivery import input_provenance, MACHINES
+    from c54x_rom4_call_observe_check import inspect
 
 
 def main():
@@ -57,7 +59,18 @@ def main():
     with (run / 'console.log').open('w') as stream:
         result = subprocess.run(command, cwd=run, env=env, stdout=stream,
                                 stderr=subprocess.STDOUT)
-    return result.returncode
+    try:
+        if result.returncode:
+            raise ValueError(f'MAME exited {result.returncode}')
+        report = inspect((run / 'error.log').read_text(),
+                         (run / 'console.log').read_text(), args.machine)
+    except (ValueError, OSError) as error:
+        (run / 'summary.json').write_text(json.dumps(dict(
+            observation_complete=False, error=str(error)), indent=2) + '\n')
+        print(f'Invalid observation: {error}', file=sys.stderr)
+        return 1
+    (run / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+    return 0
 
 
 if __name__ == '__main__':

@@ -2191,8 +2191,11 @@ control. Each run has isolated generated storage, input/binary/observer hashes,
 its launch command, console, bus log and snapshots under `tmp/native-call-*`.
 Inherited DCT3 fixture/backend settings are removed. This is a manual research
 instrument, not a connected-call gate: a zero process exit is not acceptance.
-Require a healthy final CPU record, inspect the physical-input/screen evidence,
-and reject truncated bus captures (each kind reports its total and 512 cap).
+The runner writes `summary.json` and rejects observer errors, missing/duplicate
+summaries, wrong-machine/faulted completion, invalid masks/times and truncated
+or count-inconsistent bus captures. Each kind reports its total and 512 cap.
+Completeness is not semantic acceptance: independently inspect the physical
+input/screen and transaction evidence before drawing a behavioral conclusion.
 Both standard-bus frontends reproduce 68 post-boot host writes, 18 payload
 reads and 75 COBBA writes for this dial fixture, with zero codec entries and
 active mode zero. Equal counts do not establish physical timing parity.
