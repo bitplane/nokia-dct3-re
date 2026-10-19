@@ -2356,6 +2356,57 @@ names to the other ranges, certify valid provisioning, or authorize filling
 unknown identity/security/calibration fields. No checksum or NV value is
 modified by the observer or checker.
 
+### Equipment-identity consumer contract
+
+The own image identifies a concrete use of `000c..0013`: routines `2a0640`
+and `2a066a` read eight bytes there and call formatter `2a05cc`. The formatter
+consumes the first seven bytes as fourteen high-nibble-first equipment digits;
+this does not classify the eighth byte for other consumers. It repacks those
+digits into mobile-identity value bytes. Selector 1 produces eight bytes with
+type 2/odd digit count and a zero transmitted spare digit. Selector 2 produces
+nine bytes with type 3/even digit count, two software-version digits and a final
+high-nibble filler. The type/header half-byte is part of these value bytes;
+they are not simply the abstract eight-byte packed IMEISV storage format.
+
+These operations match IMEI/IMEISV structure, including the distinction
+between display check digit and transmitted zero spare digit described in
+[RFC 7254 sections 4.2/4.3](https://www.rfc-editor.org/rfc/rfc7254.html#section-4.2).
+The own ROM software-version byte at `44d844` is 6, formatted as `06`, not the
+MCU release string `3.53`. Its divide helper `3ad490` returns remainder in R0
+and quotient in R1 for these positive operands; assuming the opposite ABI
+would reverse the version digits.
+
+The separate ASCII formatter at `29fc00` has these qualified decimal-input
+flag forms, modeled in `noki5510_identity_contract.py`:
+
+| Flags | Output |
+| --- | --- |
+| `01` | fourteen equipment digits |
+| `03` | equipment digits plus Luhn check digit |
+| `05` | equipment digits plus zero spare digit |
+| `09` | equipment digits plus two software-version digits |
+
+The source model is not an NV writer. Synthetic decimal vectors test these
+equations and independently decode the mobile-identity type/digit layout;
+they are not injected into a running phone. A fresh eight-second hybrid run
+with `noki5510_identity_observe.lua` observes one organic selector-1 call,
+with input `ffffffffffffffff` and output `faffffffffffff0f`. The paired frame,
+source/destination contexts and preceding `000c+8` request match the original
+byte model. Those nibbles are not a valid decimal equipment identity. Selector
+2 and the positive decimal vectors remain source/reference coverage, not
+observed handset execution. The hybrid bootstrap and erased-NV failures
+reproduce unchanged.
+
+Run `noki5510_identity_contract.py RUN --firmware
+roms/5510-npm5-v353/5510f353c.fls` to check the source hash, bounded NV
+inventory and formatter observations. Its report explicitly rejects a valid
+product-NV claim. Correcting only the two checksums would not establish a
+valid identity or product profile; this finding also does not prove that the
+malformed identity is a separate boot gate. Neighboring record contents,
+their consistency/binding rules and the remaining configuration fields still
+need their own contracts before provisioning is justified. No NSE-1 identity,
+key or donor record is imported.
+
 ## Input consumer boundary
 
 ### Physical MU4 ownership
