@@ -33,8 +33,10 @@ against a host-decoded projection has maximum sample difference 13 and RMS
 1.24083, without fitted gain or alignment. These are measurements, not a
 codec tolerance. Consumed-input byte coverage extends across all 375 calls;
 detailed arithmetic and output-store binding remain bounded to eight calls.
-Other media and independent conformance criteria
-remain open. See [processing contracts](#processing-and-conversion) and
+Other media and application of independent conformance criteria remain open.
+The [AAC validation contract](aac_validation.md) identifies an official baseline
+fixture and procedure; native execution, delay and measurement-point mapping
+are not yet established. See [processing contracts](#processing-and-conversion) and
 [reference comparison](#independent-reference-comparison).
 
 Every captured channel-3 source read binds to an owned DXR bus write, and
@@ -6249,9 +6251,10 @@ observed maximum of 13 signed sample units nor RMS 1.1492 can be substituted
 for its criterion without the specified reference precision, normalization,
 evaluation intervals and test sequences.
 
-Before adding an audio-acceptance threshold, obtain the applicable procedure
-and reference vectors, pin their identities and decoder configuration, and
-implement their comparison rules independently. Broader original-media
+The [AAC validation contract](aac_validation.md) now pins an acquired official
+baseline and draft procedure. Before adding an audio-acceptance threshold,
+establish applicability, decoder configuration, delay and measurement point,
+and implement the comparison rules independently. Broader original-media
 coverage and exact DMA/TX/DIN epoch pairing remain separate requirements;
 passing an arithmetic snapshot or this handset regression closes neither.
 

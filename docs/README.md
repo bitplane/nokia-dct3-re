@@ -43,6 +43,7 @@ distinction.
 | `8810_bringup.md` | Own NSE-6 v6.02 graphical native compatibility fixture, upload geometry and unresolved native serial-control completion. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
 | `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
+| `aac_validation.md` | Independent native music-decoder procedure, original reference fixtures and unresolved measurement contract. |
 | `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
 | `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
