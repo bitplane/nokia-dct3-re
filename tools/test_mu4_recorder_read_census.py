@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_recorder_read_census import check,check_buffers
+from tools.mu4_recorder_read_census import check,check_buffers,check_read_identity,pin_read_instructions
 
 
 def fixture():
@@ -16,6 +16,25 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_read_instruction_identity_requires_exact_bus_coverage(self):
+        text = '\n'.join([
+            'mu4_recorder_buffer_instruction: bank=0 instruction=038eb5 opcode=e598 reads=10 observer_writes=0',
+            'mu4_recorder_buffer_identity_terminal: missing=0 dropped=0 cap=256 identity=staged_operand_bus_read save_restore=unsupported observer_writes=0 retirement=0'])
+        buffers = dict(banks={0:dict(readers={'00':10}),1:dict(readers={})})
+        self.assertEqual(check_read_identity(text,buffers)['instructions'][0]['opcode'],'e598')
+        identities = check_read_identity(text,buffers)
+        self.assertEqual(pin_read_instructions(identities,{0x38eb5:0xe598})['instructions'][0]['operation'],'MVDD Xmem,Ymem')
+        for words in ({},{0x38eb5:0xf495}):
+            with self.assertRaises(ValueError):
+                pin_read_instructions(identities,words)
+        for before,after in [('reads=10','reads=9'),('missing=0','missing=1'),
+                             ('dropped=0','dropped=1'),('retirement=0','retirement=1'),
+                             ('instruction=038eb5','instruction=838eb5')]:
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_read_identity(text.replace(before,after),buffers)
+        with self.assertRaises(ValueError):
+            check_read_identity(text+'\n'+text.splitlines()[0],buffers)
+
     def test_buffer_lifetimes_distinguish_read_retired_and_pending_epochs(self):
         text = '\n'.join([
             'mu4_recorder_buffer: bank=0 writes=4 read_epochs=2 retired_unread=1 pending_unread=1 unknown_reads=5 observer_writes=0',

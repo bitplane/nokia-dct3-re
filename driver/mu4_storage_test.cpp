@@ -432,6 +432,8 @@ private:
 	std::array<u64,128> m_ac_buffer_readers{};
 	std::map<u32,u64> m_ac_buffer_contexts;
 	u64 m_ac_buffer_bad = 0, m_ac_buffer_dropped = 0;
+	std::map<u64,u64> m_ac_buffer_instructions;
+	u64 m_ac_buffer_identity_missing = 0, m_ac_buffer_identity_dropped = 0;
 	void install_recorder_buffer_observers()
 	{
 		m_cpu->space(AS_DATA).install_write_tap(0x1800,0x19ff,"mu4_recorder_buffer_write",
@@ -460,6 +462,16 @@ private:
 				++m_ac_buffer_readers[bank*64+owners];
 				if (!owners)
 				{
+					u32 instruction = 0; u16 opcode = 0;
+					if (m_cpu->observe_staged_data_read(address,instruction,opcode))
+					{
+						u64 const identity = (u64(bank)<<48) | (u64(instruction)<<16) | opcode;
+						auto found = m_ac_buffer_instructions.find(identity);
+						if (found != m_ac_buffer_instructions.end()) ++found->second;
+						else if (m_ac_buffer_instructions.size() < 256) m_ac_buffer_instructions.emplace(identity,1);
+						else ++m_ac_buffer_identity_dropped;
+					}
+					else ++m_ac_buffer_identity_missing;
 					u32 const key = (bank<<24) | m_cpu->state_int(STATE_GENPC);
 					auto found = m_ac_buffer_contexts.find(key);
 					if (found != m_ac_buffer_contexts.end()) ++found->second;
@@ -3108,6 +3120,7 @@ private:
 		m_ac_buffer_word.fill(0); m_ac_buffer_valid.fill(false); m_ac_buffer_read.fill(false);
 		m_ac_buffer_writes.fill(0); m_ac_buffer_consumed.fill(0); m_ac_buffer_unread.fill(0); m_ac_buffer_unknown.fill(0);
 		m_ac_buffer_readers.fill(0); m_ac_buffer_contexts.clear(); m_ac_buffer_bad = m_ac_buffer_dropped = 0;
+		m_ac_buffer_instructions.clear(); m_ac_buffer_identity_missing = m_ac_buffer_identity_dropped = 0;
 		m_ac_read_total = m_ac_context_dropped = 0;
 		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
 		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
@@ -3661,6 +3674,11 @@ private:
 					logerror("mu4_recorder_buffer_context: bank=%u context_pc=%06x reads=%llu observer_writes=0\n",key>>24,key&0xffffff,static_cast<unsigned long long>(count));
 				logerror("mu4_recorder_buffer_terminal: bad=%llu dropped=%llu context_cap=256 context_pc=not_instruction_owner save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
 					static_cast<unsigned long long>(m_ac_buffer_bad),static_cast<unsigned long long>(m_ac_buffer_dropped));
+				for (auto const &[key,count] : m_ac_buffer_instructions)
+					logerror("mu4_recorder_buffer_instruction: bank=%u instruction=%06x opcode=%04x reads=%llu observer_writes=0\n",
+						unsigned(key>>48),unsigned((key>>16)&0x7fffff),unsigned(key&0xffff),static_cast<unsigned long long>(count));
+				logerror("mu4_recorder_buffer_identity_terminal: missing=%llu dropped=%llu cap=256 identity=staged_operand_bus_read save_restore=unsupported observer_writes=0 retirement=0\n",
+					static_cast<unsigned long long>(m_ac_buffer_identity_missing),static_cast<unsigned long long>(m_ac_buffer_identity_dropped));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
 				for (unsigned mask=0;mask<64;++mask)

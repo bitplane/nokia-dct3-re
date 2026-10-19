@@ -19353,8 +19353,20 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x14b2); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, destination); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
 		data.write_word(0x14b2, value); data.write_word(destination, 0xaaaa);
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdd_peripheral_read", [this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x14b2 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Peripheral MVDD retains one RAM source before its write wait"); ++m_pipeline_operand_reads; });
-		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdd_peripheral_write", [this, destination, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == destination && word == value && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == 7, "Peripheral MVDD publishes once after paying one extra cycle"); ++m_pipeline_store_writes; });
+		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdd_peripheral_read", [this, value, base, x, y](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			u32 instruction = 0; u16 opcode = 0;
+			expect(m_cpu->observe_staged_data_read(at,instruction,opcode) && instruction == base+0x600 && opcode == (0xe500 | (x<<4) | y), "Staged operand bus read retains logical instruction and opcode before Execute");
+			expect(!m_cpu->observe_staged_data_read(at^1,instruction,opcode), "Read identity excludes other addresses");
+			{ auto const disable = machine().disable_side_effects(); expect(!m_cpu->observe_staged_data_read(at,instruction,opcode), "Read identity excludes debugger peeks"); }
+			expect(at == 0x14b2 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Peripheral MVDD retains one RAM source before its write wait"); ++m_pipeline_operand_reads;
+		});
+		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdd_peripheral_write", [this, destination, value](offs_t at, u16 &word, u16) {
+			if (machine().side_effects_disabled()) return;
+			u32 instruction = 0; u16 opcode = 0;
+			expect(!m_cpu->observe_staged_data_read(0x14b2,instruction,opcode), "Read identity expires before the destination write");
+			expect(at == destination && word == value && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == 7, "Peripheral MVDD publishes once after paying one extra cycle"); ++m_pipeline_store_writes;
+		});
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254320;
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -51672,6 +51684,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < 1535) { start_mvdd_peripheral(variant + 1); return; }
 				osd_printf_info("TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged read identity: PASS cases=1536 restore=1536 logical_instruction=1 captured_opcode=1 wrong_address_excluded=1 peeks_excluded=1\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated peripheral MVDD complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

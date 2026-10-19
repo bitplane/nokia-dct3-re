@@ -44,6 +44,9 @@ public:
 	auto instruction_observer_cb() { return m_instruction_observer_cb.bind(); }
 	// Valid only for the matching staged Execute entry; no bus reads or retirement claim.
 	bool observe_execute_memory_multiply(offs_t address, u16 opcode, u16 &source, u16 &operand, u16 &immediate) const;
+	// Valid only inside an actual staged operand bus read, not forwarded values,
+	// debugger peeks, DMA reads or Execute/retirement. Never accesses guest memory.
+	bool observe_staged_data_read(u16 address, u32 &instruction, u16 &opcode) const;
 
 	enum : unsigned
 	{
@@ -285,6 +288,9 @@ private:
 	emu_timer *m_clock_timer = nullptr;
 	devcb_write32 m_system_clock_cb;
 	devcb_write16 m_instruction_observer_cb;
+	bool m_observed_data_read = false;
+	u16 m_observed_data_address = 0, m_observed_data_opcode = 0;
+	u32 m_observed_data_instruction = 0;
 	bool m_pll_locked = false;
 	emu_timer *m_pll_timer = nullptr;
 	u16 m_tim = 0xffff;

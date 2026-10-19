@@ -5748,6 +5748,13 @@ u16 tms320c54x_device::pipeline_store_word() const
 	return u16(saturated_store(value) >> (BIT(word, 9) ? 16 : 0));
 }
 
+bool tms320c54x_device::observe_staged_data_read(u16 address, u32 &instruction, u16 &opcode) const
+{
+	if (!m_observed_data_read || address != m_observed_data_address || machine().side_effects_disabled()) return false;
+	instruction = m_observed_data_instruction; opcode = m_observed_data_opcode;
+	return true;
+}
+
 u16 tms320c54x_device::pipeline_read_data(u16 address)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
@@ -5780,7 +5787,14 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
 			m_pipeline_word[5] == 0x6af8 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
 	}
-	return m_data.read_word(address);
+	// Transient synchronous observer context; not hardware or save-state state.
+	m_observed_data_read = m_pipeline_valid[4];
+	m_observed_data_address = address;
+	m_observed_data_instruction = m_pipeline_address[4];
+	m_observed_data_opcode = m_pipeline_word[4];
+	u16 const value = m_data.read_word(address);
+	m_observed_data_read = false;
+	return value;
 }
 
 u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_status)

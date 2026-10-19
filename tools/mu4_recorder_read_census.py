@@ -1,6 +1,7 @@
 """Reconcile actual DRR read owners; CPU PC is context, not instruction ownership."""
 import argparse
 from decimal import Decimal
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -8,9 +9,13 @@ import sys
 if __package__:
     from .mu4_playback_frame_check import rows
     from .noki5510_bootstrap_check import verify_recorder_input
+    from .noki5510_a00_inventory import uploaded_word_image
+    from .mu4_clock_contract import SOURCE_SHA256
 else:
     from mu4_playback_frame_check import rows
     from noki5510_bootstrap_check import verify_recorder_input
+    from noki5510_a00_inventory import uploaded_word_image
+    from mu4_clock_contract import SOURCE_SHA256
 
 
 def check_fresh(text,owners):
@@ -114,6 +119,40 @@ def check_buffers(text,destinations):
     return dict(banks=summaries,scope='Observed bus read lifetimes, not instruction ownership, copy semantics or encoder consumption')
 
 
+def check_read_identity(text,buffers):
+    ends = rows(text,'mu4_recorder_buffer_identity_terminal')
+    if len(ends) != 1 or ends[0] != dict(missing='0',dropped='0',cap='256',
+            identity='staged_operand_bus_read',save_restore='unsupported',observer_writes='0',retirement='0'):
+        raise ValueError('missing or capped staged operand read identity')
+    if buffers is None:
+        raise ValueError('instruction identity requires buffer lifetime census')
+    seen,counts,result = set(),[0,0],[]
+    for row in rows(text,'mu4_recorder_buffer_instruction'):
+        bank,address,opcode,count = int(row['bank']),int(row['instruction'],16),int(row['opcode'],16),int(row['reads'])
+        key = bank,address,opcode
+        if (bank not in (0,1) or not 0 <= address <= 0x7fffff or not 0 <= opcode <= 0xffff
+                or count <= 0 or key in seen or row['observer_writes'] != '0'):
+            raise ValueError('invalid staged read instruction histogram')
+        seen.add(key); counts[bank] += count
+        result.append(dict(bank=bank,instruction=f'{address:06x}',opcode=f'{opcode:04x}',reads=count))
+    if len(seen) > 256 or counts != [buffers['banks'][bank]['readers'].get('00',0) for bank in range(2)]:
+        raise ValueError('staged read identities do not cover non-DMA buffer reads')
+    return dict(instructions=result,scope='Captured staged operand bus-read instruction/opcode; not retirement or encoder consumption')
+
+
+def pin_read_instructions(identities,words):
+    if identities is None:
+        raise ValueError('source pinning requires staged read identities')
+    result = []
+    for row in identities['instructions']:
+        address,opcode = int(row['instruction'],16),int(row['opcode'],16)
+        if words.get(address) != opcode:
+            raise ValueError('captured read opcode does not match original AA88 source')
+        result.append(dict(row,operation='MVDD Xmem,Ymem' if opcode&0xff00 == 0xe500 else 'unclassified'))
+    return dict(segment='aa88',instructions=result,
+                scope='Original source opcode matches actual staged bus-read identity; not copy destination, full routine identity or encoder consumption')
+
+
 def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
@@ -152,7 +191,9 @@ def check(text,require_fresh=False):
         raise ValueError('DRR publication observation required')
     destinations = check_destinations(text,owners) if rows(text,'mu4_recorder_destination_terminal') else None
     buffers = check_buffers(text,destinations) if rows(text,'mu4_recorder_buffer_terminal') else None
+    identities = check_read_identity(text,buffers) if rows(text,'mu4_recorder_buffer_identity_terminal') else None
     return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,'dma_destinations':destinations,'buffer_lifetimes':buffers,
+            'read_instructions':identities,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -167,6 +208,8 @@ def main():
     parser.add_argument('--fresh',action='store_true',help='require publication/read/reset reconciliation')
     parser.add_argument('--destinations',action='store_true',help='require exact DMA read/write pairing')
     parser.add_argument('--buffers',action='store_true',help='require receive-buffer write/read lifetimes')
+    parser.add_argument('--instructions',action='store_true',help='require staged operand read identities')
+    parser.add_argument('--source-a00',type=Path,help='pin captured read opcodes to original R060 AA88 upload')
     args = parser.parse_args()
     try:
         result = check(args.log.read_text(),args.fresh)
@@ -174,6 +217,14 @@ def main():
             raise ValueError('DMA destination observation required')
         if args.buffers and result['buffer_lifetimes'] is None:
             raise ValueError('recorder buffer lifetime observation required')
+        if args.instructions and result['read_instructions'] is None:
+            raise ValueError('staged buffer read instruction observation required')
+        if args.source_a00:
+            source = args.source_a00.read_bytes()
+            if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
+                raise ValueError('expected original R060 InitData source')
+            words = uploaded_word_image(bytes.fromhex(source.decode('ascii')),'aa88')
+            result['read_source'] = pin_read_instructions(result['read_instructions'],words)
         print(json.dumps(result,indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')

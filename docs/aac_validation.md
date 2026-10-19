@@ -971,6 +971,32 @@ this fixture. The live downstream investigation must follow the channel-3
 `1800` range. These bus lifetimes alone prove neither conversion/FIFO loss
 nor copy/filter semantics, encoder consumption or decoded audio.
 
+`--instructions --source-a00 roms/5510-mu4-reference/InitData_R060.a00`
+resolves the known non-DMA buffer reads using scoped staged operand bus-read
+identity, not the current PC or most recent Execute callback. Read precedes
+Execute in the staged core, so those alternatives can identify another
+instruction. The query excludes forwarded values (no bus read), other
+addresses and side-effect-disabled peeks; its transient context is not
+hardware/save-state state and does not imply retirement.
+
+The 20-second `tmp/native-gates/mu4-recorder-instructions` capture identifies
+every one of the 1699328 known-value reads, with no missing or capped identity:
+
+| Actual read instruction | Captured opcode | Reads |
+| --- | --- | ---: |
+| `038eb5` | `e598` (`MVDD Xmem,Ymem`) | 452352 |
+| `038eda` | `e598` (`MVDD Xmem,Ymem`) | 452352 |
+| `03faa5` | `e598` (`MVDD Xmem,Ymem`) | 794624 |
+
+All three opcodes match the source-hash-pinned original AA88 upload. This
+establishes copy-read sites, not their destination writes, full routine
+identity or encoder consumption. The existing 1536-case peripheral-MVDD
+fixture and its 1536 save/restore replays additionally verify the scoped
+read identity, logical page, captured opcode, wrong-address/peek rejection
+and expiry before the destination write. The native buffer lifetimes and
+both NAND hashes above remain unchanged. Follow these three copy sites to
+their actual writes before assigning encoder-buffer semantics.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected
