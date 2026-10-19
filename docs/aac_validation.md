@@ -39,8 +39,12 @@ Full-lifecycle transform observation now validates all 4539 calls in the
 recording fixture, including initialization and 4498 data windows. Native
 plaintext contains 386 complete host-decodable packets; stored bytes match
 only the first 143360 native bytes (385 packets plus 140 bytes). The remaining
-stored suffix diverges. Codec conformance, tail persistence/completion and
-handset speech acceptance remain unproven; see [full recording transform](#full-recording-transform).
+stored suffix diverges. A stop-time RAM capture accounts for the remaining
+576 transformed bytes and 28 pending plaintext bytes; together the captured
+data decodes as 387 packets / 396288 stereo frames. This is not a flushed
+recording: codec conformance, persisted-tail policy and handset speech remain
+separate obligations. See [full recording transform](#full-recording-transform)
+and [pending stop buffers](#pending-stop-buffers).
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -814,12 +818,11 @@ local reference and revision qualification are recorded in the 5510 bring-up
 document. The source helper ORs register/data arguments into the transmitted
 word and polls status bit 1 on each side of the write.
 
-The source-level next boundary is the processing request downstream of
-`0395e6` and the producer of completion `8009/1`: does that worker commit its
-partial output block before reporting completion? Neither the codec-control
-helper nor the selected completion consumer answers this. The 512-byte file
-granularity alone is not grounds to add padding, modify the file extent or
-invent a flush reply.
+The processing path downstream of `0395e6` is software-owned. Its selected
+stop buffer and empty finish-method slot are characterized below; neither the
+codec-control helper nor the completion consumer constitutes a file flush.
+File granularity alone is not grounds to add padding, modify the file extent
+or invent a flush reply.
 
 `recorder_stop_mailbox` adds 233 pinned AA88 words for publication, callback
 initialization, software interrupt dispatch and selected deferred/reset paths.
@@ -834,8 +837,9 @@ Selector 3 stores `(argument==0)` at `05eb` and, when that flag is set,
 sets `05f3`. The common reply marks selector 3 as `8003`, not `8009`.
 The selected `05eb` processing branch invokes `0389cf(0)` and reset/cleanup
 helpers. Inside the pinned counter-update helper, `05f0==0 && 05eb!=0`
-clears `05ed`, `05ee` and `05eb`; buffer units and the deeper cleanup helper's
-file ownership remain unclassified.
+clears `05ed`, `05ee` and `05eb`. The stop-time byte comparison below qualifies
+their selected pending-buffer extent; the original source still does not
+establish a general file-flush promise.
 
 `mu4_recorder_stop_observe.lua` records changed RAM writes in an explicitly
 bounded 0.8--15-second window. The fresh control observes 4159 changes out of
@@ -859,7 +863,8 @@ precedes completion; neither a missing stop acknowledgement nor a decoder
 failure explains this recording boundary. This short observation still is
 not the twenty-second finalized-recording acceptance gate. The finalized
 extent and size-update accounting are measured separately below; the deeper
-cleanup/flush policy remains unresolved, not an established hardware defect.
+intended persisted-tail policy remains unresolved, not an established hardware
+defect. Pending bytes are now accounted for separately below.
 
 ### Finalized Recording Extent
 
@@ -1266,14 +1271,65 @@ explicitly reports it while keeping `stored_file_correspondence_validated`,
 `--output-native-plain` bytes are actual captured pre-transform windows,
 never replacement media or a firmware input. The next persistence boundary
 is the final writer/buffer lifecycle, not an assumed later transform-state
-change. Intended packet/sample extent and the missing final 28 bytes remain
-unresolved.
+change. The final 28 bytes are accounted for by the pending adapter capture
+below; intended persisted packet/sample extent remains unresolved.
 
 ```sh
 .venv/bin/python tools/mu4_recorder_full_transform_check.py RUN/error.log \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
   --stored-file READBACK/TEST --inventory-divergence \
   --output-native-plain NEW_NATIVE_PLAIN
+```
+
+### Pending Stop Buffers
+
+`mu4_recorder_tail_check.py` pins 307 original AA88 words across compaction
+helper `0389cf..038a30`, selected stop tail `038ff7..039001`, virtual dispatcher
+`03e30c..03e332`, processing adapter `03e76f..03e7f9` and output forwarder
+`03e918..03e92b`. The adapter unpacks groups of 16 source words into 32
+byte-valued words for the transform/output path, then retains a shorter group
+at `fd4e` with count `fd70`. Compaction uses buffer base `05e6+36=061c` and
+fields `05ed/05ee`; the selected stop branch calls this helper with zero,
+resets the processing descriptor and invokes method `0c` of object `05f4`.
+That is a virtual call, not an unconditional file-close/flush operation.
+
+`mu4_recorder_tail_observe.lua` takes a passive RAM snapshot at the actual
+`05eb=1` stop-request write. Its 20-second `tmp/native-gates/mu4-stop-tail`
+run reproduces metadata success, all 4539 transform calls, the original input
+PCM and the endpoint NAND hash. The selected object is `eed6`, table `567e`:
+method `0e` selects `03e76f`, but finish method `0c` is null. This is observed
+at the stop boundary, not inferred to be immutable throughout the recording.
+
+At 10.100595994 seconds, `05ed=05ee=0120` and `fd70=000e`:
+
+- The 288 words at `061c` serialize big-endian to exactly the 576 transformed
+  bytes beyond the independently verified persisted prefix. Thus these
+  selected pending counts have a measured two-byte-per-word correspondence.
+- The 14 words at `fd4e` supply the remaining 28 plaintext bytes of packet 387.
+- The terminal has both main-buffer counts zero. The previously qualified
+  stop-write trace locates their clearing before completion; no missing
+  external acknowledgement is needed to explain this reset.
+
+Concatenating observed plaintext windows with that pending RAM carry yields
+143964 bytes / 387 complete AAC-LC stereo packets, SHA256
+`62f98e58fd41d8c12cb9481de3e48474cf76824d1c8ba9ce49ec182fc1e9a3ab`.
+FFmpeg `-xerror` decodes without diagnostics to 396288 stereo frames, exactly
+the captured input-frame count; s16le SHA256 is
+`f2cf637767c7a9f821a36d09a8b3d939beb4f6b17f93af2d4aa0816f7588a616`.
+This is an output-only host artifact from native observations, not a file the
+firmware saved. It must never be substituted into NAND or playback input.
+
+The checker rejects a buffer/suffix mismatch, changed dispatch, incomplete
+capture or invalid packet chain. It keeps `stored_tail_complete` and
+`native_flush_validated` false. The remaining policy question is whether a
+different evidenced caller lifecycle commits these buffers or whether this
+stop operation deliberately discards the partial extent. Do not manufacture
+a flush, repair the file or label the observed truncation a hardware bug.
+
+```sh
+.venv/bin/python tools/mu4_recorder_tail_check.py RUN/error.log READBACK/TEST \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --output-captured-aac NEW_CAPTURED_PENDING.aac
 ```
 
 ### Metadata Overwrite Accounting
