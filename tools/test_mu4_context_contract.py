@@ -32,6 +32,7 @@ from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
+from tools.mu4_context_contract import pocp_count_words, decode_pocp_buffer_count
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -697,6 +698,20 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=hex(address)), self.assertRaises(ValueError):
                 decode_playback_final_input(changed)
+
+    def test_pocp_count_is_bound_to_writer_argument_in_both_overlays(self):
+        rel,resident = pocp_count_words('aa99'),pocp_count_words('aa22')
+        result = decode_pocp_buffer_count(rel,resident)
+        self.assertEqual(result['pinned_words'],228)
+        self.assertIn('caller argument',result['source'])
+        self.assertIn('constant 16',result['next_field'])
+        for marker,source in (('aa99',rel),('aa22',resident)):
+            for address in source:
+                changed = dict(source)
+                changed[address] ^= 1
+                with self.subTest(marker=marker,address=hex(address)), self.assertRaises(ValueError):
+                    decode_pocp_buffer_count(changed if marker == 'aa99' else rel,
+                                             changed if marker == 'aa22' else resident)
 
     def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
         words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))

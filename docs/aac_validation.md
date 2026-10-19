@@ -584,3 +584,35 @@ unextended `mpeg2eof` probe cannot consume its allocation's zero-filled tail.
 This closes arithmetic/conversion coverage of the complete generated packet
 prefix, not the original caller's EOF/drain policy, formal conformance,
 original REL playback completion, or handset/analog audio.
+
+## Recording Extent Metadata
+
+The independently extracted `tmp/mu4-dst-bypass-recorder/TEST` is 143680
+bytes, SHA256 `4ba59580f8bf50b8d45d7a62d8ddf42ea94dfb7d884ff05b5092e7c13141470d`.
+Its flag-free ID3v2.3 tag has a 100-byte payload, ending at file byte
+110: `TIT2`/`MAME`, `TPE1`/`TEST`, then 70 zero-padding bytes. It contains
+no `TLEN` frame. The [ID3v2.3 specification](https://id3.org/id3v2.3.0)
+defines that frame as a millisecond length declaration; its absence gives
+no duration or sample count, not a zero-length recording.
+
+The strict inventory rejects unsupported flags, bad frame extents and
+nonzero padding instead of treating a failed parse as missing metadata:
+
+```sh
+.venv/bin/python tools/mu4_recorder_media_inventory.py TEST TEST \
+  --extracted-files --id3-tags
+```
+
+The next 16 file bytes are `504f4350030000010002000010000000`.
+The `POCP` writer's count field at header offsets 8..11 is serialized from
+a caller-supplied 16-bit count, with a required minimum of `0200`; the
+stored value here is 512. The field at offsets 12..15 is 16: helper
+`02adb2` returns constant 16 after its normal callee return and the writer
+serializes that result. The matching AA22 writer/helper spans agree after
+branch/call relocation; 228 original words pin both overlays.
+
+Neither visible count is an established total sample count. This does not
+exclude useful information elsewhere in the custom body or encoder control
+records. The intended recording extent therefore remains unproven; neither
+375 native blocks nor the longer host-decoded prefix should be promoted to
+the expected answer from these tag/header fields alone.

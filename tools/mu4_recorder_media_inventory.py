@@ -79,6 +79,44 @@ def file_inventory(source, endpoint):
             'scope': 'byte deltas of independently extracted files only; no filesystem or codec validation'}
 
 
+def id3v23_inventory(source):
+    """Strict flag-free ID3v2.3 inventory (https://id3.org/id3v2.3.0)."""
+    if len(source) < 10 or source[:6] != b'ID3\x03\x00\x00' or any(byte & 0x80 for byte in source[6:10]):
+        raise ValueError('requires a complete flag-free ID3v2.3.0 tag')
+    size = 0
+    for byte in source[6:10]:
+        size = (size << 7) | byte
+    end,cursor = 10+size,10
+    if end > len(source):
+        raise ValueError('truncated ID3 tag extent')
+    frames,duration = [],None
+    while cursor < end:
+        if source[cursor] == 0:
+            if any(source[cursor:end]):
+                raise ValueError('nonzero ID3 padding')
+            break
+        if cursor+10 > end:
+            raise ValueError('truncated ID3 frame header')
+        name = source[cursor:cursor+4]
+        length = int.from_bytes(source[cursor+4:cursor+8],'big')
+        if (not all(65 <= byte <= 90 or 48 <= byte <= 57 for byte in name)
+                or source[cursor+8:cursor+10] != b'\0\0' or not length
+                or cursor+10+length > end):
+            raise ValueError('unsupported or truncated ID3 frame')
+        payload = source[cursor+10:cursor+10+length]
+        frame = dict(id=name.decode('ascii'),payload_bytes=length,payload_prefix_hex=payload[:32].hex())
+        if name == b'TLEN':
+            digits = payload[1:].rstrip(b'\0')
+            if duration is not None or payload[0] != 0 or not digits or any(byte not in b'0123456789' for byte in digits):
+                raise ValueError('unsupported, duplicate or malformed ID3 length frame')
+            duration = int(digits)
+        frames.append(frame)
+        cursor += 10+length
+    return dict(tag_payload_bytes=size,tag_end=end,frames=frames,padding_bytes=end-cursor,
+                declared_length_milliseconds=duration,post_tag_prefix_hex=source[end:end+16].hex(),
+                scope='Flag-free ID3v2.3 tag fields only; no inferred sample count, custom payload interpretation or audio completeness')
+
+
 def fixture_volume(image):
     """Export the original InitDisk fixture's single partition, not arbitrary NAND FTL."""
     page_bytes, data_bytes = 528, 512
@@ -160,14 +198,19 @@ def main():
                       help='compare independent file readbacks instead of raw NAND captures')
     parser.add_argument('--adts-headers', action='store_true',
                         help='inventory candidate ADTS headers in both independently extracted files')
+    parser.add_argument('--id3-tags', action='store_true',help='strictly inventory ID3v2.3 tags in extracted files')
     args = parser.parse_args()
     if args.adts_headers and not args.extracted_files:
         parser.error('--adts-headers requires --extracted-files')
+    if args.id3_tags and not args.extracted_files:
+        parser.error('--id3-tags requires --extracted-files')
     try:
         source, endpoint = args.source.read_bytes(), args.endpoint.read_bytes()
         report = file_inventory(source, endpoint) if args.extracted_files else inventory(source, endpoint)
         if args.adts_headers:
             report['adts_header_candidates'] = {'source': adts_inventory(source), 'endpoint': adts_inventory(endpoint)}
+        if args.id3_tags:
+            report['id3_tags'] = {'source':id3v23_inventory(source),'endpoint':id3v23_inventory(endpoint)}
         if args.export_fixture_volume:
             metadata, volume = fixture_volume(endpoint)
             with args.export_fixture_volume.open('xb') as output:

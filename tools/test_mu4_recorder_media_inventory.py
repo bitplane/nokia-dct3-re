@@ -6,10 +6,40 @@ import json
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
-from tools.mu4_recorder_media_inventory import inventory, fixture_volume, file_inventory, main, adts_header, adts_inventory
+from tools.mu4_recorder_media_inventory import inventory, fixture_volume, file_inventory, main, adts_header, adts_inventory, id3v23_inventory
 
 
 class RecorderMediaInventoryTest(unittest.TestCase):
+    def id3_fixture(self, length=None):
+        def frame(name,payload):
+            return name+len(payload).to_bytes(4,'big')+b'\0\0'+payload
+        body = frame(b'TIT2',b'\0MAME')+frame(b'TPE1',b'\0TEST')
+        if length is not None:
+            body += frame(b'TLEN',b'\0'+length)
+        body = body.ljust(100,b'\0')
+        return b'ID3\x03\0\0\0\0\0\x64'+body+b'POCP'
+
+    def test_tag_inventory_does_not_invent_missing_length(self):
+        result = id3v23_inventory(self.id3_fixture())
+        self.assertEqual([frame['id'] for frame in result['frames']],['TIT2','TPE1'])
+        self.assertEqual(result['tag_end'],110)
+        self.assertEqual(result['padding_bytes'],70)
+        self.assertIsNone(result['declared_length_milliseconds'])
+        self.assertEqual(id3v23_inventory(self.id3_fixture(b'1234'))['declared_length_milliseconds'],1234)
+
+    def test_tag_inventory_rejects_unsupported_or_incomplete_fields(self):
+        source = self.id3_fixture()
+        for bad in (source[:20],source[:5]+b'\x80'+source[6:],
+                    source[:6]+b'\x80'+source[7:],
+                    source[:18]+b'\x01'+source[19:],
+                    source[:14]+b'\x7f\xff\xff\xff'+source[18:],
+                    source[:45]+b'X'+source[46:],self.id3_fixture(b'not-a-length')):
+            with self.subTest(bad=bad[:30]), self.assertRaises(ValueError):
+                id3v23_inventory(bad)
+        with patch('sys.argv',['inventory','missing','missing','--id3-tags']), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                main()
+
     def test_adts_cli_requires_file_mode_and_does_not_modify_inputs(self):
         with patch('sys.argv', ['inventory', 'missing', 'missing', '--adts-headers']), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as error:

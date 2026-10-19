@@ -746,6 +746,54 @@ DECODER_INPUT_RESERVE_WITNESS = (
     0x6de8,0xfff8,0xf6aa,0xf820,0x4438,0xf520,0x81f8,0xb331,
     0xe800,0xf073,0x443c)
 
+POCP_COUNT_WITNESSES = {
+    0x2adb2: (0xeefc,0xf495,0x8002,0xe810,0x4e00,0x1002,0xf982,0xad94,
+              0xee04,0xe810,0xf495,0xf495,0xf4e4),
+    0x2aea5: (0x715d,0x0011,0x7710,0x0200,0x7181,0x0011,0xf5a9,0xf820,
+              0xaeba,0x715d,0x0011,0x7681,0x0200,0xf7b8,0xf495,0xf062,
+              0x8004,0xf273,0xaf83,0xf040,0x0006),
+    0x2aeff: (0xe8ff,0x715d,0x0011,0x1381,0xf280,0x715c,0x0011,0x80e1,
+              8,0x715d,0x0011,0x1281,0xf1f8,0xe8ff,0xf280,0x715c,
+              0x0011,0x80e1,9,0x715d,0x0011,0x1281,0xf1f0,0xe8ff,
+              0xf280,0x715c,0x0011,0x80e1,10,0x715d,0x0011,0x1281,
+              0xf1f0,0xf3f8,0xe8ff,0x715c,0x0011,0xf280,0x80e1,11),
+    0x2af27: (0x105c,0xfb82,0xadb2,0xf000,0x0010,0xf540,0x4e04,0xe8ff,
+              0xf280,0x715c,0x0011,0xf6b8,0x80e1,12,0x5604,0xf1f8,
+              0xe8ff,0xf280,0x715c,0x0011,0x80e1,13,0x5604,0xf1f0,
+              0xe8ff,0x715c,0x0011,0xf280,0x80e1,14,0x5604,0xf1f0,
+              0xf3f8,0xe8ff,0xf280,0xf7b8,0x715c,0x0011,0x80e1,15),
+}
+
+
+def pocp_count_words(marker):
+    if marker not in ('aa22','aa99'):
+        raise ValueError('unsupported POCP writer overlay')
+    delta = 0xa3c if marker == 'aa22' else 0
+    expected = {}
+    for base,witness in POCP_COUNT_WITNESSES.items():
+        for offset,value in enumerate(witness):
+            # These are the two absolute branch targets in the bounded prefix.
+            if base == 0x2aea5 and offset in (8,18):
+                value -= delta
+            if (base == 0x2adb2 and offset == 7) or (base == 0x2af27 and offset == 2):
+                value -= delta
+            expected[base-delta+offset] = value
+    return expected
+
+
+def decode_pocp_buffer_count(rel_words, resident_words):
+    for marker,words in (('aa99',rel_words),('aa22',resident_words)):
+        if any(words.get(address) != value for address,value in pocp_count_words(marker).items()):
+            raise ValueError(f'{marker} POCP count writer changed or absent')
+    return dict(pinned_words=228,
+                source='pointer in caller argument at local SP[5d]; dereferenced 16-bit count',
+                minimum='unsigned count < 0200: store required 0200 through that pointer and return error',
+                serialization='mask and shift the count into output byte-valued words 8..11, least significant first',
+                next_field='normal return from 02adb2 is constant 16; caller serializes it least significant first into output words 12..15',
+                source_spans=dict(aa99=['02aea5..02aeb9','02aeff..02af26','02adb2..02adbe','02af27..02af4e'],
+                                  aa22=['02a469..02a47d','02a4c3..02a4ea','02a376..02a382','02a4eb..02a512']),
+                scope='Four source-pinned writer/helper spans in each overlay; not total track samples, custom-body interpretation or completed recording')
+
 
 def decode_decoder_input_reserve(words):
     for offset,value in enumerate(DECODER_INPUT_RESERVE_WITNESS):
@@ -2082,6 +2130,7 @@ def contract(source):
     result['playback_info_query'] = decode_playback_info_query(rel_words)
     result['playback_buffer_refresh'] = decode_playback_buffer_refresh(rel_words)
     result['playback_final_input'] = decode_playback_final_input(rel_words)
+    result['pocp_buffer_count'] = decode_pocp_buffer_count(rel_words,words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
