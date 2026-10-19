@@ -676,9 +676,23 @@ semantic audit must distinguish decoded field projections from encoded
 record echoes; neither the repeated first bytes nor the separate nibble
 is by itself evidence of an IMEI, network identifier or lock level.
 `nsm1_v523_static_check.py` now exposes this reciprocal contract and checks
-24 instruction anchors. Its mutation test rejects a changed command byte.
+24 instruction anchors plus the complete builder and accepted-call spans.
+Mutation tests reject a changed command byte, intervening pointer arithmetic
+and truncated source.
 This is static construction evidence only: the current rejected records do
 not execute this branch, and no valid storage fixture is generated.
+
+The recovered wumpus/Blacksphere
+[local-command table](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_local.htm)
+independently identifies commands `13`, `14`, `15`, `16` as MSID, FAID,
+IMEI and two-block service-provider-lock operations. This corroborates the
+record family, not individual decoded-field names or NSM-1 fitted-chip
+compatibility. In particular, the visible command-`13` MSID response is not
+a decoded IMEI record; the raw BCD identity and that response do not supply
+an established plaintext/ciphertext pair for recovering an NSM-1 chip key.
+The original page is retained beside the other Blacksphere references as
+`blacksphere-local-20160119.html`, SHA-256
+`c03783b4c845ca71559d781fca8fd0e048f6fac40afeb96bde07ae634bc265b4`.
 
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required

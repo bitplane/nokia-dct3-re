@@ -104,6 +104,13 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         changed[0x27D594 - check.BASE:0x27D596 - check.BASE] = b"\x20\x16"
         with self.assertRaisesRegex(ValueError, "record-update contract differs"):
             check.record_update_contract(bytes(changed))
+        # The projection also depends on pointer arithmetic between anchors.
+        changed = bytearray(data)
+        changed[0x27D5CC - check.BASE] ^= 1
+        with self.assertRaisesRegex(ValueError, "differs in span"):
+            check.record_update_contract(bytes(changed))
+        with self.assertRaisesRegex(ValueError, "differs in span"):
+            check.record_update_contract(data[:0x7D600])
 
     def test_own_record_request_offsets_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"

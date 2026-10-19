@@ -49,6 +49,13 @@ SPANS = (
 
 def record_update_contract(image: bytes) -> dict:
     """Pin the reciprocal builder, without assigning unproved field names."""
+    spans = (
+        (0x27D568, 0x27D63A, "526cf83f2295a273cf68af87eefd4c83b39b719e295d63852004781fd68a79fb"),
+        (0x27E8C0, 0x27E8D6, "0ec2ef86f971b6972be1a7172b2231ace1ac57670b70481801a88ddf9bbd78ae"),
+    )
+    for start, end, digest in spans:
+        if hashlib.sha256(image[start - BASE:end - BASE]).hexdigest() != digest:
+            raise ValueError(f"record-update contract differs in span {start:#x}..{end:#x}")
     anchors = {
         0x27D594: ("movs", "r0, #0x17"),
         0x27D596: ("strb", "r0, [r4, #4]"),
@@ -92,6 +99,8 @@ def record_update_contract(image: bytes) -> dict:
             {"source": 0x11, "destination": 0x35, "length": 1},
         ],
         "checked_instruction_anchors": len(anchors),
+        "checked_spans": [{"start": start, "end_exclusive": end, "sha256": digest}
+                          for start, end, digest in spans],
         "scope": "static field projection, not runtime update or valid provisioning",
     }
 
