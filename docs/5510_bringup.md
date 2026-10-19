@@ -2,6 +2,16 @@
 
 ## Current boundary
 
+Current `bootrecmeta` revalidation does not reproduce the retained staged
+metadata acceptance below: execution stops at `02:9cb5` with the CPU guard
+`repeated MVDK mapped destination is unsupported`. Original recorder startup
+and its first two replies are observed, but metadata completion is not.
+Fresh `check-mu4-retained-original` initialization, six-file readback and
+fresh-process retained storage pass. Keep this staged instruction boundary
+separate from the older atomic timer starvation. Recover the exact repeated
+move operands and qualify their generic CPU semantics before changing the
+guard; neither timer tuning nor synthetic metadata success is justified.
+
 The acquired v3.53 PPM C service package is normalized and statically
 validated. The `nmp5stage` research fixture executes its own verifier and
 loaders to absent mask address `2c75`. A separate `nmp5hle` fixture reaches
