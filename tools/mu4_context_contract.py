@@ -507,6 +507,31 @@ OUTPUT_PROCESSING_WITNESS = (
     0xf584,0x8184,0x8385,0xa583,0xf604,0x2584,0xf614,0x6f87,
     0x0c0f,0x2187,0xf603,0x8297,0xf4e4,
 )
+OUTPUT_SCALE_WITNESSES = (
+    (0x29fa6,(0xf6b9,0xf7b8,0xf6b6,0x491d,0xf340,0x0021,0xf495,0xf495,0x891d)),
+    (0x29fc6,(0x771a,0x003f)),
+    (0x29fea,(0xf072,0x9fee,0xa4b0,0x6f91,0x0c64,0x6c8f,0x9fc6)),
+)
+
+
+def decode_output_scale(words):
+    for base,witness in OUTPUT_SCALE_WITNESSES:
+        if any(words.get(base+i) != value for i,value in enumerate(witness)):
+            raise ValueError('AA99 signed output-scaling setup/kernel changed or absent')
+    return dict(segment='aa99',entry='029fa2',kernel='029fea..029fee',
+                pinned_words=sum(len(witness) for _,witness in OUTPUT_SCALE_WITNESSES),
+                iterations_per_block=64,sample='MPY *AR5+,*AR2,A',
+                output='STH A,4,*AR1+',FRCT=0,SXM=1,SST=1,
+                reference='clamp_s16((signed16(sample)*signed16(coefficient)) >> 12)',
+                scope='Pinned mode setup and kernel; coefficient-update policy and all callers not decoded')
+
+
+def reference_output_scale(sample,coefficient):
+    if not 0 <= sample <= 0xffff or not 0 <= coefficient <= 0xffff:
+        raise ValueError('output scale operands must be 16-bit bus words')
+    sample = sample-0x10000 if sample & 0x8000 else sample
+    coefficient = coefficient-0x10000 if coefficient & 0x8000 else coefficient
+    return max(-32768,min(32767,(sample*coefficient) >> 12)) & 0xffff
 
 
 def decode_output_processing(words):
@@ -2334,6 +2359,7 @@ def contract(source):
     result['playback_refill_completion'] = decode_playback_refill_completion(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['output_processing'] = decode_output_processing(rel_words)
+    result['output_scale'] = decode_output_scale(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)

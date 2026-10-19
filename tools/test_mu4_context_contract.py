@@ -51,6 +51,7 @@ from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conv
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
 from tools.mu4_context_contract import OUTPUT_PROCESSING_BASE, OUTPUT_PROCESSING_WITNESS, decode_output_processing
+from tools.mu4_context_contract import OUTPUT_SCALE_WITNESSES, decode_output_scale, reference_output_scale
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
 from tools.mu4_context_contract import reference_bit_window
 from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, decode_bit_window
@@ -657,6 +658,21 @@ class ContextContractTest(unittest.TestCase):
         for address in words:
             with self.subTest(address=address),self.assertRaises(ValueError):
                 decode_output_processing({**words,address:words[address]^1})
+
+    def test_output_scaling_modes_kernel_and_signed_reference(self):
+        words = {base+i:value for base,witness in OUTPUT_SCALE_WITNESSES for i,value in enumerate(witness)}
+        self.assertEqual(decode_output_scale(words)['iterations_per_block'],64)
+        for address in words:
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_output_scale({**words,address:words[address]^1})
+        for sample,coefficient,expected in [(0,0x1000,0),(1234,0x1000,1234),
+                (0xfb2e,0x1000,0xfb2e),(1,0x0800,0),(0xffff,0x0800,0xffff),
+                (0x7fff,0x2000,0x7fff),(0x8000,0x2000,0x8000),
+                (0x8000,0x8000,0x7fff),(0x7fff,0x8000,0x8000)]:
+            self.assertEqual(reference_output_scale(sample,coefficient),expected)
+        for sample,coefficient in [(-1,0),(0,65536)]:
+            with self.assertRaises(ValueError):
+                reference_output_scale(sample,coefficient)
 
     def test_recorder_mac_original_image_and_syntax_are_pinned(self):
         words = dict(enumerate(RECORDER_MAC_WITNESS, RECORDER_MAC_BASE))

@@ -10,8 +10,8 @@ detailed arithmetic and actual decoded-bank copy correspondence cover eight
 calls. A bounded actual DMA capture identifies intervening processing writes at
 context `02a2ea`, rather than direct consumption of copy-helper output. Its
 five-pass kernel is source-pinned and bounded nonzero output epochs match DMA;
-the intervening upstream writer at `029fee` and independent processing arithmetic
-remain open. The protected
+the upstream signed scaling stage matches an independent Q12 model for 3456
+actual operand/output pairs. Independent filter arithmetic remains open. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -1060,5 +1060,38 @@ exactly, with no unmatched DMA read whose latest writer is inside that window.
 The earlier copy proof also reproduces unchanged. Check the chain with
 `mu4_output_processing_check.py RUN/error.log`, alongside the copy and DMA
 epoch checkers. Do not extend the result to serial/codec delivery or whole-track
-audio. Next recover the `029fee` input/write contract and independently evaluate
-the configured processing arithmetic; direct copy-to-DMA provenance remains false.
+audio. The scalar contract below closes the `029fee` input/write link in the
+bounded window. Independent filter arithmetic remains open; direct copy-to-DMA
+provenance remains false.
+
+### Signed Output Scaling
+
+The original AA99 helper `029fa2` selects signed extension, clears fractional
+multiply and accumulator saturation, and enables store saturation. The pinned
+kernel (`029fea..029fee`) repeats 64 signed `MPY *AR5+,*AR2,A` operations and
+stores with `STH A,4,*AR1+`. Therefore the independently evaluated bus-word
+result is `clamp_s16((signed16(sample) * signed16(coefficient)) >> 12)`, with
+arithmetic-floor truncation. `decode_output_scale` pins the 18 setup/kernel words;
+the coefficient-update policy and all helper callers are not thereby decoded.
+
+`mu4_output_scale_observe.lua` adds actual operands/stores to the processing and
+copy observers over 1.06--1.10 seconds. A global data read can belong to DMA even
+when GENPC is inside this helper: 38 such reads occur. The checker excludes them
+using the device's explicit active channel-3 source-read records, matched by
+timestamp/address/word, and rejects ambiguous CPU/DMA collisions. PC alone is
+not an operand-ownership test. The full-space read tap is installed shortly
+before the window to avoid unrelated bootstrap overhead.
+
+The uncapped, zero-illegal capture verifies all 3456 outputs against actual
+sample/coefficient reads, with zero pending or left-censored scalar operands.
+All coefficients are `050f`; all 3456 results differ from their input words,
+and 3453 are nonzero. Every input matches an actual `02a367` copy-write epoch.
+10314 subsequent processing reads match these scalar-output epochs exactly.
+The eight-block decoded-bank copy proof and bounded processing/DMA checks also
+pass on this same run. This explains the amplitude change through original
+instructions and observed coefficient data, not fitted gain or waveform delay.
+
+Check with `mu4_output_scale_check.py RUN/error.log --source-a00 SOURCE`, alongside
+the copy, processing and DMA checkers. The result establishes bounded
+decoded-copy/scalar/processing dataflow, not independent five-pass filter
+arithmetic, complete-track consumption, serial/codec delivery or audible output.
