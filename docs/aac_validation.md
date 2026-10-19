@@ -4,9 +4,10 @@
 
 The MU4 bench executes the 5510's separate music DSP. Its captured recording
 and FFmpeg comparison are diagnostic evidence, not decoder conformance or
-native handset speech acceptance. Both the protected and fresh recording
-captures contain 375 successful decoder calls with consumed input-byte coverage;
-detailed arithmetic and output-store binding cover eight calls in each.
+native handset speech acceptance. The coherent fresh record/save/cold-reopen
+control reaches 376 successful decoder calls with consumed input-byte coverage;
+detailed arithmetic and output-store binding cover eight calls. The protected
+recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
 acknowledges its software request, resets buffer counters, then completes;
@@ -911,3 +912,48 @@ This accounts for the extension through original firmware behavior; no seek,
 file-size or media-byte workaround should be added to emulation. It does not
 establish intended recording duration, justify decoding erased bytes, or close
 the separate partial-buffer and playback-drain contracts.
+
+### Finalized Cold-Reopen Control
+
+The finalized NAND above cold-boots through original `bootplaystage`, using its
+ordinary first-track serial request. Native title publication is `MAME`
+(`title_verified=1`), so the existing protected-title transport/capture checks
+apply unchanged; no title gate is bypassed. The copied NAND remains byte-identical
+to its source after the run.
+
+There are 376 successful calls and 376 converted stereo blocks. All 139872
+consumed encoded bytes are covered by entry reservoirs and 69936 actual in-call
+bus reads, SHA256
+`8cec1952c11baf6d9410fed7bf4758c125a1e3c8640ac57036b844996aeab411`.
+The captured returned PCM is 1540096 bytes, SHA256
+`14ae1beaaa5fe4b4a8ba040c4b3b0929e607fe1c3314386e0fccf544c8c9e13a`.
+Its first 1536000 bytes exactly equal the before-metadata capture; the larger
+file extent permits one additional native call without changing those earlier
+decoded samples. Against the host decode of the same complete-packet projection,
+the 770048 compared channel samples have maximum error 11 and RMS 1.220195074
+s16 units. Nine host-decoded blocks/3348 encoded bytes remain uncompared.
+
+Use the original packet-session verification mode with the finalized capture,
+the 385-packet projection and its host PCM:
+
+```sh
+.venv/bin/python tools/mu4_packet_session_check.py PLAYBACK \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-aac FINAL_PROJECTION.aac --reference-pcm HOST_385_BLOCKS.s16le
+```
+
+The supplied projection is a diagnostic reference, not independently generated
+encoded input or formal conformance material. The first-eight-call arithmetic,
+complete capture integrity, slot/timestamp checks all pass. Chronological serial
+pairing matches all 1661061 completed TX words to DIN with no missing/mismatched
+TX word; 30781 additional DIN words remain outside completed-TX pairing and only
+have held-level value consistency, not pin/reset ownership proof. DMA-source
+epoch pairing and decoder-to-DMA provenance are not established by that result.
+
+The native twenty-second run still exits through the deliberate negative audio
+completion diagnostic (exit 3), with zero illegal instructions. This is a
+record/save/reopen and consumed-prefix validation milestone, not whole-track
+draining, audible output, handset boot or GSM speech acceptance. The next
+transport target is actual decoded-buffer copy/read/write ownership through
+DMA to codec slots, without fitting sample offsets or treating post-mute serial
+activity as audible music.
