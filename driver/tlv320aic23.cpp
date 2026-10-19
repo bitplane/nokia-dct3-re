@@ -40,6 +40,10 @@ void tlv320aic23_device::control_word_w(u16 value)
 	if (address == 15 && !data) { device_reset(); return; }
 	if (address >= 10) return;
 	m_regs[address] = data;
+	// SLWS106H 3.1.3: simultaneous headphone volume/mute update. The
+	// opposite channel's independent zero-cross/control fields are preserved.
+	if ((address == 2 || address == 3) && BIT(data, 8))
+		m_regs[address ^ 1] = (m_regs[address ^ 1] & ~u16(0x7f)) | (data & 0x7f);
 	if (address >= 6) update_clock();
 }
 

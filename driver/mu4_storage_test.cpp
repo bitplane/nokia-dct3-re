@@ -328,6 +328,11 @@ public:
 			m_mcbsp0->tx_clock_w(state); m_mcbsp0->rx_clock_w(state);
 		});
 		subdevice<tlv320aic23_device>("codec")->frame_cb().set([this](int state) {
+			if (playback_profile() && machine().time().as_double() >= 0.817 && machine().time().as_double() <= 0.824)
+			{
+				++m_playback_startup_frames;
+				logerror("mu4_startup_frame: state=%u ns=%llu observer_writes=0\n",unsigned(bool(state)),static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)));
+			}
 			if (playback_profile() && m_playback_overlay_checked && state) ++m_playback_audio_frames;
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
 			m_mcbsp0->tx_frame_w(state); m_mcbsp0->rx_frame_w(state);
@@ -474,6 +479,7 @@ private:
 	std::ofstream m_playback_decoded_capture;
 	bool m_playback_capture_finished = false;
 	u32 m_playback_tx_lifecycle_events = 0;
+	u32 m_playback_tx_startup_events = 0, m_playback_startup_frames = 0;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
@@ -960,17 +966,24 @@ private:
 	void observe_playback_tx(offs_t event, u16 word)
 	{
 		double const time = machine().time().as_double();
-		if (!playback_profile() || time < 1.0 || time > 1.25) return;
+		bool const startup = time >= 0.817 && time <= 0.824;
+		if (!playback_profile() || (!startup && (time < 1.0 || time > 1.25))) return;
 		static constexpr std::array<char const *,8> names{"reset","ignore","accept","overwrite","load_fresh","load_repeat","complete","restart"};
 		if (event >= names.size()) fatalerror("MU4 invalid McBSP diagnostic transition");
-		++m_playback_tx_lifecycle_events;
-		if (m_playback_tx_lifecycle_events > 100000) return;
+		u32 &counter = startup ? m_playback_tx_startup_events : m_playback_tx_lifecycle_events;
+		++counter;
+		if (counter > (startup ? 4096U : 100000U)) return;
 		u8 owner = 0;
 		if (event == tms320c54x_mcbsp_device::TX_ACCEPT || event == tms320c54x_mcbsp_device::TX_OVERWRITE || event == tms320c54x_mcbsp_device::TX_IGNORE)
 			for (unsigned channel=0;channel<6;++channel)
 				if (m_dma->destination_write_matches(channel, AS_DATA, 0x23)) owner = channel+1;
-		logerror("mu4_tx_lifecycle: ordinal=%u kind=%s word=%04x ns=%llu dma_owner=%u dma_read=%u observer_writes=0 audio_acceptance=0\n",
-			m_playback_tx_lifecycle_events,names[event],word,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),owner,owner == 4 ? m_playback_dma_reads : 0);
+		if (startup)
+			logerror("mu4_tx_startup: ordinal=%u kind=%s word=%04x ns=%llu dma_owner=%u dma_read=%u pcr=%04x spcr2=%04x xcr1=%04x xcr2=%04x observer_writes=0 audio_acceptance=0\n",
+				counter,names[event],word,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),owner,owner == 4 ? m_playback_dma_reads : 0,
+				m_mcbsp0->inspect_register(14),m_mcbsp0->inspect_register(1),m_mcbsp0->inspect_register(4),m_mcbsp0->inspect_register(5));
+		else
+			logerror("mu4_tx_lifecycle: ordinal=%u kind=%s word=%04x ns=%llu dma_owner=%u dma_read=%u observer_writes=0 audio_acceptance=0\n",
+				counter,names[event],word,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),owner,owner == 4 ? m_playback_dma_reads : 0);
 	}
 	void finish_playback_capture()
 	{
@@ -1006,6 +1019,8 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), machine().time().as_double());
 		logerror("mu4_tx_lifecycle_terminal: events=%u first=1.000000000 last=1.250000000 capped=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
 			m_playback_tx_lifecycle_events,unsigned(m_playback_tx_lifecycle_events>100000),machine().time().as_double());
+		logerror("mu4_tx_startup_terminal: events=%u frames=%u first=0.817000000 last=0.824000000 capped=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
+			m_playback_tx_startup_events,m_playback_startup_frames,unsigned(m_playback_tx_startup_events>4096),machine().time().as_double());
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -1491,7 +1506,14 @@ private:
 	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
 	void serial_tx(u16 value)
 	{
-		if (m_phase == 30 && system_bios() >= 2) subdevice<tlv320aic23_device>("codec")->control_word_w(value);
+		if (m_phase == 30 && system_bios() >= 2)
+		{
+			auto &codec = *subdevice<tlv320aic23_device>("codec");
+			codec.control_word_w(value);
+			if (playback_profile())
+				logerror("mu4_codec_control: word=%04x ns=%llu power=%03x analog=%03x digital=%03x format=%03x rate=%03x active=%03x hp_left=%03x hp_right=%03x observer_writes=0 audio_acceptance=0\n",
+					value,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),codec.reg(6),codec.reg(4),codec.reg(5),codec.reg(7),codec.reg(8),codec.reg(9),codec.reg(2),codec.reg(3));
+		}
 		m_serial_tx_words.push_back(value);
 		if (m_phase == 30 && m_serial_tx_words.size() <= 16) logerror("mu4_native_tx: word=%04x\n", value);
 		// End the serial-setup fixture at its observed complete control stream,
@@ -2942,6 +2964,7 @@ private:
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
 		m_playback_capture_finished = false;
 		m_playback_tx_lifecycle_events = 0;
+		m_playback_tx_startup_events = m_playback_startup_frames = 0;
 		m_playback_buffer_writes.fill(playback_buffer_write{});
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
@@ -3042,6 +3065,14 @@ private:
 		{
 			program.write_word(0x1800, 0xf4e1);
 			auto &codec = *subdevice<tlv320aic23_device>("codec");
+			codec.control_word_w(0x0412);
+			if (codec.reg(2) != 0x12 || codec.reg(3) != 0x79) fatalerror("MU4 headphone independent volume update mismatch");
+			codec.control_word_w(0x0580);
+			if (codec.reg(2) != 0x180 || codec.reg(3)) fatalerror("MU4 headphone simultaneous mute mismatch");
+			codec.control_word_w(0x0401); codec.control_word_w(0x0790);
+			if (codec.reg(2) != 0x10 || codec.reg(3) != 0x190) fatalerror("MU4 headphone simultaneous volume copied independent control fields");
+			codec.control_word_w(0x0479); codec.control_word_w(0x0679);
+			logerror("mu4_codec_headphone_controls: PASS independent=1 simultaneous=1 mute=1 independent_fields_preserved=1 analog_conversion=0\n");
 			for (u16 word : { 0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023 }) codec.control_word_w(word);
 			m_codec_edges.clear(); m_codec_frames.clear(); m_codec_clocks = 0;
 			m_codec_din_words.clear();

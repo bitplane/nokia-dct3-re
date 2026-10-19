@@ -43,6 +43,9 @@ through owned DMA/DXR epochs to codec DIN. Full-session attribution and physical
 ownership of unmatched DIN intervals remain unvalidated. See the
 [bounded serial contract](aac_validation.md#actual-shift-buffer-and-din-epochs)
 and [transport provenance](#dma-source-to-dxr-ownership).
+The [codec control/startup contract](aac_validation.md#codec-routing-and-startup-phase)
+accounts for the initial discarded DMA word and paired headphone volume/mute
+writes. Converted DAC/analog output is not yet implemented.
 
 For the protected 143680-byte recording, termination is a firmware file-length path, not an established
 missing DSP event: 375 refill completions supply 71,834 words; the next

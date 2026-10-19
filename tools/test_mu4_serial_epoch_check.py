@@ -1,6 +1,7 @@
+import struct
 import unittest
 
-from tools.mu4_serial_epoch_check import bind_lifecycle
+from tools.mu4_serial_epoch_check import bind_lifecycle, codec_control_history, startup_report
 
 
 BASE = 1_000_000_000
@@ -66,6 +67,39 @@ class SerialEpochTest(unittest.TestCase):
             events[index][key] = value
             with self.subTest(index=index,key=key),self.assertRaises(ValueError):
                 bind_lifecycle(events,*original[1:])
+
+    def test_startup_reset_discards_first_source_without_value_fitting(self):
+        events,writes,tx,times = fixture([
+            ('reset',10,0,0),('accept',11,0,1),('reset',12,0,0),
+            ('accept',13,0,2),('load_fresh',14,0,0),('complete',20,0,0)])
+        delta = 176_700_000
+        for row in events:
+            row['ns'] = str(int(row['ns'])-delta)
+            row.update(pcr='000e',spcr2='0101',xcr1='0140',xcr2='0044')
+        writes = [(time-delta,ordinal,word,owner,reserved) for time,ordinal,word,owner,reserved in writes]
+        times = [time-delta for time in times]
+        text = '\n'.join('mu4_tx_startup: '+' '.join(f'{key}={value}' for key,value in row.items()) for row in events)
+        text += ('\nmu4_startup_frame: state=1 ns=823299900 observer_writes=0'
+                 '\nmu4_startup_frame: state=0 ns=823299983 observer_writes=0'
+                 '\nmu4_tx_startup_terminal: events=6 frames=2 first=0.817000000 last=0.824000000 capped=0 t=2.016666667 observer_writes=0')
+        report = startup_report(text,writes,tx,times,[0],struct.pack('<QB',times[0]+41,0))
+        self.assertEqual(report['discarded_source_ordinals'],[1])
+        self.assertEqual(report['first_completed_source'],2)
+        self.assertEqual(report['first_completed_slot'],0)
+
+    def test_codec_simultaneous_mute_and_independent_control_bits(self):
+        prefix = 'mu4_codec_control: word='
+        suffix = (' power=007 analog=00a digital=008 format=001 rate=020 active=000 '
+                  'observer_writes=0 audio_acceptance=0')
+        muted = prefix+'0580 ns=10 hp_left=180 hp_right=000'+suffix
+        self.assertEqual(codec_control_history(muted)[-1][1][2:4],(0x180,0))
+        restored = muted+'\n'+prefix+'05f0 ns=20 hp_left=1f0 hp_right=070'+suffix
+        self.assertEqual(codec_control_history(restored)[-1][1][2:4],(0x1f0,0x70))
+        independent = (prefix+'0401 ns=10 hp_left=001 hp_right=079'+suffix+'\n'+
+                       prefix+'0790 ns=20 hp_left=010 hp_right=190'+suffix)
+        self.assertEqual(codec_control_history(independent)[-1][1][2:4],(0x10,0x190))
+        with self.assertRaisesRegex(ValueError,'latch contract'):
+            codec_control_history(muted.replace('hp_right=000','hp_right=079'))
 
 
 if __name__ == '__main__':

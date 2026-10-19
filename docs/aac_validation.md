@@ -1165,7 +1165,8 @@ actual DMA read, ordinals 21121--21248, one owned DXR write, one observed shift
 load and one completed TX word. Every completion pairs chronologically with
 codec DIN within the existing 84-ns clock bound, with exact values. Bank
 `1000..103f` reaches callback slot 1; `1040..107f` reaches slot 0. These are
-observed slot labels, not yet a physical left/right polarity verdict.
+observed slot labels, not yet a physical left/right polarity verdict. The startup
+reset accounting below explains the one-word phase shift in this bench.
 
 Across the complete short capture, 105345 TX completions pair with DIN without
 mismatch or missing TX. The 367 additional DIN callbacks are consistent with
@@ -1173,3 +1174,42 @@ held-zero levels but still lack pin/reset ownership proof. The copy, scalar and
 filter arithmetic checks pass on this same run. This proves a bounded native
 decoded-sample path to digital codec ingress, not DAC activation, analogue sound,
 whole-track draining, full-session epoch accounting, handset boot or GSM speech.
+
+### Codec Routing and Startup Phase
+
+The early transition capture brackets 0.817--0.824 seconds and includes actual
+codec frame edges and raw programmed McBSP controls. PCR `000e`, XCR1 `0140`
+and XCR2 `0044` select external clocks/frame, two 16-bit words and frame-ignore
+behavior. Raw SPCR2 inspection does not synthesize its dynamic XRDY/XEMPTY bits;
+buffer ownership comes from the transition observer instead.
+
+DMA source 1 is accepted at 823308662 ns. An observed XRST reset at 823309163 ns
+discards it before any shift load/completion. Source 2 therefore completes in
+codec slot 0 first, and subsequent odd/even source words occupy the shifted
+slots seen above. This is an actual reset/discard identity chain, not a
+zero-valued waveform alignment. It explains the current bench's phase but does
+not establish whether its initialization timing matches fitted silicon. Do not
+"correct" it by relabeling slots or overriding the codec's LRSWAP bit.
+
+The native control stream also requests and later restores headphone volume:
+
+| Control | Register effect |
+| --- | --- |
+| `0580` | Left headphone volume code 0, simultaneous right volume/mute update |
+| `05f0` at 837904201 ns | Both volume codes `70`; independent zero-cross/control fields retained |
+| `0a01` at 837975346 ns | Digital DAC mute clear |
+
+At the validated sample block the other controls are power `007`, analog path
+`010`, format `053`, rate `023`, active `001`: DAC selected, DAC/output amplifier
+not powered down, digital mute clear and no headphone-mute request. These are
+programmed-control facts, not proof of applied zero-cross gain or analog sound.
+SLWS106H sections 3.1.3/3.2.4 specify the headphone volume/mute coupling; the
+device now updates the partner's seven-bit volume field while preserving its
+independent controls. Executable tests cover independent writes, simultaneous
+mute and right-to-left updates. Clock/framing and all seven binary captures
+remain unchanged.
+
+The next software boundary is a control-gated converted-DAC/output model for the
+recovered mode. Analog filtering, effective zero-cross behavior, physical channel
+routing and the cause of the initialization reset timing remain distinct from
+the already-proved digital sample delivery. Whole-track draining remains open.

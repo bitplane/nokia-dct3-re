@@ -20,7 +20,8 @@ else:
     from mu4_playback_dxr_check import check_writes, parse_row
 
 
-def bind_lifecycle(events, writes, tx, times):
+def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
+                   last_ns=1_250_000_000, first_ordinal=1):
     """Current 16-bit MU4 format; prefix state remains explicitly unknown."""
     if len(tx) != len(times) or len(set(times)) != len(times):
         raise ValueError('invalid completed-TX timestamp extent')
@@ -32,11 +33,11 @@ def bind_lifecycle(events, writes, tx, times):
     buffer = shift = retained = None
     accepted,discarded,ignored,completed = set(),set(),set(),{}
     kinds,unknown = Counter(),0
-    previous = 1_000_000_000
-    for ordinal,row in enumerate(events,1):
+    previous = first_ns
+    for ordinal,row in enumerate(events,first_ordinal):
         time,word,owner,source = int(row['ns']),int(row['word'],16),int(row['dma_owner']),int(row['dma_read'])
         kind = row['kind']
-        if (int(row['ordinal']) != ordinal or not previous <= time <= 1_250_000_000
+        if (int(row['ordinal']) != ordinal or not previous <= time <= last_ns
                 or not 0 <= word <= 0xffff or row['audio_acceptance'] != '0'):
             raise ValueError('invalid McBSP lifecycle event')
         previous = time
@@ -102,10 +103,74 @@ def bind_lifecycle(events, writes, tx, times):
         raise ValueError('accepted buffer epochs disappear without completion/discard/pending state')
     report = dict(events=len(events),kinds=dict(kinds),accepted=len(accepted),ignored=len(ignored),
                   discarded=len(discarded),endpoint_pending=sorted(pending),
+                  discarded_source_ordinals=sorted(discarded),
                   source_epochs_completed=len(completed),unknown_prefix_completions=unknown,
                   internal_buffer_loads_observed=bool(kinds['load_fresh']+kinds['load_repeat']),
                   native_audio_validated=False)
     return report,completed
+
+
+def codec_control_history(text):
+    registers = [0x97,0x97,0x79,0x79,0x0a,0x08,0x07,0x01,0x20,0]
+    history = []
+    fields = {'power':6,'analog':4,'digital':5,'format':7,'rate':8,'active':9,
+              'hp_left':2,'hp_right':3}
+    previous = 0
+    for row in rows(text,'mu4_codec_control'):
+        time,word = int(row['ns']),int(row['word'],16)
+        if time < previous or not 0 <= word <= 0xffff or row['audio_acceptance'] != '0':
+            raise ValueError('invalid codec control chronology')
+        previous = time
+        address,data = word >> 9,word & 0x1ff
+        if address == 15 and data == 0:
+            registers = [0x97,0x97,0x79,0x79,0x0a,0x08,0x07,0x01,0x20,0]
+        elif address < 10:
+            registers[address] = data
+            if address in (2,3) and data & 0x100:
+                registers[address^1] = (registers[address^1] & ~0x7f) | (data & 0x7f)
+        if any(int(row[field],16) != registers[index] for field,index in fields.items()):
+            raise ValueError('codec snapshot differs from control-word/latch contract')
+        history.append((time,tuple(registers)))
+    return history
+
+
+def startup_report(text,writes,tx,times,din,slots):
+    events,ends = rows(text,'mu4_tx_startup'),rows(text,'mu4_tx_startup_terminal')
+    if not events and not ends:
+        return None
+    frames = rows(text,'mu4_startup_frame')
+    if (len(ends) != 1 or len(events) != int(ends[0]['events']) or not events
+            or len(frames) != int(ends[0]['frames']) or ends[0]['capped'] != '0'
+            or ends[0]['first'] != '0.817000000' or ends[0]['last'] != '0.824000000'
+            or Decimal(ends[0]['t']) < Decimal('0.824')):
+        raise ValueError('incomplete startup framing capture')
+    for ordinal,row in enumerate(events,1):
+        if (int(row['ordinal']) != ordinal or row['pcr'] != '000e'
+                or row['xcr1'] != '0140' or row['xcr2'] != '0044'):
+            raise ValueError('startup format or event sequence changed')
+    previous,state = 817_000_000,None
+    for frame in frames:
+        time,current = int(frame['ns']),int(frame['state'])
+        if not previous <= time <= 824_000_000 or current not in (0,1) or current == state:
+            raise ValueError('invalid startup frame-edge sequence')
+        previous,state = time,current
+    first = next((i for i,row in enumerate(events) if row['kind'] == 'accept' and row['dma_read'] == '1'),None)
+    resets = [] if first is None else [i for i in range(first) if events[i]['kind'] == 'reset']
+    if not resets:
+        raise ValueError('no observed reset before first DMA acceptance')
+    tail = events[resets[-1]:]
+    report,completed = bind_lifecycle(tail,writes,tx,times,first_ns=817_000_000,
+                                     last_ns=824_000_000,first_ordinal=int(tail[0]['ordinal']))
+    first_time,first_word,first_source = min((time,word,source)
+        for source,values in completed.items() for time,word in values)
+    sink_records = list(struct.iter_unpack('<QB',slots))
+    sink = bisect_left([time for time,slot in sink_records],first_time)
+    if sink == len(sink_records) or sink_records[sink][0]-first_time > 84 or din[sink] != first_word:
+        raise ValueError('startup completion lacks chronological DIN pair')
+    report.update(first_completed_source=first_source,first_completed_slot=sink_records[sink][1],
+                  frame_edges=len(frames),scope='Actual startup reset/write/load/completion identities; '
+                  'does not decide whether the firmware sequence or emulated timing matches silicon')
+    return report
 
 
 def verify(directory):
@@ -169,7 +234,23 @@ def verify(directory):
             raise ValueError('selected serial epoch lacks chronological codec DIN correspondence')
         delivered += 1
         channel_slots[f'bank_{address & ~63:04x}_slot_{sink_slots[sink]}'] += 1
+    startup = startup_report(text,writes,streams['mcbsp_tx'],times,streams['codec_din'],slots)
+    controls = codec_control_history(text)
+    route = None
+    if controls:
+        first_selected = min(time for source in selected.values() for time,word in completed[source])
+        snapshots = [registers for time,registers in controls if time <= first_selected]
+        if not snapshots:
+            raise ValueError('no codec control state before selected sample delivery')
+        registers = snapshots[-1]
+        route = dict(power=f'{registers[6]:03x}',analog=f'{registers[4]:03x}',digital=f'{registers[5]:03x}',
+                     format=f'{registers[7]:03x}',active=bool(registers[9]&1),
+                     dac_selected=bool(registers[4]&0x10),dac_power_down=bool(registers[6]&8),
+                     output_power_down=bool(registers[6]&0x10),digital_dac_mute=bool(registers[5]&8),
+                     headphone_mute_requested=[(registers[channel]&0x7f)==0 for channel in (2,3)],
+                     analog_effect_validated=False)
     return dict(streams=reports,dma_to_dxr=write_report,lifecycle=lifecycle,serial_callbacks=serial,
+                startup=startup,codec_route=route,
                 final_filter_words=len(final),final_words_consumed=len(selected),final_words_at_din=delivered,
                 selected_dma_read_range=[min(selected.values()),max(selected.values())],
                 bounded_sample_to_din_epochs_validated=True,

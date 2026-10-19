@@ -12,6 +12,9 @@ public:
 	void control_w(offs_t offset, u16 value);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 value);
+	// Raw programmed contents without changing the index latch; control_r also
+	// synthesizes dynamic readiness/empty bits, which are not included here.
+	u16 inspect_register(unsigned index) const { return index < 32 ? m_regs[index] : 0; }
 	void tx_clock_w(int state);
 	void internal_clock_stop_w(int state);
 	void tx_frame_w(int state);
