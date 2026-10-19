@@ -87,6 +87,24 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
             decoded = check.instruction(data, address)
             self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
 
+    def test_reciprocal_record_update_projection_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        result = check.record_update_contract(data)
+        self.assertEqual((3, 0x17, 0x30),
+                         (result["task"], result["command"], result["declared_length"]))
+        self.assertEqual([0, 0, 12, 20, 8, 17],
+                         [entry["source"] for entry in result["copies"]])
+        self.assertEqual([8, 14, 22, 50, 52, 53],
+                         [entry["destination"] for entry in result["copies"]])
+        self.assertEqual(0xF0, result["copies"][4]["mask"])
+        changed = bytearray(data)
+        changed[0x27D594 - check.BASE:0x27D596 - check.BASE] = b"\x20\x16"
+        with self.assertRaisesRegex(ValueError, "record-update contract differs"):
+            check.record_update_contract(bytes(changed))
+
     def test_own_record_request_offsets_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

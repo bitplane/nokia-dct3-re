@@ -47,6 +47,55 @@ SPANS = (
 )
 
 
+def record_update_contract(image: bytes) -> dict:
+    """Pin the reciprocal builder, without assigning unproved field names."""
+    anchors = {
+        0x27D594: ("movs", "r0, #0x17"),
+        0x27D596: ("strb", "r0, [r4, #4]"),
+        0x27D598: ("movs", "r0, #0x30"),
+        0x27D59A: ("strb", "r0, [r4, #5]"),
+        0x27D5AC: ("movs", "r0, #8"),
+        0x27D5B0: ("mov", "r1, sb"),
+        0x27D5B2: ("movs", "r2, #5"),
+        0x27D5BA: ("movs", "r0, #0xe"),
+        0x27D5BE: ("adds", "r1, r5, #0"),
+        0x27D5C0: ("movs", "r2, #8"),
+        0x27D5C6: ("movs", "r0, #0x16"),
+        0x27D5CA: ("movs", "r1, #0xc"),
+        0x27D5CE: ("movs", "r2, #4"),
+        0x27D5FC: ("movs", "r0, #0x32"),
+        0x27D600: ("ldrb", "r1, [r5, #0x14]"),
+        0x27D604: ("ldrb", "r1, [r5, #0x15]"),
+        0x27D608: ("movs", "r1, #0xf0"),
+        0x27D60A: ("ldrb", "r2, [r5, #8]"),
+        0x27D610: ("ldrb", "r1, [r5, #0x11]"),
+        0x27D622: ("movs", "r0, #3"),
+        0x27D626: ("bl", "#0x275b60"),
+        0x27E8C0: ("movs", "r0, #0xc"),
+        0x27E8C4: ("movs", "r1, #0xc"),
+        0x27E8D2: ("bl", "#0x27d568"),
+    }
+    for address, expected in anchors.items():
+        decoded = instruction(image, address)
+        if (decoded.mnemonic, decoded.op_str) != expected:
+            raise ValueError(f"record-update contract differs at {address:#x}")
+    return {
+        "builder": 0x27D568, "accepted_record_call": 0x27E8D2,
+        "task": 3, "command": 0x17, "declared_length": 0x30,
+        "source_relative_to_decoded_record": True,
+        "copies": [
+            {"source": 0, "destination": 8, "length": 5},
+            {"source": 0, "destination": 0x0E, "length": 8},
+            {"source": 0x0C, "destination": 0x16, "length": 4},
+            {"source": 0x14, "destination": 0x32, "length": 2},
+            {"source": 8, "destination": 0x34, "length": 1, "mask": 0xF0},
+            {"source": 0x11, "destination": 0x35, "length": 1},
+        ],
+        "checked_instruction_anchors": len(anchors),
+        "scope": "static field projection, not runtime update or valid provisioning",
+    }
+
+
 def read32(image: bytes, address: int) -> int:
     offset = address - BASE
     if offset < 0 or offset + 4 > len(image):
@@ -385,6 +434,7 @@ def verify(image: bytes) -> dict:
                 "accepted_record_destination_offset": 0x1C,
                 "field_semantics_proven": False},
             "storage_validity_proven": False},
+        "record_update": record_update_contract(image),
         "restart_boundary": {
             "request": 0x2C2A02,
             "call_candidates": direct_call_candidates(image, 0x2C2A02),

@@ -654,6 +654,32 @@ format failure. Field semantics and complete storage validity remain
 unproved; the static report exposes these bounds without generating
 accepted records or changing any storage.
 
+The conditional block-swap/echo-success branch also calls reciprocal builder
+`0x27d568` at `0x27e8d2`, passing object `+0x0c` as both source pointers.
+This constructs a class-`0x70`, command-`0x17`, declared-length-`0x30`
+message for task 3; it is not a terminal/FBUS export. The source-checked
+projection below uses offsets relative to the decoded 24-byte record and
+absolute offsets within the newly allocated message:
+
+| Decoded source | Message destination | Operation |
+| --- | --- | --- |
+| `0..4` | `08..0c` | Five-byte copy from the first argument. |
+| `0..7` | `0e..15` | Eight-byte copy from the second argument. |
+| `0c..0f` | `16..19` | Four-byte copy. |
+| `14..15` | `32..33` | Two-byte copy. |
+| `08` | `34` | High nibble only (`& f0`). |
+| `11` | `35` | Full byte. |
+
+The builder separately rereads the encoded EEPROM blocks for message
+`1a..31`, selecting its retained-marker transform when required. Thus a
+semantic audit must distinguish decoded field projections from encoded
+record echoes; neither the repeated first bytes nor the separate nibble
+is by itself evidence of an IMEI, network identifier or lock level.
+`nsm1_v523_static_check.py` now exposes this reciprocal contract and checks
+24 instruction anchors. Its mutation test rejects a changed command byte.
+This is static construction evidence only: the current rejected records do
+not execute this branch, and no valid storage fixture is generated.
+
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required
 between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace
