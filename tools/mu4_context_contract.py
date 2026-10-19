@@ -719,6 +719,27 @@ CATALOGUE_MEDIA_WITNESSES = (
 )
 
 
+DECODER_SYNC_BASE = 0x24457
+DECODER_SYNC_WITNESS = (0xe80f,0xf982,0x510c,0xf7b8,0x11f8,0x11,0xf300,0xf,
+                        0x4f02,0xf468,0xf478,0xf010,0x7ffc,0xf845,0x4486)
+
+
+def native_adts_sync_word(word):
+    if not isinstance(word, int) or not 0 <= word <= 0xffff:
+        raise ValueError('expected unsigned first ADTS word')
+    return word >> 1 == 0x7ffc
+
+
+def decode_decoder_sync(words):
+    for offset, expected in enumerate(DECODER_SYNC_WITNESS):
+        if words.get(DECODER_SYNC_BASE+offset) != expected:
+            raise ValueError('AA99 ADTS sync predicate changed or absent')
+    return dict(entry='024457', pinned_words=15, reader_width=15, expected='7ffc',
+                accepted_first_words=['fff8','fff9'],
+                interpretation='MPEG-2 ADTS ID=1 and layer=0; protection bit is not in this comparison',
+                scope='Local sync predicate only; not MPEG-4 payload-tool absence or complete ADTS validation')
+
+
 def decode_catalogue_media_admission(words):
     for base, witness in CATALOGUE_MEDIA_WITNESSES:
         for offset, expected in enumerate(witness):
@@ -1887,6 +1908,7 @@ def contract(source):
     result['decoder_channel_reset'] = decode_decoder_channel_reset(rel_words)
     result['decoder_constructor'] = decode_decoder_constructor(rel_words)
     result['decoder_configuration'] = decode_decoder_configuration(rel_words)
+    result['decoder_sync'] = decode_decoder_sync(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

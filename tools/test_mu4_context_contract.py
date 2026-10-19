@@ -35,6 +35,7 @@ from tools.mu4_context_contract import DECODER_CHANNEL_RESET_BASE, DECODER_CHANN
 from tools.mu4_context_contract import DECODER_CONSTRUCTOR_BASE, DECODER_CONSTRUCTOR_WITNESS, decode_decoder_constructor
 from tools.mu4_context_contract import DECODER_CONFIGURATION_WITNESSES, decode_decoder_configuration
 from tools.mu4_context_contract import CATALOGUE_MEDIA_WITNESSES, decode_catalogue_media_admission
+from tools.mu4_context_contract import DECODER_SYNC_BASE, DECODER_SYNC_WITNESS, decode_decoder_sync, native_adts_sync_word
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -705,6 +706,17 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_constructor(changed)
+
+    def test_native_adts_sync_requires_mpeg2_id_without_testing_crc_flag(self):
+        words = dict(enumerate(DECODER_SYNC_WITNESS, DECODER_SYNC_BASE))
+        self.assertEqual(decode_decoder_sync(words)['pinned_words'], 15)
+        self.assertEqual([word for word in range(65536) if native_adts_sync_word(word)], [0xfff8,0xfff9])
+        self.assertFalse(native_adts_sync_word(0xfff1))
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_sync(changed)
 
     def test_catalogue_extension_filter_does_not_admit_plain_aac(self):
         words = {base+i:value for base,witness in CATALOGUE_MEDIA_WITNESSES

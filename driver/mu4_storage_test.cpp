@@ -5037,6 +5037,143 @@ private:
 	}
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
+// Isolated codec ABI probe. This does not alter a running handset or recorder.
+class mu4_aac_test_state : public driver_device
+{
+public:
+	mu4_aac_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_cpu(*this, "cpu"),
+		  m_container(*this, "container"), m_input(*this, "input") { }
+	void test(machine_config &config)
+	{
+		TMS320C54X(config, m_cpu, 13'000'000);
+		m_cpu->set_extended_program(true);
+		m_cpu->set_c5416_bus_profile(true);
+		m_cpu->set_addrmap(AS_PROGRAM, &mu4_aac_test_state::program_map);
+		m_cpu->set_addrmap(AS_DATA, &mu4_aac_test_state::data_map);
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (address == 0x242cb && m_headers++ < 8)
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				logerror("mu4_aac_abi_header: ordinal=%u sync=%04x id=%04x layer=%04x protection=%04x profile=%04x frequency=%04x channels=%04x frame_length=%04x blocks=%04x identity=Execute_entry observer_writes=0\n",
+					m_headers,data.read_word(0xa8b8),data.read_word(0xa8b9),data.read_word(0xa8ba),data.read_word(0xa8bb),
+					data.read_word(0xa8bc),data.read_word(0xa8bd),data.read_word(0xa8bf),data.read_word(0xa8c4),data.read_word(0xa8c6));
+			}
+			if (address == m_completion)
+			{
+				if (opcode != 0xf4e1) fatalerror("MU4 AAC ABI completion opcode changed");
+				m_done = true;
+			}
+		});
+	}
+private:
+	required_device<tms320c54x_device> m_cpu;
+	required_region_ptr<u8> m_container, m_input;
+	emu_timer *m_check = nullptr;
+	unsigned m_completion = 0;
+	unsigned m_headers = 0;
+	bool m_done = false;
+	void program_map(address_map &map)
+	{
+		map(0, 0x7fffff).ram();
+		map(0x2000, 0x7fff).rw(FUNC(mu4_aac_test_state::shared_r), FUNC(mu4_aac_test_state::shared_w));
+	}
+	void data_map(address_map &map) { map(0, 0xffff).ram(); }
+	u16 shared_r(offs_t offset) { return m_cpu->space(AS_DATA).read_word(0x2000 + offset); }
+	void shared_w(offs_t offset, u16 value) { m_cpu->space(AS_DATA).write_word(0x2000 + offset, value); }
+	u16 source_word(unsigned offset)
+	{
+		if (offset + 1 >= m_container.length()) fatalerror("MU4 AAC source bounds");
+		return (u16(m_container[offset]) << 8) | m_container[offset+1];
+	}
+	virtual void machine_start() override
+	{
+		m_check = timer_alloc(FUNC(mu4_aac_test_state::check), this);
+	}
+	virtual void machine_reset() override
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned segment = 0;
+		while (source_word(segment) != 0xaa99)
+			segment += 10 + (u32(source_word(segment+2)) << 16) + source_word(segment+4);
+		unsigned cursor = segment + 6, records = 0, total = 0;
+		unsigned const end = cursor + (u32(source_word(segment+2)) << 16) + source_word(segment+4);
+		while (source_word(cursor))
+		{
+			unsigned const count = source_word(cursor);
+			u32 const destination = (u32(source_word(cursor+2)) << 16) | source_word(cursor+4);
+			cursor += 6;
+			if (cursor + 2*count > end) fatalerror("MU4 AAC upload extent");
+			bool const code = destination > 0xffff;
+			u32 const base = (destination & 0x8000) ? destination : destination & 0xffff;
+			for (unsigned i = 0; i < count; ++i)
+			{
+				u32 const address = (code ? base & 0x7f0000 : 0) | u16(base+i);
+				if (!code && address < 0x80) continue;
+				(code ? program : data).write_word(address, source_word(cursor+2*i));
+			}
+			cursor += 2*count;
+			total += count;
+			++records;
+		}
+		if (cursor+2 != end || records != 3127 || total != 49843)
+			fatalerror("MU4 AAC original upload coverage changed");
+		// Apply only original C-initialization records, never captured live state.
+		cursor = 0x27000;
+		unsigned initializers = 0;
+		while (unsigned const count = program.read_word((cursor++) & 0xffff))
+		{
+			unsigned const destination = program.read_word((cursor++) & 0xffff);
+			if (cursor+count > 0x27692 || destination < 0x60 || destination+count > 0x10000)
+				fatalerror("MU4 AAC initialization record bounds cursor=%06x destination=%04x count=%u",cursor,destination,count);
+			for (unsigned i = 0; i < count; ++i) data.write_word(destination+i, program.read_word((cursor++) & 0xffff));
+			++initializers;
+		}
+		if (cursor != 0x27692 || initializers != 228) fatalerror("MU4 AAC initialization coverage changed cursor=%06x records=%u",cursor,initializers);
+		// Original input descriptor shape, with the first 2048 source bytes.
+		for (unsigned i = 0; i < 1024; ++i)
+			data.write_word(0x162e + i, (u16(m_input[2*i]) << 8) | m_input[2*i+1]);
+		data.write_word(0x1400, 0x162e);
+		data.write_word(0x1401, 0x1a2e);
+		u16 const wrapper[] = {
+			0x7718,0x9000,0xf7be,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,
+			0xf020,0xaaac,0xf982,0x3d27,
+			0x7600,0x1400,0x7601,0x8000,0xf020,0xaaac,0xf982,0x3d5d,
+			0x80f8,0x1402,0xf4e1
+		};
+		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1000+i, wrapper[i]);
+		m_completion = 0x1000 + std::size(wrapper)-1;
+		m_done = false;
+		m_headers = 0;
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x2028);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
+		m_cpu->set_state_int(STATE_GENPC, 0x1000);
+		m_cpu->set_pipeline_frontend(true);
+		m_check->adjust(attotime::from_msec(250));
+		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers);
+	}
+	TIMER_CALLBACK_MEMBER(check)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		logerror("mu4_aac_abi_result: returned=%u result=%04x base=%04x index=%04x remaining=%04x illegal=%u pc=%06x isolated_abi=1 conformance=0\n",
+			m_done,data.read_word(0x1402),data.read_word(0xb332),data.read_word(0xb331),data.read_word(0xa854),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),unsigned(m_cpu->pc()));
+		if (!m_done || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || data.read_word(0x1402))
+			fatalerror("MU4 AAC ABI probe did not decode a successful block");
+		machine().schedule_exit();
+	}
+};
+
+ROM_START(mu4aac)
+	ROM_REGION(741916, "container", 0)
+	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
+	ROM_REGION(61912, "input", 0)
+	ROM_LOAD("al00_44-remux.adts", 0, 61912, CRC(ca68dd78) SHA1(372ec00b9683403e2db6ffe2dc9119b8c07a48b7))
+ROM_END
+
 ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(0, "setup", "Original storage, loader and serial setup")
 	ROM_SYSTEM_BIOS(1, "stream", "Original streaming frontier (incomplete)")
@@ -5090,3 +5227,5 @@ ROM_END
 } // anonymous namespace
 CONS(2026, mu4nand, 0, 0, test, mu4_storage_test, mu4_storage_test_state, empty_init,
 		"Test", "MU4 original NAND routine boundary", MACHINE_NO_SOUND_HW)
+CONS(2026, mu4aac, 0, 0, test, mu4_storage_test, mu4_aac_test_state, empty_init,
+		"Test", "MU4 original AAC isolated ABI probe", MACHINE_NO_SOUND_HW)

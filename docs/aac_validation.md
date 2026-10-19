@@ -234,6 +234,46 @@ are in `tmp/aac-conformance/filename-fixture/` and
 `tmp/native-gates/mu4-aac-filename/`; no acceptance claim depends on retaining
 these scratch paths.
 
+## Isolated Native ABI Probe
+
+Development target `mu4aac` is separate from `mu4nand` and handset profiles.
+It loads the original AA99 records (3127 records, 49843 words), applies the
+228 original C-initialization records, calls constructor `023d27` with the
+original configuration, then calls processing wrapper `023d5d` once. Only
+its synthetic ABI stack/input descriptor and the first 2048 derived input
+bytes are supplied by the bench. It does not restore a live snapshot,
+patch original instructions, or modify a booting phone's state.
+
+The present probe deliberately fails closed: it returns `ffff`, index
+`03f9`, remaining bits `0011`, with no illegal instruction and no ADTS
+header return. Original sync search `024457..024465` explains the result:
+it requests 15 bits and compares against `7ffc`. This accepts first words
+`fff8/fff9` (MPEG-2 ID, layer zero) and rejects the official remux's `fff1`
+(MPEG-4 ID). All 15 words are pinned and the first-word predicate is tested
+over all 65536 possibilities. Do not relax that native predicate to make
+the official vector run.
+
+A diagnostic MPEG-2 transport adaptation would be a separately identified
+derived control, requiring an explicit payload-tool compatibility assessment;
+it is not an untouched official MPEG-2 conformance vector. No native block,
+sample accuracy, full input-read bound or complete fixture ABI is accepted
+from this failed probe. Preserve this distinction when adding further tests.
+
+Reproduce after `make build`, placing the original normalized
+`mu4_initdata_container.bin` and the identified `al00_44-remux.adts` in an
+isolated ROM search directory's `mu4aac/` subdirectory:
+
+```sh
+PATH_TO_MAME mu4aac -rompath PRIVATE_ROM_DIRECTORY \
+  -video none -sound none -nothrottle -debugger none -log \
+  -nonvram_save -seconds_to_run 1
+```
+
+Use a private working directory for `error.log`. The present negative probe
+must exit 3 with the explicit unsuccessful-block message, not pass merely
+because its wrapper returned. Original module instructions and the normal
+`mu4nand` fixture remain unchanged.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;

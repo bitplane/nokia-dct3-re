@@ -1,7 +1,7 @@
 diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -36213,6 +36213,12 @@
+@@ -36213,6 +36213,13 @@
  clrmatch
  sportmem
  
@@ -9,6 +9,7 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 +nandtest
 +
 +@source:nokia/mu4_storage_test.cpp
++mu4aac
 +mu4nand
 +
  @source:novadesitec/novadesitec_fr004.cpp
