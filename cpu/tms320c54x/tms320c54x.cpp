@@ -4229,7 +4229,12 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		bool const bk_arithmetic = source == 0x19 && ((m_pipeline_word[3] & 0xfe00) == 0x0000 || (m_pipeline_word[3] & 0xfe00) == 0x0800 || (m_pipeline_word[3] & 0xf800) == 0x2800);
+		bool const shifted_bk = source == 0x19 && shifted && mode == 0xf8 && staged_shifted_memory_arithmetic(m_pipeline_immediate[3]);
+		bool const bk_arithmetic = source == 0x19 && ((m_pipeline_word[3] & 0xfe00) == 0x0000 || (m_pipeline_word[3] & 0xfe00) == 0x0800 || (m_pipeline_word[3] & 0xf800) == 0x2800 || shifted_bk);
+		if (shifted_bk && (m_pipeline_repeat_active || m_pipeline_block_body[3] || m_pipeline_xc_active || m_pipeline_control_words))
+		{
+			logerror("%s: staged shifted BK arithmetic repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const shifted_peripheral = staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) && source >= 0x20 && source <= 0x5f;
 		// These gaps are not owned by internal_data_map: retain the ordinary
 		// board-bus read instead of inventing a CPU register or return value.

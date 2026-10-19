@@ -2179,6 +2179,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVDM AR: PASS cases=1152 restore=1152 registers=8 sources=RAM,self_AR,other_AR gaps=0,1 pages=2 literal_fetches=1 reads=1 writes=1 repeat_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDM AR complete",
     ),
+    "shift-bk-edge": (
+        "TMS320C54x shifted BK exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,LD,ST data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated shifted BK exclusions complete",
+    ),
+    "shifted-bk": (
+        "TMS320C54x shifted BK arithmetic: PASS cases=24576 restore=24576 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=3 source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated shifted BK arithmetic complete",
+    ),
     "move-rpt-owner": (
         "TMS320C54x mapped move repeat ownership: PASS cases=64 restore=64 before_header=1 repeated_body_rejected=1 headers=short,long pages=2 values=2 counts=0,3 snapshots=2 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeat ownership complete",
@@ -2252,7 +2260,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mac-family", "mac-family-edge", "stmac", "stmac-edge", "sqdst", "sqdst-edge", "portr-bypass", "mvdk-circular", "mvdk-circ-edge", "mvdk-repeat", "mvdk-rpt-edge", "rptb-call", "rptb-call-edge", "rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain", "addc", "addc-edge", "addc-chain", "repeat-stlm", "mvdm-acc", "mvdm-acc-edge", "stack-page0", "stack-page0-edge", "stld", "stld-edge", "unsigned-map", "unsigned-edge", "cmpm-map", "cmpm-map-edge"):
         machine = "tms54xtra"
-    if args.profile in ("move-rpt-owner", "mvdm-t", "xorm-absolute", "poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
+    if args.profile in ("shift-bk-edge", "shifted-bk", "move-rpt-owner", "mvdm-t", "xorm-absolute", "poll-interrupt", "rptb-tc-delay", "rcd", "addm-brc", "addm-brc-loop", "st-mvmm", "ldm-ar-age", "mapped-load-age", "mvmd-repeat", "rptbd-t-load", "rptb-exit-delay", "mvmd-rptz", "squr-smem"):
         machine = "tms54xtra"
     if args.profile in ("rpt-sfta", "addm-t", "rptb-memory", "banzd-t-load", "sqacc-repeat", "sqacc-rpt-edge", "mac-rpt", "mac-rpt-edge", "bd-rpt", "bd-rpt-edge", "stm-ind", "stm-ind-edge", "stld-repeat", "stld-rpt-edge", "block-xc-end-irq", "asm-circular", "st-par-alu", "st-par-edge", "mvdk-index", "mvdk-index-edge", "mvdk-index-rpt", "mvdk-irpt-edge", "cond-store", "cond-store-edge", "shift16-map", "shift16-map-edge", "logic-map", "logic-map-edge"):
         machine = "tms54xtra"

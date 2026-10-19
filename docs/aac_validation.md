@@ -270,9 +270,28 @@ and one raw block. Processing then stops at original `025593`:
 missing peripheral. The staged CPU's generic diagnostic calls this family
 "shifted load", but the operation here is ADD. The neighboring source
 `02558f..025598` (10 words) pins AR6/BK additions and AR2/AR1 publication.
-No CPU admission is made until Read ownership, pending BK writers and replay
-are covered by an executable core fixture. The probe reports `illegal=1`
-and exits 3; successful header parsing is not a successful decoded block.
+The absolute-address ADD/SUB family now has a bounded CPU admission.
+`shifted-bk` checks 24576 cases and replays: eight source/destination/operation
+selectors, all 32 shifts, four values, SXM/OVM combinations, two program
+pages and three save checkpoints. It changes BK after Read, poisons fetched
+extensions, supplies live Execute accumulator operands, and requires one
+source read with no data writes. The unchanged CPU guard fails this fixture;
+the admitted implementation passes. `shift-bk-edge` checks 64 exclusions
+and replays covering repeat, block, XC, delay, ST1, BRC and neighboring
+BK load/store forms, with zero data reads/writes. Indirect addressing,
+pending BK-writer composition and physical silicon phase timing are not
+qualified by these tests.
+The existing 245760-case shifted RAM/mapped-AR arithmetic profile and
+1024-case ordinary BK ADD/SUB profile also pass with their save-state
+replays. These guard neighboring supported behavior; they do not widen
+the new absolute BK admission.
+
+The generated MPEG-2 ABI control now returns zero with `illegal=0`, index
+`009b` and 16 reservoir bits remaining: cursor accounting corresponds to
+308 bytes, exactly the first declared ADTS extent. This is one successful
+native processing call, not yet independently bound pre-quantization PCM,
+all actual input reads or full-stream playback. The MPEG-4 negative control
+remains rejected by the unchanged sync predicate.
 
 Reproduce after `make build`, placing the original normalized
 `mu4_initdata_container.bin` and the identified `al00_44-remux.adts` in an
@@ -288,6 +307,11 @@ Use a private working directory for `error.log`. The present negative probe
 must exit 3 with the explicit unsuccessful-block message, not pass merely
 because its wrapper returned. Original module instructions and the normal
 `mu4nand` fixture remain unchanged.
+
+Select `-bios mpeg2` with `generated-mpeg2.aac` in the same private ROM
+directory to reproduce the one-call positive control. Its successful exit
+does not imply waveform conformance; capture and independent comparison of
+raw decoder output remain required.
 
 ## Next Acceptance Boundary
 

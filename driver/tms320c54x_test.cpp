@@ -10196,8 +10196,15 @@ private:
 		u16 extension, result_st0;
 		u64 a, b, result;
 	};
-	static shifted_arithmetic_fixture shifted_arithmetic_case(unsigned variant)
+	static shifted_arithmetic_fixture shifted_arithmetic_case(unsigned variant, bool bk = false)
 	{
+		if (bk)
+		{
+			auto f = shifted_arithmetic_case(147456 + (variant % 4096) * 8 + ((variant / 4096) % 3) * 32768);
+			f.operand.address = f.operand.literal = 0x19;
+			f.operand.reg = variant / 12288 ? 6 : 1;
+			return f;
+		}
 		if (variant >= 245760)
 		{
 			unsigned const n = variant - 245760; bool const mapped = n >= 18432;
@@ -10251,7 +10258,8 @@ private:
 	void start_pipeline_shifted_arithmetic(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = shifted_arithmetic_case(variant); auto const &o = f.operand;
+		bool const bk = !strcmp(machine().options().bios(), "shifted-bk");
+		auto const f = shifted_arithmetic_case(variant, bk); auto const &o = f.operand;
 		bool const subc = variant >= 245760;
 		u32 const base = o.reg == 6 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -10268,7 +10276,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, o.memory);
-		else m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.address - 0x10, o.memory);
+		else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + o.address - 0x10, o.memory);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shifted_arithmetic_read",
@@ -19806,6 +19814,13 @@ private:
 		case 4: case 5: program.write_word(base + 0x600, variant % 8 == 4 ? 0x6f07 : 0x6f1a); program.write_word(base + 0x601, operation); break;
 		case 6: case 7: program.write_word(base + 0x600, 0x6f20); program.write_word(base + 0x601, (operation & ~u16(0x0040)) | (variant % 8 == 7 ? 0x20 : 0)); break;
 		}
+		if (!strcmp(machine().options().bios(), "shift-bk-edge"))
+		{
+			unsigned const prefix = variant % 8 == 0 || variant % 8 == 2 ? 1 : variant % 8 == 1 || variant % 8 == 3 ? 2 : 0;
+			program.write_word(base + 0x600 + prefix, 0x6ff8);
+			program.write_word(base + 0x601 + prefix, variant % 8 == 4 ? 7 : variant % 8 == 5 ? 0x1a : 0x19);
+			program.write_word(base + 0x602 + prefix, (operation & ~u16(0x0040)) | (variant % 8 == 6 ? 0x40 : variant % 8 == 7 ? 0x60 : 0));
+		}
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shifted_peripheral_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shifted_peripheral_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 62122; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -20010,7 +20025,7 @@ private:
 		if (!strcmp(machine().options().bios(), "stlm-st1-edge")) { start_stlm_status_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-st1-irq")) { start_mvmd_status_irq(); return; }
 		if (!strcmp(machine().options().bios(), "shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
-		if (!strcmp(machine().options().bios(), "shift-per-edge")) { start_shifted_peripheral_edge(); return; }
+		if (!strcmp(machine().options().bios(), "shift-per-edge") || !strcmp(machine().options().bios(), "shift-bk-edge")) { start_shifted_peripheral_edge(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-cpl") || !strcmp(machine().options().bios(), "stlm-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "stm-cpl") || !strcmp(machine().options().bios(), "stm-cmpt")) { start_pipeline_cpl(); return; }
 		if (!strcmp(machine().options().bios(), "stlm-imr")) { start_pipeline_imr_store(); return; }
@@ -20091,7 +20106,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mul-t-sources")) { start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "memory-alu")) { start_pipeline_memory_arithmetic(); return; }
-		if (!strcmp(machine().options().bios(), "shifted-alu")) { start_pipeline_shifted_arithmetic(); return; }
+		if (!strcmp(machine().options().bios(), "shifted-alu") || !strcmp(machine().options().bios(), "shifted-bk")) { start_pipeline_shifted_arithmetic(); return; }
 		if (!strcmp(machine().options().bios(), "indirect-load")) { start_pipeline_indirect_case(); return; }
 		if (!strcmp(machine().options().bios(), "ldu-shift16")) { start_pipeline_offset_load(12672); return; }
 		if (!strcmp(machine().options().bios(), "indirect-dld")) { start_pipeline_extended_dst(); return; }
@@ -47802,7 +47817,8 @@ private:
 		if (m_phase == 253210)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-			auto const f = shifted_arithmetic_case(variant); auto const &o = f.operand;
+			bool const bk = !strcmp(machine().options().bios(), "shifted-bk");
+			auto const f = shifted_arithmetic_case(variant, bk); auto const &o = f.operand;
 			bool const subc = variant >= 245760;
 			bool const destination = BIT(f.extension, 8), retired = tick > o.read_cycle;
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -47826,10 +47842,10 @@ private:
 			{
 				auto const disable = machine().disable_side_effects();
 				if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, 0xdead);
-				else m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.address - 0x10, 0xdead);
+				else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + o.address - 0x10, 0xdead);
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 			}
-			unsigned const checkpoint_index = subc ? variant - 245760 < 18432 ? (variant - 245760) / 6144 : (variant - 264192) / 4096 : variant < 147456 ? variant / 49152 : (variant - 147456) / 32768;
+			unsigned const checkpoint_index = bk ? (variant / 4096) % 3 : subc ? variant - 245760 < 18432 ? (variant - 245760) / 6144 : (variant - 264192) / 4096 : variant < 147456 ? variant / 49152 : (variant - 147456) / 32768;
 			unsigned const checkpoint = std::array<unsigned, 3>{!subc && o.form >= 14 ? 4U : 3U, o.read_cycle - 1, o.read_cycle}[checkpoint_index];
 			if (tick == checkpoint && !m_pipeline_replay)
 			{
@@ -47847,6 +47863,12 @@ private:
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253220; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (bk)
+				{
+					if (variant < 24575) { start_pipeline_shifted_arithmetic(variant + 1); return; }
+					osd_printf_info("TMS320C54x shifted BK arithmetic: PASS cases=24576 restore=24576 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=3 source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated shifted BK arithmetic complete");
+				}
 				if (variant == 245759) osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 				if (variant == 245759 && !strcmp(machine().options().bios(), "shifted-alu")) throw emu_fatalerror(0, "TMS320C54x isolated shifted memory ADD SUB complete");
 				if (variant < 276479) { start_pipeline_shifted_arithmetic(variant + 1); return; }
@@ -49980,6 +50002,11 @@ private:
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore excluded shifted operand without admitting its endpoint"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62123; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 63) { start_shifted_peripheral_edge(m_pipeline_peripheral_case + 1); return; }
+				if (!strcmp(machine().options().bios(), "shift-bk-edge"))
+				{
+					osd_printf_info("TMS320C54x shifted BK exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,LD,ST data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
+					throw emu_fatalerror(0, "TMS320C54x isolated shifted BK exclusions complete");
+				}
 				osd_printf_info("TMS320C54x shifted peripheral exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,ADD,SUB data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated shifted peripheral exclusions complete");
 			}
@@ -56939,6 +56966,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(195, "xorm-absolute", "Staged absolute immediate XORM retained read and publication")
 	ROM_SYSTEM_BIOS(196, "mvdm-t", "MVDM T TRN source capture and adjacent mapped consumer")
 	ROM_SYSTEM_BIOS(197, "move-rpt-owner", "Mapped move precedes an independent repeat header")
+	ROM_SYSTEM_BIOS(198, "shifted-bk", "Read-owned extended ADD/SUB from mapped BK")
+	ROM_SYSTEM_BIOS(199, "shift-bk-edge", "Excluded shifted BK and adjacent register compositions")
 ROM_END
 
 ROM_START(tms54rom4)
