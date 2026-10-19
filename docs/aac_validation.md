@@ -882,6 +882,44 @@ prefix for fixed-origin correspondence. The original metadata/file-size
 accounting that exposes the erased extension is established below; this is not
 an unobserved later save operation flushing the encoded tail.
 
+### Recorder DRR Read Ownership
+
+The finalized varying-input fixture has a complete all-channel census at
+McBSP0 DRR address `0021`. Ownership comes from the DMA device's active
+source-read API, not enabled-channel register addresses or the CPU's current
+PC. Unowned reads additionally record a bounded PC-context histogram; those
+contexts are not instruction-owner claims. Side-effect-disabled observations
+are excluded, and the diagnostic histogram is not a save-state output.
+
+`mu4_recorder_read_census.py RUN/error.log` reconciles owner masks, all
+unowned contexts and the existing independent square-source counter check.
+It rejects missing, duplicate, inconsistent or capped evidence. The fresh
+20-second `bootrecac` run at `tmp/native-gates/mu4-recorder-read-census`
+has 1,707,055 reads, no dropped contexts and no multiple-owner masks:
+
+| Active DMA mask | Zero-based channel | DRR reads |
+| --- | --- | ---: |
+| `04` | 2 | 801990 |
+| `08` | 3 | 905064 |
+| `00` | no active DMA source owner | 1 |
+
+The sole unowned read has observed CPU context `038edb`; its instruction
+and purpose remain unclassified. Thus the current fixture's 905065
+`other_owner_reads` are almost entirely channel-3 traffic, not unexplained
+CPU reads. This does not retrospectively assign the different protected
+recording's counts, or prove that channel 3 has one fixed peripheral role:
+its configuration differs from the playback TX fixture.
+
+All four selected channel-2 symbol counts and 871742 generated stereo frames
+match the banked finalized recording. Native metadata success reproduces,
+and the endpoint NAND remains exactly
+`f09e3e8c1049a563a073fa40040c9d400e2d6212ba1a223ce44045303104277d`.
+The copied formatted seed remains
+`75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
+No read histogram writes guest state. Generated samples and DRR read counts
+still do not establish fresh-word delivery, FIFO drop/repeat accounting,
+destination-buffer ownership or encoder consumption.
+
 ### Metadata Overwrite Accounting
 
 `metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected

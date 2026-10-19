@@ -412,6 +412,9 @@ public:
 private:
 	std::array<u32, 4> m_ac_generated{}, m_ac_received{};
 	u32 m_ac_other = 0, m_ac_other_owners = 0;
+	std::array<u64,64> m_ac_read_owners{};
+	std::map<u32,u64> m_ac_unowned_contexts;
+	u64 m_ac_read_total = 0, m_ac_context_dropped = 0;
 	u16 converted_adc(offs_t channel)
 	{
 		if (!recorder_ac_profile()) return channel ? 0x5678 : 0x1234;
@@ -2480,15 +2483,30 @@ private:
 			if (measurement_profile()) install_measurement_observers();
 			if (playback_profile()) machine().add_notifier(MACHINE_NOTIFY_EXIT, machine_notify_delegate(&mu4_storage_test_state::report_playback_parent, this));
 			if (recorder_ac_profile())
+			{
+				logerror("mu4_recorder_read_scope: address=0021 context_cap=128 dma_identity=active_source_read context_pc=not_instruction_owner side_effects_disabled=excluded observer_writes=0\n");
 				m_cpu->space(AS_DATA).install_read_tap(0x21, 0x21, "mu4_recorder_ac_receive",
 					[this](offs_t address, u16 &value, u16) {
 						if (machine().side_effects_disabled()) return;
+						u8 owners = 0;
+						for (unsigned channel=0;channel<6;++channel)
+							if (m_dma->source_read_matches(channel,AS_DATA,address)) owners |= 1U << channel;
+						++m_ac_read_total; ++m_ac_read_owners[owners];
+						if (!owners)
+						{
+							u32 const pc = m_cpu->state_int(STATE_GENPC);
+							auto found = m_ac_unowned_contexts.find(pc);
+							if (found != m_ac_unowned_contexts.end()) ++found->second;
+							else if (m_ac_unowned_contexts.size() < 128) m_ac_unowned_contexts.emplace(pc,1);
+							else ++m_ac_context_dropped;
+						}
 						if (!m_dma->source_read_matches(2, AS_DATA, address)) { ++m_ac_other_owners; return; }
 						std::array<u16, 4> const alphabet{0x2000, 0xe000, 0x1000, 0xf000};
 						auto const found = std::find(alphabet.begin(), alphabet.end(), value);
 						if (found == alphabet.end()) ++m_ac_other;
 						else ++m_ac_received[found - alphabet.begin()];
 					});
+			}
 			if (playback_profile())
 			{
 				m_cpu->space(AS_DATA).install_write_tap(0x23, 0x23, "mu4_playback_dxr_owner",
@@ -2981,6 +2999,8 @@ private:
 		m_dma_output.clear(); m_dma_completions = 0;
 		m_rx_dma_completions = m_rx_irqs = 0;
 		m_ac_generated = {}; m_ac_received = {}; m_ac_other = m_ac_other_owners = 0;
+		m_ac_read_owners.fill(0); m_ac_unowned_contexts.clear();
+		m_ac_read_total = m_ac_context_dropped = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_native_din_words = 0;
 		m_continuous_tx.fill(0);
@@ -3500,9 +3520,17 @@ private:
 		{
 			if (playback_profile()) finish_playback_capture();
 			if (recorder_ac_profile())
+			{
 				logerror("mu4_recorder_ac_input: generated=%u,%u,%u,%u received=%u,%u,%u,%u other=%u other_owner_reads=%u shape=square periods=64,32 amplitudes=8192,4096 ownership=actual_channel2_source_read analog_adc=0 decoded_audio=0\n",
 					m_ac_generated[0], m_ac_generated[1], m_ac_generated[2], m_ac_generated[3],
 					m_ac_received[0], m_ac_received[1], m_ac_received[2], m_ac_received[3], m_ac_other, m_ac_other_owners);
+				for (unsigned mask=0;mask<m_ac_read_owners.size();++mask)
+					if (m_ac_read_owners[mask]) logerror("mu4_recorder_read_owner: dma_mask=%02x reads=%llu observer_writes=0\n",mask,static_cast<unsigned long long>(m_ac_read_owners[mask]));
+				for (auto const &[pc,count] : m_ac_unowned_contexts)
+					logerror("mu4_recorder_read_context: context_pc=%06x reads=%llu observer_writes=0\n",pc,static_cast<unsigned long long>(count));
+				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
+					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
+			}
 			if (playback_profile())
 			{
 				logerror("mu4_native_playback_execution: bootstrap_fetch=%u bootstrap_execute=%u resident_fetch=%u resident_execute=%u filter_calls=%u filter_iterations=%u filter_returns=%u instruction_entries=%llu loader_execute=%u observer=Execute_entry retirement_claim=0\n", m_native_bootstrap_entries, m_playback_execute_entries[0], m_native_bootstrap_resident_entries, m_playback_execute_entries[1], m_playback_filter[0], m_playback_filter[1], m_playback_filter[2], static_cast<unsigned long long>(m_playback_execute_steps), m_playback_execute_entries[2]);

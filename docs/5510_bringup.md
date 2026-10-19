@@ -4979,8 +4979,10 @@ Actual channel-2 source reads at data `0021` observe counts
 `201120,201155,201141,201134` for `2000,e000,1000,f000`, respectively
 (804,550 reads, no other values). Attribution uses the active-source-read
 API, not the enabled channel's address. Another 902,505 reads are outside
-that ownership selection and remain unclassified; neither their identity
-nor complete delivery/drop accounting is inferred. The strict
+that ownership selection remain unclassified for that protected artifact;
+the finalized recording's separately checked all-owner census is documented
+in [Recorder DRR read ownership](aac_validation.md#recorder-drr-read-ownership).
+Complete delivery/drop accounting and encoder consumption are not inferred. The strict
 `--recorder-input` check independently verifies square-source statistics
 and both received polarities for both amplitudes. This proves varying
 peripheral input, not encoder consumption or decoded audio.
