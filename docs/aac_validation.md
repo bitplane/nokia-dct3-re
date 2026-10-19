@@ -168,6 +168,33 @@ by the original loader near 0.81497 seconds, before constructor use.
 The earlier configuration-provenance question is therefore closed at this
 boundary; compressed-input and refill construction remain open.
 
+## Candidate Transport Adapter
+
+FFmpeg 8.0.1 stream-copy from the official MP4 to ADTS produces 323 frames,
+61912 bytes, SHA-256
+`3ba27972ae6c81b501983ead0f50c00c87d8a580999f410f3e01a6a1691a98d9`.
+This is a derived diagnostic input, not the original
+official fixture or a conformance result. Comparing each original MP4 packet
+by its container offset/size with each ADTS payload finds:
+
+- Packets 1..322 are byte-identical after removal of the ADTS headers.
+- Packet 0 preserves the original six bytes `00c81483ea1c` as its suffix,
+  preceded by seven added bytes `a0a08000000000`.
+- All ADTS declared extents account for the complete derived file.
+
+The added prefix is the remuxer's program-configuration insertion for the
+zero-channel-configuration source. Its derivation from AudioSpecificConfig
+still needs an independent bit-level check before using the adapter as an
+acceptance fixture. In particular, do not describe the remux as preserving
+every compressed byte unchanged or silently discard the extra prefix.
+
+The pinned bit reader `02510c` refills directly from `b332+b331` whenever
+`a854 <= 16`; it has no storage callback or input-length check. Thus an
+isolated caller must provide a bounded buffer with evidenced lookahead,
+observe actual reads and consumed extents, and replenish only at the
+original wrapper boundary. A successful file remux does not settle this
+caller-owned memory contract.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;
