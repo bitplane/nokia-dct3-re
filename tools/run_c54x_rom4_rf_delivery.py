@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +20,30 @@ except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
     from c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window
     from c54x_rom4_rf_consumption_check import check as check_consumption
+
+
+MACHINES = {
+    'noki5110': ('atomic', 'legacy'),
+    'nse1astd': ('atomic', 'standard'),
+    'nse1plg': ('staged', 'legacy'),
+    'nse1pipe': ('staged', 'standard'),
+}
+
+
+def machine_profile(name):
+    frontend, bus = MACHINES[name]
+    return dict(machine=name, frontend=frontend, swwsr_model=bus,
+                physical_dialect_claim=False)
+
+
+def check_cpu_health(text, machine):
+    profiles = re.findall(r'rom4_rf_profile: system=(\w+)', text)
+    states = re.findall(r'rom4_rf_cpu_state: illegal=(\d+) pc=([0-9a-f]{4})', text)
+    if profiles != [machine]:
+        raise ValueError('missing, duplicate or wrong RF machine selection')
+    if len(states) != 1 or states[0][0] != '0':
+        raise ValueError('missing or faulted native RF CPU completion state')
+    return dict(machine=machine, illegal=False, pc=states[0][1])
 
 
 def check_repeats(observations):
@@ -44,7 +69,7 @@ def input_provenance(paths):
     return result
 
 
-def inspect_case(text, console, mode):
+def inspect_case(text, console, mode, machine='noki5110'):
     """Keep independent evidence even when an acceptance boundary fails."""
     report = dict(mode=mode, failures={}, checks={})
 
@@ -58,10 +83,16 @@ def inspect_case(text, console, mode):
             report['failures'][name] = str(error)
             return None
 
+    def score_operation(operation):
+        if MACHINES[machine][0] == 'staged':
+            raise ValueError('staged RF scores require execution-owned observation, not program-fetch snapshots')
+        return operation(text)
+
     capture('observer_health', lambda: check_observer_health(console))
-    score = capture('score_observation', lambda: observe_score(text))
+    capture('cpu_health', lambda: check_cpu_health(text, machine))
+    score = capture('score_observation', lambda: score_operation(observe_score))
     capture('window_observation', lambda: check_window(text))
-    capture('score_acceptance', lambda: check_score(text))
+    capture('score_acceptance', lambda: score_operation(check_score))
     capture('consumption', lambda: check_consumption(text))
     capture('scan_consumption', lambda: check_consumption(text, scan=True))
     delivery = capture('delivery', lambda: check_delivery(text))
@@ -90,6 +121,8 @@ def main():
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / 'tmp')
     parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument('--machine', choices=tuple(MACHINES), default='noki5110',
+                        help='explicit CPU frontend/bus research composition; no physical dialect claim')
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats must be positive")
@@ -107,22 +140,22 @@ def main():
     paths['provisioning_eeprom'] = root / 'roms/noki5110/nse-1.bin'
     (run / 'inputs.json').write_text(json.dumps(dict(schema=1,
         inputs=input_provenance(paths), physical_iq_claim=False,
-        acquisition_claim=False), indent=2) + '\n')
+        acquisition_claim=False, profile=machine_profile(args.machine)), indent=2) + '\n')
     observations = []
     summary = dict(schema=2, status='running', cases=observations,
-                   fresh_storage=True, acquisition_claim=False)
+                   fresh_storage=True, acquisition_claim=False, profile=machine_profile(args.machine))
     (run / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     for mode in ("zero", "tone"):
         for repeat in range(args.repeats):
             case = run / f"{mode}_{repeat}"
-            nvram = case / "nvram" / "noki5110"
+            nvram = case / "nvram" / args.machine
             nvram.mkdir(parents=True)
             subprocess.run([sys.executable, str(root / "tools/make_5110_eeprom_profile.py"),
                             "--eeprom", str(root / "roms/noki5110/nse-1.bin"),
                             "--flash", str(root / "roms/noki5110/5110f530.fls"),
                             "--output", str(nvram / "eeprom")],
                            check=True, stdout=subprocess.DEVNULL)
-            command = [str(args.mame.resolve()), "noki5110", "-rompath", str(args.rompath.resolve()),
+            command = [str(args.mame.resolve()), args.machine, "-rompath", str(args.rompath.resolve()),
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
                        "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "60",
                        "-autoboot_script", str(root / "tools/c54x_rom4_rf_score.lua")]
@@ -144,7 +177,7 @@ def main():
             except OSError as error:
                 text = ''
                 execution_errors['trace_read'] = str(error)
-            report = inspect_case(text, (case / 'console.log').read_text(), mode)
+            report = inspect_case(text, (case / 'console.log').read_text(), mode, args.machine)
             report.update(repeat=repeat, returncode=returncode)
             report['failures'].update(execution_errors)
             if returncode:

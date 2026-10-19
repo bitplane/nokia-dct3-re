@@ -327,10 +327,10 @@ the active TC-mode interpretation remain to be validated numerically.
 
 ### Current RF-control reproducibility boundary
 
-A fresh `run_c54x_rom4_rf_delivery.py --repeats 2` check against binary
-SHA-256 `ae96a9ea391a40bd7c353b279362fd63dd8dbf11bfd48d2febd055ca8d6df1d3`
-does not reproduce the accepted-store result below. Both zero controls produce
-4,888 completed zero scores; both rotating controls produce 4,888 nonzero scores, maximum
+A fresh `run_c54x_rom4_rf_delivery.py --repeats 1` check against binary
+SHA-256 `bba02bfa06831197307db818903f3d47bd0d831403d96b19b53f829cd6ba4b06`
+does not reproduce the accepted-store result below. The zero control produces
+4,888 completed zero scores; the rotating control produces 4,888 nonzero scores, maximum
 `0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
 `0x0574`. The strict rotating-input gate fails and is not rebanked.
 The retained comparison data below therefore describes earlier captures,
@@ -386,6 +386,32 @@ remain visible alongside named failures; a decoded summary is not score
 acceptance. Failed cases cannot make the overall exit status green. Binary,
 observer, generator and actual ROM identities remain in `inputs.json`, with
 the per-case command and generated storage identity in `invocation.json`.
+
+#### Frontend observation boundary
+
+The RF runner accepts four explicit research compositions: `noki5110`
+(atomic/legacy SWWSR), `nse1astd` (atomic/standard), `nse1plg`
+(staged/legacy) and `nse1pipe` (staged/standard). Each has isolated own
+NVRAM, recorded frontend/bus metadata and a unique observed machine header.
+The final DSP illegal flag is independently checked: a normal MAME exit does
+not prove that the CPU continued executing. These choices do not identify the
+fitted Lead bus dialect.
+
+`nse1pipe` zero and rotating-input controls each consume 991,360 RF words
+over 60 emulated seconds and finish with the illegal flag clear after the
+independently qualified MVDM-to-T/TRN extension. The original staged stop at
+`47f6` was `720e 06be`, a transfer from data `06be` to T; it was a CPU
+coverage boundary, not an RF-input verdict.
+
+The Lua program-read probes are not instruction-entry probes on staged
+execution: prefetch can sample a different live accumulator and can count
+unretired instructions. The runner therefore rejects staged score
+observation/acceptance explicitly. Its other DSP program-fetch-derived fields
+remain diagnostic, not validated staged routing or tuning contracts. Actual
+port access counts and the CPU illegal flag are separate observations. Next
+establish execution-owned score/caller observations, then compare matched
+SWWSR compositions before attributing a difference to the CPU frontend or RF.
+Do not interpret staged fetch-snapshot scores as physical signal measurements.
 
 The retained arithmetic audit used binary SHA-256
 `67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`.

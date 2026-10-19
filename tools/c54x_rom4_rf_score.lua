@@ -1,6 +1,7 @@
 -- Diagnostic mathematical port-input stimuli, not a GSM RF model.
 local machine = manager.machine
 local cpu = assert(machine.devices[":dsp_c54x:cpu"])
+machine:logerror('rom4_rf_profile: system=' .. machine.system.name .. '\n')
 local memory = cpu.spaces["data"]
 local mode = os.getenv("ROM4_RF_SCORE_MODE") or "zero"
 assert(mode == "zero" or mode == "dc" or mode == "tone")
@@ -510,6 +511,8 @@ local stop = emu.add_machine_stop_notifier(function()
     end
     machine:logerror(string.format("rom4_rf_candidate_counter_range: minimum=%04x maximum=%04x\n",
         counter_min, counter_max))
+    machine:logerror(string.format("rom4_rf_cpu_state: illegal=%d pc=%04x\n",
+        cpu.state["ILLEGAL"].value, cpu.state["PC"].value))
     machine:logerror(string.format(
         "rom4_rf_score_summary: mode=%s reads=%d results=%d nonzero=%d maximum=%010x second=%d accepted=%d acquisition_claim=0\n",
         mode, reads, results, nonzero, maximum, second, accepted))

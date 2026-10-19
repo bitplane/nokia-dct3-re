@@ -4,13 +4,32 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from tools.run_c54x_rom4_rf_delivery import check_repeats, input_provenance, inspect_case
+from tools.run_c54x_rom4_rf_delivery import check_repeats, input_provenance, inspect_case, machine_profile, check_cpu_health
 from tools.test_c54x_rom4_rf_score_check import TONE
 
 
 class RepeatTests(unittest.TestCase):
+    def test_cpu_stop_and_wrong_profile_are_not_rf_input_failures(self):
+        text = 'rom4_rf_profile: system=nse1pipe\nrom4_rf_cpu_state: illegal=0 pc=47f8\n'
+        self.assertEqual(check_cpu_health(text, 'nse1pipe')['pc'], '47f8')
+        for bad in ('', text + text, text.replace('illegal=0', 'illegal=1'),
+                    text.replace('system=nse1pipe', 'system=noki5110')):
+            with self.subTest(text=bad), self.assertRaises(ValueError):
+                check_cpu_health(bad, 'nse1pipe')
+
+    def test_machine_profiles_keep_frontend_and_bus_dialect_distinct(self):
+        for machine, frontend, bus in (
+            ('noki5110', 'atomic', 'legacy'), ('nse1astd', 'atomic', 'standard'),
+            ('nse1plg', 'staged', 'legacy'), ('nse1pipe', 'staged', 'standard')):
+            with self.subTest(machine=machine):
+                self.assertEqual(machine_profile(machine), dict(machine=machine,
+                    frontend=frontend, swwsr_model=bus, physical_dialect_claim=False))
+        with self.assertRaises(KeyError):
+            machine_profile('noki3310')
+
     def case_checks(self, **overrides):
         functions = dict(check_observer_health=lambda text: None,
+                         check_cpu_health=lambda text, machine: {'machine': machine, 'illegal': False},
                          check_window=lambda text: {'reads_on': 800000, 'reads_off': 100000, 'physical_gate_claim': False},
                          check_consumption=lambda text, scan=False: {'scan': scan, 'reads': 64},
                          check_delivery=lambda text: ('00101438', '006d'),
@@ -31,12 +50,20 @@ class RepeatTests(unittest.TestCase):
         self.assertEqual(report['checks']['scan_consumption']['value'], {'scan': True, 'reads': 64})
         self.assertEqual(report['checks']['tuning']['status'], 'pass')
 
+    def test_staged_fetch_snapshots_cannot_be_promoted_to_scores(self):
+        with self.case_checks():
+            report = inspect_case(TONE, '', 'tone', 'nse1pipe')
+        self.assertEqual(set(report['failures']), {'score_observation', 'score_acceptance'})
+        self.assertIn('execution-owned', report['failures']['score_observation'])
+        self.assertNotIn('score', report)
+        self.assertEqual(report['checks']['delivery']['status'], 'pass')
+
     def test_passing_case_keeps_all_checks(self):
         with self.case_checks():
             report = inspect_case(TONE, '', 'tone')
         self.assertEqual(report['status'], 'pass')
         self.assertFalse(report['failures'])
-        self.assertEqual(len(report['checks']), 10)
+        self.assertEqual(len(report['checks']), 11)
         self.assertEqual(report['results'], 5000)
         self.assertEqual(report['accepted'], 8)
 
