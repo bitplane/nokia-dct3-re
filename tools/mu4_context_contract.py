@@ -711,6 +711,26 @@ DECODER_CONFIGURATION_WITNESSES = (
 )
 
 
+CATALOGUE_MEDIA_WITNESSES = (
+    (0xbff3, (0x52,0x45,0x4c,0,0x4c,0x53,0x45,0)),
+    (0x39494, (0x1028,0x8000,0xf020,0xbff3,0xf982,0xe36f,
+               0x10f8,8,0xf845,0x94a9,0x1028,0x8000,0xf020,0xbff7,
+               0xf982,0xe36f,0x8812,0xf495,0xf495,0x6c82,0x9570)),
+)
+
+
+def decode_catalogue_media_admission(words):
+    for base, witness in CATALOGUE_MEDIA_WITNESSES:
+        for offset, expected in enumerate(witness):
+            if words.get(base+offset) != expected:
+                raise ValueError('AA22 catalogue media-admission witness changed or absent')
+    return dict(segment='aa22', pinned_words=29, entry='039494',
+                extension_source='local SP+0x28, derived directory descriptor +9',
+                comparisons=[dict(literal='bff3', text='REL'),dict(literal='bff7', text='LSE')],
+                compare_helper='02e36f', rejection='039570: advance directory enumeration',
+                scope='Pinned scanner extension filter; not LSE container validity, AAC decoder capability or every media-opening route')
+
+
 def decode_decoder_configuration(words):
     for base, witness in DECODER_CONFIGURATION_WITNESSES:
         for offset, expected in enumerate(witness):
@@ -1819,6 +1839,7 @@ def contract(source):
     words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa22')
     result = decode_words(words)
     result['measurement_response'] = decode_measurement_response(words)
+    result['catalogue_media_admission'] = decode_catalogue_media_admission(words)
     result['worker_entry'] = decode_worker_entry(words)
     result['worker_return'] = decode_worker_return(words)
     result['worker_copy'] = decode_worker_copy(words)

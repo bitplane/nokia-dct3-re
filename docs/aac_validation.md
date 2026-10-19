@@ -209,9 +209,19 @@ ID3 title/artist envelope under `TEST.AAC` does not select a decoder overlay
 in the bounded two-second `bootplaystage` run. The response path completes
 without illegal instructions, but both verified-AA99-session entries and
 decoder calls remain zero. This is a media-selection boundary, not evidence
-of unsupported AAC syntax or a failed decoder. Catalogue admission and the
-filename/extension contract must be established before extending this route;
-do not force the loader's AAC subtype or overlay selector.
+of unsupported AAC syntax or a failed decoder. Do not force the loader's
+AAC subtype or overlay selector.
+
+The original AA22 scanner at `039494..0394a8` compares the directory
+descriptor's extension against `REL` (`bff3`) and `LSE` (`bff7`) through
+`02e36f`; failure advances directory enumeration at `039570`. These 29
+instruction/literal words are source-pinned with mutation coverage. A passive
+snapshot confirms the `.AAC` fixture has track count `3768=0`, settled
+mode `373e=2`, and no playback flags at 1.116666667 seconds. Thus this
+catalogue does not admit a plain `.AAC` file even though an AAC decoder
+module exists. A `.LSE` extension alone is not evidence of a valid LSE
+container. Keep the original decoder ABI bench as the direct route for the
+official vector rather than attempting filename variants or internal flags.
 
 The fixture was independently extracted through 7z with byte-identical
 readback. NAND SHA-256 is
