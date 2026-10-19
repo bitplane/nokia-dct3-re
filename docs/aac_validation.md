@@ -131,7 +131,18 @@ eight values. This is initialization-plus-runtime agreement, not proof that
 no indirect writer can change them later. The original loader can supply
 these records for a future decoder bench; copied live RAM is unnecessary.
 Remaining ABI prerequisites are the caller's configuration fields, input
-buffer/refill ownership and the complete reset-helper memory footprint.
+buffer/refill ownership.
+
+The complete `0245d7..02460f` reset helper is pinned as 57 original words.
+It makes 1034 data writes: six scalar defaults, four channel-state clears,
+and zeros at every word of `af30..b32f` (1024 words). With original pointer
+records, the four channel destinations are `a89f,a8a5,ac39,acc4`.
+A passive data-write tap during original `bootplaystage` observes two complete
+invocations before 1.116666667 seconds: 2068 full-mask writes, each invocation
+matching all 1034 expected address/value pairs and both having identical
+write order. The tap uses bus-context PC to select the routine; this is
+write-footprint evidence, not an instruction-retirement or timing claim.
+No reset memory outside the stated footprint was inferred from a snapshot.
 
 ## Next Acceptance Boundary
 

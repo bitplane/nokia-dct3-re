@@ -690,6 +690,29 @@ DECODER_POINTER_RECORD_BASE = 0x273DB
 DECODER_POINTER_RECORD_WITNESS = (
     2,0xb333,0xaaec,0xaaec,2,0xb335,0xac36,0xacc1,
     2,0xb337,0xad4c,0xae3e,2,0xb339,0xab64,0xabcd)
+DECODER_CHANNEL_RESET_BASE = 0x245D7
+DECODER_CHANNEL_RESET_WITNESS = (
+    0x4a11,0xeeff,0x76f8,0xa8c7,0,0x76f8,0xa85e,1,
+    0x76f8,0xa85f,0xffff,0x7711,0xa89c,0x76e1,1,1,
+    0x76e1,2,3,0x76f8,0xb333,0xaaec,0x4811,0xf000,3,
+    0x8811,0xf495,0x7712,0xb335,0x771a,1,0xf072,0x4600,
+    0x7681,0,0x7192,0x13,0x76e3,3,0,0x6de9,6,
+    0x7711,0xaf2f,0x771a,0x1ff,0xf072,0x460b,
+    0x7699,0,0x76e1,0x200,0,0xe800,0xee01,0x8a11,0xf4e4)
+
+
+def decode_decoder_channel_reset(words):
+    for offset, expected in enumerate(DECODER_CHANNEL_RESET_WITNESS):
+        if words.get(DECODER_CHANNEL_RESET_BASE + offset) != expected:
+            raise ValueError('AA99 channel reset witness changed or absent')
+    return dict(entry='0245d7', pinned_words=57,
+                defaults={'a8c7':'0000','a85e':'0001','a85f':'ffff',
+                          'a89d':'0001','a89e':'0003','b333':'aaec'},
+                channel_iterations=2, channel_stride=6,
+                channel_clears=['a89f','a8a5','[b335]+3','[b336]+3'],
+                buffer=dict(first='af30', last='b32f', words=1024, value=0),
+                expected_data_writes=1034,
+                scope='Complete local source footprint with initialized pointers; not runtime retirement or all codec-state construction')
 
 
 def decode_decoder_pointer_records(words):
@@ -1802,6 +1825,7 @@ def contract(source):
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
+    result['decoder_channel_reset'] = decode_decoder_channel_reset(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

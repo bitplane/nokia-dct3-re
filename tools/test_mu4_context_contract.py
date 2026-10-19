@@ -31,6 +31,7 @@ from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
 from tools.mu4_context_contract import DECODER_POINTER_RECORD_BASE, DECODER_POINTER_RECORD_WITNESS, decode_decoder_pointer_records
+from tools.mu4_context_contract import DECODER_CHANNEL_RESET_BASE, DECODER_CHANNEL_RESET_WITNESS, decode_decoder_channel_reset
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -676,6 +677,18 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_pointer_records(changed)
+
+    def test_decoder_channel_reset_bounds_and_pointer_dependencies(self):
+        words = dict(enumerate(DECODER_CHANNEL_RESET_WITNESS, DECODER_CHANNEL_RESET_BASE))
+        result = decode_decoder_channel_reset(words)
+        self.assertEqual(result['pinned_words'], 57)
+        self.assertEqual(result['expected_data_writes'], 1034)
+        self.assertEqual(int(result['buffer']['last'],16)-int(result['buffer']['first'],16)+1, 1024)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_channel_reset(changed)
 
     def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
         words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES
