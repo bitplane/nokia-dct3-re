@@ -18,10 +18,12 @@ else:
     from mu4_decoder_session_check import verify as verify_session
 
 
-def check_packets(text, aac):
+def check_packets(text, aac, *, window_last=10.0):
+    if window_last not in (10.0, 12.0):
+        raise ValueError('unsupported packet observation window')
     scopes, ends = rows(text,'mu4_packet_read_scope'), rows(text,'mu4_packet_read_terminal')
     reads, calls = rows(text,'mu4_packet_read'), rows(text,'mu4_decoder_call')
-    if len(scopes) != 1 or scopes[0] != dict(first='0.8',last='10.0',first_address='162e',
+    if len(scopes) != 1 or scopes[0] != dict(first='0.8',last=f'{window_last:.1f}',first_address='162e',
             last_address='1e2d',cap='131072',ownership='data_bus',pc='context_only',
             observer_writes='0',audio_acceptance='0') or len(ends) != 1:
         raise ValueError('missing or changed packet capture scope/terminal')
@@ -30,14 +32,14 @@ def check_packets(text, aac):
         stop = float(end['t'])
         if (not 0 < len(reads) == int(end['reads']) < 131072 or end['closed'] != '1'
                 or end['illegal'] != '0' or end['audio_acceptance'] != '0'
-                or not math.isfinite(stop) or stop < 10):
+                or not math.isfinite(stop) or stop < window_last):
             raise ValueError('incomplete, capped or faulted packet capture')
         if not calls or len(calls) % 2 or len(calls) >= 1024:
             raise ValueError('incomplete decoder call pairs')
         previous = 0.8
         for index, read in enumerate(reads,1):
             when = float(read['t'])
-            if (int(read['ordinal']) != index or not previous <= when <= 10
+            if (int(read['ordinal']) != index or not previous <= when <= window_last
                     or int(read['mask'],16) != 0xffff
                     or not 0x162e <= int(read['address'],16) <= 0x1e2d
                     or not 0 <= int(read['word'],16) <= 0xffff
@@ -52,7 +54,7 @@ def check_packets(text, aac):
                     or row['context_only'] != '1' for row in (entry,returned)):
                 raise ValueError('decoder call identity/order changed')
             first, last = float(entry['t']), float(returned['t'])
-            if (not previous <= first < last <= 10 or
+            if (not previous <= first < last <= window_last or
                     not 0x162e <= int(entry['base'],16) <= 0x1e2d or
                     not 0 <= int(returned['result'],16) < 1 << 40 or
                     int(returned['result'],16) & 0xffff):
@@ -89,6 +91,51 @@ def check_packets(text, aac):
                       'no whole-file, retired-store, physical audio or speech acceptance')
 
 
+def extract_observed_packets(text, *, window_last=10.0):
+    """Recover only covered bus/reservoir bytes; never synthesize decoder input."""
+    calls, reads = rows(text, 'mu4_decoder_call'), rows(text, 'mu4_packet_read')
+    observed, offset = {}, 0
+
+    def insert(position, value):
+        if position in observed and observed[position] != value:
+            raise ValueError('conflicting observed packet bytes')
+        observed[position] = value
+
+    try:
+        if not calls or len(calls) % 2:
+            raise ValueError('incomplete decoder call pairs')
+        for index in range(0, len(calls), 2):
+            entry, returned = calls[index:index + 2]
+            remaining, retained = int(entry['remaining'], 16), int(returned['remaining'], 16)
+            if remaining not in (0, 8, 16, 24, 32) or retained not in (0, 8, 16, 24, 32):
+                raise ValueError('packet boundary is not byte-aligned')
+            start = int(entry['index'], 16) * 2 - remaining // 8
+            length = int(returned['index'], 16) * 2 - retained // 8 - start
+            if not 0 < length <= 8191:
+                raise ValueError('invalid observed packet extent')
+            prefix = int(entry['reservoir'], 16).to_bytes(4, 'big')[4 - remaining // 8:]
+            for at, value in enumerate(prefix):
+                insert(offset + at, value)
+            for read in reads:
+                if not float(entry['t']) <= float(read['t']) <= float(returned['t']):
+                    continue
+                relative = (int(read['address'], 16) - int(entry['base'], 16)) * 2 - start
+                for at, value in enumerate(int(read['word'], 16).to_bytes(2, 'big'), relative):
+                    if not 0 <= at < length + retained // 8:
+                        raise ValueError('observed read outside packet/lookahead')
+                    insert(offset + at, value)
+            if any(position not in observed for position in range(offset, offset + length)):
+                raise ValueError('missing observed packet bytes')
+            offset += length
+        data = bytes(observed[position] for position in range(offset))
+        report = check_packets(text, data, window_last=window_last)
+    except (KeyError, TypeError, OverflowError) as error:
+        raise ValueError('incomplete observed packet fields') from error
+    report['reference_independent'] = False
+    report['scope'] = 'Observed bus/reservoir extraction for host diagnostics only; not emulation input or independent reference'
+    return data, report
+
+
 def verify(directory, source, aac, pcm):
     session = verify_session(directory,source,pcm)
     result = check_packets((directory/'error.log').read_text(),aac)
@@ -104,12 +151,25 @@ def verify(directory, source, aac, pcm):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
-    parser.add_argument('--source-a00',type=Path,required=True)
-    parser.add_argument('--reference-aac',type=Path,required=True)
-    parser.add_argument('--reference-pcm',type=Path,required=True)
+    parser.add_argument('--source-a00',type=Path)
+    parser.add_argument('--reference-aac',type=Path)
+    parser.add_argument('--reference-pcm',type=Path)
+    parser.add_argument('--export-observed-aac',type=Path,
+                        help='exclusive new host-diagnostic artifact; never emulation input')
+    parser.add_argument('--window-last',type=float,choices=(10.0,12.0),default=10.0)
     args = parser.parse_args()
     try:
-        result = verify(args.directory,args.source_a00.read_bytes(),args.reference_aac.read_bytes(),args.reference_pcm.read_bytes())
+        if args.export_observed_aac:
+            if any((args.source_a00,args.reference_aac,args.reference_pcm)):
+                raise ValueError('observed extraction is not independent-reference verification')
+            data, result = extract_observed_packets((args.directory/'error.log').read_text(),
+                                                   window_last=args.window_last)
+            with args.export_observed_aac.open('xb') as output:
+                output.write(data)
+        else:
+            if not all((args.source_a00,args.reference_aac,args.reference_pcm)) or args.window_last != 10.0:
+                raise ValueError('reference verification requires all three inputs and the original window')
+            result = verify(args.directory,args.source_a00.read_bytes(),args.reference_aac.read_bytes(),args.reference_pcm.read_bytes())
     except (ValueError,OSError) as error:
         parser.exit(1,f'MU4 packet session: {error}\n')
     print(json.dumps(result,indent=2))

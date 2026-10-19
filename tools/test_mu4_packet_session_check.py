@@ -1,6 +1,6 @@
 import unittest
 
-from tools.mu4_packet_session_check import check_packets
+from tools.mu4_packet_session_check import check_packets, extract_observed_packets
 
 
 def fixture():
@@ -16,6 +16,27 @@ def fixture():
 
 
 class PacketSessionTest(unittest.TestCase):
+    def test_extracts_only_observed_bytes(self):
+        text, packet = fixture()
+        data, report = extract_observed_packets(text)
+        self.assertEqual(data, packet)
+        self.assertFalse(report['reference_independent'])
+        extended = text.replace('last=10.0', 'last=12.0')
+        self.assertEqual(extract_observed_packets(extended, window_last=12.0)[0], packet)
+        with self.assertRaises(ValueError):
+            extract_observed_packets(extended)
+
+    def test_extraction_rejects_gaps_conflicts_and_bad_framing(self):
+        text, _ = fixture()
+        missing = '\n'.join(line for line in text.splitlines() if 'ordinal=7 ' not in line)
+        for changed in (missing, text.replace('word=5080', 'word=ffff'),
+                        text.replace('reservoir=0000fff9', 'reservoir=00000000')):
+            with self.assertRaises(ValueError):
+                extract_observed_packets(changed)
+        duplicate = next(line for line in text.splitlines() if 'ordinal=1 ' in line)
+        with self.assertRaises(ValueError):
+            extract_observed_packets(text + '\n' + duplicate.replace('word=5080', 'word=ffff'))
+
     def test_prefix_is_complete_but_tail_is_explicit(self):
         text, packet = fixture()
         report = check_packets(text,packet+packet)

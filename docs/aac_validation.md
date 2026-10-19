@@ -646,6 +646,29 @@ projection fails at header 2, byte 373. Do not fit an offset or transfer the
 Use `mu4_context_contract.py SOURCE --recording-session-log RUN/error.log`
 to check this observation. Optional `--recording-session-reference AAC`
 requires exact header equality at successive declared offsets and reports
-payload validity as unestablished. The remaining comparison needs this
-fresh recording's own buffer/file projection and completion records, not
-assumed equivalence with an older capture.
+payload validity as unestablished.
+
+### Same-Recording Native Playback
+
+Playing that before-metadata NAND through the original first-track command
+selects its generated title, not protected `TEST`. A read-only 0.8--12-second
+observer captures 88443 bit-reader bus reads, with no illegal instruction;
+the original twenty-second diagnostic still terminates with audio completion
+explicitly unvalidated. There are 375 successful decoder calls. Their consumed
+139500 bytes are completely covered by entry reservoirs and 69750 in-call
+reads, without searching for an alignment or supplying missing reference data.
+The extracted prefix SHA256 is
+`986f2373a3a6143fef3682a29fd5037750bf473f7a21c96aaee5c0bdd34e4591`.
+All 375 headers match the same recording's encoder publications at their
+declared offsets, including the early 614/384/328-byte packets. Twelve later
+header publications remain outside this consumed prefix; their payload and
+intended output extent are not established by this comparison.
+
+`mu4_packet_session_check.py RUN --window-last 12 --export-observed-aac PATH`
+creates an exclusive new **host diagnostic**, never an emulation input or an
+independent reference. It rejects missing/conflicting observations and validates
+framing and net consumption through the existing packet checker. FFmpeg decodes
+this prefix without errors into 375 stereo blocks (1536000 bytes). Comparison
+with native returned s16 output gives maximum difference 11, RMS 1.220189855
+over 768000 channel samples. This is a cross-decoder diagnostic, not bit-exact
+codec conformance, physical audio, whole-file completion or speech acceptance.
