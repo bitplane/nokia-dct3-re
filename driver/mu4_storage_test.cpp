@@ -480,6 +480,9 @@ private:
 	u64 m_playback_execute_steps = 0;
 	u32 m_playback_audio_clocks = 0, m_playback_audio_frames = 0;
 	u32 m_playback_dma_reads = 0, m_playback_dma_nonzero = 0;
+	// Bounded diagnostic provenance, not emulated hardware or save-state data.
+	struct playback_buffer_write { double time = -1; u32 pc = 0; u16 word = 0, mask = 0; };
+	std::array<playback_buffer_write, 0x380> m_playback_buffer_writes{};
 	std::array<u32, 10> m_playback_parent{};
 	u32 m_playback_parent_mismatch = 0;
 	u32 m_playback_switch_samples = 0;
@@ -2380,11 +2383,24 @@ private:
 						for (char byte : bytes) m_playback_dxr_hash = (m_playback_dxr_hash ^ u8(byte)) * 16777619U;
 						++m_playback_dxr_writes;
 					});
+				m_cpu->space(AS_DATA).install_write_tap(0x1000, 0x137f, "mu4_playback_buffer_writer",
+					[this](offs_t address, u16 &value, u16 mask) {
+						double const time = machine().time().as_double();
+						if (machine().side_effects_disabled() || time < 1.0 || time > 1.25) return;
+						m_playback_buffer_writes[address - 0x1000] = {time, m_cpu->pc(), value, mask};
+					});
 				m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mu4_playback_dma_source",
 					[this](offs_t address, u16 &value, u16) {
 						if (!m_playback_overlay_checked || machine().side_effects_disabled() ||
 							!m_dma->source_read_matches(3, AS_DATA, address)) return;
 						++m_playback_dma_reads;
+						double const time = machine().time().as_double();
+						if (time >= 1.0 && time <= 1.25 && address >= 0x1000 && address <= 0x137f)
+						{
+							auto const &writer = m_playback_buffer_writes[address - 0x1000];
+							logerror("mu4_playback_dma_epoch: read=%u address=%04x word=%04x t=%.9f last_write_t=%.9f last_write_pc=%06x last_write_word=%04x last_write_mask=%04x channel=3 ownership=active_source_read observer_writes=0 audio_acceptance=0\n",
+								m_playback_dma_reads, unsigned(address), value, time, writer.time, writer.pc, writer.word, writer.mask);
+						}
 						capture_playback_word(2,value);
 						m_playback_dma_hash = (m_playback_dma_hash ^ (value >> 8)) * 16777619U;
 						m_playback_dma_hash = (m_playback_dma_hash ^ (value & 0xff)) * 16777619U;
@@ -2897,6 +2913,7 @@ private:
 		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
+		m_playback_buffer_writes.fill(playback_buffer_write{});
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;
 		m_playback_tx_time_hash = 2166136261U;

@@ -6,7 +6,9 @@ The MU4 bench executes the 5510's separate music DSP. Its captured recording
 and FFmpeg comparison are diagnostic evidence, not decoder conformance or
 native handset speech acceptance. The coherent fresh record/save/cold-reopen
 control reaches 376 successful decoder calls with consumed input-byte coverage;
-detailed arithmetic and actual decoded-bank copy correspondence cover eight calls. The protected
+detailed arithmetic and actual decoded-bank copy correspondence cover eight
+calls. A bounded actual DMA capture identifies intervening processing writes at
+context `02a2ea`, rather than direct consumption of copy-helper output. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -1001,3 +1003,27 @@ coverage as unknown, not zero. This closes the mapped program-alias caveat for
 this window, not the unvalidated physical DA150 RAM extent. It does not establish
 downstream DMA read epochs, codec pin/reset ownership, whole-track playback,
 analog sound or GSM speech.
+
+### Actual DMA Buffer Epochs
+
+The `bootplaystage` diagnostic records channel-3 reads only while
+`source_read_matches(3, AS_DATA, address)` owns the actual bus transaction. In
+the same 1.0--1.25-second window it retains the latest data-space write to
+`1000..137f`, including value, mask, time and context PC. No register or sample
+is changed by either observer. This is diagnostic provenance, not hardware state
+and not a save/restore acceptance run.
+
+A repeat finalized-NAND capture preserves the eight-block copy proof above and
+contains 22050 consecutive actual DMA reads, from 1.000004308 to 1.249982966
+seconds. Of these, 19458 match full-word writes at context `02a2ea`; 2592 have
+no writer observed after the window opens and remain unclassified. **Zero** DMA
+reads have the copy helper (`02a367`) as their latest writer. Thus the copied
+decoder samples are not directly consumed in this window: a later processing
+write intervenes. This does not prove that processing preserves sample values,
+nor that every copied word eventually reaches DMA. The next provenance target
+is the routine producing `02a2ea` writes, not a fitted copy-to-DMA alignment.
+
+Run `mu4_pcm_dma_epoch_check.py RUN/error.log` alongside the copy checker. It
+checks actual read ownership, consecutive ordinals, last-write chronology and
+word equality; any direct copy-origin claim must also match an actual logged
+copy-write epoch. Its output deliberately keeps native audio validation false.
