@@ -8932,6 +8932,24 @@ The remaining policy question needs the legitimate producer/consumer
 contract or an independent handset playback reference, not another guessed
 peripheral response.
 
+`playback_pending_control` pins 147 further AA99 words around the controller
+and input-16 receiver. Controller `020769` enables CPL and loads request
+frame word 2 into AR1. Its input `17` branch at `0207f5` stores **one** to
+`12fc`, independent of the parameter; it is not a zero-valued input-17
+producer. Input `16` at `0207fa` instead sets `12fa/15db` and copies frame
+word 3 into `12fb`, which the previously mapped sender forwards as input-16
+payload. Receiver `029458` replies `8016`, passes frame word 5 through
+`0291d3`, then adds `3708` and prepares frame words 1=`9`, 0=low(A) before
+calling `0299cc`. The complete 50-word copy helper selects forward copying
+when source AR4 exceeds destination AR0 and backward copying otherwise,
+with a zero-count exit. This call copies nine words from `3708 + parameter`
+to reply frame word 5. The acquired image's hook at `0291d3` is
+`NOP; NOP; RET`; runtime replacement and live argument ownership are not
+closed. These source fragments distinguish a reply-copy control from an
+established EOF/drain operation. Next resolve the input-16 argument producer
+and original controller's end-of-input protocol before changing cleanup.
+Every pinned word has a mutation test; no message or state is injected.
+
 The directory's adjacent `ADDM #1,*SP(2)` / `LD *SP(2),A` dependency
 requires same-address forwarding. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 section 7.3.2 specifies an internal-bus bypass for an on-chip read from a

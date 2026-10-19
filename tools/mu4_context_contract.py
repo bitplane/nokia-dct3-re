@@ -909,6 +909,50 @@ def reference_refill_control(reply, pending16, pending17):
     return None
 
 
+PLAYBACK_PENDING_CONTROL = {
+    0x20769: (0x4a08,0xeeed,0x7211,0x12f7,0xf495,0x6c81,0x0952,
+              0x76f8,0x12f7,1,0x76f8,0x12f8,0,0x4818,0xf000,2,
+              0xf982,0x960c,0x7716,1,0x7717,0,0xf7b8,0x7102,0x0011),
+    0x207bc: (0x10f8,0x0011,0xf010,0x0017,0xf846,0x07d9,
+              0x10f8,0x0011,0xf010,0x0017,0xf845,0x07f5,
+              0x7710,0x0014,0xf4a9,0xf830,0x0825,
+              0x7710,0x0015,0xf4a9,0xf830,0x0804,
+              0x7710,0x0016,0xf4a9,0xf830,0x07fa,0xf073,0x0866),
+    0x207f5: (0x76f8,0x12fc,1,0xf073,0x093d,
+              0x76f8,0x12fa,1,0x76f8,0x15db,1,0x7103,0x12fb,0xf073,0x093d),
+    0x29458: (0xe781,0x6de9,5,0x1081,0x7604,0x8016,0xf982,0x91d3,
+              0xf020,0x3708,0x7601,9,0x8000,0x4811,0xf982,0x99cc,
+              0x4818,0x7600,0x000a,0xf000,4,0xf982,0x929c,0xf073,0x95af),
+    0x291d3: (0xf495,0xf495,0xf4e4),
+    0x299cc: (0x8813,0x4a11,0xeeff,0xe730,0x7104,0x0014,0xf6ac,0xfa30,
+              0x99ef,0x1105,0xe732,0x4814,0x00f8,0x000b,0x8811,0x4813,
+              0x00f8,0x000b,0x490b,0xfa4d,0x99f9,0xf495,0x8812,0xf310,
+              1,0x891a,0xf495,0xf072,0x99ec,0x10e9,0xffff,0x80ea,
+              0xffff,0xf073,0x99f9,0x490b,0xf84d,0x99f9,0xf310,1,
+              0x891a,0xf495,0xf072,0x99f8,0xe5a8,0xee01,0x4813,0x8a11,
+              0xf495,0xf4e4),
+}
+
+
+def decode_playback_pending_control(words):
+    for base, witness in PLAYBACK_PENDING_CONTROL.items():
+        for offset, expected in enumerate(witness):
+            if words.get(base + offset) != expected:
+                raise ValueError(f'pending-control witness changed at {base + offset:06x}')
+    return dict(pinned_words=sum(map(len, PLAYBACK_PENDING_CONTROL.values())),
+                controller=dict(entry='020769', request='CPL frame word 2 -> AR1',
+                                input17='0207f5: pending 12fc <- 1',
+                                input16='0207fa: 12fa <- 1; 15db <- 1; 12fb <- frame word 3'),
+                receiver16=dict(entry='029458', reply='8016',
+                                argument='frame word 5 -> A; CALL 0291d3',
+                                source_hook='0291d3: NOP; NOP; RET',
+                                continuation='A += 3708; frame[1] <- 9; frame[0] <- low(A); CALL 0299cc; send through 02929c',
+                                copy='0299cc: nine words from 3708 + parameter to reply frame word 5',
+                                copy_direction='source AR4 > destination AR0: forward; otherwise backward; zero count skips body'),
+                scope='Pinned source fragments, not live message ownership, runtime execution or '
+                      'hook immutability, an EOF/drain command or an all-producer closure')
+
+
 def decode_playback_refill_control(words):
     for base, witness in PLAYBACK_REFILL_CONTROL.items():
         for offset, expected in enumerate(witness):
@@ -1638,6 +1682,7 @@ def contract(source):
     result['playback_cleanup_ingress'] = decode_playback_cleanup_ingress(rel_words)
     result['playback_input_units'] = decode_playback_input_units(rel_words, bootstrap_words)
     result['playback_refill_control'] = decode_playback_refill_control(rel_words)
+    result['playback_pending_control'] = decode_playback_pending_control(rel_words)
     result['playback_refill_completion'] = decode_playback_refill_completion(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)

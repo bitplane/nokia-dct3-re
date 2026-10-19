@@ -20,6 +20,7 @@ from tools.mu4_context_contract import playback_lifecycle_literal_census
 from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback_cleanup_ingress
 from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
 from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_refill_control, reference_refill_control
+from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback_pending_control
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -110,6 +111,23 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_playback_refill_control(changed)
+
+    def test_pending_control_producer_and_receiver_are_source_pinned(self):
+        words = {base+i: value for base, witness in PLAYBACK_PENDING_CONTROL.items()
+                 for i, value in enumerate(witness)}
+        result = decode_playback_pending_control(words)
+        self.assertEqual(result['pinned_words'], len(words))
+        self.assertIn('12fc <- 1', result['controller']['input17'])
+        self.assertIn('frame word 3', result['controller']['input16'])
+        self.assertEqual(result['receiver16']['reply'], '8016')
+        self.assertIn('nine words', result['receiver16']['copy'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_playback_pending_control(changed)
+        with self.assertRaises(ValueError):
+            decode_playback_pending_control({})
 
     def test_input_units_pins_descriptor_and_word_reader_argument_flow(self):
         images = [{base+i: value for base, witness in spans.items()
