@@ -2460,6 +2460,17 @@ encoded halves at offsets `24`/`30` against the current NV slot, update RAM
 state, or launch another record transaction. Tests exercise checksum failure,
 both bypasses and the index boundary without injecting handset messages.
 
+`noki5510_records_observe.lua` composes the existing identity/NV observer
+with bounded entry counters for both reply consumers. A fresh eight-second
+`nmp5hle` run in `tmp/native-gates/npm5-record-consumers` observes zero
+entries for each, terminal state byte `1204dd=02`, record index
+`1204e6=00`, and receipt flag `1204df=00`. Both the hybrid bootstrap and
+identity/NV checkers pass on that capture (132 NV requests). Thus the four
+outbound requests are observed without these reply consumers executing in
+the captured interval; there is no observed failing reply to decode. This
+does not establish that they must precede graphical boot or that supplying
+them would repair the independently observed erased-NV checksum failures.
+
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,
 inside a command dispatcher; this census does not classify computed/ARM
