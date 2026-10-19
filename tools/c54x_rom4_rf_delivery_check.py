@@ -202,7 +202,7 @@ def check(text, consumer_case=False, consumer_effects=False, consumer_decision=F
             matches(address="000101c8", value=f"{cursor:08x}", mask="0000ffff"))
         times.append(float(consumed["t"]))
     index, header = after(index + 1, "status_header_write",
-        matches(pc="0026be48", value="13900000", mask="ffff0000"))
+        matches(pc="0026be4a", value="13900000", mask="ffff0000"))
     object_address = header["address"]
     times.append(float(header["t"]))
     index, posted = after(index + 1, "post_fetch",

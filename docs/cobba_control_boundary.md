@@ -327,10 +327,10 @@ the active TC-mode interpretation remain to be validated numerically.
 
 ### Current RF-control reproducibility boundary
 
-A fresh `run_c54x_rom4_rf_delivery.py --repeats 1` check against binary
-SHA-256 `a4de2e3a9a48dcfb9cb305bbca31d4df550ec5306a8097eff6c4c55c1fda76fd`
-does not reproduce the accepted-store result below. Zero produces 4890
-completed zero scores; rotating input produces 4890 nonzero scores, maximum
+A fresh `run_c54x_rom4_rf_delivery.py --repeats 2` check against binary
+SHA-256 `ad5d01d874927418efc79b47311cb0ab7bc300a910d4b4b985a20b1ec36cc623`
+does not reproduce the accepted-store result below. Both zero controls produce
+4,888 completed zero scores; both rotating controls produce 4,888 nonzero scores, maximum
 `0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
 `0x0574`. The strict rotating-input gate fails and is not rebanked.
 The retained comparison data below therefore describes earlier captures,
@@ -347,6 +347,13 @@ body `006d`), request correlation and channel-109 numerical tuning consistency.
 Neither has an accepted score. The zero case passes its control conditions;
 the rotating case fails only score acceptance. This is not physical RF input,
 successful acquisition or registered-network evidence.
+
+The MCU response header belongs to `STRH r0,[r4]` (`8020`) at `26be4a`,
+not the preceding literal load at `26be48`. The observer pins that opcode
+before installing its write tap, and the checker requires the store-owned PC,
+upper-halfword `1390` write, correlated post and subsequent task-10 receipt
+in order. Both fresh controls reproduce this chain; a missing observation at
+the adjacent load is not evidence that native response delivery stopped.
 
 The runner writes schema-2 `result.json` per case and `summary.json` even
 when a checker fails. Observed values and independently evaluated boundaries

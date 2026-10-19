@@ -34,6 +34,9 @@ taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(3, 3, "rf_window_control", 
     port3 = next_value
 end)
 local mcu = assert(machine.devices[":maincpu"])
+-- The header store follows the literal load at 26be48; taps report its owner PC.
+assert(mcu.spaces["program"]:read_u16(0x26be4a) == 0x8020,
+    "RF header STRH owner differs from the checked NSE-1 image")
 local mcu_ring_writes = 0
 local post_fetches = 0
 local consumer_case_observations = 0
@@ -155,7 +158,7 @@ taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x254c80, 0x254cff,
     end)
 taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x100000, 0x17ffff,
     "rf_status_header_write", function(offset, value, mask)
-        if mcu.state["PC"].value == 0x26be48 then
+        if mcu.state["PC"].value == 0x26be4a then
             machine:logerror(string.format(
                 "rom4_rf_status_header_write: t=%.9f pc=%08x address=%08x value=%08x mask=%08x\n",
                 machine.time:as_double(), mcu.state["PC"].value, offset, value, mask))
