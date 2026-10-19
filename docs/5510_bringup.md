@@ -2470,6 +2470,11 @@ outbound requests are observed without these reply consumers executing in
 the captured interval; there is no observed failing reply to decode. This
 does not establish that they must precede graphical boot or that supplying
 them would repair the independently observed erased-NV checksum failures.
+Use the identity checker with `--records` for this observer: it additionally
+requires four ordered, matching HLE/transport request observations, erased
+record payloads, zero consumer entries and the qualified terminal state.
+It rejects incomplete, duplicate or changed evidence rather than treating
+a missing trace as proof of absence.
 
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,

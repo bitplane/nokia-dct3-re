@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 import sys
@@ -28,6 +29,41 @@ def record_reply_entry_eligible(message, record_index, state):
         return False
     total = sum(struct.unpack_from('>25H', message, 10)) & 0xffff
     return struct.unpack_from('>H', message, 0x3c)[0] == (total ^ 0xffff)
+
+
+def check_record_capture(text):
+    """Qualify the observed erased-NV frontier, not a general reply protocol."""
+    scopes = records(text, '5510_records_scope')
+    ends = records(text, '5510_records_terminal')
+    if scopes != [{'reply34':'0029fdc4','reply35':'0029ffe8',
+                   'state':'001204dc','cap':'16','observer_writes':'0'}]:
+        raise ValueError('missing or changed record observer scope')
+    if ends != [{'reply34':'0','reply35':'0','state':'02','index':'00',
+                 'receipt34':'00','cap':'16','observer_writes':'0'}] or records(text,'5510_records_reply'):
+        raise ValueError('capture differs from the qualified no-reply frontier')
+    expected = [(6,'1304',4),(14,'140c',12),(22,'1514',20),(26,'1618',24)]
+    streams = []
+    for prefix, extra in [('dsp_hle: TX packet','words=\\d+ radio_phase=\\S+'),
+                          ('dspif_transport: TX consume','words=\\d+ consumer=[0-9a-f]+')]:
+        rows = re.findall(re.escape(prefix) + r' type=70 payload=(\d+) ' + extra +
+                          r' data=([0-9a-f]+) t=(\d+\.\d+)', text)
+        selected = [(int(n),data,float(t)) for n,data,t in rows if data[:4] in
+                    {item[1] for item in expected}]
+        if len(selected) != 4:
+            raise ValueError('missing or repeated factory-record request')
+        for (length,data,t),(wanted,header,count) in zip(selected,expected):
+            if length != wanted or len(data) != length*2 or not data.startswith(header):
+                raise ValueError('factory-record request order or size changed')
+            if header != '1304' and data[4:] != 'ff'*count:
+                raise ValueError('factory-record payload is not the qualified erased NV')
+        if any(a[2] >= b[2] for a,b in zip(selected,selected[1:])):
+            raise ValueError('factory-record request times not increasing')
+        streams.append(selected)
+    if streams[0] != streams[1]:
+        raise ValueError('HLE and transport factory-record observations disagree')
+    return {'requests': [{'payload':data,'time':t} for _,data,t in streams[0]],
+            'reply34_entries':0,'reply35_entries':0,
+            'scope':'Bounded erased-NV capture; not reply necessity or boot acceptance'}
 
 
 def wire_identity(packed, selector, svn=6):
@@ -139,12 +175,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--firmware',type=Path,required=True)
+    parser.add_argument('--records',action='store_true',help='require bounded factory-record capture')
     args = parser.parse_args()
     try:
         contract = identity_contract(args.firmware.read_bytes())
         text = (args.directory/'error.log').read_text()
         inventory = check_reads(text,(args.directory/'npm5_nv_cache.bin').read_bytes(),contract['nv_contract'])
         result = check_formatting(text,contract)
+        if args.records:
+            result['record_capture'] = check_record_capture(text)
         result.update(source_contract=contract,nv_requests=inventory['requests'],
                       valid_product_nv=False, unobserved_selector_execution_claim=False)
         print(json.dumps(result,indent=2))
