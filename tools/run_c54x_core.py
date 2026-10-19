@@ -324,6 +324,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "pmac-mod3-edge": (
+        "TMS320C54x program multiply MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated program multiply MOD3 exclusions complete",
+    ),
     "ov-branch-pipe": (
         "TMS320C54x staged overflow branches: PASS cases=4608 restore=4608 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 producers=seed,SSBX,RSBX gaps=0,1,2 pages=2 snapshots=4 selected_flag_clear=1 post_evaluate_mutation=2 literal_reads=1 target_fetches=once writes=0 reset_before_restore=1 arithmetic_producers=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated staged overflow branches complete",
@@ -2199,6 +2203,8 @@ EXTRA_PROFILES = {
 
 
 def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_io=False, compose=False, bus_stm=False, mapped_read_a=False, dp_absolute=False, profile=None, verbose_teardown=False):
+    if re.search(r'^c54x_failure:', text, re.MULTILINE):
+        raise ValueError('conformance assertion diagnostic is present')
     if re.search(r'invalid BIOS|reverting to default', text, re.IGNORECASE):
         raise ValueError('fixture BIOS selection fell back to another configuration')
     scopes = [(bus_registers, BUS_REGISTER_REQUIRED, BUS_REGISTER_COMPLETION),
@@ -2269,6 +2275,8 @@ def main():
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
+        machine = "tms54xtra"
+    if args.profile == "pmac-mod3-edge":
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

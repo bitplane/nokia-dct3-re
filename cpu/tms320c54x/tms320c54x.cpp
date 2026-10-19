@@ -7038,6 +7038,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7800: case 0x7900: // MACP Smem, pmad, A/B
 	case 0x7a00: case 0x7b00: // MACD Smem, pmad, A/B
 	{
+		// Smem is read; MACD's implicit write is to Smem+1, not this operand.
+		// SPRU131G 5.5.3.1 excludes short preincrement from source reads.
+		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 coefficient_address;

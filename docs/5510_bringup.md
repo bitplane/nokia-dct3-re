@@ -97,6 +97,7 @@ fail-closed emulator contracts, not claims about silicon traps.
 | `long-pair` / `drsub` | 3,584 each | 14 paired-arithmetic classes including C16; rejection adds no positive staged T-variant support. |
 | `logic-short` | 2,816 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW, WRITA and MVDP; 576 positive logic cases run separately. |
 | `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
+| `pmac-mod3-edge` (`tms54xtra`) | 512 | MACP/MACD A/B; all ARs, CMPT modes, pages, frontends and two checkpoints; no data access or program/I/O write. |
 
 Corrected positive load domains are:
 
@@ -151,6 +152,37 @@ boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
 3210 baseline/frontier regressions pass without rebanking their oracles.
 Other implicit-copy, read/modify/write and unenumerated read families
 remain open; the RMW operand role must not be guessed from this source rule.
+
+MACP/MACD source admission is separately corrected. SPRU172C pages 4-87
+and 4-89 define Smem as the value read into the multiply and T; MACD's
+implicit copy writes its successor location, not the source operand. The
+atomic handler formerly applied short preincrement before reading that
+source. An unchanged-core run of `pmac-mod3-edge` fails on a data transaction;
+the guard now rejects `98..9f` before address modification or operand access.
+This is fail-closed emulation of an unsupported operand form, not a claimed
+silicon exception. It does not introduce positive staged MACP/MACD support.
+
+Run `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms
+--profile pmac-mod3-edge --output-root tmp`. Its 512 cases and restores cover
+four opcode classes across eight ARs, CMPT, page, frontend and save-point
+choices. Existing postdecrement/postincrement, absolute and long-offset
+MACP/MACD examples remain in the default core regression; long MOD=13 is not
+removed. The remaining source/RMW audit is still not an all-ISA closure.
+The cold finalized MU4 prefix preserves all seven prior digital captures
+byte-for-byte (decoded returns, DMA, DXR writes, TX words/times and DIN
+words/slots); its independent ideal-DAC checker also passes. This excludes
+an observed prefix regression, not every media stream or completed playback.
+
+The repeated immediate-ST fixture distinguishes first-body postincrement from
+later retained iterations. Its qualified postincrement address update is in
+Access, two clocks before the first literal write; later repeat updates occur
+one clock before their writes. Other addressing forms retain their separately
+qualified schedule. The earlier first-update assertion incorrectly applied the
+later-iteration timing to postincrement; correcting it changes no store
+execution. This is the existing emulator phase contract, not a new physical
+timing claim. Conformance failures now print the case, tick, replay, registers
+and transaction counters, and the runner rejects any such assertion diagnostic
+even if completion markers are also present.
 
 ### Standalone staged MVDP
 

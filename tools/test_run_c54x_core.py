@@ -14,6 +14,21 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_program_multiply_mod3_requires_full_scope(self):
+        marker, ending = EXTRA_PROFILES['pmac-mod3-edge']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='pmac-mod3-edge')
+        with self.assertRaises(ValueError):
+            check_result('c54x_failure: phase=1 case=0\n' + text, 3, profile='pmac-mod3-edge')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'),
+                                 3, profile='pmac-mod3-edge')
+        for bad in (marker, text + '\n' + marker, text + '\nunexpected'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                check_result(bad, 3, profile='pmac-mod3-edge')
+
     def test_move_repeat_ownership_requires_full_scope(self):
         marker, ending = EXTRA_PROFILES['move-rpt-owner']
         text = marker + '\n' + ending
