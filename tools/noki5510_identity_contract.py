@@ -52,6 +52,20 @@ def record_reply_slot_binding(message, cache, record_index):
             and message[0x30:0x3c] == cache[offset+12:offset+24])
 
 
+def record_scan_tail(index, armed, retained):
+    """2a04ba..2a052a branch only, after earlier handler state updates."""
+    if any(not isinstance(value,int) or not 0 <= value <= 255
+           for value in (index,armed,retained)):
+        raise ValueError('scan-tail inputs must be byte state')
+    if index >= 10 or armed != 1:
+        return {'request_index':None,'stored_index':index,'armed':0}
+    if retained != 0:
+        return {'request_index':None,'stored_index':index,'armed':armed}
+    next_index = index + 1
+    return {'request_index':next_index % 10,'stored_index':next_index,
+            'armed':armed,'state':2}
+
+
 def check_record_capture(text, flash_word=None):
     """Qualify the observed erased-NV frontier, not a general reply protocol."""
     scopes = records(text, '5510_records_scope')
@@ -164,7 +178,8 @@ def identity_contract(firmware):
                                    (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c),
                                    (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e),
                                    (0x39cc20,0x39cc4e),(0x39ce0e,0x39ce14),
-                                   (0x2a02aa,0x2a02ea),(0x3aea44,0x3aeabc))},
+                                   (0x2a02aa,0x2a02ea),(0x3aea44,0x3aeabc),
+                                   (0x2a04ba,0x2a053a))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 

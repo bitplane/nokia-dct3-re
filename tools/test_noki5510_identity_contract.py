@@ -2,7 +2,7 @@ import unittest
 
 from tools.noki5510_identity_contract import (wire_identity, display_identity,
     check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture,
-    record_reply_nibble_filter, record_reply_slot_binding)
+    record_reply_nibble_filter, record_reply_slot_binding, record_scan_tail)
 
 
 def decode_mobile_identity(data):
@@ -25,6 +25,22 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_bounded_record_scan_tail_and_terminal_sentinel(self):
+        state = {'stored_index':0,'armed':1}
+        requests = []
+        for _ in range(11):
+            state = record_scan_tail(state['stored_index'],state['armed'],0)
+            if state['request_index'] is not None:
+                requests.append(state['request_index'])
+        self.assertEqual(requests,list(range(1,10))+[0])
+        self.assertEqual(state,{'request_index':None,'stored_index':10,'armed':0})
+        for index in range(10):
+            self.assertIsNone(record_scan_tail(index,1,1)['request_index'])
+            self.assertEqual(record_scan_tail(index,0,0)['armed'],0)
+        for args in [(-1,1,0),(0,256,0),(0,1,256)]:
+            with self.assertRaises(ValueError):
+                record_scan_tail(*args)
+
     def test_record_reply_binding_uses_nv_slot_not_identity_offset(self):
         cache = bytearray(b'\xff'*0x3800)
         for slot in range(10):

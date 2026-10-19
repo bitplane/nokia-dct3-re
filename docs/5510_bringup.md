@@ -2522,6 +2522,18 @@ in the qualified eight-second erased-NV capture. This is a source-mapped
 continuation, not an observed transaction or justification for inventing its
 DSP response. Recovering reply `35`'s full acceptance path alone therefore
 would not establish the algorithm needed for subsequent transactions.
+The reply handler's scan tail at `2a04ba..2a052a` is separately bounded.
+Given its post-validation index `< 10`, scan-armed byte `state+7 == 1`
+and no retained-result flag (R8 zero), it increments the index, reads the
+next 24-byte NV slot and sends subcommand `16`, returning to state 2.
+Incrementing slot 9 wraps the requested slot to 0 but stores sentinel index
+10 after sending. A subsequent tail with index 10 clears scan-armed rather
+than requesting another slot. Thus an all-miss tail sequence requests slots
+`1..9,0` after the initial slot-0 request; it is not an unbounded retry.
+The host reference qualifies only these tail inputs and branches, not the
+earlier validation/state updates or receipt of real DSP responses. A
+retained result suppresses this next-slot request. The observed initial
+state 2/index 0 does not demonstrate any of these continuations executing.
 
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,
