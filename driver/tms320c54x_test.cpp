@@ -5996,6 +5996,7 @@ private:
 		u32 base;
 		u16 initial, immediate, result, st0, st1, final_st0;
 		bool t = false, short_form = false;
+		unsigned short_ar_form = 0;
 		unsigned read = 7, write = 8, extensions = 2;
 	};
 	ar_addm_fixture ar_addm_case(unsigned variant) const
@@ -6017,7 +6018,8 @@ private:
 	{
 		bool const brc = !strcmp(machine().options().bios(), "addm-brc");
 		bool const t = !strcmp(machine().options().bios(), "addm-t");
-		auto f = ar_addm_case(t ? (variant / 2) * 8 : brc ? variant * 8 : variant);
+		bool const short_ar = !strcmp(machine().options().bios(), "addm-ar-short");
+		auto f = ar_addm_case(t ? (variant / 2) * 8 : brc ? variant * 8 : short_ar ? variant / 2 : variant);
 		if (brc) f.reg = 10;
 		if (t)
 		{
@@ -6027,6 +6029,14 @@ private:
 				--f.read; --f.write; --f.checkpoint; --f.extensions;
 				f.st0 &= ~0x1ff; f.final_st0 &= ~0x1ff;
 			}
+		}
+		if (short_ar)
+		{
+			f.short_ar_form = variant % 2 + 1; f.short_form = true;
+			--f.read; --f.write; --f.checkpoint; --f.extensions;
+			f.st0 &= ~0x1ff; f.final_st0 &= ~0x1ff;
+			if (f.short_ar_form == 2 && (f.st1 & 0x20))
+				f.final_st0 = (f.final_st0 & ~0xe000) | ((f.reg == 4 ? 5 : 4) << 13);
 		}
 		return f;
 	}
@@ -6041,13 +6051,15 @@ private:
 		program.write_word(f.base + 0x9000, 0x6bf8); program.write_word(f.base + 0x9001, 0x10 + f.reg);
 		program.write_word(f.base + 0x9002, f.immediate); program.write_word(f.base + 0x9003, 0xf4e1);
 		program.write_word(f.base + 0x9001, address);
-		if (f.short_form) { program.write_word(f.base + 0x9000, 0x6b0e); program.write_word(f.base + 0x9001, f.immediate); program.write_word(f.base + 0x9002, 0xf4e1); }
+		unsigned const pointer = f.reg == 4 ? 5 : 4;
+		if (f.short_form) { program.write_word(f.base + 0x9000, 0x6b00 | (f.t ? 0x0e : f.short_ar_form == 2 ? 0x80 | pointer : address)); program.write_word(f.base + 0x9001, f.immediate); program.write_word(f.base + 0x9002, 0xf4e1); }
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
 		for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, !f.t && ar == f.reg ? f.initial : 0x3000 + ar);
+		if (f.short_ar_form == 2) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + pointer, address);
 		if (brc) m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.initial);
 		if (f.t) m_cpu->set_state_int(tms320c54x_device::STATE_T, f.initial);
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
@@ -19805,6 +19817,7 @@ private:
 		if (!strcmp(machine().options().bios(), "sat")) { start_sat(); return; }
 		if (!strcmp(machine().options().bios(), "rotate")) { start_rotate(); return; }
 		if (!strcmp(machine().options().bios(), "addm-ar")) { start_ar_addm(); return; }
+		if (!strcmp(machine().options().bios(), "addm-ar-short")) { start_ar_addm(); return; }
 		if (!strcmp(machine().options().bios(), "addm-brc")) { start_ar_addm(); return; }
 		if (!strcmp(machine().options().bios(), "addm-t")) { start_ar_addm(); return; }
 		if (!strcmp(machine().options().bios(), "addm-brc-loop")) { start_addm_brc_loop(); return; }
@@ -20182,10 +20195,10 @@ private:
 				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
-				(rom4_codec_is("efr-dtx-decoder") || !strcmp(machine().options().bios(), "efr-erasure") || !strcmp(machine().options().bios(), "efr-loss-observe") ||
+				(rom4_codec_is("efr-dtx-decoder") || rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ||
 				 rom4_codec_is("efr-homing") || !strcmp(machine().options().bios(), "efr-home-errors") || rom4_codec_is("efr-invalid-sid")))
 		{
-			enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : "EFR homing decoder");
+			enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
 			start_rom4_efr_decoder(0, true);
 			return;
 		}
@@ -21336,6 +21349,7 @@ private:
 		else if(bios=="efr-dtx-dec") bios="efr-dtx-decoder";
 		else if(bios=="efr-ehome") bios="efr-enc-homing";
 		else if(bios=="efr-isid") bios="efr-invalid-sid";
+		else if(bios=="efr-loss") bios="efr-loss-observe";
 		return bios==name;
 	}
 	void enable_rom4_codec_pipeline(char const *kind)
@@ -21408,7 +21422,7 @@ private:
 		char const *const bios = machine().options().bios();
 		if (rom4_codec_is("efr-dtx-decoder")) return { "efr_dtx_input", "efr_dtx_pcm", " DTX", 518 };
 		if (rom4_codec_is("efr-invalid-sid")) return { "efr_invalid_sid_input", "efr_invalid_sid_pcm", " invalid SID", 518 };
-		if (!strcmp(bios, "efr-erasure") || !strcmp(bios, "efr-loss-observe")) return { "efr_erasure_input", "efr_erasure_pcm", " erasure", 163 };
+		if (rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe")) return { "efr_erasure_input", "efr_erasure_pcm", " erasure", 163 };
 		if (rom4_codec_is("efr-homing")) return { "efr_homing_input", "efr_homing_pcm", " homing", 46 };
 		if (!strcmp(bios, "efr-home-errors")) return { "efr_homing_error_input", "efr_homing_error_pcm", " homing error", 49 };
 		return { "efr_reference_input", "efr_reference_pcm", "", 163 };
@@ -21486,6 +21500,9 @@ private:
 					"Original recovery wrapper explicitly stores zero to previous-bad-frame state");
 			osd_printf_info("EFRFLAG frame=%u stage=%s value=%04x\n", frame, before ? "before" : "after", unsigned(data.read_word(0xab9)));
 		}
+		if (frame == 8 && address == 0xc38c && m_rom4_fr_trace_count++ < 16)
+			osd_printf_info("EFRADDM frame=8 owner=%04x opcode=%04x ar4=%04x value=%04x\n", unsigned(address), opcode,
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(data.read_word(m_cpu->state_int(tms320c54x_device::STATE_AR4))));
 		if (address == 0xc7a0)
 		{
 			expect(opcode == 0xe801, "EFR LSF observation is the original post-decoder instruction");
@@ -22501,16 +22518,20 @@ private:
 			}
 			if (tick == 24)
 			{
+				if (f.short_ar_form && (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(destination) != f.result || m_cpu->state_int(tms320c54x_device::STATE_ST0) != f.final_st0 || m_cpu->state_int(tms320c54x_device::STATE_ST1) != f.st1))
+					osd_printf_info("Short ADDM mismatch: variant=%u replay=%u idle=%u result=%04x/%04x st0=%04x/%04x st1=%04x/%04x reads=%u writes=%u extensions=%u\n", variant, unsigned(m_pipeline_replay), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), unsigned(m_cpu->state_int(destination)), f.result, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), f.final_st0, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), f.st1, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == f.extensions && m_cpu->state_int(destination) == f.result && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Mapped ADDM preserves retained operands, arithmetic flags and unaffected accumulators");
-				for (unsigned ar = 0; ar < 8; ++ar) if (f.t || ar != f.reg) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0x3000 + ar, "Mapped ADDM does not retarget other ARs under CMPT");
+				for (unsigned ar = 0; ar < 8; ++ar) if (f.t || ar != f.reg) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (f.short_ar_form == 2 && ar == (f.reg == 4 ? 5U : 4U) ? 0x10 + f.reg : 0x3000 + ar), "Mapped ADDM does not retarget other ARs under CMPT");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					if (f.short_ar_form) m_cpu->set_pipeline_frontend(true);
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped ADDM without resampling or duplicate publication");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = ar_addm_phase + 1; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (f.t ? 6143 : brc ? 3071 : 24575)) { start_ar_addm(variant + 1); return; }
+				if (variant < (f.short_ar_form ? 49151 : f.t ? 6143 : brc ? 3071 : 24575)) { start_ar_addm(variant + 1); return; }
+				if (f.short_ar_form) { osd_printf_info("TMS320C54x short mapped AR ADDM: PASS cases=49152 restore=49152 forms=DP,indirect registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=6 write=7 retained_source=1 modifying_forms=excluded physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated short mapped AR ADDM complete"); }
 				if (f.t) { osd_printf_info("TMS320C54x mapped T ADDM: PASS cases=6144 restore=6144 forms=DP,absolute values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 retained_source=1 newer_t_overwritten=1 duplicate_reads=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped T ADDM complete"); }
 				if (brc) { osd_printf_info("TMS320C54x mapped BRC ADDM: PASS cases=3072 restore=3072 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 retained_source=1 active_loop_composition=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped BRC ADDM complete"); }
 				osd_printf_info("TMS320C54x mapped AR ADDM: PASS cases=24576 restore=24576 registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 accumulators_preserved=1 silicon_phase_claim=0\n");
@@ -53938,8 +53959,8 @@ private:
 		{
 			bool const dtx = rom4_codec_is("efr-dtx-decoder");
 			bool const invalid_sid = rom4_codec_is("efr-invalid-sid");
-			bool const observing = !strcmp(machine().options().bios(), "efr-loss-observe");
-			bool const erasure = observing || !strcmp(machine().options().bios(), "efr-erasure");
+			bool const observing = rom4_codec_is("efr-loss-observe");
+			bool const erasure = observing || rom4_codec_is("efr-erasure");
 			bool const homing = rom4_codec_is("efr-homing");
 			bool const homing_errors = !strcmp(machine().options().bios(), "efr-home-errors");
 			auto const fixture = rom4_efr_decoder_fixture();
@@ -54903,7 +54924,7 @@ void tms320c54x_test_state::rom4(machine_config &config)
 			else if (m_phase == 304001 && !m_rom4_codec_replay && ++m_rom4_fr_trace_count <= 200000)
 				trace_rom4_fr_state("efr_frame_execute", address, opcode);
 		});
-	if (!strcmp(config.options().bios(), "efr-loss-observe"))
+	if (!strcmp(config.options().bios(), "efr-loss-observe") || !strcmp(config.options().bios(), "efr-loss-pipe"))
 		m_cpu->instruction_observer_cb().set(FUNC(tms320c54x_test_state::observe_rom4_efr_state));
 	if (!strcmp(config.options().bios(), "efr-home-errors"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
@@ -56631,6 +56652,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(188, "tmac-rpt-edge", "Repeated T-based MAC mapped and peripheral exclusions")
 	ROM_SYSTEM_BIOS(189, "lms", "Paired LMS samples and dual accumulator Execute ownership")
 	ROM_SYSTEM_BIOS(190, "lms-edge", "LMS mapped and peripheral operand exclusions")
+	ROM_SYSTEM_BIOS(191, "addm-ar-short", "Short DP and plain indirect mapped AR ADDM ownership")
 ROM_END
 
 ROM_START(tms54rom4)
@@ -56663,7 +56685,15 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(26, "efr-ehome-pipe", "Isolated acquired ROM EFR encoder homing on staged CPU")
 	ROM_SYSTEM_BIOS(27, "efr-homing-pipe", "Isolated acquired ROM EFR decoder homing on staged CPU")
 	ROM_SYSTEM_BIOS(28, "efr-isid-pipe", "Isolated acquired ROM EFR invalid SID decoder on staged CPU")
+	ROM_SYSTEM_BIOS(29, "efr-erasure-pipe", "Strict acquired ROM EFR erasure comparison on staged CPU")
+	ROM_SYSTEM_BIOS(30, "efr-loss-pipe", "Characterize staged EFR loss differences without conformance promotion")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(29))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(30))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(28))
@@ -56752,6 +56782,12 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(29))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(30))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(28))
@@ -56864,9 +56900,13 @@ ROM_START(tms54rom4)
 	ROM_REGION(80522, "efr_erasure_input", 0)
 	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(13))
 	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(16))
+	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(29))
+	ROMX_LOAD("erasure.dec", 0, 80522, CRC(22c45c1f) SHA1(d43031c892249f8bb518bd22cea3b3211f9faeb4), ROM_BIOS(30))
 	ROM_REGION(52160, "efr_erasure_pcm", 0)
 	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(13))
 	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(16))
+	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(29))
+	ROMX_LOAD("erasure.out", 0, 52160, CRC(804fa6e4) SHA1(2354fca3c58245950b00734f002acbcb354a323b), ROM_BIOS(30))
 	ROM_REGION(165760, "efr_dtx_encoder_pcm", 0)
 	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(12))
 	ROMX_LOAD("dtx.inp", 0, 165760, CRC(4e0886dc) SHA1(d9b80f83f09556f430f03deb17c207b4aefe782e), ROM_BIOS(24))

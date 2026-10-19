@@ -4161,9 +4161,10 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		if ((m_pipeline_word[3] & 0xff00) == 0x6b00 && m_pipeline_operand_address[3] < (extended_rmw ? 0x20 : 0x60) &&
-			m_pipeline_operand_address[3] != 0x0e)
+			m_pipeline_operand_address[3] != 0x0e &&
+			!(!extended_rmw && mode < 0x88 && m_pipeline_operand_address[3] >= 0x10 && m_pipeline_operand_address[3] <= 0x17))
 		{
-			logerror("%s: staged ADDM register/peripheral destination is unsupported\n", machine().describe_context());
+			logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;
 		}
 		if (!absolute && !offset_memory && !extended_rmw && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);

@@ -18,6 +18,8 @@ def lost(frame):
 
 
 def characterize(text, returncode, reference, serial):
+    if re.search(r'^Driver .+: [1-9]\d* errors?,', text, re.MULTILINE):
+        raise ValueError('MAME driver validity errors invalidate codec characterization')
     if len(reference) != FRAMES * SAMPLES * 2 or len(serial) != FRAMES * 494:
         raise ValueError('incomplete EFR reference or serial input')
     lines = text.splitlines()

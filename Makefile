@@ -1330,10 +1330,20 @@ check-c54x-rom4-efr-erasure-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-decoder
 
+.PHONY: check-c54x-rom4-efr-erasure-decoder-staged
+check-c54x-rom4-efr-erasure-decoder-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-decoder --staged
+
 .PHONY: observe-c54x-rom4-efr-loss
 observe-c54x-rom4-efr-loss: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-observe
+
+.PHONY: observe-c54x-rom4-efr-loss-staged
+observe-c54x-rom4-efr-loss-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-observe --staged
 
 .PHONY: check-c54x-rom4-efr-invalid-sid
 check-c54x-rom4-efr-invalid-sid: build prepare-c54x-rom4-fixture

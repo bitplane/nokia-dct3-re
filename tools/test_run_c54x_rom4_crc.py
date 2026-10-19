@@ -37,6 +37,8 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('efr-enc-homing', 'efr-ehome-pipe', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
             ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
             ('efr-invalid-sid', 'efr-isid-pipe', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
+            ('efr-erasure', 'efr-erasure-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
+            ('efr-loss-observe', 'efr-loss-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
         )
         self.assertTrue(all(len(name) <= 16 for name in bios))
         for name, staged, regions in cases:
@@ -46,7 +48,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                     loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
                                        r'"(.*), ROM_BIOS\((\d+)\)\)', content)
                     by_bios = {int(number): payload for payload, number in loads}
-                    self.assertEqual(len(loads), 2)
+                    self.assertEqual(len(loads), 4 if region.startswith('efr_erasure_') else 2)
                     self.assertEqual(by_bios[bios[name]], by_bios[bios[staged]])
 
     def test_staged_efr_lifecycle_requires_its_own_frontend_and_full_result(self):
@@ -56,6 +58,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('EFR homing encoder', dict(efr_homing_encoder=True), 46, EFR_ENCODER_HOMING_REPLAY, EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE),
             ('EFR homing decoder', dict(efr_homing_decoder=True), 46, EFR_HOMING_REPLAY, EFR_HOMING_PASS, EFR_HOMING_COMPLETE),
             ('EFR invalid SID decoder', dict(efr_invalid_sid=True), 518, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE),
+            ('EFR erasure decoder', dict(efr_erasure_decoder=True), 163, EFR_ERASURE_REPLAY, EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE),
         )
         for kind, mode, count, replay, marker, complete in cases:
             frontend = f'ROM4 {kind} frontend: staged handset_audio_claim=0'
@@ -73,7 +76,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         check_result(bad, 3, staged=True, **mode)
 
-    def test_invalid_sid_frontends_load_the_same_roms(self):
+    def test_efr_lifecycle_frontends_load_the_same_roms(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
@@ -85,8 +88,11 @@ class Rom4HelperResultTest(unittest.TestCase):
                                r'"(.*?)ROM_BIOS\((\d+)\)\)', content, re.S)
             by_bios = {int(number): re.sub(r'\s+', ' ', payload).strip()
                        for payload, number in loads}
-            self.assertEqual(by_bios[bios['efr-invalid-sid']],
-                             by_bios[bios['efr-isid-pipe']], region)
+            for atomic, staged in (('efr-invalid-sid', 'efr-isid-pipe'),
+                                   ('efr-erasure', 'efr-erasure-pipe'),
+                                   ('efr-loss-observe', 'efr-loss-pipe')):
+                with self.subTest(region=region, atomic=atomic):
+                    self.assertEqual(by_bios[bios[atomic]], by_bios[bios[staged]], region)
 
     def test_efr_decoder_frontends_load_the_same_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()

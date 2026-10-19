@@ -1789,6 +1789,33 @@ exception. The manual describes suppressed circular modification instead;
 this store extension does not resolve that fitted-silicon discrepancy or claim
 measured physical pipeline timing. Single-instruction repeat is still excluded.
 
+## Short mapped-AR ADDM
+
+DP and plain indirect `ADDM #lk,Smem` may target AR0..AR7, in addition to
+the separately qualified absolute mapped-AR path. The short forms retain
+the source at Read and publish one arithmetic result at Execute; a newer
+write to the destination cannot replace the retained operand. Compatibility
+mode's ordinary ARP update remains visible for indirect addressing.
+
+`addm-ar-short` passes 49,152 cases and cleared-pipeline replays: two forms,
+eight registers, four values, four immediates, sixteen SXM/OVM/carry/overflow
+configurations, both compatibility modes, two pages and three checkpoints.
+It checks Read at clock 6, Write at clock 7, retained literal/source values,
+one read/write and unchanged accumulators and unrelated ARs. The indirect
+fixtures use a separate addressing pointer. Short modifying forms and other
+mapped/peripheral destinations are not newly admitted; physical pipeline
+timing and additional compositions are not inferred from this matrix.
+
+The active-speech erasure bench organically reaches `6b84 0001` at `c38c`,
+with AR4=`0010` selecting AR0 in both frontends. Its staged continuation
+currently stops at `31e2 eb08` in the `f273` branch delay at `c3b4` during
+frame 8. Both `observe-c54x-rom4-efr-loss-staged` and the strict staged erasure
+comparison remain rejecting until that composition is independently qualified.
+`efr-loss-pipe` and `efr-erasure-pipe` load the same hashed inputs as their
+atomic controls. Observation requires its own staged marker, full frame/RAM
+replay and a valid driver; a completed characterization cannot satisfy the
+strict conformance checker.
+
 ## Staged LMS
 
 `LMS Xmem,Ymem` (`e1xx`, TI SPRU172C page 4-80) retains both RAM samples

@@ -583,6 +583,14 @@ reinterpret a complex-float capture as packed integers or tune permutations
 until the phone advances. No capture is installed as a production input, and
 no native reception result is claimed from this source inventory.
 
+[TS 45.002 section 5.2.4](https://www.etsi.org/deliver/etsi_TS/145000_145099/145002/13.01.00_60/ts_145002v130100p.pdf)
+specifies the ordinary frequency-correction burst's positive `1625/24 kHz`
+offset. The diagnostic's sixteen-complex-sample rotation would have that
+frequency at `13 MHz / 12` (four samples per GSM symbol), but neither that
+clock nor the physical component order is established for port `27`.
+This conditional frequency identity is not grounds for selecting a sample
+clock, swapping lanes or treating read-indexed stimuli as received bursts.
+
 `check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
 the isolated impulse contract. It supplies 32 words, signed values
 `((n*7919+1237) mod 4096)-2048`, through port `27`, then zeros. The native
@@ -2742,6 +2750,16 @@ published conformance vectors or handset speech transport. No CPU, codec state,
 production clock or reference PCM was altered to obtain agreement.
 
 ### Native EFR active-speech erasures
+
+The atomic reference comparison and staged execution have distinct frontiers.
+`observe-c54x-rom4-efr-loss-staged` currently matches frames 0..7, then
+rejects long-offset `MPYA` (`31e2 eb08`) in a BD delay at `c3b4` during
+the first erased frame (8). Its short mapped-AR ADDM predecessor is
+independently qualified; see [the loader contract](rom4_dsp_loader.md#short-mapped-ar-addm).
+The staged observation is incomplete, not a passing recovery comparison.
+The strict `check-c54x-rom4-efr-erasure-decoder-staged` remains rejecting too.
+Staged/atomic profiles share hashed program/data and vectors; selection
+markers and driver-validity checks cannot be bypassed by characterization.
 
 **Current frontier:** `make check-c54x-rom4-efr-erasure-decoder` deliberately
 fails at recovery frame 9 (zero-based), with 127 of 160 PCM samples different.
