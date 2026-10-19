@@ -2407,6 +2407,52 @@ their consistency/binding rules and the remaining configuration fields still
 need their own contracts before provisioning is justified. No NSE-1 identity,
 key or donor record is imported.
 
+### Factory-record DSP request boundary
+
+The own-image constructor at `29f8ec..29f9f6` builds four type-`70`
+messages and sends each through `2ce7a4` with destination argument 3.
+The first two payload bytes are a subcommand and its following byte count:
+
+| Subcommand | Data bytes | Own MCU data source |
+| --- | --- | --- |
+| `13` | 4 | platform word: `39cc20(0)` selects MMIO `200038` or getter `39ce0e` |
+| `14` | 12 | NV `0014..001f` |
+| `15` | 20 | NV `0000..000b`, then `000c..0013` |
+| `16` | 24 | NV `0020..0037` |
+
+These are not merely inferred consumers of the NV layout. The fresh erased-NV
+identity capture records matching HLE TX and transport-consume entries for all
+four, at emulated times `1.693595`, `1.693927`, `1.694339` and `1.694726`
+seconds respectively. Their complete payloads are `1304c71bbe68`,
+`140c` plus 12 `ff` bytes, `1514` plus 20 `ff` bytes, and `1618` plus
+24 `ff` bytes. The following `0d00` self-test request is consumed at
+`1.694964` seconds. The capture is
+`tmp/native-gates/npm5-identity-contract/error.log`; it is reproducible evidence,
+not a required source artifact.
+
+The HLE's optional `answer_identity_query`/`answer_record_query` codec is not
+enabled by the NPM-5 profile. Its documented ROM4 observations and ROM6 key/
+format hypotheses do not establish an NPM-5 reply contract. In particular, the
+four observed requests establish transport delivery, not successful decoding,
+record authentication, reply generation or valid provisioning. The remaining
+question is how this own firmware consumes the corresponding DSP replies and
+which algorithms/material those replies require; request ordering alone does
+not prove that missing replies cause either observed NV-checksum failure.
+
+An adjacent record-update routine, `29fa6c`, must not be mistaken for that
+reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,
+inside a command dispatcher; this census does not classify computed/ARM
+callers or prove dispatcher ownership. In its ordinary accepted path it
+requires a byte-sum over message offsets `08..21` to equal byte `22`, and
+byte `09` to equal `4f`, before writing 24 bytes from message offset `0a`
+through NV writer `3ac608`. The destination is `0020 + 24 * record_index`.
+A selector of `ff` replicates that record across ten slots. Successful paths
+call `29fa1e`, which recomputes the checksum over NV `0000..011b` and
+writes the four-byte result at `011c`. Product-feature-conditioned branches
+also exist and are not reduced to this ordinary path. This establishes an
+MCU-side record-update/checksum mechanism, not the record's cryptographic
+validity or a connection to DSP replies `34`/`35`.
+
 ## Input consumer boundary
 
 ### Physical MU4 ownership
