@@ -72,3 +72,10 @@ Neither file has yet been executed through the native decoder.
 
 Recording persistence, playback-tail completion, DMA/codec epoch pairing and
 handset audio remain separately gated requirements.
+
+`tools/aac_reference_metrics.py` supplies independently tested per-channel
+metrics, original 24-bit WAV loading and explicitly scaled signed-32 loading.
+It refuses unequal intervals, incomplete channel frames and non-normalized
+samples; it performs no delay search, gain fitting or automatic trimming.
+Its criterion result is not a conformance verdict until the obligations above
+are met. `test_aac_reference_metrics.py` is included by tool-test discovery.
