@@ -202,6 +202,28 @@ observe actual reads and consumed extents, and replenish only at the
 original wrapper boundary. A successful file remux does not settle this
 caller-owned memory contract.
 
+### External Filename Control
+
+A cloned original storage fixture with the derived stream plus the existing
+ID3 title/artist envelope under `TEST.AAC` does not select a decoder overlay
+in the bounded two-second `bootplaystage` run. The response path completes
+without illegal instructions, but both verified-AA99-session entries and
+decoder calls remain zero. This is a media-selection boundary, not evidence
+of unsupported AAC syntax or a failed decoder. Catalogue admission and the
+filename/extension contract must be established before extending this route;
+do not force the loader's AAC subtype or overlay selector.
+
+The fixture was independently extracted through 7z with byte-identical
+readback. NAND SHA-256 is
+`a94241b0dffcb6f6ed18bee451f3dce05af4f32fff5663709f5e59e25dab9d5a`;
+track SHA-256 is
+`a1542e26e9e97ec7de0a011d4dae84f096e57464362afb398daf4aefb49a815b`.
+Only 125 mapped data pages differ; spare bytes and bytes outside the music
+partition are preserved. The source NAND remains unchanged. Local artifacts
+are in `tmp/aac-conformance/filename-fixture/` and
+`tmp/native-gates/mu4-aac-filename/`; no acceptance claim depends on retaining
+these scratch paths.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;
