@@ -44,7 +44,10 @@ stored suffix diverges. A stop-time RAM capture accounts for the remaining
 data decodes as 387 packets / 396288 stereo frames. This is not a flushed
 recording: codec conformance, persisted-tail policy and handset speech remain
 separate obligations. See [full recording transform](#full-recording-transform)
-and [pending stop buffers](#pending-stop-buffers).
+and [pending stop buffers](#pending-stop-buffers). The original buffer-delivery
+protocol independently acknowledges exactly the persisted prefix; at stop,
+delivery is disabled with unread data and no outstanding transfer. See
+[buffer delivery](#buffer-delivery).
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -1345,6 +1348,60 @@ a flush, repair the file or label the observed truncation a hardware bug.
 .venv/bin/python tools/mu4_recorder_tail_check.py RUN/error.log READBACK/TEST \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
   --output-captured-aac NEW_CAPTURED_PENDING.aac
+```
+
+### Buffer Delivery
+
+The nested callback is not a file writer. The original slot at `55b4..55b7`
+selects `03eb4d`; its observed full-window path calls `03ee2b` at `03eb82`,
+performing the in-place prefix transform. `03e76f` repacks those byte-valued
+words into the main word buffer. Data reaching this callback therefore does
+not establish that it reached NAND. The separate buffer-delivery/consumption
+path owns that next boundary.
+
+`mu4_recorder_delivery_check.py` adds 290 pinned AA88 words to the 361-word
+tail contract. The native publisher at `038a31..038ad1` constructs an internal
+five-word `0021` record, not a GSM or external mailbox opcode. After control
+priorities, ordinary delivery requires `05ea!=0`, signed `05ee>0100` and
+`05f0==0`. It advertises `0200` words only when `05ee>0200`; otherwise it
+advertises `0100`. Exact equality at either threshold matters. The source is
+`061c+05ed-05ee`; publication marks `05f0=1`. Consumers `038b43..038b55` and
+`038b74..038b8b` subtract the acknowledged word count from `05ee` and clear
+that transfer flag. The selector-3 stop path clears `05ea`, sets the selected
+stop flags, and gives control publication priority over further data offers.
+
+The twenty-second `tmp/native-gates/mu4-buffer-delivery-checked` run observes:
+
+| Boundary | Result |
+| --- | --- |
+| Ordinary data offers | 272: 264 of 256 words and eight of 512 words |
+| Matching consumer acknowledgements | 272; exact subtraction, chronological pairing, no outstanding offer |
+| Acknowledged data extent | 71680 words / 143360 bytes, exactly the independently verified stored native prefix |
+| Other publications | Three two-word `0016` control records |
+| Final control | Argument zero; `05ea=0`, `05f0=0`, `05f1=1`, `05ed=05ee=0120` |
+
+Thus 288 unread words remain with no transfer awaiting completion. The count
+alone meets the threshold for a 256-word offer, but delivery is disabled;
+even if that offer occurred, another 32 words would remain below the ordinary
+offer threshold. This does not assume other control priorities are clear.
+Together with the independently captured 14-word transform carry, this
+accounts for the selected stop boundary without inventing a missing device
+reply. The native transform calls, endpoint NAND and input PCM retain their
+established hashes.
+
+The observer uses Execute-boundary construction/consumer sites and the
+already-computed record pointer, not a live-SP entry-frame assumption.
+The checker rejects missing/capped events, overlapping offers, mismatched
+acknowledgements, altered threshold selection and inconsistent final flags.
+Its byte extent is count correlation with the independently verified file:
+per-offer payload-to-NAND ownership is not established. No final buffer is
+replayed into firmware. This explains the exercised immediate stop; it does
+not establish which stop/drain lifecycle a normal product caller intends or
+justify changing device timing to retain the suffix.
+
+```sh
+.venv/bin/python tools/mu4_recorder_delivery_check.py RUN/error.log READBACK/TEST \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
 ```
 
 ### Metadata Overwrite Accounting
