@@ -62,9 +62,9 @@ steady encoder-homing outputs. Acceptance targets are
 `check-c54x-rom4-efr-homing-decoder-staged`.
 
 Staged DTX is a diagnostic frontier, not accepted: encoding matches frames
-0..50 before unsupported `fb30` at `cd7f` in frame 51. Decoding matches
+0..50 before unsupported repeated MAC `2992` at `cba3` in frame 51. Decoding matches
 frames 0..50 before unsupported LMS `e109` at `cbf4` in frame 51. These
-need independent control-form and LMS ordering/numerical qualifications;
+need independent repeated-MAC and LMS ordering/numerical qualifications;
 the atomic 518-frame conversation remains the control. The mapped AH
 multiply-accumulate at `fc00` (`6709`, literal `f38b`) is now covered by
 the mapped memory/immediate MAC contract below.
@@ -1782,15 +1782,31 @@ measured physical pipeline timing. Single-instruction repeat is still excluded.
 ## Staged TC conditional calls
 
 Nondelayed CC with TC/NTC uses the existing retained call transaction.
-SPRU172C page 4-29 assigns condition byte `30` to TC and `20` to NTC;
-the earlier `f930` NTC label was incorrect. `tc-call` verifies 64 cases
+SPRU172C page 4-29 assigns condition byte `30` to TC and `20` to NTC:
+`f930` is TC and `f920` is NTC. `tc-call` verifies 64 cases
 and replays across both predicates, both initial TC values, two program
 pages and four snapshots. After the decision, TC and accumulator values
 are changed and the target literal is overwritten: only the retained
 decision may allocate a frame, the target must stay retained and RET
 must balance the single taken-call write. Untaken calls touch neither
-SP nor stack memory. Delayed TC calls remain unadmitted; this fixture
-does not establish measured silicon pipeline phases.
+SP nor stack memory. This fixture does not establish measured silicon
+pipeline phases.
+
+Delayed CCD TC/NTC (`fb30`/`fb20`) uses the same retained Read decision and
+the existing delayed-call PC+4 frame. `tc-delay-call` passes 1,280 cases
+and cleared-pipeline replays: both predicates and initial TC values, eight
+unrelated accumulator patterns in either accumulator, two delay layouts,
+two pages and five snapshots across decision/frame/delay/return state.
+An organic SSBX/RSBX in either delay slot flips TC after evaluation; it
+cannot change whether the call owns a frame or reaches its retained target.
+Target/delay words and the return frame are poisoned after their samples.
+The matrix checks both delay words once on both paths, no untaken stack
+transaction, and one balanced taken call. Disabling the TC admission fails
+the fixture. The acquired encoder uses `fb30` at `cd7f` during its first
+DTX SID interval. Block-repeat compositions remain guarded and interrupt
+compositions remain unqualified;
+the former edge controls now use unadmitted compound bytes `24`/`34`
+instead of the qualified `20`/`30`.
 
 ## Staged accumulator-lane comparisons
 

@@ -182,14 +182,14 @@ constexpr bool staged_immediate_alu(u16 word)
 
 constexpr bool staged_tc_branch(u16 word)
 {
-	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30 || word == 0xf920 || word == 0xf930;
+	return word == 0xf820 || word == 0xf830 || word == 0xfa20 || word == 0xfa30 || word == 0xf920 || word == 0xf930 || word == 0xfb20 || word == 0xfb30;
 }
 
 constexpr bool staged_conditional_call(u16 word)
 {
-	// CC and CCD admit the six signed predicates for either 40-bit accumulator.
+	// CC/CCD admit TC/NTC and six signed predicates for either accumulator.
 	u8 const condition = word;
-	return word == 0xf920 || word == 0xf930 || ((word & 0xfd00) == 0xf900 &&
+	return word == 0xf920 || word == 0xf930 || word == 0xfb20 || word == 0xfb30 || ((word & 0xfd00) == 0xf900 &&
 		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
@@ -3545,7 +3545,7 @@ void tms320c54x_device::pipeline_step()
 		bool const block_far_call = staged_far_call(word) &&
 			(BIT(word, 9) ? m_pipeline_address[2] + 3 <= m_pipeline_block_end_address : m_pipeline_address[2] + 1 < m_pipeline_block_end_address) &&
 			(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
-		bool const block_conditional_call = staged_conditional_call(word) && BIT(word, 9) &&
+		bool const block_conditional_call = staged_conditional_call(word) && !staged_tc_branch(word) && BIT(word, 9) &&
 			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
 			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
 		bool const block_near_call = staged_call(word) &&

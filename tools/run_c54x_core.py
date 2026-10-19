@@ -637,6 +637,10 @@ EXTRA_PROFILES = {
         "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated atomic conditional returns complete",
     ),
+    "tc-delay-call": (
+        "TMS320C54x TC delayed calls: PASS cases=1280 restore=1280 predicates=TC,NTC initial_tc=2 accumulator_patterns=8 seed_accumulators=2 delay_layouts=2 pages=2 snapshots=5 tc_flip=organic_delay target_delay_poison=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 reset_before_restore=1 block_interrupt_acceptance=0 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated TC delayed calls complete",
+    ),
     "mac-map-imm": (
         "TMS320C54x mapped memory immediate MAC: PASS cases=786432 restore=786432 sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped memory immediate MAC complete",
@@ -2212,7 +2216,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("stld-bsp", "stld-periph", "square-delay", "st-par-mpy", "st-mpy-edge", "cond-store-ar", "calld-rpt", "ctrl-t-load", "stm-low-ram", "st-alu-rpt", "st-alu-rpt-edge", "squr-delay", "rptbd-squr", "bcd-rpt", "bcd-rpt-edge", "bitt-ctrl"):
         machine = "tms54xtra"
-    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm"):
+    if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

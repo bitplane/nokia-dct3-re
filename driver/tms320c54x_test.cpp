@@ -18357,13 +18357,29 @@ private:
 	{
 		unsigned condition, layout, checkpoint;
 		bool b, taken;
+		bool tc=false, initial_tc=false;
 		u32 base;
 		u64 initial, changed;
 		u16 literal;
+		u16 opcode() const { return tc ? 0xfb20+(condition ? 0x10 : 0) : 0xfb42+condition+(b ? 8 : 0); }
+		u16 status(bool final=false) const { return 0xa608|(tc && (initial_tc!=final) ? 0x1000 : 0); }
+		u16 delay(unsigned i) const
+		{
+			if(tc) return i==layout ? (initial_tc ? 0xf4bc : 0xf5bc) : 0x6d95;
+			return !i ? layout ? (b ? 0xf120 : 0xf020) : (b ? 0xf793 : 0xf493) : layout ? literal : 0x6d95;
+		}
 	};
-	static delayed_conditional_call_fixture delayed_conditional_call_case(unsigned v)
+	static delayed_conditional_call_fixture delayed_conditional_call_case(unsigned v, bool tc=false)
 	{
 		delayed_conditional_call_fixture f{};
+		if(tc)
+		{
+			f.tc=true; f.condition=v%2; f.initial_tc=(v/2)%2; f.b=(v/32)%2; f.layout=(v/64)%2;
+			f.base=(v/128)%2 ? 0x20000 : 0; f.checkpoint=std::array<unsigned,5>{3,6,7,10,13}[v/256];
+			f.initial=std::array<u64,8>{0,1,0x8000000000ULL,0xffffffffffULL,0x7fffffffffULL,0x0100000000ULL,0x0080000000ULL,0x00ffffffffULL}[(v/4)%8];
+			f.taken=bool(f.condition)==f.initial_tc; f.changed=f.initial;
+			return f;
+		}
 		f.condition = v % 6; f.b = (v / 48) % 2; f.layout = (v / 96) % 2;
 		f.base = (v / 192) % 2 ? 0x20000 : 0;
 		f.checkpoint = std::array<unsigned, 5>{3, 6, 7, 10, 13}[v / 384];
@@ -18377,16 +18393,16 @@ private:
 	void start_delayed_conditional_call(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		auto const f = delayed_conditional_call_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
+		auto const f = delayed_conditional_call_case(variant, !strcmp(machine().options().bios(),"tc-delay-call")); auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 24; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
-		program.write_word(f.base + 0x600, 0xfb42 + f.condition + (f.b ? 8 : 0)); program.write_word(f.base + 0x601, 0x700);
-		program.write_word(f.base + 0x602, f.layout ? (f.b ? 0xf120 : 0xf020) : (f.b ? 0xf793 : 0xf493));
-		program.write_word(f.base + 0x603, f.layout ? f.literal : 0x6d95);
+		program.write_word(f.base + 0x600, f.opcode()); program.write_word(f.base + 0x601, 0x700);
+		program.write_word(f.base + 0x602, f.delay(0));
+		program.write_word(f.base + 0x603, f.delay(1));
 		program.write_word(f.base + 0x604, 0x6d94); program.write_word(f.base + 0x605, 0xf4e1);
 		program.write_word(f.base + 0x700, 0x6d96); program.write_word(f.base + 0x701, 0xfc00);
 		m_cpu->set_pipeline_frontend(false);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.status()); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_RTN, 0x5555);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, f.b ? 0x123456789aULL : f.initial); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ? f.initial : 0xfedcba9876ULL);
@@ -18403,7 +18419,7 @@ private:
 			if (machine().side_effects_disabled()) return;
 			if (at == f.base + 0x601) { expect(!m_pipeline_extensions_reads && word == 0x700, "CCD retains one target literal"); ++m_pipeline_extensions_reads; return; }
 			unsigned const i = m_fast_stack_reads++;
-			u16 const expected = !i ? f.layout ? (f.b ? 0xf120 : 0xf020) : (f.b ? 0xf793 : 0xf493) : f.layout ? f.literal : 0x6d95;
+			u16 const expected = f.delay(i);
 			expect(i < 2 && at == f.base + 0x602 + i && word == expected, "CCD fetches each delay word once on both paths"); });
 		m_operand_data_tap = program.install_read_tap(f.base + 0x700, f.base + 0x700, "ccd_selected_target", [this, f](offs_t, u16 &word, u16) {
 			if (machine().side_effects_disabled()) return;
@@ -18416,7 +18432,7 @@ private:
 		u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
 		start_delayed_conditional_call(base ? 192 : 0); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove();
-		m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xfb00 | std::array<u16, 8>{0, 2, 3, 8, 0x0c, 0x20, 0x30, 0x70}[variant % 8]);
+		m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xfb00 | std::array<u16, 8>{0, 2, 3, 8, 0x0c, 0x24, 0x34, 0x70}[variant % 8]);
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ccd_edge_no_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ccd_edge_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
 		m_phase = 255440; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -19985,6 +20001,7 @@ private:
 		if (!strcmp(machine().options().bios(), "tc-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-call")) { start_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "conditional-cd")) { start_delayed_conditional_call(); return; }
+		if (!strcmp(machine().options().bios(), "tc-delay-call")) { start_delayed_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "cond-cd-edge")) { start_delayed_conditional_call_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rptb-ccd")) { start_block_conditional_call(); return; }
 		if (!strcmp(machine().options().bios(), "repeat-isr")) { start_saved_repeat(); return; }
@@ -48205,7 +48222,7 @@ private:
 		if (m_phase == 255450) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255440; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 255420)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_conditional_call_case(variant);
+			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_conditional_call_case(variant,!strcmp(machine().options().bios(),"tc-delay-call"));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CCD and complete delay instructions stay in supported forms");
 			if (!f.taken) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Untaken CCD never reserves a stack frame");
 			if (tick == 3 || tick == 4 || tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + (tick == 3 ? 0x601 : tick == 4 ? 0x602 : 0x603), 0xdead); }
@@ -48217,18 +48234,19 @@ private:
 			if (tick == 40)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x606 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-					m_cpu->state_int(tms320c54x_device::STATE_RTN) == (f.taken ? 0x604 : 0x5555) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
+					m_cpu->state_int(tms320c54x_device::STATE_RTN) == (f.taken ? 0x604 : 0x5555) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.status(true) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
 					m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.changed && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (f.b ? 0x123456789aULL : 0xfedcba9876ULL) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1401 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1500 + unsigned(!f.layout) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + unsigned(f.taken) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1401 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1500 + unsigned(f.tc || !f.layout) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + unsigned(f.taken) &&
 					m_pipeline_operand_reads == unsigned(f.taken) && m_pipeline_store_writes == unsigned(f.taken) && m_pipeline_drained_fetches == unsigned(f.taken) && m_pipeline_extensions_reads == 1 && m_fast_stack_reads == 2,
 					"CCD retains the original predicate, runs delay work once on both paths and balances only a taken frame");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[4];
-					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed conditional call without duplicate effects or a changed decision"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255430; m_check_timer->enable(true); return;
+					m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed conditional call without duplicate effects or a changed decision"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255430; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < 1919) { start_delayed_conditional_call(variant + 1); return; }
+				if (variant < (f.tc ? 1279 : 1919)) { start_delayed_conditional_call(variant + 1); return; }
+				if(f.tc) { osd_printf_info("TMS320C54x TC delayed calls: PASS cases=1280 restore=1280 predicates=TC,NTC initial_tc=2 accumulator_patterns=8 seed_accumulators=2 delay_layouts=2 pages=2 snapshots=5 tc_flip=organic_delay target_delay_poison=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 reset_before_restore=1 block_interrupt_acceptance=0 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated TC delayed calls complete"); }
 				osd_printf_info("TMS320C54x delayed conditional call: PASS cases=1920 restore=1920 conditions=12 patterns=8 delay_layouts=2 pages=2 snapshots=5 target_literals=1 delay_words=2 delay_effects=once predicate_retained=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated delayed conditional call complete");
 			}
@@ -56572,6 +56590,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(183, "addsub-ar-age", "Mapped ADD SUB retains the older AR Read sample")
 	ROM_SYSTEM_BIOS(184, "bd-read-a", "Retained READA transfers in unconditional BD delay spans")
 	ROM_SYSTEM_BIOS(185, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
+	ROM_SYSTEM_BIOS(186, "tc-delay-call", "TC NTC delayed conditional calls retain their Read decision")
 ROM_END
 
 ROM_START(tms54rom4)
