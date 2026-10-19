@@ -3,7 +3,7 @@ import unittest
 
 from tools.mu4_serial_epoch_check import (bind_lifecycle, codec_control_history,
     startup_report, frame_wait_din, nonshifting_din, tx_event_rows, check_tx_event_capture,
-    full_lifecycle_report)
+    full_lifecycle_report, codec_capture_horizon)
 
 
 BASE = 1_000_000_000
@@ -26,6 +26,20 @@ def fixture(specification):
 
 
 class SerialEpochTest(unittest.TestCase):
+    def test_active_codec_capture_cannot_end_on_an_early_valid_prefix(self):
+        text = '\n'.join([
+            'mu4_codec_control: word=0e53 ns=1 power=007 analog=00a digital=008 format=053 rate=020 active=000 hp_left=079 hp_right=079 observer_writes=0 audio_acceptance=0',
+            'mu4_codec_control: word=1023 ns=2 power=007 analog=00a digital=008 format=053 rate=023 active=000 hp_left=079 hp_right=079 observer_writes=0 audio_acceptance=0',
+            'mu4_codec_control: word=1201 ns=3 power=007 analog=00a digital=008 format=053 rate=023 active=001 hp_left=079 hp_right=079 observer_writes=0 audio_acceptance=0'])
+        self.assertEqual(codec_capture_horizon(text,struct.pack('<QB',1_000_000,1),1_015_000)['gap_ns'],15000)
+        divided = text.replace('word=1023','word=1063').replace('rate=023','rate=063')
+        self.assertEqual(codec_capture_horizon(divided,struct.pack('<QB',1_000_000,0),1_030_000)['maximum_gap_ns'],45352)
+        for last in (900_000,1_015_001):
+            with self.assertRaises(ValueError):
+                codec_capture_horizon(text,struct.pack('<QB',last,1),1_015_000)
+        with self.assertRaises(ValueError):
+            codec_capture_horizon(text,b'',1_015_000)
+
     def test_streamed_owned_epochs_cover_all_writes(self):
         specification = []
         for source in range(1,2001):

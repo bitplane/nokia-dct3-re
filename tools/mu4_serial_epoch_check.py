@@ -191,6 +191,28 @@ def codec_control_history(text):
     return history
 
 
+def codec_capture_horizon(text,slots,stop_ns):
+    """Recovered active MU4 bench clock, not measured converter timing."""
+    history = codec_control_history(text)
+    if not history or not slots or len(slots)%9:
+        raise ValueError('codec endpoint requires control history and complete DIN records')
+    if any(when > stop_ns for when,registers in history):
+        raise ValueError('codec control observation extends beyond capture closure')
+    registers = history[-1][1]
+    if (not registers[9]&1 or not registers[7]&0x40 or registers[6]&0xc0
+            or registers[7]&0x5f != 0x53 or registers[8]&0x3f != 0x23):
+        raise ValueError('codec endpoint is outside the qualified active master profile')
+    last,slot = struct.unpack('<QB',slots[-9:])
+    # USB/272 at the research machine's declared MCLK; CLKIN halves BCLK.
+    numerator = 272*1_000_000_000*(2 if registers[8]&0x40 else 1)
+    maximum_gap = (numerator+11_995_200-1)//11_995_200
+    if slot not in (0,1) or not 0 <= stop_ns-last <= maximum_gap:
+        raise ValueError('active codec DIN capture stops before the declared endpoint')
+    return {'last_callback_ns':last,'stop_ns':stop_ns,'gap_ns':stop_ns-last,
+            'maximum_gap_ns':maximum_gap,'declared_mclk_hz':11_995_200,
+            'scope':'Active fixed-rate research bench endpoint; not physical clock calibration'}
+
+
 def frame_wait_din(events,din,slots):
     """Bounded observed underrun-to-next-load intervals, not analog pin proof."""
     if len(slots) != 9*len(din):
@@ -361,6 +383,8 @@ def verify(directory,require_full=False,transport_only=False):
         raw_events = (directory/'mu4_playback_tx.events').read_bytes()
         full = full_lifecycle_report(text,raw_events,writes,streams['mcbsp_tx'],times,
             streams['codec_din'],slots,int(Decimal(terminal[0]['t'])*1_000_000_000))
+        full['codec_capture_horizon'] = codec_capture_horizon(text,slots,
+            int(Decimal(terminal[0]['t'])*1_000_000_000))
     elif require_full or transport_only:
         raise ValueError('full transmitter transition capture required')
     if transport_only:

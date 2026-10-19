@@ -1377,6 +1377,16 @@ complete encoded packets still buffered, validate those packets' native
 decoding, prove intended tail/drain policy, or establish physical timing.
 The strict whole-track audio gate remains separate and rejecting.
 
+Full-capture validation also checks the recording horizon, not merely file
+counts/hashes. For the declared active MU4 master profile, the final DIN
+callback must be no more than one USB/272 frame before closure, using the
+research machine's fixed 11,995,200-Hz MCLK and the programmed CLKIN divider.
+The 11-second capture ends 15,818 ns after its last callback, below the
+22,676-ns bound. A self-consistent early prefix, future callback, missing
+metadata or unqualified inactive clock profile is rejected. This is an
+observer-coverage check against the configured bench clock, not a physical
+frequency measurement or a relaxation of the independent audio gate.
+
 ### Codec Routing and Startup Phase
 
 The early transition capture brackets 0.817--0.824 seconds and includes actual
