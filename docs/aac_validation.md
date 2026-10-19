@@ -1315,6 +1315,36 @@ the short capture's emulated nonshifting-word accounting, not measured reset
 electrical behavior, physical pin timing, full-session decoded ownership or
 whole-track audio acceptance.
 
+### Full Short-Capture Buffer Accounting
+
+The research bench also writes a compact `mu4_playback_tx.events` stream
+over the same interval as its TX/DIN captures, rather than only the two text
+observation windows. Each 16-byte little-endian record contains nanoseconds,
+word, transition ID, active DMA owner and source-read ordinal. The terminal
+pins its record/byte count and FNV-1a hash; a capped or truncated stream is
+rejected. This diagnostic output is explicitly not a save-state artifact.
+Use `mu4_serial_epoch_check.py RUN --full` to require it; older captures
+without it retain bounded-window coverage only.
+
+The fresh finalized-input run `tmp/native-gates/mu4-full-serial`, ending at
+2.016666667 seconds, has 316,043 transitions. Every one of its 105,254 DXR
+writes and 105,345 TX completions has exactly one corresponding event.
+Observed loads/completions account for 105,252 completed DMA-owned source
+epochs, source ordinal 1 discarded by reset, and ordinal 105254 pending at
+the endpoint. The 93 initial repeated-word completions remain explicitly
+unattributed to a captured DMA source; their word values are not used to
+invent provenance. All 367 nonshifting DIN callbacks retain the separate
+reset/wait accounting above, with zero uncovered words.
+
+All seven pre-existing TX/DIN/DMA/slot/time/DXR/decoded-return files are
+byte-identical to `mu4-wait-frame`. The validator requires coverage of every
+captured TX/DXR word and rejects duplicate completions, not just malformed
+files. A negative test removes a completion and recomputes the file checksum
+to prove that protocol coverage still fails. This extends actual serial
+buffer ownership across the full short capture; it does not extend the
+independent decoder/filter arithmetic window, prove whole-track draining,
+assign physical timing or establish handset speech.
+
 ### Codec Routing and Startup Phase
 
 The early transition capture brackets 0.817--0.824 seconds and includes actual

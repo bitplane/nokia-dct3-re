@@ -32,7 +32,7 @@ def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
     buffer_known = shift_known = False
     buffer = shift = retained = None
     accepted,discarded,ignored,completed = set(),set(),set(),{}
-    kinds,unknown = Counter(),0
+    kinds,unknown,completed_times = Counter(),0,set()
     previous = first_ns
     for ordinal,row in enumerate(events,first_ordinal):
         time,word,owner,source = int(row['ns']),int(row['word'],16),int(row['dma_owner']),int(row['dma_read'])
@@ -92,8 +92,9 @@ def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
             if retained is not None and retained[1] != word:
                 raise ValueError('frame wait differs from retained DXR word')
         elif kind == 'complete':
-            if time not in tx_by_time or tx_by_time[time] != word:
+            if time in completed_times or time not in tx_by_time or tx_by_time[time] != word:
                 raise ValueError('lifecycle completion lacks exact completed-TX callback')
+            completed_times.add(time)
             if shift_known and (shift is None or shift[1] != word):
                 raise ValueError('completed shift word differs from observed load')
             if shift is None or shift[0] is None:
@@ -106,13 +107,59 @@ def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
     pending = {value[0] for value in (buffer,shift) if value is not None and value[0] is not None}
     if accepted-set(completed)-discarded-pending:
         raise ValueError('accepted buffer epochs disappear without completion/discard/pending state')
-    report = dict(events=len(events),kinds=dict(kinds),accepted=len(accepted),ignored=len(ignored),
+    report = dict(events=sum(kinds.values()),kinds=dict(kinds),accepted=len(accepted),ignored=len(ignored),
                   discarded=len(discarded),endpoint_pending=sorted(pending),
                   discarded_source_ordinals=sorted(discarded),
                   source_epochs_completed=len(completed),unknown_prefix_completions=unknown,
                   internal_buffer_loads_observed=bool(kinds['load_fresh']+kinds['load_repeat']),
                   native_audio_validated=False)
     return report,completed
+
+
+TX_EVENT_NAMES = ('reset','ignore','accept','overwrite','load_fresh','load_repeat',
+                  'complete','restart','wait_frame')
+
+
+def tx_event_rows(data):
+    if len(data)%16:
+        raise ValueError('truncated binary transmitter event')
+    for ordinal,(when,word,event,owner,source) in enumerate(struct.iter_unpack('<QHBBI',data),1):
+        if event >= len(TX_EVENT_NAMES) or owner > 6:
+            raise ValueError('invalid binary transmitter event or owner')
+        yield dict(ordinal=str(ordinal),kind=TX_EVENT_NAMES[event],word=f'{word:04x}',
+                   ns=str(when),dma_owner=str(owner),dma_read=str(source),audio_acceptance='0')
+
+
+def check_tx_event_capture(text,data):
+    ends = rows(text,'mu4_tx_event_capture')
+    if len(ends) != 1:
+        raise ValueError('missing or repeated binary transmitter capture terminal')
+    end = ends[0]
+    if (end['capped'] != '0' or end['encoding'] != 'le64ns_u16word_u8event_u8owner_u32source'
+            or end['file'] != 'mu4_playback_tx.events' or end['save_restore'] != 'unsupported'
+            or end['observer_writes'] != '0' or end['audio_acceptance'] != '0'
+            or not 0 < int(end['records']) <= 8_000_000
+            or len(data) != int(end['bytes']) or len(data) != int(end['records'])*16):
+        raise ValueError('incomplete, capped or changed binary transmitter capture')
+    checksum = 2166136261
+    for value in data:
+        checksum = ((checksum ^ value)*16777619)&0xffffffff
+    if f'{checksum:08x}' != end['fnv1a']:
+        raise ValueError('binary transmitter capture hash mismatch')
+    return {'records':int(end['records']),'fnv1a':end['fnv1a']}
+
+
+def full_lifecycle_report(text,data,writes,tx,times,din,slots,stop_ns):
+    integrity = check_tx_event_capture(text,data)
+    report,_ = bind_lifecycle(tx_event_rows(data),writes,tx,times,
+                              first_ns=0,last_ns=stop_ns)
+    if (report['kinds'].get('complete',0) != len(times)
+            or sum(report['kinds'].get(kind,0) for kind in ('accept','overwrite','ignore')) != len(writes)):
+        raise ValueError('full event stream does not cover every captured TX/DXR word')
+    report.update(capture=integrity,nonshifting_din=nonshifting_din(
+        tx_event_rows(data),times,din,slots),
+        scope='Actual full-capture buffer transitions; not whole-track or silicon timing acceptance')
+    return report
 
 
 def codec_control_history(text):
@@ -276,7 +323,7 @@ def startup_report(text,writes,tx,times,din,slots):
     return report
 
 
-def verify(directory):
+def verify(directory,require_full=False):
     text = (directory/'error.log').read_text()
     terminal = rows(text,'mu4_playback_capture_terminal')
     lifecycle_end = rows(text,'mu4_tx_lifecycle_terminal')
@@ -338,6 +385,13 @@ def verify(directory):
         delivered += 1
         channel_slots[f'bank_{address & ~63:04x}_slot_{sink_slots[sink]}'] += 1
     startup = startup_report(text,writes,streams['mcbsp_tx'],times,streams['codec_din'],slots)
+    full = None
+    if rows(text,'mu4_tx_event_capture'):
+        raw_events = (directory/'mu4_playback_tx.events').read_bytes()
+        full = full_lifecycle_report(text,raw_events,writes,streams['mcbsp_tx'],times,
+            streams['codec_din'],slots,int(Decimal(terminal[0]['t'])*1_000_000_000))
+    elif require_full:
+        raise ValueError('full transmitter transition capture required')
     controls = codec_control_history(text)
     route = None
     if controls:
@@ -353,21 +407,22 @@ def verify(directory):
                      headphone_mute_requested=[(registers[channel]&0x7f)==0 for channel in (2,3)],
                      analog_effect_validated=False)
     return dict(streams=reports,dma_to_dxr=write_report,lifecycle=lifecycle,serial_callbacks=serial,
-                startup=startup,codec_route=route,
+                startup=startup,full_capture_lifecycle=full,codec_route=route,
                 final_filter_words=len(final),final_words_consumed=len(selected),final_words_at_din=delivered,
                 selected_dma_read_range=[min(selected.values()),max(selected.values())],
                 bounded_sample_to_din_epochs_validated=True,
                 channel_slots=dict(channel_slots),native_audio_validated=False,
                 scope='Bounded actual buffer loads/completions and timestamp-paired codec DIN; '
-                      'not whole playback, unmatched-DIN pin ownership, codec analogue routing or GSM speech')
+                      'not whole playback, physical pin timing, codec analogue routing or GSM speech')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
+    parser.add_argument('--full',action='store_true',help='require full-capture binary buffer transitions')
     args = parser.parse_args()
     try:
-        print(json.dumps(verify(args.directory),indent=2))
+        print(json.dumps(verify(args.directory,args.full),indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         print(f'FAIL: {error}',file=sys.stderr)
         return 1

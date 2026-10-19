@@ -2,7 +2,8 @@ import struct
 import unittest
 
 from tools.mu4_serial_epoch_check import (bind_lifecycle, codec_control_history,
-    startup_report, frame_wait_din, nonshifting_din)
+    startup_report, frame_wait_din, nonshifting_din, tx_event_rows, check_tx_event_capture,
+    full_lifecycle_report)
 
 
 BASE = 1_000_000_000
@@ -25,6 +26,53 @@ def fixture(specification):
 
 
 class SerialEpochTest(unittest.TestCase):
+    def test_full_lifecycle_rejects_missing_event_with_recomputed_checksum(self):
+        def capture(events):
+            data = b''.join(struct.pack('<QHBBI',*event) for event in events)
+            checksum = 2166136261
+            for value in data:
+                checksum = ((checksum ^ value)*16777619)&0xffffffff
+            text = (f'mu4_tx_event_capture: records={len(events)} bytes={len(data)} fnv1a={checksum:08x} capped=0 '
+                    'encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events '
+                    'save_restore=unsupported observer_writes=0 audio_acceptance=0')
+            return text,data
+        events = [(1,0,0,0,0),(10,1,2,4,1),(11,1,4,0,0),(20,1,6,0,0),
+                  (21,1,8,0,0),(30,1,5,0,0),(40,1,6,0,0)]
+        args = ([(10,1,1,4,0)],[1,1],[20,40],[1,1],
+                struct.pack('<QBQB',20,0,40,1),50)
+        report = full_lifecycle_report(*capture(events),*args)
+        self.assertEqual(report['unknown_prefix_completions'],0)
+        self.assertEqual(report['source_epochs_completed'],1)
+        with self.assertRaises(ValueError):
+            full_lifecycle_report(*capture(events[:-1]),*args)
+
+    def test_binary_event_integrity_and_decoder(self):
+        data = struct.pack('<QHBBI',1,0x1234,2,4,1) + struct.pack('<QHBBI',2,0x1234,4,0,0)
+        checksum = 2166136261
+        for value in data:
+            checksum = ((checksum ^ value)*16777619)&0xffffffff
+        text = (f'mu4_tx_event_capture: records=2 bytes=32 fnv1a={checksum:08x} capped=0 '
+                'encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events '
+                'save_restore=unsupported observer_writes=0 audio_acceptance=0')
+        self.assertEqual(check_tx_event_capture(text,data)['records'],2)
+        decoded = list(tx_event_rows(data))
+        self.assertEqual([row['kind'] for row in decoded],['accept','load_fresh'])
+        self.assertEqual(decoded[0]['dma_read'],'1')
+        for changed,binary in [(text.replace('capped=0','capped=1'),data),
+                               (text,data[:-1]),(text,data[:-1]+b'\x01'),
+                               (text.replace('records=2','records=1'),data)]:
+            with self.assertRaises(ValueError):
+                check_tx_event_capture(changed,binary)
+        with self.assertRaises(ValueError):
+            list(tx_event_rows(struct.pack('<QHBBI',1,0,9,0,0)))
+
+    def test_duplicate_completion_cannot_hide_missing_event(self):
+        data = fixture([('accept',1,1,1),('load_fresh',2,1,0),('complete',3,1,0)])
+        events,writes,tx,times = data
+        events.append(dict(events[-1],ordinal='4'))
+        with self.assertRaises(ValueError):
+            bind_lifecycle(iter(events),writes,tx,times)
+
     def test_nonshifting_ownership_needs_completion_not_zero_matching(self):
         events = [dict(kind=kind,ns=str(time),word=f'{word:04x}') for kind,time,word in [
             ('load_fresh',5,0x1235),('complete',10,0x1235),('wait_frame',11,0x1235),

@@ -492,6 +492,9 @@ private:
 	u32 m_playback_tx_time_hash = 2166136261U;
 	std::ofstream m_playback_dxr_capture;
 	u32 m_playback_dxr_hash = 2166136261U, m_playback_dxr_writes = 0;
+	std::ofstream m_playback_tx_event_capture;
+	u32 m_playback_tx_event_hash = 2166136261U, m_playback_tx_events = 0;
+	static constexpr u32 PLAYBACK_TX_EVENT_CAP = 8'000'000;
 	std::ofstream m_playback_decoded_capture;
 	bool m_playback_capture_finished = false;
 	u32 m_playback_tx_lifecycle_events = 0;
@@ -990,16 +993,32 @@ private:
 	{
 		double const time = machine().time().as_double();
 		bool const startup = time >= 0.817 && time <= 0.824;
-		if (!playback_profile() || (!startup && (time < 1.0 || time > 1.25))) return;
+		if (!playback_profile()) return;
 		static constexpr std::array<char const *,9> names{"reset","ignore","accept","overwrite","load_fresh","load_repeat","complete","restart","wait_frame"};
 		if (event >= names.size()) fatalerror("MU4 invalid McBSP diagnostic transition");
-		u32 &counter = startup ? m_playback_tx_startup_events : m_playback_tx_lifecycle_events;
-		++counter;
-		if (counter > (startup ? 4096U : 100000U)) return;
 		u8 owner = 0;
 		if (event == tms320c54x_mcbsp_device::TX_ACCEPT || event == tms320c54x_mcbsp_device::TX_OVERWRITE || event == tms320c54x_mcbsp_device::TX_IGNORE)
 			for (unsigned channel=0;channel<6;++channel)
 				if (m_dma->destination_write_matches(channel, AS_DATA, 0x23)) owner = channel+1;
+		if (m_playback_overlay_checked && m_playback_tx_event_capture.is_open())
+		{
+			if (++m_playback_tx_events <= PLAYBACK_TX_EVENT_CAP)
+			{
+				u64 const ns = machine().time().as_ticks(1'000'000'000);
+				u32 const source = owner == 4 ? m_playback_dma_reads : 0;
+				char bytes[16];
+				for (unsigned i=0;i<8;++i) bytes[i] = char(ns >> (8*i));
+				bytes[8] = char(word); bytes[9] = char(word >> 8);
+				bytes[10] = char(event); bytes[11] = char(owner);
+				for (unsigned i=0;i<4;++i) bytes[12+i] = char(source >> (8*i));
+				m_playback_tx_event_capture.write(bytes,sizeof(bytes));
+				for (char byte : bytes) m_playback_tx_event_hash = (m_playback_tx_event_hash ^ u8(byte))*16777619U;
+			}
+		}
+		if (!startup && (time < 1.0 || time > 1.25)) return;
+		u32 &counter = startup ? m_playback_tx_startup_events : m_playback_tx_lifecycle_events;
+		++counter;
+		if (counter > (startup ? 4096U : 100000U)) return;
 		if (startup)
 			logerror("mu4_tx_startup: ordinal=%u kind=%s word=%04x ns=%llu dma_owner=%u dma_read=%u pcr=%04x spcr2=%04x xcr1=%04x xcr2=%04x observer_writes=0 audio_acceptance=0\n",
 				counter,names[event],word,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),owner,owner == 4 ? m_playback_dma_reads : 0,
@@ -1032,6 +1051,11 @@ private:
 		if (!m_playback_dxr_capture || dxr_bytes != std::streamoff(m_playback_dxr_writes)*16) fatalerror("MU4 playback DXR observation is incomplete");
 		logerror("mu4_playback_dxr_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u32ordinal_u16word_u8owner_u8reserved file=mu4_playback_dxr.writes save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			m_playback_dxr_writes,m_playback_dxr_writes*16,m_playback_dxr_hash);
+		m_playback_tx_event_capture.flush(); auto const event_bytes=m_playback_tx_event_capture.tellp(); m_playback_tx_event_capture.close();
+		u32 const captured_events = std::min(m_playback_tx_events,PLAYBACK_TX_EVENT_CAP);
+		if (!m_playback_tx_event_capture || event_bytes != std::streamoff(captured_events)*16) fatalerror("MU4 playback TX event observation is incomplete");
+		logerror("mu4_tx_event_capture: records=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+			captured_events,captured_events*16,m_playback_tx_event_hash,unsigned(m_playback_tx_events>PLAYBACK_TX_EVENT_CAP));
 		m_playback_decoded_capture.flush(); auto const decoded_bytes=m_playback_decoded_capture.tellp(); m_playback_decoded_capture.close();
 		if (!m_playback_decoded_capture || decoded_bytes != std::streamoff(m_playback_decoded_words)*2) fatalerror("MU4 decoded-return observation is incomplete");
 		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
@@ -2996,6 +3020,7 @@ private:
 		m_playback_slot_hash = 2166136261U;
 		m_playback_tx_time_hash = 2166136261U;
 		m_playback_dxr_hash = 2166136261U; m_playback_dxr_writes = 0;
+		m_playback_tx_event_hash = 2166136261U; m_playback_tx_events = 0;
 		m_playback_decoded_hash = 2166136261U; m_playback_decoded_words = 0;
 		m_decoder_gate_events = m_decoder_gate_bad = 0;
 		for (unsigned i=0;i<3;++i)
@@ -3013,6 +3038,8 @@ private:
 		m_playback_tx_time_capture.clear();
 		if (m_playback_dxr_capture.is_open()) m_playback_dxr_capture.close();
 		m_playback_dxr_capture.clear();
+		if (m_playback_tx_event_capture.is_open()) m_playback_tx_event_capture.close();
+		m_playback_tx_event_capture.clear();
 		if (m_playback_decoded_capture.is_open()) m_playback_decoded_capture.close();
 		m_playback_decoded_capture.clear();
 		if (playback_profile())
@@ -3023,6 +3050,8 @@ private:
 			if (!m_playback_tx_time_capture) fatalerror("MU4 playback TX time observation could not be opened");
 			m_playback_dxr_capture.open("mu4_playback_dxr.writes",std::ios::binary|std::ios::trunc);
 			if (!m_playback_dxr_capture) fatalerror("MU4 playback DXR observation could not be opened");
+			m_playback_tx_event_capture.open("mu4_playback_tx.events",std::ios::binary|std::ios::trunc);
+			if (!m_playback_tx_event_capture) fatalerror("MU4 playback TX event observation could not be opened");
 			m_playback_decoded_capture.open("mu4_decoded_returns.le16",std::ios::binary|std::ios::trunc);
 			if (!m_playback_decoded_capture) fatalerror("MU4 decoded-return observation could not be opened");
 		}
