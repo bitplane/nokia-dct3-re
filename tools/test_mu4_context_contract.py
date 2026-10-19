@@ -64,7 +64,7 @@ from tools.mu4_context_contract import SERVICE_GATE_BASE, SERVICE_GATE_WITNESS, 
 from tools.mu4_context_contract import POST_FLAG_BASE, POST_FLAG_WITNESS, decode_post_flag_branch, post_flag_route
 from tools.mu4_context_contract import FLAG_CONTEXT_BASE, FLAG_CONTEXT_WITNESS, decode_flag_context, reference_flag_context
 from tools.mu4_context_contract import RECORD_HEADER_BASE, RECORD_HEADER_WIDTHS, decode_recording_header_writer, reference_recording_header
-from tools.mu4_context_contract import recording_header_observations
+from tools.mu4_context_contract import recording_header_observations, recording_session_observations
 from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS, decode_recording_window_arguments, reference_recording_windows
 
 
@@ -241,6 +241,37 @@ class ContextContractTest(unittest.TestCase):
         self.assertEqual(result['argument_records'], 120)
         self.assertEqual(result['frames'][0]['header_hex'], 'fff950802ea600')
         self.assertEqual(result['frames'][7]['header_hex'], 'fff950802e8600')
+
+    def session_header_fixture(self):
+        legacy = self.header_observation_fixture()
+        text = legacy.replace('mu4_record_header_argument:','mu4_record_session_argument:')
+        text = text.replace('mu4_record_header_taps_closed: t=2.016666667 observer_writes=0',
+                            'mu4_record_session_closed: arguments=120 counts='+','.join(['8']*15)+' capped=0 t=15.016666667 observer_writes=0')
+        text = ('mu4_record_session_scope: first=0.8 last=15 fields=15 max_frames=512 boundary=data_read context_pc=not_owner observer_writes=0\n'
+                +text+'\nmu4_record_session_terminal: closed=1 arguments=120 capped=0 illegal=0 observer_writes=0')
+        frames = recording_header_observations(legacy)['frames']
+        encoded = b''.join(bytes.fromhex(frame['header_hex'])+bytes(frame['values'][12]-7) for frame in frames)
+        return text,encoded
+
+    def test_complete_header_session_binds_headers_not_payload_validity(self):
+        text,encoded = self.session_header_fixture()
+        result = recording_session_observations(text,encoded)
+        self.assertEqual(result['publications'],8)
+        self.assertEqual(result['reference']['matched_headers'],8)
+        self.assertFalse(result['reference']['payload_validated'])
+        self.assertEqual(recording_session_observations(text,encoded[:-10])['reference']['declared_tail_shortfall'],10)
+        with self.assertRaises(ValueError):
+            recording_session_observations(text,b'\0'+encoded[1:])
+
+    def test_header_session_rejects_missing_fields_caps_and_partial_terminals(self):
+        text,_ = self.session_header_fixture()
+        for bad in (text.replace('capped=0','capped=1'),text.replace('illegal=0','illegal=1'),
+                    text.replace('closed=1','closed=0'),text.replace('arguments=120','arguments=119'),
+                    text.replace('counts=8,8','counts=7,8'),text+'\0',
+                    text.replace('t=15.016666667','t=14.900000000'),
+                    text+'\nmu4_record_session_terminal: malformed'):
+            with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
+                recording_session_observations(bad)
 
     def test_header_observations_reject_missing_malformed_and_wrong_scope(self):
         text = self.header_observation_fixture()

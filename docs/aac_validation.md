@@ -616,3 +616,36 @@ exclude useful information elsewhere in the custom body or encoder control
 records. The intended recording extent therefore remains unproven; neither
 375 native blocks nor the longer host-decoded prefix should be promoted to
 the expected answer from these tag/header fields alone.
+
+### Encoder Publication Control
+
+`mu4_recorder_session_observe.lua` reuses the header observer with a separately
+labelled 0.8--15-second window and 512-publication cap. The default observer
+retains its original two-second/eight-header contract. Session mode checks
+all 15 source-pinned argument fields for each publication, including declared
+packet length. Its wrapper exits at 15.1 seconds; this is a header-observation
+run, not the original twenty-second recorder acceptance gate.
+
+A fresh `bootrecac` run from the unchanged formatted NAND observes 387
+complete header-argument groups (5805 arguments), uncapped, with no illegal
+instruction. Their declared lengths total 143964 bytes, and the concatenated
+seven-byte headers have SHA256
+`922add2bf7bccad36400d0767c25cb7da14e58e81a9fdbd5499ae423f26f9adf`.
+This is not a count of committed, valid encoded packets or intended samples.
+
+The before-metadata NAND observation is
+`9832d2309e352dc3afb4f8f6ddcfbf7744fe191ee8633027f19dba46bcdea5e0`.
+Independent fixture-volume export and 7-Zip extraction yield `REL_001.REL`,
+143982 bytes, SHA256
+`59a1f4b67f2ca07b5f4387fbf0fda459908b0be79bd751f1fdd336ad2103887b`.
+The source NAND file remains byte-identical. This is a different recording
+from protected `TEST`; comparing its observed headers with the protected
+projection fails at header 2, byte 373. Do not fit an offset or transfer the
+387 count to explain the older 375-block playback stop.
+
+Use `mu4_context_contract.py SOURCE --recording-session-log RUN/error.log`
+to check this observation. Optional `--recording-session-reference AAC`
+requires exact header equality at successive declared offsets and reports
+payload validity as unestablished. The remaining comparison needs this
+fresh recording's own buffer/file projection and completion records, not
+assumed equivalence with an older capture.

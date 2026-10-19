@@ -99,19 +99,21 @@ def reference_recording_header(values):
     return int(bits, 2).to_bytes(7, 'big')
 
 
-def recording_header_observations(text, frames=8):
-    if frames not in range(1, 9):
-        raise ValueError('header observation requires one to eight bounded frames')
+def recording_header_observations(text, frames=8, *, session=False):
+    if frames not in range(1,513 if session else 9):
+        raise ValueError('header observation exceeds its bounded frame domain')
+    marker = 'mu4_record_session_argument' if session else 'mu4_record_header_argument'
+    last = 15 if session else 2
     overlay = ('mu4_native_recorder_overlay: PASS marker=aa88 records=4622 words=73766 '
                'checked_ram_words=73762 excluded_register_words=4 before_execution=1')
-    if text.count(overlay) != 1 or text.find('mu4_record_header_argument:') < text.index(overlay):
+    if text.count(overlay) != 1 or text.find(marker+':') < text.index(overlay):
         raise ValueError('header observation lacks its preceding verified AA88 upload')
-    pattern = (r'mu4_record_header_argument: field=(\d+) ordinal=(\d+) caller=([0-9a-f]{6}) '
+    pattern = (marker+r': field=(\d+) ordinal=(\d+) caller=([0-9a-f]{6}) '
                r'high=([0-9a-f]{4}) low=([0-9a-f]{4}) width=(\d+) receiver=([0-9a-f]{4}) '
                r'sp=([0-9a-f]{4}) t=([0-9.]+) context_pc=([0-9a-f]{6}) '
                r'boundary=data_read ownership=unvalidated observer_writes=0')
     rows = re.findall(pattern, text)
-    if len(rows) != 15 * frames or text.count('mu4_record_header_argument:') != len(rows):
+    if len(rows) != 15 * frames or text.count(marker+':') != len(rows):
         raise ValueError('incomplete, duplicate or malformed header arguments')
     result, previous = [], 0.0
     for frame in range(frames):
@@ -121,18 +123,60 @@ def recording_header_observations(text, frames=8):
             when = float(time)
             if (int(index) != field or int(ordinal) != frame + 1 or
                     int(caller,16) != 0x3a93a + 10*field or int(width) != RECORD_HEADER_WIDTHS[field] or
-                    not 0x3acc8 <= int(pc,16) <= 0x3accf or not 0.8 <= when <= 2 or when <= previous or
+                    not 0x3acc8 <= int(pc,16) <= 0x3accf or not 0.8 <= when <= last or when <= previous or
                     (receiver is not None and receiver != pointer)):
                 raise ValueError('header argument identity, order, receiver or scope mismatch')
             receiver, previous = pointer, when
             values.append((int(high,16) << 16) | int(low,16))
         result.append({'ordinal': frame+1, 'values': values,
                        'header_hex': reference_recording_header(values).hex(), 'receiver': receiver})
-    closed = re.findall(r'mu4_record_header_taps_closed: t=([0-9.]+) observer_writes=0', text)
-    if len(closed) != 1 or text.count('mu4_record_header_taps_closed:') != 1 or not 2 < float(closed[0]) < 3:
-        raise ValueError('missing or invalid header observation closure')
+    if session:
+        scope = 'mu4_record_session_scope: first=0.8 last=15 fields=15 max_frames=512 boundary=data_read context_pc=not_owner observer_writes=0'
+        closed = re.findall(r'mu4_record_session_closed: arguments=(\d+) counts=([0-9,]+) capped=0 t=([0-9.]+) observer_writes=0',text)
+        terminal = f'mu4_record_session_terminal: closed=1 arguments={15*frames} capped=0 illegal=0 observer_writes=0'
+        if (text.count(scope) != 1 or len(closed) != 1 or text.count('mu4_record_session_closed:') != 1
+                or int(closed[0][0]) != 15*frames or closed[0][1] != ','.join([str(frames)]*15)
+                or not 15 < float(closed[0][2]) < 16 or text.count(terminal) != 1
+                or text.count('mu4_record_session_terminal:') != 1
+                or not text.index(scope) < text.index(marker+':') <= text.rfind(marker+':') < text.index('mu4_record_session_closed:') < text.index(terminal)
+                or '\0' in text or 'LUA ERROR' in text):
+            raise ValueError('missing, capped, faulted or incomplete encoder session observation')
+    else:
+        closed = re.findall(r'mu4_record_header_taps_closed: t=([0-9.]+) observer_writes=0', text)
+        if len(closed) != 1 or text.count('mu4_record_header_taps_closed:') != 1 or not 2 < float(closed[0]) < 3:
+            raise ValueError('missing or invalid header observation closure')
     return {'frames': result, 'argument_records': len(rows),
             'scope': 'Data-read-selected caller contexts and scalar header model; not retained CPU arguments, encoded payload or native audio'}
+
+
+def recording_session_observations(text, reference=None):
+    counts = re.findall(r'mu4_record_session_closed: arguments=\d+ counts=([0-9,]+)',text)
+    if len(counts) != 1:
+        raise ValueError('missing encoder session counts')
+    fields = counts[0].split(',')
+    if len(fields) != 15 or len(set(fields)) != 1:
+        raise ValueError('encoder session field counts disagree')
+    result = recording_header_observations(text,int(fields[0]),session=True)
+    frames = result['frames']
+    headers = [bytes.fromhex(frame['header_hex']) for frame in frames]
+    offset = 0
+    for frame,header in zip(frames,headers):
+        length = frame['values'][12]
+        if length < 7:
+            raise ValueError('encoder declared an incomplete fixed header')
+        if reference is not None and reference[offset:offset+7] != header:
+            raise ValueError(f'encoder header {frame["ordinal"]} differs from reference at byte {offset}')
+        offset += length
+    report = dict(publications=len(frames),argument_records=result['argument_records'],
+                  declared_packet_bytes=offset,first_header=headers[0].hex(),last_header=headers[-1].hex(),
+                  headers_sha256=hashlib.sha256(b''.join(headers)).hexdigest(),
+                  scope='Complete bounded header-argument sequence; not committed encoded payload, intended sample count or audio completion')
+    if reference is not None:
+        report['reference'] = dict(bytes=len(reference),matched_headers=len(frames),
+                                   sha256=hashlib.sha256(reference).hexdigest(),
+                                   declared_tail_shortfall=max(0,offset-len(reference)),
+                                   trailing_bytes=max(0,len(reference)-offset),payload_validated=False)
+    return report
 
 
 def decode_flag_context(words):
@@ -2163,13 +2207,20 @@ def main():
                         help='check the bounded first-eight-header argument observation')
     parser.add_argument('--playback-poly-log', type=Path,
                         help='check one bounded native three-step polynomial bus observation')
+    parser.add_argument('--recording-session-log',type=Path,help='check the complete bounded encoder header-argument sequence')
+    parser.add_argument('--recording-session-reference',type=Path,help='compare those headers against an independently projected AAC stream')
     args = parser.parse_args()
+    if args.recording_session_reference and not args.recording_session_log:
+        parser.error('--recording-session-reference requires --recording-session-log')
     try:
         result = contract(args.source.read_bytes())
         if args.recording_header_log:
             result['recording_header_observation'] = recording_header_observations(args.recording_header_log.read_text())
         if args.playback_poly_log:
             result['playback_polynomial_observation'] = playback_poly_observation(args.playback_poly_log.read_text())
+        if args.recording_session_log:
+            reference = args.recording_session_reference.read_bytes() if args.recording_session_reference else None
+            result['recording_session_observation'] = recording_session_observations(args.recording_session_log.read_text(),reference)
     except (OSError, ValueError) as error:
         print(f'MU4 context contract: {error}', file=sys.stderr)
         return 1
