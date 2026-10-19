@@ -5052,6 +5052,16 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_aac_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_aac_test_state::data_map);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (address == 0x23de7)
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+				if (opcode != 0x800f || m_sources_seen++) fatalerror("MU4 AAC ABI source boundary changed");
+				m_sources = {data.read_word(sp+6),data.read_word(sp+5)};
+				logerror("mu4_aac_abi_sources: left=%04x right=%04x sp=%04x result=%04x identity=Execute_entry observer_writes=0\n",
+					m_sources[0],m_sources[1],sp,u16(m_cpu->state_int(tms320c54x_device::STATE_A)));
+			}
 			if (address == 0x242cb && m_headers++ < 8)
 			{
 				auto const disable = machine().disable_side_effects();
@@ -5073,6 +5083,8 @@ private:
 	emu_timer *m_check = nullptr;
 	unsigned m_completion = 0;
 	unsigned m_headers = 0;
+	unsigned m_sources_seen = 0;
+	std::array<u16,2> m_sources{};
 	bool m_done = false;
 	void program_map(address_map &map)
 	{
@@ -5147,6 +5159,7 @@ private:
 		m_completion = 0x1000 + std::size(wrapper)-1;
 		m_done = false;
 		m_headers = 0;
+		m_sources_seen = 0; m_sources = {};
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x2028);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
@@ -5163,6 +5176,23 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),unsigned(m_cpu->pc()));
 		if (!m_done || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || data.read_word(0x1402))
 			fatalerror("MU4 AAC ABI probe did not decode a successful block");
+		if (m_sources_seen != 1 || m_sources[0] < 0x80 || m_sources[1] < 0x80 ||
+			m_sources[0] > 0xf800 || m_sources[1] > 0xf800)
+			fatalerror("MU4 AAC ABI output source bounds");
+		std::ofstream raw("mu4_aac_abi_raw.s32le",std::ios::binary);
+		std::ofstream converted("mu4_aac_abi_converted.s16le",std::ios::binary);
+		for (unsigned sample = 0; sample < 1024; ++sample)
+			for (unsigned channel = 0; channel < 2; ++channel)
+			{
+				u16 const source = m_sources[channel] + 2*sample;
+				u32 const value = (u32(data.read_word(source)) << 16) | data.read_word(source ^ 1);
+				for (unsigned byte = 0; byte < 4; ++byte) raw.put(char(value >> (8*byte)));
+				u16 const word = data.read_word(0x8000 + channel*1024 + sample);
+				converted.put(char(word)); converted.put(char(word >> 8));
+			}
+		raw.close(); converted.close();
+		if (!raw || !converted) fatalerror("MU4 AAC ABI output capture failed");
+		logerror("mu4_aac_abi_capture: frames=1024 channels=2 raw_bytes=8192 converted_bytes=4096 source=decoder_return_pointers memory=post_wrapper_return conformance=0\n");
 		machine().schedule_exit();
 	}
 };

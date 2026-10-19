@@ -313,6 +313,40 @@ directory to reproduce the one-call positive control. Its successful exit
 does not imply waveform conformance; capture and independent comparison of
 raw decoder output remain required.
 
+### One-Frame Output Capture
+
+The bench observes the original decoder-return boundary `023de7` and uses
+its returned source pointers, not presumed physical bank/channel labels.
+For the generated control these are left `f000`, right `e800`, in frame
+SP `8fe8`. The pointers differ from the constructor's initial bank ordering.
+After the wrapper returns, the bench exports interleaved raw signed-32 and
+converted signed-16 memory (`8192` and `4096` bytes respectively).
+`mu4_aac_abi_check.py` checks source/header/result identity and event order,
+capture extents and all 2048 rounded-shift/clamp conversions. Every native
+converted word matches the independent source-derived conversion.
+
+Against the unfitted first 1024 frames of the generated control's host s16
+reference, the left channel has 937 differing samples, maximum 398 and RMS
+14.0775266937; the right has four differences of one, RMS 0.0625. The
+largest left difference is at sample 111 (native 402, host 4). These remain
+unresolved waveform diagnostics, not a chosen codec tolerance. Raw capture
+SHA-256 is `9695c578720d12b711818933fe47157f499acc09ea641a12226e63fcb8d67506`;
+converted capture SHA-256 is
+`5ea624a1cc5cac4cb6653daed578146ff9cc6c6380b07cf51aeb144c03e48374`.
+Per-store ownership, raw output normalization, actual input-read binding and
+the cause of the asymmetric error remain open.
+
+```sh
+python3 tools/mu4_aac_abi_check.py PRIVATE_RUN_DIRECTORY \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
+  --reference-pcm GENERATED_CONTROL_HOST.s16
+```
+
+The checker accepts an internally consistent observation and reports errors;
+its zero exit status is not waveform conformance. Unit tests explicitly
+retain nonzero waveform errors while rejecting malformed/faulted/partial
+captures and raw-to-converted disagreement.
+
 ## Next Acceptance Boundary
 
 1. Recover the native decoder initialization and input framing contract;
