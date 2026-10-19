@@ -2167,6 +2167,16 @@ call" screen. An isolated 18-second run and an empty-input control both record
 zero entries to codec wrappers `9c4f/9cb9`, active mode `1836=0`, and no DSP
 illegal-instruction flag. This is call-attempt presentation, not registration,
 speech activation or a connected call; no external network backend is enabled.
+Read-only MCU write taps and DSP data-read taps narrow this boundary further:
+after Navi, MCU shared word `100a8` publishes `8626`, `9204`, then `9ec4`
+at approximately 9.755, 9.755 and 9.773 seconds; the DSP reads those same
+values at data word `0854` (read-time PC context `27f2`). The preceding digit
+keys publish the distinct `920c/920f` tone-control dialogue. An empty-input
+control instead publishes `8406/8002/900f` at approximately 11.73 seconds.
+Thus the call-attempt controls cross the mailbox; zero codec entries cannot
+be attributed simply to their loss in transport. Their complete semantic
+effect and any dependence on RF acquisition remain unresolved. The read-time
+PC context is not an instruction-retirement or physical-timing claim.
 
 The current native boundary profiles are distinct: the four-second coherent
 boot observes thirteen ordered RF control writes, including the firmware-owned
