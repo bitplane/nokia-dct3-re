@@ -10904,13 +10904,15 @@ private:
 	{
 		start_repeat_load(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-		bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge");
+		bool const tmac = !strcmp(machine().options().bios(), "tmac-rpt-edge");
+		bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge") || tmac;
 		bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
 		u32 const base = (dual ? (variant / 128) % 2 : square ? (variant / 16) % 2 : (variant / 8) % 2) ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
 		program.write_word(base + 0x600, 0xec01);
 		program.write_word(base + 0x601, std::array<u16, 8>{0xf4f0, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
 		if (square) { program.write_word(base+0x601,0x3882 | ((variant % 4) << 8)); m_cpu->set_state_int(tms320c54x_device::STATE_AR2,std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/4)%4]); }
+		if (tmac) program.write_word(base+0x601,0x2882 | ((variant % 4) << 8) | (variant & 1 ? 0x400 : 0));
 		if (dual)
 		{
 			program.write_word(base+0x601,0xb001 | (((variant/4)%4) << 10) | ((variant%4) << 8));
@@ -17410,6 +17412,7 @@ private:
 		u16 st0, st1, t;
 		u64 a, b;
 		bool square = false;
+		bool tmac = false;
 		unsigned operation = 0;
 		bool dual = false;
 		unsigned selector = 0;
@@ -17434,16 +17437,19 @@ private:
 			f.b = std::array<u64,4>{0xffffffffff,0x0180000000,0,0x123456789a}[pattern];
 			return f;
 		}
-		if (!strcmp(machine().options().bios(), "sqacc-repeat"))
+		if (!strcmp(machine().options().bios(), "sqacc-repeat") || !strcmp(machine().options().bios(), "tmac-repeat"))
 		{
 			unsigned v = variant; poly_fixture f{}; f.square = true;
-			f.form = v % 3; v /= 3; f.operation = v % 4; v /= 4;
+			f.tmac = !strcmp(machine().options().bios(), "tmac-repeat");
+			unsigned const operations = f.tmac ? 8 : 4;
+			f.form = v % 3; v /= 3; f.operation = v % operations; v /= operations;
 			unsigned const pattern = v % 8; v /= 8; unsigned const flags = v % 16; v /= 16;
 			f.iterations = std::array<unsigned,4>{1,2,8,256}[v % 4]; v /= 4;
 			f.base = v % 2 ? 0x20000 : 0; v /= 2;
 			f.checkpoint = std::array<unsigned,4>{5,6,7+f.iterations/2,6+f.iterations}[v % 4];
 			f.st0 = 0x1030 | (pattern & 1 ? 0x400 : 0) | (pattern & 2 ? 0x200 : 0) | (pattern & 4 ? 0x800 : 0);
 			f.st1 = 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0) | (flags & 8 ? 0x80 : 0);
+			if (f.tmac) f.pmst = flags & 8 ? 2 : 0;
 			f.t = std::array<u16,8>{0,1,0x5678,0x8000,0xffff,0x7fff,0x8000,0x1234}[pattern];
 			f.a = std::array<u64,8>{0,0x12340000,0x12340000,0x0080000000,0x0180000000,0xff80000000,0xff00000000,0x7fffffffff}[pattern];
 			f.b = std::array<u64,8>{0,0x8000,0x10000,0x7fffffff,0xff80000000,0x7fff8000,0xffffffffff,0x7fffffffff}[pattern];
@@ -17492,8 +17498,10 @@ private:
 		unsigned const destination = f.operation & 1;
 		s64 const old = state[destination] & 0x8000000000ULL ? s64(state[destination]) - 0x10000000000LL : s64(state[destination]);
 		s64 const sample = s16(square_repeat_memory(f, ordinal));
-		s64 const product = sample * sample * (f.st1 & 0x40 ? 2 : 1);
-		s64 result = old + (f.operation & 2 ? -product : product);
+		s64 product = sample * (f.tmac ? s16(f.t) : sample) * (f.st1 & 0x40 ? 2 : 1);
+		if (f.tmac && (f.pmst & 2) && (f.st1 & 0x240) == 0x240) product = std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
+		s64 result = old + (f.operation & (f.tmac ? 4 : 2) ? -product : product);
+		if (f.tmac && (f.operation & 2)) result = (result + 32768) & ~s64(65535);
 		if (result < -2147483648LL || result > 2147483647LL)
 		{
 			state[2] |= destination ? 0x200 : 0x400;
@@ -17531,7 +17539,7 @@ private:
 		program.write_word(f.base + 0x600, repeat ? 0xec00 | (f.iterations - 1) : 0xf495);
 		u16 const mode = f.dual ? 0 : std::array<u16,3>{0,0x82,0x92}[f.form];
 		program.write_word(f.base+0x601,f.dual ? 0xb000 | (f.operation << 10) | (f.selector << 8) | std::array<u16,4>{0x01,0x9a,0x49,0x84}[f.form] :
-			f.square ? 0x3800 | (f.operation << 8) | mode : 0x3600 | mode);
+			f.square ? (f.tmac ? 0x2800 : 0x3800) | (f.operation << 8) | mode : 0x3600 | mode);
 		program.write_word(f.base + 0x602, 0xf4e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,f.st1);
@@ -20041,7 +20049,9 @@ private:
 		if (!strcmp(machine().options().bios(), "banzd-t-load")) { start_rptbd_t_load(); return; }
 		if (!strcmp(machine().options().bios(), "ctrl-t-load")) { start_rptbd_t_load(); return; }
 		if (!strcmp(machine().options().bios(), "sqacc-repeat")) { start_poly(); return; }
+		if (!strcmp(machine().options().bios(), "tmac-repeat")) { start_poly(); return; }
 		if (!strcmp(machine().options().bios(), "sqacc-rpt-edge")) { start_repeat_load_edge(); return; }
+		if (!strcmp(machine().options().bios(), "tmac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mac-rpt")) { start_poly(); return; }
 		if (!strcmp(machine().options().bios(), "mac-rpt-edge")) { start_repeat_load_edge(); return; }
 		if (!strcmp(machine().options().bios(), "bd-rpt")) { start_branch_repeat(); return; }
@@ -48555,7 +48565,8 @@ private:
 		if (m_phase == 310490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310480; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310500)
 		{
-			bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge");
+			bool const tmac = !strcmp(machine().options().bios(), "tmac-rpt-edge");
+			bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge") || tmac;
 			bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < (dual ? 256U : square ? 32U : 16U) ? 3 : 10;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded register repeat performs no data transaction");
@@ -48573,6 +48584,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant < (dual ? 511U : square ? 63U : 31U)) { start_repeat_load_edge(variant + 1); return; }
 				if (dual) { osd_printf_info("TMS320C54x repeated dual MAC exclusions: PASS cases=512 restore=512 operations=4 selectors=4 low_operands=X,Y sources=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated dual MAC exclusions complete"); }
+				if (tmac) { osd_printf_info("TMS320C54x repeated T MAC exclusions: PASS cases=64 restore=64 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated T MAC exclusions complete"); }
 				if (square) { osd_printf_info("TMS320C54x repeated square exclusions: PASS cases=64 restore=64 operations=4 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated square exclusions complete"); }
 				osd_printf_info("TMS320C54x repeated accumulator LD exclusions: PASS cases=32 restore=32 other_families=8 pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 flag_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD exclusions complete");
 			}
@@ -50827,7 +50839,7 @@ private:
 				unsigned const completed = tick < 7 ? 0 : std::min(tick-6,f.iterations);
 				auto const expected = m_repeat_load_expected[completed];
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[2], "Every repeated square samples the live accumulator at Execute and preserves carry");
-				u16 const t = tick < 6 ? f.t : tick > f.iterations+5 ? 0xdead : square_repeat_memory(f,tick-6);
+				u16 const t = tick > f.iterations+5 ? 0xdead : f.tmac || tick < 6 ? f.t : square_repeat_memory(f,tick-6);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == t, "Repeated square publishes each original source at Read without overwriting newer T at Execute");
 				if (tick == f.iterations+5) m_cpu->set_state_int(tms320c54x_device::STATE_T,0xdead);
 				if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base+0x601,0xe8ff); }
@@ -50856,10 +50868,12 @@ private:
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
+					if (f.tmac) m_cpu->set_pipeline_frontend(true);
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE,"Replay POLY without duplicate coefficient reads"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase = 399990; m_check_timer->enable(true); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (f.dual ? 98303 : f.square ? 49151 : 4607)) { start_poly(variant+1); return; }
+				if (variant < (f.dual || f.tmac ? 98303 : f.square ? 49151 : 4607)) { start_poly(variant+1); return; }
+				if (f.tmac) { osd_printf_info("TMS320C54x repeated T MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=DP,indirect,postincrement patterns=8 flags=16 counts=0,1,7,255 pages=2 snapshots=4 per_clock_accumulator=1 t_preserved=1 source_opcode_poison=1 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated repeated T MAC complete"); }
 				if (f.dual) { osd_printf_info("TMS320C54x repeated dual MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR selectors=4 layouts=fixed,postinc,postdec,alias patterns=4 flags=16 counts=0,1,7,255 pages=2 snapshots=3 per_clock_accumulator=1 paired_reads=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 writes=0 physical_banks=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated repeated dual MAC complete"); }
 				if (f.square) { osd_printf_info("TMS320C54x repeated square accumulate: PASS cases=49152 restore=49152 operations=SQURA,SQURS destinations=A,B forms=DP,indirect,postincrement patterns=8 flags=16 counts=0,1,7,255 pages=2 snapshots=4 per_clock_accumulator=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated repeated square accumulate complete"); }
 				osd_printf_info("TMS320C54x staged POLY: PASS cases=4608 restore=4608 forms=direct,indirect,postincrement patterns=8 flags=8 repeat=none,0,2 pages=2 snapshots=4 coefficient_reads=iterations data_writes=0 mapped_acceptance=0 extended_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n");
@@ -56591,6 +56605,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(184, "bd-read-a", "Retained READA transfers in unconditional BD delay spans")
 	ROM_SYSTEM_BIOS(185, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
 	ROM_SYSTEM_BIOS(186, "tc-delay-call", "TC NTC delayed conditional calls retain their Read decision")
+	ROM_SYSTEM_BIOS(187, "tmac-repeat", "Repeated RAM T-based MAC retains operands and accumulator feedback")
+	ROM_SYSTEM_BIOS(188, "tmac-rpt-edge", "Repeated T-based MAC mapped and peripheral exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

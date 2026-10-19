@@ -61,11 +61,12 @@ steady encoder-homing outputs. Acceptance targets are
 `check-c54x-rom4-efr-homing-encoder-staged` and
 `check-c54x-rom4-efr-homing-decoder-staged`.
 
-Staged DTX is a diagnostic frontier, not accepted: encoding matches frames
-0..50 before unsupported repeated MAC `2992` at `cba3` in frame 51. Decoding matches
-frames 0..50 before unsupported LMS `e109` at `cbf4` in frame 51. These
-need independent repeated-MAC and LMS ordering/numerical qualifications;
-the atomic 518-frame conversation remains the control. The mapped AH
+Staged DTX encoding passes all 518 frames: 29,526 parameters, 1,036 flags
+and 8,806 packed words match, with full 65,440-word RAM replay for every frame.
+Acceptance target: `check-c54x-rom4-efr-dtx-encoder-staged`.
+Staged DTX decoding remains diagnostic: frames 0..50 match before unsupported
+LMS `e109` at `cbf4` in frame 51. LMS needs independent ordering/numerical
+qualification; the atomic 518-frame conversation remains the control. The mapped AH
 multiply-accumulate at `fc00` (`6709`, literal `f38b`) is now covered by
 the mapped memory/immediate MAC contract below.
 Short staged BIOS aliases preserve MAME's sixteen-character limit. Fixture
@@ -1778,6 +1779,26 @@ BK=0 retains the pre-existing linear-update behavior as an explicit legacy
 exception. The manual describes suppressed circular modification instead;
 this store extension does not resolve that fitted-silicon discrepancy or claim
 measured physical pipeline timing. Single-instruction repeat is still excluded.
+
+## Staged repeated T-based MAC
+
+Short RAM `MAC/MACR/MAS/MASR Smem,A/B` bodies (`28xx..2fxx`, short
+address byte below `98`) use the existing pipelined repeat issue/retirement
+path. Each iteration retains its memory and T operands at Read, uses the
+live destination accumulator at Execute, and does not publish T. Rounding,
+fractional multiplication, PMST.SMUL product saturation, accumulator
+saturation and sticky destination overflow retain ordinary-instruction semantics.
+
+`tmac-repeat` passes 98,304 cases and cleared-pipeline replays: both
+destinations, four operations, DP/plain/postincrement RAM forms, eight
+operand/accumulator patterns, sixteen flag configurations, counts 0/1/7/255,
+two program pages and four snapshots. It checks every accumulator publication,
+one source read per iteration, a single retained opcode, source/opcode poisoning,
+and preservation of a newer T value after the last Read. `tmac-rpt-edge`
+passes 64 cases and replays rejecting mapped T/AR5, peripheral and low-page
+edge sources before any data transaction or arithmetic/pointer/T change.
+This is bounded instruction qualification, not measured silicon timing or
+blanket acceptance of mapped, extended, interrupt or block-repeat compositions.
 
 ## Staged TC conditional calls
 

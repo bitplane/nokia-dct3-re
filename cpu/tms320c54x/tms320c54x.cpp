@@ -164,7 +164,7 @@ constexpr bool staged_ram_stm(u16 word)
 
 constexpr bool staged_pipelined_repeat(u16 word)
 {
-	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_parallel_load(word) || staged_parallel_alu(word) || (square_accumulate(word) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -4180,6 +4180,10 @@ void tms320c54x_device::pipeline_step()
 		if ((m_pipeline_repeat_active || m_pipeline_control_words) && square_accumulate(m_pipeline_word[3]) && source < 0x60)
 		{
 			logerror("%s: repeated square mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		if (m_pipeline_repeat_active && (m_pipeline_word[3] & 0xf800) == 0x2800 && source < 0x60)
+		{
+			logerror("%s: repeated T-based MAC mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		if (staged_poly(m_pipeline_word[3]) && source < 0x60)
 		{
