@@ -46,8 +46,8 @@ all 65,440 ordinary RAM words on every frame's save/replay. The repeatable
 gate is `make check-c54x-rom4-efr-encoder-staged`; it verifies the independent
 ETSI fixture and retains the atomic comparison requirements. Staged FR
 encoder and decoder retain their separate 32-frame controls. These isolated
-DTX-disabled algorithm results do not prove handset speech, staged EFR
-DTX coverage or physical bus timing. The staged decoder separately
+DTX-disabled algorithm results do not prove handset speech or physical bus
+timing; DTX has its own acceptance below. The staged decoder separately
 passes 163 clean speech frames and all 26,080 PCM samples, with full-RAM
 replays, through `make check-c54x-rom4-efr-decoder-staged`. Its existing
 ten-case delayed-repeat preflight remains atomic; decoder reset and every
@@ -67,6 +67,14 @@ eight SID frames, 135 erased frames and 46 nonzero comfort-noise frames match
 on decoding. Both check full 65,440-word RAM replay for every frame.
 Acceptance targets: `check-c54x-rom4-efr-dtx-encoder-staged` and
 `check-c54x-rom4-efr-dtx-decoder-staged`. Atomic runs remain controls.
+
+The independent invalid/bad-SID conversation also passes all 518 frames on
+the staged frontend: 82,880 PCM samples, four invalid codewords, one bad valid
+codeword, per-frame invalid-SID control checks and full-RAM replay.
+`check-c54x-rom4-efr-invalid-sid-staged` uses the same hashed inputs, reference,
+program and cold data as the atomic control. Its dedicated frontend marker
+is mandatory; this is decoder-entry coverage, not RF SID classification.
+
 The mapped AH
 multiply-accumulate at `fc00` (`6709`, literal `f38b`) is now covered by
 the mapped memory/immediate MAC contract below.

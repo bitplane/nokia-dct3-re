@@ -2466,9 +2466,9 @@ first-frame instruction observations, excluding replay; tracing cannot weaken
 vector acceptance.
 
 This is an isolated DTX-disabled encoder algorithm gate, not handset speech.
-The staged clean-speech decoder and homing suites have separate acceptance
-gates below. Staged DTX and native RF/traffic-channel activation retain
-their separate, unaccepted boundaries.
+The staged clean-speech decoder, homing and DTX suites have separate acceptance
+gates below. Native RF/traffic-channel activation remains a distinct,
+unaccepted boundary.
 
 The separately acquired ETSI source archive and its provenance live in
 `roms/README.md`. `tools/verify_etsi_efr_reference.py` verifies its complete
@@ -2718,11 +2718,16 @@ fresh decoder processes. Local research pins are:
 | `invalid_sid.dec` | `ea9ecb8fa25d734bdcd5744362264a0a51d489682ad5bd12c16f5e9bfa45cc69` |
 | `invalid_sid.out` | `272757031568500197fe395934096dfd2f53a87f0af935a66de14e7ff7cc7d8d` |
 
-Original native `c941`/`c8dc` match all 82,880 PCM samples and replay all
+Both atomic and staged execution of original native `c941`/`c8dc` match all
+82,880 PCM samples and replay all
 65,440 ordinary RAM words per frame. Every frame independently checks the
 original RX-invalid-SID bit at `09c0`: it is set for the five invalid received
 SID events and clear elsewhere. Output differs from clean DTX in 101 frames,
-so the input changes are not merely accepted and ignored.
+so the input changes are not merely accepted and ignored. The staged gate is
+`check-c54x-rom4-efr-invalid-sid-staged`: its short `efr-isid-pipe` BIOS loads
+the same hashed program, cold data and vectors as the atomic profile. The runner
+requires exactly one invalid-SID-specific staged selection marker and rejects
+driver-validity errors, incomplete comparisons and missing replay evidence.
 
 This is bounded decoder-entry coverage with independently classified input,
 not native RF SID detection, all corruption patterns, homing/error combinations,

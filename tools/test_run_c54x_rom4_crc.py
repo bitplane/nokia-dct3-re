@@ -22,6 +22,7 @@ from tools.run_c54x_rom4_crc import EFR_DTX_ENCODER_PASS, EFR_DTX_ENCODER_COMPLE
 from tools.run_c54x_rom4_crc import EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE, EFR_ERASURE_REPLAY
 from tools.run_c54x_rom4_crc import EFR_HOMING_PASS, EFR_HOMING_COMPLETE, EFR_HOMING_REPLAY
 from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE, EFR_ENCODER_HOMING_REPLAY
+from tools.run_c54x_rom4_crc import EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE, EFR_INVALID_SID_REPLAY
 
 
 class Rom4HelperResultTest(unittest.TestCase):
@@ -35,6 +36,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('efr-dtx-decoder', 'efr-dtx-dec-pipe', (('efr_dtx_input', 'dtx.dec'), ('efr_dtx_pcm', 'dtx.out'))),
             ('efr-enc-homing', 'efr-ehome-pipe', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
             ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
+            ('efr-invalid-sid', 'efr-isid-pipe', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
         )
         self.assertTrue(all(len(name) <= 16 for name in bios))
         for name, staged, regions in cases:
@@ -53,6 +55,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('EFR DTX decoder', dict(efr_dtx_decoder=True), 518, EFR_DTX_DECODER_REPLAY, EFR_DTX_DECODER_PASS, EFR_DTX_DECODER_COMPLETE),
             ('EFR homing encoder', dict(efr_homing_encoder=True), 46, EFR_ENCODER_HOMING_REPLAY, EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE),
             ('EFR homing decoder', dict(efr_homing_decoder=True), 46, EFR_HOMING_REPLAY, EFR_HOMING_PASS, EFR_HOMING_COMPLETE),
+            ('EFR invalid SID decoder', dict(efr_invalid_sid=True), 518, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE),
         )
         for kind, mode, count, replay, marker, complete in cases:
             frontend = f'ROM4 {kind} frontend: staged handset_audio_claim=0'
@@ -69,6 +72,21 @@ class Rom4HelperResultTest(unittest.TestCase):
                             output + '\ntrailer'):
                     with self.assertRaises(ValueError):
                         check_result(bad, 3, staged=True, **mode)
+
+    def test_invalid_sid_frontends_load_the_same_roms(self):
+        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
+        bios = dict((name, int(number)) for number, name in
+                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
+        for region, filename in (('dspprg', 'dsp_full.bin'),
+                                 ('dspdata', 'dsp_cold_data.bin')):
+            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
+            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
+                               r'"(.*?)ROM_BIOS\((\d+)\)\)', content, re.S)
+            by_bios = {int(number): re.sub(r'\s+', ' ', payload).strip()
+                       for payload, number in loads}
+            self.assertEqual(by_bios[bios['efr-invalid-sid']],
+                             by_bios[bios['efr-isid-pipe']], region)
 
     def test_efr_decoder_frontends_load_the_same_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
@@ -142,7 +160,6 @@ class Rom4HelperResultTest(unittest.TestCase):
                 check_result(invalid, 3, efr_homing_decoder=True)
 
     def test_efr_invalid_sid_requires_every_frame_control_scope_and_replay(self):
-        from tools.run_c54x_rom4_crc import EFR_INVALID_SID_PASS, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_COMPLETE
         frames = '\n'.join(f'ROM4 EFR invalid SID decoder comparison: frame={frame} mismatches=0' for frame in range(518))
         text = '\n'.join((frames, EFR_INVALID_SID_REPLAY, EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE))
         check_result(text, 3, efr_invalid_sid=True)

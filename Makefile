@@ -1340,6 +1340,11 @@ check-c54x-rom4-efr-invalid-sid: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --invalid-sid-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-invalid-sid
 
+.PHONY: check-c54x-rom4-efr-invalid-sid-staged
+check-c54x-rom4-efr-invalid-sid-staged: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --invalid-sid-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-invalid-sid --staged
+
 .PHONY: check-c54x-rom4-efr-homing-errors
 check-c54x-rom4-efr-homing-errors: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
