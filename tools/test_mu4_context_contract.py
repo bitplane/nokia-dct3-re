@@ -31,6 +31,7 @@ from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decod
 from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT_RESERVE_WITNESS, decode_decoder_input_reserve
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
+from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -684,6 +685,18 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=hex(address)), self.assertRaises(ValueError):
                 decode_playback_buffer_refresh(changed)
+
+    def test_final_input_cleanup_bypasses_short_read_and_normal_completion(self):
+        words = playback_final_input_words()
+        result = decode_playback_final_input(words)
+        self.assertIn('029500 -> 02956f',result['one_pass']['branch'])
+        self.assertIn('ordinary input-12 completion',result['one_pass']['bypassed'][1])
+        self.assertIn('follows loader call',result['one_pass']['ordering'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_playback_final_input(changed)
 
     def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
         words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))

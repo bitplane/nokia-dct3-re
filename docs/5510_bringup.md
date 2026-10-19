@@ -8837,9 +8837,9 @@ snapshots, six transport streams and decoded returns) match the previous
 ten-second capture exactly; the gate checker still passes.
 
 Thus a late change to `aa1a` is not the trigger on this observed bus path.
-The one-valued control was present before decoding began. The next target
-is the input-`11` transaction reaching the check: its producer, local-frame
-length/cursor fields and the intervening paths that reach `0294fd`. This is
+The one-valued control was present before decoding began. The input-`11`
+length and completion paths are mapped below; the remaining question is
+correct end/drain ordering for the selected recording. This is
 not proof of EOF, a decoder error, absence of indirect writers, or Execute
 ownership at the context PCs. No control word or input selector should be
 forced to extend playback.
@@ -8871,10 +8871,33 @@ the `aa1a` test. These source operations and the observed successors locate
 the immediate stop in input-length handling, not a decoder-return failure.
 The complete producer contract and whether this represents intended
 end-of-input or an emulation defect remain unresolved. The input-word
-units are established below; the next question is how buffered decoder
-input is meant to drain at this boundary. Do not force a larger
+units are established below; buffered decoder input is not drained by this
+selected branch. Do not force a larger
 length or suppress cleanup. All 925 output artifacts remain byte-identical
 to the earlier ten-second capture, with `illegal=0` and the gate check green.
+
+`playback_final_input` composes 235 original source words to distinguish
+the final short-input route from ordinary completion. The BGEQ path reaches
+`0294ea`, computes the remaining count in AR1, sets `aa1c=1`, stores the
+local full extent into the counter, and joins `0294fb`. With `aa1a==1`,
+`029500` branches directly to `02956f`, bypassing both normal reader call
+`0294e0` and the ordinary input-12 completion publication `029563..029568`.
+Thus the observed last request does not receive that short-read completion.
+
+For active state 4 the cleanup path includes loader call `02959b -> 002080`.
+The source after it (`02959d..0295a7`) prepares selector `16`, argument `9`
+and a two-word send through `0292a7`. It is not a pre-reload flush request;
+its presence after the loader call is not proof of delivery in the original
+session. The alternative `aa1a!=1` path restores the counter from `3726`,
+clears `aa1c`, calls API `002092`, then calls the reader before its ordinary
+completion. That is not an independently established decoder-drain operation
+and does not justify changing the control word.
+
+The selected source policy is therefore explicit. Whether its 375-block
+stop is correct for the recording's intended audio extent remains separate:
+header-shaped buffered bytes alone do not prove that every remaining packet
+belongs in the intended output. Resolve recording metadata/encoder extent or
+an independent playback contract before treating this policy as a device bug.
 
 `playback_input_units` pins 116 source words across AA55/AA99.
 Descriptor arithmetic is `36b0 + index*002c`; index 2 is `3708`, and its

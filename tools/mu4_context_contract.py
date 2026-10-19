@@ -1317,6 +1317,56 @@ PLAYBACK_REFILL_COMPLETION = {
              0x80E1,0x0006,0xEE01,0x8A11,0xF4E4),
 }
 
+PLAYBACK_FINAL_INPUT_WITNESSES = {
+    0x294cc: (0x10f8,0x3733,0xf845,0x94d6,0xf062,2,0xf040,0x95cd,
+              0xf073,0x94da,0xf062,2,0xf040,0x95de,0x1166,0x7001,
+              0x0011,0x7602,0x3aea,0x8100,0xf982,0x92cc,0x8812,0xf020,
+              0x36b0,0x806e,0x6c82,0x94fd),
+    0x29500: (0xf830,0x956f,0xf7b8,0x10f8,0x0011,0x4e68,0x10f8,0x0012,0xf845,0x953e),
+    0x2950a: (0x56f8,0x3726,0x4ef8,0xa9f6,0x76f8,0xaa1c,0,0x7602,
+              0x3aea,0x4e00,0xf020,0x3708,0xf980,0x2092,0x7166,0x0012,
+              0x10f8,0x3733,0xf845,0x9524,0xf062,2,0xf040,0x95cd,
+              0xf073,0x9528,0xf062,2,0xf040,0x95de,0xf120,0x3aea,
+              0x7000,0x0012,0x7001,0x0011,0x8102,0xf982,0x92cc,0xf120,
+              0x36b0,0x816e,0x10f8,8,0xf845,0x953e,0x7600,0,
+              0xf020,0x05a5,0xf982,0x91c2),
+    0x29563: (0x7600,0x000f,0x4818,0xf000,4,0xf982,0x92a7,0x76f8,0xaa1d,0,0xf073,0x95a8),
+    0x2959d: (0x7604,0x0016,0x7605,9,0x4818,0x7600,2,0xf000,4,0xf982,0x92a7),
+}
+
+
+def playback_final_input_words():
+    spans = list(PLAYBACK_FINAL_INPUT_WITNESSES.items())
+    spans += [(base,PLAYBACK_CLEANUP_INGRESS[base]) for base in (0x294bb,0x294ea,0x294fd)]
+    spans += [(0x2953e,PLAYBACK_REFILL_CONTROL[0x2953e]),(REL_CLEANUP_BASE,REL_CLEANUP_WITNESS)]
+    expected = {}
+    for base,witness in spans:
+        for offset,value in enumerate(witness):
+            address = base+offset
+            if address in expected and expected[address] != value:
+                raise ValueError('conflicting final-input source witnesses')
+            expected[address] = value
+    return expected
+
+
+def decode_playback_final_input(words):
+    expected = playback_final_input_words()
+    if any(words.get(address) != value for address,value in expected.items()):
+        raise ValueError('playback final-input source changed or absent')
+    return dict(pinned_words=len(expected),
+                terminal_compare='0294c3: counter plus signed incoming count >= logical half extent',
+                short_input='0294ea: AR1 <- low16(local half - counter low); aa1c <- 1; counter <- local full extent',
+                join='0294fb sets AR2=1; 0294fd tests aa1a == 1',
+                one_pass=dict(branch='029500 -> 02956f',
+                              bypassed=['normal reader callback 0294e0','ordinary input-12 completion 029563..029568'],
+                              cleanup='state 4 follows existing 02956f cleanup and loader call 02959b',
+                              notification_in_source='02959d: local frame[4]=16, frame[5]=9; send two words through 0292a7',
+                              ordering='notification follows loader call in the source; reaching loader is not proof that notification executes in the same session'),
+                alternate=dict(branch='aa1a != 1 -> 029502',
+                               behavior='nonzero AR2 restores counter from 3726, clears aa1c, calls API 002092 and reader callback 02952f before ordinary completion',
+                               scope='Not evidence of a decoder-drain command or permission to change aa1a'),
+                scope='Source-selected final-input control flow; not intended track sample count, all live message delivery, or correct whole-file/audio completion')
+
 
 def reference_refill_completion(pending, supplied, field6):
     """Only the pending test and low-word cursor update, not the full receiver."""
@@ -2031,6 +2081,7 @@ def contract(source):
     result['decoder_input_reserve'] = decode_decoder_input_reserve(rel_words)
     result['playback_info_query'] = decode_playback_info_query(rel_words)
     result['playback_buffer_refresh'] = decode_playback_buffer_refresh(rel_words)
+    result['playback_final_input'] = decode_playback_final_input(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
