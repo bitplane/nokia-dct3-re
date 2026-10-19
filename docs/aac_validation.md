@@ -1345,6 +1345,38 @@ buffer ownership across the full short capture; it does not extend the
 independent decoder/filter arithmetic window, prove whole-track draining,
 assign physical timing or establish handset speech.
 
+### Transport Across EOF Cleanup and Restart
+
+The separate `--transport-only` mode requires the full binary transition
+stream and exact chronological/value pairing for every captured TX completion,
+but does not require or promote the selected decoder/filter arithmetic window.
+The ordinary checker mode retains that independent provenance requirement.
+Neither mode promotes whole-track audio acceptance. Duplicate-write detection
+uses direct set membership, not a growing per-write set union, so that check
+remains linear in the number of buffer events.
+
+The finalized-input run `tmp/native-gates/mu4-session-serial` observes the
+original `mu4_restart_tail_observe.lua` lifecycle through 11.016666667 seconds.
+Both `mu4_serial_epoch_check.py RUN --transport-only` and the source-/AAC-pinned
+`mu4_restart_tail_check.py` pass. The first-session cleanup and restart timing
+are unchanged, including return to lifecycle 4 at 10.115552110 seconds.
+All seven digital files retain the exact prefix of `mu4-full-serial`.
+
+The 2,651,838 transition records account for 883,938 completed TX words and
+869,246 captured DXR writes: 869,242 DMA-owned source epochs complete, ordinals
+1/785215/788489 are discarded by reset, and ordinal 869246 remains pending
+at the endpoint. The 93 initial repeated completions still have no captured
+DMA provenance. Every TX completion pairs exactly with codec DIN; all 15,574
+additional DIN callbacks are explained by observed frame waits (14,698) or
+reset-held intervals (876), with zero uncovered callbacks. Retained repeats
+remain associated with their actual source epoch, not a fitted sample match.
+
+This closes captured serial-buffer accounting across this EOF/restart
+lifecycle. It does not explain why the original software enters cleanup with
+complete encoded packets still buffered, validate those packets' native
+decoding, prove intended tail/drain policy, or establish physical timing.
+The strict whole-track audio gate remains separate and rejecting.
+
 ### Codec Routing and Startup Phase
 
 The early transition capture brackets 0.817--0.824 seconds and includes actual

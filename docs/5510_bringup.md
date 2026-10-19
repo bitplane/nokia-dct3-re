@@ -39,8 +39,10 @@ sequence accounting distinguishes fresh-write completions, retained-word
 repetition, reset discards and an unattributed pre-reset prefix. Actual
 internal DXR-to-XSR loads/completions are now observed over a bounded interval:
 64 stereo sample frames follow decoded copying, signed scaling and processing
-through owned DMA/DXR epochs to codec DIN. Full-session attribution and physical
-ownership of unmatched DIN intervals remain unvalidated. See the
+through owned DMA/DXR epochs to codec DIN. Serial-buffer accounting also spans
+the original EOF cleanup and restart, with every captured DXR write and TX
+completion accounted for. Full-session decoded-sample attribution and physical
+pin timing remain unvalidated. See the
 [bounded serial contract](aac_validation.md#actual-shift-buffer-and-din-epochs)
 and [transport provenance](#dma-source-to-dxr-ownership).
 The [codec control/startup contract](aac_validation.md#codec-routing-and-startup-phase)

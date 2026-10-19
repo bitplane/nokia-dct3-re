@@ -26,6 +26,19 @@ def fixture(specification):
 
 
 class SerialEpochTest(unittest.TestCase):
+    def test_streamed_owned_epochs_cover_all_writes(self):
+        specification = []
+        for source in range(1,2001):
+            specification.extend([('accept',source*3,source,source),
+                                  ('load_fresh',source*3+1,source,0),
+                                  ('complete',source*3+2,source,0)])
+        events,writes,tx,times = fixture(specification)
+        report,completed = bind_lifecycle(iter(events),writes,tx,times)
+        self.assertEqual(report['accepted'],2000)
+        self.assertEqual(report['events'],6000)
+        self.assertEqual(len(completed),2000)
+        self.assertEqual(report['endpoint_pending'],[])
+
     def test_full_lifecycle_rejects_missing_event_with_recomputed_checksum(self):
         def capture(events):
             data = b''.join(struct.pack('<QHBBI',*event) for event in events)
@@ -45,6 +58,10 @@ class SerialEpochTest(unittest.TestCase):
         self.assertEqual(report['source_epochs_completed'],1)
         with self.assertRaises(ValueError):
             full_lifecycle_report(*capture(events[:-1]),*args)
+        changed = list(args)
+        changed[3] = [1,0]
+        with self.assertRaises(ValueError):
+            full_lifecycle_report(*capture(events),*changed)
 
     def test_binary_event_integrity_and_decoder(self):
         data = struct.pack('<QHBBI',1,0x1234,2,4,1) + struct.pack('<QHBBI',2,0x1234,4,0,0)

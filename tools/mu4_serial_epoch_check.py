@@ -43,7 +43,8 @@ def bind_lifecycle(events, writes, tx, times, *, first_ns=1_000_000_000,
         previous = time
         kinds[kind] += 1
         if kind in ('accept','overwrite','ignore'):
-            if owner != 4 or not source or owned.get(source) != (time,word) or source in accepted|ignored:
+            if (owner != 4 or not source or owned.get(source) != (time,word)
+                    or source in accepted or source in ignored):
                 raise ValueError('buffer event lacks unique actual channel-3 DXR write')
         elif owner or source:
             raise ValueError('non-write transition claims active DMA ownership')
@@ -156,8 +157,12 @@ def full_lifecycle_report(text,data,writes,tx,times,din,slots,stop_ns):
     if (report['kinds'].get('complete',0) != len(times)
             or sum(report['kinds'].get(kind,0) for kind in ('accept','overwrite','ignore')) != len(writes)):
         raise ValueError('full event stream does not cover every captured TX/DXR word')
+    serial = compare_serial_callbacks(tx,times,din,slots)
+    if not serial['all_completed_tx_paired']:
+        raise ValueError('full transmitter capture lacks exact chronological codec DIN pairs')
     report.update(capture=integrity,nonshifting_din=nonshifting_din(
         tx_event_rows(data),times,din,slots),
+        all_completed_tx_paired=True,
         scope='Actual full-capture buffer transitions; not whole-track or silicon timing acceptance')
     return report
 
@@ -323,7 +328,7 @@ def startup_report(text,writes,tx,times,din,slots):
     return report
 
 
-def verify(directory,require_full=False):
+def verify(directory,require_full=False,transport_only=False):
     text = (directory/'error.log').read_text()
     terminal = rows(text,'mu4_playback_capture_terminal')
     lifecycle_end = rows(text,'mu4_tx_lifecycle_terminal')
@@ -350,6 +355,19 @@ def verify(directory,require_full=False):
     # Keep the original whole-run verifier separate: this accepts bounded capture
     # integrity, not its twenty-second execution/title/audio-completion contract.
     serial = compare_serial_callbacks(streams['mcbsp_tx'],times,streams['codec_din'],slots)
+    startup = startup_report(text,writes,streams['mcbsp_tx'],times,streams['codec_din'],slots)
+    full = None
+    if rows(text,'mu4_tx_event_capture'):
+        raw_events = (directory/'mu4_playback_tx.events').read_bytes()
+        full = full_lifecycle_report(text,raw_events,writes,streams['mcbsp_tx'],times,
+            streams['codec_din'],slots,int(Decimal(terminal[0]['t'])*1_000_000_000))
+    elif require_full or transport_only:
+        raise ValueError('full transmitter transition capture required')
+    if transport_only:
+        return dict(streams=reports,dma_to_dxr=write_report,lifecycle=lifecycle,
+                    serial_callbacks=serial,startup=startup,full_capture_lifecycle=full,
+                    bounded_sample_to_din_epochs_validated=False,native_audio_validated=False,
+                    scope='Transport-only capture; no decoder/filter arithmetic or whole-track acceptance')
     final = {}
     for row in rows(text,'mu4_filter_bus'):
         address = int(row['address'],16)
@@ -384,14 +402,6 @@ def verify(directory,require_full=False):
             raise ValueError('selected serial epoch lacks chronological codec DIN correspondence')
         delivered += 1
         channel_slots[f'bank_{address & ~63:04x}_slot_{sink_slots[sink]}'] += 1
-    startup = startup_report(text,writes,streams['mcbsp_tx'],times,streams['codec_din'],slots)
-    full = None
-    if rows(text,'mu4_tx_event_capture'):
-        raw_events = (directory/'mu4_playback_tx.events').read_bytes()
-        full = full_lifecycle_report(text,raw_events,writes,streams['mcbsp_tx'],times,
-            streams['codec_din'],slots,int(Decimal(terminal[0]['t'])*1_000_000_000))
-    elif require_full:
-        raise ValueError('full transmitter transition capture required')
     controls = codec_control_history(text)
     route = None
     if controls:
@@ -420,9 +430,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--full',action='store_true',help='require full-capture binary buffer transitions')
+    parser.add_argument('--transport-only',action='store_true',
+                        help='require full transport capture without claiming selected filter provenance')
     args = parser.parse_args()
     try:
-        print(json.dumps(verify(args.directory,args.full),indent=2))
+        print(json.dumps(verify(args.directory,args.full,args.transport_only),indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         print(f'FAIL: {error}',file=sys.stderr)
         return 1
