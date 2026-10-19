@@ -8,7 +8,10 @@ native handset speech acceptance. The coherent fresh record/save/cold-reopen
 control reaches 376 successful decoder calls with consumed input-byte coverage;
 detailed arithmetic and actual decoded-bank copy correspondence cover eight
 calls. A bounded actual DMA capture identifies intervening processing writes at
-context `02a2ea`, rather than direct consumption of copy-helper output. The protected
+context `02a2ea`, rather than direct consumption of copy-helper output. Its
+five-pass kernel is source-pinned and bounded nonzero output epochs match DMA;
+the intervening upstream writer at `029fee` and independent processing arithmetic
+remain open. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -1020,10 +1023,42 @@ no writer observed after the window opens and remain unclassified. **Zero** DMA
 reads have the copy helper (`02a367`) as their latest writer. Thus the copied
 decoder samples are not directly consumed in this window: a later processing
 write intervenes. This does not prove that processing preserves sample values,
-nor that every copied word eventually reaches DMA. The next provenance target
-is the routine producing `02a2ea` writes, not a fitted copy-to-DMA alignment.
+nor that every copied word eventually reaches DMA. The processing contract below
+narrows that boundary without fitting a copy-to-DMA alignment.
 
 Run `mu4_pcm_dma_epoch_check.py RUN/error.log` alongside the copy checker. It
 checks actual read ownership, consecutive ordinals, last-write chronology and
 word equality; any direct copy-origin claim must also match an actual logged
 copy-write epoch. Its output deliberately keeps native audio validation false.
+
+### In-Place Output Processing
+
+`decode_output_processing` pins the original AA99 kernel `02a2c6..02a2ea`
+and its five parent calls (55 source words including call/rewind witnesses).
+`BRC=63` and `RPTB 02a2e9` apply a fixed-point multiply/accumulate loop to 64
+sample words. The sample enters through `LD *AR7,T`; the final instruction is
+`STH A,*AR7+`. State writes use AR3/AR4/AR5. Between the five calls, the parent
+rewinds AR7 by 64, processing the same block again. This establishes source
+geometry, not coefficient meaning or an independently evaluated filter equation.
+
+`mu4_output_processing_observe.lua` composes the copy observer with a bounded
+1.06--1.10-second sample-bus observation. It selects reads by the helper interval
+and actual address matching AR7, not by a single presumed instruction PC. Actual
+read contexts are `02a2d2/02a2ea/02a2cd`, including pipeline/block-repeat effects;
+PC snapshots remain context, not retained instruction ownership.
+
+The uncapped, zero-illegal capture has 52068 sample reads and 17448 processing
+writes, of which 17265 are nonzero. One initial write is left-censored; no final
+sample read is unmatched. All fully observed writes equal their input words in
+this configuration. This is a measured no-change result, not proof that every
+coefficient setting is an identity or that CPU arithmetic is independently valid.
+
+41754 reads follow prior processing writes; 10314 follow another writer at
+context `029fee`. None directly follows the copy helper. Within the same bounded
+window, 3348 actual channel-3 DMA reads match observed processing-write epochs
+exactly, with no unmatched DMA read whose latest writer is inside that window.
+The earlier copy proof also reproduces unchanged. Check the chain with
+`mu4_output_processing_check.py RUN/error.log`, alongside the copy and DMA
+epoch checkers. Do not extend the result to serial/codec delivery or whole-track
+audio. Next recover the `029fee` input/write contract and independently evaluate
+the configured processing arithmetic; direct copy-to-DMA provenance remains false.

@@ -50,6 +50,7 @@ from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decode
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
+from tools.mu4_context_contract import OUTPUT_PROCESSING_BASE, OUTPUT_PROCESSING_WITNESS, decode_output_processing
 from tools.mu4_context_contract import playback_control_literal_census, PLAYBACK_SWITCH_CALLS
 from tools.mu4_context_contract import reference_bit_window
 from tools.mu4_context_contract import BIT_WINDOW_BASE, BIT_WINDOW_WITNESS, decode_bit_window
@@ -642,6 +643,20 @@ class ContextContractTest(unittest.TestCase):
             decode_filter_parent({**words, 0x20000: 0xa2c6})
         with self.assertRaises(ValueError):
             decode_filter_parent({address - 0x10000: value for address, value in words.items()})
+
+    def test_output_processing_kernel_and_five_pass_rewinds(self):
+        words = dict(enumerate(OUTPUT_PROCESSING_WITNESS,OUTPUT_PROCESSING_BASE))
+        for site in FILTER_CALL_SITES:
+            words.update({site:0xfb82,site+1:0xa2c6})
+        for site in FILTER_CALL_SITES[1:]:
+            words.update({site+2:0x6def,site+3:0xffc0})
+        result = decode_output_processing(words)
+        self.assertEqual(result['iterations'],64)
+        self.assertEqual(result['passes_per_parent'],5)
+        self.assertEqual(result['sample_write'],'02a2e9 STH A,*AR7+')
+        for address in words:
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_output_processing({**words,address:words[address]^1})
 
     def test_recorder_mac_original_image_and_syntax_are_pinned(self):
         words = dict(enumerate(RECORDER_MAC_WITNESS, RECORDER_MAC_BASE))

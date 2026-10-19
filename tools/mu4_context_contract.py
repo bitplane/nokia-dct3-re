@@ -499,6 +499,34 @@ FILTER_PARENT_WITNESSES = (
     (0xC70E, (0x0002, 0xA315)),
 )
 FILTER_CALL_SITES = (0x2A23C, 0x2A246, 0x2A250, 0x2A25A, 0x2A264)
+OUTPUT_PROCESSING_BASE = 0x2A2C6
+OUTPUT_PROCESSING_WITNESS = (
+    0x771a,0x003f,0x7710,0x0001,0xf072,0xa2e9,0xe900,0x941e,
+    0x3087,0x8c83,0x2892,0xa78d,0xb081,0xa701,0xf45f,0xf75f,
+    0xa743,0xb00f,0xa7e4,0xa743,0xb003,0xa724,0xf610,0xf442,
+    0xf584,0x8184,0x8385,0xa583,0xf604,0x2584,0xf614,0x6f87,
+    0x0c0f,0x2187,0xf603,0x8297,0xf4e4,
+)
+
+
+def decode_output_processing(words):
+    for offset, expected in enumerate(OUTPUT_PROCESSING_WITNESS):
+        if words.get(OUTPUT_PROCESSING_BASE+offset) != expected:
+            raise ValueError('AA99 output-processing kernel changed or absent')
+    for site in FILTER_CALL_SITES:
+        if (words.get(site),words.get(site+1)) != (0xfb82,0xa2c6):
+            raise ValueError('AA99 output-processing parent call changed or absent')
+    for site in FILTER_CALL_SITES[1:]:
+        if (words.get(site+2),words.get(site+3)) != (0x6def,0xffc0):
+            raise ValueError('AA99 output-processing sample rewind changed or absent')
+    return dict(segment='aa99',entry='02a2c6',return_instruction='02a2ea',
+                pinned_words=len(OUTPUT_PROCESSING_WITNESS)+18,
+                block_repeat_end='02a2e9',repeat_counter=63,iterations=64,
+                sample_read='02a2ce LD *AR7,T',sample_write='02a2e9 STH A,*AR7+',
+                passes_per_parent=5,between_pass_sample_rewind=-64,
+                arithmetic='Fixed-point multiply/accumulate with persistent state writes through AR3/AR4/AR5',
+                scope='Pinned kernel, loop and parent call geometry; not independent arithmetic, '
+                      'coefficient meaning, runtime pass ownership or analog output')
 PLAYBACK_SWITCH_CALLS = (0x2018B, 0x201DE, 0x201EC, 0x2023D, 0x20375)
 
 
@@ -2305,6 +2333,7 @@ def contract(source):
     result['playback_pending_control'] = decode_playback_pending_control(rel_words)
     result['playback_refill_completion'] = decode_playback_refill_completion(rel_words)
     result['filter_parent'] = decode_filter_parent(rel_words)
+    result['output_processing'] = decode_output_processing(rel_words)
     result['bit_reader'] = decode_bit_window(rel_words)
     result['nibble_selector'] = decode_nibble_selector(rel_words)
     result['prefix_transform'] = decode_prefix_transform(rel_words)
