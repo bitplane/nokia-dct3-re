@@ -1047,6 +1047,31 @@ restart contexts against the snapshot-derived source model. The NAND copy
 remains unchanged. The observer owns only the cleanup-buffer breakpoint plus
 distinct resident sites, avoiding the ingress/snapshot breakpoint collision.
 
+The same snapshot contains descriptor byte extent 144192, counter 144192,
+policy `aa1a=1`, short-input flag `aa1c=1`, and a pending 186-word refill.
+The counter equals the **full byte extent** because the decoded short-input
+branch replaces its ordinary word-count value with that full extent; do not
+reinterpret the terminal sentinel as 144192 consumed file words. This matches
+the original branch's state transition, not a missing completion IRQ.
+
+Reconstructed codec controls establish the output lifecycle independently of
+continuing serial traffic. After lifecycle 5 at 9.724472811 seconds, firmware
+writes paired headphone mute at 9.724548625 and digital DAC mute at 9.724619770.
+It restores paired volume at 10.115636626 and clears digital mute at
+10.115707772, after restarted lifecycle 4 at 10.115552110. The restart/tail
+checker now requires both the short-input snapshot state and the
+enabled/muted/re-enabled control sequence. These are digital control facts,
+not measured analog silence or proof of the intended track length.
+
+Thus the observed first session takes a software-selected EOF cleanup, mutes
+output, and advances/wraps the catalogue while nine reference packets remain
+buffered. The remaining question is the product caller's intended input/drain
+contract, not whether DMA needs more time or a synthesized peripheral reply.
+This evidence does not establish that discarding those packets is either a
+firmware bug or an emulation bug. Preserve the rejecting completion gate until
+an independent intended extent or legitimate end-buffer control resolves that
+distinction.
+
 ### Decoded-Bank Copy Correspondence
 
 `mu4_pcm_copy_observe.lua` captures actual copy-helper source reads from

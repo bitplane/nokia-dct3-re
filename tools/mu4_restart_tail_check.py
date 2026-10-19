@@ -1,5 +1,6 @@
 """Bind finalized cleanup RAM to the native resident restart selection."""
 import argparse
+from decimal import Decimal
 import hashlib
 import json
 from pathlib import Path
@@ -10,12 +11,14 @@ if __package__:
     from .mu4_context_contract import decode_resident_cleanup_restart, resident_cleanup_restart
     from .mu4_clock_contract import SOURCE_SHA256
     from .mu4_playback_frame_check import rows
+    from .mu4_serial_epoch_check import codec_control_history
     from .noki5510_a00_inventory import uploaded_word_image
 else:
     from mu4_cleanup_buffer_check import check as check_buffer
     from mu4_context_contract import decode_resident_cleanup_restart, resident_cleanup_restart
     from mu4_clock_contract import SOURCE_SHA256
     from mu4_playback_frame_check import rows
+    from mu4_serial_epoch_check import codec_control_history
     from noki5510_a00_inventory import uploaded_word_image
 
 
@@ -63,6 +66,50 @@ def check_restart(text, snapshot):
                      'not retained instruction operands, intended repeat settings, tail validity or audio acceptance'}
 
 
+def check_eof_mute(text, snapshot):
+    control = snapshot['file_control']
+    if (not 0 < control['descriptor_bytes'] <= 0xffffffff
+            or control['descriptor_bytes'] % 2
+            or control['counter'] != control['descriptor_bytes']
+            or control['policy'] != 1 or control['short_input'] != 1
+            or not snapshot['pending_refill']):
+        raise ValueError('cleanup snapshot differs from default short-input path')
+    writes = [row for row in rows(text, 'mu4_playback_lifecycle_write')
+              if row['address'] == '373e']
+    cleanup = [row for row in writes if row['value'] == '0005']
+    if len(cleanup) != 1:
+        raise ValueError('missing unique cleanup lifecycle')
+    def nanoseconds(row):
+        value = Decimal(row['t'])
+        if not value.is_finite() or value < 0:
+            raise ValueError('invalid lifecycle time')
+        return value * 1_000_000_000
+    cleanup_ns = nanoseconds(cleanup[0])
+    restart = [row for row in writes if row['value'] == '0004'
+               and nanoseconds(row) > cleanup_ns]
+    if len(restart) != 1:
+        raise ValueError('missing unique restarted playback lifecycle')
+    restart_ns = nanoseconds(restart[0])
+    history = codec_control_history(text)
+    def muted(registers):
+        return bool(registers[5] & 8) and all((registers[i] & 0x7f) < 0x30 for i in (2, 3))
+    def enabled(registers):
+        return (bool(registers[9] & 1) and not registers[6] & 0x98
+                and bool(registers[4] & 0x10) and not registers[5] & 8
+                and all((registers[i] & 0x7f) >= 0x30 for i in (2, 3)))
+    before = [ns for ns, registers in history if ns < cleanup_ns and enabled(registers)]
+    silence = [ns for ns, registers in history
+               if cleanup_ns < ns < restart_ns and muted(registers)]
+    after = [ns for ns, registers in history if ns > restart_ns and enabled(registers)]
+    if not before or not silence or not after:
+        raise ValueError('missing enabled/muted/re-enabled codec control sequence')
+    return {'file_control': control, 'pending_refill_words': snapshot['pending_refill'],
+            'cleanup_ns': str(cleanup_ns), 'mute_observed_ns': silence[0],
+            'restart_ns': str(restart_ns), 'reenabled_ns': after[0],
+            'scope': 'Original software short-input state and reconstructed mute controls; '
+                     'not analog silence, intended sample count or correct end-of-track policy'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
@@ -79,6 +126,7 @@ def main():
         snapshot = check_buffer(text, (args.directory/'mu4_cleanup_input.le16').read_bytes(),
                                 args.reference_aac.read_bytes())
         print(json.dumps({'restart': check_restart(text, snapshot),
+                          'eof_mute': check_eof_mute(text, snapshot),
                           'cleanup_buffer': snapshot, 'source_contract': contract}, indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'restart/tail check: {error}', file=sys.stderr)
