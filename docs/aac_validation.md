@@ -12,8 +12,9 @@ incomplete packet 386 and no packet 387 in the projection. The native stop path
 acknowledges its software request, resets buffer counters, then completes;
 missing external completion is not the current boundary.
 
-The open lifecycle questions are the metadata writer's erased-tail size increase,
-the processing worker's partial-buffer policy and playback draining. Formal codec conformance,
+The metadata size increase is explained by the original writer's unconditional
+byte accounting, including in-place metadata writes. The open lifecycle
+questions are the processing worker's partial-buffer policy and playback draining. Formal codec conformance,
 DMA/codec epoch pairing and analog output remain separate obligations.
 
 The separate `mu4aac` ABI controls execute the original decoder with its
@@ -831,8 +832,8 @@ matching the encoder/publication capture. Thus the selected buffer reset
 precedes completion; neither a missing stop acknowledgement nor a decoder
 failure explains this recording boundary. This short observation still is
 not the twenty-second finalized-recording acceptance gate. The finalized
-extent is measured separately below; the deeper cleanup/flush and size-update
-policies remain unresolved, not established hardware defects.
+extent and size-update accounting are measured separately below; the deeper
+cleanup/flush policy remains unresolved, not an established hardware defect.
 
 ### Finalized Recording Extent
 
@@ -866,6 +867,47 @@ the complete-window model. No additional complete AAC packet is recovered.
 Reproduce the byte/tag comparison with
 `mu4_recorder_media_inventory.py BEFORE_FILE FINAL_FILE --extracted-files
 --id3-tags`; use the existing transform checker with the fresh native observed
-prefix for fixed-origin correspondence. The next finalization question is the
-original metadata/file-size writer that exposes this 210-byte erased extension,
-not whether an unobserved later save operation flushes the encoded tail.
+prefix for fixed-origin correspondence. The original metadata/file-size
+accounting that exposes the erased extension is established below; this is not
+an unobserved later save operation flushing the encoded tail.
+
+### Metadata Overwrite Accounting
+
+`metadata_overwrite_extent` pins 168 original AA22/AA55 words. In the selected
+existing-ID3 path, updater `028420` seeks to zero, then clears the old tag using
+one-word writes through `03c2c2`. For the 100-byte payload that is fifty calls.
+It seeks zero again at `028455`, writes five header words and fifty payload
+words. These are three phases, not three helper invocations.
+
+The seek prefix `0033ea` resets directory-record cluster/offset fields
+`+14/+15/+16`; it does not change the size at `+12/+13`. The writer tail
+`03c3f6..03c3fe` doubles its processed-word count and unconditionally adds it
+to that size, without taking a maximum against the seek position. Directory
+serialization `03c421` writes the size's two halves into the on-disk buffer.
+Caller `038eab` selects record `1444` for this update. Thus the source predicts
+growth of 100 + 10 + 100 = 210 bytes despite in-place writes.
+
+The complete twenty-second native run with `mu4_metadata_extent_observe.lua`
+captures 352 writes in its 14.9--20-second record window, uncapped and without
+an illegal instruction. All 52 observed size updates agree with the unfitted
+source progression:
+
+| Phase | Size (bytes) |
+| --- | ---: |
+| Initial independent readback | 143982 |
+| Fifty two-byte increments | 144082 |
+| Five-word header | 144092 |
+| Fifty-word payload | 144192 |
+
+The first/last size writes occur at 15.175756900/17.414961348 seconds. Both
+NAND snapshots reproduce the before/final hashes above. Check this against
+independent file readbacks with `mu4_metadata_extent_check.py LOG BEFORE_FILE
+FINAL_FILE --source-a00 SOURCE`. The checker validates actual size-write pairs,
+native metadata success and unchanged common payload, and reports exposed-byte
+contents without assuming they are meaningful padding. Its bounded arithmetic
+model excludes odd/too-small tags and overflowing extents.
+
+This accounts for the extension through original firmware behavior; no seek,
+file-size or media-byte workaround should be added to emulation. It does not
+establish intended recording duration, justify decoding erased bytes, or close
+the separate partial-buffer and playback-drain contracts.

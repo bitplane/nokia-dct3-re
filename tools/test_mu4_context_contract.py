@@ -35,6 +35,7 @@ from tools.mu4_context_contract import playback_final_input_words, decode_playba
 from tools.mu4_context_contract import pocp_count_words, decode_pocp_buffer_count
 from tools.mu4_context_contract import RECORDER_STOP_FRONTEND, decode_recorder_stop_frontend
 from tools.mu4_context_contract import RECORDER_STOP_MAILBOX, decode_recorder_stop_mailbox
+from tools.mu4_context_contract import METADATA_EXTENT_WITNESSES, decode_metadata_overwrite_extent, reference_metadata_size_updates
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -776,6 +777,32 @@ class ContextContractTest(unittest.TestCase):
                 decode_recorder_stop_mailbox(changed)
         with self.assertRaises(ValueError):
             decode_recorder_stop_mailbox({})
+
+    def test_metadata_extent_source_has_unconditional_writer_accounting(self):
+        sources = {marker: {base+offset: value for base,witness in spans.items()
+                           for offset,value in enumerate(witness)}
+                   for marker,spans in METADATA_EXTENT_WITNESSES.items()}
+        result = decode_metadata_overwrite_extent(sources['aa22'],sources['aa55'])
+        self.assertEqual(result['pinned_words'],168)
+        self.assertIn('unconditionally',result['accounting'])
+        self.assertIn('not extent',result['seeks'])
+        for marker,words in sources.items():
+            for address in words:
+                changed = dict(words)
+                changed[address] ^= 1
+                with self.subTest(marker=marker,address=hex(address)), self.assertRaises(ValueError):
+                    decode_metadata_overwrite_extent(changed if marker == 'aa22' else sources['aa22'],
+                                                     changed if marker == 'aa55' else sources['aa55'])
+
+    def test_metadata_size_progression_is_written_bytes_not_maximum_cursor(self):
+        result = reference_metadata_size_updates(143982,100)
+        self.assertEqual([row['words'] for row in result],[1]*50+[5,50])
+        self.assertEqual([row['extent'] for row in result[-3:]],[144082,144092,144192])
+        self.assertEqual(reference_metadata_size_updates(0x1fffe,100)[0]['extent'],0x20000)
+        self.assertEqual(reference_metadata_size_updates(1000,50)[-1]['extent'],1160)
+        for initial,tag in ((100,100),(1000,49),(1000,51),(1000,0x8000),(0x7fffffff,100),(1000,100.0)):
+            with self.subTest(initial=initial,tag=tag), self.assertRaises(ValueError):
+                reference_metadata_size_updates(initial,tag)
 
     def test_pocp_count_is_bound_to_writer_argument_in_both_overlays(self):
         rel,resident = pocp_count_words('aa99'),pocp_count_words('aa22')

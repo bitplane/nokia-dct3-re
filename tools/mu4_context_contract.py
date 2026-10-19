@@ -922,6 +922,60 @@ def decode_recorder_stop_mailbox(words):
         scope='Selected original-source mailbox/stop paths; no live callback identity, final-flush policy, asynchronous completion producer or intended sample extent proof')
 
 
+METADATA_EXTENT_WITNESSES = {
+    'aa22': {
+        0x28394: (0x7712,0x1784,0xec31,0x7692,0),
+        0x28420: (0xe800,0x4e00,0x1031,0x8002,0x4811,0xf980,0x2092,0xf6b8,0xf495,
+                  0x5632,0xf0ff,0x4e32,0xf0e0,0xf845,0x8445,0x7716,0,0x1031,0x7000,
+                  0x0017,0x7601,1,0x8002,0x4811,0xf983,0xc2c2,0xf7b8,0x6d96,0x11f8,
+                  0x0016,0xf6b8,0xf495,0x5632,0xf3e0,0xf520,0xf84b,0x8431,0x102e),
+        0x28455: (0xe800,0x4e00,0x1031,0x8002,0x4811,0xf980,0x2092,0x7618,0x4944,
+                  0x7619,0x3303,0x761a,0,0x761b,0,0x1030,0x801c,0x7600,5,0x4818,
+                  0xf000,0x0018,0xf982,0x86db,0x4818,0xf000,0x0018,0x8000,0x1031,
+                  0x8002,0x7601,5,0x4811,0xf983,0xc2c2,0x1031,0x8002,0x7000,0x0017,
+                  0x7601,0x0032,0x4811,0xf983,0xc2c2,0xf073,0x8513),
+        0x3c3f6: (0x4817,0xf0e1,0xf495,0x4808,0x50e1,0x0012,0x4ee1,0x0012,0xe800),
+        0x3c421: (0x6b04,0x000e,0x1104,0xf200,1,0x8004,0x4816,0xf600,0x8812,
+                  0x10e1,0x0013,0x8082,0xf6b8,0x56e1,0x0012,0xf1f0,0x4816,0x0004,
+                  0x8812,0xf495,0xf495,0x8182),
+        0x38eab: (0xf020,0x1444,0x8011,0x61f8,0x1451,0x0010,0xf830,0x8efb,0xf7b8,
+                  0x10f8,0x0011,0xf010,1,0xf845,0x8ee6,0x6c81,0x8efb,0x100c,0x8000,
+                  0x7002,0x0016,0x100b,0x7604,0,0x8001,0x100a,0x8003,0x1011,0xf982,0x8385),
+    },
+    'aa55': {
+        0x33ea: (0x4a11,0x4a16,0xeefa,0x8811,0x560a,0x4e02,0x710c,0x0016,0x10e1,
+                 0x0011,0x80e1,0x0016,0x80e1,0x0014,0x76e1,0x0015,0,0xf6b8),
+    },
+}
+
+
+def decode_metadata_overwrite_extent(resident_words, bootstrap_words):
+    for marker, words in (('aa22',resident_words),('aa55',bootstrap_words)):
+        for base,witness in METADATA_EXTENT_WITNESSES[marker].items():
+            if any(words.get(base+offset) != value for offset,value in enumerate(witness)):
+                raise ValueError('metadata overwrite extent source changed or absent')
+    return dict(pinned_words=sum(len(witness) for spans in METADATA_EXTENT_WITNESSES.values() for witness in spans.values()),
+        record='038eab selects directory record 1444 before updater 028385; byte extent at record+12/+13',
+        seeks='0033ea resets cluster/offset fields +14/+15/+16, not extent +12/+13',
+        rewrite='028420 seeks zero then old_tag_bytes/2 single-word zero writes; 028455 seeks zero then writes five header words and fifty tag words',
+        accounting='03c3f6 doubles processed AR7 word count and unconditionally DADDs it into record+12/+13; no position maximum in this tail',
+        directory='03c421 serializes record+13 then high half of record+12/+13 into the on-disk directory buffer',
+        scope='Selected source-pinned ID3 rewrite, seek-prefix and writer/accounting blocks; no claim that the extension is desirable, a hardware defect, or valid codec padding')
+
+
+def reference_metadata_size_updates(file_bytes, old_tag_bytes):
+    """Admitted even ID3 payload and nonoverflowing positive-file source model."""
+    if (not isinstance(file_bytes,int) or not isinstance(old_tag_bytes,int) or
+            not 50 <= old_tag_bytes <= 0x7ffe or old_tag_bytes % 2 or
+            not old_tag_bytes+10 <= file_bytes <= 0x7fffffff-old_tag_bytes-110):
+        raise ValueError('metadata size model requires an even admitted tag and nonoverflowing file extent')
+    result, size = [], file_bytes
+    for count in [1]*(old_tag_bytes//2)+[5,50]:
+        size += 2*count
+        result.append(dict(words=count,bytes=2*count,extent=size))
+    return result
+
+
 def decode_pocp_buffer_count(rel_words, resident_words):
     for marker,words in (('aa99',rel_words),('aa22',resident_words)):
         if any(words.get(address) != value for address,value in pocp_count_words(marker).items()):
@@ -2272,6 +2326,7 @@ def contract(source):
     result['playback_buffer_refresh'] = decode_playback_buffer_refresh(rel_words)
     result['playback_final_input'] = decode_playback_final_input(rel_words)
     result['pocp_buffer_count'] = decode_pocp_buffer_count(rel_words,words)
+    result['metadata_overwrite_extent'] = decode_metadata_overwrite_extent(words,bootstrap_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)
