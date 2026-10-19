@@ -106,6 +106,12 @@ def identity_contract(firmware):
             'software_version_decimal': 6,
             'formatter': '002a05cc', 'imei_reader': '002a066a', 'imeisv_reader': '002a0640',
             'display_formatter': '0029fc00',
+            'factory_record_continuation': {
+                'constructor':'0029ecf8', 'type':'70', 'subcommand':'17',
+                'body_bytes':48, 'send_call':'0029edd6', 'destination_argument':3,
+                'nv_record_base':'0020', 'nv_record_stride':24,
+                'record_half_order':'normal unless fifth argument is 1, then swapped',
+                'scope':'Source constructor only; not a qualified reply encoder or observed continuation'},
             'factory_record_reply_dispatch': {
                 'selector_offset': 8,
                 '34': {'branch': '0024c9d8', 'call': '0024cadc',
@@ -121,7 +127,8 @@ def identity_contract(firmware):
                 firmware[first-0x200000:last-0x200000]).hexdigest()
                 for first,last in ((0x2a05cc,0x2a0692),(0x29fc00,0x29fd14),
                                    (0x3ad490,0x3ad542),(0x24c9d2,0x24cafc),
-                                   (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c))},
+                                   (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c),
+                                   (0x29ecf8,0x29ede6))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 

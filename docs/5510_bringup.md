@@ -2476,6 +2476,20 @@ record payloads, zero consumer entries and the qualified terminal state.
 It rejects incomplete, duplicate or changed evidence rather than treating
 a missing trace as proof of absence.
 
+The continuation constructor `29ecf8..29ede4` emits type `70`, subcommand
+`17`, body length `30` (48 bytes), through send call `29edd6` with
+destination argument 3. It saves its first argument and control state in
+RAM, then combines raw argument fields with the selected NV slot at
+`0020 + 24 * index`. Normally that 24-byte record is copied intact; when
+the fifth argument is 1, its two 12-byte halves are reversed. Body fields
+outside the record are copied/masked from the caller rather than derived by
+a recovered MCU codec. The source report pins the constructor separately.
+Neither HLE TX nor transport-consume logs contain a subcommand-`17` request
+in the qualified eight-second erased-NV capture. This is a source-mapped
+continuation, not an observed transaction or justification for inventing its
+DSP response. Recovering reply `35`'s full acceptance path alone therefore
+would not establish the algorithm needed for subsequent transactions.
+
 An adjacent record-update routine, `29fa6c`, must not be mistaken for that
 reply contract. Its sole aligned direct Thumb-call candidate is `24f842`,
 inside a command dispatcher; this census does not classify computed/ARM
