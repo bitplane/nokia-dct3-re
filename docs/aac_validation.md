@@ -340,13 +340,26 @@ remain waveform diagnostics, not a chosen codec tolerance. Raw capture
 SHA-256 is `13d2355308b88874511f5100f01a6dbf84bb11199af28748b383d5c791e2bf58`;
 converted capture SHA-256 is
 `d82f9703e1bffa46aa5d330c7935f9fc7e0720f7ab0b7eee19bc6d87bd2063a6`.
-Per-store ownership, raw output normalization, actual input-read binding and
-broader media accuracy remain open.
+Per-store ownership, raw output normalization, out-of-window read exclusion
+and broader media accuracy remain open.
+
+The one-frame input proof records 163 actual input-window reads covering
+156 distinct contiguous words (312 bytes). Every observed word equals the
+independently generated control, and all 308 consumed frame bytes are
+covered. Four bytes are lookahead; returned index `009b` with 16 reservoir
+bits retains two bytes beyond the frame, while other lookahead comes from
+header inspection. Context PCs are checked, but are not presented as
+retained instruction identity. The input observer does not prove absence
+of reads outside its window. Consumed-prefix SHA-256 is
+`021cfce1f69f3848c960a8e6e37ce393b9231573e355d704a8253b8d350b8de3`.
+For subsequent calls, distinguish fetched-word advancement from semantic
+packet length; do not discard or synthesize the retained reservoir.
 
 ```sh
 python3 tools/mu4_aac_abi_check.py PRIVATE_RUN_DIRECTORY \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00 \
-  --reference-pcm GENERATED_CONTROL_HOST.s16
+  --reference-pcm GENERATED_CONTROL_HOST.s16 \
+  --input-aac GENERATED_CONTROL.aac
 ```
 
 The checker accepts an internally consistent observation and reports errors;

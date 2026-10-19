@@ -5087,6 +5087,8 @@ private:
 	unsigned m_headers = 0;
 	unsigned m_sources_seen = 0;
 	std::array<u16,2> m_sources{};
+	unsigned m_input_reads = 0;
+	std::array<bool,1024> m_input_seen{};
 	bool m_done = false;
 	void program_map(address_map &map)
 	{
@@ -5104,6 +5106,17 @@ private:
 	virtual void machine_start() override
 	{
 		m_check = timer_alloc(FUNC(mu4_aac_test_state::check), this);
+		m_cpu->space(AS_DATA).install_read_tap(0x162e,0x1a2d,"mu4_aac_abi_input",
+			[this](offs_t address, u16 &value, u16 mask) {
+				if (machine().side_effects_disabled()) return;
+				unsigned const index = address - 0x162e;
+				u16 const expected = (u16(m_input[2*index]) << 8) | m_input[2*index+1];
+				if (++m_input_reads > 4096 || mask != 0xffff || value != expected)
+					fatalerror("MU4 AAC ABI changed, partial or capped input read");
+				m_input_seen[index] = true;
+				logerror("mu4_aac_abi_input_read: ordinal=%u index=%u address=%04x value=%04x mask=%04x context_pc=%06x observer_writes=0\n",
+					m_input_reads,index,unsigned(address),value,mask,unsigned(m_cpu->pc()));
+			});
 	}
 	virtual void machine_reset() override
 	{
@@ -5162,6 +5175,7 @@ private:
 		m_done = false;
 		m_headers = 0;
 		m_sources_seen = 0; m_sources = {};
+		m_input_reads = 0; m_input_seen = {};
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x2028);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
@@ -5178,6 +5192,10 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),unsigned(m_cpu->pc()));
 		if (!m_done || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || data.read_word(0x1402))
 			fatalerror("MU4 AAC ABI probe did not decode a successful block");
+		unsigned unique = 0, highest = 0;
+		for (unsigned i = 0; i < m_input_seen.size(); ++i)
+			if (m_input_seen[i]) { ++unique; highest = i; }
+		logerror("mu4_aac_abi_input_end: reads=%u unique_words=%u highest_index=%u complete=1 observer_writes=0\n",m_input_reads,unique,highest);
 		if (m_sources_seen != 1 || m_sources[0] < 0x80 || m_sources[1] < 0x80 ||
 			m_sources[0] > 0xf800 || m_sources[1] > 0xf800)
 			fatalerror("MU4 AAC ABI output source bounds");

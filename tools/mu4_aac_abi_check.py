@@ -9,8 +9,10 @@ import sys
 
 if __package__:
     from .mu4_context_contract import contract, reference_pcm_conversion
+    from .mu4_recorder_media_inventory import adts_header
 else:
     from mu4_context_contract import contract, reference_pcm_conversion
+    from mu4_recorder_media_inventory import adts_header
 
 
 def rows(text, marker):
@@ -26,6 +28,39 @@ def rows(text, marker):
             fields[key] = value
         result.append(fields)
     return result
+
+
+def check_input(text, encoded):
+    reads, ends = rows(text,'mu4_aac_abi_input_read'), rows(text,'mu4_aac_abi_input_end')
+    if not 0 < len(reads) <= 4096 or len(ends) != 1 or len(encoded) < 2048:
+        raise ValueError('missing, capped or incomplete input observation')
+    header = adts_header(encoded,0)
+    if not header or header['frame_bytes'] != 308 or not header['frame_within_file']:
+        raise ValueError('input does not contain the declared first ADTS frame')
+    seen = set()
+    try:
+        for ordinal, read in enumerate(reads,1):
+            index = int(read['index'])
+            if (int(read['ordinal']) != ordinal or not 0 <= index < 1024
+                    or int(read['address'],16) != 0x162e+index
+                    or int(read['value'],16) != int.from_bytes(encoded[2*index:2*index+2],'big')
+                    or read['mask'] != 'ffff' or read['observer_writes'] != '0'
+                    or read['context_pc'] not in ('023d8b','025129')):
+                raise ValueError('input read identity, byte value or context changed')
+            seen.add(index)
+        if ends[0] != dict(reads=str(len(reads)),unique_words=str(len(seen)),highest_index=str(max(seen)),
+                           complete='1',observer_writes='0'):
+            raise ValueError('input terminal does not account for the reads')
+    except (KeyError,TypeError) as error:
+        raise ValueError('incomplete input-read fields') from error
+    if seen != set(range(max(seen)+1)) or not set(range(155)).issubset(seen):
+        raise ValueError('input coverage omits consumed or retained reservoir bytes')
+    if text.rfind('mu4_aac_abi_input_read:') > text.index('mu4_aac_abi_sources:'):
+        raise ValueError('input observation extends past decoder return')
+    return dict(reads=len(reads),unique_words=len(seen),consumed_frame_bytes=308,
+                observed_prefix_bytes=2*len(seen),lookahead_bytes=2*len(seen)-308,
+                consumed_sha256=hashlib.sha256(encoded[:308]).hexdigest(),
+                scope='Actual input-window reads and contiguous consumed-prefix coverage; context PCs are not retained instruction ownership or an all-address exclusion proof')
 
 
 def check_capture(text, raw, converted, reference):
@@ -83,6 +118,7 @@ def main():
     parser.add_argument('run', type=Path)
     parser.add_argument('--source-a00', required=True, type=Path)
     parser.add_argument('--reference-pcm', required=True, type=Path)
+    parser.add_argument('--input-aac', required=True, type=Path)
     args = parser.parse_args()
     try:
         contract(args.source_a00.read_bytes())
@@ -90,6 +126,10 @@ def main():
                                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
                                (args.run/'mu4_aac_abi_converted.s16le').read_bytes(),
                                args.reference_pcm.read_bytes())
+        encoded = args.input_aac.read_bytes()
+        if hashlib.sha256(encoded).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
+            raise ValueError('expected the independently generated MPEG-2 control')
+        result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
     except (OSError, ValueError) as error:
         print(f'MU4 AAC ABI: {error}', file=sys.stderr)
         return 1
