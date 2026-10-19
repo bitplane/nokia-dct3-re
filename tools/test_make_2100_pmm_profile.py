@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from tools.make_2100_pmm_profile import (
     IDENTITY_CHECKSUM_OFFSET,
@@ -7,10 +8,28 @@ from tools.make_2100_pmm_profile import (
     PMM_OFFSET,
     VERSION_REFERENCE_OFFSET,
     make_profile,
+    make_own_v521_profile,
 )
 
 
 class Make2100PmmProfileTest(unittest.TestCase):
+    def test_own_v521_rejects_unidentified_image(self):
+        with self.assertRaisesRegex(ValueError, "unchanged acquired"):
+            make_own_v521_profile(bytes(FLASH_SIZE))
+
+    def test_own_v521_changes_only_its_checksum_when_available(self):
+        source = Path(__file__).resolve().parents[1] / "roms/noki2100/2100f521sharp.fls"
+        if not source.exists():
+            self.skipTest("acquired NAM-2 v5.21 input not present")
+        original = source.read_bytes()
+        repaired = make_own_v521_profile(original)
+        self.assertEqual([0x1FC144, 0x1FC145],
+                         [index for index, (a, b) in enumerate(zip(original, repaired)) if a != b])
+        self.assertEqual(original[:PMM_OFFSET], repaired[:PMM_OFFSET])
+        self.assertEqual(bytes.fromhex("0000a0aa"), repaired[0x1FC142:0x1FC146])
+        with self.assertRaisesRegex(ValueError, "unchanged acquired"):
+            make_own_v521_profile(repaired)
+
     def fixture(self):
         base = bytes((index * 7) & 0xff for index in range(PMM_OFFSET))
         donor = bytearray(b"\xff" * FLASH_SIZE)

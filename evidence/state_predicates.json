@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nam2_v521_own_checksum_release", "owner": "nam2_firmware", "status": "satisfied",
+      "predicate": "A checksum-only fixture derived entirely from the acquired NAM-2 v5.21 full image passes its observed product-state checksum and releases the later task batch without firmware-state forcing",
+      "current": "Fresh own-image controls compare computed a0aa with stored 99a6 in validator 291b0c and report self-test item 18 as 12. The independent product reference already matches 933d/933d with secondary 2d10. The hash-pinned generator changes only physical offsets 1fc144/1fc145; fresh corrected runs compare a0aa/a0aa, retain readiness bit 6 and return one from release helper 2e0b5c, then execute SIM APDUs and render the localized Security-code prompt. Physical 12345/left-softkey contacts assert IRQ0 but it remains masked under a2/control 0a, with no rendered digits; this is not credential rejection or interactive acceptance. Native DSP, authentic erased identity fields, registered idle and phone-service parity are not promoted. The v5.84 foreign-PMM boundary is unchanged.",
+      "evidence": ["docs/2100_bringup.md", "docs/model_coverage.md", "tools/make_2100_pmm_profile.py", "tools/make_2100_v521_profile.py", "tools/test_make_2100_pmm_profile.py", "tools/noki2100_v521_startup_observe.lua", "tools/noki2100_v521_security_input.lua"]
+    },
+    {
       "id": "c54x_mvdp_short_preincrement_source", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "MVDP rejects the write-only short preincrement encoding for its data-memory source before data, program or pointer effects",
       "current": "SPRU131G table 5-4/5.5.3.1 limits short MOD=3 to write operands; SPRU172C 4-111 identifies MVDP Smem as a data-memory source. The unchanged atomic core fails the extended executable fixture on a data transaction. Adding 7dxx to the existing early source-admission guard passes 256 new cases/restores across eight ARs, initial TC, CMPT, two pages, both frontends and two checkpoints. The logic-short rejection bank now has 2816 cases/restores over eleven opcode classes, with 576 positive memory-logic cases checked separately. Rejection requires zero data reads/writes, program/I/O writes or AR/accumulator/T/status changes. The staged frontend remains fail-closed for unsupported MVDP forms; this adds no positive staged transfer or silicon-trap claim. Long MOD=13, destination-side preincrement and other implicit-copy/RMW legality are not decided by this correction.",

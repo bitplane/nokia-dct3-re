@@ -18,6 +18,61 @@ This is a bounded interactive compatibility result, not a default boot profile.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
 contract is inherited merely because its values appear compatible.
 
+## Own v5.21 checksum fixture
+
+The complete Sharp-labelled v5.21 image (SHA-1
+`b7e30deb4393a76d509f843d25ecf20881bc25bb`) has an independently reproduced
+checksum defect; this is separate from the v5.84/foreign-PMM experiment.
+Own validator `0x291b0c` reads logical bytes `0000..011f`, optionally replaces
+eight identity bytes through `0x3071bc`, sums `0000..011b` at `0x2f13b8`,
+then compares the dword at `011c`. In the fresh control the optional callback
+at `0x10fad4` is null, identity bytes remain erased, and the actual comparison
+at `0x291b3e` is `0000a0aa != 000099a6`. Task 2 records item 18 as `12`;
+its result-table sweep clears status bit 6 at `0x253136`.
+
+The independent reference comparison at `0x2530a4` already succeeds:
+computed/stored `933d/933d`, secondary `2d10`. Thus a missing or foreign
+version reference is not the observed v5.21 defect. Supervisor release helper
+`0x2e0b5c` returns zero at `0x2f84aa`, and the third startup predicate
+`0x2c85a4` remains false. These are own-ROM addresses, not relocated v5.84
+assumptions.
+
+`tools/make_2100_v521_profile.py` accepts only the unchanged acquired full
+image and changes exactly offsets `1fc144/1fc145` (`99a6 -> a0aa`). It
+preserves all executable, identity, lock, calibration and other PMM bytes;
+it does not import another image or alter firmware state. A fresh cold run
+with this derived NVRAM confirms checksum equality, retains status bit 6,
+returns one from the release helper and executes SIM SELECT/STATUS/READ
+APDUs. It renders the localized Security-code prompt instead of
+`CONTACT SERVICE`. This does not make erased identity fields authentic or
+promote native DSP, registration or usable MMI.
+
+Reproduce with an empty run directory:
+
+```sh
+.venv/bin/python tools/make_2100_v521_profile.py \
+  roms/noki2100/2100f521sharp.fls RUN/nvram/noki2100_1/flash
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  noki2100 -bios 521sharp -rompath ../roms -video none -sound none \
+  -nothrottle -seconds_to_run 13 -log -verbose -debug -debugger none \
+  -autoboot_delay 0 -autoboot_script ../tools/noki2100_v521_startup_observe.lua
+```
+
+The observer uses debugger breakpoints and read/write taps only for logging;
+it writes no firmware or MMIO state. Fresh raw controls and corrected runs
+are retained under ignored `tmp/nam2-v521-*-20261020/`, with the banked
+observer reproduced in `tmp/nam2-v521-banked-observer-20261020/`.
+
+The next boundary is physical input delivery. A separate fresh corrected run
+with `tools/noki2100_v521_security_input.lua` (26 seconds, without the debugger)
+presses `12345`/left softkey at seconds 14 through 19. It does not render
+masked digits or change the prompt. Device tracing observes IRQ0 asserted
+and retained across those contacts while the IRQ mask is `a2` and control
+is `0a`; IRQ0 is masked. This is not an observed wrong-code result and does
+not justify changing the security verifier. Decode this version's interrupt
+and input-enable lifecycle before treating the input fixture as a credential
+test. No keypad mask or task event is to be forced.
+
 ## Established contracts
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the

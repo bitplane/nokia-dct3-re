@@ -2,6 +2,7 @@
 """Build a bounded NAM-2 v5.84 product-state research fixture."""
 
 import argparse
+import hashlib
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ LOGICAL_DATA_OFFSET = 0x26
 IDENTITY_BLOCK_SIZE = 0x120
 IDENTITY_CHECKSUM_OFFSET = 0x11C
 VERSION_REFERENCE_OFFSET = 0x270
+V521_SHA1 = "b7e30deb4393a76d509f843d25ecf20881bc25bb"
 
 
 def make_profile(base: bytes, donor: bytes) -> bytes:
@@ -45,6 +47,17 @@ def make_profile(base: bytes, donor: bytes) -> bytes:
     result[logical + IDENTITY_CHECKSUM_OFFSET:logical + IDENTITY_BLOCK_SIZE] = (
         checksum.to_bytes(4, "big"))
     return bytes(result)
+
+
+def make_own_v521_profile(image: bytes) -> bytes:
+    """Correct only the observed checksum defect in the acquired full image."""
+    if hashlib.sha1(image).hexdigest() != V521_SHA1:
+        raise ValueError("expected the unchanged acquired NAM-2 v5.21 full image")
+    result = make_profile(image[:PMM_OFFSET], image)
+    changed = [index for index, pair in enumerate(zip(image, result)) if pair[0] != pair[1]]
+    if changed != [0x1FC144, 0x1FC145]:
+        raise ValueError("own v5.21 repair changes bytes outside the two checksum bytes")
+    return result
 
 
 def main() -> None:

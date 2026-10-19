@@ -1,0 +1,44 @@
+-- Read-only NAM-2 v5.21 startup observer. Run with -debug -debugger none.
+local machine = manager.machine
+assert(machine.system.name == 'noki2100')
+local debugger = machine.debugger
+local cpu = machine.devices[':maincpu']
+local memory = cpu.spaces.program
+local commands = {
+    {0x291b24, 'checksum_input', 'root=%08x identity0=%08x identity1=%08x callback=%08x',
+        'r4,d@(r4+c),d@(r4+10),d@10fad4'},
+    {0x291b3e, 'checksum', 'computed=%08x stored=%08x root=%08x identity0=%08x identity1=%08x',
+        'r0,r1,r4,d@(r4+c),d@(r4+10)'},
+    {0x2530a4, 'reference', 'computed=%04x stored=%04x secondary=%04x',
+        'r5,r0,w@(r13+2)'},
+    {0x25312a, 'failed_item', 'index=%d value=%02x pointer=%08x', 'r1,r0,r2'},
+    {0x2f84aa, 'release', 'result=%08x flag=%02x ready=%02x service=%02x mode=%02x',
+        'r0,b@13fdaf,b@10ef46,b@10e9f4,b@10fbf1'},
+}
+for index, site in ipairs(commands) do
+    local counter = 'temp' .. (index - 1)
+    debugger:command(counter .. '=0')
+    debugger:command(string.format(
+        'bpset %x,%s<32,{%s=%s+1;logerror "nam2_v521_%s: %s cycles=%%016x observer_writes=0\\n",%s,totalcycles;g}',
+        site[1], counter, counter, counter, site[2], site[3], site[4]))
+end
+local times = {0.5, 2, 4, 8, 12}
+local index = 1
+emu.register_frame_done(function()
+    local now = machine.time:as_double()
+    if index > #times or now < times[index] then return end
+    machine:logerror(string.format('nam2_v521_cold: t=%.9f pc=%08x sp=%08x observer_writes=0\n',
+        now, cpu.state['PC'].value, cpu.state['R13'].value))
+    machine.screens[':screen']:snapshot(string.format('nam2_v521_%02d.png', index))
+    index = index + 1
+end)
+local flag_writes = 0
+local handle = memory:install_write_tap(0x13fdac, 0x13fdaf, 'nam2_v521_flag',
+    function(offset, value, mask)
+        if flag_writes >= 32 or (mask & 0xff) == 0 then return end
+        flag_writes = flag_writes + 1
+        machine:logerror(string.format('nam2_v521_flag: pc=%08x value=%08x mask=%08x t=%.9f observer_writes=0\n',
+            cpu.state['PC'].value, value, mask, machine.time:as_double()))
+    end)
+_G.nam2_v521_flag_handle = handle
+debugger:command('g')
