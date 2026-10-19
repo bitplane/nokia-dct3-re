@@ -672,6 +672,22 @@ DECODER_FRAMING_WITNESS = (
     0x10f8,0xba44,0xf844,0x3da0,0xf982,0x41f2,
     0xf982,0x542b,0x76f8,0xba44,0x0001)
 
+DECODER_ALIGNMENT_BASE = 0x2542B
+DECODER_ALIGNMENT_WITNESS = (
+    0xeefe,0x10f8,0xa854,0xf7b8,0xf540,0x8000,0xe807,0x11f8,
+    0x000b,0xf493,0xf77e,0xf773,0x0100,0xf280,0x1100,0xf520,
+    0xf640,0xf982,0x510c,0xee02,0xf495,0xf4e4)
+
+
+def decode_decoder_alignment(words):
+    for offset, expected in enumerate(DECODER_ALIGNMENT_WITNESS):
+        if words.get(DECODER_ALIGNMENT_BASE + offset) != expected:
+            raise ValueError('AA99 decoder alignment witness changed or absent')
+    return dict(entry='02542b', pinned_words=len(DECODER_ALIGNMENT_WITNESS),
+                input='a854 remaining-bit count',
+                positive_domain='0..31: consume remaining & 7 bits through 02510c',
+                scope='Local byte-alignment helper, not a codec initializer or negative-count contract')
+
 
 def decode_decoder_framing(words):
     for offset, expected in enumerate(DECODER_FRAMING_WITNESS):
@@ -1740,6 +1756,7 @@ def contract(source):
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['decoder_output'] = decode_decoder_output(rel_words)
     result['decoder_framing'] = decode_decoder_framing(rel_words)
+    result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')

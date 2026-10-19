@@ -27,6 +27,7 @@ from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
 from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
+from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
@@ -639,6 +640,15 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
                 decode_decoder_framing(changed)
+
+    def test_decoder_alignment_is_not_codec_initialization(self):
+        words = dict(enumerate(DECODER_ALIGNMENT_WITNESS, DECODER_ALIGNMENT_BASE))
+        self.assertEqual(decode_decoder_alignment(words)['pinned_words'], 22)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_decoder_alignment(changed)
 
     def test_decoder_output_loop_pins_processing_and_two_channel_conversion(self):
         words = {address:value for base,witness in DECODER_OUTPUT_WITNESSES

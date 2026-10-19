@@ -84,7 +84,18 @@ this detection. This proves a local ADIF-recognition/initialization path,
 not complete format support or permission to construct its private state.
 `mu4_context_contract.py` verifies every word against the original AA99 upload;
 mutation tests reject changes at all 45 positions. The next source boundary
-is the pair of original initialization callees and their input requirements.
+is the original header parser and its input requirements.
+
+The two calls have different roles, not two codec constructors. `0241f2`
+reads four eight-bit characters through `02510c`, compares the resulting
+string via `029a43`, consumes the optional copyright string and fixed ADIF
+fields, then invokes `0242cc` for program configuration. Its return has not
+been runtime-validated on the official vector. `02542b..025440` is a
+22-word source-pinned byte-alignment helper: in the nonnegative remaining-bit
+domain 0..31 it consumes `a854 & 7` bits through `02510c`. It does not
+initialize a codec. The subsequent `02a81a` call saves execution context
+(SP, return words and registers), not an AAC header dispatcher. Preserve
+those distinctions when naming the future isolated ABI fixture.
 
 ## Next Acceptance Boundary
 
