@@ -12,14 +12,14 @@ import tempfile
 
 try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
-    from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
+    from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health, check_execution_tuning
     from tools.c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window, observe_execution, check_execution
-    from tools.c54x_rom4_rf_consumption_check import check as check_consumption
+    from tools.c54x_rom4_rf_consumption_check import check as check_consumption, check_execution_scan
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
-    from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
+    from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health, check_execution_tuning
     from c54x_rom4_rf_score_check import check as check_score, observe as observe_score, check_window, observe_execution, check_execution
-    from c54x_rom4_rf_consumption_check import check as check_consumption
+    from c54x_rom4_rf_consumption_check import check as check_consumption, check_execution_scan
 
 
 MACHINES = {
@@ -94,10 +94,11 @@ def inspect_case(text, console, mode, machine='noki5110', execution_probes=False
     capture('window_observation', lambda: check_window(text))
     capture('score_acceptance', lambda: score_operation(check_execution if execution_probes else check_score))
     capture('consumption', lambda: check_consumption(text))
-    capture('scan_consumption', lambda: check_consumption(text, scan=True))
-    delivery = capture('delivery', lambda: check_delivery(text))
+    capture('scan_consumption', lambda: check_execution_scan(text) if execution_probes else check_consumption(text, scan=True))
+    delivery = capture('delivery', lambda: check_delivery(text, execution=True) if execution_probes else check_delivery(text))
     request = capture('request', lambda: check_request(text))
-    tuning = capture('tuning', lambda: nse1_gsm900_tuning_consistency(check_tuning_upload(text)))
+    tuning = capture('tuning', lambda: nse1_gsm900_tuning_consistency(
+        check_execution_tuning(text) if execution_probes else check_tuning_upload(text)))
     capture('tuning_blob', lambda: check_tuning_blob(text))
     if score is not None and score['mode'] != mode:
         report['failures']['mode'] = 'RF stimulus mode differs from requested case'
@@ -125,9 +126,13 @@ def main():
                         help='explicit CPU frontend/bus research composition; no physical dialect claim')
     parser.add_argument('--execution-probes', action='store_true',
                         help='observe scores at debugger instruction entry (automatic for staged CPUs)')
+    parser.add_argument('--seconds', type=int, default=60,
+                        help='emulated duration; shorter probes still face unchanged completeness checks')
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats must be positive")
+    if args.seconds < 1:
+        parser.error('--seconds must be positive')
     root = Path(__file__).resolve().parent.parent
     execution_probes = args.execution_probes or MACHINES[args.machine][0] == 'staged'
     observer = root / 'tools' / ('c54x_rom4_rf_execute.lua' if execution_probes else 'c54x_rom4_rf_score.lua')
@@ -162,7 +167,7 @@ def main():
                            check=True, stdout=subprocess.DEVNULL)
             command = [str(args.mame.resolve()), args.machine, "-rompath", str(args.rompath.resolve()),
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
-                       "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "60",
+                       "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", str(args.seconds),
                        "-autoboot_script", str(observer)]
             if execution_probes:
                 command += ['-debug', '-debugger', 'none', '-autoboot_delay', '0']

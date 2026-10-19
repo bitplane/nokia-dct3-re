@@ -104,6 +104,19 @@ def check_tuning_stages(text):
     times = [float(stage["t"]) for stage in selected]
     if times != sorted(times):
         raise ValueError("packing stage timestamps regress")
+    result = check_tuning_values(selected)
+    if check_tuning(text) != result:
+        raise ValueError('programming ports differ from the packing result')
+    return result
+
+
+def check_tuning_values(selected):
+    """Shared numeric contract; sampling ownership is checked by the caller."""
+    required = {'address', 'a', 'b', 'ar2', 'flags6be', 'flags216a', 'addend216b', 'field60'}
+    if any(not required <= stage.keys() for stage in selected):
+        raise ValueError('missing tuning operand fields')
+    if tuple(stage.get('address') for stage in selected) != ('3ffb', '400f', '402e', '403a', '4048'):
+        raise ValueError('missing or reordered selected-entry packing stages')
     if any(int(stage["flags6be"], 16) & 0x80 or stage["flags216a"] != "0004"
            or stage["ar2"] != "0031" for stage in selected):
         raise ValueError("capture does not use the bounded packing branch")
@@ -117,9 +130,52 @@ def check_tuning_stages(text):
         raise ValueError("packing input differs from selected entry plus addend")
     result = pack_tuning_nonnegative(value)
     if (int(returned["a"], 16) != result or int(returned["b"], 16) != result
-            or int(returned["field60"], 16) != value // 64
-            or check_tuning(text) != result):
+            or int(returned["field60"], 16) != value // 64):
         raise ValueError("packing result differs from observed quotient or port pair")
+    return result
+
+
+def check_execution_tuning(text):
+    """Correlate execution-entry packing with actual uploads and port writes."""
+    marker = 'rom4_rf_tuning_probe: points=3ffb,400f,402e,403a,4048 phase=instruction_entry'
+    if text.count(marker) != 1:
+        raise ValueError('missing or duplicate execution-owned tuning probe')
+    events = [(index, match[1], dict(FIELDS.findall(match[2])))
+              for index, line in enumerate(text.splitlines())
+              if (match := EVENT.search(line))]
+    stages = [(index, fields) for index, name, fields in events if name == 'execution_tuning']
+    if not stages or len(stages) % 5:
+        raise ValueError('incomplete execution-owned tuning groups')
+    uploaded = [(index, fields) for index, name, fields in events
+                if name == 'tuning_field_write' and fields.get('space') == 'program']
+    expected = (('216a', '0004'), ('216b', '13a6'), ('216c', '13a6'))
+    if (tuple((fields.get('address'), fields.get('value')) for _, fields in uploaded) != expected
+            or any(fields.get('pc') != '31d7' for _, fields in uploaded)
+            or uploaded[-1][0] >= stages[0][0]):
+        raise ValueError('tuning upload differs or follows execution-owned packing')
+    if any('t' not in fields for _, fields in uploaded):
+        raise ValueError('missing tuning upload timestamps')
+    upload_times = [float(fields['t']) for _, fields in uploaded]
+    if upload_times != sorted(upload_times):
+        raise ValueError('tuning upload timestamps regress')
+    result = None
+    for offset in range(0, len(stages), 5):
+        group = stages[offset:offset + 5]
+        if any(fields.get('selected1867') != '006d' for _, fields in group):
+            raise ValueError('execution tuning selected a different entry')
+        result = check_tuning_values([fields for _, fields in group])
+        next_group = stages[offset + 5][0] if offset + 5 < len(stages) else float('inf')
+        # No program-counter ownership is inferred from the I/O callback.
+        writes = [(index, fields) for index, name, fields in events
+                  if name == 'tuning_write' and group[-1][0] < index < next_group
+                  and fields.get('selected1867') == '006d']
+        if (len(writes) < 2 or writes[0][1].get('port') != '0031'
+                or writes[1][1].get('port') != '0032'
+                or any(not {'value', 't'} <= fields.keys() for _, fields in writes[:2])
+                or int(writes[0][1]['value'], 16) != result & 0xffff
+                or int(writes[1][1]['value'], 16) != result >> 16
+                or not upload_times[-1] <= float(writes[0][1]['t']) <= float(writes[1][1]['t'])):
+            raise ValueError('execution-owned packing differs from subsequent port pair')
     return result
 
 
@@ -167,14 +223,16 @@ def check_tuning_blob(text):
     return 0x299894
 
 
-def check(text, consumer_case=False, consumer_effects=False, consumer_decision=False):
+def check(text, consumer_case=False, consumer_effects=False, consumer_decision=False, *, execution=False):
     check_observer_health(text)
+    if execution and text.count('rom4_rf_publication_probe: points=37ce,3807 phase=instruction_entry') != 1:
+        raise ValueError('missing or duplicate execution-owned publication probe')
     events = []
     for line in text.splitlines():
         match = EVENT.search(line)
         if match:
             fields = dict(FIELDS.findall(match[2]))
-            if "t" in fields:
+            if "t" in fields or (execution and match[1] in ('execution_publication', 'execution_publish_exit')):
                 events.append((match[1], fields))
 
     def after(start, kind, predicate):
@@ -187,8 +245,12 @@ def check(text, consumer_case=False, consumer_effects=False, consumer_decision=F
     def matches(**expected):
         return lambda fields: all(fields.get(key) == value for key, value in expected.items())
 
-    index, publication = after(0, "native_publication", matches(type="008a", bytes="2"))
-    index, queued = after(index + 1, "native_publish_exit", matches(address="3807", type="008a", bytes="2"))
+    index, publication = after(0, "execution_publication" if execution else "native_publication", matches(type="008a", bytes="2"))
+    if not re.fullmatch(r'[0-9a-f]{4}', publication.get('words', '')):
+        raise ValueError('native two-byte response body is missing or malformed')
+    index, queued = after(index + 1, "execution_publish_exit" if execution else "native_publish_exit", matches(address="3807", type="008a", bytes="2"))
+    if any(not re.fullmatch(r'[0-9a-f]{4}', queued.get(key, '')) for key in ('producer', 'consumer')):
+        raise ValueError('missing or malformed receive-ring cursors')
     producer = int(queued["producer"], 16)
     consumer = int(queued["consumer"], 16)
     if not 0x80 <= producer < 0xe4 or not 0x80 <= consumer < 0xe4:
@@ -196,7 +258,7 @@ def check(text, consumer_case=False, consumer_effects=False, consumer_decision=F
     next_word = lambda cursor: 0x80 if cursor == 0xe3 else cursor + 1
     if next_word(next_word(consumer)) != producer:
         raise ValueError("response is not the next two-word ring packet")
-    times = [float(publication["t"]), float(queued["t"])]
+    times = [] if execution else [float(publication["t"]), float(queued["t"])]
     for cursor in (next_word(consumer), producer):
         index, consumed = after(index + 1, "mcu_ring_write",
             matches(address="000101c8", value=f"{cursor:08x}", mask="0000ffff"))

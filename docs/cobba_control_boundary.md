@@ -437,12 +437,35 @@ rotating stimulus remains below `0574` on both frontends. The entry-count
 difference is not hidden or treated as timing parity. The rotating score gate
 still fails. This establishes neither a valid physical stimulus nor acquisition.
 
-Other DSP program-fetch-derived fields remain diagnostic, not validated staged
-routing or tuning contracts. Actual port access counts and the CPU illegal flag
-are separate observations. Convert those remaining caller/publication probes
-before interpreting a failed staged delivery/tuning check as missing firmware
-activity. Neither score agreement nor matched SWWSR selections establishes
-physical sample timing or the fitted bus dialect.
+The same execution observer protects three additional boundaries:
+
+| Probe | Checked contract |
+| --- | --- |
+| `37ce` / `3807` | Capture native type `008a`, its two-byte body and the producer/consumer cursors at execution entry. Require a coherent two-word ring advance, ordered MCU consumption, store-owned `1390` header, correlated task-10 post and receipt. |
+| `3ffb` / `400f` / `402e` / `403a` / `4048` | Check selected-entry addition and packing against the same independent numeric model as the atomic fixture. Require the actual program-space upload before these entries, then the corresponding port-31/32 values after the result. I/O callback PCs are context, not opcode owners. |
+| `330a` / `3310` / `3316` / `331c` | Require the first 64 execution entries in the exact four-instruction order, with live program words `74d6 0027` at each site. A debugger-only counter bounds observation; no firmware state is changed. |
+
+Execution records have no synthetic timestamps. Their log order establishes
+causal sequence; actual MCU/upload/I/O timestamps retain their own monotonicity
+checks. The filter result is explicitly an executed-input-instruction count,
+not the earlier bus-read timing measurement or proof of ADC cadence. Legacy
+atomic fetch-based checks remain separate and unchanged in scope. Missing
+markers, incomplete groups, wrong payload/cursor identity, changed arithmetic
+or port order invalidate the corresponding execution check.
+
+All three boundaries pass in the full matched atomic/staged controls, for both
+zero and rotating input. Native `008a/006d` reaches MCU object `101438` as
+status `1390`; selected-entry packing yields `00302813` and the channel-109
+numeric consistency check passes. The staged delivery/tuning failures from
+fetch-based snapshots therefore do not demonstrate missing firmware activity.
+This is a correlated scan-response transport contract, not accepted RF data or
+laboratory registration through native DSP execution.
+
+Other broad caller/request snapshots remain diagnostic. Neither these transport
+observations, score agreement nor matched SWWSR selections establishes physical
+sample packing, synthesizer-wire serialization or the fitted bus dialect.
+`--seconds` permits short development probes, but does not relax the score or
+completeness checks; the matched comparison above uses the default 60 seconds.
 
 The retained arithmetic audit used binary SHA-256
 `67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`.

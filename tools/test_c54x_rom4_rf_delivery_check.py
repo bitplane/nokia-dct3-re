@@ -8,7 +8,7 @@ from unittest.mock import patch
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
     check_tuning_stages, check_tuning_upload, check_tuning_blob, pack_tuning_nonnegative, decode_search_bitmap)
 from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
-from tools.c54x_rom4_rf_delivery_check import check_observer_health, main
+from tools.c54x_rom4_rf_delivery_check import check_observer_health, main, check_execution_tuning
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -22,6 +22,47 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_execution_publication_requires_its_own_complete_chain(self):
+        marker = 'rom4_rf_publication_probe: points=37ce,3807 phase=instruction_entry\n'
+        lines = TRACE.splitlines()
+        lines[0] = lines[0].replace('native_publication: t=1.0', 'execution_publication:')
+        lines[1] = lines[1].replace('native_publish_exit:', 'execution_publish_exit:').replace(' t=1.1', '')
+        trace = marker + '\n'.join(lines)
+        self.assertEqual(check(trace, execution=True), ('00101438', '006d'))
+        for bad in (TRACE, marker + TRACE, marker + trace, trace.replace('words=006d', 'words=bad'),
+                    trace.replace('producer=00ab', 'producer=00ac'),
+                    trace.replace('r1=00101438', 'r1=00101480')):
+            with self.subTest(text=bad), self.assertRaises(ValueError):
+                check(bad, execution=True)
+        for index in range(len(lines)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                check(marker + '\n'.join(lines[:index] + lines[index + 1:]), execution=True)
+
+    def test_execution_tuning_requires_numeric_ownership_and_real_port_order(self):
+        marker = 'rom4_rf_tuning_probe: points=3ffb,400f,402e,403a,4048 phase=instruction_entry\n'
+        fields = 'ar2=0031 flags6be=0010 flags216a=0004 addend216b=13a6 selected1867=006d'
+        stages = [('3ffb', '6d', '4', '32'), ('400f', '6d', '13a6', '32'),
+                  ('402e', '1413', '13a6', '32'), ('403a', '1413', '13a6', '32'),
+                  ('4048', '302813', '302813', '50')]
+        rows = [f'rom4_rf_execution_tuning: address={pc} a={a} b={b} field60={word} {fields}\n'
+                for pc, a, b, word in stages]
+        upload = ''.join(f'rom4_rf_tuning_field_write: space=program t=0.{i + 1} pc=31d7 address={pc} value={word}\n'
+                         for i, (pc, word) in enumerate((('216a', '0004'), ('216b', '13a6'), ('216c', '13a6'))))
+        ports = ('rom4_rf_tuning_write: t=1.0 pc=ffff port=0031 value=2813 selected1867=006d\n'
+                 'rom4_rf_tuning_write: t=1.1 pc=ffff port=0032 value=0030 selected1867=006d\n')
+        trace = marker + upload + ''.join(rows) + ports
+        self.assertEqual(check_execution_tuning(trace), 0x302813)
+        for bad in (trace.replace(marker, ''), marker + trace, marker + ''.join(rows) + upload + ports,
+                    trace.replace('t=0.3', 't=2.0'), trace.replace('value=2813', 'value=2814'),
+                    trace.replace('a=1413', 'a=1414'), trace.replace('flags6be=0010', 'flags6be=0090'),
+                    trace.replace('addend216b=13a6 ', ''), trace.replace('t=1.1', 't=0.9'),
+                    trace.replace('execution_tuning:', 'tuning_stage:')):
+            with self.subTest(text=bad), self.assertRaises(ValueError):
+                check_execution_tuning(bad)
+        for index in range(len(rows)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                check_execution_tuning(marker + upload + ''.join(rows[:index] + rows[index + 1:]) + ports)
+
     def test_header_write_requires_the_store_not_adjacent_literal_load(self):
         self.assertEqual(check(TRACE), ('00101438', '006d'))
         for pc in ('0026be48', '0026be4c'):

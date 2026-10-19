@@ -32,9 +32,11 @@ class RepeatTests(unittest.TestCase):
                          check_cpu_health=lambda text, machine: {'machine': machine, 'illegal': False},
                          check_window=lambda text: {'reads_on': 800000, 'reads_off': 100000, 'physical_gate_claim': False},
                          check_consumption=lambda text, scan=False: {'scan': scan, 'reads': 64},
-                         check_delivery=lambda text: ('00101438', '006d'),
+                         check_execution_scan=lambda text: {'entries': 64},
+                         check_delivery=lambda text, **kwargs: ('00101438', '006d'),
                          check_request=lambda text: 109,
                          check_tuning_upload=lambda text: (),
+                         check_execution_tuning=lambda text: 0x00302813,
                          nse1_gsm900_tuning_consistency=lambda words: {'channel': 109},
                          check_tuning_blob=lambda text: 0x299894)
         return patch.multiple('tools.run_c54x_rom4_rf_delivery', **(functions | overrides))

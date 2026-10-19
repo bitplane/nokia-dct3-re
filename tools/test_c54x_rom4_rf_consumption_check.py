@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_consumption_check import check
+from tools.c54x_rom4_rf_consumption_check import check, check_execution_scan
 
 
 def fixture():
@@ -17,6 +17,28 @@ def scan_fixture():
 
 
 class ConsumptionTests(unittest.TestCase):
+    def execution_fixture(self):
+        owners = (0x330a, 0x3310, 0x3316, 0x331c)
+        return 'rom4_rf_filter_probe: entries=64 phase=instruction_entry\n' + '\n'.join(
+            f'rom4_rf_execution_filter: index={i + 1} pc={owners[i % 4]:04x} opcode=74d6 port=0027'
+            for i in range(64))
+
+    def test_executed_filter_sequence_is_not_a_read_time_claim(self):
+        result = check_execution_scan(self.execution_fixture())
+        self.assertEqual(result['entries'], 64)
+        self.assertEqual(result['source_port'], 0x27)
+        self.assertFalse(result['physical_sample_rate_proven'])
+        self.assertNotIn('span_seconds', result)
+
+    def test_execution_requires_marker_count_order_and_pinned_words(self):
+        text = self.execution_fixture()
+        for bad in (scan_fixture(), text + '\n' + text,
+                    '\n'.join(text.splitlines()[:-1]), text.replace('index=64 ', 'index=63 '),
+                    text.replace('pc=3310', 'pc=3312', 1), text.replace('opcode=74d6', 'opcode=f495', 1),
+                    text.replace('port=0027', 'port=0028', 1), text.replace('index=1 ', 'index=bad ', 1)):
+            with self.subTest(text=bad[:100]), self.assertRaises(ValueError):
+                check_execution_scan(bad)
+
     def test_scan_window(self):
         text = scan_fixture()
         self.assertEqual(check(text, scan=True)["window"], "scan")

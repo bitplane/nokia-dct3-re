@@ -9,6 +9,25 @@ PATTERN = re.compile(
     r"pc=([0-9a-f]+) counter=([0-9a-f]+)")
 
 
+def check_execution_scan(text):
+    marker = 'rom4_rf_filter_probe: entries=64 phase=instruction_entry'
+    if text.count(marker) != 1:
+        raise ValueError('missing or duplicate execution-owned filter probe')
+    rows = [line.split('rom4_rf_execution_filter: ', 1)[1] for line in text.splitlines()
+            if 'rom4_rf_execution_filter: ' in line]
+    if len(rows) != 64:
+        raise ValueError('expected exactly 64 executed filter input entries')
+    owners = (0x330a, 0x3310, 0x3316, 0x331c)
+    for index, row in enumerate(rows):
+        match = re.fullmatch(r'index=(\d+) pc=([0-9a-f]{4}) opcode=([0-9a-f]{4}) port=([0-9a-f]{4})', row)
+        if (not match or int(match[1]) != index + 1 or int(match[2], 16) != owners[index % 4]
+                or match[3] != '74d6' or match[4] != '0027'):
+            raise ValueError('executed filter input sequence or PORTR encoding differs')
+    return dict(entries=64, program_counters=list(owners), source_port=0x27,
+                group_size_input_instructions=32, evidence_class='executed-filter-input-instructions',
+                physical_sample_rate_proven=False)
+
+
 def check(text, *, scan=False):
     pattern = PATTERN if not scan else re.compile(
         PATTERN.pattern.replace("sample_consumption", "scan_consumption"))
