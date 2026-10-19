@@ -31,6 +31,9 @@ public:
 	auto tx_observer_cb() { return m_tx_observer_cb.bind(); }
 	auto rx_irq_cb() { return m_rx_irq_cb.bind(); }
 	auto rx_event_cb() { return m_rx_event_cb.bind(); }
+	// Observation only: publication and side-effecting DRR read/reset boundaries.
+	enum : unsigned { RX_PUBLISH, RX_READ_FRESH, RX_READ_STALE, RX_RESET };
+	auto rx_observer_cb() { return m_rx_observer_cb.bind(); }
 protected:
 	void device_start() override ATTR_COLD;
 	void device_reset() override ATTR_COLD;
@@ -80,6 +83,7 @@ private:
 	devcb_write_line m_tx_event_cb;
 	devcb_write_line m_rx_irq_cb;
 	devcb_write_line m_rx_event_cb;
+	devcb_write16 m_rx_observer_cb;
 };
 
 DECLARE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device)

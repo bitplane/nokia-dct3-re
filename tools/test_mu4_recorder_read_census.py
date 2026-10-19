@@ -16,6 +16,24 @@ def fixture():
 
 
 class RecorderReadCensusTests(unittest.TestCase):
+    def test_publication_freshness_reconciles_every_owner_and_pending_epoch(self):
+        text = fixture()+'\n'+'\n'.join([
+            'mu4_recorder_rx_owner: dma_mask=00 fresh=0 stale=3 observer_writes=0',
+            'mu4_recorder_rx_owner: dma_mask=02 fresh=2 stale=0 observer_writes=0',
+            'mu4_recorder_rx_owner: dma_mask=04 fresh=40 stale=0 observer_writes=0',
+            'mu4_recorder_rx_terminal: publications=43 discarded=0 pending=1 resets=1 bad=0 unknown_stale=1 save_restore=unsupported observer_writes=0 encoder_consumption=0'])
+        result = check(text,True)['drr_freshness']
+        self.assertEqual(result['fresh_reads'],42)
+        self.assertEqual(result['stale_reads'],3)
+        self.assertTrue(result['published_drr_delivery_validated'])
+        for before,after in [('publications=43','publications=42'),('bad=0','bad=1'),
+                             ('pending=1','pending=2'),('unknown_stale=1','unknown_stale=4'),
+                             ('dma_mask=02 fresh=2','dma_mask=02 fresh=1')]:
+            with self.assertRaises(ValueError):
+                check(text.replace(before,after),True)
+        with self.assertRaises(ValueError):
+            check(fixture(),True)
+
     def test_distinguishes_other_dma_from_unowned_context(self):
         result = check(fixture())
         self.assertEqual(result['channel2_selected_reads'],40)

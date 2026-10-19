@@ -916,9 +916,21 @@ and the endpoint NAND remains exactly
 `f09e3e8c1049a563a073fa40040c9d400e2d6212ba1a223ce44045303104277d`.
 The copied formatted seed remains
 `75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
-No read histogram writes guest state. Generated samples and DRR read counts
-still do not establish fresh-word delivery, FIFO drop/repeat accounting,
-destination-buffer ownership or encoder consumption.
+No read histogram writes guest state.
+
+`mu4_recorder_read_census.py RUN/error.log --fresh` additionally reconciles
+side-effecting DRR reads with actual receiver publications and reset boundaries.
+The 20-second `tmp/native-gates/mu4-recorder-fresh` capture has 1,707,056
+publications: 1,707,054 fresh reads, two invalidated by receiver reset, and none
+pending at the endpoint. All 801990 channel-2 and 905064 channel-3 reads are
+fresh; the sole unowned read is stale and matches the known retained DRR word.
+There are no readiness/value inconsistencies or unknown stale-prefix reads.
+The finalized NAND and formatted seed retain the hashes above.
+
+This validates delivery of published DRR words, not ADC conversion, losses
+before publication, destination-buffer ownership or encoder consumption.
+The optional observer does not alter receive timing, FIFO or interrupt behavior;
+its diagnostic accounting is fresh-run only, without save/restore support.
 
 ### Metadata Overwrite Accounting
 

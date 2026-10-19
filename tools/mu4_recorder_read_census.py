@@ -13,7 +13,36 @@ else:
     from noki5510_bootstrap_check import verify_recorder_input
 
 
-def check(text):
+def check_fresh(text,owners):
+    ends = rows(text,'mu4_recorder_rx_terminal')
+    if len(ends) != 1:
+        raise ValueError('missing or repeated DRR publication closure')
+    end = ends[0]
+    if end['bad'] != '0' or end['save_restore'] != 'unsupported' or end['encoder_consumption'] != '0':
+        raise ValueError('DRR publication lifetime/value observation failed')
+    fresh,stale = {},{}
+    for row in rows(text,'mu4_recorder_rx_owner'):
+        mask = int(row['dma_mask'],16)
+        new,old = int(row['fresh']),int(row['stale'])
+        if mask in fresh or mask not in owners or min(new,old) < 0 or new+old != owners[mask]:
+            raise ValueError('DRR read freshness does not match bus ownership')
+        fresh[mask],stale[mask] = new,old
+    publications,discarded,pending,resets,unknown = (int(end[field]) for field in
+        ('publications','discarded','pending','resets','unknown_stale'))
+    if (set(fresh) != set(owners) or min(publications,discarded,resets,unknown) < 0
+            or pending not in (0,1) or unknown > sum(stale.values())
+            or publications != sum(fresh.values())+discarded+pending):
+        raise ValueError('DRR publication/reset/read counters do not reconcile')
+    return {'publications':publications,'fresh_reads':sum(fresh.values()),
+            'stale_reads':sum(stale.values()),'reset_discarded':discarded,'pending':pending,
+            'unknown_stale_prefix_reads':unknown,
+            'fresh_by_dma_mask':{f'{mask:02x}':value for mask,value in sorted(fresh.items())},
+            'stale_by_dma_mask':{f'{mask:02x}':value for mask,value in sorted(stale.items())},
+            'published_drr_delivery_validated':True,
+            'scope':'Observed DRR publication/read readiness and retained-word equality; not ADC conversion, FIFO loss or encoder consumption'}
+
+
+def check(text,require_fresh=False):
     scopes,ends = (rows(text,marker) for marker in
         ('mu4_recorder_read_scope','mu4_recorder_read_terminal'))
     if scopes != [dict(address='0021',context_cap='128',dma_identity='active_source_read',
@@ -44,7 +73,12 @@ def check(text):
             or selected != sum(source['dma_symbol_reads'])
             or total-selected != source['other_owner_reads']):
         raise ValueError('recorder owner/context/input counters do not reconcile')
-    return {'reads':total,'stop_seconds':str(stop),
+    freshness = None
+    if rows(text,'mu4_recorder_rx_terminal'):
+        freshness = check_fresh(text,owners)
+    elif require_fresh:
+        raise ValueError('DRR publication observation required')
+    return {'reads':total,'stop_seconds':str(stop),'drr_freshness':freshness,
             'dma_masks':{f'{mask:02x}':count for mask,count in sorted(owners.items())},
             'unowned_contexts':{f'{pc:06x}':count for pc,count in sorted(contexts.items())},
             'multi_owner_masks':[f'{mask:02x}' for mask in owners if mask&(mask-1)],
@@ -56,9 +90,10 @@ def check(text):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log',type=Path)
+    parser.add_argument('--fresh',action='store_true',help='require publication/read/reset reconciliation')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text()),indent=2))
+        print(json.dumps(check(args.log.read_text(),args.fresh),indent=2))
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         parser.exit(1,f'MU4 recorder read census FAIL: {error}\n')
 

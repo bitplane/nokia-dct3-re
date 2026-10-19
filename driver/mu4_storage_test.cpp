@@ -322,6 +322,7 @@ public:
 		m_mcbsp0->tx_irq_cb().set([this](int state) { if (state) ++m_external_tx_irqs; m_cpu->set_input_line(5, state); });
 		m_mcbsp0->rx_event_cb().set([this](int state) { m_dma->sync_w(1, state); });
 		m_mcbsp0->rx_irq_cb().set([this](int state) { if (state) ++m_rx_irqs; m_cpu->set_input_line(4, state); });
+		m_mcbsp0->rx_observer_cb().set(FUNC(mu4_storage_test_state::observe_recorder_rx));
 		TLV320AIC23(config, "codec", 11'995'200);
 		SPEAKER(config, "headphone_left").front_left();
 		SPEAKER(config, "headphone_right").front_right();
@@ -415,6 +416,38 @@ private:
 	std::array<u64,64> m_ac_read_owners{};
 	std::map<u32,u64> m_ac_unowned_contexts;
 	u64 m_ac_read_total = 0, m_ac_context_dropped = 0;
+	std::array<u64,64> m_ac_rx_fresh{}, m_ac_rx_stale{};
+	u64 m_ac_rx_publications = 0, m_ac_rx_discarded = 0, m_ac_rx_resets = 0;
+	u64 m_ac_rx_bad = 0, m_ac_rx_unknown_stale = 0;
+	bool m_ac_rx_pending = false, m_ac_rx_known = false;
+	u16 m_ac_rx_word = 0;
+	void observe_recorder_rx(offs_t event,u16 word)
+	{
+		if (!recorder_ac_profile()) return;
+		if (event == tms320c54x_mcbsp_device::RX_PUBLISH)
+		{
+			if (m_ac_rx_pending) ++m_ac_rx_bad;
+			++m_ac_rx_publications;
+			m_ac_rx_pending = m_ac_rx_known = true; m_ac_rx_word = word;
+		}
+		else if (event == tms320c54x_mcbsp_device::RX_RESET)
+		{
+			++m_ac_rx_resets;
+			if (m_ac_rx_pending) ++m_ac_rx_discarded;
+			m_ac_rx_pending = false; m_ac_rx_known = true; m_ac_rx_word = word;
+		}
+		else if (event == tms320c54x_mcbsp_device::RX_READ_FRESH || event == tms320c54x_mcbsp_device::RX_READ_STALE)
+		{
+			u8 owners = 0;
+			for (unsigned channel=0;channel<6;++channel)
+				if (m_dma->source_read_matches(channel,AS_DATA,0x21)) owners |= 1U << channel;
+			bool const fresh = event == tms320c54x_mcbsp_device::RX_READ_FRESH;
+			if (m_ac_rx_pending != fresh || (m_ac_rx_known && m_ac_rx_word != word)) ++m_ac_rx_bad;
+			if (!fresh && !m_ac_rx_known) ++m_ac_rx_unknown_stale;
+			++(fresh ? m_ac_rx_fresh : m_ac_rx_stale)[owners];
+			if (fresh) m_ac_rx_pending = false;
+		}
+	}
 	u16 converted_adc(offs_t channel)
 	{
 		if (!recorder_ac_profile()) return channel ? 0x5678 : 0x1234;
@@ -3001,6 +3034,10 @@ private:
 		m_ac_generated = {}; m_ac_received = {}; m_ac_other = m_ac_other_owners = 0;
 		m_ac_read_owners.fill(0); m_ac_unowned_contexts.clear();
 		m_ac_read_total = m_ac_context_dropped = 0;
+		m_ac_rx_fresh.fill(0); m_ac_rx_stale.fill(0);
+		m_ac_rx_publications = m_ac_rx_discarded = m_ac_rx_resets = 0;
+		m_ac_rx_bad = m_ac_rx_unknown_stale = 0;
+		m_ac_rx_pending = m_ac_rx_known = false; m_ac_rx_word = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_native_din_words = 0;
 		m_continuous_tx.fill(0);
@@ -3530,6 +3567,12 @@ private:
 					logerror("mu4_recorder_read_context: context_pc=%06x reads=%llu observer_writes=0\n",pc,static_cast<unsigned long long>(count));
 				logerror("mu4_recorder_read_terminal: reads=%llu contexts=%u dropped=%llu context_cap=128 t=%.9f save_restore=unsupported observer_writes=0\n",
 					static_cast<unsigned long long>(m_ac_read_total),unsigned(m_ac_unowned_contexts.size()),static_cast<unsigned long long>(m_ac_context_dropped),machine().time().as_double());
+				for (unsigned mask=0;mask<64;++mask)
+					if (m_ac_rx_fresh[mask] || m_ac_rx_stale[mask]) logerror("mu4_recorder_rx_owner: dma_mask=%02x fresh=%llu stale=%llu observer_writes=0\n",
+						mask,static_cast<unsigned long long>(m_ac_rx_fresh[mask]),static_cast<unsigned long long>(m_ac_rx_stale[mask]));
+				logerror("mu4_recorder_rx_terminal: publications=%llu discarded=%llu pending=%u resets=%llu bad=%llu unknown_stale=%llu save_restore=unsupported observer_writes=0 encoder_consumption=0\n",
+					static_cast<unsigned long long>(m_ac_rx_publications),static_cast<unsigned long long>(m_ac_rx_discarded),unsigned(m_ac_rx_pending),
+					static_cast<unsigned long long>(m_ac_rx_resets),static_cast<unsigned long long>(m_ac_rx_bad),static_cast<unsigned long long>(m_ac_rx_unknown_stale));
 			}
 			if (playback_profile())
 			{

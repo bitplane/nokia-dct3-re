@@ -6,7 +6,7 @@
 DEFINE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device, "tms54mcbsp", "TMS320C54x McBSP (partial)")
 
 tms320c54x_mcbsp_device::tms320c54x_mcbsp_device(machine_config const &config, char const *tag, device_t *owner, u32 clock)
-	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_observer_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this), m_tx_event_cb(*this), m_rx_irq_cb(*this), m_rx_event_cb(*this)
+	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_observer_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this), m_tx_event_cb(*this), m_rx_irq_cb(*this), m_rx_event_cb(*this), m_rx_observer_cb(*this)
 {
 }
 
@@ -189,6 +189,7 @@ u16 tms320c54x_mcbsp_device::data_r(offs_t offset)
 	{
 		if (!machine().side_effects_disabled())
 		{
+			m_rx_observer_cb(m_rx_ready ? RX_READ_FRESH : RX_READ_STALE,m_rx_word);
 			set_rx_ready(false);
 			if (m_rx_overrun)
 			{
@@ -214,6 +215,7 @@ void tms320c54x_mcbsp_device::reset_receiver()
 	m_regs[0] &= ~u16(8);
 	update_receive_error_irq();
 	set_rx_ready(false);
+	m_rx_observer_cb(RX_RESET,m_rx_word);
 }
 
 void tms320c54x_mcbsp_device::update_receive_error_irq()
@@ -265,6 +267,7 @@ void tms320c54x_mcbsp_device::publish_receive()
 	}
 	else if (justify == 2) m_rx_word <<= 16 - m_rx_buffer_width;
 	m_rx_buffer_full = false;
+	m_rx_observer_cb(RX_PUBLISH,m_rx_word);
 	set_rx_ready(true);
 }
 
