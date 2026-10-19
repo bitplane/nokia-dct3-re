@@ -2397,6 +2397,15 @@ byte model. Those nibbles are not a valid decimal equipment identity. Selector
 observed handset execution. The hybrid bootstrap and erased-NV failures
 reproduce unchanged.
 
+Decimal identity validity must not be confused with the separate record
+reply's nibble filter. At `2a01dc..2a0218`, that filter rejects nibble values
+`c..e`, but permits `a`, `b` and `f`. It checks both nibbles of reply bytes
+`0c..12` and only the high nibble of byte `13`. Consequently all-`ff` bytes
+pass this isolated filter despite being nondecimal equipment digits. The
+host reference tests every byte value at all eight positions (2,048 cases).
+This does not demonstrate acceptance of an erased record: entry eligibility,
+other product/state tests and encoded-record comparisons are independent.
+
 Run `noki5510_identity_contract.py RUN --firmware
 roms/5510-npm5-v353/5510f353c.fls` to check the source hash, bounded NV
 inventory and formatter observations. Its report explicitly rejects a valid

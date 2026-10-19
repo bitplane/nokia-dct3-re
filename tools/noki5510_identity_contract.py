@@ -31,6 +31,18 @@ def record_reply_entry_eligible(message, record_index, state):
     return struct.unpack_from('>H', message, 0x3c)[0] == (total ^ 0xffff)
 
 
+def record_reply_nibble_filter(packed):
+    """2a01dc..2a0218 only; permissive record syntax, not decimal validity."""
+    if len(packed) != 8:
+        raise ValueError('expected reply offsets 0c..13')
+    for value in packed[:7]:
+        if value >= 0xc0 and value >> 4 != 15:
+            return False
+        if value & 12 == 12 and value & 15 != 15:
+            return False
+    return not (packed[7] >= 0xc0 and packed[7] >> 4 != 15)
+
+
 def check_record_capture(text):
     """Qualify the observed erased-NV frontier, not a general reply protocol."""
     scopes = records(text, '5510_records_scope')
@@ -128,7 +140,7 @@ def identity_contract(firmware):
                 for first,last in ((0x2a05cc,0x2a0692),(0x29fc00,0x29fd14),
                                    (0x3ad490,0x3ad542),(0x24c9d2,0x24cafc),
                                    (0x29fdc4,0x29fdde),(0x29ffe8,0x2a005c),
-                                   (0x29ecf8,0x29ede6))},
+                                   (0x29ecf8,0x29ede6),(0x2a01dc,0x2a021e))},
             'scope': 'Pinned own source and bounded reference equations; not encrypted-record binding, valid product NV or boot acceptance'}
 
 

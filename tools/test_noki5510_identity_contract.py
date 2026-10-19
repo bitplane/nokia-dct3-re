@@ -1,7 +1,8 @@
 import unittest
 
 from tools.noki5510_identity_contract import (wire_identity, display_identity,
-    check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture)
+    check_formatting, identity_contract, record_reply_entry_eligible, check_record_capture,
+    record_reply_nibble_filter)
 
 
 def decode_mobile_identity(data):
@@ -24,6 +25,20 @@ def fixture():
 
 
 class IdentityContractTests(unittest.TestCase):
+    def test_record_nibble_filter_is_not_decimal_identity_validation(self):
+        allowed = set(range(12)) | {15}
+        self.assertTrue(record_reply_nibble_filter(bytes.fromhex('abffffffffffffff')))
+        self.assertTrue(record_reply_nibble_filter(b'\xff'*8))
+        for position in range(8):
+            for value in range(256):
+                packed = bytearray(b'\xff'*8)
+                packed[position] = value
+                expected = value >> 4 in allowed and (position == 7 or value & 15 in allowed)
+                self.assertEqual(record_reply_nibble_filter(packed),expected,(position,value))
+        for size in (0,7,9):
+            with self.assertRaises(ValueError):
+                record_reply_nibble_filter(bytes(size))
+
     def test_factory_capture_evidence(self):
         lines = ['5510_records_scope: reply34=0029fdc4 reply35=0029ffe8 state=001204dc cap=16 observer_writes=0']
         for index,(header,count) in enumerate([('1304',4),('140c',12),('1514',20),('1618',24)]):
