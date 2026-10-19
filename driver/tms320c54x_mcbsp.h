@@ -22,6 +22,10 @@ public:
 	auto tx_bit_cb() { return m_tx_bit_cb.bind(); }
 	auto tx_irq_cb() { return m_tx_irq_cb.bind(); }
 	auto tx_event_cb() { return m_tx_event_cb.bind(); }
+	// Diagnostic state-transition observation, not an external hardware pin.
+	enum : unsigned { TX_RESET, TX_IGNORE, TX_ACCEPT, TX_OVERWRITE,
+		TX_LOAD_FRESH, TX_LOAD_REPEAT, TX_COMPLETE, TX_RESTART };
+	auto tx_observer_cb() { return m_tx_observer_cb.bind(); }
 	auto rx_irq_cb() { return m_rx_irq_cb.bind(); }
 	auto rx_event_cb() { return m_rx_event_cb.bind(); }
 protected:
@@ -67,6 +71,7 @@ private:
 	bool m_tx_sync_irq = false;
 	emu_timer *m_bit_timer = nullptr;
 	devcb_write16 m_tx_word_cb;
+	devcb_write16 m_tx_observer_cb;
 	devcb_write_line m_tx_bit_cb;
 	devcb_write_line m_tx_irq_cb;
 	devcb_write_line m_tx_event_cb;

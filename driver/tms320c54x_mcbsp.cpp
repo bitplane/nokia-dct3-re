@@ -6,7 +6,7 @@
 DEFINE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device, "tms54mcbsp", "TMS320C54x McBSP (partial)")
 
 tms320c54x_mcbsp_device::tms320c54x_mcbsp_device(machine_config const &config, char const *tag, device_t *owner, u32 clock)
-	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this), m_tx_event_cb(*this), m_rx_irq_cb(*this), m_rx_event_cb(*this)
+	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_observer_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this), m_tx_event_cb(*this), m_rx_irq_cb(*this), m_rx_event_cb(*this)
 {
 }
 
@@ -70,6 +70,7 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_paused_bit_time = attotime::never;
 	m_bit_timer->adjust(attotime::never);
 	m_tx_event_cb(CLEAR_LINE);
+	m_tx_observer_cb(TX_RESET, 0);
 	m_rx_clock_input = m_rx_frame_input = m_rx_data_input = false;
 	m_rx_word = m_rx_high = 0;
 	reset_receiver();
@@ -93,6 +94,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		m_regs[1] = value & 0x03f9; // XRDY/XEMPTY are hardware-owned; reserved bits read zero.
 		if (!BIT(value, 0))
 		{
+			m_tx_observer_cb(TX_RESET, 0);
 			m_regs[1] &= ~u16(8);
 			set_ready(false);
 			m_buffer_full = m_shift_active = false;
@@ -349,7 +351,11 @@ void tms320c54x_mcbsp_device::data_w(offs_t offset, u16 value)
 		return;
 	}
 	if (offset != 3) return;
-	if (!BIT(m_regs[1], 0)) return; // Writes while transmitter is held in reset do not start it.
+	if (!BIT(m_regs[1], 0))
+	{
+		m_tx_observer_cb(TX_IGNORE, value);
+		return; // Writes while transmitter is held in reset do not start it.
+	}
 	bool const external = !BIT(m_regs[14], 9) && !BIT(m_regs[14], 11);
 	if (BIT(m_regs[5], 15) || (!external && ((m_regs[4] & 0x7f00) || BIT(m_regs[7], 12) || BIT(m_regs[5], 2))) ||
 		((m_regs[4] >> 5) & 7) > 2 || (m_regs[5] & 0x0018) ||
@@ -357,6 +363,7 @@ void tms320c54x_mcbsp_device::data_w(offs_t offset, u16 value)
 		fatalerror("McBSP unsupported active transmit format xcr=%04x/%04x srgr2=%04x", m_regs[4], m_regs[5], m_regs[7]);
 	// SPRU302B 2.3.7.3: a premature DXR write replaces the buffered word;
 	// it does not change the word already being shifted from XSR.
+	m_tx_observer_cb(m_buffer_full ? TX_OVERWRITE : TX_ACCEPT, value);
 	m_buffer = value;
 	m_buffer_full = true;
 	set_ready(false);
@@ -389,6 +396,7 @@ void tms320c54x_mcbsp_device::load_shift(bool external, bool first)
 	m_shift = m_buffer & ((1U << m_bits) - 1);
 	m_delay = first ? m_regs[5] & 3 : 0;
 	m_shift_active = true; m_buffer_full = false;
+	m_tx_observer_cb(fresh ? TX_LOAD_FRESH : TX_LOAD_REPEAT, m_shift);
 	// SPRU302B 2.3.7.4: old DXR repeats at frame sync on underflow,
 	// but XEMPTY stays low and an already-ready DXR generates no new event.
 	m_xempty = fresh;
@@ -407,6 +415,7 @@ void tms320c54x_mcbsp_device::shift_bit()
 		m_shift_active = false;
 		if (!m_buffer_full) m_xempty = false;
 		if (m_frame_words) --m_frame_words;
+		m_tx_observer_cb(TX_COMPLETE, m_shift);
 		m_tx_word_cb(m_shift);
 		if (!m_frame_words && m_tx_frame_pending)
 		{
@@ -446,6 +455,7 @@ void tms320c54x_mcbsp_device::tx_frame_w(int state)
 		m_bits = widths[width];
 		m_delay = m_regs[5] & 3;
 		m_regs[1] |= 8;
+		m_tx_observer_cb(TX_RESTART, m_shift);
 		update_transmit_error_irq();
 	}
 	else load_shift(true, true);

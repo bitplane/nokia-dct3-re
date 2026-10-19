@@ -312,6 +312,7 @@ public:
 			if (m_phase == 30 && system_bios() >= 11) { if (state) ++m_command_rx_irqs; m_cpu->set_input_line(6, state); }
 		});
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
+		m_mcbsp0->tx_observer_cb().set(FUNC(mu4_storage_test_state::observe_playback_tx));
 		m_mcbsp0->tx_bit_cb().set([this](int state) {
 			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78 || (m_phase >= 99 && m_phase <= 118)) m_external_bits.push_back(state);
 			subdevice<tlv320aic23_device>("codec")->din_w(state);
@@ -471,6 +472,8 @@ private:
 	std::ofstream m_playback_dxr_capture;
 	u32 m_playback_dxr_hash = 2166136261U, m_playback_dxr_writes = 0;
 	std::ofstream m_playback_decoded_capture;
+	bool m_playback_capture_finished = false;
+	u32 m_playback_tx_lifecycle_events = 0;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
@@ -954,8 +957,24 @@ private:
 		m_playback_slot_capture.write(bytes,sizeof(bytes));
 		for (char byte : bytes) m_playback_slot_hash = (m_playback_slot_hash ^ u8(byte)) * 16777619U;
 	}
+	void observe_playback_tx(offs_t event, u16 word)
+	{
+		double const time = machine().time().as_double();
+		if (!playback_profile() || time < 1.0 || time > 1.25) return;
+		static constexpr std::array<char const *,8> names{"reset","ignore","accept","overwrite","load_fresh","load_repeat","complete","restart"};
+		if (event >= names.size()) fatalerror("MU4 invalid McBSP diagnostic transition");
+		++m_playback_tx_lifecycle_events;
+		if (m_playback_tx_lifecycle_events > 100000) return;
+		u8 owner = 0;
+		if (event == tms320c54x_mcbsp_device::TX_ACCEPT || event == tms320c54x_mcbsp_device::TX_OVERWRITE || event == tms320c54x_mcbsp_device::TX_IGNORE)
+			for (unsigned channel=0;channel<6;++channel)
+				if (m_dma->destination_write_matches(channel, AS_DATA, 0x23)) owner = channel+1;
+		logerror("mu4_tx_lifecycle: ordinal=%u kind=%s word=%04x ns=%llu dma_owner=%u dma_read=%u observer_writes=0 audio_acceptance=0\n",
+			m_playback_tx_lifecycle_events,names[event],word,static_cast<unsigned long long>(machine().time().as_ticks(1'000'000'000)),owner,owner == 4 ? m_playback_dma_reads : 0);
+	}
 	void finish_playback_capture()
 	{
+		if (m_playback_capture_finished) return;
 		std::array<u32,3> const counts{m_playback_audio_words[0],m_playback_audio_words[1],m_playback_dma_reads};
 		std::array<u32,3> const hashes{m_playback_audio_hash[0],m_playback_audio_hash[1],m_playback_dma_hash};
 		for (unsigned i=0;i<3;++i)
@@ -982,6 +1001,11 @@ private:
 		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
 			m_playback_processing[0],m_playback_processing[1],m_playback_processing[2],m_playback_decoded_words,m_playback_decoded_words*2,m_playback_decoded_hash,m_playback_processing[3],
 			unsigned(m_playback_processing_pending || m_playback_conversion_active || m_playback_conversion_pending),unsigned(m_playback_processing[0]>=512));
+		m_playback_capture_finished = true;
+		logerror("mu4_playback_capture_terminal: closed=1 illegal=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), machine().time().as_double());
+		logerror("mu4_tx_lifecycle_terminal: events=%u first=1.000000000 last=1.250000000 capped=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
+			m_playback_tx_lifecycle_events,unsigned(m_playback_tx_lifecycle_events>100000),machine().time().as_double());
 	}
 	void observe_playback_audio(u16 value, bool din)
 	{
@@ -1407,6 +1431,9 @@ private:
 	}
 	void report_playback_parent()
 	{
+		// A bounded observer can stop before the twenty-second acceptance timer.
+		// Close its evidence without pretending that the full playback gate ran.
+		finish_playback_capture();
 		logerror("mu4_decoder_gate_terminal: events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
 			m_decoder_gate_events,m_decoder_gate_bad,unsigned(m_decoder_gate_events>512),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
@@ -2913,6 +2940,8 @@ private:
 		m_playback_audio_last_nonzero = {};
 		m_playback_audio_clocks = m_playback_audio_frames = 0;
 		m_playback_dma_reads = m_playback_dma_nonzero = 0;
+		m_playback_capture_finished = false;
+		m_playback_tx_lifecycle_events = 0;
 		m_playback_buffer_writes.fill(playback_buffer_write{});
 		m_playback_dma_hash = 2166136261U;
 		m_playback_slot_hash = 2166136261U;

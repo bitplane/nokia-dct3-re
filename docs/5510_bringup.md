@@ -25,28 +25,26 @@ call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
 The independent MU4 music-DSP bench completes original recording control,
-storage and metadata transactions. It captures 375 successful native AAC
-processing calls and 768,000 converter-return words. All 30 transforms in
-the first eight packet-bound calls match source-derived integer arithmetic;
-their conversions match later RAM. Whole-session chronological comparison
-against a host-decoded projection has maximum sample difference 13 and RMS
-1.24083, without fitted gain or alignment. These are measurements, not a
-codec tolerance. Consumed-input byte coverage extends across all 375 calls;
-detailed arithmetic and output-store binding remain bounded to eight calls.
-Other media and application of independent conformance criteria remain open.
-The [AAC validation contract](aac_validation.md) identifies an official baseline
-fixture and procedure; native execution, delay and measurement-point mapping
-are not yet established. See [processing contracts](#processing-and-conversion) and
-[reference comparison](#independent-reference-comparison).
+storage and metadata transactions. Fresh finalized record/save/cold-reopen
+reaches 376 native AAC calls with consumed-input coverage. The protected and
+fresh before-metadata 375-call controls remain separate inputs. Independent
+decoder arithmetic and decoded-bank copying cover eight calls; signed output
+scaling and the configured five-section processing kernel have bounded operand
+checks. The authoritative quantities, source identities, host-comparison limits
+and formal-conformance requirements live in the [AAC validation contract](aac_validation.md).
 
 Every captured channel-3 source read binds to an owned DXR bus write, and
 every completed TX callback pairs with the next codec DIN sample. Reset-aware
 sequence accounting distinguishes fresh-write completions, retained-word
 repetition, reset discards and an unattributed pre-reset prefix. Actual
-internal DXR-to-XSR loads and physical ownership of unmatched DIN intervals
-remain unvalidated. See [transport provenance](#dma-source-to-dxr-ownership).
+internal DXR-to-XSR loads/completions are now observed over a bounded interval:
+64 stereo sample frames follow decoded copying, signed scaling and processing
+through owned DMA/DXR epochs to codec DIN. Full-session attribution and physical
+ownership of unmatched DIN intervals remain unvalidated. See the
+[bounded serial contract](aac_validation.md#actual-shift-buffer-and-din-epochs)
+and [transport provenance](#dma-source-to-dxr-ownership).
 
-The observed termination is a firmware file-length path, not an established
+For the protected 143680-byte recording, termination is a firmware file-length path, not an established
 missing DSP event: 375 refill completions supply 71,834 words; the next
 186-word request crosses the 71,840-word file boundary. Original code
 enters cleanup before publishing that request's completion. A passive RAM
@@ -59,7 +57,7 @@ seek/read rather than a proven drain-only operation. See
 
 The intended product cleanup/drain policy and independent waveform acceptance
 remain unresolved; the strict audio-completion gate stays rejecting. The
-host's 383-packet valid prefix is not proof of native decoding beyond 375
+protected control's 383-packet host prefix is not proof of native decoding beyond 375
 calls or validity of its final, 384th packet. Do not force counters, keys,
 lengths, file offsets or completions, replay RAM, fit a lag, change the
 converter or substitute reference samples. These results establish neither
@@ -9474,7 +9472,9 @@ owner into a save state. I/O-space destination ownership is not independently
 exercised by this fixture. Use this explicit write owner when binding
 playback source reads to DXR; matching a word or timestamp alone is not
 ownership evidence. The complete playback capture now validates this
-source-to-DXR leg; DXR-to-TX buffering remains separate.
+source-to-DXR leg. Bounded internal load/completion attribution is covered by the
+[serial-epoch contract](aac_validation.md#actual-shift-buffer-and-din-epochs);
+full-session DXR-to-TX accounting remains separate.
 Every uncancelled generated word matches the independent
 tone calculation in alternating left/right source order. Bounded queues
 then require every observed DMA source word to match McBSP TX, followed by

@@ -13,7 +13,9 @@ five-pass kernel is source-pinned and bounded nonzero output epochs match DMA;
 the upstream signed scaling stage matches an independent Q12 model for 3456
 actual operand/output pairs. Independent fixed-point equations also match one
 64-word block through each of the ten configured filter sections. Arbitrary
-coefficient settings, complete playback and codec delivery remain open. The protected
+coefficient settings, complete playback and codec analogue routing remain open.
+A bounded 64-stereo-frame block is traced through actual shift loads/completions
+to codec DIN. The protected
 recording and fresh before-metadata captures remain separate 375-call controls.
 The fresh stored-file projection has 385 complete host-decodable packets, an
 incomplete packet 386 and no packet 387 in the projection. The native stop path
@@ -23,7 +25,7 @@ missing external completion is not the current boundary.
 The metadata size increase is explained by the original writer's unconditional
 byte accounting, including in-place metadata writes. The open lifecycle
 questions are the processing worker's partial-buffer policy and playback draining. Formal codec conformance,
-DMA/codec epoch pairing and analog output remain separate obligations.
+Full-session DMA/codec epoch accounting and analog output remain separate obligations.
 
 The separate `mu4aac` ABI controls execute the original decoder with its
 original initialization and explicit caller-owned input:
@@ -1132,4 +1134,42 @@ Check with `mu4_filter_arithmetic_check.py RUN/error.log --source-a00 SOURCE`.
 The copy, scalar and processing checks also pass on this same run. This closes
 the configured kernel's bounded state/sample arithmetic, not arbitrary equalizer
 settings, every block's arithmetic, complete-track draining or analog sound.
-The next boundary is accepted DMA/DXR/serial/codec delivery of these sample epochs.
+The bounded serial-epoch contract below follows these samples through actual
+buffer loads and transmission. Full-session and analogue acceptance remain separate.
+
+### Actual Shift-Buffer and DIN Epochs
+
+The McBSP has an optional diagnostic callback for reset, ignored write, buffer
+accept/overwrite, fresh/repeated shift load, frame restart and completed word.
+These are observations of internal device transitions, not external pins, saved
+hardware state or inferred PC ownership. The MU4 bench records them only over
+1.0--1.25 seconds. Buffer acceptance carries the active DMA destination owner
+and source-read ordinal; load and completion identities are propagated from
+those actual transitions, never selected by matching waveform values.
+
+Early observer exits now finalize binary capture counts/hashes exactly once.
+The original twenty-second playback verifier still rejects short execution;
+`mu4_serial_epoch_check.py RUN` separately validates bounded capture integrity.
+The native run's TX, DIN, DMA, slot, timestamp, DXR and decoded-return files are
+byte-identical before/after this observation change. The `setup` device suite
+also passes McBSP underrun, packing, synchronization and save-state checks.
+
+The bounded capture has 66150 lifecycle events: 22050 each of fresh load,
+accepted write and completed word. It attributes 22049 completed source epochs,
+leaves one initial completion unattributed and one accepted word pending at the
+window endpoint. No overwrite, reset, ignored write or repeat occurs in this
+window; synthetic checker tests cover their distinct accounting.
+
+All 128 final filter words (`1000..107f`, 64 stereo frames) have exactly one
+actual DMA read, ordinals 21121--21248, one owned DXR write, one observed shift
+load and one completed TX word. Every completion pairs chronologically with
+codec DIN within the existing 84-ns clock bound, with exact values. Bank
+`1000..103f` reaches callback slot 1; `1040..107f` reaches slot 0. These are
+observed slot labels, not yet a physical left/right polarity verdict.
+
+Across the complete short capture, 105345 TX completions pair with DIN without
+mismatch or missing TX. The 367 additional DIN callbacks are consistent with
+held-zero levels but still lack pin/reset ownership proof. The copy, scalar and
+filter arithmetic checks pass on this same run. This proves a bounded native
+decoded-sample path to digital codec ingress, not DAC activation, analogue sound,
+whole-track draining, full-session epoch accounting, handset boot or GSM speech.
