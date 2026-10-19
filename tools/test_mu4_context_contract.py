@@ -27,6 +27,7 @@ from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
 from tools.mu4_context_contract import COPY_ADAPTER_WITNESSES, decode_copy_adapter, reference_copy_adapter
 from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_output
 from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
+from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decode_decoder_input_descriptor
 from tools.mu4_context_contract import DECODER_ALIGNMENT_BASE, DECODER_ALIGNMENT_WITNESS, decode_decoder_alignment
 from tools.mu4_context_contract import DECODER_RESET_BASE, DECODER_RESET_WITNESS, decode_decoder_reset
 from tools.mu4_context_contract import DECODER_BIT_RESET_BASE, DECODER_BIT_RESET_WITNESS
@@ -637,6 +638,15 @@ class ContextContractTest(unittest.TestCase):
         for values in ((1,2,1,0),(-1,0,1,0),(32768,0,1,0),(1,0,1,2)):
             with self.assertRaises(ValueError):
                 reference_copy_adapter(*values)
+
+    def test_descriptor_extent_and_cursor_ownership_are_source_pinned(self):
+        words = {base+i:value for base,witness in DECODER_INPUT_DESCRIPTOR_WITNESSES for i,value in enumerate(witness)}
+        self.assertEqual(decode_decoder_input_descriptor(words)['pinned_words'],30)
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_decoder_input_descriptor(changed)
 
     def test_decoder_framing_pins_adif_detection_and_initialization_gate(self):
         words = dict(enumerate(DECODER_FRAMING_WITNESS, DECODER_FRAMING_BASE))

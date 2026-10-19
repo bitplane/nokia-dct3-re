@@ -663,6 +663,27 @@ def decode_pcm_conversion(words):
 
 
 DECODER_FRAMING_BASE = 0x23D73
+DECODER_INPUT_DESCRIPTOR_WITNESSES = (
+    (0x2973c,(0x4a11,0xeeff,0x8811,0xf495,0xf495,0x10e1,1,0x0881,0xee01,0x8a11,0xf4e4)),
+    (0x23d6e,(0x100d,0xf982,0x973c,0x80f8,0xb330)),
+    (0x23def,(0x10f8,0xb331,0x8010)),
+    (0x23e59,(0x710d,0x0011,0x1010,0x0081,0x8081,0x100f,0xee13,0x8a17,0x8a16,0x8a11,0xf4e4)),
+)
+
+
+def decode_decoder_input_descriptor(words):
+    for base,witness in DECODER_INPUT_DESCRIPTOR_WITNESSES:
+        for offset,value in enumerate(witness):
+            if words.get(base+offset) != value:
+                raise ValueError(f'decoder input descriptor witness changed at {base+offset:06x}')
+    return dict(pinned_words=sum(len(w) for _,w in DECODER_INPUT_DESCRIPTOR_WITNESSES),
+                descriptor='two word pointers: cursor, exclusive end',
+                extent='02973c returns end minus cursor; wrapper stores at b330',
+                advancement='023def snapshots fetched-word index b331; 023e59 adds it to descriptor cursor',
+                ownership='caller supplies window; decoder owns reservoir and advances public cursor',
+                scope='Local source spans plus isolated successful-call observations; not original storage refill lifecycle, short-input recovery or EOF')
+
+
 DECODER_FRAMING_WITNESS = (
     0x710d,0x0011,0x7181,0xb332,0x76f8,0xb331,0x0000,
     0x10f8,0xba50,0xf844,0x3da0,0x76f8,0xba4f,0x0001,
@@ -1918,6 +1939,7 @@ def contract(source):
     result['copy_adapter'] = decode_copy_adapter(rel_words)
     result['decoder_output'] = decode_decoder_output(rel_words)
     result['decoder_framing'] = decode_decoder_framing(rel_words)
+    result['decoder_input_descriptor'] = decode_decoder_input_descriptor(rel_words)
     result['decoder_alignment'] = decode_decoder_alignment(rel_words)
     result['decoder_reset'] = decode_decoder_reset(rel_words)
     result['decoder_pointer_records'] = decode_decoder_pointer_records(rel_words)

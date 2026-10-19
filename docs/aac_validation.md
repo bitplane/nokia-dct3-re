@@ -130,7 +130,8 @@ A read-only `bootplaystage` snapshot at 1.116666667 seconds reproduces all
 eight values. This is initialization-plus-runtime agreement, not proof that
 no indirect writer can change them later. The original loader can supply
 these records for a future decoder bench; copied live RAM is unnecessary.
-Remaining ABI prerequisites are compressed-input buffer/refill ownership.
+The caller-owned input descriptor and bounded refill contract are described
+below; original storage integration and EOF remain separate requirements.
 
 The complete `0245d7..02460f` reset helper is pinned as 57 original words.
 It makes 1034 data writes: six scalar defaults, four channel-state clears,
@@ -166,7 +167,8 @@ constructor's copied fields `aaad=0, aaae=e800, aaaf=f000`.
 A completed passive write capture sees those configuration words populated
 by the original loader near 0.81497 seconds, before constructor use.
 The earlier configuration-provenance question is therefore closed at this
-boundary; compressed-input and refill construction remain open.
+boundary; the isolated input/refill controls below do not establish the
+original storage integration.
 
 ## Candidate Transport Adapter
 
@@ -403,9 +405,38 @@ reference differs at 3139 samples, maximum four s16 units; these are
 diagnostic differences, not an acceptance tolerance or conformance claim.
 There are 700 observed input reads covering 669 contiguous words, including
 lookahead. Run `tools/mu4_aac_abi_check.py` with `--four-calls` and the same
-source/input/reference arguments as the single-call control. The one-second
+source/input/reference arguments as the single-call control. The two-second
 deadline is a bench bound, not a recovered decoder timing requirement.
 
 This proves four calls without decoder reset or input-pointer intervention;
 it does not cover input-window refill, EOF, full-stream playback or handset
 boot. Those remain separate requirements.
+
+## Caller-owned input-window refill
+
+Thirty original words pin the descriptor contract: `02973c..029746`
+computes `end-cursor`, the wrapper stores that extent at `b330`, snapshots
+fetched-word index `b331` at `023def`, and adds it to the public cursor at
+`023e59..023e63`. The caller owns the window; the decoder owns its reservoir.
+These local spans do not establish the original file-reader's refill policy.
+
+`mu4aac -bios mpeg2refill` exercises eight calls with one constructor. After
+call four, the explicit ABI caller reloads the 2048-byte input window from
+source byte 1336 and resets only the public cursor/end pointers. The prior
+1334 bytes have been consumed; the next two bytes (`fff9`) remain in the
+decoder reservoir. No decoder fields are written by the refill fixture.
+
+All eight calls return success without illegal instructions. The 8192 stereo
+frames consume 2720 source bytes. For every return the checker verifies
+`window_source_offset + 2*(cursor-window_base) - remaining_bits/8` equals
+the cumulative ADTS packet lengths, including the odd 349/365-byte frames.
+Actual window reads are independently bound to the source bytes before and
+after refill. Every one of 16384 raw-to-s16 sample conversions matches;
+the host reference differs at 7109 samples, maximum four units. This is
+diagnostic evidence, not formal codec conformance.
+
+Use the usual ABI checker arguments with `--refill`. The fixture needs
+`-seconds_to_run 3` to include its two-second completion bound. Single-call
+and four-call controls remain available. Input exhaustion, short-window
+recovery, repeated refills, original storage integration and EOF remain open;
+this bench is not a handset playback or analog-output claim.
