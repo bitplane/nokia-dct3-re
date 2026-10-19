@@ -64,16 +64,15 @@ def check_input(text, encoded, session=False):
                 scope='Actual input-window reads and contiguous consumed-prefix coverage; context PCs are not retained instruction ownership or an all-address exclusion proof')
 
 
-def check_session(text, raw, converted, reference, encoded, *, refill=False):
+def check_session(text, raw, converted, reference, encoded, *, refill=False, stream=False):
     """Original calls sharing a constructor/reservoir; optional public-input refill."""
     try:
-        return _check_session(text,raw,converted,reference,encoded,refill=refill)
+        return _check_session(text,raw,converted,reference,encoded,refill=refill or stream,calls=32 if stream else 8 if refill else 4)
     except (KeyError,TypeError) as error:
         raise ValueError('incomplete session fields') from error
 
 
-def _check_session(text, raw, converted, reference, encoded, *, refill):
-    calls = 8 if refill else 4
+def _check_session(text, raw, converted, reference, encoded, *, refill, calls):
     returns = rows(text, 'mu4_aac_session_return')
     headers = rows(text, 'mu4_aac_abi_header')
     sources = rows(text, 'mu4_aac_abi_sources')
@@ -86,7 +85,7 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
                       isolated_abi='1',handset_boot='0',conformance='0')]:
         raise ValueError('session setup changed')
     refills = rows(text,'mu4_aac_session_refill')
-    if len(refills) != int(refill):
+    if len(refills) != (calls//4-1 if refill else 0):
         raise ValueError('unexpected or missing public-input refill')
     markers = ['mu4_aac_abi_'+name for name in ('setup','header','sources','capture','result','input_end')]
     markers += ['mu4_aac_session_return','mu4_aac_session_refill']
@@ -94,7 +93,7 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
     expected_order = ['mu4_aac_abi_setup']
     for call in range(1,calls+1):
         expected_order += ['mu4_aac_abi_header','mu4_aac_abi_sources','mu4_aac_abi_capture','mu4_aac_session_return']
-        if refill and call == 4:
+        if refill and call % 4 == 0 and call < calls:
             expected_order.append('mu4_aac_session_refill')
     expected_order += ['mu4_aac_abi_result','mu4_aac_abi_input_end']
     if observed != expected_order:
@@ -124,9 +123,9 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
         if captures[call-1] != dict(frames='1024',channels='2',raw_bytes='8192',converted_bytes='4096',
                                     source='decoder_return_pointers',memory='post_wrapper_return',conformance='0'):
             raise ValueError('session capture scope changed')
-        if refill and call == 4:
-            window_offset = 2*(cursor-0x162e)
-            if refills[0] != dict(after_call='4',source_byte=str(window_offset),old_cursor=f'{cursor:04x}',
+        if refill and call % 4 == 0 and call < calls:
+            window_offset += 2*(cursor-0x162e)
+            if refills[call//4-1] != dict(after_call=str(call),source_byte=str(window_offset),old_cursor=f'{cursor:04x}',
                                   cursor='162e',end='1a2e',bytes='2048',remaining=f'{remaining:04x}',
                                   reservoir_high=encoded[window_offset-4:window_offset-2].hex(),
                                   reservoir_low=encoded[window_offset-2:window_offset].hex(),fixture_input='1',decoder_state_writes='0'):
@@ -134,7 +133,7 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
             base = 0x162e
     terminal = rows(text, 'mu4_aac_abi_result')
     if terminal != [dict(returned='1',result='0000',base=result['base'],index=result['index'],
-                         remaining=result['remaining'],illegal='0',pc='001076' if refill else '001042',
+                         remaining=result['remaining'],illegal='0',pc='001023' if calls > 8 else '001076' if refill else '001042',
                          isolated_abi='1',conformance='0')]:
         raise ValueError('missing successful session terminal')
     if 'Fatal error:' in text or 'unsupported instruction' in text:
@@ -148,7 +147,7 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
     if any(reference_pcm_conversion(x & 0xffffffff)['word'] != (y & 0xffff) for x,y in zip(values,actual)):
         raise ValueError('session conversion mismatch')
     if refill:
-        check_refill_input(text,encoded,consumed)
+        check_refill_input(text,encoded,consumed,calls)
     else:
         check_input(text,encoded,session=True)
     return dict(calls=calls,frames=calls*1024,consumed_bytes=consumed,
@@ -156,15 +155,15 @@ def _check_session(text, raw, converted, reference, encoded, *, refill):
                 max_error=max(abs(x-y) for x,y in zip(actual,wanted)),conformance=False)
 
 
-def check_refill_input(text, encoded, consumed):
+def check_refill_input(text, encoded, consumed, calls=8):
     reads = rows(text,'mu4_aac_session_input_read')
-    if not 0 < len(reads) <= 4096 or rows(text,'mu4_aac_abi_input_read'):
+    if not 0 < len(reads) <= max(4096,calls*1024) or rows(text,'mu4_aac_abi_input_read'):
         raise ValueError('missing, mixed or capped session input')
     source_words, indices = set(), set()
     window_offset, ordinal = 0, 0
     for line in text.splitlines():
         if 'mu4_aac_session_refill:' in line:
-            window_offset = 1336
+            window_offset = int(rows(line,'mu4_aac_session_refill')[0]['source_byte'])
         entries = rows(line,'mu4_aac_session_input_read')
         if not entries:
             continue
@@ -248,6 +247,7 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--four-calls', action='store_true')
     mode.add_argument('--refill', action='store_true', help='check eight calls with one public-input refill')
+    mode.add_argument('--stream', action='store_true', help='check 32 calls with repeated public-input refills')
     args = parser.parse_args()
     try:
         contract(args.source_a00.read_bytes())
@@ -256,10 +256,10 @@ def main():
                                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
                                (args.run/'mu4_aac_abi_converted.s16le').read_bytes(),
                                args.reference_pcm.read_bytes())
-        result = check_session(*capture_args,encoded,refill=args.refill) if args.four_calls or args.refill else check_capture(*capture_args)
+        result = check_session(*capture_args,encoded,refill=args.refill,stream=args.stream) if args.four_calls or args.refill or args.stream else check_capture(*capture_args)
         if hashlib.sha256(encoded).hexdigest() != '6b55159252fa5bc00dadfc76bab243ee1d3993314d7c2c704ed98d73469d001c':
             raise ValueError('expected the independently generated MPEG-2 control')
-        if not args.four_calls and not args.refill:
+        if not args.four_calls and not args.refill and not args.stream:
             result['input_binding'] = check_input((args.run/'error.log').read_text(),encoded)
     except (OSError, ValueError) as error:
         print(f'MU4 AAC ABI: {error}', file=sys.stderr)

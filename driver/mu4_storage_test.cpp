@@ -5062,8 +5062,9 @@ public:
 				logerror("mu4_aac_abi_sources: left=%04x right=%04x sp=%04x result=%04x identity=Execute_entry observer_writes=0\n",
 					m_sources[0],m_sources[1],sp,u16(m_cpu->state_int(tms320c54x_device::STATE_A)));
 			}
-			if (address == 0x242cb && m_headers++ < 8)
+			if (address == 0x242cb)
 			{
+				if (++m_headers > m_expected_calls) fatalerror("MU4 AAC header count exceeded caller bound");
 				auto const disable = machine().disable_side_effects();
 				auto &data = m_cpu->space(AS_DATA);
 				logerror("mu4_aac_abi_header: ordinal=%u sync=%04x id=%04x layer=%04x protection=%04x profile=%04x frequency=%04x channels=%04x frame_length=%04x blocks=%04x identity=Execute_entry observer_writes=0\n",
@@ -5075,7 +5076,7 @@ public:
 				if (opcode != 0xf4e1) fatalerror("MU4 AAC ABI completion opcode changed");
 				m_done = true;
 			}
-			if (m_expected_calls > 1 && m_captured < m_expected_calls && address == m_capture_sites[m_captured])
+			if (m_expected_calls > 1 && m_captured < m_expected_calls && address == m_capture_sites[m_expected_calls > 8 ? 0 : m_captured])
 			{
 				if (opcode != 0xf495 || m_sources_seen != m_captured+1) fatalerror("MU4 AAC session return boundary changed");
 				auto const disable = machine().disable_side_effects();
@@ -5084,15 +5085,15 @@ public:
 				capture_output(m_captured != 0);
 				logerror("mu4_aac_session_return: call=%u descriptor=%04x base=%04x index=%04x remaining=%04x result=%04x observer_writes=0\n",
 					++m_captured,data.read_word(0x1400),data.read_word(0xb332),data.read_word(0xb331),data.read_word(0xa854),data.read_word(0x1402));
-				if (m_expected_calls == 8 && m_captured == 4)
+				if (m_expected_calls >= 8 && m_captured % 4 == 0 && m_captured < m_expected_calls)
 				{
 					// Explicit ABI caller input, not a handset hook: retain the decoder's reservoir.
 					unsigned const cursor = data.read_word(0x1400);
 					if (cursor < 0x162e || cursor > 0x1a2e) fatalerror("MU4 AAC refill cursor bounds");
 					m_input_offset += 2*(cursor-0x162e);
 					load_input_window();
-					logerror("mu4_aac_session_refill: after_call=4 source_byte=%u old_cursor=%04x cursor=162e end=1a2e bytes=2048 remaining=%04x reservoir_high=%04x reservoir_low=%04x fixture_input=1 decoder_state_writes=0\n",
-						m_input_offset,cursor,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859));
+					logerror("mu4_aac_session_refill: after_call=%u source_byte=%u old_cursor=%04x cursor=162e end=1a2e bytes=2048 remaining=%04x reservoir_high=%04x reservoir_low=%04x fixture_input=1 decoder_state_writes=0\n",
+						m_captured,m_input_offset,cursor,data.read_word(0xa854),data.read_word(0xa858),data.read_word(0xa859));
 				}
 			}
 		});
@@ -5134,10 +5135,10 @@ private:
 				if (machine().side_effects_disabled()) return;
 				unsigned const index = address - 0x162e;
 				u16 const expected = (u16(m_input[m_input_offset+2*index]) << 8) | m_input[m_input_offset+2*index+1];
-				if (++m_input_reads > 4096 || mask != 0xffff || value != expected)
+				if (++m_input_reads > std::max(4096U,m_expected_calls*1024) || mask != 0xffff || value != expected)
 					fatalerror("MU4 AAC ABI changed, partial or capped input read");
 				m_input_seen[index] = true;
-				if (m_expected_calls == 8)
+				if (m_expected_calls >= 8)
 					logerror("mu4_aac_session_input_read: ordinal=%u index=%u source_byte=%u address=%04x value=%04x mask=%04x context_pc=%06x observer_writes=0\n",
 						m_input_reads,index,m_input_offset+2*index,unsigned(address),value,mask,unsigned(m_cpu->pc()));
 				else
@@ -5202,9 +5203,10 @@ private:
 			0x7718,0x9000,0xf7be,0x7600,0xd43d,0x7601,0,0x7602,0xd43b,
 			0xf020,0xaaac,0xf982,0x3d27
 		};
-		m_expected_calls = system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
+		m_expected_calls = system_bios() == 5 ? 32 : system_bios() == 4 ? 8 : system_bios() == 3 ? 4 : 1;
 		m_captured = 0;
-		for (unsigned call = 0; call < m_expected_calls; ++call)
+		data.write_word(0x1403,m_expected_calls);
+		for (unsigned call = 0; call < (m_expected_calls > 8 ? 1 : m_expected_calls); ++call)
 		{
 			wrapper.insert(wrapper.end(), {0x7600,0x1400,0x7601,OUTPUT_BASE,0xf020,0xaaac,0xf982,0x3d5d,0x80f8,0x1402});
 			if (m_expected_calls > 1)
@@ -5213,6 +5215,11 @@ private:
 				wrapper.insert(wrapper.end(), {0xf495,0xf495,0xf495});
 				m_capture_sites[call] = 0x1000 + wrapper.size()-1;
 			}
+		}
+		if (m_expected_calls > 8)
+		{
+			// Ordinary DSP instructions own the loop count; observers never redirect execution.
+			wrapper.insert(wrapper.end(), {0x10f8,0x1403,0xf010,1,0x80f8,0x1403,0xf844,0x100d});
 		}
 		wrapper.push_back(0xf4e1);
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1000+i, wrapper[i]);
@@ -5226,7 +5233,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
 		m_cpu->set_state_int(STATE_GENPC, 0x1000);
 		m_cpu->set_pipeline_frontend(true);
-		m_check->adjust(attotime::from_msec(m_expected_calls > 1 ? 2000 : 250));
+		m_check->adjust(attotime::from_msec(m_expected_calls > 8 ? 8000 : m_expected_calls > 1 ? 2000 : 250));
 		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 output_base=%04x output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers,OUTPUT_BASE);
 	}
 	TIMER_CALLBACK_MEMBER(check)
@@ -5275,6 +5282,7 @@ ROM_START(mu4aac)
 	ROM_SYSTEM_BIOS(1, "mpeg2", "Generated MPEG-2 AAC-LC ABI control")
 	ROM_SYSTEM_BIOS(2, "mpeg2four", "Generated MPEG-2 AAC-LC four-call continuity probe")
 	ROM_SYSTEM_BIOS(3, "mpeg2refill", "Generated MPEG-2 AAC-LC eight-call input refill probe")
+	ROM_SYSTEM_BIOS(4, "mpeg2stream", "Generated MPEG-2 AAC-LC 32-call repeated refill probe")
 	ROM_REGION(741916, "container", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION(65339, "input", 0)
@@ -5282,6 +5290,7 @@ ROM_START(mu4aac)
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(1))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(2))
 	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(3))
+	ROMX_LOAD("generated-mpeg2.aac", 0, 65339, CRC(874fe22e) SHA1(6047afd4a8246d838726b7ddfdb9c6185f7d6f16), ROM_BIOS(4))
 ROM_END
 
 ROM_START(mu4nand)

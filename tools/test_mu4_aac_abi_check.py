@@ -13,9 +13,10 @@ mu4_aac_abi_capture: frames=1024 channels=2 raw_bytes=8192 converted_bytes=4096 
 
 
 class AbiCheckTest(unittest.TestCase):
-    def session_fixture(self):
-        lengths = [308,378,362,286,324,348,349,365]
-        encoded = bytearray(4096)
+    def session_fixture(self, calls=8):
+        lengths = [308,378,362,286,324,348,349,365]*(calls//8)
+        remaining_counts = [16,16,16,16,32,16,24,16]*(calls//8)
+        encoded = bytearray(max(4096,sum(lengths)+2048))
         offset = 0
         for length in lengths:
             header = bytearray.fromhex('fff95080269ffc')
@@ -36,7 +37,7 @@ class AbiCheckTest(unittest.TestCase):
                 lines.append(f'mu4_aac_session_input_read: ordinal={ordinal} index={index} source_byte={source} address={0x162e+index:04x} value={int.from_bytes(encoded[source:source+2],"big"):04x} mask=ffff context_pc=025129 observer_writes=0')
         reads(0,669)
         base, consumed, window = 0x162e, 0, 0
-        for call,(length,remaining) in enumerate(zip(lengths,[16,16,16,16,32,16,24,16]),1):
+        for call,(length,remaining) in enumerate(zip(lengths,remaining_counts),1):
             consumed += length
             cursor = 0x162e+(consumed+remaining//8-window)//2
             lines += [TEXT.splitlines()[1].replace('ordinal=1',f'ordinal={call}').replace('frame_length=0134',f'frame_length={length:04x}'),
@@ -44,13 +45,28 @@ class AbiCheckTest(unittest.TestCase):
                       f'mu4_aac_session_return: call={call} descriptor={cursor:04x} base={base:04x} index={cursor-base:04x} remaining={remaining:04x} result=0000 observer_writes=0']
             last_base, last_index = base, cursor-base
             base = cursor
-            if call == 4:
-                lines.append('mu4_aac_session_refill: after_call=4 source_byte=1336 old_cursor=18ca cursor=162e end=1a2e bytes=2048 remaining=0010 reservoir_high=dbbc reservoir_low=fff9 fixture_input=1 decoder_state_writes=0')
-                window,base = 1336,0x162e
-                reads(window,694)
-        lines += [f'mu4_aac_abi_result: returned=1 result=0000 base={last_base:04x} index={last_index:04x} remaining=0010 illegal=0 pc=001076 isolated_abi=1 conformance=0',
+            if call % 4 == 0 and call < calls:
+                window += 2*(cursor-0x162e)
+                lines.append(f'mu4_aac_session_refill: after_call={call} source_byte={window} old_cursor={cursor:04x} cursor=162e end=1a2e bytes=2048 remaining={remaining:04x} reservoir_high={encoded[window-4:window-2].hex()} reservoir_low={encoded[window-2:window].hex()} fixture_input=1 decoder_state_writes=0')
+                base = 0x162e
+                next_count = (sum(lengths[call:call+4])+remaining_counts[call+3]//8-remaining//8)//2+1
+                reads(window,next_count)
+        pc = '001023' if calls > 8 else '001076'
+        lines += [f'mu4_aac_abi_result: returned=1 result=0000 base={last_base:04x} index={last_index:04x} remaining=0010 illegal=0 pc={pc} isolated_abi=1 conformance=0',
                   f'mu4_aac_abi_input_end: reads={ordinal} unique_words={len(indices)} highest_index={max(indices)} complete=1 observer_writes=0']
         return '\n'.join(lines), bytes(encoded)
+
+    def test_repeated_refills_require_all_offsets_and_final_call(self):
+        text,encoded = self.session_fixture(32)
+        def check(value):
+            return check_session(value,bytes(262144),bytes(131072),bytes(131072),encoded,stream=True)
+        self.assertEqual(check(text)['calls'],32)
+        for changed in (text.replace('after_call=28','after_call=24'),
+                        text.replace('call=32 descriptor','call=31 descriptor'),
+                        text.replace('pc=001023','pc=001076'),
+                        text.replace('context_pc=025129','context_pc=000000',1)):
+            with self.subTest(changed=changed[-100:]), self.assertRaises(ValueError):
+                check(changed)
 
     def test_refill_session_and_mutated_continuity(self):
         text, encoded = self.session_fixture()

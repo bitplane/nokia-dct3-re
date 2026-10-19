@@ -438,5 +438,28 @@ diagnostic evidence, not formal codec conformance.
 Use the usual ABI checker arguments with `--refill`. The fixture needs
 `-seconds_to_run 3` to include its two-second completion bound. Single-call
 and four-call controls remain available. Input exhaustion, short-window
-recovery, repeated refills, original storage integration and EOF remain open;
+recovery, original storage integration and EOF remain open;
 this bench is not a handset playback or analog-output claim.
+
+The `mpeg2stream` BIOS extends this contract to 32 decoder calls and seven
+refills. A fixed-size synthetic DSP caller loops using ordinary instructions
+and a caller-owned counter at `1403`; no observer redirects execution or
+changes decoder state. This avoids an unrolled caller overlapping the input
+window. Refill source-byte offsets are 1336, 2722, 4156, 5610, 7152, 8624
+and 10132. The retained-bit counts at those boundaries are 16, 16, 16, 16,
+24, 24 and 32, respectively; each reservoir matches the last four fetched
+source bytes.
+
+The run consumes 11658 bytes and captures 32768 stereo frames. All 65536
+sample conversions match; 31116 samples differ from the host reference,
+maximum four s16 units. There are 6110 observed input reads. The checker
+requires all 32 call/header/capture/return groups, seven correctly ordered
+refills and byte-bound contiguous source coverage. Invoke it with `--stream`;
+run MAME with `-seconds_to_run 9` for the eight-second bench bound. The
+single-, four- and eight-call controls retain their original call layouts.
+
+This is repeated-refill continuity, not EOF acceptance. The generated file
+has 174 packets and an odd 65339-byte extent; its final packet is 14 bytes.
+The public descriptor expresses word pointers, so final partial-word and
+lookahead handling must be established rather than silently zero-padding
+the input or dropping its last byte.
