@@ -1342,8 +1342,9 @@ bool tms320c54x_device::observe_execute_memory_multiply(offs_t address, u16 opco
 bool tms320c54x_device::observe_execute_memory_store(offs_t address, u16 opcode, u16 &destination, u16 &value) const
 {
 	if (!m_pipeline_valid[5] || m_pipeline_annulled[5] || m_pipeline_address[5] != address ||
-		m_pipeline_word[5] != opcode || !staged_store(opcode)) return false;
-	destination = m_pipeline_operand_address[5]; value = pipeline_store_word();
+		m_pipeline_word[5] != opcode || (!staged_store(opcode) && !staged_direct_push(opcode))) return false;
+	destination = m_pipeline_operand_address[5];
+	value = staged_direct_push(opcode) ? m_pipeline_operand[5] : pipeline_store_word();
 	return true;
 }
 

@@ -3223,6 +3223,13 @@ private:
 			[this, expected](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(value == expected && m_cpu->pipeline_cycles() == 6, "PSHM direct MMR writes the retained source to its allocated stack word");
+				u32 const base = m_pipeline_peripheral_case & 1 ? 0x10000 : 0;
+				u16 const source = m_pipeline_peripheral_case < 6 ? 0x1e : (m_pipeline_peripheral_case-6)/6;
+				u16 destination = 0, observed = 0;
+				expect(m_cpu->observe_execute_memory_store(base+0x600,0x4a00|source,destination,observed) && destination == 0xfff && observed == value,
+					"PSHM inspection retains allocated stack address and source across restore");
+				expect(!m_cpu->observe_execute_memory_store(base+0x601,0x4a00|source,destination,observed) &&
+					!m_cpu->observe_execute_memory_store(base+0x600,0x4b00|source,destination,observed), "PSHM inspection rejects wrong instruction identities");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
@@ -20127,6 +20134,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mul-mod3-edge")) { start_short_read_mod3_edge(46848); return; }
 		if (!strcmp(machine().options().bios(), "pmac-mod3-edge")) { start_short_read_mod3_edge(58112); return; }
 		if (!strcmp(machine().options().bios(), "store-observe")) { start_pipeline_store_case(); return; }
+		if (!strcmp(machine().options().bios(), "push-observe")) { start_pipeline_xpc_push(); return; }
 		if (!strcmp(machine().options().bios(), "mul-t-sources")) { start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "memory-alu")) { start_pipeline_memory_arithmetic(); return; }
@@ -41997,6 +42005,8 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 197) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0\n");
+				if (!strcmp(machine().options().bios(), "push-observe"))
+					throw emu_fatalerror(3, "TMS320C54x isolated push observation complete");
 				start_pipeline_far_return(); return;
 			}
 			++m_pipeline_expected_cycle;
@@ -57017,6 +57027,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(199, "shift-bk-edge", "Excluded shifted BK and adjacent register compositions")
 	ROM_SYSTEM_BIOS(200, "pmac-mod3-edge", "Write-only short-preincrement program multiply source exclusions")
 	ROM_SYSTEM_BIOS(201, "store-observe", "Retained accumulator-store inspection across pending write restore")
+	ROM_SYSTEM_BIOS(202, "push-observe", "Retained direct-PSHM stack and source inspection across restore")
 ROM_END
 
 ROM_START(tms54rom4)

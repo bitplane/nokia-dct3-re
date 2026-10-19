@@ -44,7 +44,7 @@ public:
 	auto instruction_observer_cb() { return m_instruction_observer_cb.bind(); }
 	// Valid only for the matching staged Execute entry; no bus reads or retirement claim.
 	bool observe_execute_memory_multiply(offs_t address, u16 opcode, u16 &source, u16 &operand, u16 &immediate) const;
-	// Matching staged accumulator-store Execute slot; no memory access or write.
+	// Matching staged accumulator-store/direct-PSHM Execute slot; no memory access or write.
 	bool observe_execute_memory_store(offs_t address, u16 opcode, u16 &destination, u16 &value) const;
 	// Valid only inside an actual staged operand bus read, not forwarded values,
 	// debugger peeks, DMA reads or Execute/retirement. Never accesses guest memory.

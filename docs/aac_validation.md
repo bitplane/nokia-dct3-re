@@ -989,6 +989,14 @@ instruction. The query excludes forwarded values (no bus read), other
 addresses and side-effect-disabled peeks; its transient context is not
 hardware/save-state state and does not imply retirement.
 
+Execute-entry observation also does not provide a historical register snapshot.
+Stack allocation by PSHM/FRAME is published in earlier pipeline stages; a
+younger FRAME can therefore have changed the live SP when the older PSHM's
+Execute callback runs. Caller/argument attribution must use retained stack
+accesses or independently qualified call-boundary observations, not interpret
+the live SP as the pre-prologue value. A matching arithmetic result alone does
+not validate that ABI attribution.
+
 The 20-second `tmp/native-gates/mu4-recorder-instructions` capture identifies
 every one of the 1699328 known-value reads, with no missing or capped identity:
 

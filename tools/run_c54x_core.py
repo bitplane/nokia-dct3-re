@@ -2080,6 +2080,10 @@ EXTRA_PROFILES = {
         "TMS320C54x store observation: PASS cases=12 restore=12 retained_address=1 exact_value=1 rejected_other_identity=1 observer_writes=0",
         "Fatal error: TMS320C54x isolated store observation complete",
     ),
+    "push-observe": (
+        "TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0",
+        "Fatal error: TMS320C54x isolated push observation complete",
+    ),
     "mvmd-t": (
         "TMS320C54x staged MVMD T/TRN: PASS cases=432 restore=432 sources=2 destinations=AR0_to_AR7,BK values=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 producer_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD T/TRN complete",
@@ -2280,7 +2284,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
         machine = "tms54xtra"
-    if args.profile in ("pmac-mod3-edge","store-observe"):
+    if args.profile in ("pmac-mod3-edge","store-observe","push-observe"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
