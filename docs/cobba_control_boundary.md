@@ -328,7 +328,7 @@ the active TC-mode interpretation remain to be validated numerically.
 ### Current RF-control reproducibility boundary
 
 A fresh `run_c54x_rom4_rf_delivery.py --repeats 2` check against binary
-SHA-256 `ad5d01d874927418efc79b47311cb0ab7bc300a910d4b4b985a20b1ec36cc623`
+SHA-256 `ae96a9ea391a40bd7c353b279362fd63dd8dbf11bfd48d2febd055ca8d6df1d3`
 does not reproduce the accepted-store result below. Both zero controls produce
 4,888 completed zero scores; both rotating controls produce 4,888 nonzero scores, maximum
 `0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
@@ -347,6 +347,31 @@ body `006d`), request correlation and channel-109 numerical tuning consistency.
 Neither has an accepted score. The zero case passes its control conditions;
 the rotating case fails only score acceptance. This is not physical RF input,
 successful acquisition or registered-network evidence.
+
+The baseline remains unchanged after staged FR/EFR speech, DTX, homing and
+loss qualification. Those CPU improvements do not establish an RF adapter.
+The retained MADos reference provides matching NHM-5 upload payloads and MCU
+interface definitions, not a measured NSE-1 receive-word stream. The parallel
+RF contract in the NSE-1 manual and the separate 1 MHz/8 kHz PCM contract
+must not be conflated: neither the PCM rate nor the twelve-bit parallel bus
+width fixes port-`0x27` sample packing or timing.
+
+An evidence-backed receiver fixture still needs these independently justified
+properties before its success or failure can diagnose acquisition:
+
+| Boundary | Required evidence |
+| --- | --- |
+| Word representation | Signed/offset encoding, significant bits, alignment and lane order at DSP port `27`. |
+| Production | Sample cadence and retention/backpressure across reads and receive-window transitions. |
+| Tuning | Selected channel/frequency and the relationship between sampled waveform and SCU programming. |
+| Waveform | Independent FCCH/SCH or other known GSM input with generator and adapter provenance. |
+
+The existing impulse and mathematical rotating-input diagnostics qualify
+software consumption and arithmetic only. They do not fill these physical
+contracts. Neither a continuously supplied tone nor an accepted score alone
+is a native GSM decode. A new waveform experiment may declare explicit
+adapter hypotheses, but must not promote them to product configuration merely
+because a threshold is crossed.
 
 The MCU response header belongs to `STRH r0,[r4]` (`8020`) at `26be4a`,
 not the preceding literal load at `26be48`. The observer pins that opcode
