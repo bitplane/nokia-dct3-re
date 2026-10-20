@@ -341,6 +341,17 @@ publication is implied by this RSSI return. The existing candidate 8a
 mapping must not be promoted to a required scan completion without its
 own operation/request evidence.
 
+`tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
+captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
+DSP entry controls, uncapped post-reset pending-index/completion progression
+and the live RSSI stack. A changed boundary fails for review rather than
+silently becoming a new baseline. This supplements, not replaces, the
+independent boot/storage qualification and proves no RF validity or registration.
+
+```sh
+.venv/bin/python -m tools.nsk1_radio_trace_check path/to/error.log
+```
+
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
 It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state
