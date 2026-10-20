@@ -29,7 +29,9 @@ The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
 Physical SIM wrong-PIN/cold-correct-PIN verification also passes using the
-shared laboratory card. Blocking and PUK recovery remain to be tested.
+shared laboratory card. Physical PIN exhaustion, cold PUK recovery and cold
+replacement-PIN verification also pass; wrong-PUK/permanent-block behavior
+remains untested on this product.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -705,7 +707,25 @@ separate phone Security code prompt have exact frame checks. The latter receives
 its own physical `12345/OK`; this does not substitute for SIM authentication.
 Both phases validate native record arithmetic, sampled execution, unchanged
 flash and preserved phone identity/code fields. This proves ordinary PIN retry
-persistence/recovery, not blocked PIN/PUK, factory data, fitted DSP or network.
+persistence/recovery, not factory data, fitted DSP or network.
+
+```sh
+.venv/bin/python tools/nsk1_puk_roundtrip.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-puk-roundtrip
+```
+
+The three-process extension starts with three normal PIN retries, not a seeded
+blocked counter. Three physical `4321/OK` attempts produce `9804`/2,
+`9804`/1, then `9840`/0. A cold process displays Enter PUK code, accepts
+physical `12345678`, new PIN `4321` and matching confirmation, and issues
+exactly one successful UNBLOCK CHV. Only the eight CHV1 bytes and its retry
+byte may change; unrelated serialized card contents are compared in full.
+A third cold process verifies physical `4321/OK`, restores the separate
+phone-code prompt and preserves the entire recovered card. Each phase checks
+native record arithmetic, execution samples through 40 seconds, persistent
+identity/code fields, executable flash and ordered physical contacts. Exact
+PUK/new-PIN/PIN/acceptance/phone-prompt frames guard the UI sequence.
+Wrong PUK and permanent PUK exhaustion are not covered by this gate.
 
 ## Persistent SIM phonebook
 
