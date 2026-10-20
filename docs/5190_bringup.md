@@ -8,9 +8,12 @@ graphical boot or phone services. The separate `noki5190` MCU research
 configuration executes the own input, initializes the own EEPROM geometry,
 installs its exact ROM4-catalogue program and reaches a supervisor flag loop.
 The supervisor flag is cleared organically by FIQ; its sampled loop is not
-a blocked lifecycle. The next work is the DSP release/upload lifecycle and
-its own completion consumers. Do not inherit the 5110 machine merely because
-the restore manifest names ROM4.
+a blocked lifecycle. The first unanswered DSP transition is the uploaded
+program's resident-version publication to shared word `10004`, before the
+MCU begins sparse-flash handoffs. The next work is native execution with
+explicitly qualified resident-program input, not a scheduler or ownership
+flag injection. Do not inherit the 5110 machine merely because the restore
+manifest names ROM4.
 
 ## Qualified executable input
 
@@ -132,3 +135,25 @@ flash. It additionally requires repeated FIQ-owned flag clears and actual
 global interrupt-enable observations. Register `0b` is labeled `irqmask`,
 not global control (`0c`). It is a boundary regression, not a graphical boot
 oracle.
+
+### First missing DSP publication
+
+MCU routine `28f934` initializes shared results to `0000/ffff/ffff/ffff`,
+loads its selected program, supplies arguments
+`0100/0300/0000/8000/0001/0001/0200` at `100f6..10102` and releases reset
+with command `01` at `28f9c8` (0.007852154 s in the measured profile).
+Its first result check at `28f9dc` reads shared `10004` (DSP data `0802`),
+then retries at `28f9fc`. The own uploaded program's early MVPD reads
+resident program cell `ff87` into `0802`; this precedes its block loop and
+the later calls to resident helpers `8023` and `802b`.
+
+With the explicitly silent DSP the MCU repeatedly reads `ffff`, times out,
+clears success byte `10ad2d`, saves `ffff` at `10ad36` and skips the
+sparse-flash transfer branch. Both ownership flags remain 1. The subsequent
+supervisor wakeups are independent evidence that the RTOS still runs, not
+proof of a completed verifier. Do not describe this as an unacknowledged
+first block: no first sparse-flash block has been supplied yet.
+
+The observer suppresses its own snapshot reads from the API-read tap.
+Accepted read evidence must come from the firmware PCs above, not the
+supervisor PC that happened to be current while Lua inspected memory.

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_dsp_version_publication", "owner": "nsb1_uploaded_dsp", "status": "unresolved",
+      "predicate": "The own uploaded DSP program publishes its resident version to shared 10004 before MCU sparse-flash handoffs",
+      "current": "Passive release observation at 28f9c8 records command 01 and arguments 0100/0300/0000/8000/0001/0001/0200. Firmware reads 10004 as ffff at 28f9dc and retries at 28f9fc. The own program's early MVPD would copy resident program ff87 into DSP data 0802, before its later 8023/802b helper calls. With no executing DSP, initialization times out, success byte 10ad2d clears, saved version 10ad36 is ffff and sparse-flash transfers are skipped; ownership flags remain 1. Observer snapshot reads are explicitly excluded from firmware read evidence. No version value, success flag or acknowledgement is fabricated, and fitted resident-mask compatibility remains unproved.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_boot_check.py", "tools/test_nsb1_boot_check.py"]
+    },
+    {
       "id": "nsb1_v671_supervisor_fiq_wake", "owner": "nsb1_supervisor", "status": "satisfied",
       "predicate": "The sampled NSB-1 supervisor loop wakes through organic FIQ entry and is not a globally disabled interrupt deadlock",
       "current": "Own FIQ entry 2acac4 clears flag 10c540 at 2acaca; the supervisor re-arms it at 2a4668. Passive observation records repeated wake/re-arm pairs and 39 writes through five seconds. After startup actual global control 0c is 05, CPSR interrupt-disable bits are clear and FIQ mask is e3. The observer's former ctrl label read local IRQ mask 0b; it is corrected to irqmask, with actual global control independently reported. This closes the flag-owner question but does not identify the remaining DSP/application dependency or promote boot.",

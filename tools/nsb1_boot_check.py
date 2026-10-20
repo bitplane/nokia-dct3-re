@@ -16,6 +16,11 @@ def check_trace(trace, program):
     uploads = re.findall(r'nsb1_program: words=186 data=([0-9a-f]+) observer_writes=0', trace)
     if len(uploads) != 1 or bytes.fromhex(uploads[0]) != program:
         raise ValueError('installed program differs from own ROM4 catalogue')
+    releases = re.findall(r'nsb1_dsp_release: command=01 arguments=([0-9a-f]+) pc=0028f9c8 t=([0-9.]+) observer_writes=0', trace)
+    if len(releases) != 1 or releases[0][0] != '0100030000008000000100010200' or not 0 < float(releases[0][1]) < 0.1:
+        raise ValueError('missing own DSP release arguments')
+    if not re.search(r'nsb1_dsp_result_read: address=00010004 data=ffff0000 mask=ffff0000 pc=0028f9dc t=', trace):
+        raise ValueError('missing firmware-owned initial version read')
     samples = re.findall(
         r'nsb1_boot: t=([0-9.]+) pc=([0-9a-f]+) sp=([0-9a-f]+) irqmask=([0-9a-f]+) '
         r'eeprom_mode=01 page=20 capacity=00002000 selector=00 dsp_family=0004 '

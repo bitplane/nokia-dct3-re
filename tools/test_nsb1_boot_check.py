@@ -8,6 +8,8 @@ class BootCheckTest(unittest.TestCase):
 
     def trace(self):
         lines = ['Soft reset', 'nsb1_program: words=186 data=' + self.program.hex() + ' observer_writes=0']
+        lines += ['nsb1_dsp_release: command=01 arguments=0100030000008000000100010200 pc=0028f9c8 t=0.007852154 observer_writes=0',
+                  'nsb1_dsp_result_read: address=00010004 data=ffff0000 mask=ffff0000 pc=0028f9dc t=0.008895923 observer_writes=0']
         for time in (0.1, 0.5, 1, 2, 5):
             lines.append(f'nsb1_boot: t={time:.9f} pc=002a4674 sp=0010c6dc irqmask=de '
                          'eeprom_mode=01 page=20 capacity=00002000 selector=00 dsp_family=0004 '
@@ -47,3 +49,11 @@ class BootCheckTest(unittest.TestCase):
     def test_disabled_delivery_rejected(self):
         with self.assertRaisesRegex(ValueError, 'delivery'):
             check_trace(self.trace().replace('ctrl=05', 'ctrl=0a'), self.program)
+
+    def test_observer_read_not_firmware_evidence(self):
+        with self.assertRaisesRegex(ValueError, 'firmware-owned'):
+            check_trace(self.trace().replace('pc=0028f9dc', 'pc=002a4674'), self.program)
+
+    def test_wrong_release_arguments(self):
+        with self.assertRaisesRegex(ValueError, 'release arguments'):
+            check_trace(self.trace().replace('0100030000008000000100010200', '010003000000e800000100010200'), self.program)
