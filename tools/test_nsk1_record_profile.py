@@ -52,7 +52,8 @@ class Nsk1RecordProfileTest(unittest.TestCase):
             (inputs/name).write_bytes(data)
             expected.append((name,hashlib.sha1(data).hexdigest()))
         manifest = {'inputs':[{'source':name,'sha1':digest} for name,digest in expected],
-                    'peer_completions':False,'external_eeprom':'own erased 2048 bytes; no donor provisioning'}
+                    'peer_completions':False,'physical_keys':False,
+                    'external_eeprom':'own erased 2048 bytes; no donor provisioning'}
         (root/'input_manifest.json').write_text(json.dumps(manifest))
         (root/'summary.json').write_text(json.dumps({'variant':'standard','unchanged_flash':True,
             'own_slot25_payload_observed':True,'native_illegal_observed':False}))
@@ -77,6 +78,12 @@ class Nsk1RecordProfileTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'qualified'):
                     build_from_capture(source,expected)
                 manifest['peer_completions'] = False
+                (source/'input_manifest.json').write_text(json.dumps(manifest))
+                manifest['physical_keys'] = True
+                (source/'input_manifest.json').write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError,'qualified'):
+                    build_from_capture(source,expected)
+                manifest['physical_keys'] = False
                 (source/'input_manifest.json').write_text(json.dumps(manifest))
                 (source/'summary.json').write_text(json.dumps({'variant':'2915','unchanged_flash':True}))
                 with self.assertRaisesRegex(ValueError,'standard-family'):

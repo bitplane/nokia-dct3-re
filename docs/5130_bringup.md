@@ -11,9 +11,11 @@ physical input, SIM or radio acceptance is claimed.
 An explicit record-only external fixture now reaches the accepted-copy path
 and removes the standard family's reason-`04` restart, but remains blank
 through 20 seconds. Identity/calibration are still erased, and no phone
-service is accepted. The next boundary is ordinary startup after that
-accepted record, plus the separate `2915` loader-result interpretation,
-not an absent LCD link.
+service is accepted. A physical-contact probe confirms that startup still
+holds IRQ0/columns masked, with checklist `0a` rather than `0f`.
+The next boundary is the legitimate producers of reports `14` and `15`,
+plus the separate `2915` loader-result interpretation, not an absent LCD
+link or a guessed key event.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -114,8 +116,8 @@ The keypad scanner `2933c4` separately uses row signal `31`, direction
 `33`. These do not overlap the serial interface. The default later-product
 keypad layout does overlap it and must not be retained for this composition.
 The static checker covers these own instruction fragments and both variants'
-literal base addresses. Physical key mapping and the compatibility
-power-on-column value `10` are not yet accepted.
+literal base addresses. The key-table contract below independently confirms
+power column `10`; runtime logical-key/UI acceptance is still absent.
 
 ```sh
 .venv/bin/python tools/nsk1_static_check.py roms/noki5130/5130f561a.fls
@@ -155,22 +157,24 @@ grammar (`fd00 ff80 0244 0500 0078 0000`), while the `2915` payload count
 is `0241`. Shared grammar does not make the payloads, variants or resident
 masks interchangeable.
 
-These own MCU contracts justify a separately labelled native compatibility
-spike against the acquired NSE-1 ROM4 input. Such a spike must keep own MCU
-and PPM bytes, erased own external storage, and bounded read-only upload/
-CPU observations. It must not promote board/clock/fitted-mask correctness
-from a successful handshake, or seed NSE-1 EEPROM to get past later checks.
+These own MCU contracts support the separately labelled native compatibility
+composition against the acquired NSE-1 ROM4 input. Its baseline keeps own
+MCU/PPM and erased external storage; any derived fixture is separately
+declared with its input provenance below. Bounded read-only upload/CPU
+observations cannot promote board/clock/fitted-mask correctness from a
+successful handshake or justify seeding NSE-1 EEPROM to pass later checks.
 
 ## Native compatibility observation
 
 `nsk1r4t` uses the own 1-MiB image, an initially erased 2-KiB serial EEPROM,
 the common boot-ROM substitution and the explicitly named NSE-1 program/data
 ROM inputs. The 52-MHz DSP clock, capacity-compatible flash/EEPROM parts,
-power-on column and default analog inputs are compatibility assumptions,
+and default analog inputs are compatibility assumptions,
 not recovered NSK-1 board calibration. The bounded 64-KiB SRAM / 1-MiB flash
 map is reused from the existing NSE-3 extent, not a fitted-part attribution.
-No DSP HLE, synthetic SIM, radio/service responder or physical key sequence
-is enabled by this composition.
+No DSP HLE, synthetic SIM, radio/service responder or automatic physical key
+sequence is enabled by the machine composition; the separately selected
+input fixture drives only mapped physical contacts.
 
 ```sh
 .venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms tmp/nsk1-native-qualified
@@ -212,7 +216,7 @@ blank frame rather than manufacturing a presentation or completion.
 Checkpoint validation: both isolated compatibility runs above reproduce;
 the NSB-1 native-bootstrap regression and default 3210 structural gate pass.
 All 24 MAME patches apply to the pinned upstream revision. The tools suite
-passes 3,735 tests with one skip; these do not establish NSK-1 UI support.
+passes 3,738 tests with one skip; these do not establish NSK-1 UI support.
 
 ## Presentation and low-NV validation
 
@@ -349,3 +353,56 @@ complete provisioning, SIM acceptance or network service. The ordinary
 machine remains erased by default. Replace this diagnostic in favor of a
 complete independently grounded profile, rather than promoting its example
 policy or remaining erased fields to factory defaults.
+
+## Key tables and startup readiness
+
+Own decoder `2948dc` uses normal table `2adbac`, special table `2adbc8`
+and layout selector `10be96`. The `2915` tables are separately read from
+their own literals (`2ae90c/2ae928`). Layout zero uses raw index
+`row * 5 + column`: the existing Menu contact (column 1 / row 2) selects
+logical `19`, Up (1/4) selects `17`, and C (1/1) selects `1a`.
+The cold comparison at `2951be` requires raw `84`; special-table column 4
+maps to logical power `0d`, independently confirming power mask `10`.
+The static checker pins the decoder, both tables and the comparison, with
+mutation controls. This is firmware lookup evidence, not a successful
+runtime UI input transaction.
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-input-qualified --record-profile-from tmp/nsk1-profile-source \
+  --debug-startup --seconds 21 --physical-keys
+```
+
+The isolated fixture presses/releases Menu at 12 s, Up at 14 s and C at
+16 s. All six contacts are recorded, but no key reaches forwarder `294862`
+and no new rendering follows. At every contact, layout is zero, IRQ mask
+is `ce` (IRQ0 disabled), column mask is `3f`, byte `10ffb0` is `06`, and
+checklist `10be35` is `0a`. There are no reads or writes in the watched
+standard SIMI window `20036..2003f` through that interval. An own control
+write at `2810e4` independently addresses `20039`; this is not evidence
+that a missing controller reply blocks an already active SIM transaction.
+Do not force input masks or SIM initialization to hide the earlier state.
+
+The startup consumer gives this state a precise scope:
+
+| Own code | Contract |
+| --- | --- |
+| `25bbec..25bc24` | Input codes `14/15/16/17` set checklist bits `1/4/2/8`, respectively. |
+| `25bc40..25bc46` | Input `10` selects low-nibble state 6 via setter `291968`. Its source is not established by the scalar-post trace. |
+| `25bc92..25bca6` | State must be 6 and the checklist low nibble must be `f`; otherwise execution returns to receive helper `25ad34`. The live comparison sees `0a`. |
+| `291ad2` / `22a1c0` | Literal report-14 stub and its mapped direct caller. Recover the caller's preceding lifecycle. |
+| `291af6` / `24168c` | Literal report-15 stub and its mapped direct caller after the eleven-byte aggregation test at `241672..241682`. Enumerate the eleven flag producers. |
+
+Only `16` and `17` of this checklist family are observed through scalar
+post primitive `2553b8`; the live bitmap confirms `14/15` are not latched
+in this run. Other observed task-1 scalars are `32/33/35/37`, not substitutes
+for checklist bits. The mapped direct callers are not an absence proof for
+indirect/table-driven producers. The task-2 control dispatcher `22c5f8`
+also receives real payload `0d00`; its arrival is not proof of full storage
+or hardware self-test success, nor a reason to invent different status bits.
+
+`nsk1_input_check.py` requires all physical contact observations and reports
+the actual masks, flags, forwarded keys, scalar posts and control reply.
+It explicitly does not certify interactive input. Redundant raw-record
+debug probes have been retired in favor of the complete exchange checker;
+the accepted-copy and restart diagnostics remain for the active fixtures.

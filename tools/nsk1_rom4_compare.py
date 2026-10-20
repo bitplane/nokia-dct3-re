@@ -13,6 +13,7 @@ if __package__ in (None, ''):
 from tools.nsk1_static_check import inspect
 from tools.nsk1_record_exchange_check import check as check_records
 from tools.nsk1_record_profile import build_from_capture,check_observation
+from tools.nsk1_input_check import check as check_input
 
 
 INPUTS = (
@@ -23,7 +24,7 @@ INPUTS = (
 )
 
 
-def prepare(root, run, record_profile_from=None):
+def prepare(root, run, record_profile_from=None, physical_keys=False):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
     sources = [(root / name, digest) for name, digest in INPUTS]
@@ -49,7 +50,7 @@ def prepare(root, run, record_profile_from=None):
                            if profile_metadata else 'own erased 2048 bytes; no donor provisioning'),
         'record_profile':profile_metadata,
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
-        'peer_completions': False, 'physical_keys': False,
+        'peer_completions': False, 'physical_keys': physical_keys,
     }, indent=2)+'\n')
     return initial_eeprom
 
@@ -101,15 +102,18 @@ def main():
     parser.add_argument('--debug-startup', action='store_true', help='bounded read-only own startup entry traces')
     parser.add_argument('--record-profile-from',type=Path,help='diagnostic external record example keyed only from a qualified own erased capture')
     parser.add_argument('--seconds',type=int,choices=range(6,62),default=6)
+    parser.add_argument('--physical-keys',action='store_true',help='physical Menu/Up/C probe on independently mapped contacts')
     args = parser.parse_args()
     run = args.run.resolve()
     if args.record_profile_from and args.variant != 'standard':
         parser.error('record-profile experiment is not established for the 2915 family')
     if args.record_profile_from and not args.debug_startup:
         parser.error('record-profile experiment requires --debug-startup for own accepted-copy evidence')
+    if args.physical_keys and (not args.debug_startup or args.seconds < 21):
+        parser.error('physical keys require --debug-startup and at least 21 seconds')
     try:
-        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from)
-        script = Path(__file__).with_name('nsk1_boot_observe.lua').resolve()
+        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys)
+        script = Path(__file__).with_name('nsk1_input_fixture.lua' if args.physical_keys else 'nsk1_boot_observe.lua').resolve()
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
                 str(args.binary.resolve()), 'nsk1r4t', '-bios',
@@ -143,6 +147,8 @@ def main():
         if args.record_profile_from:
             check_observation(summary,initial_eeprom,(storage/'eeprom').read_bytes())
             summary['synthetic_record_conformance'] = True
+        if args.physical_keys:
+            summary['physical_input_observation'] = check_input(trace)
         (run / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:

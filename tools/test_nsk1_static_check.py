@@ -3,7 +3,7 @@ import struct
 import unittest
 from unittest.mock import patch
 
-from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract,read_peripheral_contract
+from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract,read_peripheral_contract,read_keymap_contract
 
 
 class Nsk1StaticTest(unittest.TestCase):
@@ -33,7 +33,8 @@ class Nsk1StaticTest(unittest.TestCase):
         profiles = {'test':(hashlib.sha1(image).hexdigest(),self.table)}
         with patch('tools.nsk1_static_check.PROFILES',profiles), \
                 patch('tools.nsk1_static_check.read_eeprom_output_contract',return_value={}), \
-                patch('tools.nsk1_static_check.read_peripheral_contract',return_value={}):
+                patch('tools.nsk1_static_check.read_peripheral_contract',return_value={}), \
+                patch('tools.nsk1_static_check.read_keymap_contract',return_value={}):
             result = inspect(image,'test')
             self.assertEqual('0x2000ec',result['thumb_entry'])
             self.assertFalse(result['boot_or_fitted_hardware_proved'])
@@ -116,6 +117,30 @@ class Nsk1StaticTest(unittest.TestCase):
                 with self.subTest(variant=variant,address=address),self.assertRaises(ValueError):
                     read_peripheral_contract(image,variant)
                 image[offset] ^= 1
+
+    def test_own_key_tables_and_power_comparison(self):
+        decoder = bytes.fromhex('b500f7fefd7128ffd101203ebd0009c12900d00949167809008a188918404913180838807800bd0021194a1178124351184049105c08bd00')
+        for variant,shift in (('standard',0),('2915',-0x10)):
+            image = bytearray(0x100000)
+            start = 0x948dc+shift
+            image[start:start+len(decoder)] = decoder
+            image[0x951be+shift:0x951c6+shift] = bytes.fromhex('f7fef9012884d1f9')
+            struct.pack_into('>I',image,0x94950+shift,0x200800)
+            struct.pack_into('>I',image,0x94948+shift,0x200840)
+            struct.pack_into('>I',image,0x9494c+shift,0x10be96)
+            image[0x800:0x819] = bytes.fromhex('3e3e3e3e3e3e1a0102033e19040506183e0708093e170c0a0b')
+            image[0x840:0x845] = bytes.fromhex('3e3e3e3e0d')
+            report = read_keymap_contract(image,variant)
+            self.assertEqual(0x19,report['layout_zero_logical_keys'][11])
+            self.assertEqual('0x10',report['power_column_mask'])
+            for offset in (0x800,0x844,start,0x951c1+shift):
+                image[offset] ^= 1
+                with self.subTest(variant=variant,offset=offset),self.assertRaises(ValueError):
+                    read_keymap_contract(image,variant)
+                image[offset] ^= 1
+            struct.pack_into('>I',image,0x94950+shift,0x300000)
+            with self.assertRaisesRegex(ValueError,'outside'):
+                read_keymap_contract(image,variant)
 
 
 if __name__ == '__main__':

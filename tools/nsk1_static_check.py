@@ -73,6 +73,31 @@ def read_peripheral_contract(image, variant):
             'physical_key_mapping_proved': False, 'electrical_timing_proved': False}
 
 
+def read_keymap_contract(image, variant):
+    shift = {'standard':0,'2915':-0x10}[variant]
+    decoder = bytes.fromhex('b500f7fefd7128ffd101203ebd0009c12900d00949167809008a188918404913180838807800bd0021194a1178124351184049105c08bd00')
+    start = 0x2948dc+shift-0x200000
+    if image[start:start+len(decoder)] != decoder:
+        raise ValueError('own keypad decoder instruction contract differs')
+    start = 0x2951be+shift-0x200000
+    if image[start:start+8] != bytes.fromhex('f7fef9012884d1f9'):
+        raise ValueError('own power-key raw-84 comparison differs')
+    normal,special,selector = (struct.unpack_from('>I',image,address+shift-0x200000)[0]
+                               for address in (0x294950,0x294948,0x29494c))
+    expected = bytes.fromhex('3e3e3e3e3e3e1a0102033e19040506183e0708093e170c0a0b')
+    for pointer,size in ((normal,25),(special,5)):
+        if pointer < 0x200000 or pointer+size > 0x200000+len(image):
+            raise ValueError('own key table outside image')
+    if (image[normal-0x200000:normal-0x200000+25] != expected
+            or image[special-0x200000:special-0x200000+5] != bytes.fromhex('3e3e3e3e0d')
+            or not 0x100000 <= selector < 0x110000):
+        raise ValueError('own key table or layout selector differs')
+    return {'normal_table':hex(normal),'special_table':hex(special),'layout_selector':hex(selector),
+            'raw_formula':'row * 5 + column','layout_zero_logical_keys':list(expected),
+            'power_raw':'0x84','power_logical':'0x0d','power_column_mask':'0x10',
+            'runtime_key_forwarding_proved':False}
+
+
 def read_catalogue(image,table):
     offset = table-0x200000
     if offset < 8 or offset+112 > len(image):
@@ -115,6 +140,7 @@ def inspect(image,variant):
     return {'variant':variant,'sha1':digest,'catalogue':catalogue,
             'eeprom_output_contract':read_eeprom_output_contract(image,variant),
             'peripheral_contract':read_peripheral_contract(image,variant),
+            'keymap_contract':read_keymap_contract(image,variant),
             'arm_entry':'0x200040','thumb_entry':'0x2000ec',
             'firmware_eeprom_geometry':eeprom_geometry(image[5]),
             'stack_literal':hex(int.from_bytes(image[0x16c:0x170],'big')),

@@ -401,8 +401,8 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
 };
-// NSK-1 scanner 2933c4 independently uses these five-row GPIO registers.
-// Power-on column remains a compatibility input pending its key-table audit.
+// NSK-1 scanner 2933c4 uses these five-row GPIO registers. Own 2951be
+// compares raw power key 84; table 2adbc8 maps that column to logical 0d.
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSK1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
 };
