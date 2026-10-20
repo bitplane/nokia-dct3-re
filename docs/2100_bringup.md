@@ -113,6 +113,19 @@ This rules out a difference between those acquired executable sources, not
 cryptographic vendor authenticity or PMM provenance. Reproduce with
 `tools/nam2_v521_flash_contract.py IMAGE --installer INSTALLER`.
 
+The own exception dispatchers constrain control-register reinterpretation.
+Runtime vectors branch to ARM IRQ entry `2fb574` and FIQ entry `2fb6dc`.
+IRQ reads `2000c` at `2fb57c`, tests bit 3 and immediately returns if set;
+FIQ reads it at `2fb6e0`, tests bit 1 and likewise returns if set. Early
+exception-mode reads in `tmp/nam2-c3-vectors-20261020` observe `05` before
+dispatch. The critical-section helper `2fab36` saves the actual low control
+byte at `10f9f4`, writes `0a` on outer entry and tracks depth at `10f9f6`;
+`2fab58` restores the saved low nibble only on final leave. These consumers
+do not justify hiding disable bits on reads or enabling interrupts on every
+idle-loop iteration. The physical write/read/clock-transition contract still
+needs independent evidence; no alternative emulator's read-mask convention
+is promoted by this audit.
+
 ## Own v5.21 checksum fixture
 
 The complete Sharp-labelled v5.21 image (SHA-1

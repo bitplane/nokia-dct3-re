@@ -58,6 +58,12 @@ def select_family(rows, manufacturer, device, third):
 def inspect(image):
     if hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("requires the unchanged acquired NAM-2 v5.21 image")
+    # ARM LDRB control, TST disable bit, SUBSNE return in each dispatcher.
+    for address, word in [(0x2FB57C, 0xE5D0100C), (0x2FB580, 0xE3110008),
+                          (0x2FB588, 0x125EF004), (0x2FB6E0, 0xE5DC800C),
+                          (0x2FB6E4, 0xE3180002), (0x2FB6E8, 0x125EF004)]:
+        if struct.unpack_from('>I', image, address - BASE)[0] != word:
+            raise ValueError(f'interrupt-control instruction differs at {address:#x}')
     rows = [struct.unpack_from(">4H", image, TABLE - BASE + index * 8)
             for index in range(10)]
     return {
@@ -84,6 +90,16 @@ def inspect(image):
             "dispatch_slots": "0x10fac8",
         },
         "erase_geometry": "not established by algorithm selection",
+        "interrupt_control_consumers": {
+            "irq_entry": "0x2fb574", "irq_guard": "0x2fb580",
+            "irq_disable_read_bit": 3, "irq_disabled_return": "0x2fb588",
+            "fiq_entry": "0x2fb6dc", "fiq_guard": "0x2fb6e4",
+            "fiq_disable_read_bit": 1, "fiq_disabled_return": "0x2fb6e8",
+            "critical_enter": "0x2fab36", "critical_leave": "0x2fab58",
+            "critical_snapshot": "0x10f9f4", "critical_depth": "0x10f9f6",
+            "disable_write": 0x0a, "restore_mask": 0x0f,
+            "read_masking_justified": False,
+        },
     }
 
 

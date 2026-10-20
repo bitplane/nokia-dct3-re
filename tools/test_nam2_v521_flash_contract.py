@@ -30,6 +30,10 @@ class Nam2FlashContractTest(unittest.TestCase):
         candidate = result["intel_c3_top_candidate"]
         self.assertEqual(3, candidate["selected_family"])
         self.assertFalse(candidate["fitted_part_proven"])
+        interrupt = result['interrupt_control_consumers']
+        self.assertEqual(3, interrupt['irq_disable_read_bit'])
+        self.assertEqual(1, interrupt['fiq_disable_read_bit'])
+        self.assertFalse(interrupt['read_masking_justified'])
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]
