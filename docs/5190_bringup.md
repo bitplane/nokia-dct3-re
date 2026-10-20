@@ -257,6 +257,29 @@ but does not prove that this packet requires a direct DSP reply or that the
 later task-12 `8b` result completes task 11. The completion contract remains
 open; neither a guessed reply nor a controller-state change is justified.
 
+The aligned literal scan finds `0811/0812/0813` outside the controller wait
+in `2516e8/251794/251798`, loaded at `251392/25149c/251574`. These select
+`r6`, which the common tail `251772` passes to `27fcda` and returns in `r0`.
+The reporting helper is gated by `2adc10(3400)`; it is not evidence of an
+unconditional task-17 sender. Neither the common tail nor `27fcda` with these
+three statuses fires in the 61-second physical probe. Two more literals at
+`2803fc/280400` feed `280204/280208` in a separately gated reporting mapper.
+This is an aligned-literal/reference inventory, not closure of computed
+status producers.
+
+The selector's owner is now statically bounded: `2505d0` is the enclosing
+routine, and an aligned Thumb BL scan over the complete 1-MiB MCU image finds
+one direct caller, `28f318`, inside controller 17's own receive helper.
+At `28f2e4` the helper loads a nested buffer from message offset 8, tests the
+low nibble of buffer byte 4 for `6`, and calls the selector with the outer
+message byte 3 as its second argument. The selector dispatches on nested
+buffer byte 5; the `24` branch reaches `2512b0`, including the `0813` selector.
+Returned status goes into `r6` at `28f31c`, then the common receive tail
+returns nonzero `r6` at `28f580`. These are decoded-input results, not proof
+of task-11 acknowledgement messages. The next query is which outer message
+and nested buffer legitimately reach this parser; do not synthesize the
+completion IDs to skip the receive transaction.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns

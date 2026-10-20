@@ -17,6 +17,8 @@ if machine.debugger then
     machine.debugger:command('temp2=0')
     machine.debugger:command('temp0=0')
     machine.debugger:command('temp1=0')
+    machine.debugger:command('bpset 27fcda,r0>=811&&r0<=813&&temp1<30,{temp1=temp1+1;logerror "nsb1_call_completion_publish: status=%04x r1=%08x r2=%08x caller=%08x observer_writes=0\\n",r0,r1,r2,r14;g}')
+    machine.debugger:command('bpset 251772,temp1<30,{temp1=temp1+1;logerror "nsb1_call_completion_select: status=%04x context=%08x observer_writes=0\\n",r6,r8;g}')
     machine.debugger:command('bpset 2188f0,temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_start: mode=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
     machine.debugger:command('bpset 218b34,temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_dsp_post: task=%08x object=%08x header=%08x body=%08x count=%04x observer_writes=0\\n",r0,r1,d@r1,d@(r1+4),w@(r4+18);g}')
     for _, address in ipairs({'219ea8','219ec0','219eda','21a1bc','21a22e'}) do
