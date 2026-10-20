@@ -505,6 +505,17 @@ the receive loop266c80. These are initial values, not an observed transition
 into an error state. This watch covers this run and qualified owner address;
 it is not an exhaustive static writer census or a meaning assigned to state3.
 
+An own-ROM static exit candidate is header043f: dispatch literal21a570
+feeds the first subtract case, targeting21a674. That handler passes
+packet byte2 to2190f4 via21a6a6;2190f4 allocates/initializes a separate
+40-entry structure and writes state1 at21913a. The owner literal2192e4
+is106ce8, matching the runtime-watched owner. Thus state3 is not an
+immutable native limitation: this MCU-owned input has a concrete state1
+transition. Its producer, prerequisites and runtime occurrence remain open.
+The reset/cleanup helper2170ec instead explicitly restores state3 at217108.
+These are independently decoded candidates, not closure over all writers;
+linear scans across literal pools cannot establish function ownership.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
