@@ -10,7 +10,10 @@ readable Messages menu. A separate cold process preserves storage unchanged
 and requires the phone code again. The displayed idle content is not accepted.
 Physical Add entry now saves A/12345 to SIM EF_ADN; a separate cold process
 retrieves the entry through Search/Details and displays12345 without rewriting
-the card. Other SIM/security operations and radio remain unaccepted.
+the card. An explicit PIN-enabled laboratory card additionally passes physical
+wrong-PIN, cold retry persistence and correct-PIN authentication, then reaches
+the separate phone security-code prompt. Other SIM/security operations and radio
+remain unaccepted.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -253,6 +256,31 @@ contains no UPDATE RECORD. Both final-build runs pass:
 This accepts one physical SIM-backed phonebook save/cold-read lifecycle under
 the declared research inputs, not arbitrary contacts, handset-local storage,
 all SIM security, correct idle content or network service.
+
+### SIM PIN and cold retries
+
+`nsk3_nominal_input.py --insert-sim --pin-enabled` supplies the shared explicit
+laboratory card (PIN1234), not donor storage. The wrong physical4321/command19
+sequence issues `a0 20 00 01 08` with the padded PIN, returns9804, presents Code
+error and changes persistent CHV1 attempts3->2. A fresh process copies only
+NVRAM/config; `nsk3_cold_input.py` records pre-launch EEPROM/card bytes and hashes
+without RAM or save states. Physical1234 then returns9000, restores attempts3
+and displays the distinct phone Security code prompt. The entire card differs
+from the qualified cold input only at the CHV1 attempt byte; credentials and
+other retry fields remain unchanged.
+
+```sh
+.venv/bin/python tools/nsk3_pin_check.py roms/noki6130/source \
+  tmp/nsk3-pin-wrong tmp/nsk3-pin-cold-qualified
+```
+
+The gate checks own unchanged executable flash, native upload, physical contacts,
+VERIFY bytes/status, exact PIN/error/phone-code frames, pre-launch card identity
+and the whole persistent retry transition. The shared card generator uses an
+older serialized prefix; the device appends its later storage defaults, which
+the cold comparison preserves byte-for-byte. No unexpected credential-changing
+APDU is admitted. PUK recovery, permanent blocking, PIN changes, PIN request
+settings and PIN2 remain separate unaccepted operations on this handset.
 
 ## Own firmware inputs
 

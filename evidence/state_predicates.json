@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_pin_cold_retry", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Own physical wrong PIN durably decrements CHV1 retries and correct PIN after cold copy restores retries before the distinct phone lock prompt",
+      "current": "Explicit shared synthetic PIN1234 card receives physical4321 VERIFY, returns9804 and serializes attempts2. Cold preparation records the exact copied card before execution and copies no RAM/state. Physical1234 returns9000/restores attempts3, changing only the attempt byte across the entire current serialized card; exact PIN/error/phone-code frames, own flash, native upload and physical/APDU inputs are checked. Legacy input-profile tail expansion is explicit. This does not accept PUK, PIN2, PIN-setting changes, radio or fitted hardware assumptions.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
+    },
+    {
       "id": "nsk3_physical_sim_phonebook_cold_read", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 Add entry saves A/12345 to SIM and a separate cold process displays the persisted number without rewriting the card",
       "current": "Own table/asserted contacts drive Names, Down, Add entry, A/12345 and Save after physical code acceptance. The complete bounded TX stream contains one exact absolute UPDATE RECORD payload. Card record1 matches GSM ADN ASCII A and BCD12345, with all49 other records erased. The separate cold process unlocks, searches and renders exact Details12345, sends no UPDATE RECORD and leaves the entire card unchanged. Exact Saved/Details frames, own unchanged flash and native upload are checked. Research native-mask/nominal-ADC/retry fixtures remain explicit; other SIM security, handset-local storage, idle content and radio remain unaccepted.",
