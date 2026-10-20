@@ -658,6 +658,17 @@ byte+11!=0 path calls21ac94. Thus neither an observed0a22 input nor an
 erased halfword causes the mode branch: it is an explicit missing-context
 sentinel path. Context contents, the+11 lifecycle and mode1's domain meaning
 remain unproved; no sentinel/flag replacement is proposed.
+
+The alternate context path21ac94 calls295c1e, which reads exactly two
+bytes at NV offset0074 through2a61f6, accepting only signed range[0200,0376).
+Rejected values clear flag10adf1 at21acb8 and recurse into sentinel setup.
+`tmp/nsk3-context-flag` observes that rejection write, then a later clear
+at21aa44; no nonzero flag write occurs through45s. Its persisted EEPROM
+bytes0074/75 are0000, outside the accepted range. This is a concrete stored
+context prerequisite, not a demonstrated provisioning defect: a phone with
+no remembered context must still have an ordinary acquisition path. Do not
+invent a cached value merely to bypass it. The static contract/mutation
+checks now anchor the NV read, range comparisons, sentinel store and branch.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
