@@ -527,6 +527,13 @@ This identifies a dormant concrete producer route, not proof that no other
 producer exists. The predecessor's dispatch input and context lifecycle are
 the next unresolved boundary.
 
+The predecessor is selected by dispatcher input0834:2536bc loads literal
+253994, compares r5, and2536c2 calls254476 only on equality. The small
+`tools/nsk3_state_contract.py` checker qualifies these instruction/literal
+relationships, the043f load and the owner/state1 store against the own image;
+mutation tests reject changes to each anchor. This establishes one concrete
+0834 ->043f ->state1 route, not the meaning or producer of0834.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
