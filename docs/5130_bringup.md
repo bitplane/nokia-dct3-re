@@ -1486,8 +1486,36 @@ confirmation returns UNBLOCK9804 with Code error. Only PUK2 retry byte3519
 changes10→9; PIN2 remains blocked and both credentials remain unchanged.
 A cold correct-PUK2 recovery resets both retry counters and applies8765;
 a further cold authentication/restoration returns the whole card to the
-original seed. This does not cover permanent PUK2 exhaustion and does not
-establish fitted-mask, network or long-run stability acceptance.
+original seed. Permanent PUK2 exhaustion is qualified separately below;
+none of these gates establishes fitted-mask, network or long-run stability.
+
+### Permanent PIN2 rejection
+
+```sh
+.venv/bin/python tools/nsk1_puk2_exhaust.py mame/mame \
+  tmp/nsk1-pin-roundtrip-qualified tmp/nsk1-pin2-wrong-complete \
+  tmp/nsk1-pin2-retries-one tmp/nsk1-pin2-retries-zero tmp/nsk1-puk2-wrong \
+  tmp/nsk1-puk2-permanent --check-only --permanent-cold \
+  tmp/nsk1-puk2-permanent-select tmp/nsk1-puk2-permanent-navigation
+```
+
+The runner first requalifies the healthy seed, all three physical PIN2
+failures and the first wrong-PUK2 attempt. Nine further independent cold
+processes physically enter87654322 and replacement/confirmation. Each changes
+only PUK2 retry byte3519, from9 down to0. UNBLOCK returns9804 until the last
+attempt, which returns9840 and renders the exact `PIN2 code rejected` frame.
+`--check-only` rechecks raw inputs/logs/storage/frames without running MAME;
+omit it with a fresh output directory to generate the sequence. `--resume`
+requalifies existing attempts before continuing missing ones.
+
+Two separate cold controls preserve the fully exhausted card unchanged.
+Selecting Change PIN2 shows `PIN2 code rejected` and returns to the menu,
+without issuing CHANGE or UNBLOCK. In the navigation control, a subsequent
+physical Down decodes as18 and moves to Change security code. Full decoded
+startup/menu/navigation input, exact rejection/menu frames and unchanged
+storage distinguish credential refusal from dead input. This is firmware UI
+refusal at zero PUK2 retries, not a claim that a correct-PUK2 APDU was submitted
+at zero, nor that the entire SIM is rejected: startup PIN1 still authenticates.
 
 ### Ordinary PIN change
 

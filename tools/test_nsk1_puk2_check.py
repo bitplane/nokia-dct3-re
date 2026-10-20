@@ -44,8 +44,14 @@ class Nsk1Puk2Tests(unittest.TestCase):
         self.assertEqual([i for i, pair in enumerate(zip(blocked, rejected)) if pair[0] != pair[1]], [ATTEMPTS_OFFSET+3])
         self.assertEqual(rejected[ATTEMPTS_OFFSET+3], 9)
         self.assertEqual(recovered_card(rejected), recovered_card(blocked))
+        remaining = rejected
+        for count in range(8, -1, -1):
+            after = recovered_card(remaining, wrong=True)
+            self.assertEqual(after[ATTEMPTS_OFFSET+3], count)
+            self.assertEqual([i for i, pair in enumerate(zip(remaining, after)) if pair[0] != pair[1]], [ATTEMPTS_OFFSET+3])
+            remaining = after
         with self.assertRaises(ValueError):
-            recovered_card(rejected, wrong=True)
+            recovered_card(remaining, wrong=True)
 
     def test_wrong_puk_input_is_distinct_from_correct_recovery(self):
         menu = MENU[:]

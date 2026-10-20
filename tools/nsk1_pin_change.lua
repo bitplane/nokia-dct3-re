@@ -1,4 +1,4 @@
--- Physical ordinary PIN change, distinct from PUK recovery.
+-- Physical access-code menu operations; only firmware may issue card commands.
 local source=debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsk1_pin_reload.lua')
 local machine,keys=manager.machine,{}
@@ -28,6 +28,17 @@ if _G.nsk1_wrong_puk2 then old={'eight','seven','six','five','four','three','two
 -- Authentication is deferred until new-code confirmation submits the card command.
 local delay=_G.nsk1_puk2 and 2 or 0
 local phases={{60,'old',old},{64+delay,'new',replacement},{68+delay,'confirm',replacement}}
+if _G.nsk1_pin2_entry_only then
+    phases={}
+    if _G.nsk1_pin2_entry_down then add(60,'down',1,'navigate') end
+    local cpu=machine.devices[':maincpu']
+    local count=0
+    _G.nsk1_access_key_tap=cpu.spaces.program:install_read_tap(0x294860,0x294863,'nsk1_access_key',function()
+        if cpu.state['R15'].value~=0x294862 or count>=128 then return end
+        count=count+1
+        machine:logerror(string.format('nsk1_access_key: value=%02x t=%.9f observer_writes=0\n',cpu.state['R0'].value,machine.time:as_double()))
+    end)
+end
 for _,phase in ipairs(phases) do
     for index,name in ipairs(phase[3]) do add(phase[1]+(index-1)*0.5,name,index,phase[2]) end
 end

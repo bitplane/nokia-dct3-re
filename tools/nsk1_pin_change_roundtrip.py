@@ -24,7 +24,7 @@ def check_change(previous,card):
         raise ValueError('ordinary PIN change modified unrelated card bytes')
 
 
-def check_change_contacts(trace, pin2=False, restore=False, wrong=False, puk2=False, wrong_puk2=False):
+def check_change_contacts(trace, pin2=False, restore=False, wrong=False, puk2=False, wrong_puk2=False, entry_only=False, navigate=False):
     menu = MENU[:]
     if pin2:
         menu.insert(-1, 'down')
@@ -39,6 +39,10 @@ def check_change_contacts(trace, pin2=False, restore=False, wrong=False, puk2=Fa
     if wrong_puk2:
         old = ['eight','seven','six','five','four','three','two','two','menu']
     sequences={'menu':menu,'old':old,'new':replacement,'confirm':replacement}
+    if entry_only:
+        sequences={'menu':menu}
+        if navigate:
+            sequences['navigate']=['down']
     marker='nsk1_pin_change_contact: '
     rows=re.findall(re.escape(marker)+r'phase=(\w+) index=(\d+) key=(\w+) down=([01]) t=[0-9.]+ physical_only=1',trace)
     expected=[(phase,str(i),name,down) for phase,names in sequences.items()
