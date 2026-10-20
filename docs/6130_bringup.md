@@ -45,8 +45,11 @@ authentication; PIN2 authorizes the ADN validity change. Cold captures show
 the selectable On/Off/Numbers list, not a current-state caption: its highlight
 is not used as a state oracle. Physical PIN2-protected FDN Add entry also saves
 A/12345, and a separate cold process displays12345 without rewriting the card.
-A wrong-PIN2 control changes only its retry counter, not FDN data. In-place FDN
-editing, erasure and local dial enforcement remain unaccepted on this product.
+A wrong-PIN2 control changes only its retry counter, not FDN data. Physical
+in-place editing changes only the last-number byte to12346, retained and
+displayed after cold boot. Erase cancellation preserves the whole card;
+confirmed erasure clears only record1, and cold Search displays No phone
+numbers. Local dial enforcement remains unaccepted on this product.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -93,7 +96,11 @@ Record save/cold retrieval and the independent wrong-PIN2 control:
 
 ```sh
 .venv/bin/python tools/nsk3_fdn_record_check.py roms/noki6130/source \
-  tmp/nsk3-fdn-write-confirm tmp/nsk3-fdn-read-cold tmp/nsk3-fdn-write-wrong
+  tmp/nsk3-fdn-write-confirm tmp/nsk3-fdn-read-cold tmp/nsk3-fdn-write-wrong \
+  --edit tmp/nsk3-fdn-edit-confirm --edit-cold tmp/nsk3-fdn-edit-cold
+.venv/bin/python tools/nsk3_fdn_erase_check.py roms/noki6130/source \
+  tmp/nsk3-fdn-edit-cold tmp/nsk3-fdn-cancel-confirm \
+  tmp/nsk3-fdn-erase-confirm tmp/nsk3-fdn-erased-qualified
 ```
 
 `nsk3_fdn_write.lua` uses the own physical matrix and an additional OK between
@@ -103,6 +110,12 @@ ASCII A/BCD12345 and no unrelated card changes. Cold retrieval pins the Number
 12345 frame; the independent `nsk3_fdn_write_wrong.lua` control enters5675,
 requires9804 and permits only PIN2 retries3-to2. No ADC, firmware state or DSP
 response is changed to make these short UI transactions succeed.
+`nsk3_fdn_record_edit.lua` retains the name and changes the final digit through
+physical Clear/6/OK. `nsk3_fdn_record_erase.lua` and its cancellation wrapper
+start from the same edited card. `nsk3_fdn_empty.lua` stops after submitting
+the empty Search name, before a further OK could dismiss the empty-list result.
+The edit gate permits only byte3600 F5-toF6; the erase gate permits only the
+selected32-byte record to become FF and pins the cold empty-search frame.
 
 ### Diagnostic record persistence
 

@@ -32,11 +32,18 @@ def expected_card(before, wrong=False):
 
 
 def check_trace(trace, mode):
-    if mode not in ('write', 'cold', 'wrong'):
+    if mode not in ('write', 'cold', 'wrong', 'edit', 'erase', 'cancel', 'empty'):
         raise ValueError('unknown FDN record phase')
     keys = READ_KEYS if mode == 'cold' else PREFIX + (5, 6, 7, 5 if mode == 'wrong' else 8, 0x19)
     if mode == 'write':
         keys += (2, 0x19, 0x19, 1, 2, 3, 4, 5, 0x19)
+    elif mode == 'edit':
+        keys = READ_KEYS + (0x19, 5, 6, 7, 8, 0x19, 0x19, 0x19, 0x19, 0x1a, 6, 0x19)
+    elif mode in ('erase', 'cancel'):
+        keys = READ_KEYS + (0x19, 5, 6, 7, 8, 0x19, 0x19, 0x18, 0x19,
+                            0x1a if mode == 'cancel' else 0x19)
+    elif mode == 'empty':
+        keys = READ_KEYS[:9]
     check_phone(trace, True, keys)
     contacts = re.findall(r'nsk3_pin_contact: correct=1 key=([0-9a-f]+) down=([01]) ', trace)
     if contacts != [(f'{key:02x}', down) for key in (1, 2, 3, 4, 0x19) for down in ('1', '0')]:
@@ -47,7 +54,7 @@ def check_trace(trace, mode):
     if application[6].start() < trace.index('nsk3_security_accepted:'):
         raise ValueError('application input preceded phone acceptance')
     results = [(0x9000, 3, 10)]
-    if mode != 'cold':
+    if mode not in ('cold', 'empty'):
         results.append((0x9804 if mode == 'wrong' else 0x9000, 3, 10))
     if statuses(trace, 0x20) != results:
         raise ValueError('PIN1/PIN2 results differ')
@@ -60,14 +67,20 @@ def check_trace(trace, mode):
         raise ValueError('startup PIN payload differs')
     if bytes.fromhex('a0a40000026f3b') not in tx:
         raise ValueError('FDN selection absent')
-    if mode != 'cold':
+    if mode not in ('cold', 'empty'):
         pin2 = bytes.fromhex('a020000208') + padded_pin('5675' if mode == 'wrong' else '5678')
         if tx.count(pin2) != 1:
             raise ValueError('PIN2 payload differs')
-    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode == 'write' else []):
+    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit', 'erase') else []):
         raise ValueError('record update result differs')
     command = bytes.fromhex('a0dc010420') + RECORD
-    if mode == 'write':
+    if mode == 'edit':
+        body = bytearray(RECORD)
+        body[22] = 0xf6
+        command = bytes.fromhex('a0dc010420') + body
+    elif mode == 'erase':
+        command = bytes.fromhex('a0dc010420') + bytes([255]) * 32
+    if mode in ('write', 'edit', 'erase'):
         if tx.count(command) != 1 or tx.index(command) < tx.index(pin2):
             raise ValueError('protected record update differs')
     elif bytes.fromhex('a0dc') in tx:
@@ -79,6 +92,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('source', 'write', 'cold', 'wrong'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--edit', type=Path)
+    parser.add_argument('--edit-cold', type=Path)
     args = parser.parse_args()
     try:
         _, flash = inspect(args.source, 'boot4')
@@ -99,10 +114,32 @@ def main():
             raise ValueError('negative EEPROM input differs')
         frame_check(args.cold / 'snap/nsk3_fdn_read_29.png',
                     'a089a5b358dd43b2f090d972dadb617c935180f95923efa43f99e9e330c055d0')
+        if bool(args.edit) != bool(args.edit_cold):
+            raise ValueError('edit and edit-cold must be paired')
+        if args.edit:
+            edited = bytearray(saved)
+            edited[3600] = 0xf6
+            previous = args.cold
+            for run, mode in ((args.edit, 'edit'), (args.edit_cold, 'cold')):
+                storage = run / 'nvram/nsk3r4t'
+                if (run / 'initial_sim_card.bin').read_bytes() != (saved if mode == 'edit' else edited):
+                    raise ValueError('edit card input differs')
+                if (storage / 'sim_card').read_bytes() != edited:
+                    raise ValueError('edit changed unrelated card bytes')
+                if (run / 'initial_eeprom.bin').read_bytes() != (previous / 'nvram/nsk3r4t/eeprom').read_bytes():
+                    raise ValueError('edit EEPROM cold link differs')
+                if (storage / 'flash').read_bytes() != flash:
+                    raise ValueError('edit changed own flash')
+                check_trace((run / 'error.log').read_text(), mode)
+                previous = run
+            frame_check(args.edit_cold / 'snap/nsk3_fdn_read_29.png',
+                        'a05b707808f144e8ba04fada27a7ed5557521a51c73497beb2ef0756f053836e')
     except (OSError, ValueError) as error:
         print(f'NSK-3 FDN record failed: {error}', file=sys.stderr)
         return 1
     print('NSK-3 physical protected FDN save/cold read and wrong-PIN2 preservation PASS')
+    if args.edit:
+        print('NSK-3 physical FDN edit and unchanged cold12346 display PASS')
     return 0
 
 
