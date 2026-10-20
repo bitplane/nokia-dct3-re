@@ -152,8 +152,10 @@ emu.register_frame_done(function()
         space:read_u8(0x10c3f5), space:read_u8(0x20033)))
     machine:logerror(string.format('nsb1_acquisition_state: t=%.9f remaining=%02x gain=%08x offset=%08x observer_writes=0\n',
         now, space:read_u8(0x10a0fe), space:read_u32(0x10fe50), space:read_u32(0x10fe54)))
-    machine:logerror(string.format('nsb1_simi_summary: t=%.9f reads=%d writes=%d card_inserted=0 observer_writes=0\n',
-        now, simi_reads, simi_writes))
+    local inserted = machine.system.name == 'nsb1r4t' and
+        (machine.ioport.ports[':SIM_REMOVED']:read() & 1) == 0
+    machine:logerror(string.format('nsb1_simi_summary: t=%.9f reads=%d writes=%d card_inserted=%d observer_writes=0\n',
+        now, simi_reads, simi_writes, inserted and 1 or 0))
     next_sample = next_sample + 1
     observing = false
 end, 'NSB-1 passive MCU boundary')

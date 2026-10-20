@@ -372,8 +372,57 @@ to require the late readiness observation and exact ten-second frame:
 The six-second gate remains only native/bootstrap/readiness acceptance.
 The late gate explicitly accepts graphical **empty-socket** continuation;
 it does not prove inserted-card SIM security, menus, phonebook or radio.
-Next attach a card through the existing controller/device boundary and
-verify the own ATR/APDU lifecycle, without SIM-ready or UI-state injection.
+
+### Inserted-card experiment
+
+The compatibility instrument now exposes an explicit removable synthetic card;
+its socket remains empty by default. `--insert-sim` selects insertion through
+the MAME input configuration, not a firmware memory write. Ordinary `noki5190`
+does not acquire this experimental card configuration.
+
+With the same checksum-only EEPROM fixture, the inserted run activates the
+card and issues SELECT, STATUS, GET RESPONSE, READ BINARY and READ RECORD
+transactions, including the 50 records in EF_ADN (`6f3a`). At ten seconds it
+displays **Security code**, not a SIM PIN prompt. Physical entry of `12345`
+and Menu/OK paints five masked characters, then **Code error**, and returns
+to the prompt. This demonstrates input and card traffic, not successful
+phone security, persistent phonebook operation or idle/menu parity.
+
+The inserted runner checks native execution and storage integrity, and the
+optional physical-code fixture checks the own comparison/retry gate. It still
+explicitly declines general card/presentation acceptance and must not be
+presented as the empty-socket graphical gate.
+
+The own static validator is `2ab9c8`: five-character input is encoded by
+`2ab7ac`, compared against four bytes at `10c494`, then its Boolean result
+is passed to `2ab974`. That latter routine first reads `10c498` and rejects
+**every** result if the unsigned retry byte is at least five. Below five,
+a failed comparison increments and persists the byte through record `0709`;
+a successful comparison clears a nonzero byte through the same record.
+The directory independently maps `0709` to EEPROM `04ac`, the fifth byte
+of record `0701`. Thus retry ownership is established from this ROM, not
+inferred from a sibling. A passive read at `2ab978` observes comparison
+result one with retry `ff`: the default code matches, but the retry gate
+rejects it. The positive external-storage control changes only `04ac` to
+zero beyond the six integrity bytes. The same physical keys then reach the
+gate with result one/count zero and paint a Menu / Names idle frame at 25 s.
+Identity/encoded-code fields remain untouched; placeholder identity text is
+still visible, and neither normal provisioning nor registration is claimed.
+
+Reproduce the negative control, then repeat with `--initialized-retry`:
+
+```sh
+.venv/bin/python tools/nsb1_rom4_compare.py mame/mame roms \
+  tmp/nsb1-security-negative --seconds 27 --insert-sim --phonecode-fixture \
+  --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+`nsb1_security_fixture.lua` uses only physical contacts and a read-only gate
+watch; it captures the entry, result and settled frame. Acceptance requires
+all twelve press/release edges and the exact own match/retry observation.
+It does not yet require an exact idle pixel oracle or prove menu navigation,
+phonebook writes, radio service or speech. Next test physical Menu/navigation
+and persistent SIM phonebook operations on this explicitly synthetic fixture.
 
 ### External reference leads, not provisioning evidence
 

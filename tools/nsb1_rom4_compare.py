@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+import xml.etree.ElementTree as ET
 
 INPUTS = (
     ('noki5190/5190f671a.fls', '27b8f0cb8640e5b423960b206e9aee065f32d726'),
@@ -16,6 +17,15 @@ INPUTS = (
 
 
 EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
+
+
+def check_security_gate(trace, initialized_retry):
+    contacts = re.findall(r'nsb1_phonecode_contact: index=(\d+) down=([01]) t=[0-9.]+ physical_only=1', trace)
+    if contacts != [(str(index), down) for index in range(1, 7) for down in ('1', '0')]:
+        raise ValueError('missing physical security-code contact sequence')
+    gates = re.findall(r'nsb1_security_gate: retry=([0-9a-f]{2}) match=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0', trace)
+    if gates != [('00' if initialized_retry else 'ff', '00000001')]:
+        raise ValueError('own security-code comparison/retry gate changed')
 
 
 def check_late_presentation(trace, snapshots):
@@ -29,7 +39,7 @@ def check_late_presentation(trace, snapshots):
             raise ValueError('late empty-socket Insert SIM card pixels changed')
 
 
-def checksum_control(source):
+def checksum_control(source, initialized_retry=False):
     """Own decoded integrity fields only; never claim erased contents are calibrated."""
     if len(source) != 8192:
         raise ValueError('checksum control requires own 8 KiB external storage')
@@ -38,6 +48,10 @@ def checksum_control(source):
     calibration_sum = (sum(source[0x120:0x1fe]) - source[0x154] - source[0x155]) & 0xffff
     struct.pack_into('>I', result, 0x11c, security_sum)
     struct.pack_into('>H', result, 0x1fe, calibration_sum)
+    if initialized_retry:
+        # Own 0709 record: 2ab974 rejects all comparisons at counts >= 5.
+        # External synthetic storage only; do not alter identity or encoded code.
+        result[0x4ac] = 0
     return bytes(result)
 
 
@@ -114,7 +128,9 @@ def check_lcd(trace, snapshots):
                 raise ValueError(f'LCD self-test pixels mismatch: {name}')
 
 
-def prepare(root, run, checksum_from=None):
+def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=False):
+    if initialized_retry and (checksum_from is None or not insert_sim):
+        raise ValueError('initialized retry requires an inserted-card checksum-control experiment')
     if run.exists():
         raise ValueError('use a fresh comparison directory; no prior EEPROM is admitted')
     qualified = []
@@ -132,7 +148,7 @@ def prepare(root, run, checksum_from=None):
         if hashlib.sha1((checksum_from / 'nvram/nsb1r4t/flash').read_bytes()).hexdigest() != INPUTS[0][1]:
             raise ValueError('checksum source executable differs')
         original = (checksum_from / 'nvram/nsb1r4t/eeprom').read_bytes()
-        fixture = checksum_control(original)
+        fixture = checksum_control(original, initialized_retry)
     target = run / 'inputs/nsb1r4t'
     target.mkdir(parents=True)
     for name, data, expected in qualified:
@@ -143,17 +159,28 @@ def prepare(root, run, checksum_from=None):
                 'dsp_clock_hz': 52000000, 'physical_dsp_clock_proved': False,
                 'adc2_raw': 554, 'adc2_basis': '3.6 V / CCONT typical 6.5 mV per bit; nominal hypothesis',
                 'physical_nsb1_adc_routing_proved': False,
+                'synthetic_sim_inserted': insert_sim,
+                'synthetic_retry_initialized': initialized_retry,
                 'boot_claim': False}
     if fixture is not None:
         storage = run / 'nvram/nsb1r4t'
         storage.mkdir(parents=True)
         (storage / 'eeprom').write_bytes(fixture)
-        manifest['external_eeprom'] = 'diagnostic checksum-only control; calibration/identity not validated'
+        manifest['external_eeprom'] = ('diagnostic checksum/retry control; calibration/identity not validated'
+                                      if initialized_retry else
+                                      'diagnostic checksum-only control; calibration/identity not validated')
         manifest['checksum_source_run'] = str(checksum_from.resolve())
         manifest['checksum_source_sha1'] = hashlib.sha1(original).hexdigest()
         manifest['checksum_fixture_sha1'] = hashlib.sha1(fixture).hexdigest()
         manifest['changed_offsets'] = [hex(i) for i, (a, b) in enumerate(zip(original, fixture)) if a != b]
     (run / 'input_manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    if insert_sim:
+        config = ET.Element('mameconfig', version='10')
+        system = ET.SubElement(config, 'system', name='nsb1r4t')
+        inputs = ET.SubElement(system, 'input')
+        ET.SubElement(inputs, 'port', tag=':SIM_REMOVED', type='OTHER', mask='1', defvalue='1', value='0')
+        (run / 'cfg').mkdir()
+        ET.ElementTree(config).write(run / 'cfg/nsb1r4t.cfg', encoding='utf-8', xml_declaration=True)
     return run / 'inputs'
 
 
@@ -164,19 +191,27 @@ def main():
     parser.add_argument('run_dir', type=Path)
     parser.add_argument('--seconds', type=int, default=6, choices=range(1, 61))
     parser.add_argument('--verbose', action='store_true', help='include the larger native opcode inventory')
+    parser.add_argument('--insert-sim', action='store_true', help='physical card-input experiment; no card-service acceptance claim')
+    parser.add_argument('--initialized-retry', action='store_true',
+                        help='diagnostic external EEPROM only: initialize own 0709 retry byte to zero')
+    parser.add_argument('--phonecode-fixture', action='store_true',
+                        help='physical 12345/Menu entry plus own comparison/retry observation (27 seconds minimum)')
     parser.add_argument('--checksum-control-from', type=Path,
                         help='diagnostic only: recompute six checksum bytes from a qualified own erased-storage run')
     args = parser.parse_args()
+    if args.phonecode_fixture and (not args.insert_sim or not args.checksum_control_from or args.seconds < 27):
+        parser.error('phonecode fixture requires inserted card, checksum source and at least 27 seconds')
     try:
         binary, root, run = args.binary.resolve(), args.rom_root.resolve(), args.run_dir.resolve()
-        rompath = prepare(root, run, args.checksum_control_from)
+        rompath = prepare(root, run, args.checksum_control_from, args.insert_sim, args.initialized_retry)
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
                 str(binary), 'nsb1r4t', '-rompath', str(rompath), '-noreadconfig',
                 '-video', 'none', '-sound', 'none', '-nothrottle', '-log',
                 *(['-verbose'] if args.verbose else []),
                 '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                '-autoboot_script', str(Path(__file__).with_name('nsb1_boot_observe.lua').resolve())],
+                '-autoboot_script', str(Path(__file__).with_name(
+                    'nsb1_security_fixture.lua' if args.phonecode_fixture else 'nsb1_boot_observe.lua').resolve())],
                 cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
         (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
         if args.seconds >= 6:
@@ -185,7 +220,7 @@ def main():
                         image[0xbe570:0xbe570 + 372], result.returncode)
             if args.checksum_control_from is None:
                 check_lcd((run / 'error.log').read_text(), run / 'snap')
-            else:
+            elif not args.insert_sim:
                 check_checksum_control((run / 'error.log').read_text())
                 if args.seconds >= 12:
                     check_late_presentation((run / 'error.log').read_text(), run / 'snap')
@@ -193,6 +228,8 @@ def main():
                 raise ValueError('own executable flash changed')
             if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
                 raise ValueError('external EEPROM capacity changed')
+            if args.phonecode_fixture:
+                check_security_gate((run / 'error.log').read_text(), args.initialized_retry)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
     status = 'native continuation PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
@@ -200,6 +237,8 @@ def main():
     if args.checksum_control_from:
         qualifier = ('checksum diagnostic; graphical empty-socket frame accepted; no card/service acceptance; '
                      if args.seconds >= 12 else 'checksum diagnostic; late presentation not tested; ')
+    if args.insert_sim:
+        qualifier = 'inserted-card experiment; card/presentation acceptance not established; '
     print(f'NSB-1 compatibility {status}; {qualifier}fitted mask/phone boot not promoted; evidence={run}')
 
 

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_physical_security_retry", "owner": "nsb1_phone_security", "status": "satisfied",
+      "predicate": "Own NSB-1 security-code comparison and retry-limit rejection are distinguished using physical input and a declared external-storage control",
+      "current": "Own 2ab9c8 encodes five characters and compares four bytes at 10c494; 2ab974 rejects all results when retry byte 10c498 >=5. Own record 0709 maps that byte to EEPROM 04ac. Physical 12345/Menu reaches 2ab978 with match one and count ff in the checksum-only negative control, displaying Code error. Initializing only external 04ac to zero beyond the six integrity bytes yields match one/count zero and a Menu / Names frame at 25 seconds. The fixture requires all twelve physical contact edges and the exact own gate observation; it does not assert general graphical/card-service parity. Identity/code contents, firmware and live RAM are not edited. Fitted DSP mask, ADC routing and provisioning remain unproved; registration, contact persistence and speech remain separate work.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_security_fixture.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py", "driver/nokia_dct3.cpp"]
+    },
+    {
       "id": "nsb1_v671_empty_socket_graphical", "owner": "nsb1_presentation", "status": "satisfied",
       "predicate": "Own NSB-1 firmware with declared nominal inputs and checksum-only diagnostic storage reaches exact late empty-socket presentation without UI injection",
       "current": "The isolated nsb1r4t comparison completes native bootstrap/readiness and renders Insert SIM card by ten seconds. RGB SHA256 a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc reproduces at 10/20/29 seconds, 84x48 with 250 black pixels. The >=12-second checksum-control gate requires late phase 03/reports 0f/column-mask 20 plus exact ten-second pixels; blank and early observations fail. The sparse five-second raster was transient, not a settled presentation failure. Independent wire replay matches its 28 black pixels exactly, with zero overlay mask. Physical Menu additionally reaches logical decoder 19; inserted-card security, menu/app interaction, contacts and network services remain unaccepted. Normal silent machine, fitted-mask uncertainty and nominal ADC assumptions remain unchanged.",

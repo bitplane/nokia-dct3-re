@@ -1,9 +1,13 @@
 from pathlib import Path
 import struct
+import hashlib
+import json
 import tempfile
 import unittest
+from unittest.mock import patch
+import xml.etree.ElementTree as ET
 
-from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -64,6 +68,28 @@ class NativeCompareTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'prior EEPROM'):
                 prepare(Path(directory), Path(directory))
 
+    def test_card_selection_is_explicit_and_empty_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'own.bin'
+            source.write_bytes(b'qualified test input')
+            inputs = [('own.bin', hashlib.sha1(source.read_bytes()).hexdigest())]
+            with patch('tools.nsb1_rom4_compare.INPUTS', inputs):
+                for inserted in (False, True):
+                    run = root / str(inserted)
+                    prepare(root, run, insert_sim=inserted)
+                    manifest = json.loads((run / 'input_manifest.json').read_text())
+                    self.assertEqual(manifest['synthetic_sim_inserted'], inserted)
+                    self.assertFalse(manifest['boot_claim'])
+                    config = run / 'cfg/nsb1r4t.cfg'
+                    self.assertEqual(config.exists(), inserted)
+                    if inserted:
+                        system = ET.parse(config).getroot().find('system')
+                        self.assertEqual(system.get('name'), 'nsb1r4t')
+                        port = system.find('input/port')
+                        self.assertEqual(port.attrib, dict(tag=':SIM_REMOVED', type='OTHER',
+                                                          mask='1', defvalue='1', value='0'))
+
     def test_unqualified_inputs_leave_no_run(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -106,6 +132,32 @@ class LcdCompareTest(unittest.TestCase):
 
 
 class ChecksumControlTest(unittest.TestCase):
+    def test_physical_security_gate_controls(self):
+        contacts = '\n'.join(f'nsb1_phonecode_contact: index={index} down={down} t=12.0 physical_only=1'
+                             for index in range(1, 7) for down in (1, 0))
+        for initialized, count in ((False, 'ff'), (True, '00')):
+            trace = contacts + f'\nnsb1_security_gate: retry={count} match=00000001 t=14.0 observer_writes=0'
+            check_security_gate(trace, initialized)
+            for old, new in (('match=00000001', 'match=00000000'), ('index=6', 'index=5'),
+                             ('observer_writes=0', 'observer_writes=1')):
+                with self.subTest(change=old), self.assertRaises(ValueError):
+                    check_security_gate(trace.replace(old, new), initialized)
+            with self.assertRaises(ValueError):
+                check_security_gate(trace, not initialized)
+
+    def test_retry_fixture_changes_only_own_counter_beyond_integrity(self):
+        source = bytes([0xff]) * 8192
+        integrity = checksum_control(source)
+        initialized = checksum_control(source, initialized_retry=True)
+        self.assertEqual([i for i, (a, b) in enumerate(zip(integrity, initialized)) if a != b], [0x4ac])
+        self.assertEqual(initialized[0x4ac], 0)
+        self.assertEqual(initialized[0x4a8:0x4ac], source[0x4a8:0x4ac])
+
+    def test_retry_requires_explicit_inserted_checksum_experiment(self):
+        for inserted in (False, True):
+            with self.subTest(inserted=inserted), self.assertRaisesRegex(ValueError, 'initialized retry requires'):
+                prepare(Path('.'), Path('unused'), insert_sim=inserted, initialized_retry=True)
+
     def test_late_presentation_rejects_early_or_blank(self):
         from PIL import Image
         with self.assertRaisesRegex(ValueError, 'readiness'):
