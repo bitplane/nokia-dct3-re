@@ -11,6 +11,15 @@ from tools import nsb1_package_check as checker
 
 
 class PackageTest(unittest.TestCase):
+    def test_post_coverage_preserves_unknown_arguments(self):
+        calls = [{'callsite': index, 'arguments': {'task': task, 'event': event}}
+                 for index, (task, event) in enumerate(((20, 33), (None, 33), (20, None), (1, 20)))]
+        report = checker.post_coverage(calls)
+        self.assertEqual((4, 2, 2), (report['direct_calls'], report['both_arguments_recovered'],
+                                     report['incomplete_arguments']))
+        self.assertEqual(calls[:2], report['event_21_candidates'])
+        self.assertFalse(report['absence_proved'])
+
     def test_security_directory_uses_32_bit_ids(self):
         image = bytearray(0xcc400)
         struct.pack_into('>IHH', image, 0xcc3d8, 0x2cc0a8, 2, 0)

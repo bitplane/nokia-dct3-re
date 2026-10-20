@@ -47,6 +47,28 @@ def security_record_directory(image):
     return {'lookup': '0x2a75e4', 'records': records, 'field_semantics_proved': False}
 
 
+def post_coverage(calls):
+    resolved = [call for call in calls if all(call['arguments'][name] is not None
+                                            for name in ('task', 'event'))]
+    candidates = [call for call in calls if call['arguments']['event'] == 0x21]
+    return {'direct_calls': len(calls), 'both_arguments_recovered': len(resolved),
+            'incomplete_arguments': len(calls) - len(resolved),
+            'event_21_candidates': candidates,
+            'absence_proved': False,
+            'scope': 'direct BL to 0x268a94 only; no indirect or data-driven closure'}
+
+
+def startup_post_census(image):
+    from tools.message_census import decode_image, extract_calls
+    # The shared census reads swap16 bytes, whereas this normalizer emits CPU order.
+    swapped = bytearray(image)
+    swapped[0::2], swapped[1::2] = image[1::2], image[0::2]
+    profile = {'apis': [{'address': '0x268a94', 'name': 'nsb1_task_post',
+                         'kind': 'task_message', 'arguments': {'task': 'r0', 'event': 'r1'}}]}
+    instructions = decode_image(swapped, 0x200000)
+    return post_coverage(extract_calls(profile, instructions, swapped, 0x200000))
+
+
 def flash_integrity(image):
     """Own 294e70 header grammar: at most two inclusive BE-halfword ranges."""
     if len(image) < 0x30:
@@ -123,11 +145,15 @@ def main():
     parser.add_argument('archive', type=Path)
     parser.add_argument('--ppm', choices=('A', 'B'), default='A')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--post-census', action='store_true',
+                        help='include bounded direct startup-post argument census')
     args = parser.parse_args()
     try:
         if args.output and args.output.resolve() == args.archive.resolve():
             raise ValueError('output must not overwrite the source archive')
         image, report = inspect(args.archive.read_bytes(), args.ppm)
+        if args.post_census:
+            report['startup_post_census'] = startup_post_census(image)
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_bytes(image)

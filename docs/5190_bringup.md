@@ -232,6 +232,15 @@ and `179`; that capped list is not exhaustive absence evidence for later
 receives. It does establish live periodic activity, rather than a wholly
 dormant charging task.
 
+Reproduce the wider direct-post census with `tools/nsb1_package_check.py
+roms/archive-dct3-packages/5190e671.zip --post-census`. It reuses the shared
+swap16/Thumb argument-recovery machinery after source qualification: 115
+direct calls to `268a94`, 84 with both task/event arguments recovered, 31
+with incomplete arguments. The two event-`21` candidates above both resolve
+to task `14`; no resolved event-`21` call has an unknown destination. This
+does not close those 31 calls, other transport APIs, indirect calls, or
+table-driven production. The JSON explicitly sets `absence_proved=false`.
+
 A single host charger-contact diagnostic connects at 3 seconds and removes
 at 6 seconds, using the existing configured connected raw value `3ff`
 (physical voltage not validated). It still observes `{phase=06,reports=0e,
