@@ -163,15 +163,31 @@ _G.nsb1_call_result = memory:install_read_tap(0x10100,0x101c7,'nsb1_call_result'
     end
 end)
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
-local decode_sites = {0x3805,0x4c6f,0x4ef7,0x4f1c,0x50d5}
+local decode_sites = {0x3805,0x33f3,0x313f,0x46e1,0x46fd,0x4701,
+    0x0ade,0x0ae0,
+    0x5e62,0x5514,0x98b7,0x4c6f,0x4ef7,0x4f1c,0x50d5}
 local decode_counts, decode_taps = {}, {}
+local native_observing, result_total, result_zero = false, 0, 0
 for _, address in ipairs(decode_sites) do
     decode_counts[address] = 0
     decode_taps[#decode_taps+1] = dsp.spaces['program']:install_read_tap(address,address,
         string.format('nsb1_decode_%04x',address),function(offset,data)
             local pc = dsp.state['PC'].value
-            if pc == offset or pc == offset+1 then
+            if not native_observing and (pc == offset or pc == offset+1) then
+                -- Uploaded addresses differ from NSE-1; reject stale probes.
+                if address == 0x0ade then assert(data == 0xf074,'own scan call moved') end
+                if address == 0x0ae0 then assert(data == 0x6ff8,'own scan comparison moved') end
                 decode_counts[address] = decode_counts[address]+1
+                if address == 0x0ae0 then
+                    local value = dsp.state['A'].value & 0xffffffffff
+                    result_total = result_total+1
+                    if value == 0 then result_zero = result_zero+1 end
+                    if result_total <= 4 then
+                        local data = dsp.spaces['data']
+                        machine:logerror(string.format('nsb1_native_scan_result: a=%010x threshold=%04x prior=%04x observer_writes=0\n',
+                            value,data:read_u16(0x219b),data:read_u16(0x198d)))
+                    end
+                end
             end
         end)
 end
@@ -185,8 +201,19 @@ emu.register_frame_done(function()
             address,decode_counts[address]))
     end
     local data = dsp.spaces['data']
+    local words = {}
+    native_observing = true
+    for address=0x0ac7,0x0b20 do
+        words[#words+1] = string.format('%04x',dsp.spaces['program']:read_u16(address))
+    end
+    native_observing = false
+    machine:logerror(string.format('nsb1_native_scan_code: start=0ac7 words=%s results=%d zero=%d observer_writes=0\n',
+        table.concat(words,','),result_total,result_zero))
     machine:logerror(string.format('nsb1_native_decode_selectors: primary=%04x secondary=%04x deferred=%04x observer_writes=0\n',
         data:read_u16(0x194f),data:read_u16(0x1950),data:read_u16(0x11fd)))
+    machine:logerror(string.format('nsb1_native_acquisition_state: flags=%04x result1956=%04x result198c=%04x count1f24=%04x channel=%04x active=%04x callback=%04x observer_writes=0\n',
+        data:read_u16(0x1949),data:read_u16(0x1956),data:read_u16(0x198c),
+        data:read_u16(0x1f24),data:read_u16(0x1835),data:read_u16(0x1836),data:read_u16(0x07fb)))
 end,'NSB-1 native receive-decode census')
 local rx_count, rx_previous = 0, 0x80
 _G.nsb1_call_rx = dsp.spaces['data']:install_write_tap(0x08e4,0x08e4,'nsb1_call_rx',function(offset,data,mask)

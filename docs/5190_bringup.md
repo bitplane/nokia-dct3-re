@@ -343,6 +343,26 @@ unbound zero RF samples from activation prerequisites before designing a
 software RF fixture; arbitrary samples or manufactured type-80 packets
 would not demonstrate native reception.
 
+Own uploaded scan code must be relocated independently of NSE-1: the live
+`0ac7..0b20` capture places the `CALL 4701` at `0ade`, not NSE-1's `0acf`.
+Return `0ae0` begins `6ff8 219b 0d20`; the subsequent delayed conditional
+branch targets `0b02`, with another comparison against `198d` before the
+accepted-value store. Probes at the borrowed uploaded addresses are invalid
+for NSB-1; only the relocated counts below are used.
+
+At 60 seconds own callsite `0ade` executes 4059 times, with 4058 completed
+returns at `0ae0`; **all 4058 return A=0**. Four bounded operand snapshots
+show threshold `219b=0574` and prior `198d=0`. Frame control `33f3` executes
+34131 times; sample processor `4701` runs, while resident acquisition tail
+`46e1`, channel routine `5e62`, configuration `5514` and scheduler `98b7`
+do not. Channel/mode/callback cells `1835/1836/07fb` finish zero. This
+reproduces the known zero-input result boundary with own uploads and fresh
+storage, rather than proving a scheduler bug or a physical signal unit.
+The next useful native experiment needs an independently justified RF sample
+source/format and activation contract, not adjustment of threshold `0574`
+or the zero selectors. The observer asserts the relocated instruction words
+when those probe sites execute to catch future upload/address drift.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns
