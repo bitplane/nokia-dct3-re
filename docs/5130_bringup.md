@@ -30,8 +30,8 @@ and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
 Physical SIM wrong-PIN/cold-correct-PIN verification also passes using the
 shared laboratory card. Physical PIN exhaustion, cold PUK recovery and cold
-replacement-PIN verification also pass; wrong-PUK/permanent-block behavior
-remains untested on this product.
+replacement-PIN verification also pass, including a wrong-PUK retry persisted
+across cold recovery. Permanent PUK exhaustion remains untested on this product.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -725,7 +725,14 @@ phone-code prompt and preserves the entire recovered card. Each phase checks
 native record arithmetic, execution samples through 40 seconds, persistent
 identity/code fields, executable flash and ordered physical contacts. Exact
 PUK/new-PIN/PIN/acceptance/phone-prompt frames guard the UI sequence.
-Wrong PUK and permanent PUK exhaustion are not covered by this gate.
+Add `--wrong-puk-first` for a fourth process between blocking and recovery.
+The physical incorrect PUK `87654321` plus new-PIN/confirmation produces
+UNBLOCK `9804`; exactly the PUK1 retry byte changes from 10 to 9. Credentials
+and PIN retries remain unchanged. Its frame says SIM card blocked, which is
+not evidence of permanent blocking: the persisted PUK counter remains 9.
+Cold correct-PUK recovery must restore both counters and change only the new
+PIN, then a further cold verification preserves the whole card. Permanent
+PUK exhaustion is not covered by this gate.
 
 ## Persistent SIM phonebook
 

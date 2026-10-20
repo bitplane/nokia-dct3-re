@@ -5,7 +5,7 @@ local machine = manager.machine
 local cells = {['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},
     ['5']={3,4},['6']={4,4},['7']={2,8},['8']={3,8},ok={1,4}}
 local events = {}
-for _,phase in ipairs({{12,'puk','12345678'},{20,'new','4321'},{26,'confirm','4321'}}) do
+for _,phase in ipairs({{12,'puk',_G.nsk1_wrong_puk and '87654321' or '12345678'},{20,'new','4321'},{26,'confirm','4321'}}) do
     local names = {}
     for name in phase[3]:gmatch('.') do names[#names+1] = name end
     names[#names+1] = 'ok'

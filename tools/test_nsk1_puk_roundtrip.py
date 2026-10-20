@@ -50,6 +50,38 @@ class Nsk1PukTest(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         check_run(run,'block')
 
+    def test_failed_puk_changes_only_one_retry_and_recovery_restores_it(self):
+        blocked = bytearray(AOC_NVRAM_SIZE)
+        blocked[CHV_OFFSET:CHV_OFFSET+32] = CHV1+CHV2+PUK1+PUK2
+        blocked[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4] = bytes((0,3,10,10))
+        blocked[ENABLED_OFFSET] = 1
+        failed = bytearray(blocked)
+        failed[ATTEMPTS_OFFSET+2] = 9
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            path = run/'nvram/nsk1r4t/sim_card'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(failed)
+            (run/'initial_eeprom.bin').write_bytes(bytes(2048))
+            trace = 'SIM status ins=2c sw=9804 chv=0/3 puk=9/10 enabled=1'
+            with patch('tools.nsk1_puk_roundtrip.check_contacts'),patch('tools.nsk1_puk_roundtrip.frame_check'):
+                with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},trace)):
+                    self.assertEqual('wrong',check_run(run,'wrong',blocked)[0]['physical_sim_security_phase'])
+                    for invalid in (blocked[:-1],failed):
+                        with self.assertRaises(ValueError):
+                            check_run(run,'wrong',invalid)
+                    mutated = bytearray(failed)
+                    mutated[CHV_OFFSET] ^= 1
+                    path.write_bytes(mutated)
+                    with self.assertRaises(ValueError):
+                        check_run(run,'wrong',blocked)
+                recovered = bytearray(failed)
+                recovered[CHV_OFFSET:CHV_OFFSET+8] = NEW_PIN
+                recovered[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4] = bytes((3,3,10,10))
+                path.write_bytes(recovered)
+                with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},'SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1')):
+                    self.assertEqual('unblock',check_run(run,'unblock',failed)[0]['physical_sim_security_phase'])
+
 
 if __name__ == '__main__':
     unittest.main()

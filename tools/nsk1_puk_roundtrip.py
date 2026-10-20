@@ -13,16 +13,17 @@ from tools.nsk1_rom4_compare import prepare
 from tools.nsk1_security_compare import run_machine,check_phase
 from tools.nsk1_phonebook_roundtrip import copy_persistent,frame_check
 from tools.nsk1_pin_roundtrip import check_card,check_contacts,PIN_PROMPT,PHONE_PROMPT,ACCEPTED
-from tools.sim_security_trace_check import statuses,CHV_OFFSET,ATTEMPTS_OFFSET
+from tools.sim_security_trace_check import statuses,CHV_OFFSET,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
 
 
 PUK_PROMPT = '2944a1b1d362846853f92be495ece23c7986528e9fb519fcae638a8f1a2023b8'
 NEW_PIN_PROMPT = '836967ace63acc78a441c69f89272159ec24faa2c4dec6983d436edb9f223bc7'
 NEW_PIN = b'4321\xff\xff\xff\xff'
+WRONG_PUK = '642bb9aa764fc34ad31c1eb32611724b5c3902d56c127cfe5e0a447e37d58f7c'
 
 
 def check_run(run, phase, previous=None):
-    if phase not in ('block','unblock','cold'):
+    if phase not in ('block','wrong','unblock','cold'):
         raise ValueError('unknown physical PUK phase')
     summary,trace = check_phase(run,(run/'initial_eeprom.bin').read_bytes(),through=40,
                                 minimum_records=2 if phase == 'block' else 1)
@@ -37,18 +38,28 @@ def check_run(run, phase, previous=None):
         check_card(card,0)
         frame_check(run/'snap/nsk1_pin_block_1.png',PIN_PROMPT)
     else:
-        if previous is None:
+        if previous is None or len(previous) != AOC_NVRAM_SIZE:
             raise ValueError('cold PUK phase requires qualified predecessor storage')
         expected = bytearray(previous)
-        if phase == 'unblock':
-            check_card(previous,0)
+        if phase in ('wrong','unblock'):
+            normalized = bytearray(previous)
+            if normalized[ATTEMPTS_OFFSET+2] not in ((10,) if phase == 'wrong' else (9,10)):
+                raise ValueError('unexpected predecessor PUK retry state')
+            normalized[ATTEMPTS_OFFSET+2] = 10
+            check_card(normalized,0)
             for name,count in (('puk',9),('new',5),('confirm',5)):
                 check_contacts(trace,name,count)
-            if statuses(trace,0x2c) != [(0x9000,3,10)] or statuses(trace,0x20):
+            result = (0x9804,0,9) if phase == 'wrong' else (0x9000,3,10)
+            if statuses(trace,0x2c) != [result] or statuses(trace,0x20):
                 raise ValueError('physical PUK recovery sequence differs')
-            expected[CHV_OFFSET:CHV_OFFSET+8] = NEW_PIN
-            expected[ATTEMPTS_OFFSET] = 3
-            for index,digest in ((1,PUK_PROMPT),(2,NEW_PIN_PROMPT),(4,PHONE_PROMPT)):
+            if phase == 'wrong':
+                expected[ATTEMPTS_OFFSET+2] = 9
+            else:
+                expected[CHV_OFFSET:CHV_OFFSET+8] = NEW_PIN
+                expected[ATTEMPTS_OFFSET] = 3
+                expected[ATTEMPTS_OFFSET+2] = 10
+            frames = ((1,PUK_PROMPT),(2,NEW_PIN_PROMPT),(4,WRONG_PUK)) if phase == 'wrong' else ((1,PUK_PROMPT),(2,NEW_PIN_PROMPT),(4,PHONE_PROMPT))
+            for index,digest in frames:
                 frame_check(run/f'snap/nsk1_puk_unblock_{index}.png',digest)
         else:
             original = bytearray(previous)
@@ -74,6 +85,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary','roms','capture','run'):
         parser.add_argument(name,type=Path)
+    parser.add_argument('--wrong-puk-first',action='store_true',help='verify failed-PUK persistence before cold recovery')
     args = parser.parse_args()
     root = args.run.resolve()
     try:
@@ -90,7 +102,11 @@ def main():
         manifest['synthetic_pin_profile'] = 'shared laboratory PIN-enabled card; retries initially 3, not pre-blocked'
         path.write_text(json.dumps(manifest,indent=2)+'\n')
         previous_run,previous_card = None,None
-        for phase,script in (('block','nsk1_pin_block.lua'),('unblock','nsk1_puk_input.lua'),('cold','nsk1_puk_reload.lua')):
+        phases = [('block','nsk1_pin_block.lua')]
+        if args.wrong_puk_first:
+            phases.append(('wrong','nsk1_puk_wrong.lua'))
+        phases.extend((('unblock','nsk1_puk_input.lua'),('cold','nsk1_puk_reload.lua')))
+        for phase,script in phases:
             run = root/phase
             if previous_run is not None:
                 copy_persistent(run,previous_run)
@@ -101,8 +117,9 @@ def main():
             previous_run,previous_card = run,card
         (root/'result.json').write_text(json.dumps({'physical_pin_exhaustion':True,'cold_puk_recovery':True,
             'cold_replacement_pin':True,'seeded_blocked_state':False,
-            'scope':'native compatibility; no wrong-PUK/permanent-block, fitted-mask or network proof'},indent=2)+'\n')
-        print('NSK-1 physical PIN blocking / cold PUK recovery / cold replacement PIN PASS')
+            'physical_wrong_puk_cold_retry':args.wrong_puk_first,
+            'scope':'native compatibility; no permanent-block, fitted-mask or network proof'},indent=2)+'\n')
+        print('NSK-1 physical PIN blocking / '+('wrong PUK / ' if args.wrong_puk_first else '')+'cold PUK recovery / cold replacement PIN PASS')
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         parser.exit(1,f'NSK-1 PUK round trip failed: {error}; inspect {root}\n')
 
