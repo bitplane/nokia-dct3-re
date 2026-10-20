@@ -46,7 +46,29 @@ ffffe42c at90s andffffeca2 at100s. Between65 and90, each queue cursor has5417
 writes; between90 and100, each has2166. Those increments equal the counter
 steps, and late cursors agree. Sampled1344/1266 remain zero and219b is0574.
 These are bounded queue/candidate-field observations, not validated RF units.
-No MCU reset/restart is observed through105s; longer stability is unaccepted.
+The separate165s capture `tmp/nsm1-native-radio-long`, using only the existing
+physical PIN/phone/Menu composition, observes a second native8a/87 exchange at
+122.883660923/122.883774231s and a second8b measurement at161.230732615s.
+The8a payload changes from0202 to0375; the second8b reproduces the original
+162-byte measurement payload. No restart request at the own2c2a02 entry is
+observed through165s. The extended checker qualifies this bounded repeated-scan
+result; it is not an unbounded stability or RF-acquisition claim.
+Own dispatcher2c1b96 increments context112860 halfword+2; timer deliveryDC
+tests it at2c1cc2, rearms timer1c/ticks09cd and clears it when nonzero, otherwise
+calls policy2b4b72 with argument1. The policy includes further conditions before
+reason68, so the6130 reset deadline must not be inherited from this structural
+similarity. No keepalive, counter write or disabled supervision was added.
+
+```sh
+.venv/bin/python tools/nsm1_native_radio_check.py tmp/nsm1-native-radio-long --long-run
+```
+
+`nsm1_native_radio_long.lua` extends the existing own observer to120/140/160s
+and observes the own restart-request entry without modifying guest state.
+The gate requires all ten complete packets, identical measurement payloads,
+late queue activity followed by the second quiet scan window, physical
+authentication/Menu, unchanged card/flash, own live program hash and165s
+horizon. Missing/malformed second-cycle packets or a restart request fail it.
 
 The own45s live program SHA256 is
 `b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e`.

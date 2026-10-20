@@ -12,6 +12,29 @@ def sample_trace():
 
 
 class NativeRadioTests(unittest.TestCase):
+    def test_second_scan_packet_contract(self):
+        payload=b'\x00\x80'+b''.join((512+i).to_bytes(2,'big')+(-129-i%2).to_bytes(2,'big',signed=True) for i in range(40))
+        rows=[]
+        for index,kind in enumerate((0x74,0x74,0x74,0x74,0x8a,0x87,0x8b,0x8a,0x87,0x8b),1):
+            body=payload if kind==0x8b else bytes.fromhex('0375') if index==8 else b'\x00'
+            time={7:49.2,8:122.8,9:122.9,10:161.2}.get(index,2.5)
+            packet=bytes((0x18,2,len(body),kind))+body
+            rows.append(f'nsm1_native_radio_packet: index={index} type={kind:02x} pointer=00102000 bytes={packet.hex()} t={time} observer_writes=0')
+        value='\n'.join(rows)
+        packets(value,True)
+        for bad in (value.replace('8a0375','8a0202'),value.replace('t=161.2','t=160.2'),
+                    value.rsplit('\n',1)[0],value.replace('ff7f','ff6c',1)):
+            with self.assertRaises(ValueError):packets(bad,True)
+        with self.assertRaises(ValueError):packets(value)
+
+    def test_extended_queue_horizon(self):
+        value=sample_trace()
+        for time,scan,packets_count,producer,consumer in ((120,0xffffed06,7,13118,11119),(140,0,9,18000,16000),(160,0,9,18000,16000)):
+            value+=f'\nnsm1_native_radio_sample: t={time:.6f} pending=0003 completed=010e scan={scan:08x} qualified=0000 flags=0000 producer=1a00 consumer=1a00 threshold=0574 packets={packets_count} queue_writes={producer}/{consumer} observer_writes=0'
+        self.assertEqual(len(samples(value,True)),10)
+        for bad in (value.replace('t=160.000000','t=159.000000'),value.replace('packets=9','packets=8',1),value.rsplit('\n',1)[0]):
+            with self.assertRaises(ValueError):samples(bad,True)
+
     def test_own_metric_address_and_zero_source_are_both_required(self):
         program=bytearray(131072)
         for address,raw in {0x0b25:'6ff8219b0d20',0x0b47:'77161262e8015086',

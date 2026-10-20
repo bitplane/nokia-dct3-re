@@ -1304,6 +1304,12 @@
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
     },
     {
+      "id": "nsm1_native_repeated_scan_165s", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "The explicit NSM-1 native compatibility composition completes two own measurement packet cycles within165s without an observed restart request",
+      "current": "The unchanged own PIN/phone/Menu composition emits the initial seven native packets and a second8a/87 exchange at122.884s followed by8b at161.231s. Second8a carries0375 and both8b measurement payloads are identical162-byte objects with no qualified RF result. Passive queue samples retain the prior105s baseline, show further activity at120s and the second quiet scan window at140/160s. The gate checks ten complete packets, publication windows, queue/counter relationships, own live program hash, unchanged executable/card, physical authentication and exact Menu frame through a165s snapshot horizon. The own2c2a02 restart-request observer records no calls. This does not import the6130 restart deadline, identify fitted mask/physical timing, prove unbounded stability, qualify RF acquisition or establish connected calls/native speech.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_native_radio_long.lua", "tools/nsm1_native_radio_observe.lua", "tools/nsm1_native_radio_check.py", "tools/test_nsm1_native_radio_check.py"]
+    },
+    {
       "id": "nsk3_local_fdn_rejection_contrast", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Own physical NSK-3 dial attempts distinguish enabled-unlisted local rejection from listed and disabled controls without claiming connected calls",
       "current": "Physical FDN activation retains A/12346 and changes only ADN validity; physical deactivation restores only validity. Linked cold dial processes authenticate PIN1 and the own phone code before digits/Send0e. Enabled/unlisted54321 renders exact Call not allowed. Enabled/listed12346 and disabled/unlisted54321 return to the same reviewed idle-like frame, without that restriction prompt. All three preserve the whole card, own flash and preceding EEPROM inputs; enabled cold identity rehabilitation and disabled absence are checked. Early captures show entered digits but no Calling state. This establishes local restriction contrast only, not positive call setup, laboratory registration, a connected call or native speech.",

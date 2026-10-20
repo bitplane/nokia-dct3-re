@@ -35,7 +35,7 @@ taps[#taps+1]=memory:install_read_tap(0x2c1b94,0x2c1b97,'nsm1_native_radio_packe
 end)
 _G.nsm1_native_radio_taps=taps
 local index=1
-local times={5,20,40,45,65,90,100}
+local times=_G.nsm1_native_radio_times or {5,20,40,45,65,90,100}
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     if not times[index] or now<times[index] then return end
