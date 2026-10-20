@@ -9,6 +9,7 @@ if __package__ in (None,''):
 from tools.nsm1_security_check import check_trace
 from tools.nsm1_published_record_check import records
 from tools.nsm1_v523_static_check import SHA1
+from tools.nsm1_phonebook_name_check import CLEAN
 from tools.nsk3_phonebook_check import check_card,transmitted,READ_KEYS,DETAIL
 from tools.nsk1_phonebook_roundtrip import frame_check
 
@@ -47,10 +48,11 @@ def main():
         if (args.cold/'initial_sim_card.bin').read_bytes()!=(args.erase/'nvram/nsm1r4t/sim_card').read_bytes():
             raise ValueError('cold SIM input differs')
         frame_check(args.erase/'snap/nsm1_erase_phone_30.png',ERASED)
+        frame_check(args.cold/'snap/nsm1_phonebook_read_17.png',CLEAN)
         frame_check(args.cold/'snap/nsm1_phonebook_read_20.png',DETAIL)
     except (ValueError,OSError) as error:
         print(f'NSM-1 Phone erase qualification failed: {error}',file=sys.stderr);return 1
-    print('NSM-1 physical Phone erase acknowledgement and unchanged SIM cold Details PASS; list-name repair unproved')
+    print('NSM-1 physical Phone erase, clean cold A list and unchanged SIM Details PASS')
     return 0
 
 

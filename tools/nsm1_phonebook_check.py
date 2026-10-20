@@ -43,7 +43,7 @@ def main():
         frame_check(args.cold/'snap/nsm1_phonebook_read_20.png',DETAIL)
     except (ValueError,OSError) as error:
         print(f'NSM-1 phonebook qualification failed: {error}',file=sys.stderr);return 1
-    print('NSM-1 physical A/12345 SIM save and cold Details readback PASS; list rendering unqualified')
+    print('NSM-1 physical A/12345 SIM save and cold Details readback PASS; selected-name/Phone-row coverage has a separate gate')
     return 0
 
 

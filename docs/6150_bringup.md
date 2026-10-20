@@ -21,8 +21,9 @@ The separately labelled nominal ADC2 comparison now reaches a readable
 **Security code** frame and organic SIM SELECT traffic. Saturated controls
 retain the blank display and readiness inputs `01/ff/00/01`. Physical key
 entry, accepted phone code and the Messages menu additionally pass the own
-retry-initializer contrast below. Physical SIM contact save and cold number
-readback also pass; list rendering and network services remain unaccepted.
+retry-initializer contrast below. Physical SIM contact save and cold selected
+name/number readback also pass. Physical Phone erasure removes the template's
+extra Phone rows without touching that SIM contact. Network services remain unaccepted.
 No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -142,38 +143,33 @@ It performs no UPDATE RECORD and leaves the complete card byte-identical.
 Own flash, physical input sequence, code acceptance, native record dialogue,
 exact APDU payload and cold input links are checked independently.
 
-Both post-save and cold list frames display unexpected glyphs rather than a
-qualified A entry. The source is now narrowed: the correct A string reaches
-111cb8, then memcpy2c3a0e (caller259eed) overwrites it with bytes beginning
-2a079700 from stack1137b0. The preceding read259ec8 requests own record0728,
-selector7ff0, indices0/1; both return success and exactly the original repair
-template's first32 bytes at physical19d4 (descriptor size37). Its field+16
-begins2a079700. This is measured EEPROM-backed text replacement, not proof
-of a font, LCD, SIM-alpha decoder or arithmetic defect. The record's lifecycle
-and intended cache semantics remain open. Do not hand-clear its fields.
+The selected SIM name is **A**, white-on-black in rows7..16. It is not
+blank or corrupted. The original-template list additionally contains two
+unselected EEPROM-backed Phone rows with garbage names. Formatter259e78
+runs mode2/index1 for the selected SIM contact, then mode1/index1 and index2.
+For those latter rows, index helper259c9a returns0/1 and reader259ec8 selects
+record0728/selector7ff0. Its first32 bytes match the original template at
+physical19d4 (descriptor size37); field+16 begins2a079700. The shared buffer
+111cb8 is reused between rows. That reuse is not evidence that the selected
+SIM name was overwritten on-screen.
 
-Physical Names/Options/Memory in use/SIM card produces the acknowledged
-SIM card memory selected screen, but an independent cold list remains
-anomalous. Thus ordinary memory selection alone does not repair this fixture.
-The next target is the firmware's invalidation/initialization path for the
-selected record family, retaining the correct SIM contents as the control.
-Handset-local contacts, delete/cancel, SIM security and radio remain open.
+Physical Names/Erase/Erase all/Phone/confirmation asks for12345 again;
+both submissions are accepted and Memory erased appears at30s. Firmware
+changes the Phone record family while preserving the low encoded block,
+security record and entire SIM card, with no SIM UPDATE RECORD. Independent
+cold entry then shows a clean list containing selected A and Details12345.
+The selected84x10 row is byte-identical before/after (RGB SHA256
+8b953af1aa7385609df59fee4b01998ead9cc31ac1a044fac208b01d0a7aac7f), while
+the full clean84x48 list hash is695c5291d789ebaf9c11583885e0183373313ee4e3fdd5ee16c9aee36d957c8b.
+No LCD, font, SIM-alpha decoder or selected-name cache repair is required
+by this case; the two formatter namespaces must be kept distinct.
 
-The physical Phone-memory erase experiment narrows, but does not close,
-that boundary. Names/Erase/Erase all/Phone/confirmation asks for12345 again;
-both code submissions match and are accepted. The exact Memory erased frame
-appears at30s. Firmware changes EEPROM-backed record0728 while preserving
-the encoded low block/security record and the entire SIM card, with no SIM
-UPDATE RECORD. An independent cold process uses those saved inputs and
-still renders SIM number12345. Its list is now blank rather than the prior
-garbage text; it does not display A. Thus Phone erase is not a complete
-SIM-name cache rebuild, and storage is not fixed by treating its payload
-as all-zero or erased bytes. The erased record retains opaque non-text data.
-
-The additional physical Phone-memory selection acknowledges and changes
-settings bytes03d6 (1->0) and03e8 (0->6), but a subsequent cold query still
-reaches12345. No cold empty-Phone-book claim is made: query namespace and
-record-family selection must be traced before interpreting that continuation.
+Physical memory-selection acknowledgements are also observed, including
+Phone selection changing settings03d6/03e8. Those settings' complete semantics
+are not inferred from the mixed-list formatter. Native Phone record layout
+and all local-contact operations remain incompletely mapped; physical SIM
+name/number persistence and removal of the template's extra Phone rows are
+the accepted scope. The next independent targets are SIM security and SMS.
 
 ```sh
 .venv/bin/python tools/nsm1_phonebook_erase_check.py \
@@ -182,15 +178,16 @@ record-family selection must be traced before interpreting that continuation.
 
 ```sh
 .venv/bin/python tools/nsm1_phonebook_name_check.py \
-  tmp/nsm1-phonebook-name-records/error.log \
+  tmp/nsm1-name-namespace-qualified/error.log \
   roms/research/nsm1-v523/nsm1-security-checksum-valid.bin \
-  roms/research/nsm1-v523/6150-v523-ppm-c.fls
+  roms/research/nsm1-v523/6150-v523-ppm-c.fls --namespace \
+  --before-list tmp/nsm1-name-namespace-qualified/snap/nsm1_phonebook_read_17.png \
+  --after-list tmp/nsm1-erase-phone-cold/snap/nsm1_phonebook_read_17.png
 ```
 
-`nsm1_phonebook_name_observe.lua` is the bounded active read/write/record
-observer; its retirement trigger is resolution of this name-record boundary.
-The menu-enumeration and full-RAM-dump probes were removed after extracting
-the source contract. Ordinary cold-read acceptance retains a17s list capture.
+`nsm1_phonebook_name_observe.lua` retains the bounded formatter/record/write
+regression. Exploratory candidate-buffer reads, menu enumeration and full-RAM
+dumps were removed. Ordinary cold-read acceptance retains a17s list capture.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-qualified tmp/FRESH

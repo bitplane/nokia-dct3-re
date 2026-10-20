@@ -157,6 +157,10 @@ Some recurring mistakes need stronger checks than ordinary source review:
   establish nonzero comfort-noise synthesis, and a blank frame does not
   establish an interactive display. Preserve those coverage checks alongside
   the byte-comparison oracle.
+- Inspect inverse-video selections at pixel/row resolution before declaring
+  a missing label. Separate the selected item from adjacent rows and recover
+  their producer namespaces; unrelated stale user records are not evidence
+  that the selected SIM name or LCD font is broken.
 - Similar addressing names need not have the same legal operand domain.
   On C54x, short MOD=3 preincrement is write-only (SPRU131G table 5-4),
   while long-offset MOD=13 preincrement can read. A passing fixture for

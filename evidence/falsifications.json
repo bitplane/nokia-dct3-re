@@ -5,8 +5,8 @@
     {
       "id": "nsm1_phone_erase_rebuilds_sim_list_name",
       "status": "disproven",
-      "hypothesis": "Physically erasing Phone memory is sufficient to rebuild the malformed SIM list name from its valid A/12345 ADN entry",
-      "conclusion": "Physical Names/Erase all/Phone/confirmation and a second accepted12345 produce the exact Memory erased acknowledgement. Record0728 changes without manual EEPROM edits; the whole SIM card and low identity/record/security blocks stay unchanged. Independent cold Details still renders12345, but the name list becomes blank rather than A. Thus erasure removes the earlier text prefix but is not a complete SIM-name repair. Physical Phone-memory selection additionally acknowledges and changes03d6/03e8, yet cold Details still reaches12345; this is not proof of an empty Phone namespace or complete cache initialization. Trace record/type ownership instead of zeroing payloads or claiming the list fixed.",
+      "hypothesis": "The selected SIM list name is malformed or blank and needs cache reconstruction by Phone-memory erasure",
+      "conclusion": "The premise is false: formatter mode2/index1 supplies selected SIM A, shown white-on-black in rows7..16. Later mode1/index1/index2 format separate EEPROM-backed Phone rows from the original template. Their shared temporary buffer reuse was incorrectly read as corruption of the selected item. Physical Phone erase removes the extra rows; the selected A band is byte-identical and the independent cold full list is clean, with Details12345 and the whole SIM card preserved. The earlier claim that the post-erase list was blank is retracted. This is removal of stale Phone user records, not a SIM-name cache, font or LCD repair.",
       "evidence": ["docs/6150_bringup.md", "tools/nsm1_phonebook_erase_phone.lua", "tools/nsm1_phonebook_erase_check.py", "tools/nsm1_phonebook_select_phone.lua", "tools/nsm1_phonebook_memory.lua", "tools/test_nsm1_phonebook_erase_check.py"]
     },
     {

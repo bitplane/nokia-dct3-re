@@ -41,7 +41,7 @@ distinction.
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `6130_bringup.md` | Own NSK-3 inputs, bounded physical UI/SIM storage and security, native radio/liveness boundaries. |
 | `5130_bringup.md` | Own NSK-1 startup/storage/input contracts; native compatibility boot, physical security, persistent contacts and offline SMS save/cold read. |
-| `6150_bringup.md` | Acquired NSM-1 v5.23 reset/verifier contract and matching storage/DSP prerequisites. |
+| `6150_bringup.md` | NSM-1 native-compatibility storage, nominal-input graphical boot, physical code/menu and persistent SIM contacts; fitted DSP/radio prerequisites. |
 | `8810_bringup.md` | Own NSE-6 v6.02 graphical native compatibility fixture, upload geometry and unresolved native serial-control completion. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
 | `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
