@@ -20,7 +20,8 @@ separate cold process. This is not factory provisioning or fitted-chip proof.
 The separately labelled nominal ADC2 comparison now reaches a readable
 **Security code** frame and organic SIM SELECT traffic. Saturated controls
 retain the blank display and readiness inputs `01/ff/00/01`. Physical key
-entry, accepted phone code, menu and downstream services remain unaccepted.
+entry, accepted phone code and the Messages menu additionally pass the own
+retry-initializer contrast below; downstream services remain unaccepted.
 No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -79,14 +80,49 @@ edited and no report, task resume, timer result or code selection is injected.
 Fresh `tmp/nsm1-nominal-qualified` reproduces the full84x48 Security code frame
 at8s, RGB SHA25624cbab0ad5b13376772a44f0eec7835a7ea865795c9ee229c7631fa2e0ea1fb2.
 Native record validation still passes and SIM SELECT responses occur.
-Presentation is not proof of keyboard delivery, full SIM initialization or
-interactive idle. The next target is physical input and phone-code acceptance.
+Presentation alone is not proof of keyboard delivery, full SIM initialization
+or interactive idle; the separate physical-input acceptance is below.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-published-record-cold tmp/FRESH
 # Run nsm1r4t for15s with tools/nsm1_analog_observe.lua and the fresh run directory.
 .venv/bin/python tools/nsm1_analog_check.py \
   tmp/nsm1-analog-coefficients tmp/nsm1-nominal-qualified
+```
+
+### Physical security code and Messages menu
+
+Own matrix contacts submit ASCII12345 through29faf3 ->2bcde8. The comparator
+matches, but the unchanged repair template's retry byte2b is rejected by
+2bcd94's signed comparison against5. The later extra Left key submits an
+empty string; that negative control is explicitly checked, not ignored.
+
+The own security record loads EEPROM03cc..03d3 into112820. Nested record070a
+maps112824 to03d0, one byte. Initializer29d6d4 copies the eight-byte ROM
+template2dde40 before credential construction; its retry byte is0. The
+explicit `--initialize-phone-retry` fixture therefore changes only03d0 from
+2b to0, not the stored code, lock setting, identity or calibration. It is an
+own-initializer lab fixture, not an assertion that the historical template
+represents an authentic factory phone. `nsm1_security_contract.py` pins the
+initializer, validator and own descriptor mapping.
+
+Physical12345/Left reaches match1/retry0 and accepted return2bcde6=1.
+A subsequent physical Left opens Messages. The full84x48 frame at18s has
+RGB SHA25651a20a16acead610184225c78632724f9f20025565bd29a93beffec0c271d3a3.
+A separate cold process copies the entire saved EEPROM without reinitializing
+the retry byte and repeats code acceptance and exact menu pixels. The
+security block remains unchanged by both accepted runs; other housekeeping
+writes occur and are not declared fully understood. Own flash stays exact.
+No software input event, callback result or firmware RAM byte is injected.
+Phonebook persistence, full SIM/security parity, network/calls/SMS and stable
+native radio remain unaccepted; the next target is physical SIM phonebook use.
+
+```sh
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-published-record-cold \
+  tmp/FRESH --initialize-phone-retry
+# Run22s with nsm1_security_input.lua and -debug -debugger none.
+.venv/bin/python tools/nsm1_security_check.py tmp/nsm1-security-physical \
+  tmp/nsm1-security-qualified tmp/nsm1-security-cold-qualified
 ```
 
 The independent60s cold run `tmp/nsm1-startup-qualified` preserves the
@@ -776,8 +812,9 @@ is by itself evidence of an IMEI, network identifier or lock level.
 24 instruction anchors plus the complete builder and accepted-call spans.
 Mutation tests reject a changed command byte, intervening pointer arithmetic
 and truncated source.
-This is static construction evidence only: the current rejected records do
-not execute this branch, and no valid storage fixture is generated.
+This describes the repair-template negative control. The separately qualified
+published-record diagnostic above now reaches native update/validation;
+full semantic identification of all projected fields remains unproved.
 
 The recovered wumpus/Blacksphere
 [local-command table](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_local.htm)

@@ -1,6 +1,7 @@
 """Prepare a validated-record NSM-1 nominal ADC2 comparison, not factory data."""
 import argparse
 import hashlib
+import json
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
@@ -11,11 +12,13 @@ from tools.nsm1_published_record_check import records
 from tools.nsm1_analog_contract import inspect
 from tools.nsm1_v523_static_check import SHA1
 from tools.dct3_rom4_record_codec import retained_record_transform
+from tools.nsm1_security_contract import inspect as inspect_security
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('cold',type=Path);parser.add_argument('output',type=Path)
+    parser.add_argument('--initialize-phone-retry',action='store_true')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('fresh output required')
@@ -30,9 +33,14 @@ def main():
             raise ValueError('saved record differs from qualified cold echo')
         if int.from_bytes(eeprom[0x3c:0x40],'big')!=sum(eeprom[:0x3c])&65535:
             raise ValueError('saved low-block checksum differs')
+        if args.initialize_phone_retry:
+            retry=inspect_security(flash)
+            eeprom=bytearray(eeprom);eeprom[retry['eeprom_offset']]=retry['initial_value'];eeprom=bytes(eeprom)
         target=args.output/'nvram/nsm1r4t/eeprom'
         target.parent.mkdir(parents=True);target.write_bytes(eeprom)
         (args.output/'initial_eeprom.bin').write_bytes(eeprom)
+        (args.output/'input.json').write_text(json.dumps({'adc2':554,'physical_units_proved':False,
+            'phone_retry_initialized':args.initialize_phone_retry,'donor_provisioning':False},indent=2)+'\n')
         root=ET.Element('mameconfig',version='10')
         inputs=ET.SubElement(ET.SubElement(root,'system',name='nsm1r4t'),'input')
         ET.SubElement(inputs,'port',tag=':RESEARCH_ADC2',type='CONFIG',mask='1023',defvalue='1023',value='554')
