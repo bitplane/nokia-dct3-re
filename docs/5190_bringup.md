@@ -31,6 +31,36 @@ retry recovery are accepted in this compatibility configuration. General app
 coverage, radio services and fitted ADC routing remain unproved.
 The ordinary silent `noki5190` configuration is unchanged.
 
+### SIM PIN-request settings
+
+The own PPM-A UI selects SIM card security through physical Menu4-2-1,
+consistent with the [Nokia5190 owner's manual](https://www.manualslib.com/manual/299900/Nokia-5190.html).
+The accepted four-process cycle disables and enables the request through
+physical current-PIN entry, not a card-image patch. DISABLE CHV and ENABLE CHV
+each return9000 and change only persistent request byte3520; all credentials,
+retry counters and other card contents are unchanged.
+
+After Off, a cold process performs no VERIFY CHV but still requires the
+independent phone security code. After On, a cold process displays the reviewed
+PIN prompt, physically verifies1234, then separately enters phone code12345.
+Each process qualifies own executable/native execution, reviewed settings or
+authentication frames, complete-card effects and linked saved-input hashes.
+This extends bounded synthetic-card security coverage, not fitted mask,
+factory provisioning, native radio registration or calls.
+
+```sh
+.venv/bin/python tools/nsb1_pin_request_check.py \
+  tmp/nsb1-pin-roundtrip-gated/correct \
+  tmp/nsb1-pin-request-off tmp/nsb1-pin-request-off-cold \
+  tmp/nsb1-pin-request-on-qualified tmp/nsb1-pin-request-on-cold
+```
+
+Preparation uses the existing `prepare_cold_run` with the preceding qualified
+saved devices. Warm runs use `nsb1_pin_disable.lua`/`nsb1_pin_enable.lua` for54s;
+cold runs use `nsb1_security_fixture.lua`/`nsb1_pin_reload.lua` for28s. The
+5190's Menu/Navi contact is column1/mask04 and Up is column1/mask10; the 6130's
+softkey/navigation cells are not inherited by these fixtures.
+
 ### SIM unblock and cold new-PIN verification
 
 The native compatibility configuration also accepts an explicitly synthetic

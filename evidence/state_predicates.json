@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_sim_request_cold_cycle", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Physical NSB-1 SIM card security Off/On persists across cold processes while preserving independent phone security",
+      "current": "The own PPM-A Menu4-2-1 path authenticates the current PIN and issues successful DISABLE CHV, changing only request byte3520 from1 to0. A linked cold process performs no VERIFY CHV, still physically enters phone code12345, and preserves the whole card. Physical current-PIN/On issues successful ENABLE CHV and changes only byte3520 back to1. Final cold boot reproduces the PIN prompt, physical1234 authentication, separate phone-code flow and unchanged card. Four isolated runs qualify own executable/native execution, exact reviewed settings/authentication frames, physical contact sequences and preceding saved-device hashes. Own Menu/Up matrix cells differ from the6130 and are not inherited. This does not establish factory provisioning, fitted mask, native radio, registration or connected calls.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_security_settings.lua", "tools/nsb1_pin_disable.lua", "tools/nsb1_pin_enable.lua", "tools/nsb1_pin_request_check.py", "tools/test_nsb1_pin_request_check.py"]
+    },
+    {
       "id": "nsb1_v671_sim_unblock_cold_pin", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Physical PUK/new-PIN entry unblocks the laboratory SIM and a separate cold process verifies its persisted new PIN",
       "current": "The initial synthetic card changes only CHV1 retries to zero. Physical 12345678/4321/4321 yields exactly one A0 2C/9000, restores counters to 3/3/10/10 and persists only the expected new CHV1 credential. A qualified cold process copies own devices and physically submits 4321 for A0 20/9000, followed by the separate phone-code flow. The three-process wrong-PUK-first variant additionally proves 87654321 produces 9804, unchanged credentials and counters 0/3/9/10; those persisted devices cold-boot into successful correct-PUK recovery before the final new-PIN boot. All phases require reviewed exact frames, physical contacts, native execution and unchanged flash. The SIM card blocked failure text is not permanent-exhaustion evidence. PUK exhaustion, network registration and fitted-mask identity remain unproved.",
