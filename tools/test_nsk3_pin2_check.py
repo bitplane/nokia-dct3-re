@@ -1,7 +1,7 @@
 import unittest
 from tools.nsk3_pin2_check import check_change,PREFIX
 from tools.make_sim_card_profile import make_profile
-from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,padded_pin
+from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,padded_pin
 
 
 class Pin2Test(unittest.TestCase):
@@ -19,6 +19,13 @@ class Pin2Test(unittest.TestCase):
         before=make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff')
         after=bytearray(before);after[CHV_OFFSET+8:CHV_OFFSET+16]=padded_pin('8765')
         check_change(trace,before,after,'5678','8765')
+        wrong=trace.replace('key=08 down=1 column=1','key=05 down=1 column=1',1)
+        wrong=wrong.replace('index=9 value=38','index=9 value=35')
+        wrong=wrong.replace('ins=24 sw=9000 chv=3/3','ins=24 sw=9804 chv=3/2')
+        rejected=bytearray(before);rejected[ATTEMPTS_OFFSET+1]=2
+        check_change(wrong,before,rejected,'5675','8765',False)
+        check_change(trace,rejected,after,'5678','8765')
+        with self.assertRaises(ValueError):check_change(wrong,before,after,'5675','8765',False)
         for bad in (trace.replace('value=24','value=2c'),trace.replace('ins=24 sw=9000','ins=24 sw=9804'),trace.replace('key=18','key=17')):
             with self.assertRaises(ValueError):check_change(bad,before,after,'5678','8765')
         for offset in (0,CHV_OFFSET,len(after)-1):

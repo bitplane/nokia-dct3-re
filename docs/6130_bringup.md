@@ -419,6 +419,22 @@ exact CHANGE CHV bytes/status, whole-card mutation boundaries, cold card
 identity, native uploads, own unchanged flash and exact Change PIN2 frame.
 This does not accept PIN2 retry exhaustion, PUK2 recovery or permanent block.
 
+The wrong-PIN2 control submits5675 and receives9804, displays **Code error**,
+preserves all credential bytes and changes only PIN2 attempts3->2 at3517.
+The saved rejected card is copied into a fresh process; correct5678 then
+changes PIN2 to8765 and restores its attempts2->3. Its final card exactly
+matches the independently accepted change fixture. These are physical CHANGE
+CHV retry/cold-state tests, not direct APDU injection.
+
+```sh
+.venv/bin/python tools/nsk3_pin2_check.py roms/noki6130/source \
+  tmp/nsk3-pin2-change tmp/nsk3-pin2-cold-restore \
+  --wrong tmp/nsk3-pin2-wrong --retry-cold tmp/nsk3-pin2-retry-cold
+```
+
+The checker verifies complete rejected/cold card transitions and the exact
+error/success frames. Exhaustion to0, PUK2 and permanent blocking remain open.
+
 ### Offline SMS draft
 
 The observed physical route is Messages -> Select -> Down twice to Write
