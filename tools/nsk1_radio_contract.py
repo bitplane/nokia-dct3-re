@@ -42,7 +42,8 @@ def analyze(image):
               0x26dec4:0x07d9,0x24e074:0x24dd0a,0x24df58:0x07e5,
               0x24d6e0:0x07d6,0x26df38:0x26e20c,
               0x2941e0:0x294218,0x26a500:0x1390,0x26a504:0x108a84,
-              0x2128d8:0x1389,0x2125c8:0x212b28}
+              0x2128d8:0x1389,0x2125c8:0x212b28,
+              0x26e898:0x0447,0x26e880:0x07e5,0x21147c:0x108a00}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -104,6 +105,9 @@ def analyze(image):
             'candidate_completion':{'rx_type':'0x8a','route':'0x26a2ec','status':'0x1390',
                                     'task':10,'processor_case':'0x212b28',
                                     'scope':'static counter-processing route; relation to required completion unproved'},
+            'completion_recode':{'message_input':'0x05e6','helper_case':'0x26e56a',
+                                  'condition':'message byte +2 is nonzero','returned_status':'0x07e5',
+                                  'scope':'internal helper recode, not a raw DSP packet or a closed producer census'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,

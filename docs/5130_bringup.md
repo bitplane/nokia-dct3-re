@@ -218,6 +218,26 @@ to the required 07e5 completion are not yet proved. It must not be treated
 as a recipe for fabricating 8a. The next questions are the actual completion
 publisher and which native DSP operation can produce its required input.
 
+The acknowledgement namespace is not one-to-one with wire messages.
+Helper 26e424's input 05e6 reaches 26e56a; nonzero message byte +2 makes it
+return 07e5, while zero consumes the message without that return. The base
+literal 0447 at 26e898 plus the decoded subtract offset 019f establishes
+05e6 independently of the output literal 07e5 at 26e880. The other explicit
+07e5 literal publisher is task-15's special mode-4 path at 20a59e, which the
+observed mode-1 request does not take. Neither is evidence that DSP type 8a
+alone satisfies this acknowledgement.
+
+Shared scan-state byte 108a8d belongs to builder base 108a00 +8d;
+task-10 catalogue base 10885c is a distinct owner. Runtime initialization sets 16;
+builder 21151a sets 12 at 5.923710 seconds. Native 8b consumption at 21899e
+then changes it to 10 at 39.930843 seconds. Thus the vector updates shared
+scan state even though its controller retains state 3 and caches the data.
+No counter case 212b28, scan finalizer 2111d4 or helper recode 26e56a is
+observed through 61 seconds. Static finalizer 2111d4's ordinary branch
+posts template 2ac904/status 042f to task 15; it does not directly post 07e5.
+The 05e6 producer/transport route and the actual finalizer-triggering DSP
+contract remain open and must be mapped without conflating these statuses.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 

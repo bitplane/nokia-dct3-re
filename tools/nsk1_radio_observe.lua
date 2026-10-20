@@ -41,9 +41,12 @@ machine.debugger:command('bpset 26def0,r0==3e9,{logerror "nsk1_radio_inner_const
 machine.debugger:command('bpset 255268,r0==a&&r1>=100000&&r1<110000&&w@r1==3e9,{logerror "nsk1_radio_inner_post: task=%02x object=%08x header=%08x control=%02x caller=%08x observer_writes=0\\n",r0,r1,d@r1,b@(r1+4),r14;g}')
 machine.debugger:command('bpset 2132e8,1,{logerror "nsk1_radio_task10_request: object=%08x owner=%08x flags=%08x counter_owner=%08x observer_writes=0\\n",d@(r13+18),r4,d@(r4+7c),r5;g}')
 machine.debugger:command('bpset 212600,1,{logerror "nsk1_radio_task10_process: object=%08x caller=%08x observer_writes=0\\n",r8,r14;g}')
-machine.debugger:command('bpset 2130c6,r0>=100000&&r0<110000&&temp4<40,{temp4=temp4+1;logerror "nsk1_radio_task10_receive: object=%08x header=%08x state=%02x owner=%08x observer_writes=0\\n",r0,d@r0,b@(r5+8d),r5;g}')
+machine.debugger:command('bpset 2130c6,r0>=100000&&r0<110000&&temp4<40,{temp4=temp4+1;logerror "nsk1_radio_task10_receive: object=%08x header=%08x state=%02x owner=%08x observer_writes=0\\n",r0,d@r0,b@108a8d,r5;g}')
 machine.debugger:command('bpset 2112b0,1,{logerror "nsk1_radio_scan_build: mode=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
 machine.debugger:command('bpset 2114f4,1,{logerror "nsk1_radio_scan_post: task=%02x object=%08x header=%08x field5=%02x field6=%02x observer_writes=0\\n",r0,r1,d@r1,b@(r1+5),b@(r1+6);g}')
+machine.debugger:command('bpset 26e56a,1,{logerror "nsk1_radio_completion_recode: object=%08x header=%08x result=%02x observer_writes=0\\n",r4,d@r4,b@(r4+2);g}')
+machine.debugger:command('bpset 212b28,1,{logerror "nsk1_radio_counter_completion: object=%08x caller=%08x observer_writes=0\\n",r8,r14;g}')
+machine.debugger:command('bpset 2111d4,1,{logerror "nsk1_radio_scan_finish: caller=%08x observer_writes=0\\n",r14;g}')
 machine.debugger:command('bpset 255268,r0==f&&r1>=100000&&r1<110000&&w@r1==9ec,{logerror "nsk1_radio_request_post: task=%02x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
 machine.debugger:command('bpset 2091b2,1,{logerror "nsk1_radio_mode_receive: object=%08x mode=%02x owner=%08x aux=%08x observer_writes=0\\n",r4,b@(r4+2),r5,r7;g}')
 machine.debugger:command('bpset 20948a,temp2<40,{temp2=temp2+1;logerror "nsk1_radio_task15_receive_return: input=%04x mode=%02x flag=%02x caller=%08x observer_writes=0\\n",r6,b@(r5+1),b@(r5+2),d@(r13+14);g}')
@@ -92,6 +95,13 @@ local result_reads = 0
 local status_reads = 0
 local state_writes = 0
 local lifecycle_writes = 0
+local scan_state_writes = 0
+_G.nsk1_radio_scan_state = memory:install_write_tap(0x108a8c,0x108a8f,'nsk1_radio_scan_state',function(_,data,mask)
+    if mask & 0x00ff0000 ~= 0 and scan_state_writes < 32 then
+        scan_state_writes = scan_state_writes+1
+        machine:logerror(string.format('nsk1_radio_scan_state_write: value=%02x pc=%08x t=%.9f observer_writes=0\n',(data >> 16) & 255,cpu.state['R15'].value,machine.time:as_double()))
+    end
+end)
 _G.nsk1_radio_lifecycle = memory:install_write_tap(0x10a484,0x10a487,'nsk1_radio_lifecycle',function(_,data,mask)
     if mask & 0xffff ~= 0 and lifecycle_writes < 48 then
         lifecycle_writes = lifecycle_writes+1
