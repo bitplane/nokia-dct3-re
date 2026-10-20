@@ -141,6 +141,12 @@ _G.nsb1_shared_tap = space:install_write_tap(0x10000, 0x10fff, 'nsb1_shared', fu
             offset, data, mask, cpu.state['R15'].value, machine.time:as_double()))
     end
 end)
+local function observe_native_execution(now)
+    local dsp = machine.devices[':dsp_c54x:cpu']
+    machine:logerror(string.format('nsb1_native_execution: t=%.9f pc=%04x illegal=%d idle=%d tx=%04x/%04x rx=%04x/%04x observer_writes=0\n',
+        now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value,
+        space:read_u16(0x100a4), space:read_u16(0x100a6), space:read_u16(0x101c8), space:read_u16(0x101ca)))
+end
 local times, next_sample = {0.1, 0.5, 1, 2, 5}, 1
 emu.register_frame_done(function()
     local now = machine.time:as_double()
@@ -159,10 +165,7 @@ emu.register_frame_done(function()
         space:read_u8(0x10c466), space:read_u16(0x10ad2e),
         space:read_u32(0x10adc0), space:read_u32(0x10ad50), shared_writes))
     if machine.system.name == 'nsb1r4t' then
-        local dsp = machine.devices[':dsp_c54x:cpu']
-        machine:logerror(string.format('nsb1_native_execution: t=%.9f pc=%04x illegal=%d idle=%d tx=%04x/%04x rx=%04x/%04x observer_writes=0\n',
-            now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value,
-            space:read_u16(0x100a4), space:read_u16(0x100a6), space:read_u16(0x101c8), space:read_u16(0x101ca)))
+        observe_native_execution(now)
     end
     machine:logerror(string.format('nsb1_interrupts: t=%.9f cpsr=%08x ctrl=%02x fiqmask=%02x fiq=%02x irq=%02x ext=%02x supervisor=%02x flag_writes=%d observer_writes=0\n',
         now, cpu.state['CPSR'].value, space:read_u8(0x2000c), space:read_u8(0x2000a),
@@ -193,7 +196,14 @@ emu.register_frame_done(function()
     observing = false
 end, 'NSB-1 passive MCU boundary')
 
-local late_times, late_index = {10, 20}, 1
+local next_native_time = 6
+emu.register_frame_done(function()
+    local now = machine.time:as_double()
+    if machine.system.name ~= 'nsb1r4t' or now < next_native_time then return end
+    observe_native_execution(now)
+    next_native_time = math.floor(now) + 1
+end, 'NSB-1 sustained native execution')
+local late_times, late_index = {10, 20, 30, 34, 50, 59}, 1
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     if machine.system.name ~= 'nsb1r4t' or late_index > #late_times or now < late_times[late_index] then return end

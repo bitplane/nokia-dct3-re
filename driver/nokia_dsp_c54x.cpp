@@ -446,11 +446,10 @@ void nokia_dsp_c54x_device::tx_commit_w(int state)
 	// MDISND has no separate doorbell. The producer write changes the live
 	// ring-not-empty comparator presented on INT2; mcu_shared_write observes the
 	// same write and updates that level after the transport has stored it.
+	// HPINT belongs only to doorbell_w: asserting it here also enters the
+	// parameter handler without a parameter transaction or its return context.
 	if (state && m_reset_released)
-	{
 		update_host_command_line();
-		m_cpu->set_input_line(9, HOLD_LINE);
-	}
 }
 
 u16 nokia_dsp_c54x_device::host_request() const

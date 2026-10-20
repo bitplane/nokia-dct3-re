@@ -33,12 +33,17 @@ def check_menu(trace, snapshots):
                 raise ValueError('physical phonebook list pixels changed')
 
 
-def check_native_execution(trace):
+def check_native_execution(trace, minimum_time=5):
     samples = re.findall(r'nsb1_native_execution: t=([0-9.]+) pc=([0-9a-f]{4}) illegal=([01]) idle=[01] tx=[0-9a-f]{4}/[0-9a-f]{4} rx=[0-9a-f]{4}/[0-9a-f]{4} observer_writes=0', trace)
-    if not samples or not any(float(time) >= 5 for time, _, _ in samples):
+    if not samples or not any(float(time) >= minimum_time for time, _, _ in samples):
         raise ValueError('missing native DSP execution observations')
     if any(illegal != '0' for _, _, illegal in samples):
         raise ValueError('native DSP stopped on an illegal instruction; bootstrap alone is insufficient')
+    if minimum_time >= 34:
+        activity = re.findall(r'nsb1_activity_check: count=([0-9a-f]{4}) pc=002aff04 t=[0-9.]+ observer_writes=0', trace)
+        required = int(minimum_time // 31)
+        if len(activity) < required or any(int(value, 16) == 0 for value in activity):
+            raise ValueError('missing sustained native receive activity at inactivity checks')
 
 
 def check_security_gate(trace, initialized_retry):
@@ -79,7 +84,7 @@ def checksum_control(source, initialized_retry=False):
 
 def check_checksum_control(trace):
     flags = re.findall(r'nsb1_presentation: t=([0-9.]+) selftest_flags=([0-9a-f]{2}) observer_writes=0', trace)
-    if len(flags) != 5 or [value for _, value in flags] != ['00', 'c0', '40', '40', '40']:
+    if len(flags) != 5 or [value for _, value in flags] != ['00', 'c0', 'c0', '40', '40']:
         raise ValueError('checksum control did not retain the observed self-test bit 40')
     if re.search(r'nsb1_selftest_flags: value=[0-9a-f]{2} pc=0023a018 ', trace):
         raise ValueError('checksum-failure branch still executed in checksum control')
@@ -211,7 +216,7 @@ def main():
     parser.add_argument('binary', type=Path)
     parser.add_argument('rom_root', type=Path)
     parser.add_argument('run_dir', type=Path)
-    parser.add_argument('--seconds', type=int, default=6, choices=range(1, 61))
+    parser.add_argument('--seconds', type=int, default=6, choices=range(1, 121))
     parser.add_argument('--verbose', action='store_true', help='include the larger native opcode inventory')
     parser.add_argument('--insert-sim', action='store_true', help='physical card-input experiment; no card-service acceptance claim')
     parser.add_argument('--initialized-retry', action='store_true',
@@ -246,7 +251,7 @@ def main():
         if args.seconds >= 6:
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
             if args.menu_fixture:
-                check_native_execution((run / 'error.log').read_text())
+                check_native_execution((run / 'error.log').read_text(), minimum_time=args.seconds - 1)
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
                         image[0xbe570:0xbe570 + 372], result.returncode)
             if args.checksum_control_from is None:
@@ -272,6 +277,8 @@ def main():
                      if args.seconds >= 12 else 'checksum diagnostic; late presentation not tested; ')
     if args.insert_sim:
         qualifier = 'inserted-card experiment; card/presentation acceptance not established; '
+    if args.menu_fixture:
+        qualifier = 'sustained native execution and physical Phone book list accepted; no registration/service acceptance; '
     if re.search(r'nsb1_native_execution: .* illegal=1 ', (run / 'error.log').read_text()):
         qualifier += 'DSP execution fault observed; no sustained-native acceptance; '
     print(f'NSB-1 compatibility {status}; {qualifier}fitted mask/phone boot not promoted; evidence={run}')

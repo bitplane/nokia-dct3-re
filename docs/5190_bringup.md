@@ -12,9 +12,10 @@ a blocked lifecycle. In the ordinary silent configuration, the unanswered transi
 program's resident-version publication to shared word `10004`, before the
 MCU begins sparse-flash handoffs. Separate `nsb1r4t` executes acquired NSE-1
 ROM4 as an explicit compatibility candidate: it passes own version selection,
-63 block handoffs and native loader/resident bootstrap continuation. This
-does not establish sustained native DSP execution: the compatibility core
-stops on an illegal instruction before 0.5 s (see below). LCD bus/pixel
+63 block handoffs and native loader/resident bootstrap continuation. Correct
+ring notification also permits sustained native execution and physical
+Phone book menu navigation; this remains an unproved fitted-mask comparison.
+LCD bus/pixel
 acceptance reproduces firmware clear/fill/clear self-test with erased storage.
 The qualified checksum/nominal-input comparison additionally reaches the
 firmware's Insert SIM card screen. Fitted mask identity and DSP cadence remain unproved.
@@ -430,10 +431,14 @@ radio service or speech.
 Physical Menu at 26 seconds renders Phone book; Select at 28 seconds opens
 the Search / Add entry / Edit list. Its static 84x48 RGB SHA-256 is
 `1c9dac19aa382370ba315a4e99f2ea65c844f4ec099a263624b6593b0525a5bd`.
-This establishes menu navigation within the short accepted security run,
-not a stable handset. The longer `--menu-fixture` (35 s minimum) deliberately
-requires continued native acceptance as well as contact edges and list pixels.
-**It currently fails**: at 31.972845538 s the firmware requests reset through
+The longer `--menu-fixture` (35 s minimum) requires non-illegal native CPU
+samples through the last complete second, continued bootstrap integrity,
+contact edges and exact list pixels. It passes with the corrected ring
+notification described below. Persistent phonebook writes, registration and
+services remain separate, unaccepted boundaries.
+
+The uncorrected ring-notification negative control requests reset at
+31.972845538 s through
 `2b1056`, with reason `68` and LR `23ce6b`; own reset caller `23ce66` reads
 the stored reason and calls `2b101e`. Repeated native verifier upload follows.
 The same time/reason occurs after accepted security entry with no menu input,
@@ -446,7 +451,7 @@ gate or disable the watchdog to claim menu completion. Persistent phonebook
 testing follows sustained native operation; no SIM UPDATE RECORD has been
 established.
 
-The own reason producer is now known more precisely. At 31.000902077 s,
+In that negative control, at 31.000902077 s,
 `2a46b4` writes `68` to `10ff7c` with LR `2a39c3`. Caller `2a391a` receives
 selector one, reads record `0607` into its stack, and calls `231b08`.
 That helper tests lifecycle byte `10b57d`: states four/five return one;
@@ -478,10 +483,10 @@ The own decode now
 identifies the precise receive loop whose missing traffic matters; it still
 does not justify synthesizing a packet or clearing EEPROM policy bits.
 
-### Native execution stops before the UI milestone
+### Ring notification and native stack safety
 
 Direct CPU-state observations distinguish bootstrap success from a running
-DSP. At 0.5/1/2/5/10/20/30 seconds the compatibility core reports
+DSP. With the uncorrected backend, samples at 0.5/1/2/5/10/20/30 seconds report
 `ILLEGAL=1`, `IDLE=0`, PC `ffc0`, with TX producer/consumer `0041/0033`
 and RX producer/consumer `00a6/00a6`. Thus queued work is not being consumed;
 the MCU's later graphical/security progress is not sustained native operation.
@@ -496,18 +501,43 @@ stores `465e` into that same overlaid word. Execution later branches from
 `1caa` to `1d9d`, reads `f6bb`, then reads the overwritten return and falls
 through into stack/data words, ending at `1db4` after `3798`.
 
-This establishes an observed stack/program overlap, not its root cause.
-It does not yet distinguish an emulated CPU/overlay error from an incompatible
-resident-mask ABI or incorrect stack allocation in the current composition.
-No stack pointer, return instruction or memory geometry is patched. Next
-recover the SP initialization and intervening call/interrupt stack history,
-then compare that mechanism with the independently executing NSE-1 control.
+The own loader initializes SP to `1ec6`, not `1db3`. A paired NSE-1 control
+retains foreground SP `1ec4` through 0.5 s; NSB-1 loses stack space in steps
+before the collision. The first observed imbalance returns to foreground
+`408d` at 0.196091885 s with SP `1ea5` instead of `1ec4`, after HPINT vector
+`ffe4` / handler `3772`. This is not evidence for enlarging the stack.
+
+The backend incorrectly asserted HPINT on every MDISND ring commit in
+addition to its INT2 ring-not-empty signal. HPINT is the explicit parameter
+doorbell, owned by `doorbell_w`, not the ring notification. Removing that
+extra pulse leaves explicit doorbells and the INT2 comparator intact. The
+same NSB-1 input then drains TX/RX and executes without illegal instructions
+through the sustained menu run. At the first inactivity check, `10c53a` is
+one instead of zero, so the policy rearms rather than resetting. The 60-second
+control samples legal native execution through 59 s and no baseband reset.
+The 90-second acceptance run additionally observes count one at both
+31/62-second inactivity checks and legal native execution through 89 s:
+
+```sh
+.venv/bin/python tools/nsb1_rom4_compare.py mame/mame roms \
+  tmp/nsb1-menu-sustained --seconds 90 --insert-sim --initialized-retry \
+  --menu-fixture --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+No stack pointer, return instruction, memory geometry, watchdog or policy
+value is changed. NSE-1 coherent bootstrap, physical menu and 30-second RF
+activation gates also pass with this shared correction.
 
 The ordinary comparison reports **native bootstrap PASS** only and explicitly
 warns when CPU execution has faulted. `--menu-fixture` additionally requires
-non-illegal native samples and now rejects the earlier execution fault rather
+non-illegal native samples and rejects the old execution fault rather
 than waiting for the secondary 32-second reset. Neither a graphical frame nor
 the bootstrap handshake is accepted as evidence of sustained native execution.
+
+The empty-socket pixel hash and SIMI counts are unchanged. The self-test flag
+at the one-second sample is now `c0` rather than `40`, clearing to `40` by
+two seconds as genuine DSP traffic is processed; the structural gate is
+deliberately re-banked to `00/c0/c0/40/40`, not relaxed to ignore flags.
 
 ### External reference leads, not provisioning evidence
 
@@ -698,7 +728,7 @@ chain from another checksum control or silently reuse prior NVRAM.
   --checksum-control-from tmp/nsb1-rom4-comparison
 ```
 
-This control retains bit `40` (`c0` at 0.5 seconds, `40` at 1/2/5 seconds),
+This control retains bit `40` (`c0` at 0.5/1 seconds, `40` at 2/5 seconds),
 with the same completed native bootstrap. At full-scale ADC2, LCD traffic
 and the final white frame remain unchanged. Therefore checksum consistency alone does
 **not** establish application presentation or valid provisioning. The default

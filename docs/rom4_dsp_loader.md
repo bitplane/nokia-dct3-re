@@ -2854,6 +2854,14 @@ operational ROM. The DSP's INT2 input is the level comparison between the
 port-1 command latch plus live MDISND ring state and the port-2 accept mask.
 The operational ISR now consumes the complete MCU ring (`0x0033/0x0033`) and
 returns to its ordinary idle at `0x31a5` without an illegal instruction.
+An MDISND producer commit updates this INT2 comparator only; it must not
+also assert HPINT. HPINT belongs to the explicit DSPIF parameter doorbell.
+The NSB-1 cross-ROM control exposed the duplicate pulse: the unsolicited
+vector-25 parameter handler leaked stack into uploaded code and eventually
+stopped the core. Removing only that pulse preserves the NSE-1 coherent,
+menu and RF gates and permits 90-second NSB-1 physical menu operation with
+nonzero receive-activity checks. See `5190_bringup.md` for the paired evidence
+and remaining fitted-mask/provisioning limits.
 DSP port-1 completion strobes also ring the MCU doorbell. The ordinary FIQ0
 handler drains the DSP receive ring to `0x0083/0x0083`; this is transport
 delivery, not a synthesized MCU message.

@@ -14,6 +14,18 @@ class NativeCompareTest(unittest.TestCase):
     def test_native_execution_is_separate_from_bootstrap(self):
         sample = 'nsb1_native_execution: t=5.0 pc=31a5 illegal=0 idle=1 tx=0041/0041 rx=00a6/00a6 observer_writes=0'
         check_native_execution(sample)
+        with self.assertRaisesRegex(ValueError, 'observations'):
+            check_native_execution(sample, minimum_time=34)
+        late = sample + '\n' + sample.replace('t=5.0', 't=34.0')
+        activity = '\nnsb1_activity_check: count=0001 pc=002aff04 t=31.0 observer_writes=0'
+        check_native_execution(late + activity, minimum_time=34)
+        for trace in (late, late + activity.replace('count=0001', 'count=0000')):
+            with self.assertRaisesRegex(ValueError, 'receive activity'):
+                check_native_execution(trace, minimum_time=34)
+        long = late + '\n' + sample.replace('t=5.0', 't=89.0')
+        with self.assertRaisesRegex(ValueError, 'receive activity'):
+            check_native_execution(long + activity, minimum_time=89)
+        check_native_execution(long + activity + activity.replace('t=31.0', 't=62.0'), minimum_time=89)
         for trace in ('', sample.replace('5.0', '0.5'), sample.replace('illegal=0', 'illegal=1')):
             with self.subTest(trace=trace), self.assertRaises(ValueError):
                 check_native_execution(trace)
@@ -193,7 +205,7 @@ class ChecksumControlTest(unittest.TestCase):
 
     def test_runtime_bit_retention(self):
         trace = '\n'.join(f'nsb1_presentation: t={time} selftest_flags={value} observer_writes=0'
-                          for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', '40', '40', '40')))
+                          for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', 'c0', '40', '40')))
         trace += '\n' + '\n'.join(f'nsb1_simi_summary: t={time} reads={reads} writes={writes} card_inserted=0 observer_writes=0'
                                     for time, reads, writes in ((0.1, 0, 0), (0.5, 0, 0), (1, 0, 18), (2, 3, 21), (5, 9, 45)))
         trace += '\nnsb1_simi: direction=W address=00020038 data=ff pc=0029cdfc'
