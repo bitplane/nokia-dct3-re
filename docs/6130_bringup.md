@@ -716,6 +716,17 @@ to2ab5cc and calls281e98. Its path2820ce..d2 selects mailbox0e. Packet-body
 predicates and any040b header rewrite remain to be decoded; the observed
 74/74/74/74/99/8b census contains no80. This is an available but unexercised
 transport route, not authority to fabricate its input.
+
+The decoder's namespace is byte-addressed, not a GSM message-type claim.
+After its preliminary owner gate, packet byte4==80 reaches281f50, writes
+IPC header040b, copies original byte4 to+b and byte6 to+c, then selects
+mailbox0e at281f6a. Byte4==b0/b1 also reaches this branch when byte6!=1;
+byte6==1 takes the release path. A separate gated path2820a2 writes040b,
+copies byte4 to+b and a computed0/1 to+d, then posts to0e at2820d2.
+Its counter/context predicates are not fully classified and must remain
+separate from the direct80 branch. Own instruction/literal mutation checks
+anchor both040b rewrites, destinations and the native type80 entry. These
+static routes do not establish a valid RF body or explain the absent packet.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.

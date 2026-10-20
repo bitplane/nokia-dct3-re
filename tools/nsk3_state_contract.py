@@ -16,7 +16,10 @@ def decode(image):
                0x248b9e:'9d0420ff303b5d402800d10148eae00048ea1c29f7fefa73',
                0x249292:'9d0420ff303b5d402800d101489ae000489a1c29f7fdfef9',
                0x24709c:'b5f01c0d1c06200cf020fbd01c04782870a08026',
-               0x24753e:'f01ffb9f1c078838'}
+               0x24753e:'f01ffb9f1c078838',0x2ab522:'20801a082800d050',
+               0x281f16:'39102900d019',
+               0x281f50:'4815464180084640790072c846407980730846402128f7fcf983200e4641e131',
+               0x2820a2:'48ef464180084640790072c8',0x2820ce:'200e4641f7e4fcab'}
     for address,encoded in fragments.items():
         expected=bytes.fromhex(encoded)
         if image[address-0x200000:address-0x200000+len(expected)]!=expected:
@@ -33,6 +36,8 @@ def decode(image):
     completion_input=word(0x2883ec)+0xff+0xa0
     if completion_input!=0x5e6 or word(0x2883d4)!=0x7e5:
         raise ValueError('helper completion namespace differs')
+    if word(0x281fa8)!=0x40b or word(0x282460)!=0x40b:
+        raise ValueError('lower decoder header namespace differs')
     return {'upstream_selector':0xa30,'upstream_context':0x10a7d8,
             'completion_input':completion_input,'nonzero_completion_result':0x7e5,
             'selector':selector,'header':header,'owner':owner,'new_state':1,
