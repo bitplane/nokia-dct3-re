@@ -486,19 +486,25 @@ conflated: consumer semantics, valid-entry count and physical RSSI units remain
 unproved. No available carrier or camped state is demonstrated.
 
 Own subtract-cascade/jump-table arithmetic maps type8b to table entry2ab560,
-target2ab58c ->2823b0. That wrapper creates primitivea8 and posts to task12
-through266a2c. This is a statically anchored forward route, not runtime proof
-that task12 completed its consumption or issued a next request.
+target2ab58c ->2823b0. That wrapper writes header13b8 and posts to task12
+through266a2c. Argumenta8 belongs to the gated trace wrapper27e270, not the
+queued message namespace. Runtime observation confirms the same object and
+header13b8a28b at posting, dequeue266eb0 (caller21a1dd), and dispatch21a2ea.
+The consumer enters with owner106ce8 in state03/phase01 and no cached object.
+Static decoding of this branch selects a160-byte body copy into an allocated
+cache and skips processing2176a0 while state remains3. Cache-copy completion,
+the state/phase lifecycle and subsequent native requests remain unverified.
 
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
-  tmp/nsk3-native-packets-full
+  tmp/nsk3-task12-consumer --delivery
 ```
 
 The checker rejects incomplete captures, including the initial32-byte probe,
 and distinguishes observed body fields from radio/physical-unit acceptance.
-The next bounded trace should follow task12'sa8 object and resulting native
-requests before inventing an RF stimulus or periodic response.
+The next bounded trace should verify the cache copy and identify legitimate
+writers/transitions of the task12 state/phase before inventing an RF stimulus
+or periodic response.
 
 ## Own firmware inputs
 

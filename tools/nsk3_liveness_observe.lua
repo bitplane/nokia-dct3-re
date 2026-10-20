@@ -6,6 +6,9 @@ local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
 machine.debugger:command('bpset 2ab64a,1,{logerror "nsk3_liveness_window: counter=%04x pointer=%08x cycles=%016x observer_writes=0\\n",w@(r5+2),r5,totalcycles;g}')
 machine.debugger:command('bpset 2a2a4a,r0==1,{logerror "nsk3_liveness_policy: argument=%08x caller=%08x cycles=%016x observer_writes=0\\n",r0,r14,totalcycles;g}')
+machine.debugger:command('bpset 2823c4,r1>=100000 && r1<10ff00,{logerror "nsk3_packet_forward: target=%02x pointer=%08x header=%08x cycles=%016x observer_writes=0\\n",r0,r1,d@r1,totalcycles;g}')
+machine.debugger:command('bpset 266eb0,d@(r13+4)>=100000 && d@(r13+4)<10ff00 && w@(d@(r13+4))==13b8,{logerror "nsk3_packet_receive: task=%02x pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",b@(r5+2),d@(r13+4),d@(d@(r13+4)),d@(r13+28),totalcycles;g}')
+machine.debugger:command('bpset 21a2ea,r5>=100000 && r5<10ff00,{logerror "nsk3_packet_consumer: pointer=%08x header=%08x owner=%08x state=%02x phase=%02x cache=%08x cycles=%016x observer_writes=0\\n",r5,d@r5,r6,b@(r6+14),b@(r6+19),d@(r4+28),totalcycles;g}')
 local writes=0
 _G.nsk3_liveness_counter_tap=memory:install_write_tap(0x10c5a4,0x10c5a7,'nsk3_liveness_counter',function(offset,value,mask)
     if mask & 0xffff==0 then return end

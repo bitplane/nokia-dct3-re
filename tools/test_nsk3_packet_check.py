@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.nsk3_packet_check import parse
+from tools.nsk3_packet_check import parse, check_delivery
 
 
 class PacketCensusTest(unittest.TestCase):
@@ -16,6 +16,8 @@ class PacketCensusTest(unittest.TestCase):
         self.assertEqual(result['serialized_pair_capacity'],40)
         self.assertFalse(result['radio_or_physical_units_proved'])
         self.assertEqual(result['own_forward_target'],12)
+        self.assertEqual(result['own_forward_header'],'0x13b8')
+        self.assertNotIn('own_forward_primitive',result)
 
     def test_truncation_type_and_signed_value_rejected(self):
         trace=self.trace()
@@ -23,6 +25,19 @@ class PacketCensusTest(unittest.TestCase):
                     trace.replace('18020099','18020098'),trace.replace('pointer=00102000','pointer=00202000'),
                     trace+'\nnsk3_liveness_packet: malformed'):
             with self.assertRaises(ValueError):parse(bad)
+
+    def test_delivery_requires_same_object_and_order(self):
+        trace=self.trace()+'\n'+ '\n'.join((
+            'nsk3_packet_forward: target=0c pointer=00102000 header=13b8a28b cycles=10 observer_writes=0',
+            'nsk3_packet_receive: task=0c pointer=00102000 header=13b8a28b caller=0021a1dd cycles=20 observer_writes=0',
+            'nsk3_packet_consumer: pointer=00102000 header=13b8a28b owner=00106ce8 state=03 phase=01 cache=00000000 cycles=30 observer_writes=0'))
+        self.assertEqual(check_delivery(trace)['state'],'03')
+        for old,new in (('target=0c','target=0d'),('task=0c','task=0d'),
+                        ('caller=0021a1dd','caller=0021a1df'),('cycles=20','cycles=40'),
+                        ('header=13b8a28b','header=00a8a28b'),
+                        ('owner=00106ce8','pointer=00102004')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_delivery(trace.replace(old,new))
 
 
 if __name__=='__main__':unittest.main()
