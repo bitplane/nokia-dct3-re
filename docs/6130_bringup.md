@@ -927,6 +927,21 @@ The gateway2420 isf073/0a71, targeting uploaded initializer0a71 rather than
 the resident-only0a5c address. The checker anchors its live qualification
 and counter instructions at0ae6/0b08, with mutation tests.
 
+The passive write census `nsk3_rf_queue_observe.lua` strengthens the snapshot
+result: between40s and90s both producer06b7 and consumer06b8 change10833 times,
+exactly matching the scan-counter advancement. Initial writes occur at0.135s,
+the queue is configured at4.815s, and sustained consumption appears around39s.
+Producer updates observed at3347 and consumer updates at475b are native code,
+not observer writes. Thus equal late pointers mean a repeatedly drained queue,
+not an unchanged empty one. This still does not validate the source samples,
+their units, RF filtering or physical cadence. The qualified90s capture
+`tmp/nsk3-rf-queue` also passes the existing packet, mode, cache, native-control
+and live-program scan checks.
+
+```sh
+.venv/bin/python tools/nsk3_rf_queue_check.py tmp/nsk3-rf-queue/error.log
+```
+
 The modeled COBBA RF receive callback is unattached/deterministic silence;
 the active scan's zero qualifying results are not evidence for a real
 receiver's noise/offset contract. Its timeout has not expired at90s, before
