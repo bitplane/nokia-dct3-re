@@ -29,6 +29,24 @@ def eeprom_geometry(descriptor):
             'fitted_part_proved': False}
 
 
+def security_record_directory(image):
+    """Own v6.71 direct-index records, not inferred provisioning contents."""
+    directory = 0xcc3a0 + 7 * 8
+    if len(image) < directory + 8:
+        raise ValueError('truncated security directory')
+    pointer, limit, _ = struct.unpack_from('>IHH', image, directory)
+    base = pointer - 0x200000
+    if limit < 2 or base < 0 or base + (limit + 1) * 8 > len(image):
+        raise ValueError('invalid security directory bounds')
+    records = []
+    for index in (1, 2):
+        identifier, offset, length = struct.unpack_from('>IHH', image, base + index * 8)
+        if identifier != 0x700 + index or not length or offset + length > 8192:
+            raise ValueError('invalid security record identity or storage bounds')
+        records.append({'id': hex(identifier), 'offset': hex(offset), 'length': length})
+    return {'lookup': '0x2a75e4', 'records': records, 'field_semantics_proved': False}
+
+
 def flash_integrity(image):
     """Own 294e70 header grammar: at most two inclusive BE-halfword ranges."""
     if len(image) < 0x30:
@@ -93,6 +111,7 @@ def inspect(source, ppm='A'):
                          'ppm': ppm, 'normalized_bytes': len(image),
                          'firmware_eeprom_geometry': eeprom_geometry(image[5]),
                          'declared_flash_integrity': flash_integrity(image),
+                         'security_record_directory': security_record_directory(image),
                          'normalized_sha1': hashlib.sha1(image).hexdigest(),
                          'absent_erased_gap': ['0x2d2d00', '0x2dffff'],
                          'provisioning_supplied': False, 'boot_claim': False,

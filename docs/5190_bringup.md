@@ -232,15 +232,22 @@ state, not a requirement that a future faithful phone remain blocked.
 The [independent emulator's current coverage table](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
 reports 5190 standby. Its current product profile still uses an NSE-1 donor
 EEPROM and security-settings repairs, so that outcome is not a forcing-free,
-own-storage comparison for this configuration. The useful testable lead is
-its security-record interpretation: candidate eight-byte directory records
-in the own image at `2cc0b2` and `2cc0ba` contain respectively
-`0701 04a8 0008 0000` and `0702 04b0 0030 0000`. This independently confirms
-the matching source bytes, not yet the directory reader, field semantics,
-or valid factory contents. In particular, `04b0+1f=04cf` is an address
-relationship, not permission to clear a purported lock field. Recover the
-own reader/validator before constructing any fixture; no donor bytes are
-admitted.
+own-storage comparison for this configuration. No donor bytes are admitted.
+
+Own lookup `2a75e4` splits the record ID into high-byte group and low-byte
+index, selecting eight-byte group entries at `2cc3a0`. Group 7 points to
+`2cc0a8`; the reader multiplies the low index by 8 and compares a **32-bit**
+record ID before returning the entry. Records are `{BE32 id, BE16 offset,
+BE16 length}`. Entries `2cc0b0` and `2cc0b8` identify `0701` at EEPROM
+`04a8`, length 8, and `0702` at `04b0`, length `30`. Their IDs start two
+bytes before the superficially matching `0701`/`0702` halfwords. Helper
+`2a78aa` reads entry offsets `+4/+6`; `2a7974` passes the resolved address,
+destination and length to external read `2ab0e6`. Write wrapper `2a792e`
+instead uses `2aafe2`. The package checker validates these two own records
+and their storage bounds without generating contents. Security-field
+semantics and valid factory contents remain unproved. In particular,
+`04b0+1f=04cf` is only an address relationship until its reader/validator
+is recovered, not permission to clear a purported lock field.
 
 Public catalogues also list a [5190 system-module document, `sysa3.pdf`](https://www.eserviceinfo.com/downloadsm/233124/NOKIA_sysa3.html).
 Its contents have not been acquired or verified here; the listing alone

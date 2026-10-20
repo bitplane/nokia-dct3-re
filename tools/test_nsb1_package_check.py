@@ -11,6 +11,24 @@ from tools import nsb1_package_check as checker
 
 
 class PackageTest(unittest.TestCase):
+    def test_security_directory_uses_32_bit_ids(self):
+        image = bytearray(0xcc400)
+        struct.pack_into('>IHH', image, 0xcc3d8, 0x2cc0a8, 2, 0)
+        struct.pack_into('>IHH', image, 0xcc0b0, 0x701, 0x4a8, 8)
+        struct.pack_into('>IHH', image, 0xcc0b8, 0x702, 0x4b0, 0x30)
+        result = checker.security_record_directory(image)
+        self.assertEqual([{'id': '0x701', 'offset': '0x4a8', 'length': 8},
+                          {'id': '0x702', 'offset': '0x4b0', 'length': 48}], result['records'])
+        self.assertFalse(result['field_semantics_proved'])
+        struct.pack_into('>I', image, 0xcc0b0, 0x10701)
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            checker.security_record_directory(image)
+        struct.pack_into('>IHH', image, 0xcc3d8, 0x1fffff, 2, 0)
+        with self.assertRaisesRegex(ValueError, 'bounds'):
+            checker.security_record_directory(image)
+        with self.assertRaisesRegex(ValueError, 'truncated'):
+            checker.security_record_directory(b'')
+
     def test_flash_integrity_word_order_and_bounds(self):
         image = bytearray(0x40)
         image[0x24:0x2a] = bytes.fromhex('20003020003f')
