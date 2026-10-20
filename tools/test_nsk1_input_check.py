@@ -66,10 +66,14 @@ class Nsk1InputCheckTest(unittest.TestCase):
 
     def test_power_state_observations(self):
         markers = ('nsk1_power_write: field=state value=0004 pc=00229ea4 t=4.8 observer_writes=0',
-                   'nsk1_power_snapshot: state=0004 event=0026 sample=0000 t=12.0 observer_writes=0')
+                   'nsk1_power_snapshot: state=0004 event=0026 sample=0000 t=12.0 observer_writes=0',
+                   'nsk1_power_window: sample=19d6 lower=0708 cycles=000000000047afcb observer_writes=0',
+                   'nsk1_report14_gate: remaining=0a cycles=0000000000e45ecf observer_writes=0')
         result = check(self.trace()+'\n'+'\n'.join(markers))
         self.assertEqual(4,result['power_writes'][0]['value'])
         self.assertEqual(0,result['power_snapshots'][0]['sample'])
+        self.assertEqual([10],result['report14_countdowns'])
+        self.assertEqual(6614,result['power_windows'][0]['sample'])
         for marker in markers:
             with self.assertRaises(ValueError):
                 check(self.trace()+'\n'+marker.split(':')[0]+': malformed')

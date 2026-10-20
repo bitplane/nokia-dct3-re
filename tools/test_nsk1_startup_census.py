@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from tools.nsk1_startup_census import flag_contract
+from tools.nsk1_startup_census import flag_contract,power_window_contract
 
 
 class Nsk1StartupCensusTest(unittest.TestCase):
@@ -31,6 +31,32 @@ class Nsk1StartupCensusTest(unittest.TestCase):
                 flag_contract(image,'standard')
         with self.assertRaises(ValueError):
             flag_contract(b'','standard')
+
+    def test_own_power_window_and_adc_source_table(self):
+        fragments = ((0x6276c,'2007f030f8788028'),
+                     (0x6278e,'4898434821e8f033f83004080c008028'),
+                     (0x62814,'2000882922e100d24291db0b4a754291dc08882122e100d24291db034a714291dc002001bd70'),
+                     (0x2a13a,'f038fb7e48a446804e7578302800d1074f9c20ef78394008703821284689e01b'))
+        for variant,shift in (('standard',0),('2915',-0x10)):
+            image = bytearray(0x100000)
+            for offset,encoded in fragments:
+                code = bytes.fromhex(encoded)
+                image[offset+shift:offset+shift+len(code)] = code
+            for offset,value in ((0x629f0,1500),(0x629f8,5500),(0x2a318,0x10a051),(0x9290c,0x200100)):
+                struct.pack_into('>I',image,offset+shift,value)
+            image[0x100:0x10a] = bytes([0,4,5,6,7,3,1,2,2,1])
+            result = power_window_contract(image,variant)
+            self.assertEqual([1800,5500],result['inclusive_window'])
+            self.assertEqual(2,result['adc_channel'])
+            for offset in (0x6278e,0x62814,0x629f8,0x9290c):
+                index = offset+shift
+                image[index] ^= 1
+                with self.subTest(variant=variant,offset=offset),self.assertRaises(ValueError):
+                    power_window_contract(image,variant)
+                image[index] ^= 1
+            image[0x107] = 1
+            with self.assertRaises(ValueError):
+                power_window_contract(image,variant)
 
 
 if __name__ == '__main__':

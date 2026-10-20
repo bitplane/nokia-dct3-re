@@ -30,9 +30,12 @@ def check(text):
     checksums = re.findall(r'nsk1_security_checksum: computed=([0-9a-f]{4}) stored=([0-9a-f]{4}) cycles=[0-9a-f]{16} observer_writes=0',text)
     power_writes = re.findall(r'nsk1_power_write: field=(state|event) value=([0-9a-f]{4}) pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0',text)
     power_snapshots = re.findall(r'nsk1_power_snapshot: state=([0-9a-f]{4}) event=([0-9a-f]{4}) sample=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    power_windows = re.findall(r'nsk1_power_window: sample=([0-9a-f]{4}) lower=([0-9a-f]{4}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    report14_gates = re.findall(r'nsk1_report14_gate: remaining=([0-9a-f]{2}) cycles=[0-9a-f]{16} observer_writes=0',text)
     for marker,matches in (('task_activate',activations),('application_gate',gates),
                            ('activation_status',statuses),('security_checksum',checksums),
-                           ('power_write',power_writes),('power_snapshot',power_snapshots)):
+                           ('power_write',power_writes),('power_snapshot',power_snapshots),
+                           ('power_window',power_windows),('report14_gate',report14_gates)):
         if len(matches) != text.count(f'nsk1_{marker}:'):
             raise ValueError('unrecognized activation trace format')
     for name,rows_ in (('input',ready_inputs),('flags_snapshot',ready_snapshots),('flag_write',ready_writes)):
@@ -57,4 +60,6 @@ def check(text):
             'power_writes':[{'field':field,'value':int(value,16),'pc':pc,'time':float(time)} for field,value,pc,time in power_writes],
             'power_snapshots':[{'state':int(state,16),'event':int(event,16),'sample':int(sample,16),'time':float(time)}
                                for state,event,sample,time in power_snapshots],
+            'power_windows':[{'sample':int(sample,16),'lower':int(lower,16)} for sample,lower in power_windows],
+            'report14_countdowns':[int(value,16) for value in report14_gates],
             'scope':'physical-contact and passive startup observation, not interactive UI acceptance'}

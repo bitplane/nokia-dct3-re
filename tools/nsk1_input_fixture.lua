@@ -27,6 +27,10 @@ machine.debugger:command(string.format('bpset %x,temp7<32,{temp7=temp7+1;logerro
 machine.debugger:command(string.format('bpset %x,temp8<8,{temp8=temp8+1;logerror "nsk1_application_gate: predicate=%%02x boot_reason=%%02x class=%%02x flags=%%02x stage=%%02x startup=%%02x cycles=%%016x observer_writes=0\\n",r0,b@r6,b@r4,b@(r4+1),b@r5,b@%x,totalcycles;g}',0x289218+shift,space:read_u32(0x2894b4+shift)))
 machine.debugger:command('temp9=0')
 machine.debugger:command(string.format('bpset %x,temp9<8,{temp9=temp9+1;logerror "nsk1_security_checksum: computed=%%04x stored=%%04x cycles=%%016x observer_writes=0\\n",r1,r0,totalcycles;g}',0x22c3dc+shift))
+machine.debugger:command('temp1=0')
+machine.debugger:command('temp2=0')
+machine.debugger:command(string.format('bpset %x,temp1<12,{temp1=temp1+1;logerror "nsk1_report14_gate: remaining=%%02x cycles=%%016x observer_writes=0\\n",r0,totalcycles;g}',0x22a146+shift))
+machine.debugger:command(string.format('bpset %x,temp2<12,{temp2=temp2+1;logerror "nsk1_power_window: sample=%%04x lower=%%04x cycles=%%016x observer_writes=0\\n",r1,r2,totalcycles;g}',0x26281c+shift))
 local fields = {}
 for _,field in pairs(machine.ioport.ports[':COL.1'].fields) do fields[field.mask] = field end
 local events = {{12,4,1},{12.2,4,0},{14,16,1},{14.2,16,0},{16,2,1},{16.2,2,0}}

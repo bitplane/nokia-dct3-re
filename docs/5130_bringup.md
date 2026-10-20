@@ -528,10 +528,31 @@ state-4 path through `22b2ce`. This identifies an input-dependent lifecycle,
 not proof that changing the sample produces report `14`.
 
 The report-14 block `22a192..22a1c4` sets a byte state to `0a`, manages
-timers `a8/a7`, calls `263610`, and publishes through `291ad2`. Its exact
-predecessor conditions still need decoding; do not infer a normal battery
-setting by choosing values merely to reach that block. Independently ground
-the NSK-1 board input/transfer contract before a nominal-voltage fixture.
+timers `a8/a7`, calls `263610`, and publishes through `291ad2`. One decoded
+predecessor is event `26` at `229f60..229f64`, entering `22a13a`. It calls
+`26283a` and tests countdown `10a051`; zero clears a flag and enters the
+report block, while nonzero selects another timer continuation.
+
+`26283a` decrements the countdown only when sample validator `262766`
+succeeds. Source 7 is read through `292862`; its own ten-byte channel table
+at `2adbd0` is `00 04 05 06 07 03 01 02 02 01`, selecting CCONT channel 2.
+After live gain/offset, the sample is multiplied by 1500 and divided by 232.
+Both resulting sample words must lie in the **signed, inclusive** range
+1800..5500. The source-8 branch and differential correction are conditional;
+this is not a claim that every branch uses the same raw channel.
+
+The live comparison sees `19d6` (6614), exactly `floor(1023*1500/232)`;
+the report-14 gate repeatedly observes countdown `0a`, never zero in the
+bounded trace. Thus the saturated generic ADC input cannot satisfy this
+validator in the observed calibration regime. This explains the immediate
+countdown gate, not every possible route to report `14`.
+
+The startup census now validates these opcode fragments, scale literals,
+ADC table and countdown pointer on both acquired firmware variants. Mutation
+tests protect the extraction. Physical units and fitted battery calibration
+remain separate evidence requirements: independently ground the NSK-1 board
+input/transfer contract before promoting a nominal-voltage fixture. No ADC
+value has been changed merely to make this gate pass.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

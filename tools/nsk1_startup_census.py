@@ -15,6 +15,40 @@ from tools.message_census import decode_image,extract_calls
 from tools.nse5_roller_contract import thumb_bl_candidates
 
 
+def power_window_contract(image,variant):
+    shift = {'standard':0,'2915':-0x10}[variant]
+    fragments = (
+        (0x26276c,'2007f030f8788028'),
+        (0x26278e,'4898434821e8f033f83004080c008028'),
+        (0x262814,'2000882922e100d24291db0b4a754291dc08882122e100d24291db034a714291dc002001bd70'),
+        (0x22a13a,'f038fb7e48a446804e7578302800d1074f9c20ef78394008703821284689e01b'),
+    )
+    for address,encoded in fragments:
+        start = address+shift-0x200000
+        expected = bytes.fromhex(encoded)
+        if image[start:start+len(expected)] != expected:
+            raise ValueError('own power window instruction contract differs')
+    def word(address):
+        offset = address+shift-0x200000
+        if offset < 0 or offset+4 > len(image):
+            raise ValueError('power window literal outside image')
+        return struct.unpack_from('>I',image,offset)[0]
+    multiplier,upper = word(0x2629f0),word(0x2629f8)
+    if (multiplier,upper,word(0x22a318)) != (1500,5500,0x10a051):
+        raise ValueError('power window constants or countdown differ')
+    table = word(0x29290c)
+    if not 0x200000 <= table <= 0x200000+len(image)-10:
+        raise ValueError('own ADC source table outside image')
+    channels = list(image[table-0x200000:table-0x200000+10])
+    if channels != [0,4,5,6,7,3,1,2,2,1]:
+        raise ValueError('own ADC source map differs')
+    return {'source':7,'adc_channel':channels[7], 'source_table':hex(table),
+            'calibrated_sample_multiplier':multiplier,'divisor':232,
+            'inclusive_window':[1800,upper],'countdown':hex(word(0x22a318)),
+            'report_callsite':hex(0x22a1c0+shift),
+            'scope':'own firmware conversion/window and report gate; not physical units, pack calibration or full lifecycle closure'}
+
+
 def flag_contract(image,variant):
     shift = {'standard':0,'2915':-0x10}[variant]
     table = 0x2415d8+shift
@@ -72,7 +106,7 @@ def analyze(image,variant):
     calls = extract_calls(profile,decode_image(swapped,0x200000),swapped,0x200000)
     mapping = {int(row['input'],16):row['flag_slot'] for row in contract['inputs']}
     decoded_sites = {call['callsite'] for call in calls}
-    return {'contract':contract,
+    return {'contract':contract,'power_window':power_window_contract(image,variant),
             'coverage':{'aligned_halfwords_scanned':(len(image)-2)//2,
                         'direct_bl_candidates':len(candidates),'decoded_calls':len(calls),
                         'argument_recovered':sum(call['arguments']['input'] is not None for call in calls),
