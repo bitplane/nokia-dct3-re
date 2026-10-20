@@ -764,6 +764,36 @@ forms. The45s qualified `tmp/nsk3-queue-producers` capture observes no
 208a48 construction with07d3/07d4, retains empty queue/mode0 and passes
 the mode-chain/cache/server checks. The retained-buffer producer and other
 constructor families remain open; no queue content is to be invented.
+
+### Physical Send/End and matched radio input
+
+The research profile now overrides inherited NSE-1 column0 labels using
+the own table2c7a30:row2/column0 is logical0e (Send), row3/column0 is0f
+(End). Previously Send was unexposed and End inherited a Scroll Down label.
+The correction is confined to `nsk3r4t`; no normal product gains native-call
+support from it. `nsk3_radio_input.lua` uses only physical port contacts:
+accepted phone code, Menu/Back, dial12345, Send22s and End30s. The matched
+`nsk3_radio_no_call.lua` omits only Send/End.
+
+Qualified pair `tmp/nsk3-radio-call-qualified` and
+`tmp/nsk3-radio-no-call-qualified` reproduces own logical0e/0f decoding in
+the Call/End run only. Both retain the measured mode-chain, exact packet
+cache and empty acknowledgement server through45s, with no queue or dynamic
+server construction. Flash remains own-image exact and SIM files match.
+EEPROM files differ at19 offsets, including packed12345 at1a90; their NV
+record semantics remain unqualified and the checker reports rather than
+conceals those differences. This proves physical input, not connected calls,
+network registration, native speech or EEPROM-history fidelity.
+
+```sh
+.venv/bin/python tools/nsk3_call_input_check.py roms/noki6130/source \
+  tmp/nsk3-radio-call-qualified tmp/nsk3-radio-no-call-qualified
+```
+
+The retained slot10a82c (owner10a7d8+54) stays null in the baseline45s
+`tmp/nsk3-retained-buffer` capture. Own helper209a4a copies message+4 to
+that slot for decoded inputs09c9/09d5/09e2; this is a candidate session-input
+surface, not a proved required boot transition. No input is synthesized.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
