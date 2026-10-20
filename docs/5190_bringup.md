@@ -155,6 +155,19 @@ that clears this mask remains unresolved; do not clear it diagnostically and
 claim ordinary input support. Register-observation reads in this second run
 are distinct from firmware reads and must not be counted as scanner activity.
 
+An aligned Thumb literal-load scan for the exact `20033` address finds four
+candidate unmask continuations: stores `26eb08`, `26f33e`, `26f4fc`, and
+`26f7a2` AND the register with `e0`, clearing all five column-mask bits.
+The fifth matching literal-load site belongs to the masking routine above.
+This is coverage of direct PC-relative loads of that address, not a proof
+that computed/indirect writers do not exist. None of the four candidate
+unmask stores executes in the five-second checksum-control observation.
+The startup receive call at `26f3f8` nevertheless returns repeatedly at
+`26f3fc`, with observed values `37`, `c8`, `33`, `ca`, and `32`; its
+receive loop is not wholly dormant. The remaining question is which
+firmware transition reaches a legitimate input-enable continuation, not
+whether to synthesize a key IRQ through the existing column mask.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
