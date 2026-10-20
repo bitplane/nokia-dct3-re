@@ -4,6 +4,29 @@ assert(machine.system.name == 'noki5190' or machine.system.name == 'nsb1r4t')
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local shared_writes, handoffs, releases = 0, 0, 0
+local serial_selection, lcd_commands, lcd_bytes, lcd_nonzero = 0, 0, 0, 0
+_G.nsb1_lcd_tap = space:install_write_tap(0x20028, 0x2002f, 'nsb1_lcd_bus', function(offset, data, mask)
+    if offset == 0x20028 and (mask & 0xff000000) ~= 0 then
+        serial_selection = (data >> 24) & 255
+    end
+    if serial_selection ~= 0x21 then return end
+    if offset == 0x2002c and (mask & 0xff000000) ~= 0 then
+        lcd_commands = lcd_commands + 1
+        if lcd_commands <= 24 then
+            machine:logerror(string.format('nsb1_lcd_command: byte=%02x pc=%08x t=%.9f observer_writes=0\n',
+                (data >> 24) & 255, cpu.state['R15'].value, machine.time:as_double()))
+        end
+    elseif offset == 0x20028 and (mask & 0xff) ~= 0 then
+        lcd_bytes = lcd_bytes + 1
+        if (data & 255) ~= 0 then
+            lcd_nonzero = lcd_nonzero + 1
+            if lcd_nonzero <= 8 then
+                machine:logerror(string.format('nsb1_lcd_nonzero: byte=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    data & 255, cpu.state['R15'].value, machine.time:as_double()))
+            end
+        end
+    end
+end)
 local released, result_reads, observing = false, 0, false
 local last_results = {}
 _G.nsb1_release_tap = space:install_write_tap(0x20000, 0x20003, 'nsb1_dsp_release', function(offset, data, mask)
@@ -81,6 +104,8 @@ emu.register_frame_done(function()
     if machine.system.name == 'nsb1r4t' and (next_sample == 3 or next_sample == 5) then
         machine.screens[':screen']:snapshot(string.format('nsb1_native_%ds.png', math.floor(now)))
     end
+    machine:logerror(string.format('nsb1_lcd_summary: t=%.9f commands=%d data_bytes=%d nonzero=%d observer_writes=0\n',
+        now, lcd_commands, lcd_bytes, lcd_nonzero))
     next_sample = next_sample + 1
     observing = false
 end, 'NSB-1 passive MCU boundary')

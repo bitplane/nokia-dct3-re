@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tools.nsb1_rom4_compare import check_trace, prepare
+from tools.nsb1_rom4_compare import check_lcd, check_trace, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -71,3 +71,34 @@ class NativeCompareTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'unqualified'):
                 prepare(root, root / 'run')
             self.assertFalse((root / 'run').exists())
+
+
+class LcdCompareTest(unittest.TestCase):
+    def trace(self):
+        commands = '24 40 80 41 80 42 80 43 80 44 80 45 80 20 21 05 14 ce 20 0c'.split()
+        lines = [f'nsb1_lcd_command: byte={value} pc=002ae138' for value in commands]
+        for time, command, data, nonzero in ((0.1, 0, 0, 0), (0.5, 32, 1008, 504),
+                                            (1, 32, 1008, 504), (2, 68, 2016, 504),
+                                            (5, 68, 2016, 504)):
+            lines.append(f'nsb1_lcd_summary: t={time} commands={command} data_bytes={data} '
+                         f'nonzero={nonzero} observer_writes=0')
+        return '\n'.join(lines)
+
+    def test_bus_and_both_pixel_states(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            Image.new('RGB', (84, 48), 'black').save(root / 'nsb1_native_1s.png')
+            Image.new('RGB', (84, 48), 'white').save(root / 'nsb1_native_5s.png')
+            check_lcd(self.trace(), root)
+            Image.new('RGB', (84, 48), 'white').save(root / 'nsb1_native_1s.png')
+            with self.assertRaisesRegex(ValueError, 'pixels'):
+                check_lcd(self.trace(), root)
+
+    def test_command_drift(self):
+        with self.assertRaisesRegex(ValueError, 'initialization'):
+            check_lcd(self.trace().replace('byte=24', 'byte=25'), Path('.'))
+
+    def test_missing_nonzero_transfer(self):
+        with self.assertRaisesRegex(ValueError, 'traffic'):
+            check_lcd(self.trace().replace('nonzero=504', 'nonzero=0'), Path('.'))

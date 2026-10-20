@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_lcd_selftest_transport", "owner": "nsb1_lcd_interface", "status": "satisfied",
+      "predicate": "The native compatibility configuration carries the own firmware's six-bank LCD clear/fill/clear traffic into the expected full-raster pixels",
+      "current": "Passive MCU capture under selection 21 records commands at 2c and data at 2b. The own initialization sequence selects six 84-byte banks, with 32 commands/1008 data bytes/504 nonzero bytes at 0.5 and 1 seconds, then 68/2016/504 at 2 and 5 seconds. Named snapshots are exactly 84x48 black at 1 second and white at 5 seconds. The checker requires both ordered bus initialization/counts and decoded pixel extrema, with negative controls rejecting always-white output and missing nonzero traffic. No observer framebuffer or guest-state write is used. This is LCD self-test transport/raster acceptance, not fitted controller identity, contrast/timing, graphical application boot or phone-service parity.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_rom4_native_compatibility", "owner": "nsb1_native_comparison", "status": "satisfied",
       "predicate": "With explicitly qualified NSE-1 resident-ROM compatibility inputs and own erased external storage, NSB-1 executes its own verifier selection, block handoffs and native loader continuation",
       "current": "Separate nsb1r4t admits own SHA-qualified flash plus unchanged NSE-1 program/data images, no EEPROM image or HLE DSP. Release-time readback matches own 186-word ROM3 and ROM4 uploads; firmware first rejects resident/requested 4/3 then accepts 4/4. All 63 main-loop handoffs execute, final MCU poll 28fa96 sees shared 10002 change ffff to 0004, own 580-word loader releases and native I/O traces enter 0d8f/8d98. Five-second state observations preserve success 1, saved version 4 and handoffs 63. Executable flash is unchanged and EEPROM remains 8 KiB. LCD is blank; fitted NSB-1 mask identity, physical 52 MHz cadence, valid calibration, graphical boot, RF, speech and services are not promoted. Normal noki5190 retains its independent silent-DSP boundary.",

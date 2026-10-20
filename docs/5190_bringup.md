@@ -12,8 +12,9 @@ a blocked lifecycle. In the ordinary silent configuration, the unanswered transi
 program's resident-version publication to shared word `10004`, before the
 MCU begins sparse-flash handoffs. Separate `nsb1r4t` executes acquired NSE-1
 ROM4 as an explicit compatibility candidate: it passes own version selection,
-63 block handoffs and native loader/resident continuation, but still has a
-blank LCD. Fitted NSB-1 mask identity and DSP cadence remain unproved.
+63 block handoffs and native loader/resident continuation. LCD bus/pixel
+acceptance reproduces firmware clear/fill/clear self-test, not application
+presentation. Fitted NSB-1 mask identity and DSP cadence remain unproved.
 No scheduler or ownership flag is injected.
 
 ## Qualified executable input
@@ -188,7 +189,7 @@ executes native loader/resident code observed at `0d8f` and `8d98`.
 By 0.5 seconds success byte `10ad2d` is 1, saved version `10ad36` is 4,
 and the handoff count is 63; these remain observed through five seconds.
 Source executable flash is unchanged and EEPROM persists at 8 KiB.
-The captured panel remains blank. This establishes compatibility of this
+The final panel is white after the separately validated LCD self-test. This establishes compatibility of this
 bootstrap path, **not fitted-mask identity, valid calibration, graphical
 boot, RF operation, audio or phone-service parity**.
 
@@ -205,3 +206,27 @@ executable identity. `--verbose` optionally records the larger native opcode
 inventory. Shorter runs record evidence without claiming the six-second
 acceptance boundary. The normal `noki5190` silent-MCU gate remains independent
 and unchanged in behavior.
+
+### LCD transport and pixel self-test
+
+Passive MCU MMIO capture observes selection `21` at `20028`, commands at
+`2002c` and data at `2002b`. The own initialization stream is
+`24,40,80,41,80,42,80,43,80,44,80,45,80,20,21,05,14,ce,20,0c`.
+Firmware writes six 84-byte zero banks, then six full `ff` banks, then
+clears them again. By 0.5/1 seconds totals are 32 commands, 1008 data bytes,
+504 nonzero bytes; by 2/5 seconds totals are 68/2016/504.
+
+The named snapshot `snap/nsb1_native_1s.png` is exactly 84x48 black;
+`snap/nsb1_native_5s.png` is exactly 84x48 white. These differ from the
+ordinary end-of-run auto-snapshot under `snap/nsb1r4t/`. The compatibility
+checker now requires both MCU traffic and decoded pixel values, rejecting
+an always-white panel or a missing nonzero transfer. No framebuffer or
+firmware state is written by the observer.
+
+This validates the exercised command/data transport and full raster under
+this configuration, not fitted controller identity, contrast, analogue LCD
+timing or application UI readiness. A white final frame alone must not be
+used to infer a broken display: the observed firmware deliberately clears
+the self-test pattern. The next consumer-side investigation is application
+presentation after self-test, with the own EEPROM validity gates kept
+separate from hardware transport.

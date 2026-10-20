@@ -45,6 +45,24 @@ def check_trace(trace, program3, program4, returncode):
             raise ValueError('missing native loader/resident execution evidence')
 
 
+def check_lcd(trace, snapshots):
+    from PIL import Image
+
+    commands = re.findall(r'nsb1_lcd_command: byte=([0-9a-f]{2}) pc=', trace)
+    expected = '24 40 80 41 80 42 80 43 80 44 80 45 80 20 21 05 14 ce 20 0c'.split()
+    if commands[:20] != expected:
+        raise ValueError('missing own six-bank LCD initialization')
+    summaries = re.findall(r'nsb1_lcd_summary: t=([0-9.]+) commands=(\d+) data_bytes=(\d+) nonzero=(\d+) observer_writes=0', trace)
+    counts = [(int(commands), int(data), int(nonzero)) for _, commands, data, nonzero in summaries]
+    if counts != [(0, 0, 0), (32, 1008, 504), (32, 1008, 504), (68, 2016, 504), (68, 2016, 504)]:
+        raise ValueError('LCD traffic does not reproduce clear/fill/clear self-test')
+    for name, value in (('nsb1_native_1s.png', 0), ('nsb1_native_5s.png', 255)):
+        with Image.open(snapshots / name) as source:
+            image = source.convert('RGB')
+            if image.size != (84, 48) or image.getextrema() != ((value, value),) * 3:
+                raise ValueError(f'LCD self-test pixels mismatch: {name}')
+
+
 def prepare(root, run):
     if run.exists():
         raise ValueError('use a fresh comparison directory; no prior EEPROM is admitted')
@@ -91,6 +109,7 @@ def main():
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
                         image[0xbe570:0xbe570 + 372], result.returncode)
+            check_lcd((run / 'error.log').read_text(), run / 'snap')
             if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
                 raise ValueError('own executable flash changed')
             if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
