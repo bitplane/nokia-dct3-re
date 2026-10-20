@@ -34,6 +34,11 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertEqual(3, interrupt['irq_disable_read_bit'])
         self.assertEqual(1, interrupt['fiq_disable_read_bit'])
         self.assertFalse(interrupt['read_masking_justified'])
+        event = result['idle_irq3_event']
+        self.assertEqual('00ff0000ffffffff', event['rom_bytes'])
+        self.assertEqual(0x331030, 0x330c68 + event['event'] * event['rom_stride'])
+        self.assertEqual(0x101334, 0x100d88 + event['event'] * event['runtime_stride'])
+        self.assertFalse(event['task_destination_proven'])
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]

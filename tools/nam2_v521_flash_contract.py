@@ -90,6 +90,17 @@ def inspect(image):
             "dispatch_slots": "0x10fac8",
         },
         "erase_geometry": "not established by algorithm selection",
+        "idle_irq3_event": {
+            "handler": "0x3075c8", "schedule": "0x2abaf4",
+            "cancel": "0x2ab970", "event": 0x79, "delay": 0x4b,
+            "initializer": "0x2ac7a8", "count": 0x109,
+            "rom_table": "0x330c68", "rom_stride": 8,
+            "rom_record": "0x331030",
+            "rom_bytes": image[0x331030 - BASE:0x331038 - BASE].hex(),
+            "runtime_record": "0x101334", "runtime_stride": 12,
+            "physical_source": "unresolved",
+            "task_destination_proven": False,
+        },
         "interrupt_control_consumers": {
             "irq_entry": "0x2fb574", "irq_guard": "0x2fb580",
             "irq_disable_read_bit": 3, "irq_disabled_return": "0x2fb588",

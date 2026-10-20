@@ -90,6 +90,21 @@ options and a fresh own checksum fixture. Capture
   and global control `0a` (delivery disabled). This is not a lost matrix
   contact or an interrupt-nesting leak.
 
+The idle branch acknowledges IRQ3 (`09 = 08`) and unmasks it (`0b &= f7`)
+at `2f8674/2f8682`. Its handler `3075c8` schedules numeric event `79` with
+delay `4b` through `2abaf4`, then acknowledges and remasks IRQ3. The runtime
+12-byte event descriptor at `101334` is
+`ffffffff0000ff0001000079` at 15 s in the physical no-SIM control:
+inactive state 1, zero remaining interval, and byte `+6 = ff`. This does not
+establish a task-message destination or the physical IRQ3 source. In particular,
+`2ab970` is the cancel/remove helper, not an immediate publisher. Recover the
+descriptor routing and IRQ3 source before implementing a wake response.
+The initializer `2ac7a8` consumes 265 eight-byte ROM records after the 25
+task records at `330b3c`. Event `79` therefore comes from `331030`
+(`00ff0000ffffffff`); it copies ROM bytes 0/1 to runtime flags/routing
+bytes `+7/+6`, initializes state `+8 = 1`, and stores the numeric index at
+`+a`. The hash-qualified flash-contract extractor reports this mapping.
+
 The next contract to recover is how ordinary idle is expected to service
 pending work or restore global delivery when the deep-sleep guard declines.
 Do not auto-write control `05`, alter software timer results or change the

@@ -41,8 +41,17 @@ for i, site in ipairs(sites) do
         site[1], site[4] or '7c00000', counter, site[5] or '1', counter, counter, site[2], format, site[3]))
 end
 local next_time = 10
+local descriptor_sampled = false
 emu.register_frame_done(function()
     local now = machine.time:as_double()
+    if not descriptor_sampled and now >= 15 then
+        descriptor_sampled = true
+        local bytes = {}
+        for i = 0, 11 do
+            bytes[#bytes + 1] = string.format('%02x', memory:read_u8(0x101334 + i))
+        end
+        machine:logerror(string.format('nam2_idle_irq3_descriptor: address=00101334 bytes=%s observer_writes=0\n', table.concat(bytes)))
+    end
     if now < next_time then return end
     machine:logerror(string.format('nam2_idle_sample: t=%.6f pc=%08x ctrl=%02x fmask=%02x imask=%02x fiq=%02x irq=%02x nest=%02x saved=%02x clock=%02x timer0=%04x stamp=%04x\n',
         now, cpu.state['PC'].value, memory:read_u8(0x2000c),
