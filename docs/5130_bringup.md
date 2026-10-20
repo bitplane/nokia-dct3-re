@@ -327,6 +327,20 @@ control path remains a candidate completion family, not an established
 ordinary acquisition prerequisite; its first-boot use alone does not justify
 replaying it or changing reset retention.
 
+The observed RSSI vector has its own positively identified native route.
+Publisher 47f6 sets AR4=008b at 47ff and CALLD 37ce at 4810 sets AR5=00a2
+in its delay slot. Qualified cold capture `tmp/nsk1-radio-native-rssi-caller`
+passes the 61-second boot/storage checks. At RX producer write PC 3805,
+SP=1e82 contains `0e13,008b,00a2,4814,0a2e,30ed,38ca,3976`.
+Live DSP disassembly confirms CALL 47f6 at 0a2c, returning to 0a2e;
+the acquired resident image instead has that call at 0a17. The uploaded
+program, not the resident-only caller census, is authoritative for this
+execution. Live 0a2e clears OVM and conditionally returns on NTC; the
+alternate tail writes sentinel 7fff and updates 11f9/11fa. No type-8a
+publication is implied by this RSSI return. The existing candidate 8a
+mapping must not be promoted to a required scan completion without its
+own operation/request evidence.
+
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
 It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state

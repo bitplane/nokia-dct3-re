@@ -157,7 +157,17 @@ _G.nsk1_radio_tx = memory:install_write_tap(0x100a4,0x100a7,'nsk1_radio_tx',func
     packets('tx',tx,new,0,0x52,cpu.state['R15'].value)
     tx = new
 end)
+local native_rx_stacks = 0
 _G.nsk1_radio_rx = dsp.spaces.data:install_write_tap(0x08e4,0x08e4,'nsk1_radio_rx',function(_,data)
+    if machine.time:as_double() >= 2 and native_rx_stacks < 16 then
+        native_rx_stacks = native_rx_stacks + 1
+        local sp, words = dsp.state['SP'].value, {}
+        for offset = 0, 7 do
+            words[#words + 1] = string.format('%04x', dsp.spaces.data:read_u16((sp + offset) & 0xffff))
+        end
+        machine:logerror(string.format('nsk1_radio_native_rx_stack: pc=%04x sp=%04x words=%s t=%.9f observer_writes=0\n',
+            dsp.state['PC'].value, sp, table.concat(words, ','), machine.time:as_double()))
+    end
     packets('rx',rx,data,0x80,0xe4,dsp.state['PC'].value)
     rx = data
 end)

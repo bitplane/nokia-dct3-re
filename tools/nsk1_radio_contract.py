@@ -12,7 +12,7 @@ from tools.c54x_rom4_port_census import direct_callers
 BASE = 0x200000
 
 
-def native_completion_contract(image):
+def native_completion_contract(image, data=None):
     if hashlib.sha1(image).hexdigest() != 'a05a1e96a8c36ec5a47e1ea059d15afa54ca5739':
         raise ValueError('native completion contract requires acquired NSE-1 ROM4 program')
     expected = bytes.fromhex('61f8 1949 0080 f830 3153 7713 1200 10f8 1867 8083 7715 0002 7713 1200 f274 37ce 7714 008a')
@@ -26,6 +26,11 @@ def native_completion_contract(image):
         raise ValueError('native control completion setter differs')
     request4 = [hex(address) for address, delayed in direct_callers(image, 0x318e)
                 if delayed and image[(address+2)*2:(address+4)*2] == bytes.fromhex('7712 0004')]
+    if data is not None:
+        if hashlib.sha1(data).hexdigest() != '024c7f970f4ef754d3e90471de48a167515f930d':
+            raise ValueError('native completion contract requires acquired NSE-1 ROM4 data')
+        if int.from_bytes(data[0xb0b7*2:0xb0b7*2+2], 'big') != 0x4a3c:
+            raise ValueError('native index-four command table differs')
     return {'publisher_call':'0x314d','publisher':'0x37ce','packet_type':'0x8a',
             'delay_slot':'0x314f sets AR4 to 0x008a',
             'payload':'two bytes at data 0x1200, copied from data 0x1867',
@@ -38,6 +43,10 @@ def native_completion_contract(image):
                                         'subcommand':'0x11','table_base':'0xb0a6',
                                         'table_entry':'0xb0b7','routine':'0x4a3c',
                                         'scope':'data-ROM table entry must be checked against acquired companion data image'},
+            'companion_data_checked':data is not None,
+            'rssi_publisher':{'entry':'0x47f6','type_load':'0x47ff','packet_type':'0x8b',
+                              'publisher_call':'0x4810','publisher':'0x37ce','payload_bytes':162,
+                              'scope':'resident publisher; uploaded caller addresses require live program evidence'},
             'scope':'resident ROM4 static path; neither execution nor fitted DSP mask is established by this contract'}
 
 
@@ -170,11 +179,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
     parser.add_argument('--dsp-program',type=Path)
+    parser.add_argument('--dsp-data',type=Path)
     args = parser.parse_args()
     try:
         result = analyze(args.image.read_bytes())
         if args.dsp_program:
-            result['native_completion'] = native_completion_contract(args.dsp_program.read_bytes())
+            result['native_completion'] = native_completion_contract(
+                args.dsp_program.read_bytes(), args.dsp_data.read_bytes() if args.dsp_data else None)
+        elif args.dsp_data:
+            raise ValueError('--dsp-data requires --dsp-program')
         print(json.dumps(result,indent=2))
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSK-1 radio contract failed: {error}\n')
