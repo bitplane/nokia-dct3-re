@@ -28,7 +28,8 @@ and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
-The next software target is the product's physical SIM-security workflows.
+Physical SIM wrong-PIN/cold-correct-PIN verification also passes using the
+shared laboratory card. Blocking and PUK recovery remain to be tested.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -686,6 +687,25 @@ Security code prompt at 28/30 seconds. The positive gate requires exact
 `3600e3d1cab564b185d03403552ea401e1e76edd07b110184716700828a5df2a`.
 The list exposes Search / Add entry / Erase; no persistent contact write,
 network registration, call, SMS or fitted-mask claim follows from this gate.
+
+## Physical SIM PIN
+
+```sh
+.venv/bin/python tools/nsk1_pin_roundtrip.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-pin-roundtrip
+```
+
+The first process uses the qualified own compatibility inputs and an explicitly
+generated PIN-enabled laboratory card, not donor storage. Physical `4321/OK`
+issues one VERIFY CHV returning `9804`, displays Code error and persists CHV1
+retries 3 to 2. A second process copies only persistent files and physically
+enters `1234/OK`: VERIFY returns `9000`, restores retries to 3 and leaves every
+other serialized card byte unchanged. PIN prompt, acceptance and the subsequent
+separate phone Security code prompt have exact frame checks. The latter receives
+its own physical `12345/OK`; this does not substitute for SIM authentication.
+Both phases validate native record arithmetic, sampled execution, unchanged
+flash and preserved phone identity/code fields. This proves ordinary PIN retry
+persistence/recovery, not blocked PIN/PUK, factory data, fitted DSP or network.
 
 ## Persistent SIM phonebook
 
