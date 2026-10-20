@@ -1,5 +1,5 @@
 import unittest
-from tools.nsm1_fdn_record_check import changed_card,RECORD
+from tools.nsm1_fdn_record_check import changed_card,edited_card,RECORD
 from tools.sim_fdn_profile import EXTENDED_LENGTH
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET
 
@@ -15,6 +15,13 @@ class FdnRecordTests(unittest.TestCase):
         with self.assertRaises(ValueError):changed_card(expected)
         with self.assertRaises(ValueError):changed_card(rejected)
         with self.assertRaises(ValueError):changed_card(before[:-1])
+
+    def test_edit_changes_only_last_bcd_digit(self):
+        before=bytearray(EXTENDED_LENGTH);before[3578:3610]=RECORD
+        after=edited_card(before)
+        self.assertEqual([(i,a,b) for i,(a,b) in enumerate(zip(before,after)) if a!=b],[(3600,0xf5,0xf6)])
+        with self.assertRaises(ValueError):edited_card(after)
+        with self.assertRaises(ValueError):edited_card(before[:-1])
 
 
 if __name__=='__main__':unittest.main()

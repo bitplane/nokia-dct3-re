@@ -235,7 +235,9 @@ Implementation status and remaining acceptance:
    the card's identity-session handshake, not a handset-state fixture.
 3. NSM-1 physical FDN save/cold-read and rejected PIN2 write are accepted
    with complete-card and exact-frame checks. Rejected PIN2 activation,
-   record modification and other handset coverage remain open. Physical
+   other handset coverage remain open. Physical in-place12345->12346 edit
+   and independent cold read also pass, changing only the final BCD digit.
+   Physical
    PIN2-protected erase/cancel and cold-empty search also pass on NSM-1,
    preserving the complete card outside the selected FDN record.
    Call enforcement needs a separately observed allowed/denied dial attempt;

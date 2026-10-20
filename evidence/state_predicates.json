@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_fdn_physical_in_place_edit_cold_read", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN2-protected FDN Edit updates the existing record and survives independent cold read without unrelated mutation",
+      "current": "After startup PIN1/phone acceptance, physical FDN Search/Details/Options verifies PIN25678, selects Edit, retains Name A, clears the last digit of12345 and enters6 before Save. One exact A0 DC 01 04 20 plus edited record returns9000. The complete3898-byte card changes only byte3600 F5->F6; the record location, name, ADN, credentials, retries and validity are unchanged. A separate cold Search/Details run displays12346 with no UPDATE or card-byte change. Exact physical contacts/authentication order, payload, full card/EEPROM links, native record validity, own flash and save/Details frames pass. The existing save/read/wrong-PIN checks also pass through the extended record gate. Dial enforcement remains unaccepted.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_fdn_record_edit.lua", "tools/nsm1_fdn_record_options.lua", "tools/nsm1_fdn_record_check.py", "tools/test_nsm1_fdn_record_check.py"]
+    },
+    {
       "id": "nsm1_fdn_physical_cancel_erase_cold_empty", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical PIN2-protected FDN cancellation preserves the record and confirmed erase survives independent cold empty search",
       "current": "After startup PIN1/phone acceptance, FDN Details/Options requires PIN25678 before showing Edit/Erase. Both controls reach exact Erase? A pixels. Physical Back returns to selected A and preserves all card bytes with no UPDATE. Confirm transmits one exact A0 DC 01 04 20 plus32FF bytes,9000, displays Memory erased and changes only the selected FDN record. Cold physical search shows No phone numbers with unchanged complete card and no UPDATE. Physical key/authentication order, exact APDUs, complete card/EEPROM chain, native record validity, own flash and confirmation/cancel/erase/empty frames pass. Record modification and dial enforcement remain separate.",

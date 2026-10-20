@@ -235,7 +235,14 @@ cold search displays No phone numbers and does not rewrite the card.
 links, physical PIN1/phone/PIN2 ordering, exact APDUs, confirmation/cancel/
 erase/empty frames and unchanged unrelated files. The write and erase
 checkers share the physical-authentication assertion.
-Record modification and dial enforcement remain separate targets.
+Physical Edit authenticates PIN2 at Options, retains Name A, deletes the
+last number digit and enters6 before Save. The complete card changes only
+byte3600 fromF5 toF6, updating12345 to12346 in the same FDN record.
+`nsm1_fdn_record_check.py WRITE COLD WRONG --edit EDIT --edit-cold EDIT_COLD`
+checks the exact protected UPDATE payload, physical edit contacts, full
+card/EEPROM links, save confirmation and independent cold12346 Details.
+No unrelated file, credential or validity flag changes. Dial enforcement
+remains a separate target.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \
