@@ -47,6 +47,12 @@ and matching MAME hashes do not independently establish factory authenticity.
 No ROM5/ROM6 DSP mask dump was acquired, no missing MAD2 ROM is fabricated,
 and acquisition alone does not promote any handset's runtime coverage.
 
+The acquired NSK-3 v5.61 package is additionally decoded into two own
+MCU/PPM-A pairs under ignored `roms/noki6130/`. Reproduce and qualify with
+`tools/nsk3_static_check.py`; `docs/6130_bringup.md` records member pairing,
+normalized hashes and the bootstrap's distinct3/4 identity writes. No external
+EEPROM or runtime support is implied by these extracted inputs.
+
 ## Reference 3210 image
 
 The **NSE-8/9 v06.00 3210** flash file. It is distributed (by third parties) inside
