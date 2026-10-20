@@ -94,6 +94,14 @@ def inspect(image):
             "dispatch_slots": "0x10fac8",
         },
         "erase_geometry": "not established by algorithm selection",
+        "timer1_destination_writers": {
+            "register": "0x20006", "helper": "0x2fad22",
+            "stores": [{"address": hex(address),
+                        "opcode": image[address - BASE:address - BASE + 2].hex()}
+                       for address in (0x2fadac, 0x2fadce)],
+            "execution_requires": "deep-sleep guard 0x2fac86 succeeds",
+            "write_semantics": "unresolved; current MAD2 model retains fixed 0x7fff",
+        },
         "idle_irq3_event": {
             "handler": "0x3075c8", "schedule": "0x2abaf4",
             "cancel": "0x2ab970", "event": 0x79, "delay": 0x4b,

@@ -41,6 +41,8 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertFalse(event['task_destination_proven'])
         self.assertFalse(event['initial_expiry_links_task'])
         self.assertEqual('0x2abcec', event['expiry'])
+        timer = result['timer1_destination_writers']
+        self.assertEqual(['80d0', '80d0'], [store['opcode'] for store in timer['stores']])
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]

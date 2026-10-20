@@ -5,6 +5,13 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 local owner_taps = {}
 local control_commands = {}
+local timer1_destination_writes = 0
+owner_taps[#owner_taps + 1] = memory:install_write_tap(
+    0x20004, 0x20007, 'nam2_idle_timer1_destination', function(offset, value, mask)
+        if (mask & 0xffff) ~= 0 then
+            timer1_destination_writes = timer1_destination_writes + 1
+        end
+    end)
 owner_taps[#owner_taps + 1] = memory:install_write_tap(
     0x2000c, 0x2000f, 'nam2_idle_control_commands', function(offset, value, mask)
         if (mask & 0xff000000) == 0 then return end
@@ -53,6 +60,8 @@ emu.register_frame_done(function()
     local now = machine.time:as_double()
     if not descriptor_sampled and now >= 15 then
         descriptor_sampled = true
+        machine:logerror(string.format('nam2_idle_timer1_destination: writes=%d destination=%04x observer_writes=0\n',
+            timer1_destination_writes, memory:read_u16(0x20006)))
         for command = 0, 255 do
             if control_commands[command] then
                 machine:logerror(string.format('nam2_idle_control_command: data=%02x count=%d observer_writes=0\n',

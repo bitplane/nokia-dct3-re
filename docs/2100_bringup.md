@@ -171,6 +171,13 @@ advances from `068f` at 13 s to `0f22` at 30 s while software timestamp
 20 s return an adjusted interval of zero, still declining deep sleep.
 IRQ0 from the 18 s physical contact remains pending. Waiting for this short
 timer or inventing a faster clock is therefore not an evidenced correction.
+The unentered deep-sleep helper `2fad22` nevertheless contains two explicit
+`STRH r0,[r2,#6]` writes to Timer 1 destination (`2fadac`, `2fadce`), first
+adding 50 and later applying division by 79. This is not a globally read-only
+register contract. The fresh no-SIM observer counts zero destination writes
+through 15 s and reads `7fff`, so these dormant stores do not explain the
+current pre-deep-sleep stall. Actual destination-write semantics remain open;
+the fixed-terminal model must not be promoted to complete NAM-2 sleep support.
 
 Executable provenance is independently bounded by the acquired
 `NAM-2_MCU_v5.21.EXE` installer (SHA-256
