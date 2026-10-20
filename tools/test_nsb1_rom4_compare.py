@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
-from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, check_menu, check_native_execution, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, check_menu, check_native_execution, check_receive_activity, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -18,14 +18,15 @@ class NativeCompareTest(unittest.TestCase):
             check_native_execution(sample, minimum_time=34)
         late = sample + '\n' + sample.replace('t=5.0', 't=34.0')
         activity = '\nnsb1_activity_check: count=0001 pc=002aff04 t=31.0 observer_writes=0'
-        check_native_execution(late + activity, minimum_time=34)
+        check_native_execution(late, minimum_time=34)
+        check_receive_activity(late + activity, minimum_time=34)
         for trace in (late, late + activity.replace('count=0001', 'count=0000')):
             with self.assertRaisesRegex(ValueError, 'receive activity'):
-                check_native_execution(trace, minimum_time=34)
+                check_receive_activity(trace, minimum_time=34)
         long = late + '\n' + sample.replace('t=5.0', 't=89.0')
         with self.assertRaisesRegex(ValueError, 'receive activity'):
-            check_native_execution(long + activity, minimum_time=89)
-        check_native_execution(long + activity + activity.replace('t=31.0', 't=62.0'), minimum_time=89)
+            check_receive_activity(long + activity, minimum_time=89)
+        check_receive_activity(long + activity + activity.replace('t=31.0', 't=62.0'), minimum_time=89)
         for trace in ('', sample.replace('5.0', '0.5'), sample.replace('illegal=0', 'illegal=1')):
             with self.subTest(trace=trace), self.assertRaises(ValueError):
                 check_native_execution(trace)

@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import xml.etree.ElementTree as ET
@@ -18,6 +19,14 @@ INPUTS = (
 
 EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
 PHONEBOOK_LIST_RGB_SHA256 = '1c9dac19aa382370ba315a4e99f2ea65c844f4ec099a263624b6593b0525a5bd'
+
+
+def check_frame(path, expected):
+    from PIL import Image
+    with Image.open(path) as source:
+        frame = source.convert('RGB')
+        if frame.size != (84, 48) or hashlib.sha256(frame.tobytes()).hexdigest() != expected:
+            raise ValueError(f'NSB-1 frame mismatch: {path.name}')
 
 
 def check_menu(trace, snapshots, frame_indices=(2, 3)):
@@ -39,6 +48,10 @@ def check_native_execution(trace, minimum_time=5):
         raise ValueError('missing native DSP execution observations')
     if any(illegal != '0' for _, _, illegal in samples):
         raise ValueError('native DSP stopped on an illegal instruction; bootstrap alone is insufficient')
+
+
+def check_receive_activity(trace, minimum_time):
+    """Require the observed PIN-disabled menu/control inactivity schedule, not CPU legality."""
     if minimum_time >= 34:
         activity = re.findall(r'nsb1_activity_check: count=([0-9a-f]{4}) pc=002aff04 t=[0-9.]+ observer_writes=0', trace)
         required = int(minimum_time // 31)
@@ -224,6 +237,47 @@ def run_mame(binary, rompath, run, script, seconds, verbose=False):
     return result.returncode
 
 
+def prepare_cold_run(run, source, validate_card, inputs):
+    """Copy only qualified own persisted devices; the workflow validates card contents."""
+    if run.exists():
+        raise ValueError('cold reload requires a fresh directory')
+    manifest = json.loads((source / 'input_manifest.json').read_text())
+    if (manifest.get('inputs') != [{'source': name, 'sha1': digest} for name, digest in inputs]
+            or not manifest.get('synthetic_sim_inserted') or not manifest.get('synthetic_retry_initialized')
+            or manifest.get('external_eeprom') != 'diagnostic checksum/retry control; calibration/identity not validated'):
+        raise ValueError('cold reload requires qualified own synthetic save provenance')
+    for name, digest in inputs:
+        if hashlib.sha1((source / 'inputs/nsb1r4t' / Path(name).name).read_bytes()).hexdigest() != digest:
+            raise ValueError('cold reload executable/resident inputs changed')
+    storage = source / 'nvram/nsb1r4t'
+    files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
+    if hashlib.sha1(files['flash']).hexdigest() != inputs[0][1] or len(files['eeprom']) != 8192:
+        raise ValueError('cold reload executable or EEPROM geometry changed')
+    validate_card(files['sim_card'])
+    target = run / 'nvram/nsb1r4t'
+    target.mkdir(parents=True)
+    shutil.copytree(source / 'inputs', run / 'inputs')
+    shutil.copytree(source / 'cfg', run / 'cfg')
+    for name, data in files.items():
+        (target / name).write_bytes(data)
+    manifest['cold_source_run'] = str(source.resolve())
+    manifest['cold_storage_sha256'] = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
+    (run / 'input_manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return run / 'inputs'
+
+
+def check_card_run(run, returncode, seconds):
+    image = (run / 'inputs/nsb1r4t/5190f671a.fls').read_bytes()
+    trace = (run / 'error.log').read_text()
+    check_trace(trace, image[0xb9350:0xb9350 + 372], image[0xbe570:0xbe570 + 372], returncode)
+    check_native_execution(trace, seconds - 1)
+    if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
+        raise ValueError('card phase changed executable flash')
+    if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
+        raise ValueError('card phase changed EEPROM geometry')
+    return trace, (run / 'nvram/nsb1r4t/sim_card').read_bytes()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
@@ -258,6 +312,7 @@ def main():
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
             if args.menu_fixture:
                 check_native_execution((run / 'error.log').read_text(), minimum_time=args.seconds - 1)
+                check_receive_activity((run / 'error.log').read_text(), args.seconds - 1)
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
                         image[0xbe570:0xbe570 + 372], returncode)
             if args.checksum_control_from is None:

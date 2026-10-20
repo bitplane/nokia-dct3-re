@@ -1,19 +1,17 @@
 """Accept own NSB-1 physical SIM contact save and cold-process readback."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsb1_rom4_compare import (
-    INPUTS, check_menu, check_native_execution, check_security_gate, check_trace,
-    prepare, run_mame,
+    INPUTS, check_card_run, check_frame, check_menu, check_receive_activity, check_security_gate,
+    prepare, prepare_cold_run, run_mame,
 )
 from tools.sim_phonebook_check import validate_phonebook, validate_phonebook_storage
 
@@ -21,14 +19,6 @@ from tools.sim_phonebook_check import validate_phonebook, validate_phonebook_sto
 SAVED_RGB_SHA256 = '8c01f87b60e87cb07ab22ffe2418b7a4510554681ede41c423e85abecaca5231'
 RELOADED_RGB_SHA256 = '2b55f3e9f92b0d1b7b3c06e51f5d1d080ce6e896cb0042f1ed5b98d5ee764aca'
 SAVE_KEYS = ('down', 'menu', 'two', 'three', 'two', 'menu', 'one', 'two', 'three', 'menu')
-
-
-def check_frame(path, expected):
-    from PIL import Image
-    with Image.open(path) as source:
-        frame = source.convert('RGB')
-        if frame.size != (84, 48) or hashlib.sha256(frame.tobytes()).hexdigest() != expected:
-            raise ValueError(f'phonebook frame mismatch: {path.name}')
 
 
 def check_saved(trace, storage, snapshots):
@@ -53,46 +43,16 @@ def check_reloaded(trace, storage, snapshots):
 
 
 def prepare_reload(run, source):
-    if run.exists():
-        raise ValueError('cold reload requires a fresh directory')
-    manifest = json.loads((source / 'input_manifest.json').read_text())
-    if (manifest.get('inputs') != [{'source': name, 'sha1': digest} for name, digest in INPUTS]
-            or not manifest.get('synthetic_sim_inserted') or not manifest.get('synthetic_retry_initialized')
-            or manifest.get('external_eeprom') != 'diagnostic checksum/retry control; calibration/identity not validated'):
-        raise ValueError('cold reload requires qualified own synthetic save provenance')
-    for name, digest in INPUTS:
-        if hashlib.sha1((source / 'inputs/nsb1r4t' / Path(name).name).read_bytes()).hexdigest() != digest:
-            raise ValueError('cold reload executable/resident inputs changed')
-    storage = source / 'nvram/nsb1r4t'
-    files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
-    if hashlib.sha1(files['flash']).hexdigest() != INPUTS[0][1] or len(files['eeprom']) != 8192:
-        raise ValueError('cold reload executable or EEPROM geometry changed')
-    validate_phonebook_storage(files['sim_card'])
-    target = run / 'nvram/nsb1r4t'
-    target.mkdir(parents=True)
-    shutil.copytree(source / 'inputs', run / 'inputs')
-    shutil.copytree(source / 'cfg', run / 'cfg')
-    for name, data in files.items():
-        (target / name).write_bytes(data)
-    manifest['cold_source_run'] = str(source.resolve())
-    manifest['cold_storage_sha256'] = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
-    (run / 'input_manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    return run / 'inputs'
+    return prepare_cold_run(run, source, validate_phonebook_storage, INPUTS)
 
 
 def check_phase(run, returncode, seconds):
-    image = (run / 'inputs/nsb1r4t/5190f671a.fls').read_bytes()
-    trace = (run / 'error.log').read_text()
-    check_trace(trace, image[0xb9350:0xb9350 + 372], image[0xbe570:0xbe570 + 372], returncode)
-    check_native_execution(trace, seconds - 1)
+    trace, storage = check_card_run(run, returncode, seconds)
+    check_receive_activity(trace, seconds - 1)
     check_security_gate(trace, True)
     # Subsequent physical actions change the selection before parent frame 3.
     check_menu(trace, run / 'snap', frame_indices=(2,))
-    if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
-        raise ValueError('phonebook phase changed executable flash')
-    if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
-        raise ValueError('phonebook phase changed EEPROM geometry')
-    return trace, (run / 'nvram/nsb1r4t/sim_card').read_bytes()
+    return trace, storage
 
 
 def main():
