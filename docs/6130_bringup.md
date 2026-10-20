@@ -16,6 +16,7 @@ the separate phone security-code prompt. A blocked-PIN fixture additionally
 passes physical PUK recovery, wrong-PUK rejection and cold authentication using
 the new PIN. Physical PIN-request enable also persists and causes the expected
 cold PIN challenge. Other SIM/security operations and radio remain unaccepted.
+Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -282,7 +283,7 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The PUK gate below extends this boundary; permanent blocking,
-ordinary PIN changes, PIN-request disable and PIN2 remain unaccepted.
+PIN-request disable and PIN2 remain unaccepted; ordinary PIN change is covered below.
 
 ### PUK recovery and new-PIN persistence
 
@@ -328,9 +329,32 @@ accepts physical1234, presents the separate phone lock and preserves the card:
   tmp/nsk3-pin-request-cold
 ```
 
-This accepts enable and its cold challenge, not PIN-request disable or ordinary
-CHANGE CHV. Those remain separate next operations; credentials were not changed
-to make this setting work.
+This accepts enable and its cold challenge, not PIN-request disable. The ordinary
+CHANGE CHV gate below is separate; credentials were not changed to make this
+setting work.
+
+### Ordinary PIN change
+
+The enabled card authenticates1234 on startup, then the separate phone code
+unlocks the UI. The observed route is Menu4/Security5/Change access codes6,
+Select, Down from Change security code to Change PIN, Select. Physical old
+PIN1234, new4321 and confirmation produce one CHANGE CHV
+`a0 24 00 01 10`, returning9000 and displaying PIN code changed.
+
+The full card comparison allows only PIN1's credential bytes to change. A
+qualified cold input snapshot matches the changed card; physical4321 VERIFY
+succeeds and leaves the whole card unchanged. This is independent of PUK
+recovery and does not re-provision the PIN during cold preparation.
+
+```sh
+.venv/bin/python tools/nsk3_pin_change_check.py roms/noki6130/source \
+  tmp/nsk3-change-pin-qualified tmp/nsk3-change-pin-cold
+```
+
+The fixture composes startup PIN and phone-code input through one idempotent
+passive SIM observer; timing offsets schedule physical contacts only. All
+hardware defaults and declared native/analog/provisioning hypotheses remain
+unchanged. PIN-request disable, permanent blocking and PIN2 remain separate.
 
 ## Own firmware inputs
 
