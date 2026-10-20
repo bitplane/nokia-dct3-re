@@ -6,7 +6,8 @@ The acquired v5.23 PPM C package normalizes to an exact 2 MiB CPU-order
 image. `make verify-6150-static` regenerates it from a hash-pinned ZIP
 wrapper without executing the installer, validates every Wintesla record,
 and checks its reset and sparse DSP verification contract. Normal handset
-support and graphical boot are not promoted. An explicitly separate
+support is not promoted; the separate diagnostic composition below now has
+qualified graphical presentation. An explicitly separate
 `nsm1r4t` executable compatibility instrument now exists.
 
 The next prerequisite is establishing matching resident DSP behavior and
@@ -16,9 +17,11 @@ The historical repair-template control rejects its decoded storage record.
 A separately labelled published-record diagnostic now passes that validator,
 receives a native record update, persists it and validates it again in a
 separate cold process. This is not factory provisioning or fitted-chip proof.
-The current downstream boundary remains blank display and readiness inputs
-`01/ff/00/01` at eight seconds; SIM activation is not yet observed. No
-downstream readiness event or firmware flag is synthesized.
+The separately labelled nominal ADC2 comparison now reaches a readable
+**Security code** frame and organic SIM SELECT traffic. Saturated controls
+retain the blank display and readiness inputs `01/ff/00/01`. Physical key
+entry, accepted phone code, menu and downstream services remain unaccepted.
+No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
@@ -52,9 +55,39 @@ This does not yet qualify a copied accepted-context object or graphical boot.
 ```
 
 The earlier rejection traces below remain negative controls of the unmodified
-template, not the current diagnostic frontier. The next task is the own
-post-validation startup/readiness lifecycle; do not adjust physical inputs
-until their own readers and units are established.
+template, not the current diagnostic frontier. The own analog comparison
+below resolves the next startup dependency without promoting physical units.
+
+### Own analog comparison and graphical presentation
+
+The report14 call223a74 is in a shared tail, not exclusively owned by input21's
+limited-fast-read setup. Other direct branches enter that setup at223a0a and
+223a12. The ordinary measurement loop calls28a884/28a7b0 and decrements byte
+11089a only after both converted values satisfy signed1800..5500 limits.
+Source7 maps through the own table2e0b3c to CCONT ADC2; source8 may be cached.
+Scale is1500/232. Live coefficients at11fe3c/11fe40 are3f8033c4/00000000,
+not the sibling's identity calibration.
+
+The saturated control returns19dc/19dc, validity0 and counter10 unchanged.
+The explicit nominal554 hypothesis returns0dfd/0dfd, validity1 and a decrementing
+counter, then reaches223a68 and posts the startup report organically. The
+research-only input defaults to1023 and exposes554 as the existing nominal
+3.6-V/typical6.5-mV-per-count comparison, not measured6150 ADC calibration.
+Normal handset declarations are unchanged. No identity/calibration byte is
+edited and no report, task resume, timer result or code selection is injected.
+
+Fresh `tmp/nsm1-nominal-qualified` reproduces the full84x48 Security code frame
+at8s, RGB SHA25624cbab0ad5b13376772a44f0eec7835a7ea865795c9ee229c7631fa2e0ea1fb2.
+Native record validation still passes and SIM SELECT responses occur.
+Presentation is not proof of keyboard delivery, full SIM initialization or
+interactive idle. The next target is physical input and phone-code acceptance.
+
+```sh
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-published-record-cold tmp/FRESH
+# Run nsm1r4t for15s with tools/nsm1_analog_observe.lua and the fresh run directory.
+.venv/bin/python tools/nsm1_analog_check.py \
+  tmp/nsm1-analog-coefficients tmp/nsm1-nominal-qualified
+```
 
 The independent60s cold run `tmp/nsm1-startup-qualified` preserves the
 validated EEPROM exactly and passes the record checker. Uncapped entry
@@ -551,7 +584,9 @@ sampling fields, arms timer `0xdd`, calls `0x28b760`, then publishes report
 sampling request followed by a report, not an independently established
 generic startup-initialization command. The task-1 readiness bit depends
 on that report in this run, but that consumer dependency does not establish
-the full product meaning of either input `0x21` or report `0x14`.
+the full product meaning of either input `0x21` or report `0x14`. This is
+one entry into shared setup/report code, not exclusive report ownership;
+the independently qualified ordinary measurement path above also reaches it.
 
 Selector 5 in state helper `0x2bf1a0` has a direct transport interpretation:
 `0x2c32f4` sends CCONT command `0x00` (table byte `0x2e0c52`) followed by

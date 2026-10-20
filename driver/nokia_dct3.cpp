@@ -3476,8 +3476,18 @@ static INPUT_PORTS_START( noki5110 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( dct3_research_adc2 )
+	PORT_START("RESEARCH_ADC2")
+	// Explicit analog-input comparison, not measured handset calibration.
+	// 554 is the nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis.
+	PORT_CONFNAME(0x03ff, 0x03ff, "Research CCONT ADC2 source")
+	PORT_CONFSETTING(0x03ff, "Saturated control (1023)")
+	PORT_CONFSETTING(554, "Nominal input hypothesis (554)")
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( nsm1r4t )
 	PORT_INCLUDE(noki5110)
+	PORT_INCLUDE(dct3_research_adc2)
 	// Own normal table 0x2e0b18: digits retain the NSE-1 cells, while
 	// navigation and side keys occupy different cells. Row zero is unused.
 	PORT_MODIFY("COL.0")
@@ -3499,15 +3509,6 @@ static INPUT_PORTS_START( nsb1r4t )
 	// Default empty socket; active insertion drives the existing removed line low.
 	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
-INPUT_PORTS_END
-
-static INPUT_PORTS_START( dct3_research_adc2 )
-	PORT_START("RESEARCH_ADC2")
-	// Explicit analog-input comparison, not measured handset calibration.
-	// 554 is the nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis.
-	PORT_CONFNAME(0x03ff, 0x03ff, "Research CCONT ADC2 source")
-	PORT_CONFSETTING(0x03ff, "Saturated control (1023)")
-	PORT_CONFSETTING(554, "Nominal input hypothesis (554)")
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( nsk1r4t )

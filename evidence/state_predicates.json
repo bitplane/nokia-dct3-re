@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_own_analog_graphical_comparison", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "Own-ROM analog validation and an explicit external nominal ADC2 hypothesis release startup reports to exact Security code presentation",
+      "current": "Shared report-tail census corrects input21-only ownership: other branches enter223a0a/223a12. Own source7 table2e0b3c selects ADC2, scale1500/232 and limits1800..5500. Live gain3f8033c4/offset0 with saturated control1023 yields19dc and leaves counter11089a at10; nominal554 yields0dfd, accepted samples and decrementing counter, reaches223a68 and delivers scalar14 to task1. Bitmap1126c1 reaches0f organically, SIM SELECT occurs and the exact84x48 Security code frame reproduces in a fresh run. Only the research profile exposes the nominal option; default1023 and normal handset declarations are unchanged. No identity/calibration edit, firmware flag, report or resume injection is used. Physical ADC units, fitted mask, complete SIM initialization, keyboard/code/menu and phone services remain unaccepted.",
+      "evidence": ["docs/6150_bringup.md", "driver/nokia_dct3.cpp", "tools/nsm1_analog_contract.py", "tools/nsm1_analog_observe.lua", "tools/nsm1_analog_check.py", "tools/nsm1_nominal_input.py", "tools/test_nsm1_analog_check.py"]
+    },
+    {
       "id": "nsm1_published_record_native_cold_validation", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "An explicitly diagnostic published record passes own native validation/update and persists across an independent cold process",
       "current": "The own repair-template control still rejects its decoded record. The attributed numeric diagnostic changes only record0020..0037 and checksum003c..003f, preserving identity/calibration. Native3532/3534/3532 responses agree with independently decoded arithmetic, markers and update checksum; validator27e798 retains validity1 and the initial process requests exactly one reason04 restart from242c91. A separate cold process emits one3532, no update/restart and preserves the entire16KiB EEPROM byte-for-byte. LCD remains blank and readiness second input remains zero; this is not factory provisioning, fitted-mask identification, full accepted-context verification or phone-feature acceptance.",
