@@ -3,6 +3,7 @@ local source=debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsm1_sim_observe.lua')
 local machine=manager.machine
 local memory=machine.devices[':maincpu'].spaces.program
+local start=_G.nsm1_phone_code_start or 9
 machine.debugger:command('bpset 2bcde8,1,{logerror "nsm1_security_submit: text=%08x%08x caller=%08x observer_writes=0\\n",d@r0,d@(r0+4),r14;g}')
 machine.debugger:command('bpset 2bcd98,1,{logerror "nsm1_security_gate: match=%08x retry_pointer=%08x retry=%02x observer_writes=0\\n",r0,r1,b@r1;g}')
 machine.debugger:command('bpset 2bcde6,1,{logerror "nsm1_security_accepted: result=%08x observer_writes=0\\n",r0;g}')
@@ -18,7 +19,7 @@ for index,cell in ipairs(cells) do
     local row=0
     while (1<<row)~=cell[2] do row=row+1 end
     assert(memory:read_u8(0x2e0b18+row*5+cell[1])==cell[3],'own key table changed')
-    local time=index>=7 and 15+(index-7)*0.8 or 9+(index-1)*0.5
+    local time=index>=7 and start+6+(index-7)*0.8 or start+(index-1)*0.5
     events[#events+1]={time,field,1,cell[3]}
     events[#events+1]={time+0.2,field,0,cell[3]}
 end

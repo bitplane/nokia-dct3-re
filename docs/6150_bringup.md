@@ -25,7 +25,8 @@ retry-initializer contrast below. Physical SIM contact save and cold selected
 name/number readback also pass. Physical Phone erasure removes the template's
 extra Phone rows without touching that SIM contact. Physical wrong PIN1 and
 cold correct-PIN authentication preserve/restore the card retry counter.
-Network services remain unaccepted.
+PIN1, phone-code and menu also compose in one cold boot. Physical offline
+SMS draft save/cold Outbox read pass; network services remain unaccepted.
 No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -145,7 +146,12 @@ receives9000 and restores only retries2->3, reproducing the entire initial
 card. Both cold inputs display Enter PIN code; rejection displays Code error
 and successful authentication reaches the separate Security code prompt.
 This fixture does not submit the phone code or equate SIM authentication
-with phone unlock. PIN exhaustion/PUK, PIN changes, request toggles, PIN2 and
+with phone unlock. Separate `nsm1_pin_menu.lua` composes physical1234,
+phone12345 and Menu in one cold boot. Its gate requires VERIFY before phone
+submission, phone acceptance before application input, an unchanged full
+card, preserved cold EEPROM input and the exact Messages frame at24s.
+The shared UART observer is installed once across both physical fixtures.
+PIN exhaustion/PUK, PIN changes, request toggles, PIN2 and
 authenticated network services remain separately unaccepted on NSM-1.
 
 ```sh
@@ -154,7 +160,34 @@ authenticated network services remain separately unaccepted on NSM-1.
 # Run19s with nsm1_pin_input.lua and debugger enabled.
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-pin-wrong tmp/COLD --preserve-sim
 # Run19s with nsm1_pin_reload.lua and debugger enabled.
-.venv/bin/python tools/nsm1_pin_check.py tmp/nsm1-pin-wrong tmp/nsm1-pin-cold-correct
+.venv/bin/python tools/nsm1_pin_check.py tmp/nsm1-pin-wrong tmp/nsm1-pin-cold-correct \
+  --menu tmp/nsm1-pin-menu
+```
+
+### Authenticated offline SMS
+
+After physical PIN1 and phone-code acceptance, `nsm1_sms_input.lua` opens
+Messages/Write messages, enters A and selects Save. The exact unsent SMS
+record is `070281f001ff008100000141` padded to176 bytes. Firmware selects
+EF_SMS6f3c and issues one `A0 DC 01 04 B0` with that payload; status9000
+and Message saved agree with persistent storage. Only the initially empty
+first SMS slot changes in the whole3570-byte card; ADN and credentials remain
+unchanged and the other nine SMS records stay free.
+
+The independent cold run preserves the entire saved EEPROM/card, authenticates
+both credentials again and reads A from Outbox. It issues no UPDATE RECORD,
+leaves the complete card byte-identical and matches the established exact
+editor/read frames. Shared protocol checks are parameterized only by observer
+labels/capture bounds; no sibling firmware address or menu table enters the
+driver. This is offline storage/UI acceptance, not submitted/delivered network SMS.
+Erase/cancel, received-message behavior and radio remain separate targets.
+
+```sh
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-pin-menu tmp/WRITE --preserve-sim
+# Run33s with nsm1_sms_input.lua and debugger enabled.
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-sms-draft tmp/COLD --preserve-sim
+# Run29s with nsm1_sms_reload.lua and debugger enabled.
+.venv/bin/python tools/nsm1_sms_check.py tmp/nsm1-sms-draft tmp/nsm1-sms-cold
 ```
 
 ### Physical SIM phonebook persistence

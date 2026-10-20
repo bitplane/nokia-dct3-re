@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_authenticated_offline_sms_cold_read", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "Physical PIN1 and phone-code authentication compose with offline SMS draft save and independent cold Outbox read",
+      "current": "The same cold boot verifies PIN1234 before accepting phone12345 and application input. The separate menu fixture renders exact Messages at24s with unchanged card. Physical Write messages/A/Save selects6f3c and transmits one exact A0 DC 01 04 B0 plus padded176-byte unsent draft070281f001ff008100000141,9000. The whole card differs only in the fresh first SMS slot. A separate cold process preserves saved EEPROM/card, authenticates both credentials and renders exact Outbox A without UPDATE RECORD or any card-byte change. Own flash, native record dialogue, physical keys, authentication ordering, capture completeness and full editor/read pixels pass. No network-SMS, incoming message, erase/cancel, radio or fitted-mask claim follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_pin_menu.lua", "tools/nsm1_pin_check.py", "tools/nsm1_sms_input.lua", "tools/nsm1_sms_reload.lua", "tools/nsm1_sms_check.py", "tools/test_nsm1_pin_check.py", "tools/test_nsm1_sms_check.py"]
+    },
+    {
       "id": "nsm1_physical_pin1_cold_retry", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical wrong PIN1 decrements only its card retry counter and independent cold correct-PIN authentication restores it without phone unlock",
       "current": "The explicit PIN-request fixture clones the current synthetic card and changes only its enable bit, requiring default1234 and fresh3/3/10/10 counters. Physical4321/Left produces exact A0 20 00 01 08 plus padded4321,9804 and only retries3->2. The entire3570-byte saved card and EEPROM are copied to a separate cold process. Physical1234 produces9000 and only retries2->3, restoring the exact initial card. Exact Enter PIN/Code error/separate Security code frames, own flash and native record validity pass. No phone code, APDU or firmware state is injected; PUK/PIN-change/toggle/PIN2 and network services remain unaccepted on NSM-1.",

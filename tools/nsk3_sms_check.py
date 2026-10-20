@@ -30,6 +30,15 @@ def check_card(card):
         raise ValueError('exact unsent A record/empty remainder or ADN differs')
 
 
+def check_streams(write_trace,cold_trace,write_stream,cold_stream):
+    if statuses(write_trace,0xdc)!=[(0x9000,3,10)] or statuses(cold_trace,0xdc):
+        raise ValueError('write/cold read-only status contrast differs')
+    command=bytes.fromhex('a0dc0104b0')+DRAFT
+    if write_stream.count(command)!=1 or bytes.fromhex('a0a40000026f3c') not in write_stream[:write_stream.find(command)]:
+        raise ValueError('EF_SMS selection/exact UPDATE RECORD differs')
+    if bytes.fromhex('a0dc') in cold_stream:raise ValueError('cold read rewrote a SIM record')
+
+
 def check_runs(source,write,cold):
     _,image=inspect(source,'boot4')
     cards,streams=[],[]
@@ -44,12 +53,7 @@ def check_runs(source,write,cold):
         card=(run/'nvram/nsk3r4t/sim_card').read_bytes()
         check_card(card)
         cards.append(card)
-        if statuses(trace,0xdc)!=([(0x9000,3,10)] if run==write else []):
-            raise ValueError('write/cold read-only status contrast differs')
-    command=bytes.fromhex('a0dc0104b0')+DRAFT
-    if streams[0].count(command)!=1 or bytes.fromhex('a0a40000026f3c') not in streams[0][:streams[0].find(command)]:
-        raise ValueError('EF_SMS selection/exact UPDATE RECORD differs')
-    if bytes.fromhex('a0dc') in streams[1]:raise ValueError('cold read rewrote a SIM record')
+    check_streams((write/'error.log').read_text(),(cold/'error.log').read_text(),*streams)
     if (cold/'initial_sim_card.bin').read_bytes()!=cards[0] or cards[1]!=cards[0]:
         raise ValueError('cold SMS card did not preserve saved bytes')
     frame_check(write/'snap/nsk3_sms_23.png',EDITOR)

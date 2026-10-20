@@ -1,6 +1,7 @@
 """Physical NSM-1 PIN1 retry persistence and cold authentication, not phone unlock."""
 import argparse
 import hashlib
+import re
 from pathlib import Path
 import sys
 
@@ -13,6 +14,17 @@ from tools.nsm1_v523_static_check import SHA1
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET,CHV_OFFSET,ENABLED_OFFSET,padded_pin
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
 from tools.nsk1_phonebook_roundtrip import frame_check
+from tools.nsm1_security_check import check_trace as check_phone,MENU
+
+
+def check_authenticated(trace,following_keys=(0x19,)):
+    check_trace(trace,True,prefix='nsm1',tx_limit=4096)
+    check_phone(trace,True,following_keys)
+    positions=[trace.index(marker) for marker in ('SIM status ins=20 sw=9000',
+               'nsm1_security_submit:','nsm1_security_accepted:')]
+    if positions!=sorted(positions):raise ValueError('PIN and phone-code authentication ordering differs')
+    presses=[match.start() for match in re.finditer(r'nsm1_security_contact: key=[0-9a-f]+ down=1 ',trace)]
+    if len(presses)<7 or presses[6]<=positions[-1]:raise ValueError('application input preceded phone unlock')
 
 
 def check_cards(before,wrong,cold,correct):
@@ -27,6 +39,7 @@ def check_cards(before,wrong,cold,correct):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('wrong',type=Path);parser.add_argument('correct',type=Path)
+    parser.add_argument('--menu',type=Path)
     args=parser.parse_args()
     try:
         for run,correct in ((args.wrong,False),(args.correct,True)):
@@ -44,9 +57,21 @@ def main():
             raise ValueError('cold EEPROM input differs')
         frame_check(args.wrong/'snap/nsm1_pin_12.png',ERROR)
         frame_check(args.correct/'snap/nsm1_pin_17.png',PHONE_PROMPT)
+        if args.menu:
+            run=args.menu;trace=(run/'error.log').read_text()
+            check_authenticated(trace);records(trace,True)
+            storage=run/'nvram/nsm1r4t'
+            initial=(run/'initial_sim_card.bin').read_bytes()
+            if initial!=(args.correct/'nvram/nsm1r4t/sim_card').read_bytes() or (storage/'sim_card').read_bytes()!=initial:
+                raise ValueError('authenticated-menu card input/storage differs')
+            if (run/'initial_eeprom.bin').read_bytes()!=(args.correct/'nvram/nsm1r4t/eeprom').read_bytes():
+                raise ValueError('authenticated-menu EEPROM input differs')
+            if hashlib.sha1((storage/'flash').read_bytes()).hexdigest()!=SHA1:raise ValueError('menu flash changed')
+            frame_check(run/'snap/nsm1_pin_menu.png',MENU)
     except (ValueError,OSError) as error:
         print(f'NSM-1 SIM PIN qualification failed: {error}',file=sys.stderr);return 1
     print('NSM-1 physical wrong PIN, cold retry persistence and correct PIN PASS; phone lock remains separate')
+    if args.menu:print('NSM-1 composed PIN1/phone-code authentication and Messages menu PASS')
     return 0
 
 
