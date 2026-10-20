@@ -41,7 +41,7 @@ for index,name in ipairs(keys) do
     events[#events+1]={when,field,1,index,name}
     local duration=index==#keys and _G.nsk1_fdn_hold_last or 0.2
     events[#events+1]={when+duration,field,0,index,name}
-    frames[#frames+1]=when+0.5
+    frames[#frames+1]=when+(_G.nsk1_fdn_frame_delay or 0.5)
 end
 local event,frame=1,1
 local final=false

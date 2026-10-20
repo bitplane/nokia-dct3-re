@@ -20,6 +20,7 @@ WRITE_KEYS = MENU + ['down','menu','down','menu','five','six','seven','eight','m
                      'two','menu','one','two','three','four','five','menu']
 READ_KEYS = MENU + ['down','menu','menu','menu','hash']
 EDIT_KEYS = READ_KEYS[:-1] + ['menu','menu','five','six','seven','eight','menu','menu','clear','six','menu']
+ERASE_KEYS = READ_KEYS[:-1] + ['menu','down','menu','five','six','seven','eight','menu','menu']
 SAVED_LIST = 'cde17cf68445036ced7db33a3a93c978d5068388e8031c6dff9df305ba4ba970'
 NUMBER = '55bdfda888bb09881233e5b91ad607532185f77734260a1c5b813553ccbad9bd'
 EDITED_NUMBER = '72c38308118b60921e06f8b9fcc1feee03e2fba233a053c73cf66a818e417e4b'
@@ -45,24 +46,40 @@ def edited_card(before):
     return bytes(after)
 
 
+def erased_card(before):
+    record = bytearray(RECORD)
+    record[22] = 0xf6
+    if len(before) != 3898 or before[3575] != 1 or before[3578:3610] != record:
+        raise ValueError('edited FDN-Off A/12346 record required')
+    after = bytearray(before)
+    after[3578:3610] = b'\xff'*32
+    return bytes(after)
+
+
 def check_trace(trace, mode):
-    if mode not in ('write', 'cold', 'wrong', 'edit'):
+    if mode not in ('write', 'cold', 'wrong', 'edit', 'erase', 'cancel', 'empty'):
         raise ValueError('known record mode required')
     keys = READ_KEYS if mode == 'cold' else WRITE_KEYS[:]
     if mode == 'edit':
         keys = EDIT_KEYS
+    if mode in ('erase', 'cancel'):
+        keys = ERASE_KEYS[:]
+        if mode == 'cancel':
+            keys[-1] = 'clear'
+    if mode == 'empty':
+        keys = READ_KEYS[:-1]
     if mode == 'wrong':
         keys = keys[:19]
         keys[17] = 'five'
     check_input(trace, keys)
     expected = [(0x9000, 3, 10)]
-    if mode != 'cold':
+    if mode not in ('cold', 'empty'):
         expected.append((0x9804 if mode == 'wrong' else 0x9000, 3, 10))
     if statuses(trace, 0x20) != expected:
         raise ValueError('PIN1/PIN2 verification differs')
     if any(statuses(trace, ins) for ins in (4, 0x44, 0x24, 0x26, 0x28, 0x2c, 0xd6)):
         raise ValueError('unrelated validity/credential/file operation')
-    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit') else []):
+    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit', 'erase') else []):
         raise ValueError('record update status differs')
     tx = transmitted(trace, 4096, 'nsk1_sim_tx')
     if len(tx) >= 4096 or tx.count(bytes.fromhex('a020000108') + padded_pin('1234')) != 1:
@@ -70,19 +87,23 @@ def check_trace(trace, mode):
     if bytes.fromhex('a0a40000026f3b') not in tx:
         raise ValueError('FDN selection absent')
     pin2 = bytes.fromhex('a020000208') + padded_pin('5675' if mode == 'wrong' else '5678')
-    if mode != 'cold' and tx.count(pin2) != 1:
+    if mode not in ('cold', 'empty') and tx.count(pin2) != 1:
         raise ValueError('PIN2 payload differs')
     updates = re.findall(r'update fid=([0-9a-f]+) record=(\d+) length=(\d+)', trace)
-    if updates != ([('6f3b', '1', '32')] if mode in ('write', 'edit') else []):
+    if updates != ([('6f3b', '1', '32')] if mode in ('write', 'edit', 'erase') else []):
         raise ValueError('unexpected file update')
-    if mode in ('write', 'edit'):
+    if mode in ('write', 'edit', 'erase'):
         record = bytearray(RECORD)
         if mode == 'edit':
             record[22] = 0xf6
+        if mode == 'erase':
+            record[:] = b'\xff'*32
         command = bytes.fromhex('a0dc010420') + record
         if tx.count(command) != 1 or tx.index(command) < tx.index(pin2):
             raise ValueError('protected record payload/order differs')
-    elif mode == 'cold':
+    elif bytes.fromhex('a0dc') in tx:
+        raise ValueError('non-writing operation submitted UPDATE RECORD')
+    if mode == 'cold':
         if bytes.fromhex('a0b2010420') not in tx:
             raise ValueError('cold record read absent')
         held = re.findall(r'nsk1_fdn_contact: index=15 key=hash down=([01]) t=([0-9.]+)', trace)

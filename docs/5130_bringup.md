@@ -1549,7 +1549,8 @@ now lives in `sim_fdn_profile.py`, shared with the NSB-1 gate; handset menus
 and native acceptance remain product-owned.
 
 Protected record save/edit/read/rejection is independently qualified below;
-erase and local dial enforcement remain pending. The compatibility-mask
+selected-record erase/cancel is qualified below; local dial enforcement
+remains pending. The compatibility-mask
 and radio boundaries are unchanged.
 
 ### Protected FDN record save/edit and cold retrieval
@@ -1585,7 +1586,31 @@ F5→F6: A/12345 becomes A/12346, with no new record or unrelated mutation.
 The separate cold process displays12346 using the same held-# Search route
 and leaves the complete card unchanged. `nsk1_fdn_edit.lua` keeps menu
 spacing separate from credential/number typing. These gates do not accept
-erase/cancel, dial enforcement, registration, connected calls or fitted mask.
+the later erase/cancel gates, dial enforcement, registration, connected calls
+or fitted mask on their own.
+
+### Selected FDN erase and cancellation
+
+```sh
+.venv/bin/python tools/nsk1_fdn_erase_check.py tmp/nsk1-fdn-edit-cold \
+  tmp/nsk1-fdn-erase tmp/nsk1-fdn-cancel tmp/nsk1-fdn-erased-cold
+```
+
+Independent cold copies of A/12346 enter Search → Options → Erase and
+authenticate PIN25678. Both render the exact `Erase? A` confirmation.
+Confirm issues one UPDATE RECORD to EF_FDN record1 with32 ff bytes; only
+that record is cleared. Physical C instead cancels with no update command
+(including unacknowledged ones) and preserves the complete card. The final
+frames distinguish return to Numbers from return to the existing A list.
+
+A further cold Search on the erased result displays `No phone numbers`,
+then returns to Numbers after the message expires. The gate checks both
+frames, PIN1-only cold authentication, absence of file mutation and exact
+whole-card preservation. Native/storage/source links, decoded physical
+actions, PIN2/update payloads and confirmation frames remain required.
+Fixtures are `nsk1_fdn_erase.lua`, `nsk1_fdn_cancel.lua` and
+`nsk1_fdn_empty.lua`. This proves selected-record erasure, not a command
+to erase every FDN/ADN record or any network/call support.
 
 ### Ordinary PIN change
 

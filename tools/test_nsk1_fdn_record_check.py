@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from tools.nsk1_fdn_record_check import expected_card, edited_card, check_trace, RECORD
+from tools.nsk1_fdn_record_check import expected_card, edited_card, erased_card, check_trace, RECORD
 from tools.nsk1_puk_roundtrip import exhaustion_profile
 from tools.sim_fdn_profile import extend
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET, padded_pin
@@ -64,6 +64,29 @@ class Nsk1FdnRecordTests(unittest.TestCase):
              patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()):
             with self.assertRaises(ValueError):
                 check_trace(self.trace(), 'edit')
+
+    def test_erase_requires_edited_record_and_clears_only_its_bytes(self):
+        initial = extend(exhaustion_profile(), True)
+        saved = expected_card(initial)
+        edited = edited_card(saved)
+        self.assertEqual(erased_card(edited), initial)
+        for invalid in (initial, saved, edited[:-1]):
+            with self.assertRaises(ValueError):
+                erased_card(invalid)
+        with patch('tools.nsk1_fdn_record_check.check_input'), \
+             patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()[:-32]+b'\xff'*32):
+            check_trace(self.trace(), 'erase')
+
+    def test_cancellation_rejects_even_an_unacknowledged_update(self):
+        trace = 'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n'*2
+        tx = self.transaction()[:-37]
+        with patch('tools.nsk1_fdn_record_check.check_input'), \
+             patch('tools.nsk1_fdn_record_check.transmitted', return_value=tx):
+            check_trace(trace, 'cancel')
+        with patch('tools.nsk1_fdn_record_check.check_input'), \
+             patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()):
+            with self.assertRaises(ValueError):
+                check_trace(trace, 'cancel')
 
 
 if __name__ == '__main__':
