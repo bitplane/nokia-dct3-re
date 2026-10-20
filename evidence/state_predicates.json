@@ -1304,6 +1304,12 @@
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
     },
     {
+      "id": "nsk3_local_fdn_rejection_contrast", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Own physical NSK-3 dial attempts distinguish enabled-unlisted local rejection from listed and disabled controls without claiming connected calls",
+      "current": "Physical FDN activation retains A/12346 and changes only ADN validity; physical deactivation restores only validity. Linked cold dial processes authenticate PIN1 and the own phone code before digits/Send0e. Enabled/unlisted54321 renders exact Call not allowed. Enabled/listed12346 and disabled/unlisted54321 return to the same reviewed idle-like frame, without that restriction prompt. All three preserve the whole card, own flash and preceding EEPROM inputs; enabled cold identity rehabilitation and disabled absence are checked. Early captures show entered digits but no Calling state. This establishes local restriction contrast only, not positive call setup, laboratory registration, a connected call or native speech.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_fdn_dial.lua", "tools/nsk3_fdn_dial_blocked.lua", "tools/nsk3_fdn_dial_check.py", "tools/test_nsk3_fdn_dial_check.py"]
+    },
+    {
       "id": "nsk3_physical_fdn_edit_erase", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 PIN2-protected FDN edit and erase have exact card effects and independent cold visible results, while erase cancellation preserves storage",
       "current": "Own physical Options/PIN2/Edit changes A/12345 to A/12346 through one successful UPDATE RECORD; the entire card differs only at byte3600 F5-toF6. Its linked cold process sends no UPDATE RECORD, preserves the whole card and displays exact Number12346. Independent erase/cancel runs begin with the same saved edited card and EEPROM. Cancel sends no UPDATE RECORD and preserves the whole card; confirmed Erase sends exactly one all-FF32-byte record update and changes only record1. A fresh cold Search displays exact No phone numbers, sends no UPDATE RECORD and preserves the erased card. All runs qualify own flash, PIN/phone input and native upload. These short storage transactions do not establish local dial enforcement, sustained native operation or radio connectivity.",

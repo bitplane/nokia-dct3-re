@@ -49,7 +49,10 @@ A wrong-PIN2 control changes only its retry counter, not FDN data. Physical
 in-place editing changes only the last-number byte to12346, retained and
 displayed after cold boot. Erase cancellation preserves the whole card;
 confirmed erasure clears only record1, and cold Search displays No phone
-numbers. Local dial enforcement remains unaccepted on this product.
+numbers. A local FDN rejection contrast also passes: enabled/unlisted54321
+renders Call not allowed, while enabled/listed12346 and disabled/unlisted54321
+return to the existing idle-like frame without that prompt. Neither control
+has a captured Calling/connected state; network call acceptance is unchanged.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -116,6 +119,23 @@ start from the same edited card. `nsk3_fdn_empty.lua` stops after submitting
 the empty Search name, before a further OK could dismiss the empty-list result.
 The edit gate permits only byte3600 F5-toF6; the erase gate permits only the
 selected32-byte record to become FF and pins the cold empty-search frame.
+
+Local FDN rejection controls:
+
+```sh
+.venv/bin/python tools/nsk3_fdn_dial_check.py roms/noki6130/source \
+  tmp/nsk3-fdn-edit-cold tmp/nsk3-fdn-dial-enabled \
+  tmp/nsk3-fdn-dial-listed-fast tmp/nsk3-fdn-dial-unlisted \
+  tmp/nsk3-fdn-dial-disabled tmp/nsk3-fdn-dial-unlisted-off
+```
+
+The enable/disable processes use the existing physical FDN fixtures and change
+only ADN validity, retaining A/12346. Each dial process authenticates PIN1 and
+the own phone code, enters its number and presses physical Send0e. The gate
+checks both identity rehabilitation commands on enabled cold boots, none on
+disabled cold boot, exact reviewed26s frames, unchanged whole cards, own flash
+and input/EEPROM continuity. Early23.6/23.8s captures show entered digits, not
+Calling; return to the idle-like frame is not promoted to positive call setup.
 
 ### Diagnostic record persistence
 
