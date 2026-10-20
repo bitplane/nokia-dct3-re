@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "sim_fdn_card_access_validity_storage_conformance", "owner": "sim_card", "status": "satisfied",
+      "predicate": "An explicit extended laboratory card retains FDN records and enforces CHV2 update/ADN-validity policies without changing base-card storage",
+      "current": "The versioned3898-byte image appends capability, ADN validity and optional invalid-ADN access flags plus ten32-byte FDN records to the intact3570-byte base. Twenty-six cold storage cases validate current/legacy images and atomically reject malformed extensions. Actual card APDU tests in simfdnt/simfdnrt cover protected reads/updates, CHV2 verification, reset revocation, INVALIDATE/REHABILITATE errors and access, validity save/restore, unchanged ADN and exact persisted FDN record. Native NSM-1 physical PIN2 activation issues VERIFY then INVALIDATE,9000 and changes only byte3575. Cold images retain that validity but the handset menu shows Off under both strict and readable-invalid policies; cold presentation/deactivation/dial enforcement are explicitly unaccepted. No handset-state forcing, native network or speech claim follows.",
+      "evidence": ["driver/nokia_sim_card.cpp", "driver/nokia_sim_card.h", "driver/nokia_simi_test.cpp", "tools/run_sim_fdn.py", "tools/sim_fdn_profile.py", "tools/test_sim_fdn_profile.py", "tools/run_sim_nvram_atomic.py", "docs/sim_emulator_scope.md", "docs/6150_bringup.md"]
+    },
+    {
       "id": "nsm1_physical_pin2_exhaustion_puk2_cold_recovery", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physically exhausted PIN2 can be recovered with PUK2, and its new credential works in a cold process",
       "current": "Two further cold wrong5675 changes consume PIN2 retries2->1->0,9804 then9840. From that same exhausted card, physical wrong PUK287654322/new8765/confirmation returns9804 and changes only PUK2 retries10->9. Correct87654321/new8765 returns9000, changes only PIN2 and its retry counter, then firmware automatically verifies8765. A separate cold process uses8765 to restore5678. Physical startup PIN1/phone authentication, exact UNBLOCK/automatic VERIFY order, complete card/EEPROM links, own flash and native record validity pass. No retry counters are seeded. Protected applications and network/native-speech acceptance remain separate.",

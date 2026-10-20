@@ -53,6 +53,11 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_proactive_command_number));
 	save_item(NAME(m_menu_selection));
 	save_item(NAME(m_adn));
+	save_item(NAME(m_fdn));
+	save_item(NAME(m_fdn_present));
+	save_item(NAME(m_adn_valid));
+	save_item(NAME(m_adn_access_when_invalid));
+	save_item(NAME(m_extended_storage));
 	save_item(NAME(m_loci));
 	save_item(NAME(m_kc));
 	save_item(NAME(m_bcch));
@@ -106,6 +111,7 @@ void nokia_sim_card_device::device_reset()
 
 void nokia_sim_card_device::nvram_default()
 {
+	initialize_fdn_files();
 	std::fill(std::begin(m_adn), std::end(m_adn), 0xff);
 	std::fill(std::begin(m_kc), std::end(m_kc), 0xff);
 	m_kc[8] = 0x07; // no valid ciphering key sequence
@@ -148,11 +154,18 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 	constexpr size_t plmn = acm + sizeof(m_preferred_plmn) + sizeof(m_forbidden_plmn);
 	constexpr size_t smss = plmn + sizeof(m_smss);
 	constexpr size_t current = smss + sizeof(m_acm_max) + sizeof(m_puct);
-	std::array<u8, current + 1> staged;
+	constexpr size_t extended = current + 8 + sizeof(m_fdn);
+	std::array<u8, extended + 1> staged;
 	auto const [err, actual] = util::read(file, staged.data(), staged.size());
-	if (err || (actual != files && actual != sms && actual != security && actual != acm && actual != plmn && actual != smss && actual != current))
+	if (err || (actual != files && actual != sms && actual != security && actual != acm && actual != plmn && actual != smss && actual != current && actual != extended))
 		return false;
 	if (actual >= security && staged[security - 1] > 1)
+		return false;
+	if (actual == extended &&
+			(staged[current] != 'F' || staged[current + 1] != 'D' ||
+			 staged[current + 2] != 'N' || staged[current + 3] != 1 ||
+			 staged[current + 4] > 1 || staged[current + 5] > 1 ||
+			 staged[current + 6] > 1 || staged[current + 7] != 0))
 		return false;
 	// Complete supported records make the RAM-backed parser infallible; no
 	// device fields are touched while validating lengths or retained flags.
@@ -162,6 +175,7 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 
 bool nokia_sim_card_device::nvram_read_record(util::read_stream &file)
 {
+	initialize_fdn_files();
 	// Legacy records omit the appended PLMN lists; keep profile-owned defaults.
 	initialize_plmn_files();
 	// Legacy cards start at TP-MR FF; the capacity-exceeded flag is unset.
@@ -244,9 +258,18 @@ bool nokia_sim_card_device::nvram_read_record(util::read_stream &file)
 	auto const [puct_err, puct_actual] = util::read(file, m_puct, sizeof(m_puct));
 	if (max_err || max_actual != sizeof(m_acm_max) || puct_err || puct_actual != sizeof(m_puct))
 		return false;
-	u8 trailing;
-	auto const [trailing_err, trailing_actual] = util::read(file, &trailing, 1);
-	return !trailing_err && trailing_actual == 0;
+	u8 extension[8];
+	auto const [extension_err, extension_actual] = util::read(file, extension, sizeof(extension));
+	if (!extension_err && extension_actual == 0)
+		return true;
+	if (extension_err || extension_actual != sizeof(extension))
+		return false;
+	m_extended_storage = true;
+	m_fdn_present = extension[4] != 0;
+	m_adn_valid = extension[5] != 0;
+	m_adn_access_when_invalid = extension[6] != 0;
+	auto const [fdn_err, fdn_actual] = util::read(file, m_fdn, sizeof(m_fdn));
+	return !fdn_err && fdn_actual == sizeof(m_fdn);
 }
 
 bool nokia_sim_card_device::nvram_write(util::write_stream &file)
@@ -275,6 +298,14 @@ bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 	auto const [smss_err, smss_actual] = util::write(file, m_smss, sizeof(m_smss));
 	auto const [max_err, max_actual] = util::write(file, m_acm_max, sizeof(m_acm_max));
 	auto const [puct_err, puct_actual] = util::write(file, m_puct, sizeof(m_puct));
+	if (m_extended_storage)
+	{
+		const u8 extension[] = { 'F', 'D', 'N', 1, u8(m_fdn_present), u8(m_adn_valid), u8(m_adn_access_when_invalid), 0 };
+		auto const [extension_err, extension_actual] = util::write(file, extension, sizeof(extension));
+		auto const [fdn_err, fdn_actual] = util::write(file, m_fdn, sizeof(m_fdn));
+		if (extension_err || extension_actual != sizeof(extension) || fdn_err || fdn_actual != sizeof(m_fdn))
+			return false;
+	}
 	return !loci_err && loci_actual == sizeof(m_loci) && !kc_err && kc_actual == sizeof(m_kc) &&
 			!bcch_err && bcch_actual == sizeof(m_bcch) &&
 			!sms_err && sms_actual == sizeof(m_sms) &&
@@ -290,6 +321,15 @@ bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 			!smss_err && smss_actual == sizeof(m_smss) &&
 			!max_err && max_actual == sizeof(m_acm_max) &&
 			!puct_err && puct_actual == sizeof(m_puct);
+}
+
+void nokia_sim_card_device::initialize_fdn_files()
+{
+	std::fill(std::begin(m_fdn), std::end(m_fdn), 0xff);
+	m_fdn_present = false;
+	m_adn_valid = true;
+	m_adn_access_when_invalid = false;
+	m_extended_storage = false;
 }
 
 void nokia_sim_card_device::initialize_plmn_files()
@@ -387,6 +427,11 @@ nokia_sim_card_device::selected_file_for(access_shape shape)
 
 bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 {
+	if (file.fid == 0x6f3a && !m_adn_valid && !m_adn_access_when_invalid)
+	{
+		queue_status(0x98, 0x10);
+		return false;
+	}
 	if (condition_satisfied(file.read_condition()))
 		return true;
 	queue_status(0x98, 0x04);
@@ -395,6 +440,11 @@ bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 
 bool nokia_sim_card_device::write_permitted(const file_descriptor &file)
 {
+	if (file.fid == 0x6f3a && !m_adn_valid && !m_adn_access_when_invalid)
+	{
+		queue_status(0x98, 0x10);
+		return false;
+	}
 	if (access_allowed(file))
 		return true;
 	queue_status(0x98, 0x04);
@@ -545,7 +595,9 @@ void nokia_sim_card_device::finish_header()
 		return;
 	}
 
-	if (m_ins == 0x12)
+	if (m_ins == 0x04 || m_ins == 0x44)
+		change_file_validity();
+	else if (m_ins == 0x12)
 		queue_proactive_command(m_p3 ? m_p3 : 256);
 	else if (m_ins == 0xc0 && m_pending_response_len != 0)
 		queue_pending_response(m_p3 ? m_p3 : 256);
@@ -1363,6 +1415,36 @@ void nokia_sim_card_device::append_completion_status(
 			m_ins, response[length - 2], response[length - 1]);
 }
 
+void nokia_sim_card_device::change_file_validity()
+{
+	if (m_p1 != 0 || m_p2 != 0 || m_p3 != 0)
+	{
+		queue_status(m_p1 || m_p2 ? 0x6b : 0x67, 0);
+		return;
+	}
+	const file_descriptor *file = find_file(m_selected_file);
+	if (!file || file->structure == file_structure::directory)
+	{
+		queue_status(0x94, 0);
+		return;
+	}
+	// Only ADN has an implemented non-administrative validity policy.
+	if (file->fid != 0x6f3a || !condition_satisfied(access_condition::chv2))
+	{
+		queue_status(0x98, 4);
+		return;
+	}
+	const bool valid = m_ins == 0x44;
+	if (m_adn_valid == valid)
+	{
+		queue_status(0x98, 0x10);
+		return;
+	}
+	m_adn_valid = valid;
+	m_extended_storage = true;
+	queue_status(0x90, 0);
+}
+
 void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 {
 	u8 response[26] = { 0 };
@@ -1405,6 +1487,13 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 			u8 fcp[15] = { 0, 0, u8(size >> 8), u8(size), u8(fid >> 8), u8(fid),
 				0x04, 0, 0, 0, 0, 0x01, 0x02, 0x00, 0x00 };
 			fcp[8] = (u8(file->read_condition()) << 4) | u8(file->update_condition());
+			if (fid == 0x6f3a)
+			{
+				fcp[10] = 0x22; // INVALIDATE/REHABILITATE both require CHV2.
+				fcp[11] = (m_adn_valid ? 1 : 0) | (m_adn_access_when_invalid ? 4 : 0);
+			}
+			if (fid == 0x6f3b)
+				fcp[10] = 0x44; // ADM is deliberately unavailable.
 			if (file->fid == 0x6f39)
 			{
 				// EF_ACM is READ/UPDATE/INCREASE under CHV1. Access-condition
@@ -1667,6 +1756,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x2fe2, 0x3f00, 10, 0, file_structure::transparent, ac::never },
 		{ 0x2fe6, 0x3f00, 4, 0, file_structure::transparent, ac::never },
 		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, ac::chv1, ac::chv1 },
+		{ 0x6f3b, 0x7f10, fdn_record_count * 32, 32, file_structure::linear_fixed, ac::chv2, ac::chv1 },
 		{ 0x6f3c, 0x7f10, sms_record_count * sms_record_length,
 				sms_record_length, file_structure::linear_fixed, ac::chv1, ac::chv1 },
 		{ 0x6f42, 0x7f10, smsp_record_count * smsp_record_length,
@@ -1724,6 +1814,8 @@ bool nokia_sim_card_device::is_known_file(u16 fid) const
 	const file_descriptor *file = find_file(fid);
 	if (!file)
 		return false;
+	if (fid == 0x6f3b && !m_fdn_present)
+		return false;
 	if ((fid == 0x6f15 || fid == 0x6f16) && !m_cphs_aoc)
 		return false;
 	return true;
@@ -1760,11 +1852,14 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	};
 	if (fid == 0x2fe2 && offset < m_subscriber.iccid.size()) return m_subscriber.iccid[offset];
 	if (fid == 0x6f3a && offset < sizeof(m_adn)) return m_adn[offset];
+	if (fid == 0x6f3b && offset < sizeof(m_fdn)) return m_fdn[offset];
 	if (fid == 0x6f3c && offset < sizeof(m_sms)) return m_sms[offset];
 	if (fid == 0x6f42 && offset < sizeof(m_smsp)) return m_smsp[offset];
 	if (fid == 0x6f05 && offset < std::size(language_preference)) return language_preference[offset];
 	if (fid == 0x6f38 && offset < std::size(service_table))
 	{
+		if (offset == 0 && m_fdn_present)
+			return service_table[0] | 0x30;
 		if (m_cphs_aoc && offset == 1)
 			return 0x03;
 		// Service 17 (SPN) occupies bits 0-1 of byte five.
@@ -1802,6 +1897,7 @@ u8 *nokia_sim_card_device::mutable_file_data(u16 fid)
 	switch (fid)
 	{
 	case 0x6f3a: return m_adn;
+	case 0x6f3b: return m_fdn;
 	case 0x6f3c: return m_sms;
 	case 0x6f42: return m_smsp;
 	case 0x6f7e: return m_loci;

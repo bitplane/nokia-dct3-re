@@ -16,7 +16,16 @@ def cases(default):
     changed[3560:3562] = b'\x42\xfe'
     changed[3562:3570] = bytes(range(8))
     changed = bytes(changed)
+    extended = changed + b'FDN\x01\x01\x00\x00\x00' + bytes([0x41]) * 320
     return {
+        "fdn_extended": (extended, extended, False),
+        "fdn_short": (extended[:-1], default, True),
+        "fdn_trailing": (extended+b'\x00', default, True),
+        "fdn_bad_version": (extended[:3573]+b'\x02'+extended[3574:], default, True),
+        "fdn_bad_capability": (extended[:3574]+b'\x02'+extended[3575:], default, True),
+        "fdn_bad_validity": (extended[:3575]+b'\x02'+extended[3576:], default, True),
+        "fdn_bad_access": (extended[:3576]+b'\x02'+extended[3577:], default, True),
+        "fdn_bad_reserved": (extended[:3577]+b'\x01'+extended[3578:], default, True),
         "current": (changed, changed, False),
         "legacy_files": (changed[:1636], changed[:1636] + default[1636:], False),
         "legacy_sms": (changed[:3484], changed[:3484] + default[3484:], False),

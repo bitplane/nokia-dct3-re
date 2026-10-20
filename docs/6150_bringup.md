@@ -196,17 +196,20 @@ EEPROM links, native record validity and executable flash. Retry counters
 are never initialized by these fixtures. Protected application operations
 remain separate targets; network services are not accepted.
 
-Fixed dialling is not a current card capability: the base EF_SST does not
-advertise service3, `find_file` has no EF_FDN6f3b, and INVALIDATE/REHABILITATE
-are unsupported. A physical menu4-5-3 probe displays Fixed dialling/Off,
-but the attempted continuation did not establish a protected transaction;
-later digits reached the ordinary number editor. No PIN2 or activation APDU
-was observed and the complete card remained unchanged. This does not prove
-that the handset lacks FDN support. Retire that input sequence rather than
-promoting it as an acceptance fixture. A future FDN target must first add a
-coherent standards-backed card profile, file access/activation semantics and
-persistent state; menu traversal and enforcement need their own runtime
-proof. Existing PIN2 change/recovery acceptance does not imply FDN acceptance.
+The base card does not advertise FDN. The explicit extended laboratory
+profile adds service3, EF_FDN6f3b and retained ADN validity without changing
+the legacy card layout. Physical menu4-5-3 opens On/Off/Numbers; selecting
+On then entering PIN25678 sends VERIFY CHV2 and INVALIDATE ADN, both9000.
+The complete card changes only extension byte3575 from1 to0 and the same
+session displays On. This is not yet cold FDN acceptance: the retained
+invalid flag is returned correctly in the next boot's ADN FCP
+(`000006406f3a040011002200020120`), but its following READ receives9810
+and the menu displays Off. Selecting Off then produces no REHABILITATE.
+The card image remains intact. The standard's optional read/update-while-
+invalid profile also reproduces cold Off, so that policy is not a fix.
+Card-only conformance passes both policies, including CHV2 writes and
+validity save/restore; the handset's cold interpretation remains unresolved.
+FDN record updates, deactivation and dial enforcement remain unaccepted.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

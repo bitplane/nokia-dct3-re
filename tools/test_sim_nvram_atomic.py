@@ -23,7 +23,9 @@ class SimStorageCasesTest(unittest.TestCase):
         self.assertEqual(negatives, {"short_adn", "short_sms", "short_security",
                                     "short_acm", "short_preferred_plmn",
                                     "short_forbidden_plmn", "short_smss", "short_acm_max",
-                                    "short_puct", "trailing", "invalid_enabled"})
+                                    "short_puct", "trailing", "invalid_enabled",
+                                    "fdn_short", "fdn_trailing", "fdn_bad_version",
+                                    "fdn_bad_capability", "fdn_bad_validity", "fdn_bad_access", "fdn_bad_reserved"})
         for name in negatives:
             self.assertEqual(fixtures[name][1], default)
             self.assertEqual(fixtures[name][0][0], 0x41)

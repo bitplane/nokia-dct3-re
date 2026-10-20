@@ -874,6 +874,104 @@ private:
 };
 static INPUT_PORTS_START(simi_test) INPUT_PORTS_END
 ROM_START(simitest) ROM_END
+
+// Card-only APDU conformance; no handset firmware or controller timing claim.
+class nokia_sim_fdn_test_state : public driver_device
+{
+public:
+	nokia_sim_fdn_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_card(*this, "card") { }
+	void strict(machine_config &config)
+	{
+		NOKIA_SIM_CARD(config, m_card);
+		m_card->response_cb().set(FUNC(nokia_sim_fdn_test_state::response));
+	}
+	void readable(machine_config &config) { strict(config); m_readable = true; }
+protected:
+	virtual void machine_start() override
+	{
+		m_timer = timer_alloc(FUNC(nokia_sim_fdn_test_state::run), this);
+		m_timer->adjust(attotime::from_msec(1));
+	}
+private:
+	required_device<nokia_sim_card_device> m_card;
+	emu_timer *m_timer = nullptr;
+	bool m_readable = false;
+	std::vector<u8> m_response;
+	void response(u8 data) { m_response.push_back(data); }
+	void expect(bool value, const char *message)
+	{
+		if (!value) fatalerror("SIM FDN conformance: %s", message);
+	}
+	void command(std::vector<u8> const &tx, std::vector<u8> const &expected)
+	{
+		m_response.clear();
+		for (u8 value : tx) m_card->rx_w(value);
+		expect(m_response == expected, "exact APDU response");
+	}
+	void select(u16 fid) { command({0xa0,0xa4,0,0,2,u8(fid >> 8),u8(fid)}, {0xa4,0x9f,u8(fid == 0x7f10 ? 22 : 15)}); }
+	void verify(unsigned index)
+	{
+		std::vector<u8> tx = {0xa0,0x20,0,u8(index),8};
+		for (u8 value : index == 1 ? std::initializer_list<u8>{'1','2','3','4'} : std::initializer_list<u8>{'5','6','7','8'}) tx.push_back(value);
+		tx.insert(tx.end(),4,0xff); command(tx,{0x20,0x90,0});
+	}
+	void write_record(u8 sw1, u8 sw2)
+	{
+		std::vector<u8> tx = {0xa0,0xdc,1,4,32}; tx.insert(tx.end(),32,0x41);
+		command(tx,{0xdc,sw1,sw2});
+	}
+	void read_record(u8 value)
+	{
+		std::vector<u8> expected = {0xb2};expected.insert(expected.end(),32,value);
+		expected.insert(expected.end(),{0x90,0});command({0xa0,0xb2,1,4,32},expected);
+	}
+	void metadata(bool valid)
+	{
+		m_response.clear(); for (u8 value : {0xa0,0xc0,0,0,15}) m_card->rx_w(value);
+		expect(m_response.size() == 18 && m_response[9] == 0x11 && m_response[11] == 0x22 &&
+			m_response[12] == ((valid ? 1 : 0) | (m_readable ? 4 : 0)), "ADN access and validity metadata");
+	}
+	TIMER_CALLBACK_MEMBER(run)
+	{
+		m_card->activate();
+		select(0x7f10); select(0x6f3b);
+		command({0xa0,0xb2,1,4,32},{0x98,4});
+		verify(1); read_record(0xff); write_record(0x98,4);
+		verify(2);write_record(0x90,0);read_record(0x41);
+		select(0x6f3a);metadata(true);
+		command({0xa0,4,1,0,0},{0x6b,0});
+		command({0xa0,4,0,0,1},{0x67,0});
+		std::stringstream saved;
+		expect(machine().save().write_stream(saved) == STATERR_NONE,"save card before invalidation");
+		command({0xa0,4,0,0,0},{0x90,0});
+		command({0xa0,4,0,0,0},{0x98,0x10});
+		select(0x6f3a);metadata(false);
+		if (m_readable) read_record(0xff);
+		else command({0xa0,0xb2,1,4,32},{0x98,0x10});
+		saved.seekg(0);
+		expect(machine().save().read_stream(saved) == STATERR_NONE,"restore ADN validity");
+		select(0x6f3a);metadata(true);
+		command({0xa0,4,0,0,0},{0x90,0});
+		m_card->deactivate();m_card->activate();
+		select(0x7f10);select(0x6f3a);
+		command({0xa0,0x44,0,0,0},{0x98,4});
+		verify(1);command({0xa0,0x44,0,0,0},{0x98,4});
+		verify(2);command({0xa0,0x44,0,0,0},{0x90,0});
+		command({0xa0,0x44,0,0,0},{0x98,0x10});
+		select(0x6f3a);metadata(true);read_record(0xff);
+		select(0x6f3b);read_record(0x41);
+		command({0xa0,4,0,0,0},{0x98,4});
+		osd_printf_info("SIM FDN conformance: PASS readable_invalid=%u chv2_update=1 reset_revokes=1 validity_restore=1 adn_preserved=1 handset_claim=0\n",m_readable);
+		machine().schedule_exit();
+	}
+};
+ROM_START(simfdnt) ROM_END
+ROM_START(simfdnrt) ROM_END
 }
 CONS(2026, simitest, 0, 0, test, simi_test, nokia_simi_test_state, empty_init,
 		"Test", "Nokia SIMI controller/card restoration", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+CONS(2026, simfdnt, 0, 0, strict, simi_test, nokia_sim_fdn_test_state, empty_init,
+		"Test", "SIM fixed dialling strict conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+CONS(2026, simfdnrt, 0, 0, readable, simi_test, nokia_sim_fdn_test_state, empty_init,
+		"Test", "SIM fixed dialling readable-invalid conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)

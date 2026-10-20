@@ -125,6 +125,7 @@ private:
 	void update_record();
 	void seek_record();
 	void increase_record();
+	void change_file_validity();
 	void run_gsm_algorithm();
 	void accept_terminal_profile();
 	void queue_proactive_command(unsigned requested);
@@ -146,6 +147,7 @@ private:
 	bool chv1_authorized() const;
 	bool condition_satisfied(access_condition condition) const;
 	void initialize_sms_files();
+	void initialize_fdn_files();
 	void initialize_plmn_files();
 
 	static constexpr unsigned sms_record_length = 176;
@@ -187,6 +189,12 @@ private:
 	u8 m_menu_selection = 0;
 	emu_timer *m_toolkit_timer = nullptr;
 	u8 m_adn[50 * 32] = { 0 };
+	static constexpr unsigned fdn_record_count = 10;
+	u8 m_fdn[fdn_record_count * 32] = { 0 };
+	bool m_fdn_present = false;
+	bool m_adn_valid = true;
+	bool m_adn_access_when_invalid = false;
+	bool m_extended_storage = false;
 	u8 m_loci[11] = { 0 };
 	u8 m_kc[9] = { 0 };
 	u8 m_bcch[16] = { 0 };

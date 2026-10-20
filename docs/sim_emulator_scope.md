@@ -174,9 +174,8 @@ transactions with firmware-owned UI and messaging.
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
-- INVALIDATE, REHABILITATE and additional access-condition/error
-  semantics. GSM 11.11 defines them, but no retained product trace issues the
-  corresponding APDUs; the organic REFRESH lifecycle also does not do so;
+- validity policies beyond the implemented CHV2-controlled ADN and
+  ADM-denied FDN paths; organic REFRESH does not invalidate EFs;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
 - establishing the physical sources and timing of timeout and parity/error
@@ -193,7 +192,7 @@ establishes a concrete requirement. Later work includes:
 
 ### Fixed dialling implementation boundary
 
-FDN is an unimplemented card capability, not an accepted NSM-1 feature.
+FDN is an opt-in partial card capability, not a cold-validated NSM-1 feature.
 [GSM 11.11 v5.3.0](https://www.etsi.org/deliver/etsi_gts/11/1111/05.03.00_60/gsmts_1111v050300p.pdf)
 sections8.14-8.15,10.3.1-10.3.2 and11.5.1 establish the contract:
 EF_FDN6f3b is linear-fixed, uses ADN-style records, requires CHV1 for
@@ -209,28 +208,36 @@ read-only files now correctly advertise UPDATE=NEVER rather than ALWAYS.
 The serial conformance suite and a fresh NSM-1 physical PIN/phone-code
 Messages boot pass. CHV2 policy is preparatory: no EF selects it yet, so
 its protected-write lifecycle is not accepted by these runs.
-FCP still reports valid files and there is no EF_FDN body or persistent
-validity state. Do not implement those as a handset-specific latch or by
-changing EF_SST alone.
+An append-only3898-byte card image now adds a versioned eight-byte header
+and ten32-byte FDN records. The legacy3570-byte output is retained for base
+cards. Staged loading validates the whole extension before applying it;
+26 executable cold-storage cases cover valid/legacy images and malformed
+lengths, version, flags and reserved bytes. FDN updates require CHV2; ADN
+validity and records are saved independently. Strict invalidated ADN access
+returns9810. Physical NSM-1 activation reaches On, but the following cold
+boot labels Off after reading invalid ADN and receiving9810. Therefore cold
+presentation, deactivation and enforcement remain open. The explicit
+read/update-while-invalid variant also reproduces cold Off and is not a fix.
+Card-only APDU tests pass both policies, including CHV2-only writes, reset
+revocation, validity save/restore, parameter errors, repeated-state errors,
+ADM denial and unchanged ADN contents. These are conformance results, not
+handset FDN enforcement acceptance.
 
-Implementation order and acceptance:
+Implementation status and remaining acceptance:
 
-1. Exercise CHV2 metadata with the new EF before accepting that policy:
-   test authorization before/after VERIFY, activation and reset; FCP must
-   describe exactly the permissions the command handlers enforce.
-2. Add an explicitly configured FDN card profile, its records and ADN
-   validity. Keep the base profile's service advertisement unchanged.
-   Extend the existing staged NVRAM reader with a versioned tail; retain
-   complete legacy inputs, reject truncation/invalid flags atomically and
-   test both cold persistence and save/load. Existing3570-byte fixtures
-   must not silently acquire advertised FDN service.
-3. Implement selected-EF INVALIDATE/REHABILITATE parameter validation and
-   access checks. Verify that denial leaves contents and validity unchanged;
-   toggling validity must never erase ADN records.
-4. Exercise physical activation, FDN write/read and cold deactivation on
+1. CHV2 metadata, extended persistence and selected-ADN validity commands
+   have card-level executable coverage; legacy3570-byte output is retained.
+2. Trace the cold NSM-1 state interpretation of the observed FCP/EF_SST;
+   do not synthesize a handset flag to make the menu agree.
+3. Exercise physical activation, FDN write/read and cold deactivation on
    NSM-1. An FDN menu or successful PIN2 change is insufficient evidence.
    Call enforcement needs a separately observed allowed/denied dial attempt;
    do not claim native network or speech acceptance from that UI result.
+
+`tools/run_sim_fdn.py RUN --base-card BASE --mame mame/mame` runs both
+development-only `simfdnt` and `simfdnrt` after `make build`. BASE must be
+a complete blank-ADN/default-credential lab card; the runner explicitly
+enables PIN request in its own fixtures. No handset firmware executes.
 
 The implementation tracks current DF separately from selected EF and declares
 file parent, size, structure and record length as profile metadata. Subscriber

@@ -14,6 +14,7 @@ from tools.nsm1_v523_static_check import SHA1
 from tools.dct3_rom4_record_codec import retained_record_transform
 from tools.nsm1_security_contract import inspect as inspect_security
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+from tools.sim_fdn_profile import extend as extend_fdn,EXTENDED_LENGTH
 from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,ENABLED_OFFSET,padded_pin
 
 
@@ -24,6 +25,8 @@ def main():
     card_mode=parser.add_mutually_exclusive_group()
     card_mode.add_argument('--preserve-sim',action='store_true')
     card_mode.add_argument('--pin-enabled',action='store_true')
+    parser.add_argument('--fdn',action='store_true',help='append explicit FDN laboratory card profile')
+    parser.add_argument('--fdn-adn-access',action='store_true',help='allow ADN access while invalidated in the new FDN profile')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('fresh output required')
@@ -44,12 +47,16 @@ def main():
         card=None
         if args.preserve_sim or args.pin_enabled:
             card=(storage/'sim_card').read_bytes()
-            if len(card)!=CURRENT_NVRAM_LENGTH:raise ValueError('current synthetic card extent required')
+            if len(card) not in (CURRENT_NVRAM_LENGTH,EXTENDED_LENGTH):raise ValueError('current synthetic card extent required')
             if args.pin_enabled:
                 if (card[CHV_OFFSET:CHV_OFFSET+8]!=padded_pin('1234')
                         or card[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4]!=bytes((3,3,10,10))
                         or card[ENABLED_OFFSET]!=0):raise ValueError('fresh default-credential lab card required')
                 card=bytearray(card);card[ENABLED_OFFSET]=1;card=bytes(card)
+        if args.fdn:
+            if card is None:raise ValueError('FDN requires an explicit preserved or PIN-enabled card')
+            card=extend_fdn(card,args.fdn_adn_access)
+        elif args.fdn_adn_access:raise ValueError('FDN ADN-access option requires --fdn')
         target=args.output/'nvram/nsm1r4t/eeprom'
         target.parent.mkdir(parents=True);target.write_bytes(eeprom)
         (args.output/'initial_eeprom.bin').write_bytes(eeprom)
@@ -59,6 +66,8 @@ def main():
         (args.output/'input.json').write_text(json.dumps({'adc2':554,'physical_units_proved':False,
             'phone_retry_initialized':args.initialize_phone_retry,'sim_preserved':args.preserve_sim,
             'pin_enabled_fixture':args.pin_enabled,
+            'fdn_fixture':args.fdn,
+            'fdn_adn_access':args.fdn_adn_access,
             'donor_provisioning':False},indent=2)+'\n')
         root=ET.Element('mameconfig',version='10')
         inputs=ET.SubElement(ET.SubElement(root,'system',name='nsm1r4t'),'input')
