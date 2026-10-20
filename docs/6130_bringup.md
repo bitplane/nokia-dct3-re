@@ -32,6 +32,8 @@ cold PIN challenge; physical disable persists and skips that challenge on cold
 boot without bypassing the separate phone lock. Other SIM/security operations
 and radio remain unaccepted.
 Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
+Physical Change PIN2 now persists8765 and authenticates an ordinary change
+back to5678 after a separate cold boot; PUK2 remains unaccepted.
 Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
 Outbox read displays it without changing card bytes. Network SMS is unproved.
 Physical Erase/cancel and a cold empty-Outbox check also pass.
@@ -300,8 +302,8 @@ VERIFY bytes/status, exact PIN/error/phone-code frames, pre-launch card identity
 and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
-APDU is admitted. The PUK gate below extends this boundary; permanent blocking,
-PIN2 remains unaccepted; ordinary PIN change and request settings are covered below.
+APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
+request settings; permanent blocking and PUK2 remain unaccepted.
 
 ### PUK recovery and new-PIN persistence
 
@@ -325,8 +327,8 @@ uploads and own unchanged executable flash are checked:
 ```
 
 This accepts a physical PUK recovery lifecycle under the declared research
-inputs, not permanent PUK blocking, PIN2/PUK2, ordinary CHANGE CHV, PIN-request
-settings, radio or fitted hardware assumptions.
+inputs. Other gates cover ordinary CHANGE CHV and PIN-request settings;
+permanent PUK blocking, PUK2, radio and fitted hardware remain unaccepted.
 
 ### PIN-request enable
 
@@ -371,8 +373,8 @@ recovery and does not re-provision the PIN during cold preparation.
 The fixture composes startup PIN and phone-code input through one idempotent
 passive SIM observer; timing offsets schedule physical contacts only. All
 hardware defaults and declared native/analog/provisioning hypotheses remain
-unchanged. PIN-request disable has its own gate below; permanent blocking and
-PIN2 remain unaccepted.
+unchanged. PIN-request disable and PIN2 change have separate gates below;
+permanent blocking and PUK2 remain unaccepted.
 
 ### PIN-request disable
 
@@ -390,10 +392,32 @@ SIM VERIFY or credential mutation, and presents phone Security code directly.
 ```
 
 The paired On and Off gates preserve credential bytes and independently verify
-the corresponding cold challenge behavior. PIN2, permanent PUK blocking,
+the corresponding cold challenge behavior. PUK2, permanent PUK blocking,
 correct idle content and radio remain unaccepted. A Battery low alert appears
 around33s in the longer Off run under the unchanged nominal-input hypothesis;
 that analog/power observation is not hidden by adjusting the fixture voltage.
+
+### PIN2 change and cold authentication
+
+The physical route Menu4 -> Security5 -> Access codes6 -> Select -> Down
+twice -> Select opens Change PIN2. With the explicit request-enabled lab
+card, PIN1 and phone-code unlock precede old PIN2 5678, new8765 and its
+confirmation. Firmware transmits `a0 24 00 02 10` plus padded old/new
+credentials; SIM returns9000. Only the four PIN2 digits change in the full
+3570-byte card. A separate cold process receives exactly those saved card
+bytes, uses8765 as the old PIN2 and changes it back to5678 successfully.
+This tests ordinary credential authentication across restart, not cached
+authentication or a card-side command injected by the harness.
+
+```sh
+.venv/bin/python tools/nsk3_pin2_check.py roms/noki6130/source \
+  tmp/nsk3-pin2-change tmp/nsk3-pin2-cold-restore
+```
+
+The checker verifies physical contacts, phone-code acceptance, startup PIN1,
+exact CHANGE CHV bytes/status, whole-card mutation boundaries, cold card
+identity, native uploads, own unchanged flash and exact Change PIN2 frame.
+This does not accept PIN2 retry exhaustion, PUK2 recovery or permanent block.
 
 ### Offline SMS draft
 

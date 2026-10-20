@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_pin2_change_cold_authentication", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 CHANGE CHV2 persists only PIN2 and independently authenticates the new credential after cold boot",
+      "current": "The explicit lab card accepts physical old5678/new8765 confirmation through menu4-5-6 Change PIN2, transmitting A0 24 00 02 10 with exact padded credentials and receiving9000. Full3570-byte storage changes only PIN2 digits. A separate cold process with saved card bytes uses8765 as the old credential and successfully changes it back to5678. The gate checks physical unlock/menu/credential contacts, startup PIN1, phone-code acceptance, native uploads, own flash and exact final frame. PUK2 recovery, retry exhaustion, permanent blocking, radio and fitted hardware remain unaccepted.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin2_change.lua", "tools/nsk3_pin2_restore.lua", "tools/nsk3_pin2_check.py", "tools/test_nsk3_pin2_check.py"]
+    },
+    {
       "id": "nsk3_physical_send_end_mapping", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "The qualified NSK-3 research profile exposes own-ROM Send/End matrix cells and physical contacts decode to logical0e/0f",
       "current": "Own table2c7a30 maps row2/column0 to0e and row3/column0 to0f. Research profile overrides inherited NSE-1 unused/Scroll Down labels. A matched45s physical dial pair accepts the phone code; Send22s/End30s decode to0e/0f only in the action run. Both retain the mode-chain, full native measurement cache and empty acknowledgement-server boundary. Own flash remains exact and SIM files match. EEPROM differs at19 offsets and those record semantics remain unqualified. This is input acceptance, not connected calls, registration, speech or factory hardware qualification.",
