@@ -690,6 +690,21 @@ at247542, no24709c construction and no05e6 post to mailbox11. The
 events; it does not claim all ingress routes are enumerated. Mutation tests
 anchor all three direct sites and the constructor/receiver. The active
 frontier is legitimate server ingress, not flipping+13a or injecting05e6.
+
+Mailbox identity is own-runtime-qualified: at249472 the kernel current-task
+byte[100022] is0e (`tmp/nsk3-server-identity`), before entering247524.
+The kernel receive primitive266c80 independently reads that same task byte.
+Dispatch247550 uses base040b and recognizes040c/040d, then05fa/05fb.
+`nsk3_state_contract.direct_server_sends` inventories363 aligned directBL
+candidates to266a2c. Restricting to MOVS r0,0e in the final two halfwords
+selects eight posts:213998,2146de,2147ac,214874,281748,281950,2820d2,
+287f3a. The mutation-tested inventory does not cover shared-tail, computed
+or indirect destinations. These candidates include MCU control paths and a
+lower decoder; do not classify the server as exclusively DSP-fed.
+The first four select ROM template2c670c/header040c0000;281748/281950
+select2c6204 or2c6208 (040d0000/040d0300). The2820d2 path posts a dynamic
+object after lower-decoder tracing;287f3a is a separate constructor tail.
+Their ingress conditions and payload semantics are not yet established.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
