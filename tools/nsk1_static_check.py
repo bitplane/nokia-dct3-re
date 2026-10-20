@@ -17,6 +17,28 @@ PROFILES = {
 }
 
 
+def read_eeprom_output_contract(image, variant):
+    """Check own START/STOP GPIO operations, not fitted storage or input wiring."""
+    shift = {'standard': 0, '2915': -0x10}[variant]
+    fragments = (
+        (0x29095a, '22012380029b33207819431170197919431171192004781943017019'),
+        (0x290998, '781943917019'),
+        (0x2909ba, '781943817019'),
+        (0x2909cc, '22012380029b33207819439170197919431171192004781943017019'),
+        (0x290a08, '781943117019'),
+    )
+    for address, encoded in fragments:
+        expected = bytes.fromhex(encoded)
+        offset = address + shift - 0x200000
+        if image[offset:offset+len(expected)] != expected:
+            raise ValueError('EEPROM START/STOP output instruction contract differs')
+    return {'start_entry': hex(0x2909c6+shift),
+            'stop_entry': hex(0x290954+shift),
+            'output_register': '0x20020', 'direction_register': '0x20024',
+            'sda_output_bit': 0, 'scl_output_bit': 2,
+            'input_wiring_or_fitted_part_proved': False}
+
+
 def read_catalogue(image,table):
     offset = table-0x200000
     if offset < 8 or offset+112 > len(image):
@@ -57,6 +79,7 @@ def inspect(image,variant):
     if image[0xe4:0xec] != bytes.fromhex('e28f0001e12fff10'):
         raise ValueError('startup interworking boundary differs')
     return {'variant':variant,'sha1':digest,'catalogue':catalogue,
+            'eeprom_output_contract':read_eeprom_output_contract(image,variant),
             'arm_entry':'0x200040','thumb_entry':'0x2000ec',
             'firmware_eeprom_geometry':eeprom_geometry(image[5]),
             'stack_literal':hex(int.from_bytes(image[0x16c:0x170],'big')),

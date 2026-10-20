@@ -4,8 +4,9 @@
 
 Own NSK-1 v5.61 service streams are qualified and normalized; no MAME
 configuration, graphical boot, input, SIM or radio acceptance is claimed.
-The next step is mapping the own reset/loader and nonvolatile-storage
-contracts, then choosing a fail-closed hardware composition. Do not inherit
+The own reset, loader selection and EEPROM output contracts are mapped
+below. The next step is a bounded native compatibility composition, with
+GENSIO/input wiring still to establish independently. Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
 ## Acquired inputs
@@ -85,6 +86,15 @@ capacity `1 << ((descriptor & 7)+9)`, transfer page
 addressing. The shared helper `dct3_eeprom_descriptor.py` decodes that
 grammar while retaining distinct product values and no fitted-part claim.
 This says nothing about provisioned identity/security/calibration contents.
+
+Own EEPROM START `2909c6` and STOP `290954` construct register address
+`20020` and manipulate SDA output bit 0 and SCL output bit 2. They also
+set SDA direction bit 0 at `20024`. The `2915` counterparts are `2909b6`
+and `290944`; their five checked GPIO instruction fragments are identical.
+`nsk1_static_check.py` checks those fragments on both pinned images, with
+mutation controls for each fragment. This establishes output wiring only:
+SDA input sampling, fitted EEPROM part/page wrap and electrical timing
+remain separate contracts, not inferred from the START/STOP routines.
 
 ```sh
 .venv/bin/python tools/nsk1_static_check.py roms/noki5130/5130f561a.fls

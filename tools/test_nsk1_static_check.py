@@ -3,7 +3,7 @@ import struct
 import unittest
 from unittest.mock import patch
 
-from tools.nsk1_static_check import inspect,read_catalogue
+from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract
 
 
 class Nsk1StaticTest(unittest.TestCase):
@@ -31,7 +31,8 @@ class Nsk1StaticTest(unittest.TestCase):
                          [entry['slot'] for entry in report['entries']])
         self.assertFalse(report['execution_or_mask_identity_proved'])
         profiles = {'test':(hashlib.sha1(image).hexdigest(),self.table)}
-        with patch('tools.nsk1_static_check.PROFILES',profiles):
+        with patch('tools.nsk1_static_check.PROFILES',profiles), \
+                patch('tools.nsk1_static_check.read_eeprom_output_contract',return_value={}):
             result = inspect(image,'test')
             self.assertEqual('0x2000ec',result['thumb_entry'])
             self.assertFalse(result['boot_or_fitted_hardware_proved'])
@@ -58,6 +59,31 @@ class Nsk1StaticTest(unittest.TestCase):
     def test_unknown_variant_rejected(self):
         with self.assertRaisesRegex(ValueError,'variant'):
             inspect(b'','unknown')
+
+    def test_gpio_contract_and_each_fragment_mutation(self):
+        fragments = (
+            (0x29095a, '22012380029b33207819431170197919431171192004781943017019'),
+            (0x290998, '781943917019'),
+            (0x2909ba, '781943817019'),
+            (0x2909cc, '22012380029b33207819439170197919431171192004781943017019'),
+            (0x290a08, '781943117019'),
+        )
+        for variant,shift in (('standard',0),('2915',-0x10)):
+            image = bytearray(0x100000)
+            for address,encoded in fragments:
+                start = address+shift-0x200000
+                image[start:start+len(bytes.fromhex(encoded))] = bytes.fromhex(encoded)
+            result = read_eeprom_output_contract(image,variant)
+            self.assertEqual((0,2),(result['sda_output_bit'],result['scl_output_bit']))
+            self.assertFalse(result['input_wiring_or_fitted_part_proved'])
+            for address,_ in fragments:
+                offset = address+shift-0x200000
+                image[offset] ^= 1
+                with self.subTest(variant=variant,address=address),self.assertRaises(ValueError):
+                    read_eeprom_output_contract(image,variant)
+                image[offset] ^= 1
+            with self.assertRaises(ValueError):
+                read_eeprom_output_contract(b'',variant)
 
 
 if __name__ == '__main__':
