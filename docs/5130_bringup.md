@@ -1425,6 +1425,26 @@ copying persistent inputs only. It checks exact ordered menu contacts,
 command statuses, whole-card differences, Done frames and cold prompt frames.
 Qualified output: `tmp/nsk1-pin-request-final`.
 
+### Ordinary PIN2 change
+
+The same physical access-code menu independently changes PIN2 from5678 to8765.
+Only card bytes3492..3495 change, CHANGE CHV returns9000, and the firmware
+renders `PIN2 code changed`. A separate cold process authenticates startup
+PIN1, accepts the persisted8765 as current PIN2, and restores5678 through
+CHANGE CHV; the complete card then equals the original input. No retry,
+PUK, file or PIN-request state changes. Both75-second phases retain the
+own native/storage checks and do not establish radio or fitted-mask fidelity.
+
+```sh
+.venv/bin/python tools/nsk1_pin2_change_check.py \
+  tmp/nsk1-pin-roundtrip-qualified tmp/nsk1-pin2-change tmp/nsk1-pin2-restore
+```
+
+Physical fixtures are `nsk1_pin2_change.lua` and `nsk1_pin2_restore.lua`,
+composed over the existing PIN1 input harness. The PIN2 route adds one Down
+contact before selecting the change-code entry; it is not inherited from
+another product's menu layout.
+
 ### Ordinary PIN change
 
 ```sh

@@ -24,10 +24,15 @@ def check_change(previous,card):
         raise ValueError('ordinary PIN change modified unrelated card bytes')
 
 
-def check_change_contacts(trace):
-    sequences={'menu':MENU,'old':['one','two','three','four','menu'],
-               'new':['four','three','two','one','menu'],
-               'confirm':['four','three','two','one','menu']}
+def check_change_contacts(trace, pin2=False, restore=False):
+    menu = MENU[:]
+    if pin2:
+        menu.insert(-1, 'down')
+    old = ['five','six','seven','eight','menu'] if pin2 else ['one','two','three','four','menu']
+    replacement = ['eight','seven','six','five','menu'] if pin2 else ['four','three','two','one','menu']
+    if restore:
+        old, replacement = replacement, old
+    sequences={'menu':menu,'old':old,'new':replacement,'confirm':replacement}
     marker='nsk1_pin_change_contact: '
     rows=re.findall(re.escape(marker)+r'phase=(\w+) index=(\d+) key=(\w+) down=([01]) t=[0-9.]+ physical_only=1',trace)
     expected=[(phase,str(i),name,down) for phase,names in sequences.items()
