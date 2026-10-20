@@ -1,4 +1,4 @@
-# Nokia 5190 NSB-1 source boundary
+# Nokia 5190 NSB-1 bring-up
 
 ## Current boundary
 
@@ -8,12 +8,13 @@ graphical boot or phone services. The separate `noki5190` MCU research
 configuration executes the own input, initializes the own EEPROM geometry,
 installs its exact ROM4-catalogue program and reaches a supervisor flag loop.
 The supervisor flag is cleared organically by FIQ; its sampled loop is not
-a blocked lifecycle. The first unanswered DSP transition is the uploaded
+a blocked lifecycle. In the ordinary silent configuration, the unanswered transition is the uploaded
 program's resident-version publication to shared word `10004`, before the
-MCU begins sparse-flash handoffs. The next work is native execution with
-explicitly qualified resident-program input, not a scheduler or ownership
-flag injection. Do not inherit the 5110 machine merely because the restore
-manifest names ROM4.
+MCU begins sparse-flash handoffs. Separate `nsb1r4t` executes acquired NSE-1
+ROM4 as an explicit compatibility candidate: it passes own version selection,
+63 block handoffs and native loader/resident continuation, but still has a
+blank LCD. Fitted NSB-1 mask identity and DSP cadence remain unproved.
+No scheduler or ownership flag is injected.
 
 ## Qualified executable input
 
@@ -157,3 +158,50 @@ first block: no first sparse-flash block has been supplied yet.
 The observer suppresses its own snapshot reads from the API-read tap.
 Accepted read evidence must come from the firmware PCs above, not the
 supervisor PC that happened to be current while Lua inspected memory.
+
+## Native ROM4 compatibility instrument
+
+`nsb1r4t` retains own NSB-1 flash, controller composition and erased 8 KiB
+external EEPROM. It replaces the silent backend with acquired NSE-1
+program/data images, explicitly named as NSE-1 inputs rather than relabeled
+NSB-1 dumps. SHA-1 values are
+`a05a1e96a8c36ec5a47e1ea059d15afa54ca5739` (program) and
+`024c7f970f4ef754d3e90471de48a167515f930d` (data). The 52 MHz DSP clock is a
+declared compatibility cadence here, not an independently measured NSB-1
+timing contract. No HLE reply or donor EEPROM is attached.
+
+Own firmware automatically tries two uploaded programs. The first,
+descriptor `2b9344`, has 186 words with SHA-1
+`73b0cc6e6fc602f3a2f7934eb0c35d7f31c96b3f`; the second, descriptor `2be564`,
+has SHA-1 `e1e8f15a305bf32aea98f444074f30828d933fc4`. Passive release-time
+readback matches both payloads exactly. Native execution publishes resident
+version 4: the MCU rejects the first candidate's requested version 3 and
+accepts the second candidate's requested version 4. Both attempts are also
+present in the silent control; reset-edge tracing must not suppress the
+second release or count a later command `03` as another reset release.
+
+The accepted comparison performs all 63 main-loop ownership handoffs,
+then the MCU's final-result poll at `28fa96` observes shared `10002`
+change from `ffff` to `0004` through native execution. It subsequently
+releases its own 580-word loader (`fd00/ff80/0244/0500/0078/0000`), and
+executes native loader/resident code observed at `0d8f` and `8d98`.
+By 0.5 seconds success byte `10ad2d` is 1, saved version `10ad36` is 4,
+and the handoff count is 63; these remain observed through five seconds.
+Source executable flash is unchanged and EEPROM persists at 8 KiB.
+The captured panel remains blank. This establishes compatibility of this
+bootstrap path, **not fitted-mask identity, valid calibration, graphical
+boot, RF operation, audio or phone-service parity**.
+
+```sh
+.venv/bin/python tools/nsb1_rom4_compare.py \
+  mame/mame roms tmp/nsb1-rom4-comparison --seconds 6
+```
+
+The runner rejects existing run directories and qualifies all three input
+hashes before creating its private ROM directory. It admits no EEPROM image,
+records provenance, requires ordered version mismatch/acceptance, both exact
+uploads, 63 handoffs, final-result publication and positive native I/O traces, and checks persisted
+executable identity. `--verbose` optionally records the larger native opcode
+inventory. Shorter runs record evidence without claiming the six-second
+acceptance boundary. The normal `noki5190` silent-MCU gate remains independent
+and unchanged in behavior.

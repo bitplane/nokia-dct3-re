@@ -1315,6 +1315,7 @@ public:
 	void nam2c3(machine_config &config);
 	void noki5110(machine_config &config);
 	void noki5190(machine_config &config);
+	void nsb1r4t(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
 	void nse6stage(machine_config &config);
@@ -4110,6 +4111,16 @@ void nokia_dct3_state::noki5190(machine_config &config)
 	apply_product_config(PRODUCT_5190);
 }
 
+void nokia_dct3_state::nsb1r4t(machine_config &config)
+{
+	noki5190(config);
+	// Compatibility instrument only: NSE-1 resident ROM4 is acquired,
+	// but fitted NSB-1 mask identity and DSP cadence remain unproved.
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::noki6110(machine_config &config)
 {
 	dct3_base(config);
@@ -4420,6 +4431,24 @@ ROM_START( noki5190 )
 			CRC(c8894273) SHA1(27b8f0cb8640e5b423960b206e9aee065f32d726))
 	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("nsb1_eeprom.bin", 0, 0x2000, NO_DUMP)
+ROM_END
+
+ROM_START( nsb1r4t )
+	// Own executable/erased external storage; no NSE-1 provisioning.
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb1_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("5190f671a.fls", 0, 0x100000,
+			CRC(c8894273) SHA1(27b8f0cb8640e5b423960b206e9aee065f32d726))
+	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb1_eeprom.bin", 0, 0x2000, NO_DUMP)
+	// Explicit NSE-1 compatibility inputs, not relabeled NSB-1 dumps.
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 ROM_END
 
 ROM_START( noki6110 )
@@ -4957,6 +4986,7 @@ SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empt
 SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init, "Research", "NAM-2 Intel C3 flash configuration (fitted part unproved)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

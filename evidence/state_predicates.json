@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_rom4_native_compatibility", "owner": "nsb1_native_comparison", "status": "satisfied",
+      "predicate": "With explicitly qualified NSE-1 resident-ROM compatibility inputs and own erased external storage, NSB-1 executes its own verifier selection, block handoffs and native loader continuation",
+      "current": "Separate nsb1r4t admits own SHA-qualified flash plus unchanged NSE-1 program/data images, no EEPROM image or HLE DSP. Release-time readback matches own 186-word ROM3 and ROM4 uploads; firmware first rejects resident/requested 4/3 then accepts 4/4. All 63 main-loop handoffs execute, final MCU poll 28fa96 sees shared 10002 change ffff to 0004, own 580-word loader releases and native I/O traces enter 0d8f/8d98. Five-second state observations preserve success 1, saved version 4 and handoffs 63. Executable flash is unchanged and EEPROM remains 8 KiB. LCD is blank; fitted NSB-1 mask identity, physical 52 MHz cadence, valid calibration, graphical boot, RF, speech and services are not promoted. Normal noki5190 retains its independent silent-DSP boundary.",
+      "evidence": ["docs/5190_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb1_rom4_compare.py", "tools/nsb1_boot_observe.lua", "tools/test_nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_dsp_version_publication", "owner": "nsb1_uploaded_dsp", "status": "unresolved",
       "predicate": "The own uploaded DSP program publishes its resident version to shared 10004 before MCU sparse-flash handoffs",
-      "current": "Passive release observation at 28f9c8 records command 01 and arguments 0100/0300/0000/8000/0001/0001/0200. Firmware reads 10004 as ffff at 28f9dc and retries at 28f9fc. The own program's early MVPD would copy resident program ff87 into DSP data 0802, before its later 8023/802b helper calls. With no executing DSP, initialization times out, success byte 10ad2d clears, saved version 10ad36 is ffff and sparse-flash transfers are skipped; ownership flags remain 1. Observer snapshot reads are explicitly excluded from firmware read evidence. No version value, success flag or acknowledgement is fabricated, and fitted resident-mask compatibility remains unproved.",
+      "current": "Fitted resident-mask identity remains unresolved. The separate nsb1r4t compatibility predicate now proves native publication with qualified NSE-1 input, not the normal machine. In normal silent noki5190, release at 28f9c8 records command 01 and arguments 0100/0300/0000/8000/0001/0001/0200. Firmware reads 10004 as ffff at 28f9dc and retries at 28f9fc. The own program's early MVPD would copy resident program ff87 into DSP data 0802, before its later 8023/802b helper calls. With no executing DSP, initialization times out, success byte 10ad2d clears, saved version 10ad36 is ffff and sparse-flash transfers are skipped; ownership flags remain 1. Observer snapshot reads are explicitly excluded from firmware read evidence. No version value, success flag or acknowledgement is fabricated.",
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_boot_check.py", "tools/test_nsb1_boot_check.py"]
     },
     {
