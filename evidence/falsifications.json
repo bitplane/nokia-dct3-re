@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_radio_index4_absence_requires_provisioning_restart",
+      "status": "disproven",
+      "hypothesis": "The missing native index-4 control completion and radio continuation are caused solely by loss of state across first-boot provisioning restart",
+      "conclusion": "An independent process cold-boots the qualified initialized EEPROM, flash and SIM, without copying RAM or save states. The 61-second boot/storage checks pass with one provisioning record minimum. Native requests 1, 2, 8 and 3 complete to control word 010e; no index-4 request occurs. Nine post-two-second outgoing packets and one type-8b reply reproduce the radio boundary. In the first-boot trace, the later control-word clear is performed by native loader code at PC 0f10, not a demonstrated device-side RAM discard. This excludes provisioning restart as a necessary cause, not all reset fidelity defects or other index-4 callers. The type-70/subcommand-11 path is not established as an ordinary acquisition prerequisite and must not be forced or replayed.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_radio_contract.py", "tools/nsk1_radio_observe.lua", "driver/nokia_dsp_c54x.cpp"]
+    },
+    {
       "id": "nam2_idle_stall_caused_by_partial_interrupt_command_overwrite",
       "status": "disproven",
       "hypothesis": "The observed NAM-2 idle stall is caused by losing the other interrupt domain when a partial enable/disable command replaces the whole control byte",

@@ -312,8 +312,20 @@ checks and observes 4a3c/4a49 before the provisioning restart: pending
 06d0=0004 at 0.603154 seconds, completion 06d1=011e at 0.603515 seconds.
 The later reset clears both words at 1.299708 seconds; subsequent observed
 requests are 1, 2, 8 and 3, not 4. This is not an operation that never
-executes. The open question is its replay/retention contract across that
-restart, including whether the modeled reset domain is faithful.
+executes, but its first-boot occurrence does not establish normal acquisition
+ownership.
+
+The restart-only explanation is disproven by independent cold continuation
+`tmp/nsk1-radio-native-cold-control`: only initialized inputs/NVRAM/config
+are copied, not RAM or save states. Its 61-second boot/storage check passes
+with minimum one record. Requests 1, 2, 8 and 3 again complete to 010e,
+without index 4. Post-two-second traffic remains nine TX/one native type-8b
+RX (the latter at 38.791418 seconds). The first-boot clear is a native
+loader write at PC 0f10, not an observed device-side RAM discard. Thus
+the absence survives an ordinary initialized cold boot. The type-70/11
+control path remains a candidate completion family, not an established
+ordinary acquisition prerequisite; its first-boot use alone does not justify
+replaying it or changing reset retention.
 
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
