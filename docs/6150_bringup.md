@@ -10,28 +10,57 @@ support is not promoted; the separate diagnostic composition below now has
 qualified graphical presentation. An explicitly separate
 `nsm1r4t` executable compatibility instrument now exists.
 
-The next prerequisite is establishing matching resident DSP behavior and
-runtime validity of the explicitly derived product-local EEPROM fixture,
-plus fitted flash attributes and address aliases.
-The historical repair-template control rejects its decoded storage record.
-A separately labelled published-record diagnostic now passes that validator,
-receives a native record update, persists it and validates it again in a
-separate cold process. This is not factory provisioning or fitted-chip proof.
-The separately labelled nominal ADC2 comparison now reaches a readable
-**Security code** frame and organic SIM SELECT traffic. Saturated controls
-retain the blank display and readiness inputs `01/ff/00/01`. Physical key
-entry, accepted phone code and the Messages menu additionally pass the own
-retry-initializer contrast below. Physical SIM contact save and cold selected
-name/number readback also pass. Physical Phone erasure removes the template's
-extra Phone rows without touching that SIM contact. Physical wrong PIN1 and
-cold correct-PIN authentication preserve/restore the card retry counter.
-PIN1, phone-code and menu also compose in one cold boot. Physical offline
-SMS draft save/cold Outbox read pass; network services remain unaccepted.
-No readiness event or firmware flag is synthesized.
+The diagnostic record passes native validation/update and independent cold
+persistence. Explicit nominal ADC2 and the own phone-retry initializer
+fixture permit graphical boot and physical phone-code/menu acceptance,
+not factory provisioning or fitted-chip proof. Negative saturated/original-
+retry controls remain distinct. No readiness event or firmware flag is
+synthesized.
+
+Physical/cold software coverage includes SIM contacts, separate Phone-memory
+erase, PIN1/PIN2 and PUK recovery, request settings, offline SMS storage and
+PIN2-protected FDN activation/storage/local dial enforcement. Registered
+radio, connected calls and network SMS remain unaccepted.
+
+The native frontier is now the RF-input/qualification contract. A bounded
+105-second own run observes sustained late queue activity and a162-byte
+native measurement packet, without observed restart or qualifying result.
+Fitted resident-mask compatibility, flash attributes/address aliases and
+physical RF/electrical calibration remain unproved.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
 ## Executable compatibility boundary
+
+### Native radio baseline
+
+`nsm1_native_radio_observe.lua` combines physical PIN/phone/menu input with
+an own MCU dispatcher probe at2c1b96 and passive shared-ROM4 candidate state.
+The105s run receives types74 four times,8a/87 once at2.563s and8b once at
+49.097797s. The latter has162 body bytes: first word0080 and40 channel/value
+pairs whose signed values are-129/-130. This differs from the6130 inventory;
+do not import its report timing or supervision-reset deadline.
+
+Candidate counter1262/1263 stays zero through45s, then isffffcf03 at65s,
+ffffe42c at90s andffffeca2 at100s. Between65 and90, each queue cursor has5417
+writes; between90 and100, each has2166. Those increments equal the counter
+steps, and late cursors agree. Sampled1344/1266 remain zero and219b is0574.
+These are bounded queue/candidate-field observations, not validated RF units.
+No MCU reset/restart is observed through105s; longer stability is unaccepted.
+
+The own45s live program SHA256 is
+`b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e`.
+Gateway2420 targets uploaded0a8d, not the6130's0a71. The recovered comparison
+fragment `6ff8 219b 0d20` occurs at0b25, not the6130's0ae6; PORTR0027 remains
+at330a. The next experiment must observe this own comparison return and RF
+source before assigning physical sample semantics or adding any waveform.
+
+```sh
+.venv/bin/python tools/nsm1_native_radio_check.py tmp/NATIVE_RADIO
+```
+
+The checker pins the own live image, complete packet/sample inventory,
+105s horizon, physical authentication, unchanged card and Menu pixels.
 
 ### Published-record diagnostic acceptance
 

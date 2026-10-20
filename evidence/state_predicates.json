@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_native_radio_bounded_packet_queue_baseline", "owner": "nsm1_native_compatibility", "status": "satisfied",
+      "predicate": "An own105-second physical-authenticated native compatibility run has complete packet evidence and late correlated queue/candidate-counter activity without observed restart",
+      "current": "Own MCU dispatcher2c1b96 observes exactly74x4,8ax1,87x1,8bx1. Type8b arrives49.097797s with162 body bytes, leading0080 and40 channel/signed-value pairs at-129/-130. Candidate1262/1263 is zero through45s;65->90 and90->100 increments5417/2166 equal producer and consumer write deltas with drained late cursors. Fields1344/1266 remain0 and219b=0574. No reset/restart is observed through105s. Own live45s program is SHA256 b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e;2420 targets0a8d and the comparison fragment is at0b25, not sibling0ae6. The checker also requires own flash, native record validity, physical PIN/phone/Menu, exact Menu pixels and unchanged card. Physical RF/sample semantics, fitted mask, native registration/speech and longer stability remain unaccepted. The next boundary is observing the own comparison return and port27 input, not importing a sibling address or injecting a score.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_native_radio_observe.lua", "tools/nsm1_native_radio_check.py", "tools/test_nsm1_native_radio_check.py"]
+    },
+    {
       "id": "nsm1_fdn_rejected_activation_cold_retry", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Wrong PIN2 cannot activate FDN and its exact saved retry state permits a cold correct activation without unrelated mutation",
       "current": "From an explicit FDN-Off card with A/12346 and fresh retries, physical startup PIN1/phone authentication followed by menu On/PIN25675 returns9804 and exact Code error. No validity or UPDATE command is sent; only PIN2 retries3->2 change in the complete card. An independent cold process receives the full saved card/EEPROM and physical5678 restores retries, sends ADN INVALIDATE and the identity-session rehabilitations, and renders exact On. The complete final card equals the original except ADN validity1->0. Exact physical contacts, authentication, credential/APDU outcomes, input links, own flash and native record dialogue pass alongside the four-run activation cycle. No network or native speech claim follows.",
