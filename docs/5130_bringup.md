@@ -578,6 +578,26 @@ site to four entries and checks the positive control before accepting the
 negative. These four count samples are not an all-writer census of06b6.
 The independent cold/storage/radio and90-second scan checks still pass.
 
+The queue producer is distinct from the RF sample queue. Handler8ed3 reads
+I/O35 at8ed8 and I/O36 status at8ee6, then runs the parser-state dispatch
+8f39..8f40. The checked positive count updates are8fb5 and8fc8. A full
+page-zero raw-word scan finds nine06b6 operands, not a proof against indirect
+or alias writers. Port27's frame-driven RF reduction instead supplies the
+06b7/06b8 queue; these must not be conflated with serial count06b6.
+
+The61-second cold probe `tools/nsk1_serial_queue.lua` reuses the existing
+ROM4 serial observer and records two CPU-bus writes to06b6, both zero.
+Its complete port summaries have no35 reads/writes;36 has four reads and
+two writes, ending0080. RSSI4810 remains the positive execution control.
+Qualified capture: `tmp/nsk1-serial-queue-final`. Check with
+`python -m tools.nsk1_radio_trace_check LOG --serial-queue` alongside the
+independent storage qualification. CPU-bus taps do not cover backend upload
+copies. The shadow-state model has no independently evidenced35 receive
+source or serial request-bit0200 producer; which physical interface owns
+these ports remains open. An absent optional serial input is not proof of
+the missing ordinary-radio completion and must not be populated with guessed
+bytes to satisfy the packet watchdog.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

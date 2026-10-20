@@ -2,6 +2,12 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local handles, counts, serial = {}, {}, {}
+local queue_writes, queue_nonzero = 0,0
+handles[#handles + 1] = cpu.spaces.data:install_write_tap(0x06b6,0x06b6,
+    'rom4_serial_queue',function(_,value)
+        queue_writes = queue_writes + 1
+        if value ~= 0 then queue_nonzero = queue_nonzero + 1 end
+    end)
 for _, direction in ipairs({'read', 'write'}) do
   for _, port in ipairs({0x00, 0x02, 0x34, 0x35, 0x36}) do
     local sites = {}
@@ -49,6 +55,7 @@ for _, site in ipairs({0x3bcd, 0x9232, 0x9129, 0x9140, 0x9009, 0x23e4, 0x23e6, 0
         end)
 end
 local stop = emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('rom4_serial_queue_summary: cpu_bus_writes=%d nonzero=%d observer_writes=0\n',queue_writes,queue_nonzero))
     for _, port in ipairs({0x00, 0x02, 0x34, 0x35, 0x36}) do
         for _, direction in ipairs({'read', 'write'}) do
             local state = serial[port .. '_' .. direction]

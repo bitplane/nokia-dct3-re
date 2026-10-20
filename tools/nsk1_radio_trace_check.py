@@ -58,6 +58,21 @@ def check_serial_publishers(text):
             'serial_publishers_observed':False}
 
 
+def check_serial_queue(text):
+    check_serial_publishers(text)
+    queue = re.findall(r'rom4_serial_queue_summary: cpu_bus_writes=(\d+) nonzero=(\d+) observer_writes=0',text)
+    if queue != [('2','0')]:
+        raise ValueError('serial queue CPU-bus write boundary changed')
+    rows = re.findall(r'rom4_serial_summary: port=(35|36) direction=(read|write) count=(\d+) last_value=([0-9a-f]{4}) last_pc=([0-9a-f]{4})',text)
+    expected = [('35','read','0','0000','0000'),('35','write','0','0000','0000'),
+                ('36','read','4','0080','9183'),('36','write','2','0080','90bc')]
+    if rows != expected:
+        raise ValueError('serial data/status port observation changed or truncated')
+    return {'data_port':'0x35','status_port':'0x36','data_reads':0,
+            'cpu_bus_queue_writes':2,'nonzero_queue_writes':0,
+            'physical_serial_identity_proved':False}
+
+
 def check(text):
     packets = re.findall(r'nsk1_radio_packet: direction=(tx|rx) index=(\d+) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+)', text)
     tx = [(kind, int(length)) for direction, _, kind, length, _ in packets if direction == 'tx']
@@ -155,6 +170,8 @@ def main():
                         help='classify the known late failure; does not qualify stability')
     parser.add_argument('--scan-qualification', action='store_true',
                         help='also require the passive 92-second scan qualification fixture')
+    parser.add_argument('--serial-queue', action='store_true',
+                        help='also require the passive serial-port/queue observation fixture')
     args = parser.parse_args()
     try:
         checker = diagnose_liveness_reset if args.diagnose_liveness_reset else check
@@ -162,6 +179,8 @@ def main():
         result = checker(text)
         if args.scan_qualification:
             result['scan_qualification'] = check_scan_qualification(text)
+        if args.serial_queue:
+            result['serial_queue'] = check_serial_queue(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSK-1 radio boundary: FAIL: {error}\n')

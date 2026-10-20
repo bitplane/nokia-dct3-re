@@ -6,12 +6,15 @@ from tools.nsk1_radio_contract import literal_references,analyze,native_completi
 class Nsk1RadioContractTest(unittest.TestCase):
     def test_serial_publisher_has_typed_calls_and_a_queue_gate(self):
         image = bytearray(0x20000)
-        for address,words in {0x8dd4:'721206c010f806b6fa458dfb',0x8ded:'f274938b7714009b',0x8df5:'f274938b7714009a',0x938d:'771306b61083fc47',0x9404:'f27437ce77131200'}.items():
+        for address,words in {0x8dd4:'721206c010f806b6fa458dfb',0x8ded:'f274938b7714009b',0x8df5:'f274938b7714009a',0x8ed8:'74f8000800358813',0x8fb5:'6bf806b60001',0x8fc8:'6bf806b60001',0x938d:'771306b61083fc47',0x9404:'f27437ce77131200'}.items():
             data = bytes.fromhex(words)
             image[address*2:address*2+len(data)] = data
         result = serial_publisher_contract(image)
         self.assertEqual([row['packet_type'] for row in result['direct_callers']],['0x9b','0x9a'])
         self.assertFalse(result['unconditional_heartbeat_proved'])
+        self.assertEqual(result['input_port'],'0x35')
+        self.assertEqual(result['checked_queue_increment_sites'],['0x8fb5','0x8fc8'])
+        self.assertIn('0x8fb6',result['raw_queue_word_occurrences'])
         image[0x20:0x24] = bytes.fromhex('f074938b')
         with self.assertRaisesRegex(ValueError,'caller census'):
             serial_publisher_contract(image)

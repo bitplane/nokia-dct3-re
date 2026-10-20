@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, check_serial_publishers, diagnose_liveness_reset
+from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, check_serial_publishers, check_serial_queue, diagnose_liveness_reset
 
 
 def fixture():
@@ -89,6 +89,15 @@ class NativeRadioTraceTest(unittest.TestCase):
 
 
 class ScanProgressTests(unittest.TestCase):
+    def test_serial_queue_is_separate_and_requires_complete_port_evidence(self):
+        text = '\n'.join(f'nsk1_publisher_entry: address=3f50 index={i} ar4=0000 ar5=0004 serial06b6=0000 t={2+i*0.005:.6f} observer_writes=0' for i in range(1,5))
+        text += '\nnsk1_publisher_entry: address=4810 index=1 ar4=008b ar5=03ff serial06b6=0000 t=38.791415 observer_writes=0\nrom4_serial_queue_summary: cpu_bus_writes=2 nonzero=0 observer_writes=0\n'
+        text += '\n'.join(f'rom4_serial_summary: port={port} direction={direction} count={count} last_value={value} last_pc={pc}' for port,direction,count,value,pc in [('35','read',0,'0000','0000'),('35','write',0,'0000','0000'),('36','read',4,'0080','9183'),('36','write',2,'0080','90bc')])
+        self.assertEqual(check_serial_queue(text)['data_reads'],0)
+        for before,after in [('nonzero=0','nonzero=01'),('direction=read count=0','direction=read count=1'),('port=36','port=37')]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_serial_queue(text.replace(before,after))
+
     def test_serial_negative_requires_its_positive_control(self):
         text = '\n'.join(f'nsk1_publisher_entry: address=3f50 index={i} ar4=0000 ar5=0004 serial06b6=0000 t={2+i*0.005:.6f} observer_writes=0' for i in range(1,5))
         positive = 'nsk1_publisher_entry: address=4810 index=1 ar4=008b ar5=03ff serial06b6=0000 t=38.791415 observer_writes=0'

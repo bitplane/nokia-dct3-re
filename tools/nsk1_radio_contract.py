@@ -17,6 +17,9 @@ def serial_publisher_contract(image):
         0x8dd4:'7212 06c0 10f8 06b6 fa45 8dfb',
         0x8ded:'f274 938b 7714 009b',
         0x8df5:'f274 938b 7714 009a',
+        0x8ed8:'74f8 0008 0035 8813',
+        0x8fb5:'6bf8 06b6 0001',
+        0x8fc8:'6bf8 06b6 0001',
         0x938d:'7713 06b6 1083 fc47',
         0x9404:'f274 37ce 7713 1200',
     }
@@ -28,6 +31,10 @@ def serial_publisher_contract(image):
     if callers != [(0x8ded,True),(0x8df5,True)]:
         raise ValueError('serial helper direct caller census changed')
     return {'publisher':'0x9404','helper':'0x938b','queued_count':'0x06b6',
+            'input_port':'0x35','status_port':'0x36','input_handler':'0x8ed3',
+            'checked_queue_increment_sites':['0x8fb5','0x8fc8'],
+            'raw_queue_word_occurrences':[hex(i//2) for i in range(0,len(image)-1,2)
+                                          if image[i:i+2] == bytes.fromhex('06b6')],
             'early_return':'queued count <= 0',
             'direct_callers':[{'address':'0x8ded','packet_type':'0x9b'},
                               {'address':'0x8df5','packet_type':'0x9a'}],
