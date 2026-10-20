@@ -16,20 +16,22 @@ MENU='51a20a16acead610184225c78632724f9f20025565bd29a93beffec0c271d3a3'
 ERROR='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
-def check_trace(trace,accepted,following_keys=(0x19,)):
+def check_trace(trace,accepted,following_keys=(0x19,),extra_codes=()):
+    if extra_codes and not accepted:raise ValueError('extra confirmations require accepted-code fixture')
     contacts=re.findall(r'nsm1_security_contact: key=([0-9a-f]+) down=(\d) ',trace)
     if contacts!=[(f'{key:02x}',str(down)) for key in (1,2,3,4,5,0x19)+tuple(following_keys) for down in (1,0)]:
         raise ValueError('physical code/menu input sequence differs')
     submissions=re.findall(r'nsm1_security_submit: text=([0-9a-f]+) caller=([0-9a-f]+)',trace)
     expected=[('3132333435000000','0029faf3')]
+    expected.extend((text,'0029faf3') for text in extra_codes)
     if not accepted:expected.append(('0032333435000000','0029faf3'))
     if submissions!=expected:raise ValueError('submitted code differs')
     gates=re.findall(r'nsm1_security_gate: match=([0-9a-f]+) retry_pointer=([0-9a-f]+) retry=([0-9a-f]+)',trace)
-    expected=[('00000001','00112824','00' if accepted else '2b')]
+    expected=[('00000001','00112824','00' if accepted else '2b')]*(1+len(extra_codes))
     if not accepted:expected.append(('00000000','00112824','2b'))
     if gates!=expected:raise ValueError('matching-code retry contrast differs')
     results=re.findall(r'nsm1_security_accepted: result=([0-9a-f]+)',trace)
-    if results!=(['00000001'] if accepted else []):raise ValueError('phone-code acceptance differs')
+    if results!=(['00000001']*(1+len(extra_codes)) if accepted else []):raise ValueError('phone-code acceptance differs')
 
 
 def main():

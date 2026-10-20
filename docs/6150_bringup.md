@@ -159,6 +159,27 @@ The next target is the firmware's invalidation/initialization path for the
 selected record family, retaining the correct SIM contents as the control.
 Handset-local contacts, delete/cancel, SIM security and radio remain open.
 
+The physical Phone-memory erase experiment narrows, but does not close,
+that boundary. Names/Erase/Erase all/Phone/confirmation asks for12345 again;
+both code submissions match and are accepted. The exact Memory erased frame
+appears at30s. Firmware changes EEPROM-backed record0728 while preserving
+the encoded low block/security record and the entire SIM card, with no SIM
+UPDATE RECORD. An independent cold process uses those saved inputs and
+still renders SIM number12345. Its list is now blank rather than the prior
+garbage text; it does not display A. Thus Phone erase is not a complete
+SIM-name cache rebuild, and storage is not fixed by treating its payload
+as all-zero or erased bytes. The erased record retains opaque non-text data.
+
+The additional physical Phone-memory selection acknowledges and changes
+settings bytes03d6 (1->0) and03e8 (0->6), but a subsequent cold query still
+reaches12345. No cold empty-Phone-book claim is made: query namespace and
+record-family selection must be traced before interpreting that continuation.
+
+```sh
+.venv/bin/python tools/nsm1_phonebook_erase_check.py \
+  tmp/nsm1-erase-phone-qualified tmp/nsm1-erase-phone-cold
+```
+
 ```sh
 .venv/bin/python tools/nsm1_phonebook_name_check.py \
   tmp/nsm1-phonebook-name-records/error.log \

@@ -1,5 +1,7 @@
 -- Physical Names/Options/Memory in use; no provisioning writes.
-_G.nsm1_followup_contacts={{1,16,0x1a},{1,8,0x18},{1,8,0x18},{1,8,0x18},{1,8,0x18},{1,2,0x19},{1,2,0x19},{1,2,0x19}}
+_G.nsm1_followup_contacts={{1,16,0x1a},{1,8,0x18},{1,8,0x18},{1,8,0x18},{1,8,0x18},{1,2,0x19},{1,2,0x19}}
+if _G.nsm1_select_phone then _G.nsm1_followup_contacts[#_G.nsm1_followup_contacts+1]={1,8,0x18} end
+_G.nsm1_followup_contacts[#_G.nsm1_followup_contacts+1]={1,2,0x19}
 local source=debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsm1_security_input.lua')
 local machine=manager.machine
