@@ -19,6 +19,8 @@ cold PIN challenge; physical disable persists and skips that challenge on cold
 boot without bypassing the separate phone lock. Other SIM/security operations
 and radio remain unaccepted.
 Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
+Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
+Outbox read displays it without changing card bytes. Network SMS is unproved.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -378,6 +380,34 @@ the corresponding cold challenge behavior. PIN2, permanent PUK blocking,
 correct idle content and radio remain unaccepted. A Battery low alert appears
 around33s in the longer Off run under the unchanged nominal-input hypothesis;
 that analog/power observation is not hidden by adjusting the fixture voltage.
+
+### Offline SMS draft
+
+The observed physical route is Messages -> Select -> Down twice to Write
+messages -> Select, digit2 for A, Options -> Down twice to Save -> Select.
+Menu state must be observed rather than inferred from a numeric shortcut.
+The generic Saved to SIM card presentation alone cannot distinguish ADN from
+SMS storage; acceptance requires the selected EF and its actual record bytes.
+
+`nsk3_sms_input.lua` writes one absolute176-byte UPDATE RECORD to EF_SMS6f3c.
+Record1 starts `07 02 81 f0 01 ff 00 81 00 00 01 41`, padded withff: unsent
+status07, one-character GSM7 A, no recipient yet. ADN and all nine other SMS
+slots remain empty. No SMS record is prefilled by the input fixture.
+`nsk3_sms_reload.lua` starts in a qualified cold process, physically unlocks,
+opens Outbox and displays A. It sends no UPDATE RECORD and preserves the
+entire current serialized card and pre-launch snapshot byte-for-byte.
+
+```sh
+.venv/bin/python tools/nsk3_sms_check.py roms/noki6130/source \
+  tmp/nsk3-sms-save-qualified tmp/nsk3-sms-cold-qualified
+```
+
+The gate checks physical code/command contacts, own unchanged executable flash,
+native uploads, exact EF_SMS selection and update payload/status, empty remaining
+storage, cold identity and exact editor/read frames. SMS experiments explicitly
+raise the passive TX capture bound to4096 bytes; existing phonebook captures
+retain their1024 bound. This is offline application/storage acceptance only,
+not SMS-SUBMIT delivery, network registration, RF or native speech.
 
 ## Own firmware inputs
 

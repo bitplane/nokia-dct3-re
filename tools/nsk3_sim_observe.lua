@@ -7,10 +7,11 @@ local machine=manager.machine
 local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
 local tx,rx=0,0
+local tx_limit=_G.nsk3_sim_tx_limit or 1024
 _G.nsk3_sim_tx_tap=memory:install_write_tap(0x20034,0x20037,'nsk3_sim_tx',function(offset,value,mask)
     if mask & 0x0000ff00 ==0 then return end
     tx=tx+1
-    if tx<=1024 then machine:logerror(string.format('nsk3_sim_tx: index=%d value=%02x t=%.9f observer_writes=0\n',tx,(value>>8)&0xff,machine.time:as_double())) end
+    if tx<=tx_limit then machine:logerror(string.format('nsk3_sim_tx: index=%d value=%02x t=%.9f observer_writes=0\n',tx,(value>>8)&0xff,machine.time:as_double())) end
 end)
 _G.nsk3_sim_rx_tap=memory:install_read_tap(0x20034,0x20037,'nsk3_sim_rx',function(offset,value,mask)
     if mask & 0x000000ff ==0 then return end

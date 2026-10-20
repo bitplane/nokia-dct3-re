@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_offline_sms_cold_read", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 offline SMS composition writes one exact unsent A record and a separate cold Outbox read preserves it",
+      "current": "Observed Messages/Write messages/Options/Save contacts issue one exact176-byte UPDATE RECORD to EF_SMS6f3c with9000. Record1 is unsent A with no recipient, remaining9 SMS slots and ADN stay empty. Qualified cold snapshot matches saved card; physical Outbox read renders exact A frame, sends no UPDATE RECORD and preserves the whole card. A second isolated save/read pair reproduces the gate. Own flash, native upload, physical code/command sequence and independent storage/frame checks pass. A generic Saved to SIM card frame alone is not accepted as SMS evidence. Network SMS, registration, RF and speech remain outside this predicate.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_sms_input.lua", "tools/nsk3_sms_reload.lua", "tools/nsk3_sms_check.py", "tools/test_nsk3_sms_check.py", "tools/nsk3_sim_observe.lua", "tools/nsk3_phonebook_check.py"]
+    },
+    {
       "id": "nsk3_physical_pin_request_disable", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 PIN-request disable changes only its persistent flag and a cold boot omits SIM VERIFY while preserving the separate phone lock",
       "current": "Request-enabled card authenticates1234, phone code unlocks, and own4-5-1 route selects Off using physical contacts. DISABLE CHV returns9000 and exact31s frame shows Off. The whole card changes only enabled1->0. Cold input snapshot matches saved card, no SIM VERIFY or credential mutation occurs, exact5/15s phone-lock frames appear and card remains unchanged. Own flash/native upload and command credential are checked. Longer run also shows Battery low around33s under unchanged analog inputs, not silently tuned away. This predicate does not establish PIN2, permanent blocking, idle content or radio.",
