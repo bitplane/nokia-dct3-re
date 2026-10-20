@@ -168,7 +168,15 @@ change in the complete card. The screen confirms PIN code changed;
 independent cold4321 authentication preserves the full card.
 `nsm1_pin_change_check.py CHANGED COLD` checks the physical authentication
 order, APDU, whole-card transition, EEPROM link and exact confirmation.
-PIN-request toggles, PIN2 and
+Physical menu4-5-1 also accepts PIN-request Off and On: exact authenticated
+DISABLE/ENABLE CHV commands (`A0 26/28 00 01 08`, padded1234) return9000.
+The entire card changes only its enable byte. Cold Off skips SIM VERIFY,
+but still requires the phone code and reaches Messages; physical On then
+restores the next cold PIN challenge and successful1234 authentication.
+All four runs preserve the saved card/EEPROM chain.
+`nsm1_pin_request_check.py OFF OFF_COLD ON ON_COLD` checks this cycle.
+The earlier no-PIN menu has its own captured icon-animation phase oracle.
+PIN2 and
 authenticated network services remain separately unaccepted on NSM-1.
 
 ```sh

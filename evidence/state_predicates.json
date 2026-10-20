@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_physical_pin_request_cold_cycle", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN-request Off/On changes only the card enable byte and controls the independent cold SIM challenge",
+      "current": "Authenticated menu4-5-1 Off sends exact A0 26 00 01 08 plus padded1234,9000 and changes only enable1->0. Cold Off skips all credential APDUs, physically accepts the separate phone12345 and opens Messages. Physical menu On sends exact A0 28 00 01 08 plus padded1234,9000 and changes only enable0->1. The next independent cold boot challenges and accepts1234 with the entire card unchanged. Full card and EEPROM links, own flash, native record dialogue, physical authentication/contact order and exact Off/On/PIN/menu frames pass. The no-PIN Messages icon has an independently inspected earlier animation phase, not a borrowed frame hash. No radio or native speech claim follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_pin_request_disable.lua", "tools/nsm1_pin_request_enable.lua", "tools/nsm1_pin_request_check.py", "tools/test_nsm1_pin_request_check.py"]
+    },
+    {
       "id": "nsm1_ordinary_pin_change_cold_authentication", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical authenticated Change PIN changes only PIN1 and its new credential authenticates after a cold restart",
       "current": "Physical startup PIN1234 and phone12345 precede menu4-5-6, Change PIN selection and old1234/new4321/confirmation. Exact A0 24 00 01 10 plus padded credentials returns9000 and the full card changes only its PIN1 bytes. Exact PIN code changed pixels pass. Independent cold4321 authentication preserves all card bytes; saved EEPROM link, own flash and native record validity pass. The shared authentication helper permits only the explicitly named CHANGE operation for this gate; other gates retain the no-mutation default. No phone unlock bypass or radio acceptance follows.",
