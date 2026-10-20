@@ -185,10 +185,26 @@ acknowledge-only lock handling would not implement that contract.
 The reference is retained locally as
 `roms/reference-docs/Intel-28FxxxC3-290645-011.pdf`, SHA-256
 `f5977db4c0c9c044dd1cc18503d6763d3095c2f645e2d4b74303299fdd229532`.
-Next implementation boundary: a distinct generic C3 part with executable
-ID, parameter-erase isolation, per-block lock/reset/status and save-state
-tests, followed by an isolated NAM-2 configuration trial. This is a
-firmware-supported part candidate, not proof of the acquired board's chip.
+The overlay now provides a distinct generic `INTEL_28F160C3T` part with
+geometry-driven erases and per-block lock/reset/status state, including the
+WP# override of lock-down protection. Existing parts do not enable these
+semantics. `driver/intelfsh_c3_test.cpp` is a development-only executable
+conformance fixture, not a handset provisioning route:
+
+```sh
+make build
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/c3-conformance -- c3test -video none -sound none \
+  -nothrottle -seconds_to_run 4 -log
+```
+
+It checks identity, power-up lock, rejected locked program/erase, NOR writes,
+parameter/main erase isolation, lock-down with both WP# levels, reset and
+save/load restoration of locks, pin and array state. Full CFI queries,
+protection-register programming and measured operation timing are not
+implemented by this addition. The handset still uses its previous part;
+next is an isolated NAM-2 configuration trial. This remains a
+firmware-supported candidate, not proof of the acquired board's chip.
 
 ## Established contracts
 
