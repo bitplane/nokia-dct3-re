@@ -539,6 +539,26 @@ boot/storage checks, run `python -m tools.nsk1_radio_trace_check LOG
 --scan-qualification` to require its measurement and late-counter evidence.
 The ordinary61-second radio gate alone does not cover this longer horizon.
 
+The qualification fixture also captures the live page-zero program at45s as
+`native_program_45s.bin` (65,536 big-endian words). The qualified capture
+`tmp/nsk1-scan-publishers-qualified` has3,146 changed words relative to the
+65,535 overlapping acquired resident words, but the same19 raw CALLD
+candidates targeting37ce and no immediate B/BD candidates targeting it.
+`tools/nsk1_radio_contract.py --live-dsp-program` reports all candidate
+addresses and coverage; it does not infer packet arguments or reachability
+from nearby literals. Indirect transfers, other program pages and direct
+ring writes remain outside that census. No autonomous heartbeat contract
+follows from the unchanged candidate set.
+
+The source audit still maps sample production to the frame ISR (vectorffc0
+to3204; mode1 at32f4); the separate transfer vector goes to3598. Existing
+CTSI frame timing is not falsified by slow scan completion alone. Exact
+zero unattached RF input is also not evidence for the noise/offset encoding
+of a powered physical receiver. The outstanding boundary is therefore the
+RF-input and packet-production contract, including the data-driven serial
+publisher at9404 and eligibility of the existing control/result producers,
+not a justified clock multiplier or synthetic periodic packet.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

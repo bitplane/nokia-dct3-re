@@ -1,9 +1,23 @@
 import unittest
 
-from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract
+from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census
 
 
 class Nsk1RadioContractTest(unittest.TestCase):
+    def test_live_publisher_census_is_word_ordered_and_bounded(self):
+        image = bytearray(0x20000)
+        image[0x20:0x28] = bytes.fromhex('f27437cef07337ce')
+        result = live_publisher_census(image)
+        self.assertEqual(result['words_scanned'],65536)
+        self.assertEqual(result['adjacent_pairs_scanned'],65535)
+        self.assertEqual(result['direct_call_candidates'],[{'address':'0x10','delayed':True}])
+        self.assertEqual(result['direct_tail_branch_candidates'],['0x12'])
+        self.assertIn('indirect',result['scope'])
+        image[0x20:0x28] = bytes.fromhex('74f2ce3773f0ce37')
+        self.assertFalse(live_publisher_census(image)['direct_call_candidates'])
+        with self.assertRaises(ValueError):
+            live_publisher_census(image[:-2])
+
     def test_big_endian_aligned_literal_candidates(self):
         image = bytearray(64)
         image[0:2] = bytes.fromhex('4803')

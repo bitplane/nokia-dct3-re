@@ -12,6 +12,26 @@ from tools.c54x_rom4_port_census import direct_callers
 BASE = 0x200000
 
 
+def live_publisher_census(image, resident=None):
+    if len(image) != 0x20000:
+        raise ValueError('live page-zero snapshot must contain 65536 big-endian words')
+    words = [int.from_bytes(image[i:i+2],'big') for i in range(0,len(image),2)]
+    calls = direct_callers(image,0x37ce)
+    result = {'words_scanned':len(words),'adjacent_pairs_scanned':len(words)-1,
+              'direct_call_candidates':[{'address':hex(address),'delayed':delayed}
+                                        for address,delayed in calls],
+              'direct_tail_branch_candidates':[hex(i) for i in range(len(words)-1)
+                                               if words[i] in (0xf073,0xf273) and words[i+1]==0x37ce],
+              'scope':'raw page-zero opcode candidates; excludes indirect calls, other program pages, reachability and recovered packet arguments'}
+    if resident is not None:
+        native_completion_contract(resident)
+        result['same_direct_call_sites_as_resident'] = calls == direct_callers(resident,0x37ce)
+        result['overlapping_words_compared'] = len(resident)//2
+        result['changed_overlapping_words'] = sum(image[i:i+2]!=resident[i:i+2]
+                                                  for i in range(0,len(resident),2))
+    return result
+
+
 def native_completion_contract(image, data=None):
     if hashlib.sha1(image).hexdigest() != 'a05a1e96a8c36ec5a47e1ea059d15afa54ca5739':
         raise ValueError('native completion contract requires acquired NSE-1 ROM4 program')
@@ -240,6 +260,8 @@ def main():
     parser.add_argument('image',type=Path)
     parser.add_argument('--dsp-program',type=Path)
     parser.add_argument('--dsp-data',type=Path)
+    parser.add_argument('--live-dsp-program',type=Path,
+                        help='passive full page-zero snapshot, big-endian words')
     args = parser.parse_args()
     try:
         result = analyze(args.image.read_bytes())
@@ -248,6 +270,9 @@ def main():
                 args.dsp_program.read_bytes(), args.dsp_data.read_bytes() if args.dsp_data else None)
         elif args.dsp_data:
             raise ValueError('--dsp-data requires --dsp-program')
+        if args.live_dsp_program:
+            result['live_publisher_census'] = live_publisher_census(
+                args.live_dsp_program.read_bytes(),args.dsp_program.read_bytes() if args.dsp_program else None)
         print(json.dumps(result,indent=2))
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSK-1 radio contract failed: {error}\n')

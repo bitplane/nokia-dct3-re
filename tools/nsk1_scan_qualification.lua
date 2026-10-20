@@ -5,6 +5,7 @@ dofile(source:match('^(.*[/\\])') .. 'nsk1_radio_observe.lua')
 local machine = manager.machine
 local dsp = machine.devices[':dsp_c54x:cpu']
 local count = 0
+local program_dumped = false
 -- Program-read callbacks expose PC one word past this instruction's address.
 _G.nsk1_scan_metric_tap = dsp.spaces.program:install_read_tap(0x0ae6,0x0ae6,'scan_metric',function()
     if machine.time:as_double() < 39 or count >= 8 then return end
@@ -14,6 +15,18 @@ end)
 local next_sample = 65
 emu.register_frame_done(function()
     local now = machine.time:as_double()
+    if not program_dumped and now >= 45 then
+        program_dumped = true
+        local bytes = {}
+        for address=0,0xffff do
+            local word = dsp.spaces.program:read_u16(address)
+            bytes[#bytes+1] = string.char((word >> 8)&255,word&255)
+        end
+        local output = assert(io.open('native_program_45s.bin','wb'))
+        output:write(table.concat(bytes))
+        output:close()
+        machine:logerror('nsk1_live_program_snapshot: words=65536 byte_order=big t=45 observer_writes=0\n')
+    end
     if now < next_sample or next_sample > 90 then return end
     next_sample = next_sample + 5
     local data = dsp.spaces.data
