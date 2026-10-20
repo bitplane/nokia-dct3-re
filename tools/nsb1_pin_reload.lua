@@ -4,7 +4,7 @@ dofile(source:match('^(.*[/\\])') .. 'nsb1_boot_observe.lua')
 local machine = manager.machine
 local contacts = {{2,2},{3,2},{4,2},{2,4},{3,4},{1,4}}
 local events = {}
-for _, phase in ipairs({{12,'pin',{1,2,3,4,6}}, {18,'phone',{1,2,3,4,5,6}}}) do
+for _, phase in ipairs({{12,'pin',_G.nsb1_startup_pin_contacts or {1,2,3,4,6}}, {18,'phone',{1,2,3,4,5,6}}}) do
     for index, key in ipairs(phase[3]) do
         local contact, field = contacts[key], nil
         for _, candidate in pairs(machine.ioport.ports[':COL.' .. contact[1]].fields) do

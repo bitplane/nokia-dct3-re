@@ -63,6 +63,24 @@ softkey/navigation cells are not inherited by these fixtures.
 
 ### SIM unblock and cold new-PIN verification
 
+An ordinary physical PIN1 change is separately accepted through own Menu4-2-5-1
+(Access codes). Current1234, new4321 and confirmation produce one CHANGE CHV
+`A0 24/9000`, not UNBLOCK CHV. Only the PIN1 credential changes in the complete
+saved card; request state, PIN2, PUK credentials and retry counters are retained.
+A separate cold process physically verifies4321, still enters phone code12345,
+and preserves the entire changed card without repeating the change command.
+
+```sh
+.venv/bin/python tools/nsb1_pin_change_check.py \
+  tmp/nsb1-pin-request-on-cold tmp/nsb1-pin-change tmp/nsb1-pin-changed-cold
+```
+
+The warm70s fixture uses `nsb1_pin_change.lua`; the cold28s fixture uses
+`nsb1_pin_changed_reload.lua`. Existing native/own-flash gates, reviewed PIN
+prompt/changed/accepted frames, physical contacts and linked cold-device hashes
+remain mandatory. This does not establish PIN2 change or change-rejection
+controls, which remain separate acceptance items.
+
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled
 profile only in CHV1 retries (`0`); no handset state is changed. Physical
