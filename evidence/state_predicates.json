@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsk1_v561_physical_manual_network_search", "owner": "nsk1_ui_radio", "status": "satisfied",
+      "predicate": "The own initialized native-compatibility handset accepts physical Manual network selection and initiates its firmware-owned Searching presentation and control exchange",
+      "current": "An independent cold process copies only qualified own inputs/NVRAM/config. The 61-second boot/storage checks, exact fourteen navigation press/releases and complete decoded-key sequence pass. Exact Network selection and Automatic/Manual frames plus the Searching/Quit body are checked; only the animated progress strip is excluded. Dynamic05df context0/context3 requests reach the previously idle completion server and both05e8 replies return. Whole SIM storage is unchanged. Existing bounded9TX/1RX native-radio acceptance still passes. This is search initiation, not completed search, operator discovery, network registration, calls or native RF validity.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_network_search.py", "tools/nsk1_network_search_input.lua", "tools/test_nsk1_network_search.py", "tools/nsk1_radio_observe.lua", "tools/nsk1_radio_trace_check.py", "tools/nsk1_security_compare.py"]
+    },
+    {
       "id": "nsk1_v561_synthetic_record_conformance", "owner": "nsk1_startup_storage", "status": "satisfied",
       "predicate": "A provenance-checked external record example executes the native accepted-copy path without a forced firmware result",
       "current": "The standard-family diagnostic derives its chip field only from a qualified own erased native capture and encodes the published 001-01 lock-record example. Only EEPROM 0020..0037 and the own computed low-block checksum 003c..003f are supplied; identity/FAID/calibration remain erased. Native arithmetic reproduces both blocks and private markers 54c2. Firmware reaches 25ab0c after copying the exact decoded 24 bytes to context 10ba34+1c with validity one. The 21-second run retains reason 0a, two DSP releases, unchanged executable flash and unchanged low 64 EEPROM bytes, with no sampled illegal DSP instruction. The white screen remains through 20 seconds: this is record-format/input conformance, not original provisioning, fitted-mask proof, graphical boot or SIM/network acceptance. No acceptance flag, context field or DSP response is patched, and the machine's erased default is unchanged.",

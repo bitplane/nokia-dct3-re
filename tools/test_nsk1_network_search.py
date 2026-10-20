@@ -1,0 +1,46 @@
+import unittest
+
+from tools.nsk1_network_search import KEYS, check_trace
+from tools.test_nsk1_radio_trace_check import fixture as radio_fixture
+
+
+def fixture():
+    lines = [radio_fixture()]
+    codes = [1,2,3,4,5,0x19,0x19] + [0x19 if key == 'menu' else 0x18 for key in KEYS]
+    lines.extend(f'nsk1_code_key: value={code:02x}' for code in codes)
+    for index, key in enumerate(KEYS, 1):
+        for down in (1, 0):
+            lines.append(f'nsk1_network_contact: index={index} key={key} down={down} t=23.0 physical_only=1')
+    for context in ('00', '03'):
+        lines.append(f'nsk1_radio_dynamic_request: input=05df object=00000000 field2={context}')
+        lines.append(f'nsk1_radio_completion_server_receive: object=001014a4 header=05df{context}7f')
+        lines.append(f'nsk1_radio_task16_receive: object=001014a4 header=05e8{context}a1')
+    return '\n'.join(lines)
+
+
+class NetworkSearchTest(unittest.TestCase):
+    def test_initiation_is_not_operator_discovery(self):
+        result = check_trace(fixture())
+        self.assertTrue(result['physical_manual_search_initiated'])
+        self.assertFalse(result['operator_discovery_proved'])
+        self.assertFalse(result['registration_proved'])
+
+    def test_missing_contact_release_fails(self):
+        with self.assertRaises(ValueError):
+            check_trace(fixture().replace('index=14 key=menu down=0', 'index=14 key=menu down=1'))
+
+    def test_changed_decoded_key_fails(self):
+        with self.assertRaisesRegex(ValueError, 'decoded key'):
+            check_trace(fixture().replace('nsk1_code_key: value=18', 'nsk1_code_key: value=17', 1))
+
+    def test_missing_context_reply_fails(self):
+        with self.assertRaisesRegex(ValueError, 'replies'):
+            check_trace(fixture().replace('header=05e803a1', 'header=05e703a1'))
+
+    def test_different_request_does_not_count_as_search(self):
+        with self.assertRaisesRegex(ValueError, 'requests'):
+            check_trace(fixture().replace('input=05df', 'input=05dd'))
+
+
+if __name__ == '__main__':
+    unittest.main()

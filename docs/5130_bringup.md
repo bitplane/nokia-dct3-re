@@ -24,6 +24,26 @@ deletes it and verifies erased ADN storage after another cold search.
 Offline SMS draft save/cold read/deletion/cold-empty Outbox also pass. Registration, calls
 and network SMS remain unproved.
 
+Physical manual network-search initiation also passes from independently
+qualified initialized storage: Settings -> Phone settings -> Network
+selection -> Manual renders **Searching / Quit**. The gate verifies all
+fourteen navigation press/releases, their decoded keys, exact selection
+frames and the Searching body (excluding only its animated progress strip).
+It observes task-16 dynamic 05df requests for contexts 0 and 3, delivery to
+the previously idle server and both 05e8 replies. SIM storage is unchanged.
+The native radio census still contains only the initial nine TX packets
+and one 8b reply through the qualified interval: this is UI/control
+acceptance, not completed search, operator discovery or registration.
+
+```sh
+.venv/bin/python -m tools.nsk1_network_search mame/mame QUALIFIED_SOURCE NEW_RUN
+```
+
+`QUALIFIED_SOURCE` must be an own initialized 61-second compatibility capture;
+the runner rechecks it and copies only inputs/NVRAM/config, never RAM or a
+save state. Qualified result: `tmp/nsk1-network-manual-qualified`. The menu
+sequence is an own-English-ROM harness detail, not a device configuration.
+
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
