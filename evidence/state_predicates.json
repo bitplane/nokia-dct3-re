@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_native_compatibility_upload", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "The own NSK-3 boot4 image completes its native compatibility loader exchange against explicitly identified acquired NSE-1 ROM4 inputs",
+      "current": "Separate nsk3r4t starts from erased 8 KiB EEPROM and unchanged own flash, releases the exact own 372-byte bootstrap and performs two complete 64-handoff alternating uploads at 100fe/10100. Both accept identity4 before transfer and store final verdict0/4 after completion. One firmware restart between passes carries reason04 at 0.385927692s. Sixteen bounded DSP samples remain at resident408d; no unsupported instruction is logged. The MCU and exact frames still reach CONTACT SERVICE, not idle. The checker pins NSE-1 program/DROM hashes, all128 handoffs and ordering, own flash, a separate firmware-initialized EEPROM hash and both reviewed failure frames. This is an explicit compatibility instrument, not a fitted-mask, physical-clock, input, SIM, radio, speech or long-run-stability acceptance; the ordinary noki6130 machine remains silent.",
+      "evidence": ["docs/6130_bringup.md", "driver/nokia_dct3.cpp", "tools/nsk3_boot_observe.lua", "tools/nsk3_boot_check.py", "tools/test_nsk3_boot_check.py"]
+    },
+    {
       "id": "nsk3_conservative_cold_frontier", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Both own NSK-3 v5.61 bootstrap variants reproduce a conservative cold CONTACT SERVICE checkpoint without DSP completion or donor provisioning",
       "current": "Independent fresh sixteen-second boot3/boot4 runs preserve their own executable flash, initialize erased 8 KiB EEPROM to the same reviewed hash, render exact CONTACT SERVICE frames at 5/15 seconds and retain shared cells 0000/ffff/ffff/ffff after twelve MCU writes. Own instruction fragments pin reset/interworking, EEPROM descriptor f4 and GPIO, GENSIO, five-row keypad registers and initial SIMI control. The sampled MCU location is a supervisor wait, not a direct DSP polling instruction. The backend's bootstrap/service contracts are disabled. The RAM/flash parts remain bounded capacity trials; physical keys, viewport, fitted mask, usable boot and phone services are not promoted.",

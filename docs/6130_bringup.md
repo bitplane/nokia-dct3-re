@@ -92,6 +92,45 @@ idle or fitted-hardware claim follows from this failure presentation.
 
 ## Next boundary
 
-Recover the own loader's pre-upload acknowledgement and compare both resident
-ABI requirements before choosing a native compatibility instrument. Do not
-inject a bootstrap response or import 5130 EEPROM state to clear the frame.
+The separate native checkpoint below closes the boot4 upload boundary, not
+the startup checks. Recover the direct producer/caller of the early reason04
+restart and the surviving failed self-test/storage predicate. Do not import
+5130 EEPROM state or synthesize a successful verdict to clear the frame.
+
+## Native ROM4 compatibility checkpoint
+
+`nsk3r4t` uses the same own boot4 executable, erased8KiB EEPROM and declared
+partial hardware, replacing only the silent peer with the acquired NSE-1
+ROM4 program/DROM and its52MHz research clock. It is a separate instrument,
+not the normal machine or evidence of a fitted NSK-3 mask. Boot3 is not paired
+with this resident ABI.
+
+```sh
+mkdir -p roms/nsk3r4t
+cp roms/noki5110/nse1_rom4_dsp_program.bin \
+  roms/noki5110/nse1_rom4_dsp_data.bin roms/nsk3r4t/
+make build
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsk3-native-checkpoint -- nsk3r4t -rompath ../roms \
+  -video none -sound none -nothrottle -seconds_to_run 16 -log \
+  -autoboot_delay 0 -autoboot_script ../tools/nsk3_boot_observe.lua
+.venv/bin/python tools/nsk3_boot_check.py roms/noki6130/source \
+  tmp/nsk3-native-checkpoint --variant boot4 --native-roms roms/nsk3r4t
+```
+
+Use a fresh run directory. The first release contains the exact own372-byte
+bootstrap. Two passes each accept4 into loader state10b840 before64 alternating
+zero handoffs at MCU100fe/10100. The loader copies63 groups of512 words plus
+510 words and two sentinel words; the checker observes all128 handoffs,
+their ordering and final identity/verdict stores4/0 at10b846/10b844. The first
+pass ends around0.1182s, the second around0.50195s. A firmware reset request
+at2ac696,0.385927692s carries reason04 stored at10ff60; it is retained as an
+unresolved startup observation, not suppressed or attributed by analogy.
+
+By1s the native DSP is sampled at resident408d and remains there through16s;
+no unsupported/illegal instruction is logged in this bounded run. The MCU
+returns to its supervisor wait and both reviewed frames still say CONTACT
+SERVICE. Own executable flash stays unchanged; the firmware-initialized EEPROM
+has a separate reviewed hash from the silent control. Loader acceptance does
+not establish interactivity, SIM initialization, stable radio, speech or
+long-run native execution. Those remain unaccepted.
