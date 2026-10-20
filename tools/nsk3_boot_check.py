@@ -36,9 +36,12 @@ def check_trace(trace,variant,native=False):
         raise ValueError('NSK-3 observer failed')
 
 
-def check_native_trace(trace):
+def check_upload_handoffs(trace,passes=2):
+    """Validate complete uploads independently of the subsequent boot lifecycle."""
+    if passes<1:
+        raise ValueError('native NSK-3 upload count must be positive')
     rows=re.findall(r'nsk3_loader_handoff: index=(\d+) offset=([0-9a-f]+) value=([0-9a-f]+) mask=([0-9a-f]+) pc=([0-9a-f]+) t=([0-9.]+) observer_writes=0',trace)
-    if len(rows)!=128 or len(rows)!=trace.count('nsk3_loader_handoff: '):
+    if len(rows)!=64*passes or len(rows)!=trace.count('nsk3_loader_handoff: '):
         raise ValueError('native NSK-3 handoffs incomplete')
     times=[]
     for i,row in enumerate(rows,1):
@@ -50,20 +53,25 @@ def check_native_trace(trace):
                 or mask!=('0000ffff' if odd else 'ffff0000')):
             raise ValueError('native NSK-3 alternating handoff differs')
         times.append(float(time))
-    if times!=sorted(times) or times[63]>=times[64]:
+    if times!=sorted(times) or any(times[i*64-1]>=times[i*64] for i in range(1,passes)):
         raise ValueError('native NSK-3 handoff ordering differs')
     for pc,offset,value,mask in (
             ('0028ce70','0010b840','00040000','ffff0000'),
             ('0028cf0a','0010b844','00000004','0000ffff'),
             ('0028cf0e','0010b844','00000000','ffff0000')):
         found=re.findall(f'nsk3_loader_state: offset={offset} value={value} mask={mask} pc={pc} t=([0-9.]+) observer_writes=0',trace)
-        if len(found)!=2:
+        if len(found)!=passes:
             raise ValueError('native NSK-3 identity/verdict stores differ')
         for pass_index,time in enumerate(map(float,found)):
             if pc=='0028ce70' and time>=times[pass_index*64]:
                 raise ValueError('native identity not accepted before upload')
             if pc!='0028ce70' and time<=times[pass_index*64+63]:
                 raise ValueError('native verdict stored before upload ended')
+    return times
+
+
+def check_native_trace(trace):
+    times=check_upload_handoffs(trace)
     native=re.findall(r'nsk3_native_sample: t=([0-9.]+) pc=([0-9a-f]+) releases=(\d+) handoffs=(\d+) observer_writes=0',trace)
     if native!=[(f'{i}.000000','408d','3','128') for i in range(1,17)] or len(native)!=trace.count('nsk3_native_sample: '):
         raise ValueError('native NSK-3 bounded continuation differs')

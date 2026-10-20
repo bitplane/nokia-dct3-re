@@ -19,12 +19,13 @@ RESULTS='ff ff 00 ff 00 ff 00 00 00 ff ff 00 00 ff 00 ff ff ff 00 00 00 00 ff ff
 
 def check_record_math(trace):
     pending,chip,count={},None,0
+    records=[]
     rows=re.findall(r'nsk3_record_(post|reply): .*?data=([0-9a-f]+) cycles=',trace)
     if len(rows)!=trace.count('nsk3_record_post: ')+trace.count('nsk3_record_reply: '):
         raise ValueError('malformed native record packet observation')
     for kind,raw in rows:
         packet=bytes.fromhex(raw)
-        if len(packet)!=60:raise ValueError('native record packet capture truncated')
+        if len(packet) not in (60,64):raise ValueError('native record packet capture truncated')
         if kind=='post':
             packet=packet[:packet[2]+4]
             command,size=packet[4:6]
@@ -49,10 +50,13 @@ def check_record_math(trace):
                 decoded=b''.join(block[:10]+bytes(2) for block in blocks)
                 if payload[4:28]!=decoded or payload[28:]!=encoded:
                     raise ValueError('native record arithmetic/echo differs')
+                records.append({'chip_field':chip.hex(),'flash_field':pending[0x13].hex(),
+                                'request':encoded.hex(),'decoded':decoded.hex()})
                 count+=1
                 pending,chip={},None
             else:raise ValueError('unclassified native record reply')
     if count!=2 or pending:raise ValueError('native record conversation incomplete')
+    return records
 
 
 def check_startup_trace(trace,low_block):

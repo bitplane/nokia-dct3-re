@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_diagnostic_record_cold_persistence", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "An explicitly diagnostic published numeric record is updated by the native compatibility peer, persisted by own firmware and accepted by a separate cold process",
+      "current": "The fixture uses own erased-source storage and decoded chip identity, not donor provisioning. Native 3534 carries a verified checksum and encoded update; firmware accepts and stores it, restarting through 23d836 rather than the invalid-record caller. The cold process performs one complete upload, accepts the stored record without restart and leaves the entire EEPROM unchanged. Own flash and blank frames remain exact. This proves diagnostic record persistence only, not factory content, fitted DSP identity, idle, physical input, registration, calls or speech.",
+      "evidence": ["docs/6130_bringup.md", "tools/make_nsk3_record_profile.py", "tools/nsk3_record_check.py", "tools/test_nsk3_record_check.py", "tools/nsk3_startup_observe.lua"]
+    },
+    {
       "id": "nsk3_integrity_only_startup_controls", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Own NSK-3 checksum-only external inputs independently separate integrity-result failures from the still-invalid native decoded record",
       "current": "The qualified erased-source native control has stored ffff versus computed db24 at the own 011e security checksum. A two-byte repair passes db24/db24 and firmware later recomputes da54/da54, but result item12h remains code12h. Its own 26f556 validator compares the sum of bytes0000..003b with BE32 at003c. Adding only that checksum makes all24 result entries acceptable in both passes and clears CONTACT SERVICE to exact blank5s/15s frames. Both controls preserve native upload acceptance, the invalid record format, the 5a/a5/55 marker sequence and the reason04 caller26f330. Full observed requests/replies reproduce own MSID and shared ROM4 record arithmetic with modeled chip00160010. The generator qualifies its own source and edits no semantic identity, lock or calibration field; whole final storage differs only at observed firmware-owned bytes0073/007a and the011e checksum beyond the input fixture. This does not prove usable boot, factory provisioning, fitted mask, physical input, SIM or radio.",

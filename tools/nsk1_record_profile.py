@@ -11,10 +11,7 @@ import json
 from tools.dct3_rom4_record_codec import encode_record,retained_record_transform,LOCK_TABLE_82,ENCODE_SCHEDULE
 from tools.nsk1_record_exchange_check import check
 from tools.nsk1_static_check import phonecode_contract
-
-
-SOURCE = 'https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0'
-EXAMPLE_RECORDS = bytes.fromhex('0010100000000010007954c2 0000000029000000000054c2')
+from tools.dct3_lock_record_example import SOURCE,EXAMPLE_RECORDS
 
 
 def repair_security_checksum(image):

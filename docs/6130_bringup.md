@@ -12,6 +12,43 @@ blank frame in the native compatibility instrument; they do not reach idle.
 Factory EEPROM content, fitted flash/RAM geometry, display viewport and DSP
 mask compatibility remain unproved.
 
+The separate published-record diagnostic now reaches native record acceptance
+and persistence across a cold process. It still renders only a blank frame:
+input, idle and phone services remain unproved. This fixture is not factory
+provisioning and is not promoted into the handset configuration.
+
+### Diagnostic record persistence
+
+Own request builder `26ec6a` reads EEPROM `0020..0037`; `26e0be` applies the
+retained-record transform using the first twelve EEPROM bytes. The diagnostic
+generator preserves the own erased-source identity/calibration and encodes the
+repository's documented public numeric example using the independently decoded
+modeled chip field. It modifies only the record and the two known checksums.
+The example's source attribution is retained in `dct3_lock_record_example.py`;
+the remote page currently returns403, so this is not a fresh source verification.
+
+The native peer first accepts `3532`, processes command17 and returns a62-byte
+`3534` update, including its one's-complement halfword checksum. Firmware writes
+the updated record and checksum to EEPROM, then requests reason04 through
+`23d836` (return address `23d83b`), distinct from the invalid-record restart at
+`26f330`. After that restart the record remains valid. A separate cold process,
+with only persisted NVRAM copied, accepts it without a restart or any EEPROM
+change. The accepted-copy routine clears bit3 of the second record's byte8;
+that normalization is firmware-owned, not a fixture write.
+
+```sh
+.venv/bin/python tools/nsk3_record_check.py roms/noki6130/source \
+  tmp/nsk3-startup-checksum-control roms/nsk3r4t \
+  tmp/nsk3-record-qualified tmp/nsk3-record-cold-qualified
+```
+
+The gate checks native upload handoffs, independent record arithmetic, update
+checksum, accepted copies, restart ownership, exact persistent storage and blank
+frames. The original erased-source and checksum-only negative controls retain
+their stricter failure expectations. The next unresolved question is what keeps
+this accepted-record lifecycle from presenting an interactive UI; record validity
+alone is not evidence of correct display, power or application initialization.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from
