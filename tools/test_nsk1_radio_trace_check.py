@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check, diagnose_liveness_reset
+from tools.nsk1_radio_trace_check import check, check_scan_progress, diagnose_liveness_reset
 
 
 def fixture():
@@ -86,6 +86,15 @@ class NativeRadioTraceTest(unittest.TestCase):
             check(fixture().replace('length=162 data=00', 'length=162 data='))
         with self.assertRaisesRegex(ValueError, 'packet order'):
             check(fixture().replace('type=8b', 'type=8a'))
+
+
+class ScanProgressTests(unittest.TestCase):
+    def test_progress_is_not_registration_or_an_empty_queue_stall(self):
+        text = '\n'.join(f'nsk1_scan_progress: t={40+5*i:.6f} counter_hi=ffff counter_lo={0xc296+1000*i:04x} qualified=0000 flags=0000 producer=1a00 consumer=1a00 observer_writes=0' for i in range(5))
+        self.assertEqual(check_scan_progress(text), {'samples':5,'counter_advance':4000,'qualified_results_observed':False})
+        for before,after in [('60.000000','61.000000'),('counter_lo=c67e','counter_lo=c296'),('qualified=0000','qualified=0001'),('consumer=1a00','consumer=1a04')]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_scan_progress(text.replace(before,after))
 
 
 if __name__ == '__main__':

@@ -5,6 +5,20 @@ from pathlib import Path
 import re
 
 
+def check_scan_progress(text):
+    rows = re.findall(r'nsk1_scan_progress: t=([0-9.]+) counter_hi=([0-9a-f]{4}) counter_lo=([0-9a-f]{4}) qualified=([0-9a-f]{4}) flags=([0-9a-f]{4}) producer=([0-9a-f]{4}) consumer=([0-9a-f]{4}) observer_writes=0', text)
+    if len(rows) != 5 or [float(row[0]) for row in rows] != [40,45,50,55,60]:
+        raise ValueError('missing bounded scan progress samples')
+    counters = [int(hi + lo,16) for _,hi,lo,*_ in rows]
+    if any(right <= left for left,right in zip(counters,counters[1:])):
+        raise ValueError('scan counter is not progressing')
+    if any(qualified != '0000' or flags != '0000' or producer != consumer
+           for _,_,_,qualified,flags,producer,consumer in rows):
+        raise ValueError('scan qualification or sampled queue boundary changed')
+    return {'samples':len(rows),'counter_advance':counters[-1]-counters[0],
+            'qualified_results_observed':False}
+
+
 def check(text):
     packets = re.findall(r'nsk1_radio_packet: direction=(tx|rx) index=(\d+) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+)', text)
     tx = [(kind, int(length)) for direction, _, kind, length, _ in packets if direction == 'tx']
@@ -62,9 +76,11 @@ def check(text):
         gateway = 'nsk1_rssi_gateway: word2420=f073 word2421=0a71 word0a5c=891a word0a71=76f8'
         if gateway not in text:
             raise ValueError('live uploaded scan gateway differs or is unobserved')
+    progress = check_scan_progress(text) if 'nsk1_scan_progress:' in text else None
     return {'tx': len(tx), 'rx': len(rx), 'pending_indexes': [1, 2, 8, 3],
             'live_rssi_stack': True, 'post_rssi_return_observed':bool(returns),
             'post_rssi_channel_work_observed':bool(work),
+            'scan_progress':progress,
             'registration_proved': False, 'rf_validity_proved': False}
 
 

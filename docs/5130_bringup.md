@@ -502,6 +502,20 @@ These are candidates for the next runtime trace, not proven stalls or a
 license to fabricate sample data. The capture passes independent boot,
 storage and native-radio checks; registration remains unproved.
 
+`tmp/nsk1-scan-progress-qualified` rules out a permanent empty-sample-queue
+stall at this boundary. Positive markers reach4701,4717,3360,4742,0ae6 and
+479e. The producer advances1a00 ->1a04 and the consumer catches up;4701
+returns to0ae6. Five passive samples at40,45,50,55,60 seconds show the
+double-word counter1262/1263 advancingffff:c296 ->ffff:d383 (4333 steps),
+with matched queue cursors at each sample. Data1344 and1266 stay zero.
+Thus the scan measurement loop runs but has no observed qualifying result;
+sampling activity is not evidence of valid RF data. Live0b08 increments
+the double-word counter and0b0e exits if it becomes positive;0b11/0b13
+continues the loop while1266 bit0 is clear. The next question is the
+qualification/termination contract, including how its duration relates to
+the independently proved packet-liveness reset. Do not disable that reset
+or invent sample/heartbeat traffic to make the two timelines compose.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

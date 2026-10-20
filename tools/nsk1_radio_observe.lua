@@ -228,6 +228,11 @@ _G.nsk1_radio_rx = dsp.spaces.data:install_write_tap(0x08e4,0x08e4,'nsk1_radio_r
     rx = data
 end)
 local keys = {}
+-- Upper byte is reserved for one-shot scan cursor observations after RSSI.
+for index,address in ipairs({'4701','4717','4742','479e','3357','3360','0ae6','0cb8'}) do
+    local bit = string.format('%x', 1 << (index+23))
+    machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp4&100)!=0&&(temp4&'..bit..')==0,{temp4=temp4|'..bit..';logerror "nsk1_scan_cursor: pc='..address..' producer06b7=%04x consumer06b8=%04x ar1=%04x phase06fd=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@6b7,dsp_c54x:cpu.dw@6b8,dsp_c54x:cpu.dw@11,dsp_c54x:cpu.dw@6fd;g}')
+end
 for name,cell in pairs({menu={1,4},five={3,4},zero={3,0x10},one={2,2}}) do
     for _,field in pairs(machine.ioport.ports[':COL.'..cell[1]].fields) do
         if field.mask == cell[2] then keys[name] = field end
@@ -249,8 +254,14 @@ for index,event in ipairs(sequence) do
 end
 local index,frame = 1,1
 local times = {30.5,33,36,50,59}
+local next_scan_sample = 40
 emu.register_frame_done(function()
     local now = machine.time:as_double()
+    if now >= next_scan_sample and next_scan_sample <= 60 then
+        next_scan_sample = next_scan_sample + 5
+        local data = dsp.spaces.data
+        machine:logerror(string.format('nsk1_scan_progress: t=%.6f counter_hi=%04x counter_lo=%04x qualified=%04x flags=%04x producer=%04x consumer=%04x observer_writes=0\n',now,data:read_u16(0x1262),data:read_u16(0x1263),data:read_u16(0x1344),data:read_u16(0x1266),data:read_u16(0x06b7),data:read_u16(0x06b8)))
+    end
     while index <= #events and now >= events[index][1] do
         local event = events[index]
         keys[event[2]]:set_value(event[3])
