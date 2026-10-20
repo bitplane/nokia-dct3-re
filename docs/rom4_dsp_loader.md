@@ -18,6 +18,37 @@ frontend/bus comparison, rather than inventing a message to escape a CPU guard.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
+## NSK-1 zero-word execution boundary
+
+The own-input NSK-1 listed-FDN run observes 629 distinct first opcode words;
+this is not the NSE-1 cold-boot inventory. `63f8` and `f166` require immediate
+multiply disassembly (three and two words respectively). The decoder now
+formats these existing execution forms, with the address extension before
+the immediate. Focused disassembler/conformance tests pass; this is not a new
+multiply-execution or native-radio qualification.
+
+An execution-breakpoint observer across all 128 XPC pages confirms execution
+at page-zero `29d3`, not merely a data read or a truncated nonzero-page PC.
+Observed PMST is `ffac`; program words `29d3/29d4` and data word `29d3` are
+all zero. First captured SP values are `1eab` and `1ea7`, with stack heads
+`3798/00fa/3073/3073` and `38ca/3976/3923/30bc`. Thus extending the program
+overlay alone would not reveal nonzero data at these observed entries.
+The caller/control-flow explanation remains unresolved; no overlay geometry
+or firmware state was changed.
+Live disassembly identifies `3798` and `38ca` as return addresses immediately
+after calls to ROM routine `a51b`. This narrows the investigation to that
+routine and its callees; it does not yet establish a direct branch to `29d3`.
+
+Reproduction uses `make_c54x_entry_script.py 0x29d3 OUTPUT`, copied as
+`native_entry.cmd` into an isolated qualified NSK-1 FDN-enabled cold run, and
+`nsk1_native_entry_observe.lua`. Its 65-second run retains the qualified
+boot/storage predicates, physical listed-number input, SIM conversation,
+unchanged whole card and exact digit/progress frames. Debugger `focus` alone
+does not select the command expression CPU: the observer explicitly sets
+`visible_cpu`, then verifies installation of all 128 DSP breakpoints.
+Queued headless startup scripts or failed breakpoint installation supply no
+negative execution evidence. The bounded counter is debugger-host state only.
+
 ## Mapped move and younger repeat ownership
 
 Decode can arm an RPT header while an older MVDK remains in Access. A global

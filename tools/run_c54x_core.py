@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated native C54x conformance run; intentional completion exits with code 3."""
 import argparse
+import json
 import re
 from pathlib import Path
 import subprocess
@@ -16,7 +17,10 @@ DST_BYPASS_REQUIRED = (
     "TMS320C54x DST read bypass: PASS cases=4608 restore=4608 accumulators=2 consumers=high,low,pair modes=3 patterns=4 gaps=0,1 aliases=2 sxm=2 sst=2 pages=2 save_points=2 writes_each=2 silicon_phase_claim=0",
 )
 
+IMMEDIATE_MULTIPLY_DISASM = "TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0"
+
 REQUIRED = [
+    IMMEDIATE_MULTIPLY_DISASM,
     *IMMEDIATE_MAPPED_REQUIRED,
     *DST_BYPASS_REQUIRED,
     "TMS320C54x staged STM IMR: PASS cases=4608 restore=4608 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 literal_fetches=1 writes_each=1 destination_reads=0 silicon_phase_claim=0",
@@ -727,6 +731,7 @@ EXTRA_PROFILES = {
     ),
     "cond-reg-store": (
         (
+            IMMEDIATE_MULTIPLY_DISASM,
             "TMS320C54x conditional-store disassembler: PASS opcodes=1024 supported=768 rejected=256 pages=2 bounded_extensions=1 pipeline_claim=0",
             "TMS320C54x atomic conditional register stores: PASS cases=18432 restore=18432 forms=STRCD,SRCCD predicates=12 patterns=6 xmem=16 source_values=4 snapshots=2 false_read_writeback=1 circular_update=1 silicon_phase_claim=0",
         ),
@@ -2255,6 +2260,7 @@ def main():
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, default=Path("tmp"))
+    parser.add_argument("--verbose", action="store_true", help="retain exact opcode/extension execution inventory")
     parser.add_argument("--bus-registers", action="store_true",
                         help="run opt-in C5416 register conformance, not bus timing or full core acceptance")
     parser.add_argument("--bus-io", action="store_true", help="run staged external I/O wait/READY conformance")
@@ -2291,6 +2297,8 @@ def main():
                # This is a stop bound, not acceptance: every marker and the
                # intentional test-completion exit remain mandatory.
                "-log", "-seconds_to_run", "5"]
+    if args.verbose:
+        command.append("-verbose")
     if args.bus_registers:
         command.extend(["-bios", "bus-registers"])
     if args.bus_io:
@@ -2310,10 +2318,11 @@ def main():
     print(f"C54x evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
+    (run / "exit_status.json").write_text(json.dumps({'returncode': result.returncode, 'command': command}, indent=2) + '\n')
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose, bus_stm=args.bus_stm, mapped_read_a=args.mapped_read_a, dp_absolute=args.dp_absolute, profile=args.profile)
+        check_result(text, result.returncode, bus_registers=args.bus_registers, bus_io=args.bus_io, atomic_io=args.atomic_io, compose=args.compose, bus_stm=args.bus_stm, mapped_read_a=args.mapped_read_a, dp_absolute=args.dp_absolute, profile=args.profile, verbose_teardown=args.verbose)
     except ValueError as error:
         print(f"C54x conformance: FAIL: {error}", file=sys.stderr)
         return 1

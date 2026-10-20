@@ -820,6 +820,19 @@ public:
 				return (2 + extended) | SUPPORTED;
 			}
 		}
+		if ((op & 0xfeff) == 0xf066)
+		{
+			util::stream_format(stream, "MPY     #$%04X, %c", next_word(), BIT(op, 8) ? 'B' : 'A');
+			return 2 | SUPPORTED;
+		}
+		if ((family == 0x6200 || family == 0x6300) && mode <= 0xf8 && (mode & 0xf8) != 0x98)
+		{
+			// MPY's address extension precedes its immediate (SPRU172C syntax 3).
+			bool const extended = mode >= 0xe0;
+			stream << "MPY     "; smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", #$%04X, %c", next_word(extended ? 2 : 1), BIT(op, 8) ? 'B' : 'A');
+			return (2 + extended) | SUPPORTED;
+		}
 		if ((family == 0x6c00 || family == 0x6e00) && mode >= 0x80 && mode < 0xf8)
 		{
 			bool const extended = mode >= 0xe0;

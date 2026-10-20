@@ -1897,6 +1897,37 @@ private:
 			}
 		osd_printf_info("TMS320C54x accumulator-A multiply disassembler: PASS memory_forms=1024 short_forms=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x6200, 0x6300})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					bool const valid = mode <= 0xf8 && (mode & 0xf8) != 0x98;
+					unsigned const length = valid ? 2 + (mode >= 0xe0) : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | (valid ? dasm::SUPPORTED : 0)) && buffer.seen() == (1U << length) - 1,
+						"Immediate memory multiply decoding bounds extensions and rejects write-only or invalid source modes");
+				}
+		vector const immediate_multiply_forms[] = {
+			{0xf066, 2 | dasm::SUPPORTED, "MPY     #$2345, A"},
+			{0xf166, 2 | dasm::SUPPORTED, "MPY     #$2345, B"},
+			{0x6283, 2 | dasm::SUPPORTED, "MPY     *AR3, #$2345, A"},
+			{0x63f8, 3 | dasm::SUPPORTED, "MPY     *($2345), #$6789, B"},
+			{0x62e3, 3 | dasm::SUPPORTED, "MPY     *AR3($2345), #$6789, A"},
+			{0x63eb, 3 | dasm::SUPPORTED, "MPY     *+AR3($2345), #$6789, B"},
+			{0x63f3, 3 | dasm::SUPPORTED, "MPY     *+AR3($2345)%, #$6789, B"},
+			{0x629b, 1, ".word   $629B"},
+			{0x63f9, 1, ".word   $63F9"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : immediate_multiply_forms)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == (1U << (test.result & dasm::LENGTHMASK)) - 1,
+					"Immediate multiply syntax preserves accumulator, address-before-immediate order and page wrapping");
+			}
+		osd_printf_info("TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
 			for (unsigned word = 0; word < 2048; ++word)
 			{
 				words const buffer(pc, 0x2800 | word, 0x2345);
