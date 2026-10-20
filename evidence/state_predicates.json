@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nam2_c3_security_input_state_replay", "owner": "nam2_research_checkpoint", "status": "satisfied",
+      "predicate": "The own-image C3 research configuration restores its pre-input security checkpoint and repeats physical code acceptance with exact architecture and reviewed pixels",
+      "current": "At 7.75 seconds the fixture captures all 37 ARM/banked registers, PC/SP, time and RAM checksum at emulator pre-save. Post-load observation is exactly equal. Both independently scheduled physical 12345/left-softkey sequences at 8..10.5 seconds reach equal architecture at 11 seconds and the existing 96x65 Code-accepted pixel hash. The checker requires exact observation/contact ordering, one terminal result, no fixture errors, unchanged executable bytes and valid own PMM/catalogue after the run. This is early security-editor replay, not usable idle, late input, native DSP or fitted-flash identification.",
+      "evidence": ["docs/2100_bringup.md", "tools/nam2_c3_security_state.lua", "tools/nam2_c3_security_state_check.py", "tools/test_nam2_c3_security_state_check.py"]
+    },
+    {
       "id": "nam2_c3_idle_global_delivery", "owner": "nam2_idle_interrupt_boundary", "status": "unresolved",
       "predicate": "Ordinary NAM-2 idle restores or services interrupt delivery so a locally unmasked physical keypad contact remains usable after security acceptance",
       "current": "A fresh C3 run enters Code-accepted presentation, then executes the supervisor's seven-nonzero-predicate branch with control 0a and nesting depth zero. The last permission is predicate 2c85a4: receive flag 10ef46 becomes 1 at 21d364 and SIM idle flag 10917b becomes 1 at 2b7fd6 after the SIM-side clock/control routine. Query fields 107b8b=2 and 109173=1 already qualify it. These are observed firmware permissions, not inputs to hold busy as a workaround. In eight measured initial iterations, sleep eligibility passes its flag and clock-distance tests but rejects an adjusted software-timer interval of 2 against >=3; clock helper argument zero loops without the explicit control-05 restore branch. At 18 seconds a physical keypad contact asserts IRQ0; it remains pending through 30 seconds under locally unmasked a2 and globally disabled 0a. This excludes contact loss and a nesting leak, but does not identify the physical idle/interrupt mechanism. No firmware-state or controller-enable injection is allowed as a correction.",

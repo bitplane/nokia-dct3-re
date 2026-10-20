@@ -66,6 +66,28 @@ directory without regenerating it, then restart with the read-only
   roms/noki2100/2100f521sharp.fls FIRST_RUN COLD_RUN COLD_FLASH
 ```
 
+### Security-input save-state replay
+
+`tools/nam2_c3_security_state.lua` saves at 7.75 s before any code contact,
+then physically enters `12345`/left softkey at 8..10.5 s. It loads the saved
+state and repeats the same contacts. The checkpoint requires exact restored
+ARM/banked registers, time and RAM checksum, equal continuation architecture
+at 11 s, and the existing reviewed Code-accepted frame in both branches.
+The checker additionally validates preserved executable/own PMM contents.
+This protects the early editor/storage checkpoint, not late input, usable
+idle, native DSP execution or the fitted-part hypothesis.
+
+```sh
+.venv/bin/python tools/make_2100_v521_profile.py \
+  roms/noki2100/2100f521sharp.fls RUN/nvram/nam2c3_1/flash
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  nam2c3 -bios 521sharp -rompath ../roms -video none -sound none \
+  -nothrottle -seconds_to_run 16 -log -autoboot_delay 0 \
+  -autoboot_script ../tools/nam2_c3_security_state.lua
+.venv/bin/python tools/nam2_c3_security_state_check.py \
+  roms/noki2100/2100f521sharp.fls RUN
+```
+
 ### Remaining idle/input boundary
 
 `tools/nam2_c3_idle_observe.lua` combines capped read-only breakpoints,
