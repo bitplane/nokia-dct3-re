@@ -14,7 +14,8 @@ the card. An explicit PIN-enabled laboratory card additionally passes physical
 wrong-PIN, cold retry persistence and correct-PIN authentication, then reaches
 the separate phone security-code prompt. A blocked-PIN fixture additionally
 passes physical PUK recovery, wrong-PUK rejection and cold authentication using
-the new PIN. Other SIM/security operations and radio remain unaccepted.
+the new PIN. Physical PIN-request enable also persists and causes the expected
+cold PIN challenge. Other SIM/security operations and radio remain unaccepted.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -281,7 +282,7 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The PUK gate below extends this boundary; permanent blocking,
-ordinary PIN changes, PIN request settings and PIN2 remain unaccepted.
+ordinary PIN changes, PIN-request disable and PIN2 remain unaccepted.
 
 ### PUK recovery and new-PIN persistence
 
@@ -307,6 +308,29 @@ uploads and own unchanged executable flash are checked:
 This accepts a physical PUK recovery lifecycle under the declared research
 inputs, not permanent PUK blocking, PIN2/PUK2, ordinary CHANGE CHV, PIN-request
 settings, radio or fitted hardware assumptions.
+
+### PIN-request enable
+
+Observed UI route: Menu4 -> Security settings5 -> PIN-code request1 -> Select,
+then PIN1234/OK, Up to On, Select. Numeric shortcuts focus this leaf; they do
+not replace its physical Select. CHANGE PIN is unavailable while the card's
+PIN request is disabled, so this is also a prerequisite for that workflow.
+
+`nsk3_pin_request_enable.lua` drives this sequence after phone-code acceptance.
+`tmp/nsk3-pin-request-enabled` issues ENABLE CHV `a0 28 00 01 08` with padded
+1234, returns9000 and presents PIN-code request On. The full serialized card
+changes only its enabled byte0->1. A qualified cold copy challenges for PIN,
+accepts physical1234, presents the separate phone lock and preserves the card:
+
+```sh
+.venv/bin/python tools/nsk3_pin_request_check.py roms/noki6130/source \
+  tmp/nsk3-record-cold-qualified tmp/nsk3-pin-request-enabled \
+  tmp/nsk3-pin-request-cold
+```
+
+This accepts enable and its cold challenge, not PIN-request disable or ordinary
+CHANGE CHV. Those remain separate next operations; credentials were not changed
+to make this setting work.
 
 ## Own firmware inputs
 

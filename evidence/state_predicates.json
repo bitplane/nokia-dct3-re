@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_pin_request_enable", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 PIN-request enable changes only the persistent enabled byte and causes a correct cold PIN challenge",
+      "current": "Own observed Menu4/Security5/PIN-request1 route authenticates1234, selects On and sends ENABLE CHV with9000. The full card differs from its qualified seed only at enabled0->1. A cold copy records initial card bytes, physically authenticates1234 and returns to the separate phone lock with unchanged card. Exact On/PIN/phone-code frames, contacts/APDU bytes, native upload and own unchanged flash are checked. Numeric leaf focus requires Select. Disable, ordinary PIN changes, permanent blocking, PIN2, radio and fitted hardware assumptions remain unaccepted.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_request_enable.lua", "tools/nsk3_pin_request_check.py", "tools/test_nsk3_pin_request_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_pin_reload.lua"]
+    },
+    {
       "id": "nsk3_physical_puk_cold_new_pin", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 PUK recovery changes the laboratory card PIN and survives a cold authentication, with an independently rejected wrong-PUK control",
       "current": "Explicit PIN-blocked card receives physical PUK12345678/new4321/confirmation and organic UNBLOCK CHV;9000 restores CHV1/PUK1 attempts3/10 and stores the new PIN. Wrong12345679 returns9804, keeps CHV1 blocked, preserves the PIN and decrements PUK1 only. Cold input snapshot matches the recovered card; physical4321 VERIFY succeeds and leaves its entire current serialization unchanged. Exact prompt transitions, contacts/APDUs, own flash and native upload are checked. Permanent blocking, PIN2/PUK2, ordinary PIN changes/settings, radio and fitted hardware assumptions remain unaccepted.",
