@@ -6,6 +6,27 @@ local space = cpu.spaces.program
 local shared_writes, handoffs, releases = 0, 0, 0
 local serial_selection, lcd_commands, lcd_bytes, lcd_nonzero = 0, 0, 0, 0
 local selftest_writes = 0
+local simi_reads, simi_writes = 0, 0
+local function simi_access(offset, data, mask, write)
+    for lane = 0, 3 do
+        local address, shift = offset + lane, (3 - lane) * 8
+        if address >= 0x20036 and address <= 0x2003f and (mask & (255 << shift)) ~= 0 then
+            if write then simi_writes = simi_writes + 1 else simi_reads = simi_reads + 1 end
+            local count = write and simi_writes or simi_reads
+            if count <= 8 then
+                machine:logerror(string.format('nsb1_simi: direction=%s address=%08x data=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    write and 'W' or 'R', address, (data >> shift) & 255,
+                    cpu.state['R15'].value, machine.time:as_double()))
+            end
+        end
+    end
+end
+_G.nsb1_simi_read_tap = space:install_read_tap(0x20034, 0x2003f, 'nsb1_simi_read', function(offset, data, mask)
+    simi_access(offset, data, mask, false)
+end)
+_G.nsb1_simi_write_tap = space:install_write_tap(0x20034, 0x2003f, 'nsb1_simi_write', function(offset, data, mask)
+    simi_access(offset, data, mask, true)
+end)
 _G.nsb1_selftest_tap = space:install_write_tap(0x10fde4, 0x10fde7, 'nsb1_selftest_flags', function(offset, data, mask)
     if (mask & 0x00ff0000) == 0 then return end
     selftest_writes = selftest_writes + 1
@@ -117,6 +138,8 @@ emu.register_frame_done(function()
         now, lcd_commands, lcd_bytes, lcd_nonzero))
     machine:logerror(string.format('nsb1_presentation: t=%.9f selftest_flags=%02x observer_writes=0\n',
         now, space:read_u8(0x10fde5)))
+    machine:logerror(string.format('nsb1_simi_summary: t=%.9f reads=%d writes=%d card_inserted=0 observer_writes=0\n',
+        now, simi_reads, simi_writes))
     next_sample = next_sample + 1
     observing = false
 end, 'NSB-1 passive MCU boundary')

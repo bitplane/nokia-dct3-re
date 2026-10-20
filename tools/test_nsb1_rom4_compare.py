@@ -109,11 +109,20 @@ class ChecksumControlTest(unittest.TestCase):
     def test_runtime_bit_retention(self):
         trace = '\n'.join(f'nsb1_presentation: t={time} selftest_flags={value} observer_writes=0'
                           for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', '40', '40', '40')))
+        trace += '\n' + '\n'.join(f'nsb1_simi_summary: t={time} reads=0 writes={writes} card_inserted=0 observer_writes=0'
+                                    for time, writes in ((0.1, 0), (0.5, 0), (1, 18), (2, 18), (5, 18)))
+        trace += '\nnsb1_simi: direction=W address=00020038 data=ff pc=0029cdfc'
+        trace += '\nnsb1_simi: direction=W address=0002003a data=03 pc=0029ce26'
+        trace += '\nnsb1_simi: direction=W address=0002003d data=18 pc=0029ce3c'
         check_checksum_control(trace)
         with self.assertRaises(ValueError):
             check_checksum_control(trace.replace('selftest_flags=40', 'selftest_flags=00'))
         with self.assertRaises(ValueError):
             check_checksum_control(trace + '\nnsb1_selftest_flags: value=84 pc=0023a018 t=0.4')
+        with self.assertRaisesRegex(ValueError, 'SIMI initialization'):
+            check_checksum_control(trace.replace('pc=0029cdfc', 'pc=0029cdfd'))
+        with self.assertRaisesRegex(ValueError, 'empty-socket'):
+            check_checksum_control(trace.replace('writes=18', 'writes=0'))
 
     def test_only_six_integrity_bytes_change(self):
         original = bytearray(b'\xff' * 8192)

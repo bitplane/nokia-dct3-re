@@ -1036,6 +1036,9 @@ constexpr nokia_product_config PRODUCT_3350 = make_3350_config();
 constexpr nokia_product_config make_5190_config()
 {
 	nokia_product_config result;
+	// Own 29cde8 initializes 38/39 and FIFO controls 3d/3e; 29ce5e
+	// drains RX at 37 while polling 3c. The socket is empty, not absent.
+	result.simi_controller = true;
 	// Own scanner 2af050 and maps 2d2984/2d29a0 establish this layout.
 	result.keypad_wiring = { 5, 0x10, 0x31, 0x30, 0x33, 0x2f };
 	// Own 2ad4b0 selects 22 at 28, sends through 2a, polls 29 bit 2
@@ -1043,7 +1046,7 @@ constexpr nokia_product_config make_5190_config()
 	result.gensio_wiring = { 0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true };
 	// Own EEPROM byte transfer 2ac704: SDA bit 0, SCL bit 2.
 	result.pup_eeprom_scl_bit = 2;
-	return result; // No DSP acknowledgement, SIM or application peer.
+	return result; // No DSP acknowledgement, inserted card or application peer.
 }
 constexpr nokia_product_config PRODUCT_5190 = make_5190_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();

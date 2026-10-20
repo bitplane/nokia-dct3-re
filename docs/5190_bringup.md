@@ -89,7 +89,8 @@ capacity-compatible 1 MiB trial part. The external I2C device implements
 the own 8 KiB/32-byte-page protocol, with erased initial contents and an
 unmeasured 5 ms write cycle. Boot/DSP masks and EEPROM dump remain separate
 `NO_DUMP` entries. Shared MCU boot-transfer HLE remains explicit; no DSP
-acknowledgement, service, radio or SIM peer is enabled.
+acknowledgement, service or radio peer is enabled. The own-mapped SIMI
+controller is present with an empty socket; no synthetic card is inserted.
 
 Own serial routine `2ad4b0` selects control `22` at `20028`, sends at
 `2002a`, polls `20029` bit 2 and reads `2002d`. LCD clear `2ae0ac` shares
@@ -264,3 +265,27 @@ deliberately makes no presentation claim. Its input/output hashes and changed
 offsets are retained in the run manifest. Retire this control as a bring-up
 instrument once product-matched calibrated storage supplies its replacement;
 retain the decoded integrity formulas and this negative result.
+
+### Empty-socket SIMI boundary
+
+Own routine `29cde8` resets SIMI at `20038`, configures `2003a`, writes
+RX/TX FIFO controls `2003d/3e`, and writes control `32` at `20039`.
+Receiver `29ce5e` drains `20037` while testing count `2003c`; the nearby
+initializer manipulates FIQ6 masking. These independently recovered register
+contracts justify attaching the existing controller with no inserted card.
+No ATR, APDU reply, SIM-ready event or internal firmware flag is supplied.
+
+The erased-storage native control makes no SIMI access in the first five
+seconds. The checksum-only control reaches the own initializer at about
+0.94 seconds: passive taps observe 18 writes, including `38=ff` at `29cdfc`,
+`3a=03` at `29ce26` and the FIFO-control sequence beginning at `29ce3c`.
+All five samples report zero SIMI reads, consistent with this bounded
+empty-socket path. The diagnostic checker requires positive initializer
+sites and the 0/0/18/18/18 write-count sequence, not merely a source setter.
+Native bootstrap and LCD self-test oracles remain unchanged.
+
+This is firmware initialization/write-side acceptance, not character RX/TX,
+ATR, card security, application SIM handling or proof that SIMI was the
+remaining UI prerequisite. ADC selector routing and sensible board inputs
+remain separately unvalidated; do not assign VBATT to channel 0 from its
+position in a generic tuple.

@@ -33,6 +33,14 @@ def check_checksum_control(trace):
         raise ValueError('checksum control did not retain the observed self-test bit 40')
     if re.search(r'nsb1_selftest_flags: value=[0-9a-f]{2} pc=0023a018 ', trace):
         raise ValueError('checksum-failure branch still executed in checksum control')
+    for marker in ('direction=W address=00020038 data=ff pc=0029cdfc',
+                   'direction=W address=0002003a data=03 pc=0029ce26',
+                   'direction=W address=0002003d data=18 pc=0029ce3c'):
+        if marker not in trace:
+            raise ValueError('missing own SIMI initialization after integrity acceptance')
+    simi = re.findall(r'nsb1_simi_summary: t=([0-9.]+) reads=(\d+) writes=(\d+) card_inserted=0 observer_writes=0', trace)
+    if len(simi) != 5 or [(reads, writes) for _, reads, writes in simi] != [('0', '0')] * 2 + [('0', '18')] * 3:
+        raise ValueError('unexpected empty-socket SIMI lifecycle')
 
 
 def check_trace(trace, program3, program4, returncode):
