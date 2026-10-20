@@ -581,6 +581,14 @@ conditionally,2275a6's range check before converging on this reply. Those
 predicate meanings remain open:227590 reads record0605 through2a3994 into
 a stack byte;2275a6 returns halfword[10feaa]. These are independently
 anchored inputs, not yet identified as physical measurements or policy flags.
+`tmp/nsk3-043c-inputs` observes212c04 argument2/caller2144cd,
+record0605=ff and cachedffff. The optional predicate is record==1 and
+signed cached range[0200,0376); otherwise212c4e clears108b30. Both branches
+rejoin212c56, and argument!=1 continues to the043c publication. Thus erased
+0605 does not alone suppress this reply, and assigning it1 would be an
+unevidenced fixture. Caller2144b0 supplies argument2, while the separate
+2144b4 selector can supply1 via2144c6. Their upstream dispatch/predicates
+remain open; this observation does not establish that either is defective.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
