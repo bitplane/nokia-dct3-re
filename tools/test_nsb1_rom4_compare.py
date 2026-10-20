@@ -115,6 +115,8 @@ class ChecksumControlTest(unittest.TestCase):
         trace += '\nnsb1_simi: direction=W address=0002003a data=03 pc=0029ce26'
         trace += '\nnsb1_simi: direction=W address=0002003d data=18 pc=0029ce3c'
         trace += '\nnsb1_startup_mode: value=02 pc=002a438e t=0.128846692 observer_writes=0'
+        trace += '\n' + '\n'.join(f'nsb1_input_readiness: t={time} startup_reason=0a phase=06 reports=0e column_mask=3f observer_writes=0'
+                                    for time in (0.1, 0.5, 1, 2, 5))
         check_checksum_control(trace)
         with self.assertRaises(ValueError):
             check_checksum_control(trace.replace('selftest_flags=40', 'selftest_flags=00'))
@@ -124,6 +126,11 @@ class ChecksumControlTest(unittest.TestCase):
             check_checksum_control(trace.replace('pc=0029cdfc', 'pc=0029cdfd'))
         with self.assertRaisesRegex(ValueError, 'empty-socket'):
             check_checksum_control(trace.replace('writes=18', 'writes=0'))
+        for old, new in (('reports=0e', 'reports=0f'), ('column_mask=3f', 'column_mask=20'),
+                         ('startup_reason=0a', 'startup_reason=00'), ('phase=06', 'phase=00'),
+                         ('nsb1_input_readiness:', 'missing_readiness:')):
+            with self.subTest(change=old), self.assertRaisesRegex(ValueError, 'input-readiness'):
+                check_checksum_control(trace.replace(old, new))
 
     def test_only_six_integrity_bytes_change(self):
         original = bytearray(b'\xff' * 8192)

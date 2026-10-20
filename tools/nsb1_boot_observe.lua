@@ -147,6 +147,9 @@ emu.register_frame_done(function()
         now, lcd_commands, lcd_bytes, lcd_nonzero))
     machine:logerror(string.format('nsb1_presentation: t=%.9f selftest_flags=%02x observer_writes=0\n',
         now, space:read_u8(0x10fde5)))
+    machine:logerror(string.format('nsb1_input_readiness: t=%.9f startup_reason=%02x phase=%02x reports=%02x column_mask=%02x observer_writes=0\n',
+        now, space:read_u8(0x10ff6d), space:read_u8(0x10ffb0),
+        space:read_u8(0x10c3f5), space:read_u8(0x20033)))
     machine:logerror(string.format('nsb1_simi_summary: t=%.9f reads=%d writes=%d card_inserted=0 observer_writes=0\n',
         now, simi_reads, simi_writes))
     next_sample = next_sample + 1

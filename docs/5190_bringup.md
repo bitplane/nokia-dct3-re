@@ -212,6 +212,21 @@ changing CCONT reset causes or clearing the MAD2 power-up indication.
 Charging initialization and its report completion still need tracing from
 this cold-reset lifecycle.
 
+Receive wrapper `220384` passes raw event `21` unchanged; the state dispatch
+at `221b16..221b1a` directs it to candidate block `221e88`. Two direct
+task-`14`, event-`21` publishers are `2232b0` and `2237bc`. Neither publisher
+nor the report wrapper is observed in the bounded 30-second trace. The first
+64 raw receive observations instead contain `b1`, `4c`, `174`, `175`, `176`
+and `179`; that capped list is not exhaustive absence evidence for later
+receives. It does establish live periodic activity, rather than a wholly
+dormant charging task.
+
+The reusable observer now records `nsb1_input_readiness` at all five normal
+sample times. The checksum-control checker requires the five-second
+boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
+for deliberate review if it changes. This protects the observed incomplete
+state, not a requirement that a future faithful phone remain blocked.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;

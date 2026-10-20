@@ -43,6 +43,11 @@ def check_checksum_control(trace):
     simi = re.findall(r'nsb1_simi_summary: t=([0-9.]+) reads=(\d+) writes=(\d+) card_inserted=0 observer_writes=0', trace)
     if len(simi) != 5 or [(reads, writes) for _, reads, writes in simi] != [('0', '0')] * 2 + [('0', '18')] * 3:
         raise ValueError('unexpected empty-socket SIMI lifecycle')
+    readiness = re.findall(r'nsb1_input_readiness: t=([0-9.]+) startup_reason=([0-9a-f]{2}) phase=([0-9a-f]{2}) reports=([0-9a-f]{2}) column_mask=([0-9a-f]{2}) observer_writes=0', trace)
+    # This is a diagnostic boundary regression, not an input/boot acceptance gate.
+    if (len(readiness) != 5 or not 5 <= float(readiness[-1][0]) < 5.1
+            or readiness[-1][1:] != ('0a', '06', '0e', '3f')):
+        raise ValueError('checksum-control input-readiness boundary changed; inspect before re-banking')
 
 
 def check_trace(trace, program3, program4, returncode):
