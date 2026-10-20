@@ -24,6 +24,14 @@ def check(text):
     ready_inputs = re.findall(r'nsk1_ready_input: value=([0-9a-f]{2}) caller=([0-9a-f]{8}) cycles=[0-9a-f]{16} observer_writes=0',text)
     ready_snapshots = re.findall(r'nsk1_ready_flags_snapshot: flags=([0-9a-f]{22}) t=[0-9.]+ observer_writes=0',text)
     ready_writes = re.findall(r'nsk1_ready_flag_write: index=(10|[0-9]) value=([0-9a-f]{2}) pc=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0',text)
+    activations = re.findall(r'nsk1_task_activate: task=([0-9a-f]{2}) caller=([0-9a-f]{8}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    gates = re.findall(r'nsk1_application_gate: predicate=([0-9a-f]{2}) boot_reason=([0-9a-f]{2}) class=([0-9a-f]{2}) flags=([0-9a-f]{2}) stage=([0-9a-f]{2}) startup=([0-9a-f]{2}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    statuses = re.findall(r'nsk1_activation_status: value=([0-9a-f]{2}) pc=([0-9a-f]{8}) caller=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0',text)
+    checksums = re.findall(r'nsk1_security_checksum: computed=([0-9a-f]{4}) stored=([0-9a-f]{4}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    for marker,matches in (('task_activate',activations),('application_gate',gates),
+                           ('activation_status',statuses),('security_checksum',checksums)):
+        if len(matches) != text.count(f'nsk1_{marker}:'):
+            raise ValueError('unrecognized activation trace format')
     for name,rows_ in (('input',ready_inputs),('flags_snapshot',ready_snapshots),('flag_write',ready_writes)):
         if len(rows_) != text.count(f'nsk1_ready_{name}:'):
             raise ValueError('unrecognized readiness trace format')
@@ -38,4 +46,9 @@ def check(text):
             'ready_inputs':[{'value':int(value,16),'caller':caller} for value,caller in ready_inputs],
             'ready_flag_snapshots':ready_snapshots,
             'ready_flag_writes':[{'index':int(index),'value':int(value,16),'pc':pc} for index,value,pc in ready_writes],
+            'task_activations':[{'task':int(task,16),'caller':caller} for task,caller in activations],
+            'application_gates':[dict(zip(('predicate','boot_reason','class','flags','stage','startup'),
+                                         (int(value,16) for value in row))) for row in gates],
+            'activation_status_writes':[{'value':int(value,16),'pc':pc,'caller':caller} for value,pc,caller in statuses],
+            'security_checksums':[{'computed':int(computed,16),'stored':int(stored,16)} for computed,stored in checksums],
             'scope':'physical-contact and passive startup observation, not interactive UI acceptance'}

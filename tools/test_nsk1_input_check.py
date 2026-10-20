@@ -50,6 +50,20 @@ class Nsk1InputCheckTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check(self.trace()+'\n'+marker.split(':')[0]+': malformed')
 
+    def test_activation_and_checksum_observations(self):
+        markers = ('nsk1_task_activate: task=07 caller=002891d1 cycles=0000000000524f77 observer_writes=0',
+                   'nsk1_application_gate: predicate=00 boot_reason=0a class=02 flags=00 stage=01 startup=02 cycles=00000000010024fa observer_writes=0',
+                   'nsk1_activation_status: value=84 pc=0022c454 caller=00254eab t=0.54 observer_writes=0',
+                   'nsk1_security_checksum: computed=db24 stored=ffff cycles=00000000006b17f7 observer_writes=0')
+        result = check(self.trace()+'\n'+'\n'.join(markers))
+        self.assertEqual(7,result['task_activations'][0]['task'])
+        self.assertEqual(0,result['application_gates'][0]['predicate'])
+        self.assertEqual(0x84,result['activation_status_writes'][0]['value'])
+        self.assertEqual(0xdb24,result['security_checksums'][0]['computed'])
+        for marker in markers:
+            with self.assertRaises(ValueError):
+                check(self.trace()+'\n'+marker.split(':')[0]+': malformed')
+
 
 if __name__ == '__main__':
     unittest.main()

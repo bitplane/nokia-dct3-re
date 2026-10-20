@@ -21,6 +21,12 @@ machine.debugger:command(string.format('bpset %x,temp3<20&&r0!=3e,{temp3=temp3+1
 machine.debugger:command(string.format('bpset %x,temp4<40&&r0==1,{temp4=temp4+1;logerror "nsk1_task1_scalar: value=%%08x caller=%%08x cycles=%%016x observer_writes=0\\n",r1,r14,totalcycles;g}',0x2553b8+shift))
 machine.debugger:command(string.format('bpset %x,temp5<8,{temp5=temp5+1;logerror "nsk1_checklist_compare: bits=%%02x cycles=%%016x observer_writes=0\\n",r0,totalcycles;g}',0x25bca4+shift))
 machine.debugger:command(string.format('bpset %x,temp6<32,{temp6=temp6+1;logerror "nsk1_ready_input: value=%%02x caller=%%08x cycles=%%016x observer_writes=0\\n",r0,r14,totalcycles;g}',0x2415ac+shift))
+machine.debugger:command('temp7=0')
+machine.debugger:command('temp8=0')
+machine.debugger:command(string.format('bpset %x,temp7<32,{temp7=temp7+1;logerror "nsk1_task_activate: task=%%02x caller=%%08x cycles=%%016x observer_writes=0\\n",r0,r14,totalcycles;g}',0x254cd2+shift))
+machine.debugger:command(string.format('bpset %x,temp8<8,{temp8=temp8+1;logerror "nsk1_application_gate: predicate=%%02x boot_reason=%%02x class=%%02x flags=%%02x stage=%%02x startup=%%02x cycles=%%016x observer_writes=0\\n",r0,b@r6,b@r4,b@(r4+1),b@r5,b@%x,totalcycles;g}',0x289218+shift,space:read_u32(0x2894b4+shift)))
+machine.debugger:command('temp9=0')
+machine.debugger:command(string.format('bpset %x,temp9<8,{temp9=temp9+1;logerror "nsk1_security_checksum: computed=%%04x stored=%%04x cycles=%%016x observer_writes=0\\n",r1,r0,totalcycles;g}',0x22c3dc+shift))
 local fields = {}
 for _,field in pairs(machine.ioport.ports[':COL.1'].fields) do fields[field.mask] = field end
 local events = {{12,4,1},{12.2,4,0},{14,16,1},{14.2,16,0},{16,2,1},{16.2,2,0}}
@@ -42,6 +48,13 @@ handles[#handles+1] = space:install_read_tap(0x20034,0x2003f,'nsk1_simi_read',fu
 handles[#handles+1] = space:install_write_tap(0x20034,0x2003f,'nsk1_simi_write',function(offset,data,mask) simi(offset,data,mask,true) end)
 _G.nsk1_input_handles = handles
 local flag_writes = 0
+local selftest_writes = 0
+handles[#handles+1] = space:install_write_tap(0x10fde4,0x10fde7,'nsk1_activation_status',function(offset,data,mask)
+    if (mask & 0x00ff0000) == 0 or selftest_writes >= 32 then return end
+    selftest_writes = selftest_writes+1
+    machine:logerror(string.format('nsk1_activation_status: value=%02x pc=%08x caller=%08x t=%.9f observer_writes=0\n',
+        (data >> 16) & 255,cpu.state['R15'].value,cpu.state['R14'].value,machine.time:as_double()))
+end)
 handles[#handles+1] = space:install_write_tap(ready_flags & ~3,(ready_flags+10) | 3,'nsk1_ready_flags',function(offset,data,mask)
     for lane = 0,3 do
         local address,bit = offset+lane,(3-lane)*8

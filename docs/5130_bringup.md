@@ -13,9 +13,12 @@ and removes the standard family's reason-`04` restart, but remains blank
 through 20 seconds. Identity/calibration are still erased, and no phone
 service is accepted. A physical-contact probe confirms that startup still
 holds IRQ0/columns masked, with checklist `0a` rather than `0f`.
-The next boundary is the legitimate producers of reports `14` and `15`,
-plus the separate `2915` loader-result interpretation, not an absent LCD
-link or a guessed key event.
+The supervisor skips the application-task activation sequence because its
+storage/self-test predicate returns zero. The record-only fixture still has
+an erased security-block checksum: computed `db24`, stored `ffff`; the
+failure clears the predicate's success bit. The next experiment is bounded
+external checksum repair, with remaining self-test results observed rather
+than overridden. The separate `2915` loader-result interpretation remains.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -433,6 +436,36 @@ The standard 21-second physical-input trace observes only input `64`, from
 all six contact-time snapshots contain eleven zeros. No flag-setting write
 is observed. A shared activation predecessor is therefore a stronger next
 candidate than eleven independent missing replies, but remains a hypothesis.
+
+### Application activation gate
+
+The own 12-byte task descriptors begin at `2a7c80`. Descriptor 10 points to
+`213081`, whose Thumb entry calls `20e3ec`; descriptor 14 points to `2495e1`.
+Their first actions publish aggregator inputs `0a` and `0e`, respectively.
+Supervisor `28907e` explicitly activates the eleven corresponding task indices
+at `289242..289280` through `254cd2`. The observed activation calls instead
+contain only `7,8,3,4,1,19,22,9,2,6,5` (decimal task indices).
+
+At `289218`, the observed predicate is zero, boot reason `0a`, class byte
+`02`, flags `00`, stage `01`, startup byte `02`. The branch therefore goes
+to `289286`, skipping the eleven-task activation sequence. This is not the
+later reason-`0a` exclusion at `289238..289240`.
+
+Predicate `282934` waits while bit 2 of status byte `10fde5` is set, then
+returns whether bit 6 is set. The write watch sees initialization `00 -> 40 -> c0`,
+then `c4`, followed by `84` at the checksum-failure store `22c454`.
+The observed checksum comparison at `22c3dc` is computed `db24` versus
+stored `ffff`. The `0d00` control handler later clears bit 2 (`84 -> 80`);
+it did not cause the earlier loss of bit 6.
+
+Checksum routine `22c158` normally allocates `de` bytes, reads EEPROM
+`0040..011d`, sums bytes modulo 65536, then subtracts the two bytes of the
+word read by `27e15a` at `0074/0075`. Caller `22c3be..22c3e8` compares the
+result with the BE16 at `011e` and also rejects a zero combined value with
+the word at `0090`. The allocation-failure branch reads only `9e` bytes;
+do not silently treat that distinct path as equivalent. No checksum is
+repaired in the current fixture. Even a correct checksum would not prove
+the erased block's remaining fields or every other self-test valid.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.
