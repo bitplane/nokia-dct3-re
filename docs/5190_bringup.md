@@ -386,6 +386,21 @@ import their bus width, clocks or ADC assumptions into NSB-1. No amplitude
 sweep, threshold change or synthetic decoded packet resolves these missing
 sample-interface facts.
 
+The passive 60-second read census observes four distinct port-27 consumer
+groups: `324b/3251/3257/325d` each 144664 reads,
+`32cf/32d2/32d5/32d8` each 95736, filter
+`330c/3312/3318/331e` each 32616, and filtered-pointer path
+`33cb/33d1/33d7/33dd` each 32. Reads inside a group can be separated by
+roughly 115 ns of CPU execution. With an explicitly diagnostic 1-us
+inactivity grouping rule, the first consumer forms 18083 processing bursts
+(minimum start spacing 1.247058 ms), while the filter forms 4077 bursts
+(minimum 4.615308 ms, maximum 36.337119633 s including lifecycle gaps).
+These are processing schedules, not physical sample rates. In particular,
+a source that samples a continuous waveform at each instantaneous callback
+time would conflate block consumption with acquisition. Recover component
+ordering and buffered sample-time progression before wiring such a source;
+do not derive either from the minimum read spacing or these diagnostic gaps.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns

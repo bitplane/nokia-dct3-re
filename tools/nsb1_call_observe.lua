@@ -239,11 +239,43 @@ _G.nsb1_call_rx = dsp.spaces['data']:install_write_tap(0x08e4,0x08e4,'nsb1_call_
         cursor, walked = 0x80+((cursor-0x80+words)%0x64), walked+words
     end
 end)
-local samples = 0
+local samples, rf_counts, rf_bursts = 0, {}, {}
 _G.nsb1_call_rf = dsp.spaces['io']:install_read_tap(0x27,0x27,'nsb1_call_rf',function(offset,data,mask)
+    local pc, now = dsp.state['PC'].value, machine.time:as_double()
+    rf_counts[pc] = (rf_counts[pc] or 0)+1
+    if pc == 0x324b or pc == 0x330c then
+        local group = rf_bursts[pc] or {count=0}
+        if not group.last or now-group.last > 0.000001 then
+            if group.start then
+                local interval = now-group.start
+                group.min = math.min(group.min or interval,interval)
+                group.max = math.max(group.max or interval,interval)
+            end
+            group.start, group.count = now, group.count+1
+        end
+        group.last, rf_bursts[pc] = now, group
+    end
     if machine.time:as_double() >= 4 and samples < 8 then
         samples = samples+1
         machine:logerror(string.format('nsb1_call_rf: value=%04x pc=%04x t=%.9f observer_writes=0\n',
             data,dsp.state['PC'].value,machine.time:as_double()))
     end
 end)
+local rf_reported = false
+emu.register_frame_done(function()
+    if rf_reported or machine.time:as_double() < 60 then return end
+    rf_reported = true
+    local pcs = {}
+    for pc in pairs(rf_counts) do pcs[#pcs+1] = pc end
+    table.sort(pcs)
+    for _, pc in ipairs(pcs) do
+        machine:logerror(string.format('nsb1_rf_read_count: pc=%04x count=%d observer_writes=0\n',pc,rf_counts[pc]))
+    end
+    for _, pc in ipairs({0x324b,0x330c}) do
+        local group = rf_bursts[pc]
+        if group then
+            machine:logerror(string.format('nsb1_rf_processing_bursts: pc=%04x count=%d min_interval=%.9f max_interval=%.9f grouping_gap_us=1 physical_rate_claim=0\n',
+                pc,group.count,group.min or 0,group.max or 0))
+        end
+    end
+end,'NSB-1 RF read scheduling census')
