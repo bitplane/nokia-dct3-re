@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, check_serial_publishers, check_serial_queue, diagnose_liveness_reset
+from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, check_serial_publishers, check_serial_queue, check_tuning_provenance, diagnose_liveness_reset
 
 
 def fixture():
@@ -89,6 +89,18 @@ class NativeRadioTraceTest(unittest.TestCase):
 
 
 class ScanProgressTests(unittest.TestCase):
+    def test_tuning_requires_own_source_before_native_upload_and_ports(self):
+        text = '\n'.join([
+            'nsk1_tuning_source: address=00298228 value=000417bf mask=ffffffff pc=00296104 t=0.1 observer_writes=0',
+            'nsk1_tuning_source: address=0029822c value=17971d00 mask=ffffffff pc=00296104 t=0.1 observer_writes=0',
+            *[f'nsk1_tuning_upload: space=program address={address} value={value} pc=31d7 t=0.2 observer_writes=0' for address,value in [('216a','0004'),('216b','17bf'),('216c','1797')]],
+            'nsk1_tuning_pair: port=31 value=3633 pc=4023 channel=0374 flags=0020 addend=17bf a=0000303633 t=38.8 observer_writes=0',
+            'nsk1_tuning_pair: port=32 value=0030 pc=4028 channel=0374 flags=0020 addend=17bf a=0000303633 t=38.9 observer_writes=0'])
+        self.assertEqual(check_tuning_provenance(text)['packed_word'],'0x303633')
+        for before,after in [('17bf','13a6'),('value=3633','value=3632'),('t=0.2','t=40.2'),('mask=ffffffff','mask=0000ffff')]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_tuning_provenance(text.replace(before,after))
+
     def test_serial_queue_is_separate_and_requires_complete_port_evidence(self):
         text = '\n'.join(f'nsk1_publisher_entry: address=3f50 index={i} ar4=0000 ar5=0004 serial06b6=0000 t={2+i*0.005:.6f} observer_writes=0' for i in range(1,5))
         text += '\nnsk1_publisher_entry: address=4810 index=1 ar4=008b ar5=03ff serial06b6=0000 t=38.791415 observer_writes=0\nrom4_serial_queue_summary: cpu_bus_writes=2 nonzero=0 observer_writes=0\n'

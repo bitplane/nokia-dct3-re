@@ -1,9 +1,17 @@
 import unittest
 
-from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census,serial_publisher_contract
+from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census,serial_publisher_contract,tuning_upload_contract
 
 
 class Nsk1RadioContractTest(unittest.TestCase):
+    def test_own_tuning_table_does_not_inherit_nse1_addends(self):
+        image = bytearray(0x100000)
+        image[0x9821c:0x9822e] = bytes.fromhex('216a1e80011c013000780000000417bf1797')
+        self.assertEqual(tuning_upload_contract(image)['native_fields']['0x216b'],'0x17bf')
+        image[0x9822a:0x9822c] = bytes.fromhex('13a6')
+        with self.assertRaises(ValueError):
+            tuning_upload_contract(image)
+
     def test_serial_publisher_has_typed_calls_and_a_queue_gate(self):
         image = bytearray(0x20000)
         for address,words in {0x8dd4:'721206c010f806b6fa458dfb',0x8ded:'f274938b7714009b',0x8df5:'f274938b7714009a',0x8ed8:'74f8000800358813',0x8fb5:'6bf806b60001',0x8fc8:'6bf806b60001',0x938d:'771306b61083fc47',0x9404:'f27437ce77131200'}.items():

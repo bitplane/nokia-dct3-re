@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsk1_v561_own_native_tuning_provenance", "owner": "nsk1_native_radio", "status": "satisfied",
+      "predicate": "Own MCU tuning parameters pass through native overlay upload and selected-entry arithmetic to the DSP programming port pair without firmware-state substitution",
+      "current": "The own descriptor at29821c and payload at298228 contain fields0004/17bf/1797. A qualified initialized cold run observes MCU296104 reading000417bf and17971d00 before native program-overlay writes at31d7 assign216a/216b/216c. Selected word0374, control06be0020 and receive addend17bf yield packed00303633; actual4023/4028 callbacks write3633/0030 to ports31/32. Executable checkers correlate source, upload and arithmetic ordering alongside independent boot/storage/native-radio acceptance. These are own product software values, not the sibling NSE-1 GSM900 addend13a6. Physical synthesizer layout, frequency units, SCU serialization, RF input encoding, fitted mask and reception remain unproved.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_rf_tuning.lua", "tools/nsk1_radio_contract.py", "tools/nsk1_radio_trace_check.py", "tools/test_nsk1_radio_contract.py", "tools/test_nsk1_radio_trace_check.py"]
+    },
+    {
       "id": "nsk1_v561_late_supervisory_reset", "owner": "nsk1_supervisor", "status": "unresolved",
       "predicate": "Initialized native compatibility boots remain running across the extended manual-search/cancellation interval without a supervisory reboot",
       "current": "The61-second physical search-initiation gate remains accepted;101-second --cancel correctly fails on reason68 reset at93.974106s, reproduced by an unattended cold control. Native DSP packet dispatcher294180 owns counter10bf8a and timerdd: observed windows1,1,0, including native8b increment at38.791914s and clears at31.000230/62.001171s. The empty window calls28c2b2(argument1), writes reason68 through28c34c, then eventd5 reaches the shared reset tail22effe/22f112. Independent d3 idle-supervision counter10fdea only reaches1 and is cleared by282a50 from idle2893b2, so its threshold15 is not this reset's cause. The post-RSSI native packet-producing lifecycle remains unresolved; arbitrary heartbeat injection, counter pokes or watchdog disable are not justified. The99s phone-code image is a reboot, not stable menu return.",

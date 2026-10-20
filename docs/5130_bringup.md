@@ -598,6 +598,26 @@ these ports remains open. An absent optional serial input is not proof of
 the missing ordinary-radio completion and must not be populated with guessed
 bytes to satisfy the packet watchdog.
 
+The native tuning parameters are product-owned, not inherited NSE-1 addends.
+Own descriptor29821c begins216a/1e80/011c/0130/0078/0000; payload298228
+begins0004/17bf/1797. The61-second cold capture
+`tmp/nsk1-rf-tuning-provenance` observes MCU296104 reading000417bf and
+17971d00 at298228/29822c. Native overlay copy31d7 subsequently writes
+216a=0004,216b=17bf,216c=1797, after zero initialization. With selected
+word0374 and control06be=0020, packing channel+receive-addend gives
+`pack_tuning_nonnegative(0374+17bf)=00303633`; the actual4023/4028 port
+callbacks write3633 to31 then0030 to32. All source/upload/port events are
+ordered and the ordinary native boot/storage/radio checks pass.
+
+Reproduce with `tools/nsk1_rf_tuning.lua` on the initialized cold fixture;
+`python -m tools.nsk1_radio_trace_check LOG --tuning-provenance` checks the
+correlation. The static own-image contract also pins the descriptor/payload.
+This excludes simply transplanting the NSE-1 GSM900 addend13a6 as a repair.
+It does not identify the fitted synthesizer, establish DCS frequency units,
+prove SCU wire serialization, or supply a physical RF sample representation.
+The first two unrelated programming pairs (1d00/0004 and0190/0010) are not
+interpreted as accumulator halves merely because the selected-entry pair is.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

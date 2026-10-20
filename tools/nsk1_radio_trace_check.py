@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import re
 
+from tools.c54x_rom4_rf_delivery_check import pack_tuning_nonnegative
+
 
 def check_scan_progress(text):
     rows = re.findall(r'nsk1_scan_progress: t=([0-9.]+) counter_hi=([0-9a-f]{4}) counter_lo=([0-9a-f]{4}) qualified=([0-9a-f]{4}) flags=([0-9a-f]{4}) producer=([0-9a-f]{4}) consumer=([0-9a-f]{4}) observer_writes=0', text)
@@ -71,6 +73,27 @@ def check_serial_queue(text):
     return {'data_port':'0x35','status_port':'0x36','data_reads':0,
             'cpu_bus_queue_writes':2,'nonzero_queue_writes':0,
             'physical_serial_identity_proved':False}
+
+
+def check_tuning_provenance(text):
+    reads = re.findall(r'nsk1_tuning_source: address=([0-9a-f]{8}) value=([0-9a-f]{8}) mask=([0-9a-f]{8}) pc=00296104 t=([0-9.]+) observer_writes=0',text)
+    if [row[:3] for row in reads] != [('00298228','000417bf','ffffffff'),('0029822c','17971d00','ffffffff')]:
+        raise ValueError('own tuning payload source reads changed or missing')
+    uploads = re.findall(r'nsk1_tuning_upload: space=program address=([0-9a-f]{4}) value=([0-9a-f]{4}) pc=31d7 t=([0-9.]+) observer_writes=0',text)
+    if [row[:2] for row in uploads] != [('216a','0004'),('216b','17bf'),('216c','1797')]:
+        raise ValueError('native tuning overlay upload changed or missing')
+    pairs = re.findall(r'nsk1_tuning_pair: port=(31|32) value=([0-9a-f]{4}) pc=(4023|4028) channel=([0-9a-f]{4}) flags=([0-9a-f]{4}) addend=([0-9a-f]{4}) a=([0-9a-f]{10}) t=([0-9.]+) observer_writes=0',text)
+    packed = pack_tuning_nonnegative(0x374+0x17bf)
+    expected = [('31',f'{packed&0xffff:04x}','4023','0374','0020','17bf',f'{packed:010x}'),
+                ('32',f'{packed>>16:04x}','4028','0374','0020','17bf',f'{packed:010x}')]
+    if [row[:7] for row in pairs] != expected:
+        raise ValueError('selected-entry tuning arithmetic or port pair changed')
+    times = [float(row[-1]) for row in reads+uploads+pairs]
+    if times != sorted(times) or not times[-1] < 59:
+        raise ValueError('own tuning source/upload/port ordering changed')
+    return {'channel_word':'0x0374','receive_addend':'0x17bf','transmit_addend':'0x1797',
+            'packed_word':hex(packed),'own_firmware_source_proved':True,
+            'physical_synthesizer_semantics_proved':False}
 
 
 def check(text):
@@ -172,6 +195,8 @@ def main():
                         help='also require the passive 92-second scan qualification fixture')
     parser.add_argument('--serial-queue', action='store_true',
                         help='also require the passive serial-port/queue observation fixture')
+    parser.add_argument('--tuning-provenance', action='store_true',
+                        help='also require own tuning source, native upload and selected-entry port pair')
     args = parser.parse_args()
     try:
         checker = diagnose_liveness_reset if args.diagnose_liveness_reset else check
@@ -181,6 +206,8 @@ def main():
             result['scan_qualification'] = check_scan_qualification(text)
         if args.serial_queue:
             result['serial_queue'] = check_serial_queue(text)
+        if args.tuning_provenance:
+            result['tuning_provenance'] = check_tuning_provenance(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSK-1 radio boundary: FAIL: {error}\n')

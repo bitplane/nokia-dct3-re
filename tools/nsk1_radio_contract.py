@@ -12,6 +12,16 @@ from tools.c54x_rom4_port_census import direct_callers
 BASE = 0x200000
 
 
+def tuning_upload_contract(image):
+    address = 0x29821c
+    expected = bytes.fromhex('216a 1e80 011c 0130 0078 0000 0004 17bf 1797')
+    if image[address-BASE:address-BASE+len(expected)] != expected:
+        raise ValueError('own NSK-1 tuning descriptor/payload differs')
+    return {'descriptor':hex(address),'payload':'0x298228',
+            'native_fields':{'0x216a':'0x0004','0x216b':'0x17bf','0x216c':'0x1797'},
+            'scope':'own MCU table bytes and observed native overlay destinations; descriptor control semantics and physical synthesizer format unproved'}
+
+
 def serial_publisher_contract(image):
     sequences = {
         0x8dd4:'7212 06c0 10f8 06b6 fa45 8dfb',
@@ -185,6 +195,7 @@ def analyze(image):
                         if image[site-BASE-2:site-BASE] == bytes.fromhex('200d')
                         or image[site-BASE-4:site-BASE-2] == bytes.fromhex('200d')]
     return {'image_sha1':hashlib.sha1(image).hexdigest(),
+            'own_tuning_upload':tuning_upload_contract(image),
             'rx_route':{'type':'0x8b','table':'0x2941c4','index':8,'handler':'0x26a440',
                         'status':'0x13b8','task':11,'consumer':'0x218996'},
             'activation':{'input':'0x043f','handler':'0x218d20','initializer':'0x2177a0',
