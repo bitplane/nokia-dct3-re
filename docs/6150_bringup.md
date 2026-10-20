@@ -180,7 +180,7 @@ leaves the complete card byte-identical and matches the established exact
 editor/read frames. Shared protocol checks are parameterized only by observer
 labels/capture bounds; no sibling firmware address or menu table enters the
 driver. This is offline storage/UI acceptance, not submitted/delivered network SMS.
-Erase/cancel, received-message behavior and radio remain separate targets.
+Received-message behavior and radio remain separate targets.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-pin-menu tmp/WRITE --preserve-sim
@@ -188,6 +188,23 @@ Erase/cancel, received-message behavior and radio remain separate targets.
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-sms-draft tmp/COLD --preserve-sim
 # Run29s with nsm1_sms_reload.lua and debugger enabled.
 .venv/bin/python tools/nsm1_sms_check.py tmp/nsm1-sms-draft tmp/nsm1-sms-cold
+```
+
+The authenticated erase/cancel extension reaches the exact Erase message?
+confirmation. Physical Back cancels, returns to A and preserves the entire
+card with no UPDATE RECORD. A later independently cold confirmation issues
+one exact176-byte update with the stored record's status07 changed to00;
+all TPDU/padding and unrelated card bytes remain intact. This is a free-slot
+transition, not secure deletion of message contents. The next cold process
+again authenticates both credentials, displays exact No messages pixels and
+performs no record write. Complete card/EEPROM cold links, own flash, native
+record validity and input/protocol order pass for all three phases.
+
+```sh
+# Run32s with nsm1_sms_cancel.lua, then preserve its saved inputs for
+# nsm1_sms_delete.lua (32s), then nsm1_sms_empty.lua (28s).
+.venv/bin/python tools/nsm1_sms_delete_check.py tmp/nsm1-sms-draft \
+  tmp/nsm1-sms-cancel-qualified tmp/nsm1-sms-erased tmp/nsm1-sms-erased-cold
 ```
 
 ### Physical SIM phonebook persistence

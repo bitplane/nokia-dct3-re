@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_authenticated_sms_cancel_erase_cold_empty", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "Physical authenticated SMS cancellation preserves the draft, confirmed erasure frees only its status byte and an independent cold Outbox is empty",
+      "current": "Every phase physically verifies PIN1234 then phone12345 before application input. Both cancel and confirm reach exact Erase message? pixels. Back cancellation returns to A with no UPDATE RECORD or changed card byte. Confirm sends one A0 DC 01 04 B0 with only status07->00,9000; old TPDU bytes are retained and all other card bytes match. A separate cold process preserves saved EEPROM/card, authenticates both credentials and displays exact No messages without a record write. Full cold links, own flash, native record dialogue, physical key/APDU order and confirmation/read/empty frames pass. This is logical slot deletion, not secure wiping or network SMS acceptance.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_sms_reload.lua", "tools/nsm1_sms_cancel.lua", "tools/nsm1_sms_delete.lua", "tools/nsm1_sms_empty.lua", "tools/nsm1_sms_delete_check.py", "tools/test_nsm1_sms_delete_check.py"]
+    },
+    {
       "id": "nsm1_authenticated_offline_sms_cold_read", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "Physical PIN1 and phone-code authentication compose with offline SMS draft save and independent cold Outbox read",
       "current": "The same cold boot verifies PIN1234 before accepting phone12345 and application input. The separate menu fixture renders exact Messages at24s with unchanged card. Physical Write messages/A/Save selects6f3c and transmits one exact A0 DC 01 04 B0 plus padded176-byte unsent draft070281f001ff008100000141,9000. The whole card differs only in the fresh first SMS slot. A separate cold process preserves saved EEPROM/card, authenticates both credentials and renders exact Outbox A without UPDATE RECORD or any card-byte change. Own flash, native record dialogue, physical keys, authentication ordering, capture completeness and full editor/read pixels pass. No network-SMS, incoming message, erase/cancel, radio or fitted-mask claim follows.",
