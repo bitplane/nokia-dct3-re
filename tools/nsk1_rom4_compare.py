@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -23,12 +24,39 @@ INPUTS = (
     ('noki5110/nse1_rom4_dsp_data.bin', '024c7f970f4ef754d3e90471de48a167515f930d'),
 )
 
+EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
 
-def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False):
+
+def check_nominal_startup(summary, snapshots):
+    """Own bounded graphical/input acceptance, not SIM or radio acceptance."""
+    from PIL import Image
+    observed = summary.get('physical_input_observation',{})
+    contacts = observed.get('contacts',[])
+    reports = {row['value'] for row in observed.get('task1_scalars',[])}
+    windows = observed.get('power_windows',[])
+    if (summary.get('adc2_source') != 554 or summary.get('native_illegal_observed') is not False
+            or not {0x14,0x15} <= reports or 0 not in observed.get('report14_countdowns',[])
+            or len(contacts) != 6 or any(row['checklist'] != 15 or row['irq_mask'] & 1 for row in contacts)
+            or observed.get('forwarded_keys') != [0x19,0x17,0x1a]
+            or not windows or any(row['sample'] != 554*1500//232 for row in windows)
+            or contacts[-1]['simi_reads'] == 0):
+        raise ValueError('nominal-input report/checklist/physical-key boundary changed')
+    for seconds in (10,20):
+        with Image.open(snapshots/f'nsk1_native_{seconds}s.png') as source:
+            frame = source.convert('RGB')
+            if frame.size != (84,48) or hashlib.sha256(frame.tobytes()).hexdigest() != EMPTY_SOCKET_RGB_SHA256:
+                raise ValueError('own NSK-1 Insert SIM card pixels changed')
+    return {'empty_socket_rgb_sha256':EMPTY_SOCKET_RGB_SHA256,'physical_keys':[0x19,0x17,0x1a],
+            'scope':'native compatibility graphical boot and physical key forwarding; not fitted mask, SIM acceptance or radio'}
+
+
+def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False, nominal_adc2=False):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
     if security_checksum and record_profile_from is None:
         raise ValueError('checksum-only comparison requires the qualified record fixture')
+    if nominal_adc2 and not security_checksum:
+        raise ValueError('nominal ADC2 comparison requires checksum control')
     sources = [(root / name, digest) for name, digest in INPUTS]
     for source, digest in sources:
         if hashlib.sha1(source.read_bytes()).hexdigest() != digest:
@@ -55,12 +83,21 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
         storage = run/'nvram/nsk1r4t'
         storage.mkdir(parents=True)
         (storage/'eeprom').write_bytes(initial_eeprom)
+    if nominal_adc2:
+        config = ET.Element('mameconfig',version='10')
+        system = ET.SubElement(config,'system',name='nsk1r4t')
+        inputs = ET.SubElement(system,'input')
+        ET.SubElement(inputs,'port',tag=':RESEARCH_ADC2',type='CONFIG',mask='1023',defvalue='1023',value='554')
+        (run/'cfg').mkdir()
+        ET.ElementTree(config).write(run/'cfg/nsk1r4t.cfg',encoding='utf-8',xml_declaration=True)
     (run / 'input_manifest.json').write_text(json.dumps({
         'inputs': [{'source': name, 'sha1': digest} for name, digest in INPUTS],
         'external_eeprom': ('diagnostic published lock-record example; identity/calibration erased'
                            if profile_metadata else 'own erased 2048 bytes; no donor provisioning'),
         'record_profile':profile_metadata,
         'security_checksum':checksum_metadata,
+        'adc2_source':554 if nominal_adc2 else 1023,
+        'adc2_scope':'nominal CCONT transfer hypothesis, not measured NSK-1 calibration' if nominal_adc2 else 'generic saturated research control',
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
         'peer_completions': False, 'physical_keys': physical_keys,
     }, indent=2)+'\n')
@@ -116,6 +153,7 @@ def main():
     parser.add_argument('--seconds',type=int,choices=range(6,62),default=6)
     parser.add_argument('--physical-keys',action='store_true',help='physical Menu/Up/C probe on independently mapped contacts')
     parser.add_argument('--security-checksum',action='store_true',help='repair only 011e/011f in the qualified external record fixture')
+    parser.add_argument('--nominal-adc2',action='store_true',help='explicit 554-count CCONT nominal-input hypothesis, no guest sample writes')
     args = parser.parse_args()
     run = args.run.resolve()
     if args.record_profile_from and args.variant != 'standard':
@@ -126,8 +164,10 @@ def main():
         parser.error('physical keys require --debug-startup and at least 21 seconds')
     if args.security_checksum and (not args.record_profile_from or not args.physical_keys):
         parser.error('checksum comparison requires --record-profile-from and --physical-keys')
+    if args.nominal_adc2 and not args.security_checksum:
+        parser.error('nominal ADC2 comparison requires --security-checksum')
     try:
-        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys,args.security_checksum)
+        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys,args.security_checksum,args.nominal_adc2)
         script = Path(__file__).with_name('nsk1_input_fixture.lua' if args.physical_keys else 'nsk1_boot_observe.lua').resolve()
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
@@ -150,6 +190,11 @@ def main():
         if len((storage/'eeprom').read_bytes()) != 2048:
             raise ValueError('own EEPROM storage capacity changed')
         summary = summarize(trace,image,args.variant)
+        expected_adc = 554 if args.nominal_adc2 else 1023
+        configured_adc = re.findall(r'ccont_adc2_config: raw=([0-9a-f]{3}) external_input=1',trace)
+        if not configured_adc or any(int(value,16) != expected_adc for value in configured_adc):
+            raise ValueError('requested physical ADC2 configuration was not applied')
+        summary['adc2_source'] = expected_adc
         required_late = [time for time in (10,20,30,50,59) if time <= args.seconds-1]
         allowed_late = [time for time in (10,20,30,50,59) if time <= args.seconds]
         if not len(required_late) <= len(summary['late_samples']) <= len(allowed_late) or any(
@@ -185,6 +230,8 @@ def main():
             summary['synthetic_record_conformance'] = True
         if args.physical_keys:
             summary['physical_input_observation'] = check_input(trace)
+        if args.nominal_adc2:
+            summary['nominal_input_presentation'] = check_nominal_startup(summary,run/'snap')
         (run / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:

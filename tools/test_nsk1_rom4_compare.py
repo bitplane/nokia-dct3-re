@@ -1,14 +1,45 @@
 import hashlib
+import copy
 import json
 from pathlib import Path
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
-from tools.nsk1_rom4_compare import prepare,summarize
+from tools.nsk1_rom4_compare import prepare,summarize,check_nominal_startup
 
 
 class Nsk1CompareTest(unittest.TestCase):
+    def test_nominal_graphical_gate_requires_pixels_reports_and_physical_keys(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            snapshots = Path(directory)
+            frame = Image.new('RGB',(84,48),'white')
+            digest = hashlib.sha256(frame.tobytes()).hexdigest()
+            for seconds in (10,20):
+                frame.save(snapshots/f'nsk1_native_{seconds}s.png')
+            report = {'adc2_source':554,'native_illegal_observed':False,
+                      'physical_input_observation':{'contacts':[{'checklist':15,'irq_mask':0xca,'simi_reads':12}]*6,
+                       'task1_scalars':[{'value':0x14},{'value':0x15}], 'report14_countdowns':[1,0],
+                       'forwarded_keys':[0x19,0x17,0x1a], 'power_windows':[{'sample':3581}]}}
+            with patch('tools.nsk1_rom4_compare.EMPTY_SOCKET_RGB_SHA256',digest):
+                self.assertIn('not fitted',check_nominal_startup(report,snapshots)['scope'])
+                for key,value in (('task1_scalars',[{'value':0x15}]),('forwarded_keys',[]),
+                                  ('report14_countdowns',[1]),('power_windows',[{'sample':6614}]),
+                                  ('contacts',[{'checklist':14,'irq_mask':0xce,'simi_reads':0}]*6)):
+                    changed = copy.deepcopy(report)
+                    changed['physical_input_observation'][key] = value
+                    with self.subTest(key=key),self.assertRaises(ValueError):
+                        check_nominal_startup(changed,snapshots)
+                changed = copy.deepcopy(report)
+                changed['native_illegal_observed'] = True
+                with self.assertRaises(ValueError):
+                    check_nominal_startup(changed,snapshots)
+                Image.new('RGB',(84,48),'black').save(snapshots/'nsk1_native_20s.png')
+                with self.assertRaisesRegex(ValueError,'pixels'):
+                    check_nominal_startup(report,snapshots)
+
     def test_observation_checks_own_payload_and_does_not_claim_boot(self):
         image = bytearray(0x100000)
         payload = bytes(range(186))*2
@@ -83,8 +114,16 @@ class Nsk1CompareTest(unittest.TestCase):
                     metadata = json.loads((checksum_probe/'input_manifest.json').read_text())['security_checksum']
                     self.assertEqual('011e..011f',metadata['written_range'])
                     self.assertEqual(hashlib.sha256(repaired).hexdigest(),metadata['eeprom_sha256'])
+                    nominal = root/'nominal'
+                    self.assertEqual(repaired,prepare(sources,nominal,run,True,True,True))
+                    port = ET.parse(nominal/'cfg/nsk1r4t.cfg').find('./system/input/port')
+                    self.assertEqual(':RESEARCH_ADC2',port.get('tag'))
+                    self.assertEqual('554',port.get('value'))
+                    self.assertEqual(554,json.loads((nominal/'input_manifest.json').read_text())['adc2_source'])
                 with self.assertRaisesRegex(ValueError,'qualified record'):
                     prepare(sources,root/'invalid-checksum',security_checksum=True)
+                with self.assertRaisesRegex(ValueError,'checksum control'):
+                    prepare(sources,root/'invalid-adc',nominal_adc2=True)
                 (sources/'input3.bin').write_bytes(b'wrong mask')
                 with self.assertRaisesRegex(ValueError,'hash'):
                     prepare(sources,root/'rejected')

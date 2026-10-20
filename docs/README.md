@@ -39,7 +39,7 @@ distinction.
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
-| `5130_bringup.md` | Qualified own NSK-1 v5.61 service variants and normalization; reset/loader and hardware composition remain unmapped. |
+| `5130_bringup.md` | Own NSK-1 loader, records, keypad and readiness contracts; explicit native compatibility fixture reaches Insert SIM card and forwards physical keys. SIM-present startup remains open. |
 | `6150_bringup.md` | Acquired NSM-1 v5.23 reset/verifier contract and matching storage/DSP prerequisites. |
 | `8810_bringup.md` | Own NSE-6 v6.02 graphical native compatibility fixture, upload geometry and unresolved native serial-control completion. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |

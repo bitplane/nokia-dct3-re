@@ -4,22 +4,25 @@
 
 Own NSK-1 v5.61 service streams are qualified and normalized. The explicitly
 labelled `nsk1r4t` native compatibility instrument runs both families with
-own erased EEPROM and acquired NSE-1 resident DSP input. The standard family
-reaches descriptor-0 transfers and native runtime; `2915` stops after its
-first loader exchange. Neither paints at five seconds. No graphical boot,
-physical input, SIM or radio acceptance is claimed.
-An explicit record-only external fixture now reaches the accepted-copy path
-and removes the standard family's reason-`04` restart, but remains blank
-through 20 seconds. Identity/calibration are still erased, and no phone
-service is accepted. A physical-contact probe confirms that startup still
-holds IRQ0/columns masked, with checklist `0a` rather than `0f`.
-The supervisor skips the application-task activation sequence because its
-storage/self-test predicate returns zero. The record-only fixture still has
-an erased security-block checksum: computed `db24`, stored `ffff`; the
-failure clears the predicate's success bit. A checksum-only external fixture
-now restores application activation and report `15` after firmware-owned
-record update/restart, but the checklist remains `0e`: report `14` is still
-absent. The separate `2915` loader-result interpretation remains.
+own erased EEPROM and acquired NSE-1 resident DSP input. Three explicit
+standard-family external-input comparisons separate the startup dependencies:
+the published record-pair example removes the erased-record restart;
+security-checksum repair activates the eleven application tasks/report `15`;
+and a declared nominal CCONT ADC2 hypothesis supplies report `14` and reaches
+the complete checklist `0f`. The combined fixture renders exact **Insert SIM
+card** pixels at 10 and 20 seconds and forwards physical Menu/Up/C contacts
+as logical `19/17/1a`. This is graphical boot and key-forwarding acceptance
+on an unproved native-mask compatibility instrument, not usable menu, SIM,
+registration, calls or SMS acceptance.
+
+Ordinary erased storage remains a failed-startup control. The record-only
+and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
+The combined fixture deliberately retains its firmware-owned record update
+and reason-`04` restart rather than suppressing them. Identity and calibration
+are not borrowed. `2915` separately stops after its first loader exchange.
+The next boundary is the independently recovered NSK-1 SIM controller/card
+composition and ordinary SIM-present startup. Fitted-mask, physical-clock
+and measured analog calibration evidence remain incomplete.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -551,8 +554,41 @@ The startup census now validates these opcode fragments, scale literals,
 ADC table and countdown pointer on both acquired firmware variants. Mutation
 tests protect the extraction. Physical units and fitted battery calibration
 remain separate evidence requirements: independently ground the NSK-1 board
-input/transfer contract before promoting a nominal-voltage fixture. No ADC
-value has been changed merely to make this gate pass.
+input/transfer contract before promoting a nominal-voltage fixture to the
+product default. The saturated control is retained for comparison.
+
+### Nominal analog-input comparison
+
+The `nsk1r4t` research machine exposes a configuration input for CCONT ADC2.
+It defaults to the unchanged saturated control (1023). The sole alternative
+is 554: the declared nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis
+also used in the explicit NSB-1 instrument, not a measured NSK-1 pack value.
+The input is applied to the CCONT source at reset, before firmware converts
+it. No guest ADC result, countdown, report, interrupt mask or UI state is
+written by the harness. Other machines lack this optional configuration port
+and retain their existing product selector tuples.
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-nominal-comparison --record-profile-from tmp/nsk1-profile-source \
+  --security-checksum --nominal-adc2 --debug-startup --seconds 21 --physical-keys
+```
+
+The runner writes a normal MAME configuration file before startup and records
+the requested raw source in its manifest. Device reset logs must independently
+confirm `22a` on both sides of the firmware restart. The firmware comparison
+then sees `0dfd` (3581), its countdown reaches zero, report `14` is emitted,
+and the task-1 checklist reaches `0f`. Physical Menu, Up and C reach forwarder
+`294862` with codes `19/17/1a`; IRQ0 is unmasked. SIM-register reads begin,
+but this does not certify SIM transaction success.
+
+`check_nominal_startup` requires that structural chain, exact forwarded keys,
+sampled legal native execution, and both 84x48 **Insert SIM card** frames.
+Their RGB SHA256 is
+`a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc`.
+The saturated checksum control still reproduces `0e` and blank presentation.
+This is an explicit research-input acceptance, not promotion of 554 to an
+evidenced board default or proof that a fitted NSK-1 DSP mask matches NSE-1.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

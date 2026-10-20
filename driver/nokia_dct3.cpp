@@ -1294,6 +1294,7 @@ public:
 		m_vibration(*this, "vibration"),
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
+		m_research_adc2(*this, "RESEARCH_ADC2"),
 		m_network_config(*this, "NETCFG"),
 		m_sms_config(*this, "SMSCFG"),
 		m_ussd_config(*this, "USSDCFG"),
@@ -1482,6 +1483,7 @@ private:
 	output_finder<> m_vibration;
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
+	optional_ioport m_research_adc2;
 	optional_ioport m_network_config;
 	optional_ioport m_sms_config;
 	optional_ioport m_ussd_config;
@@ -1793,6 +1795,12 @@ void nokia_dct3_state::reset_board_state(bool clear_sram)
 	// names and units remain deliberately unassigned where board evidence is absent.
 	for (unsigned id = 0; id < 8; id++)
 		m_ccont->set_adc_source(id, m_product.ccont_board.channel_defaults[id]);
+	const u16 research_adc2 = m_research_adc2.read_safe(0xffff);
+	if (research_adc2 <= 0x3ff)
+	{
+		m_ccont->set_adc_source(2, research_adc2);
+		machine().logerror("ccont_adc2_config: raw=%03x external_input=1\n", research_adc2);
+	}
 	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
 	m_ccont->set_ready(BIT(hardware, 0));
 	m_simi->set_enabled(m_product.simi_controller && BIT(hardware, 1));
@@ -3491,6 +3499,16 @@ static INPUT_PORTS_START( nsb1r4t )
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nsk1r4t )
+	PORT_INCLUDE(noki5110)
+	PORT_START("RESEARCH_ADC2")
+	// Explicit analog-input comparison, not measured NSK-1 calibration.
+	// 554 is the nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis.
+	PORT_CONFNAME(0x03ff, 0x03ff, "Research CCONT ADC2 source")
+	PORT_CONFSETTING(0x03ff, "Saturated control (1023)")
+	PORT_CONFSETTING(554, "Nominal input hypothesis (554)")
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6110 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -5069,7 +5087,7 @@ SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init,
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
