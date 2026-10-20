@@ -16,6 +16,16 @@ SOURCE = 'https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef861
 EXAMPLE_RECORDS = bytes.fromhex('0010100000000010007954c2 0000000029000000000054c2')
 
 
+def repair_security_checksum(image):
+    """Own normal-allocation path at 22c158; no semantic field reconstruction."""
+    if len(image) != 2048:
+        raise ValueError('security checksum requires own 2048-byte EEPROM')
+    result = bytearray(image)
+    checksum = (sum(image[0x40:0x11e])-sum(image[0x74:0x76])) & 0xffff
+    result[0x11e:0x120] = checksum.to_bytes(2,'big')
+    return bytes(result)
+
+
 def build_profile(chip):
     """Supply only the published record pair and its own low-block checksum."""
     image = bytearray([255])*2048

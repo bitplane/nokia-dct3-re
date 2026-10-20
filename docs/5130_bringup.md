@@ -16,9 +16,10 @@ holds IRQ0/columns masked, with checklist `0a` rather than `0f`.
 The supervisor skips the application-task activation sequence because its
 storage/self-test predicate returns zero. The record-only fixture still has
 an erased security-block checksum: computed `db24`, stored `ffff`; the
-failure clears the predicate's success bit. The next experiment is bounded
-external checksum repair, with remaining self-test results observed rather
-than overridden. The separate `2915` loader-result interpretation remains.
+failure clears the predicate's success bit. A checksum-only external fixture
+now restores application activation and report `15` after firmware-owned
+record update/restart, but the checklist remains `0e`: report `14` is still
+absent. The separate `2915` loader-result interpretation remains.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -464,8 +465,40 @@ word read by `27e15a` at `0074/0075`. Caller `22c3be..22c3e8` compares the
 result with the BE16 at `011e` and also rejects a zero combined value with
 the word at `0090`. The allocation-failure branch reads only `9e` bytes;
 do not silently treat that distinct path as equivalent. No checksum is
-repaired in the current fixture. Even a correct checksum would not prove
+repaired in the record-only control. Even a correct checksum does not prove
 the erased block's remaining fields or every other self-test valid.
+
+### Checksum-only external fixture
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-checksum-comparison --record-profile-from tmp/nsk1-profile-source \
+  --security-checksum --debug-startup --seconds 21 --physical-keys
+```
+
+The fixture changes only `011e/011f` from `ffff` to `db24` relative to the
+record-only control, before execution. Its manifest records that delta and
+the initial EEPROM hash separately from the accepted record-pair provenance.
+The ordinary erased machine and the record-only acceptance gate are unchanged.
+
+Firmware then updates storage itself, including the record pair and security
+fields `0073..0075/007a`, recomputes the security checksum to `da54`, and
+restarts with reason `04`. On the next native exchange the new record is
+accepted. The supervisor's predicate returns one and all eleven application
+tasks activate in the decoded sequence, producing all eleven flag inputs and
+report `15`. The late checklist is `0e` rather than `0a`; report `14` remains
+absent. Standard SIMI-window writes begin (18 observed), but no reads occur
+and physical input remains masked. The display is still blank at 20 seconds.
+
+The existing arithmetic checker validates both complete `35/32` read
+exchanges against their respective captured requests. A new `35/34` update
+notification lies between them; its full 54-byte payload is retained, not
+treated as a read response. The notification's update semantics are not yet
+qualified. The observer now captures the bounded envelope-declared payload
+length instead of truncating every record reply to 52 bytes. This experiment
+is activation evidence, not graphical boot, factory provisioning or complete
+record-update conformance. The next frontier is the report-14 caller's own
+preceding lifecycle and the now-active SIM controller contract.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

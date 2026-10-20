@@ -12,7 +12,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsk1_static_check import inspect
 from tools.nsk1_record_exchange_check import check as check_records
-from tools.nsk1_record_profile import build_from_capture,check_observation
+from tools.nsk1_record_profile import build_from_capture,check_observation,repair_security_checksum
 from tools.nsk1_input_check import check as check_input
 
 
@@ -24,9 +24,11 @@ INPUTS = (
 )
 
 
-def prepare(root, run, record_profile_from=None, physical_keys=False):
+def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
+    if security_checksum and record_profile_from is None:
+        raise ValueError('checksum-only comparison requires the qualified record fixture')
     sources = [(root / name, digest) for name, digest in INPUTS]
     for source, digest in sources:
         if hashlib.sha1(source.read_bytes()).hexdigest() != digest:
@@ -36,6 +38,15 @@ def prepare(root, run, record_profile_from=None, physical_keys=False):
     initial_eeprom,profile_metadata = bytes([255])*2048,None
     if record_profile_from is not None:
         initial_eeprom,profile_metadata = build_from_capture(record_profile_from,INPUTS)
+    checksum_metadata = None
+    if security_checksum:
+        before = initial_eeprom
+        initial_eeprom = repair_security_checksum(before)
+        checksum_metadata = {'classification':'diagnostic checksum-only external input, not factory data',
+                             'stored_before':before[0x11e:0x120].hex(),
+                             'stored_after':initial_eeprom[0x11e:0x120].hex(),
+                             'written_range':'011e..011f',
+                             'eeprom_sha256':hashlib.sha256(initial_eeprom).hexdigest()}
     target = run / 'inputs/nsk1r4t'
     target.mkdir(parents=True)
     for source, _ in sources:
@@ -49,6 +60,7 @@ def prepare(root, run, record_profile_from=None, physical_keys=False):
         'external_eeprom': ('diagnostic published lock-record example; identity/calibration erased'
                            if profile_metadata else 'own erased 2048 bytes; no donor provisioning'),
         'record_profile':profile_metadata,
+        'security_checksum':checksum_metadata,
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
         'peer_completions': False, 'physical_keys': physical_keys,
     }, indent=2)+'\n')
@@ -103,6 +115,7 @@ def main():
     parser.add_argument('--record-profile-from',type=Path,help='diagnostic external record example keyed only from a qualified own erased capture')
     parser.add_argument('--seconds',type=int,choices=range(6,62),default=6)
     parser.add_argument('--physical-keys',action='store_true',help='physical Menu/Up/C probe on independently mapped contacts')
+    parser.add_argument('--security-checksum',action='store_true',help='repair only 011e/011f in the qualified external record fixture')
     args = parser.parse_args()
     run = args.run.resolve()
     if args.record_profile_from and args.variant != 'standard':
@@ -111,8 +124,10 @@ def main():
         parser.error('record-profile experiment requires --debug-startup for own accepted-copy evidence')
     if args.physical_keys and (not args.debug_startup or args.seconds < 21):
         parser.error('physical keys require --debug-startup and at least 21 seconds')
+    if args.security_checksum and (not args.record_profile_from or not args.physical_keys):
+        parser.error('checksum comparison requires --record-profile-from and --physical-keys')
     try:
-        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys)
+        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys,args.security_checksum)
         script = Path(__file__).with_name('nsk1_input_fixture.lua' if args.physical_keys else 'nsk1_boot_observe.lua').resolve()
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
@@ -142,9 +157,30 @@ def main():
                 for expected,sample in zip(allowed_late,summary['late_samples'])):
             raise ValueError('missing or mistimed late native observation')
         summary['unchanged_flash'] = True
-        summary['record_arithmetic'] = (check_records(trace,minimum=1 if args.record_profile_from else 2,initial_eeprom=initial_eeprom)
+        if args.security_checksum:
+            # The checksum makes the firmware's record-update lifecycle live;
+            # its new 35/34 notification is distinct from a 35/32 read reply.
+            notifications = [line for line in trace.splitlines()
+                             if 'nsk1_record_reply:' in line and 'payload=35340000' in line]
+            read_trace = '\n'.join(line for line in trace.splitlines() if line not in notifications)
+            summary['record_arithmetic'] = check_records(read_trace,minimum=2)
+            observation = check_input(trace)
+            if (not notifications or not observation['security_checksums']
+                    or any(row['computed'] != row['stored'] for row in observation['security_checksums'])
+                    or not any(row['predicate'] == 1 for row in observation['application_gates'])
+                    or not (set(range(10,19)) | {20,21}) <= {row['value'] for row in observation['ready_inputs']}
+                    or not any(row['value'] == 0x15 for row in observation['task1_scalars'])):
+                raise ValueError('checksum experiment did not reproduce checksum/activation/report-15 evidence')
+            summary['checksum_experiment'] = {
+                'application_activation_observed':True,'report_15_observed':True,
+                'record_update_notifications':notifications,
+                'record_update_semantics':'observed, not yet qualified',
+                'final_eeprom_sha256':hashlib.sha256((storage/'eeprom').read_bytes()).hexdigest(),
+                'graphical_or_interactive_acceptance':False}
+        else:
+            summary['record_arithmetic'] = (check_records(trace,minimum=1 if args.record_profile_from else 2,initial_eeprom=initial_eeprom)
                                         if args.variant == 'standard' else {'comparison_performed':False,'reason':'2915 record lifecycle not qualified'})
-        if args.record_profile_from:
+        if args.record_profile_from and not args.security_checksum:
             check_observation(summary,initial_eeprom,(storage/'eeprom').read_bytes())
             summary['synthetic_record_conformance'] = True
         if args.physical_keys:

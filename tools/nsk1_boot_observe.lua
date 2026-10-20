@@ -53,14 +53,16 @@ record_handles[#record_handles+1] = space:install_read_tap(sender & ~3, (sender 
     machine:logerror(string.format('nsk1_record_request: command=%02x bytes=%s caller=%08x t=%.9f observer_writes=0\n',
         command, ram_bytes(pointer,6+length), cpu.state['R14'].value, machine.time:as_double()))
 end)
-for _, definition in ipairs({{0x25a620,16}, {0x25a814,52}}) do
-    local address, length = definition[1]+shift, definition[2]
+for _, entry in ipairs({0x25a620,0x25a814}) do
+    local address = entry+shift
     record_handles[#record_handles+1] = space:install_read_tap(address & ~3, (address & ~3)+3, 'nsk1_record_reply', function()
         if cpu.state['R15'].value ~= address or record_replies >= 16 then return end
         record_replies = record_replies+1
         local pointer = cpu.state['R0'].value
+        local actual_length = space:read_u16(pointer+4)-2
+        assert(actual_length >= 4 and actual_length <= 64,'own record reply exceeds bounded capture')
         machine:logerror(string.format('nsk1_record_reply: consumer=%08x envelope=%s payload=%s t=%.9f observer_writes=0\n',
-            address, ram_bytes(pointer,8), ram_bytes(pointer+8,length), machine.time:as_double()))
+            address, ram_bytes(pointer,8), ram_bytes(pointer+8,actual_length), machine.time:as_double()))
     end)
 end
 _G.nsk1_record_handles = record_handles

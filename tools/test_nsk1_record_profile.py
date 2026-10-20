@@ -7,10 +7,25 @@ import unittest
 from unittest.mock import patch
 
 from tools.dct3_rom4_record_codec import decode_record,retained_record_transform,LOCK_TABLE_82,ENCODE_SCHEDULE
-from tools.nsk1_record_profile import build_profile,build_from_capture,check_observation,EXAMPLE_RECORDS
+from tools.nsk1_record_profile import build_profile,build_from_capture,check_observation,EXAMPLE_RECORDS,repair_security_checksum
 
 
 class Nsk1RecordProfileTest(unittest.TestCase):
+    def test_security_checksum_changes_only_checksum_and_excludes_word_74(self):
+        image = bytes([255])*2048
+        repaired = repair_security_checksum(image)
+        self.assertEqual(bytes.fromhex('db24'),repaired[0x11e:0x120])
+        self.assertEqual(image[:0x11e],repaired[:0x11e])
+        self.assertEqual(image[0x120:],repaired[0x120:])
+        changed = bytearray(image)
+        changed[0x74:0x76] = bytes(2)
+        self.assertEqual(repaired[0x11e:0x120],repair_security_checksum(changed)[0x11e:0x120])
+        changed[0x40] = 0
+        self.assertEqual(0xda25,int.from_bytes(repair_security_checksum(changed)[0x11e:0x120],'big'))
+        self.assertEqual(repaired,repair_security_checksum(repaired))
+        with self.assertRaises(ValueError):
+            repair_security_checksum(image[:-1])
+
     def test_acceptance_requires_copy_native_execution_and_unchanged_low_storage(self):
         expected = b''.join(EXAMPLE_RECORDS[start:start+10]+bytes(2) for start in (0,12)).hex()
         report = {'record_accepts':[{'copied':expected}], 'startup_reasons':['0a']*5,

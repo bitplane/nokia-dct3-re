@@ -76,6 +76,15 @@ class Nsk1CompareTest(unittest.TestCase):
                     self.assertEqual(profile,prepare(sources,probe,run))
                     self.assertEqual(profile,(probe/'nvram/nsk1r4t/eeprom').read_bytes())
                     self.assertEqual({'classification':'diagnostic'},json.loads((probe/'input_manifest.json').read_text())['record_profile'])
+                    checksum_probe = root/'checksum'
+                    repaired = prepare(sources,checksum_probe,run,True,True)
+                    self.assertEqual(profile[:0x11e],repaired[:0x11e])
+                    self.assertEqual(profile[0x120:],repaired[0x120:])
+                    metadata = json.loads((checksum_probe/'input_manifest.json').read_text())['security_checksum']
+                    self.assertEqual('011e..011f',metadata['written_range'])
+                    self.assertEqual(hashlib.sha256(repaired).hexdigest(),metadata['eeprom_sha256'])
+                with self.assertRaisesRegex(ValueError,'qualified record'):
+                    prepare(sources,root/'invalid-checksum',security_checksum=True)
                 (sources/'input3.bin').write_bytes(b'wrong mask')
                 with self.assertRaisesRegex(ValueError,'hash'):
                     prepare(sources,root/'rejected')
