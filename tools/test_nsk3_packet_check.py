@@ -1,9 +1,26 @@
 import struct
 import unittest
-from tools.nsk3_packet_check import parse, check_delivery, check_cache, check_controller
+from tools.nsk3_packet_check import parse, check_delivery, check_cache, check_controller, check_mode_chain
 
 
 class PacketCensusTest(unittest.TestCase):
+    def test_mode_chain(self):
+        events=(
+            'nsk3_mode_decision: status=09ec flag=00000000 owner=0010a7d8 mode=01',
+            'nsk3_07d6_construct: caller=0020e397 argument=00000000',
+            'nsk3_07d6_post: target=11 pointer=00101760 header=07d601fb caller=00208e3f',
+            'nsk3_mode_construct: caller=002541a7',
+            'nsk3_mode_post: target=0b pointer=00102eb4 header=03e90100 caller=00287d77',
+            'nsk3_radio_argument2: object=00102eb4 header=03e90100',
+            'nsk3_043c_send: caller=00212c9f pointer=002c6750',
+            'nsk3_controller_result: value=043c',
+            'nsk3_controller_wait: owner=0010ade0 selector=0047 status=043c')
+        trace='\n'.join(f'{event} cycles={i+1:x} observer_writes=0' for i,event in enumerate(events))
+        self.assertEqual(check_mode_chain(trace)['owner_mode'],1)
+        for old,new in (('status=09ec','status=09ef'),('mode=01','mode=10'),
+                        ('target=11','target=10'),('cycles=4','cycles=1')):
+            with self.subTest(old=old),self.assertRaises(ValueError):check_mode_chain(trace.replace(old,new))
+
     def test_controller_reply_and_wait(self):
         trace='\n'.join((
             'nsk3_043c_send: caller=00212c9f pointer=002c6750 cycles=10 observer_writes=0',

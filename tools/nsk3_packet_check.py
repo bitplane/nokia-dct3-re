@@ -90,6 +90,24 @@ def check_controller(trace):
             'success_or_failure_semantics_proved':False}
 
 
+def check_mode_chain(trace):
+    check_controller(trace)
+    patterns=(
+        r'nsk3_mode_decision: status=09ec flag=00000000 owner=0010a7d8 mode=01 cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_07d6_construct: caller=0020e397 argument=00000000 cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_07d6_post: target=11 pointer=00101760 header=07d601fb caller=00208e3f cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_mode_construct: caller=002541a7 cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_mode_post: target=0b pointer=00102eb4 header=03e90100 caller=00287d77 cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_radio_argument2: object=00102eb4 header=03e90100 cycles=([0-9a-f]+) observer_writes=0',
+        r'nsk3_043c_send: caller=00212c9f pointer=002c6750 cycles=([0-9a-f]+) observer_writes=0')
+    matches=[re.findall(pattern,trace) for pattern in patterns]
+    if any(len(row)!=1 for row in matches):raise ValueError('qualified mode-chain event missing or repeated')
+    cycles=[int(row[0],16) for row in matches]
+    if any(a>=b for a,b in zip(cycles,cycles[1:])):raise ValueError('mode-chain order differs')
+    return {'request':'0x09ec','owner_mode':1,'queued_status':'0x07d6',
+            'radio_command':'0x03e9','reply':'0x043c','mode_semantics_proved':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source',type=Path)
@@ -97,6 +115,7 @@ def main():
     parser.add_argument('--delivery',action='store_true',help='require same-object forward, dequeue and consumer observations')
     parser.add_argument('--cache',action='store_true',help='require exact body cache and state3 continuation')
     parser.add_argument('--controller',action='store_true',help='require ROM reply, actual result and controller wait')
+    parser.add_argument('--mode-chain',action='store_true',help='require measured09ec-to043c MCU sequence')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -109,6 +128,7 @@ def main():
         if args.delivery:summary['delivery']=check_delivery(trace)
         if args.cache:summary['cache']=check_cache(trace)
         if args.controller:summary['controller']=check_controller(trace)
+        if args.mode_chain:summary['mode_chain']=check_mode_chain(trace)
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)

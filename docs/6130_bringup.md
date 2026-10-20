@@ -622,6 +622,16 @@ is reached through20e388 when the preceding mode/status predicates do not
 take the209d6c path. Its controlling received status and mode-byte provenance
 remain unresolved. This measured route replaces a search for an imaginary
 07e5 message producer; it still does not close computed/indirect producers.
+
+`tmp/nsk3-mode-decision` closes the earlier09ec relationship:20e356
+observes received status09ec, r7=0, owner10a7d8 and owner byte1=1.
+The comparison at20e370 matches09ec (literal20e534), but the mode!=10
+branch reaches20e388 and constructs07d6. The same capture contains the
+ordered07d6 construction/post,03e9 construction/post, argument2 selection,
+043c send/result and controller wait. `nsk3_packet_check.py --mode-chain`
+qualifies that sequence without assigning mode1 semantics. The remaining
+question is who sets owner byte10a7d9 and which legitimate lifecycle changes
+it; this is not evidence of a missing native response to synthesize.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
