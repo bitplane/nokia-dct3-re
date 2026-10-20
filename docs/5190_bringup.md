@@ -61,6 +61,38 @@ cold runs use `nsb1_security_fixture.lua`/`nsb1_pin_reload.lua` for28s. The
 5190's Menu/Navi contact is column1/mask04 and Up is column1/mask10; the 6130's
 softkey/navigation cells are not inherited by these fixtures.
 
+### Fixed dialling card state
+
+An explicit FDN-capable laboratory card now passes physical activation,
+cold enabled-state handshake, physical deactivation and cold disabled-state
+verification on own PPM A. `nsb1_fdn_prepare.py` appends the shared FDN extension
+to the qualified3570-byte card; handset EEPROM, executable/resident inputs and
+calibration are not changed. The manifest records both original and extended
+card hashes, and the initial extended card is preserved for gate comparison.
+
+Own Menu4-2-4 reaches Fixed dialing. The fixture uses the observed second
+Select to reach its On/Off/Numbers list before choosing an action and entering
+PIN2. The shared APDU contract checks exact PIN1/PIN2 payloads, ADN INVALIDATE
+or REHABILITATE targets and the enabled-session LOCI/IMSI rehabilitation.
+Only ADN validity changes in warm processes; cold processes preserve the whole
+card. Reviewed warm frames show On/Off. Cold option highlights are not used
+as state evidence: acceptance rests on full card bytes and the protocol.
+
+```sh
+.venv/bin/python tools/nsb1_fdn_check.py tmp/nsb1-pin-request-on-cold \
+  tmp/nsb1-fdn-on-qualified tmp/nsb1-fdn-on-cold \
+  tmp/nsb1-fdn-off-qualified tmp/nsb1-fdn-off-cold
+```
+
+First preparation uses `nsb1_fdn_prepare.py`; later phases use the unchanged
+`prepare_cold_run` copying preceding saved devices. Warm fixtures
+`nsb1_fdn_input.lua`/`nsb1_fdn_disable.lua` run56s; cold
+`nsb1_fdn_cold.lua` runs40s. A passive SIMI TX tap caps4096 bytes and the gate
+rejects saturation. Own input hashes/native execution, physical security and
+FDN contacts, complete-card effects and reviewed frames remain mandatory.
+FDN record manipulation and local dial restrictions are not yet accepted on
+NSB-1; registration and native speech remain separate unresolved boundaries.
+
 ### SIM credential changes and recovery
 
 An ordinary physical PIN1 change is separately accepted through own Menu4-2-5-1
