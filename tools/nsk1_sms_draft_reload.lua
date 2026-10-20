@@ -11,12 +11,13 @@ for name,cell in pairs({menu={1,4},two={3,2}}) do
     assert(keys[name],'own Outbox contact missing')
 end
 local events = {}
-for index,event in ipairs({{21,'menu'},{23,'menu'},{25,'two'},{27,'two'},{31,'menu'},{34,'menu'}}) do
+local sequence = {{21,'menu'},{23,'menu'},{25,'two'},{27,'two'},{31,'menu'},{34,'menu'}}
+for index,event in ipairs(sequence) do
     events[#events+1] = {event[1],event[2],1,index}
     events[#events+1] = {event[1]+0.2,event[2],0,index}
 end
 local index,frame = 1,1
-local times = {30,32,36}
+local times = _G.nsk1_sms_empty and {35,38,40} or {30,32,36}
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     while index <= #events and now >= events[index][1] do
@@ -26,7 +27,7 @@ emu.register_frame_done(function()
         index = index+1
     end
     if frame <= #times and now >= times[frame] then
-        machine.screens[':screen']:snapshot('nsk1_sms_reload_'..frame..'.png')
+        machine.screens[':screen']:snapshot((_G.nsk1_sms_empty and 'nsk1_sms_empty_' or 'nsk1_sms_reload_')..frame..'.png')
         frame = frame+1
     end
 end,'NSK-1 physical cold Outbox read')

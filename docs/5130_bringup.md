@@ -21,7 +21,7 @@ code/menu acceptance. A two-process gate additionally saves `ADA/123` to the
 SIM, cold-boots only its own persisted files and physically searches/renders
 the contact without rewriting it. The extended four-process gate physically
 deletes it and verifies erased ADN storage after another cold search.
-Offline SMS draft save and cold Outbox read also pass. Registration, calls
+Offline SMS draft save/cold read/deletion/cold-empty Outbox also pass. Registration, calls
 and network SMS remain unproved.
 
 Ordinary erased storage remains a failed-startup control. The record-only
@@ -739,7 +739,7 @@ PUK exhaustion is not covered by this gate.
 
 ```sh
 .venv/bin/python tools/nsk1_sms_draft_roundtrip.py mame/mame roms \
-  tmp/nsk1-profile-source tmp/nsk1-sms-roundtrip
+  tmp/nsk1-profile-source tmp/nsk1-sms-roundtrip --erase
 ```
 
 The own Messages menu directly exposes Inbox/Outbox/Write messages; the sibling
@@ -760,7 +760,18 @@ SMS UPDATE. Both phases require ordered physical contacts, decoded key values,
 successful own phone-code comparison, native record arithmetic, sampled native
 execution and unchanged executable/identity/code fields. Save samples through
 59 seconds and cold read through 40 seconds. This proves offline persistence,
-not SMS transport, registration, fitted DSP or speech. Deletion remains to test.
+not SMS transport, registration, fitted DSP or speech.
+
+With `--erase`, a third process opens the saved draft and physically selects
+Options/Erase/confirmation. One successful absolute record-one UPDATE changes
+only the status byte from 07 to 00; all TPDU bytes and unrelated SIM files are
+preserved. This is logical deletion, not payload scrubbing. Exact confirmation
+and No more messages in outbox frames are required. A fourth process copies
+only the verified persistent files, physically opens Outbox and displays
+No messages in outbox (RGB SHA256
+`cdff157a2a10f5c1528e9085b1981401a9714ae37cded35e3eddd43fd8a83fb0`).
+It reads EF_SMS without UPDATE and preserves the entire deleted card. Native,
+physical-input, phone-code and executable/identity checks apply to all stages.
 
 ## Persistent SIM phonebook
 

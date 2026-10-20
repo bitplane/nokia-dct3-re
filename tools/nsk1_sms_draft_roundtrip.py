@@ -23,6 +23,9 @@ SAVE_KEYS = ('menu','two','three','two','zero','menu')+('down',)*6+('menu',)
 SAVE_CODES = (0x19,2,3,2,0x0a,0x19)+(0x18,)*6+(0x19,)
 READ_KEYS = ('menu','menu','two','two','menu','menu')
 READ_CODES = (0x19,0x19,2,2,0x19,0x19)
+ERASE_CONFIRM = '06710f9190043e99bf225a5143e57f6ac8f622d79d89faf95750f59854349c7d'
+ERASED = 'a60c4b9f39973847843cb184ff7ea1e5b2ffc5913d09e825df22c7cabaaf4173'
+EMPTY = 'cdff157a2a10f5c1528e9085b1981401a9714ae37cded35e3eddd43fd8a83fb0'
 
 
 def check_phone_code(trace, following):
@@ -68,10 +71,47 @@ def check_run(run, cold=False, previous=None):
     return summary,card
 
 
+def check_deleted(run, previous, cold=False):
+    summary,trace = check_phase(run,(run/'initial_eeprom.bin').read_bytes(),
+                                through=40 if cold else 50,minimum_records=1)
+    check_phone_code(trace,READ_CODES+(() if cold else (0x19,)*3))
+    check_contacts(trace,'nsk1_sms_reload_contact',READ_KEYS)
+    if not cold:
+        check_contacts(trace,'nsk1_sms_erase_contact',('menu',)*3)
+        check_card(previous)
+    card = (run/'nvram/nsk1r4t/sim_card').read_bytes()
+    normalized = bytearray(card)
+    if len(normalized) != CURRENT_NVRAM_LENGTH or normalized[SMS_OFFSET] != 0:
+        raise ValueError('SMS record is not persistently free')
+    normalized[SMS_OFFSET] = 7
+    check_card(normalized)
+    expected = bytearray(previous)
+    if not cold:
+        expected[SMS_OFFSET] = 0
+    if card != expected:
+        raise ValueError('SMS deletion/cold search changed bytes outside the permitted status')
+    if cold:
+        if ('ins=b2 p1=01 p2=04 p3=b0 selected=6f3c' not in trace
+                or re.search(r'update fid=6f3c|ins=dc .*selected=6f3c',trace)):
+            raise ValueError('cold empty Outbox omitted read or rewrote SMS')
+        frame_check(run/'snap/nsk1_sms_empty_1.png',EMPTY)
+    else:
+        if (re.findall(r'update fid=6f3c record=(\d+) length=(\d+)',trace) != [('1','176')]
+                or 'ins=dc p1=01 p2=04 p3=b0 selected=6f3c' not in trace
+                or not re.search(r'SIM status ins=dc sw=9000\b',trace)):
+            raise ValueError('SMS deletion did not commit one successful record-one update')
+        frame_check(run/'snap/nsk1_sms_reload_3.png',READ_HASH)
+        frame_check(run/'snap/nsk1_sms_erase_2.png',ERASE_CONFIRM)
+        frame_check(run/'snap/nsk1_sms_erase_3.png',ERASED)
+    summary['physical_cold_empty_outbox' if cold else 'physical_sms_deletion'] = True
+    return summary,card
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary','roms','capture','run'):
         parser.add_argument(name,type=Path)
+    parser.add_argument('--erase',action='store_true',help='extend through physical SMS deletion and cold empty Outbox')
     args = parser.parse_args()
     root = args.run.resolve()
     try:
@@ -90,10 +130,24 @@ def main():
         summary,_ = check_run(cold,True,card)
         summary['command'] = command
         (cold/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+        if args.erase:
+            erased,empty = root/'erase',root/'empty'
+            check_run(save)
+            copy_persistent(erased,save)
+            command = run_machine(args.binary,erased,Path(__file__).with_name('nsk1_sms_draft_erase.lua'),51,True)
+            summary,deleted = check_deleted(erased,card)
+            summary['command'] = command
+            (erased/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+            copy_persistent(empty,erased)
+            command = run_machine(args.binary,empty,Path(__file__).with_name('nsk1_sms_draft_empty.lua'),41,True)
+            summary,_ = check_deleted(empty,deleted,cold=True)
+            summary['command'] = command
+            (empty/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
         (root/'result.json').write_text(json.dumps({'physical_sms_draft_save':True,'physical_cold_outbox_read':True,
+            'physical_delete_cold_empty':args.erase,
             'whole_card_preserved_on_read':True,'ram_or_save_state_copied':False,
             'scope':'offline unsent draft on native compatibility composition; no network SMS or fitted-mask proof'},indent=2)+'\n')
-        print('NSK-1 physical offline SMS draft save / cold Outbox read PASS')
+        print('NSK-1 physical offline SMS draft save / cold Outbox read'+(' / delete / cold empty' if args.erase else '')+' PASS')
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         parser.exit(1,f'NSK-1 SMS draft round trip failed: {error}; inspect {root}\n')
 
