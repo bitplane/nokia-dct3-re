@@ -1456,6 +1456,32 @@ and restores retries to3; its complete card matches the successful change
 control. Neither the wrong code nor the retry count is supplied through a
 card-state edit.
 
+### PIN2 exhaustion and PUK2 recovery
+
+```sh
+.venv/bin/python tools/nsk1_puk2_check.py tmp/nsk1-pin-roundtrip-qualified \
+  tmp/nsk1-pin2-wrong-complete tmp/nsk1-pin2-retries-one \
+  tmp/nsk1-pin2-retries-zero --recovery tmp/nsk1-puk2-recovery \
+  tmp/nsk1-puk2-cold-auth
+```
+
+Three independently cold physical wrong-current5675 submissions decrement
+only PIN2 retry byte3517 from3→2→1→0. CHANGE CHV returns9804,9804,9840;
+the final exact frame says `PIN2 code blocked`. No blocked-card fixture is
+supplied. The firmware then changes the same access-code menu to a PUK2
+editor. Physical87654321 plus replacement8765 and confirmation produces
+UNBLOCK9000, automatic verification of the new PIN2, and `Code accepted`.
+Only the four PIN2 digits and its retry byte change; the PUK2 retry count stays10.
+The recovery script allows the eight-digit PUK entry to finish before the
+new-code phase, rather than overlapping contacts on the PIN-change schedule.
+
+A further cold process accepts8765 and changes it back to5678. The entire
+card equals the original healthy seed. The checker requalifies that seed,
+native execution, own flash/storage, every cold link, physical contacts,
+command ordering, complete card differences and exact reviewed frames.
+This does not cover wrong-PUK2 rejection or permanent PUK2 exhaustion, and
+does not establish fitted-mask, network or long-run stability acceptance.
+
 ### Ordinary PIN change
 
 ```sh

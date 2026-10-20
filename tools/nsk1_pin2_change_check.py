@@ -33,7 +33,7 @@ def expected_card(before, restore=False, wrong=False):
     return bytes(after)
 
 
-def check_run(run, previous, restore=False, wrong=False):
+def check_cold_link(run, previous):
     source = previous / 'nvram/nsk1r4t'
     before = (source / 'sim_card').read_bytes()
     manifest = json.loads((run / 'input_manifest.json').read_text())
@@ -42,6 +42,11 @@ def check_run(run, previous, restore=False, wrong=False):
             or manifest.get('ram_or_save_state_copied') is not False
             or (run / 'initial_eeprom.bin').read_bytes() != (source / 'eeprom').read_bytes()):
         raise ValueError('cold persistent input link differs')
+    return before
+
+
+def check_run(run, previous, restore=False, wrong=False):
+    before = check_cold_link(run, previous)
     _, trace = check_phase(run, (run / 'initial_eeprom.bin').read_bytes(), through=59, minimum_records=1)
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
