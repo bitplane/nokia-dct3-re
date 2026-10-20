@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_puk_cold_new_pin", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 PUK recovery changes the laboratory card PIN and survives a cold authentication, with an independently rejected wrong-PUK control",
+      "current": "Explicit PIN-blocked card receives physical PUK12345678/new4321/confirmation and organic UNBLOCK CHV;9000 restores CHV1/PUK1 attempts3/10 and stores the new PIN. Wrong12345679 returns9804, keeps CHV1 blocked, preserves the PIN and decrements PUK1 only. Cold input snapshot matches the recovered card; physical4321 VERIFY succeeds and leaves its entire current serialization unchanged. Exact prompt transitions, contacts/APDUs, own flash and native upload are checked. Permanent blocking, PIN2/PUK2, ordinary PIN changes/settings, radio and fitted hardware assumptions remain unaccepted.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_puk_input.lua", "tools/nsk3_wrong_puk_input.lua", "tools/nsk3_changed_pin_input.lua", "tools/nsk3_puk_check.py", "tools/test_nsk3_puk_check.py", "tools/nsk3_pin_input.lua", "tools/nsk3_nominal_input.py"]
+    },
+    {
       "id": "nsk3_physical_pin_cold_retry", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Own physical wrong PIN durably decrements CHV1 retries and correct PIN after cold copy restores retries before the distinct phone lock prompt",
       "current": "Explicit shared synthetic PIN1234 card receives physical4321 VERIFY, returns9804 and serializes attempts2. Cold preparation records the exact copied card before execution and copies no RAM/state. Physical1234 returns9000/restores attempts3, changing only the attempt byte across the entire current serialized card; exact PIN/error/phone-code frames, own flash, native upload and physical/APDU inputs are checked. Legacy input-profile tail expansion is explicit. This does not accept PUK, PIN2, PIN-setting changes, radio or fitted hardware assumptions.",

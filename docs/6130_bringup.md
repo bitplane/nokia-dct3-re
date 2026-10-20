@@ -12,8 +12,9 @@ Physical Add entry now saves A/12345 to SIM EF_ADN; a separate cold process
 retrieves the entry through Search/Details and displays12345 without rewriting
 the card. An explicit PIN-enabled laboratory card additionally passes physical
 wrong-PIN, cold retry persistence and correct-PIN authentication, then reaches
-the separate phone security-code prompt. Other SIM/security operations and radio
-remain unaccepted.
+the separate phone security-code prompt. A blocked-PIN fixture additionally
+passes physical PUK recovery, wrong-PUK rejection and cold authentication using
+the new PIN. Other SIM/security operations and radio remain unaccepted.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -279,8 +280,33 @@ VERIFY bytes/status, exact PIN/error/phone-code frames, pre-launch card identity
 and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
-APDU is admitted. PUK recovery, permanent blocking, PIN changes, PIN request
-settings and PIN2 remain separate unaccepted operations on this handset.
+APDU is admitted. The PUK gate below extends this boundary; permanent blocking,
+ordinary PIN changes, PIN request settings and PIN2 remain unaccepted.
+
+### PUK recovery and new-PIN persistence
+
+`--pin-blocked` explicitly provisions the shared laboratory card with CHV1
+attempts0. It supplies no handset state. Physical PUK12345678, new PIN4321
+and confirmation produce `a0 2c 00 00 10` with the entered credential bytes.
+The card returns9000, stores PIN4321, restores CHV1 attempts3/PUK1 attempts10,
+and the UI reaches the separate phone code. A wrong-PUK12345679 control returns
+9804, preserves the original PIN, keeps CHV1 blocked and decrements only PUK1
+attempts to9. The complete generated credential/retry prefix is checked in both.
+
+The qualified cold copy records the recovered card before execution. Physical
+4321 authentication succeeds and the full current card remains byte-identical;
+volatile authentication is not assumed to survive restart. Exact PUK/PIN/phone
+code frames, physical contacts, UNBLOCK/VERIFY payloads, status counters, native
+uploads and own unchanged executable flash are checked:
+
+```sh
+.venv/bin/python tools/nsk3_puk_check.py roms/noki6130/source \
+  tmp/nsk3-puk-recovery tmp/nsk3-puk-wrong tmp/nsk3-puk-cold-pin
+```
+
+This accepts a physical PUK recovery lifecycle under the declared research
+inputs, not permanent PUK blocking, PIN2/PUK2, ordinary CHANGE CHV, PIN-request
+settings, radio or fitted hardware assumptions.
 
 ## Own firmware inputs
 

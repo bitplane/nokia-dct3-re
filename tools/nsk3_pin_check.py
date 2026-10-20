@@ -17,8 +17,9 @@ PIN='a12b3c3fdb4a3d1e8ffeb5fc8986c3bc008bb86b1f2e927440848fe0420ffc0c'
 ERROR='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
-def check_trace(trace,correct):
-    keys=(1,2,3,4,0x19) if correct else (4,3,2,1,0x19)
+def check_trace(trace,correct,pin=None):
+    pin=pin if pin is not None else (b'1234' if correct else b'4321')
+    keys=tuple(int(chr(digit)) for digit in pin)+(0x19,)
     rows=re.findall(r'nsk3_pin_contact: correct=(\d) key=([0-9a-f]+) down=([01]) ',trace)
     if rows!=[(str(int(correct)),f'{key:02x}',down) for key in keys for down in ('1','0')]:
         raise ValueError('physical PIN contacts differ')
@@ -27,7 +28,7 @@ def check_trace(trace,correct):
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28,0x2c)):
         raise ValueError('unexpected credential mutation')
     tx=bytes(int(value,16) for value in re.findall(r'nsk3_sim_tx: index=\d+ value=([0-9a-f]+)',trace))
-    command=bytes.fromhex('a020000108')+(b'1234' if correct else b'4321')+b'\xff'*4
+    command=bytes.fromhex('a020000108')+pin+b'\xff'*(8-len(pin))
     if tx.count(command)!=1:raise ValueError('physical VERIFY APDU differs')
     if re.search(r'illegal|unsupported|unhandled|fatal|\[LUA ERROR\]',trace,re.I):
         raise ValueError('execution/observer error')

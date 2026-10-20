@@ -14,6 +14,7 @@ from tools.nsk3_analog_contract import inspect
 from tools.nsk3_static_check import inspect as inspect_source
 from tools.nsk3_security_contract import inspect as inspect_security
 from tools.make_sim_card_profile import make_profile
+from tools.sim_security_trace_check import ATTEMPTS_OFFSET
 
 
 def config(insert_sim=False):
@@ -35,9 +36,12 @@ def main():
     parser.add_argument('--insert-sim',action='store_true',help='cold physical insertion of the explicit synthetic card')
     parser.add_argument('--initialize-phone-retry',action='store_true',help='external one-byte retry fixture derived from own initializer, not factory data')
     parser.add_argument('--pin-enabled',action='store_true',help='use the explicit shared laboratory PIN-enabled synthetic card')
+    parser.add_argument('--pin-blocked',action='store_true',help='use an explicit laboratory card with CHV1 attempts exhausted')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('comparison requires a fresh output directory')
+        if (args.pin_enabled or args.pin_blocked) and not args.insert_sim:
+            raise ValueError('PIN-card comparison requires explicit insertion')
         check(args.source,args.control,args.native_roms,args.initial,args.cold)
         _,image=inspect_source(args.source,'boot4')
         contract=inspect(image)
@@ -53,9 +57,9 @@ def main():
             data[security['retry_eeprom']]=0
             eeprom.write_bytes(data)
         card=None
-        if args.pin_enabled:
-            if not args.insert_sim:raise ValueError('PIN-enabled comparison requires explicit insertion')
-            card=make_profile(True)
+        if args.pin_enabled or args.pin_blocked:
+            card=bytearray(make_profile(True))
+            if args.pin_blocked:card[ATTEMPTS_OFFSET]=0
             (args.output/'nvram/nsk3r4t/sim_card').write_bytes(card)
         (args.output/'cfg').mkdir()
         config(args.insert_sim).write(args.output/'cfg/nsk3r4t.cfg',encoding='utf-8',xml_declaration=True)
@@ -64,6 +68,7 @@ def main():
                   'inserted_synthetic_sim':args.insert_sim,
                   'phone_retry_fixture':security,
                   'synthetic_pin_card_sha256':hashlib.sha256(card).hexdigest() if card else None,
+                  'synthetic_pin_blocked':args.pin_blocked,
                   'own_static_contract':contract,
                   'seed':str(args.cold.resolve()),
                   'seed_eeprom_sha256':hashlib.sha256((storage/'eeprom').read_bytes()).hexdigest(),
