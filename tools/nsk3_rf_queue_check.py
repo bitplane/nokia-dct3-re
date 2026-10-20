@@ -52,14 +52,34 @@ def check_metric(trace,program):
             'physical_rf_semantics_proved':False}
 
 
+def check_source(trace):
+    rows=re.findall(r'nsk3_scan_rf_input: index=(\d+) value=([0-9a-f]{4}) pc=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',trace)
+    if len(rows)!=8 or len(rows)!=trace.count('nsk3_scan_rf_input: '):
+        raise ValueError('RF source observation missing or malformed')
+    previous=0
+    for index,(number,value,pc,time) in enumerate(rows):
+        timestamp=float(time)
+        if int(number)!=index+1 or int(value,16)!=0 or int(pc,16)!=(0x330c,0x3312,0x3318,0x331e)[index%4]:
+            raise ValueError('RF source value or consumer differs')
+        if not 39<timestamp<40 or timestamp<=previous:raise ValueError('RF source ordering differs')
+        previous=timestamp
+    queue=re.findall(r'nsk3_scan_rf_queue: start=1a00 words=72 data=([0-9a-f]+) observer_writes=0',trace)
+    if len(queue)!=1 or trace.count('nsk3_scan_rf_queue: ')!=1 or queue[0]!='0000'*72:
+        raise ValueError('observed queue is not exactly72 zero words')
+    return {'source_words':8,'observed_queue_words':72,'all_zero':True,
+            'physical_rf_semantics_proved':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace',type=Path)
     parser.add_argument('--metric-program',type=Path)
+    parser.add_argument('--source-input',action='store_true')
     args=parser.parse_args()
     try:
         trace=args.trace.read_text()
         print(check_metric(trace,args.metric_program.read_bytes()) if args.metric_program else check(trace))
+        if args.source_input:print(check_source(trace))
     except (ValueError,OSError) as error:
         print(f'NSK-3 RF queue qualification failed: {error}',file=sys.stderr)
         return 1

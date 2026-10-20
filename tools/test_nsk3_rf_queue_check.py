@@ -1,8 +1,15 @@
 import unittest
-from tools.nsk3_rf_queue_check import check,check_metric
+from tools.nsk3_rf_queue_check import check,check_metric,check_source
 
 
 class QueueTest(unittest.TestCase):
+    def test_source_requires_zero_values_and_whole_queue(self):
+        trace='\n'.join(f'nsk3_scan_rf_input: index={i+1} value=0000 pc={pc:04x} t={39+(i+1)/100:.6f} observer_writes=0' for i,pc in enumerate((0x330c,0x3312,0x3318,0x331e)*2))
+        trace+='\nnsk3_scan_rf_queue: start=1a00 words=72 data='+'0000'*72+' observer_writes=0'
+        self.assertTrue(check_source(trace)['all_zero'])
+        for bad in (trace.replace('value=0000','value=0001',1),trace.replace('pc=330c','pc=330a',1),trace.replace('data=0000','data=0001'),trace.replace('words=72','words=71')):
+            with self.assertRaises(ValueError):check_source(bad)
+
     def test_metric_requires_live_code_and_actual_return(self):
         program=bytearray(131072)
         for address,raw in {0x4701:'f0742424',0x47e6:'7712125477131255308a218a20823083',0x330a:'74d60027',0x0ae6:'6ff8219b0d20'}.items():

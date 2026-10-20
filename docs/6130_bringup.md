@@ -948,16 +948,26 @@ PC0ae7) between39.0285s and39.0608s return A=0 with threshold219b=0574;
 each has matching producer/consumer cursors advancing by four words. Live
 4701 calls2424, consumes the queue, and reduces intermediate values through
 47e6's multiply/accumulate path. The producer uses PORTR0027 at330a, which
-the backend routes to COBBA's unattached RF callback. This locates the
-zero-result boundary across native queue consumption and measurement return;
+the backend routes to COBBA's unattached RF callback. Eight observed port reads
+at330c/3312/3318/331e are zero, and the first measurement-return snapshot of
+all72 queue words1a00..1a47 is also zero. Thus the zero return is consistent
+with observed zero input, not independent evidence of a reduction defect.
+This locates the zero-result boundary across native queue consumption and measurement return;
 it does not prove arithmetic silicon fidelity or the electrical sample format.
 `nsk3_scan_metric_observe.lua` captures live disassembly at45s; its checker
 pins live instruction fragments and rejects changed return/threshold values.
 
 ```sh
-.venv/bin/python tools/nsk3_rf_queue_check.py tmp/nsk3-scan-metric/error.log \
-  --metric-program tmp/nsk3-scan-metric/nsk3_native_program_45s.bin
+.venv/bin/python tools/nsk3_rf_queue_check.py tmp/nsk3-scan-source/error.log \
+  --metric-program tmp/nsk3-scan-source/nsk3_native_program_45s.bin --source-input
 ```
+
+The shared software-RF contract in `5190_bringup.md` applies as an evidence
+checklist, not as proof of this board's wiring: sample/component ordering,
+buffered sample-time progression and receive-window control are still needed
+before attaching a standards-derived waveform. Callback read spacing is CPU
+block processing, not an established ADC sample period. A guessed nonzero
+source or a threshold-crossing score would not establish acquisition.
 
 The modeled COBBA RF receive callback is unattached/deterministic silence;
 the active scan's zero qualifying results are not evidence for a real
