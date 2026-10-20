@@ -38,6 +38,102 @@ incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
+## Native radio frontier
+
+`nsk1_radio_observe.lua` is an observation-only boot/physical Call/End
+instrument, not registration or call acceptance. The own compatibility
+composition sends seven type-51 blocks at 3.2568..3.2778 seconds, then type
+1a/68 bytes at 5.923497 (`00219800` prefix) and type 4a/4 bytes at 5.956887
+(`02000000`). Native code at DSP PC 3805 publishes one type-8b, 162-byte
+response at 39.930208 seconds, beginning `00200374ff6c0375ff6c`.
+The passive ring census is explicitly bounded to 2..59 seconds, after the
+observed provisioning restart, and records nine TX packets and one RX packet
+without reaching its 128-packet cap. It does not classify earlier cursor
+initialization as packets or close all other command paths. Physical Call/End
+does not add a ring packet within this interval; End presentation is not
+connection or speech proof.
+
+Own MCU consumption is independently mapped and observed:
+
+| Boundary | Own route |
+| --- | --- |
+| RX ring header | 27333e reads a28b; wrapper 27338a returns object 1030f4/header 1802a28b to 2942b2. |
+| Dispatch | 2941a6 subtracts 80 then 3; table 2941c4 index 8 selects 294210 for type 8b. |
+| Status conversion | 26a440 loads literal 13b8 from 26a534, updates the header, then posts via 255268 to task 0b. |
+| Task consumer | 218892 reads 13b8. The own 13a3 subtract cascade selects table 218918 index 14, target 218996. |
+| Lifecycle | Runtime owner 107158 has state +14 = 3 and phase +19 = 1. At 2189d6 it copies 160 bytes from message +6 into cached object 102fd4. |
+| Deferral | 218a02 tests state +14; state 3 branches to the common tail, bypassing candidate routine 215d4c. That routine is not entered in the measured run. |
+
+The fixed-object status read tap is scoped to this observed allocator result,
+not a whole-allocator ownership proof. Debugger/observer reads are excluded
+from firmware-consumption observations. Do not import the sibling 5190's
+task-12 alias or candidate-vector interpretation: this own ROM posts to task
+11, and the cached payload's units/validity remain unresolved. The next
+question is which ordinary input changes owner byte 10716c out of state 3
+and consumes the cache. No state, status or ring reply should be injected.
+
+### Controller state and activation
+
+The aligned full-image literal inventory finds 16 pools for owner 107158
+and three for direct state byte 10716c; the aligned Thumb-16 literal-load
+scan finds 41 and six candidate references respectively. These are candidate
+instruction encodings, not proof every occurrence is reachable code.
+Within `213000..218dff`, the immediate STRB member-offset-14 scan finds seven
+candidates: three address this owner (below); four belong to other objects.
+The direct-byte reference at 215f3c additionally stores 2 at 215f3e.
+
+| Store | Bounded owner classification |
+| --- | --- |
+| 218852 | Task-11 initialization sets 3. |
+| 2157b4 | Reset/defer path sets 3. |
+| 2177e6 | Initializer 2177a0 sets 1 and stores its input at owner +15. |
+| 215f3e | Progression path directly sets state 2. |
+
+The fresh runtime watch observes bootstrap clear at 20010c, clear again on
+the firmware-owned provisioning restart, then initialization at 218852 sets
+3 at 2.216425 seconds. No later write is observed through the 61-second
+Call/End run. Neither initializer 2177a0 nor its task-11 activation handler
+218d20 is entered. This does not close computed aliases, generic copies,
+ARM callers or stores outside the bounded member scan.
+
+The full aligned direct Thumb-BL candidate scan finds two calls to 2177a0:
+21794c and 218d52. The first is within another controller routine. The second
+belongs to task-11 input 043f: its dispatcher compares against own literal
+043f at 218c1c, branches to 218d20, and passes message byte +2 to the
+initializer. Thus 043f is a concrete activation predecessor, not an input to
+inject. The next task is to identify its own producer/ordinary lifecycle and
+the provenance of message bytes +2/+3. No sibling task numbering or control
+record offsets should be substituted.
+
+### Activation producer boundary
+
+Own constructor 26def0 handles 043f at 26df9a: owner literal 10be77
+supplies bytes +5/+4 (10be7c/10be7b) to message +2/+3, then posts to task
+0b via 255268. The aligned literal inventory finds one producer-side 043f
+load, at 24df8e, in handler 24df64; it shares the constructor call at
+24dd2a. Dispatcher 24d45a compares against own 0834 literal 24d7dc and
+calls that handler. The qualified 61-second runtime observes neither the
+handler nor a 043f constructor invocation; state remains 3.
+
+The 0834 literal inventory has three aligned pools and three Thumb-16 load
+candidates: 2081fa belongs to the upstream constructor's status dispatch,
+20c5e0 is a producer-side load, and 24d45a is the receiver above. The next
+unresolved predecessor is the ordinary lifecycle selecting 20c5e0 and the
+source of the two control bytes. These literal results do not close
+table-driven, computed or indirect production.
+
+`tools/nsk1_radio_contract.py` checks the own image hash, critical table
+entries/instruction fragments and emits machine-readable bounded references:
+
+```sh
+.venv/bin/python -m tools.nsk1_radio_contract path/to/5130f561a.fls
+```
+
+`nsk1_radio_observe.lua` is the corresponding read-only instrument for a
+fresh qualified startup fixture. Its breakpoints are own-standard-specific;
+do not apply them to 2915 or another ROM. The current radio traces are
+observations, not a network-registration acceptance gate.
+
 ## Acquired inputs
 
 Source: [archived NSK-1 service package](https://archive.org/download/Nokia_DCT3_firmwares/nsk1_561.zip).
