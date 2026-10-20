@@ -5,9 +5,9 @@ import re
 import sys
 
 
-def check_trace(trace,retry_zero):
+def check_trace(trace,retry_zero,following_keys=()):
     contacts=re.findall(r'nsk3_security_contact: key=([0-9a-f]+) down=1 ',trace)
-    if contacts!=['01','02','03','04','05','19']:
+    if contacts!=['01','02','03','04','05','19']+[f'{key:02x}' for key in following_keys]:
         raise ValueError('own physical digit/submit contacts differ')
     submissions=re.findall(r'nsk3_security_submit: pointer=[0-9a-f]+ text=([0-9a-f]+) caller=([0-9a-f]+)',trace)
     if submissions!=[('3132333435000000','0028a1d7')]:

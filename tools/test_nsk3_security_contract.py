@@ -13,6 +13,9 @@ class SecurityContractTest(unittest.TestCase):
         check_trace(trace,False)
         positive=trace.replace('retry=ff','retry=00')+'\nnsk3_security_accepted: result=00000001'
         check_trace(positive,True)
+        menu=positive+'\nnsk3_security_contact: key=19 down=1 column=1'
+        check_trace(menu,True,(0x19,))
+        with self.assertRaises(ValueError):check_trace(menu,True)
         for bad in (positive.replace('match=00000001','match=00000000'),
                     positive.replace('3132333435','3132333436'),
                     positive.replace('key=19','key=17'),trace):

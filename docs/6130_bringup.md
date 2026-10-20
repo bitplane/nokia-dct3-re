@@ -4,8 +4,12 @@
 
 The separate native compatibility instrument reaches **Insert SIM card** and
 rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
+With the synthetic SIM inserted and an own-initializer retry-byte fixture,
+physical12345 submission is accepted and another physical command opens a
+readable Messages menu. A separate cold process preserves storage unchanged
+and requires the phone code again. The displayed idle content is not accepted.
 The saturated control remains blank after diagnostic record acceptance.
-Neither fixture proves fitted calibration, logical key mapping, SIM operation,
+Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
 erased-source failure checkpoint, not a supported phone profile.
 
@@ -188,10 +192,34 @@ the validator's result1 return at2a650e. `nsk3_security_check.py` checks this
 contrast and the physical input/ASCII submission chain. This is a retry-state
 diagnostic, not a factory-default claim.
 
-After acceptance the frame is malformed (repeated glyphs), not an accepted idle
-screen. The next boundary is the own post-security UI/render lifecycle; do not
-claim phone usability, full SIM security or correct display resources from the
-validator result alone.
+After acceptance the idle-content frame has repeated glyphs, but physical
+command19 opens a readable Messages menu (Select/Exit and envelope icon).
+This falsifies a general post-security display failure; the unresolved issue is
+the idle content, not whether menus can render or receive physical input.
+
+### Interactive menu and cold storage
+
+`nsk3_menu_input.lua` repeats the established physical code sequence, then
+presses command19 at13.5s. Both `tmp/nsk3-post-security-menu` and
+`tmp/nsk3-menu-repeat` reproduce the exact15s Messages frame. The first run's
+persisted NVRAM is copied into a fresh process with the same physical card
+configuration: `tmp/nsk3-post-security-cold` leaves the whole EEPROM unchanged
+and presents Security code again. This is persistent storage, not proof that
+phone-lock policy should have been disabled.
+
+```sh
+.venv/bin/python tools/nsk3_menu_check.py roms/noki6130/source \
+  tmp/nsk3-startup-checksum-control roms/nsk3r4t \
+  tmp/nsk3-record-qualified tmp/nsk3-record-cold-qualified \
+  tmp/nsk3-post-security-menu tmp/nsk3-post-security-cold
+```
+
+The gate covers qualified own firmware/record inputs, physical ASCII submission,
+validator acceptance, native uploads, exact prompt/menu frames and the reviewed
+firmware-written EEPROM hash across cold processes. It does not establish full
+keypad labels, arbitrary SIM support, persistent phonebook, radio, calls or SMS.
+Next test phonebook access through this live UI and classify idle content
+independently; no missing handoff message should be synthesized.
 
 ## Own firmware inputs
 
