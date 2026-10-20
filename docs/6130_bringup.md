@@ -534,6 +534,15 @@ relationships, the043f load and the owner/state1 store against the own image;
 mutation tests reject changes to each anchor. This establishes one concrete
 0834 ->043f ->state1 route, not the meaning or producer of0834.
 
+Own upstream dispatch20af86 forms0a30 (a3<<4), compares the received value
+at[sp], and calls20e9d4 only on equality. Its20e9da load selects0834 from
+20ed20, with common constructor208a48 reached through20e9f4. That
+constructor's0834 case208df8 copies context10a7d8 bytes+1f/+1c into
+message+2/+3. These independently match the sibling chain's shape but use
+own-ROM selectors, instructions and context. The qualified contract checker
+now anchors these relationships too. The0a30 producer and its prerequisites
+remain unresolved; no computed/table-driven producer closure is claimed.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
