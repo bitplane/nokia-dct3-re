@@ -23,7 +23,9 @@ retain the blank display and readiness inputs `01/ff/00/01`. Physical key
 entry, accepted phone code and the Messages menu additionally pass the own
 retry-initializer contrast below. Physical SIM contact save and cold selected
 name/number readback also pass. Physical Phone erasure removes the template's
-extra Phone rows without touching that SIM contact. Network services remain unaccepted.
+extra Phone rows without touching that SIM contact. Physical wrong PIN1 and
+cold correct-PIN authentication preserve/restore the card retry counter.
+Network services remain unaccepted.
 No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -125,6 +127,34 @@ unaccepted. Physical phonebook persistence is separately qualified below.
 # Run22s with nsm1_security_input.lua and -debug -debugger none.
 .venv/bin/python tools/nsm1_security_check.py tmp/nsm1-security-physical \
   tmp/nsm1-security-qualified tmp/nsm1-security-cold-qualified
+```
+
+### Physical PIN1 and cold retry persistence
+
+`nsm1_nominal_input.py --pin-enabled` clones a current-format synthetic card
+from the qualified input, requiring default PIN1234 and fresh3/3/10/10
+counters. It changes only the card's PIN-request enable bit; it does not
+alter handset firmware, stored phone code or retry counters. The guarded
+`nsm1_sim_observe.lua` supplies one bounded UART stream when input fixtures
+are composed.
+
+Physical4321/Left transmits `A0 20 00 01 08` plus padded4321 and receives9804.
+The complete3570-byte card changes only PIN1 retries3->2. An independent
+cold process preserves that exact card and saved EEPROM, then physical1234
+receives9000 and restores only retries2->3, reproducing the entire initial
+card. Both cold inputs display Enter PIN code; rejection displays Code error
+and successful authentication reaches the separate Security code prompt.
+This fixture does not submit the phone code or equate SIM authentication
+with phone unlock. PIN exhaustion/PUK, PIN changes, request toggles, PIN2 and
+authenticated network services remain separately unaccepted on NSM-1.
+
+```sh
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \
+  tmp/WRONG --pin-enabled
+# Run19s with nsm1_pin_input.lua and debugger enabled.
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-pin-wrong tmp/COLD --preserve-sim
+# Run19s with nsm1_pin_reload.lua and debugger enabled.
+.venv/bin/python tools/nsm1_pin_check.py tmp/nsm1-pin-wrong tmp/nsm1-pin-cold-correct
 ```
 
 ### Physical SIM phonebook persistence

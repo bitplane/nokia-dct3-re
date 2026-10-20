@@ -12,22 +12,23 @@ from tools.nsk3_static_check import inspect
 from tools.nsk3_boot_check import check_upload_handoffs
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.nsk3_menu_check import PROMPT as PHONE_PROMPT
+from tools.nsk3_phonebook_check import transmitted
 
 PIN='a12b3c3fdb4a3d1e8ffeb5fc8986c3bc008bb86b1f2e927440848fe0420ffc0c'
 ERROR='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
-def check_trace(trace,correct,pin=None):
+def check_trace(trace,correct,pin=None,prefix='nsk3',tx_limit=1024):
     pin=pin if pin is not None else (b'1234' if correct else b'4321')
     keys=tuple(int(chr(digit)) for digit in pin)+(0x19,)
-    rows=re.findall(r'nsk3_pin_contact: correct=(\d) key=([0-9a-f]+) down=([01]) ',trace)
+    rows=re.findall(re.escape(prefix)+r'_pin_contact: correct=(\d) key=([0-9a-f]+) down=([01]) ',trace)
     if rows!=[(str(int(correct)),f'{key:02x}',down) for key in keys for down in ('1','0')]:
         raise ValueError('physical PIN contacts differ')
     if statuses(trace,0x20)!=[(0x9000 if correct else 0x9804,3 if correct else 2,10)]:
         raise ValueError('VERIFY status/retry transition differs')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28,0x2c)):
         raise ValueError('unexpected credential mutation')
-    tx=bytes(int(value,16) for value in re.findall(r'nsk3_sim_tx: index=\d+ value=([0-9a-f]+)',trace))
+    tx=transmitted(trace,tx_limit,prefix+'_sim_tx')
     command=bytes.fromhex('a020000108')+pin+b'\xff'*(8-len(pin))
     if tx.count(command)!=1:raise ValueError('physical VERIFY APDU differs')
     if re.search(r'illegal|unsupported|unhandled|fatal|\[LUA ERROR\]',trace,re.I):

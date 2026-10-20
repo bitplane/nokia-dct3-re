@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_physical_pin1_cold_retry", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical wrong PIN1 decrements only its card retry counter and independent cold correct-PIN authentication restores it without phone unlock",
+      "current": "The explicit PIN-request fixture clones the current synthetic card and changes only its enable bit, requiring default1234 and fresh3/3/10/10 counters. Physical4321/Left produces exact A0 20 00 01 08 plus padded4321,9804 and only retries3->2. The entire3570-byte saved card and EEPROM are copied to a separate cold process. Physical1234 produces9000 and only retries2->3, restoring the exact initial card. Exact Enter PIN/Code error/separate Security code frames, own flash and native record validity pass. No phone code, APDU or firmware state is injected; PUK/PIN-change/toggle/PIN2 and network services remain unaccepted on NSM-1.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_nominal_input.py", "tools/nsm1_sim_observe.lua", "tools/nsm1_pin_input.lua", "tools/nsm1_pin_reload.lua", "tools/nsm1_pin_check.py", "tools/test_nsm1_pin_check.py"]
+    },
+    {
       "id": "nsm1_phonebook_list_eeprom_text_source", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "Cold list distinguishes selected SIM A from additional EEPROM-backed Phone rows and physical Phone erasure leaves a clean A list with intact SIM storage",
       "current": "Formatter259e78 receives mode2/index1 for selected SIM A, then mode1/index1/index2 for two extra Phone rows. The latter use record0728 at physical19d4, matching original template bytes including name field2a079700. Buffer111cb8 reuse across rows is not selected-name corruption. Pixel inspection confirms white-on-black A in rows7..16; the entire selected band is identical before/after physical Phone erase. The independent post-erase cold full list matches695c5291d789ebaf9c11583885e0183373313ee4e3fdd5ee16c9aee36d957c8b, with no extra Phone text; Details12345 and the complete SIM card remain intact. Earlier missing/blank-SIM-name and cache-rebuild claims are retracted. Complete Phone record semantics and other local-contact operations remain unproved; no font/LCD/SIM-alpha repair or manual field clearing is needed by this case.",

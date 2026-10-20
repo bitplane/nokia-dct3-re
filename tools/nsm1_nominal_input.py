@@ -14,13 +14,16 @@ from tools.nsm1_v523_static_check import SHA1
 from tools.dct3_rom4_record_codec import retained_record_transform
 from tools.nsm1_security_contract import inspect as inspect_security
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,ENABLED_OFFSET,padded_pin
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('cold',type=Path);parser.add_argument('output',type=Path)
     parser.add_argument('--initialize-phone-retry',action='store_true')
-    parser.add_argument('--preserve-sim',action='store_true')
+    card_mode=parser.add_mutually_exclusive_group()
+    card_mode.add_argument('--preserve-sim',action='store_true')
+    card_mode.add_argument('--pin-enabled',action='store_true')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('fresh output required')
@@ -38,16 +41,24 @@ def main():
         if args.initialize_phone_retry:
             retry=inspect_security(flash)
             eeprom=bytearray(eeprom);eeprom[retry['eeprom_offset']]=retry['initial_value'];eeprom=bytes(eeprom)
+        card=None
+        if args.preserve_sim or args.pin_enabled:
+            card=(storage/'sim_card').read_bytes()
+            if len(card)!=CURRENT_NVRAM_LENGTH:raise ValueError('current synthetic card extent required')
+            if args.pin_enabled:
+                if (card[CHV_OFFSET:CHV_OFFSET+8]!=padded_pin('1234')
+                        or card[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4]!=bytes((3,3,10,10))
+                        or card[ENABLED_OFFSET]!=0):raise ValueError('fresh default-credential lab card required')
+                card=bytearray(card);card[ENABLED_OFFSET]=1;card=bytes(card)
         target=args.output/'nvram/nsm1r4t/eeprom'
         target.parent.mkdir(parents=True);target.write_bytes(eeprom)
         (args.output/'initial_eeprom.bin').write_bytes(eeprom)
-        if args.preserve_sim:
-            card=(storage/'sim_card').read_bytes()
-            if len(card)!=CURRENT_NVRAM_LENGTH:raise ValueError('current synthetic card extent required')
+        if card is not None:
             (target.parent/'sim_card').write_bytes(card)
             (args.output/'initial_sim_card.bin').write_bytes(card)
         (args.output/'input.json').write_text(json.dumps({'adc2':554,'physical_units_proved':False,
             'phone_retry_initialized':args.initialize_phone_retry,'sim_preserved':args.preserve_sim,
+            'pin_enabled_fixture':args.pin_enabled,
             'donor_provisioning':False},indent=2)+'\n')
         root=ET.Element('mameconfig',version='10')
         inputs=ET.SubElement(ET.SubElement(root,'system',name='nsm1r4t'),'input')
