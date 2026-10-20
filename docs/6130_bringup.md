@@ -640,8 +640,14 @@ source10ae3e=1, selecting that source byte rather than the alternate2/9/10
 constants. The source itself is written1 at21f388 from literal r5=1 set
 at21f36a, after21f36e finds controller byte6!=1. Thus the mode is a
 deliberate firmware-owned branch, not an erased scalar default or unsolicited
-DSP byte. The controlling controller byte10ade6 and entry21f358 lifecycle
-are the next unresolved predicates; mode1's domain meaning remains unproved.
+DSP byte. Controller byte10ade6 remains0 through45s: after RAM clear,
+observed writes are21ad20,21d16a,21a88c and21ab50, all0.
+`tmp/nsk3-controller-shared` observes actual entry21f36a caller21d71f,
+owner10ade0/flag0; entry21f358 is unobserved. Routine21d714 calls that
+shared entry at21d71a. Static dispatch21ca46 selects21d714 for0a22
+(literal21cd7c), but its actual input still needs a runtime check;
+shared-entry ownership must not be inferred from adjacent code. Mode1's
+domain meaning remains unproved, and no flag write is proposed.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
