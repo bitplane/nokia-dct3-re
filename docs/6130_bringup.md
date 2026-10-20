@@ -467,9 +467,38 @@ assumed to have been1 since reset. Physical wall-clock calibration is unproved.
 This command qualifies a known failure and explicitly reports stable_boot=false;
 it is not a long-run acceptance gate. Opcode/literal anchors and mutation tests
 bind the ownership to this own ROM rather than importing the5130 addresses.
-The next question is the legitimate native post-initialization packet-producing
-lifecycle and its radio/clock inputs. No arbitrary heartbeat, counter write,
-disabled supervision or foreign packet replay is justified by this evidence.
+The next question is task12's consumption of the last observed native response
+and its legitimate follow-up request/clock/RF lifecycle. No arbitrary heartbeat,
+counter write, disabled supervision or foreign packet replay is justified.
+
+### Native packet census
+
+`tmp/nsk3-native-packets-full` observes complete declared packet lengths at the
+own dispatcher counter write through45s. The bounded sequence is74,74,74,74,
+99,8b; the last arrives38.808311231s and the99 arrives4.834193154s. This is
+not an assertion that all later lifecycles or all producer classes are closed.
+
+The last8b has162 payload bytes: leading word0020 followed by space for40
+two-halfword pairs. The first fields include0374/ff6c,0375/ff6c and0372/ff6c;
+all forty second fields decode as signed-148. Channel-shaped values range
+512..885; their RF mapping remains unproved. The leading word32 and capacity40 must not be
+conflated: consumer semantics, valid-entry count and physical RSSI units remain
+unproved. No available carrier or camped state is demonstrated.
+
+Own subtract-cascade/jump-table arithmetic maps type8b to table entry2ab560,
+target2ab58c ->2823b0. That wrapper creates primitivea8 and posts to task12
+through266a2c. This is a statically anchored forward route, not runtime proof
+that task12 completed its consumption or issued a next request.
+
+```sh
+.venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
+  tmp/nsk3-native-packets-full
+```
+
+The checker rejects incomplete captures, including the initial32-byte probe,
+and distinguishes observed body fields from radio/physical-unit acceptance.
+The next bounded trace should follow task12'sa8 object and resulting native
+requests before inventing an RF stimulus or periodic response.
 
 ## Own firmware inputs
 

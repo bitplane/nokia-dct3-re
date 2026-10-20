@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_native_bounded_packet_census", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "An own-ROM bounded full-length packet census identifies the last native response and statically anchors its task12 route without inventing RF semantics",
+      "current": "Through45s the dispatcher counter observes74/74/74/74/99/8b;99 arrives4.834193s and8b38.808311s. Full8b payload162 contains leading word32 and40 serialized two-halfword pairs with signed second field-148. Leading word is not promoted to valid-entry count or physical units. Own table2ab560 selects2ab58c->2823b0, statically posting primitivea8 to task12. Runtime task12 consumption/follow-up requests remain open. Truncated32-byte probes are rejected; no available carrier, registration, periodic-heartbeat contract or sustained native operation follows from this census.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_liveness_observe.lua", "tools/nsk3_packet_check.py", "tools/test_nsk3_packet_check.py"]
+    },
+    {
       "id": "nsk3_native_sustained_packet_lifecycle", "owner": "nsk3_firmware", "status": "unresolved",
       "predicate": "The native compatibility composition sustains legitimate packet activity without a packet-supervision restart",
       "current": "Not satisfied: independent120s/96s runs request reason68 at93.967473692s through own23d83b/2ac696. Own dispatcher2ab4fc increments10c5a6 at2ab512. Window2ab64a observes1/1/0 near31/62/93 configured seconds; nonzero clears/rearms timer1c09cd, empty selects2ab506->2a2a4a(argument1) from2ab50d. The failure diagnostic explicitly returns stable_boot=false and anchors own instructions/literals. Short feature gates remain bounded evidence only. Physical clock, legitimate subsequent packet production and RF input contract remain open; no injected heartbeat or disabled supervision is accepted.",

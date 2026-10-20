@@ -11,4 +11,14 @@ _G.nsk3_liveness_counter_tap=memory:install_write_tap(0x10c5a4,0x10c5a7,'nsk3_li
     if mask & 0xffff==0 then return end
     writes=writes+1
     if writes<=64 then machine:logerror(string.format('nsk3_liveness_counter: value=%04x mask=%08x pc=%08x t=%.9f observer_writes=0\n',value&0xffff,mask,cpu.state['PC'].value,machine.time:as_double())) end
+    if cpu.state['PC'].value==0x2ab512 and writes<=64 then
+        local pointer=cpu.state['R4'].value
+        if pointer>=0x100000 and pointer<=0x10ff00 then
+            local length=memory:read_u8(pointer+2)+4
+            if pointer+length>0x110000 then return end
+            local data={}
+            for i=0,length-1 do data[#data+1]=string.format('%02x',memory:read_u8(pointer+i)) end
+            machine:logerror(string.format('nsk3_liveness_packet: pointer=%08x data=%s t=%.9f observer_writes=0\n',pointer,table.concat(data),machine.time:as_double()))
+        end
+    end
 end)
