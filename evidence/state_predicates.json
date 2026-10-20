@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nam2_c3_idle_global_delivery", "owner": "nam2_idle_interrupt_boundary", "status": "unresolved",
+      "predicate": "Ordinary NAM-2 idle restores or services interrupt delivery so a locally unmasked physical keypad contact remains usable after security acceptance",
+      "current": "A fresh C3 run enters Code-accepted presentation, then executes the all-idle supervisor branch with control 0a and nesting depth zero. In eight measured initial iterations, sleep eligibility passes its flag and clock-distance tests but rejects an adjusted software-timer interval of 2 against >=3; clock helper argument zero loops without the explicit control-05 restore branch. At 18 seconds a physical keypad contact asserts IRQ0; it remains pending through 30 seconds under locally unmasked a2 and globally disabled 0a. This excludes contact loss and a nesting leak, but does not identify the physical idle/interrupt mechanism. No firmware-state or controller-enable injection is allowed as a correction.",
+      "evidence": ["docs/2100_bringup.md", "tools/nam2_c3_idle_observe.lua", "driver/nokia_mad2.cpp"]
+    },
+    {
       "id": "nam2_c3_security_storage_checkpoint", "owner": "nam2_firmware", "status": "satisfied",
       "predicate": "The own v5.21 C3 research configuration preserves EEPROM storage across erases, renders Code accepted after physical input and validates checksum/startup release after a cold restart",
       "current": "The same two-byte own-image checksum fixture selects explicit ROM family 3 through 0089/88c2. Its identity callback reads user OTP words 85..88, now represented as erased rather than an unimplemented zero response. Physical 12345 and left softkey yield reviewed Code-accepted pixels. Persisted executable bytes remain unchanged, the EEPROM catalogue and identity checksum survive, and a separately restarted copy passes a0aa/a0aa and startup release 1. Fitted part and factory OTP remain unproved/undumped; OTP programming is unsupported. Late input is unconsumed, so usable idle, security-context settlement, network services and service parity are not claimed.",

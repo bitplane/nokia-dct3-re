@@ -64,6 +64,36 @@ directory without regenerating it, then restart with the read-only
   roms/noki2100/2100f521sharp.fls FIRST_RUN COLD_RUN COLD_FLASH
 ```
 
+### Remaining idle/input boundary
+
+`tools/nam2_c3_idle_observe.lua` combines capped read-only breakpoints,
+one-second state samples and physical contacts; run it with the same debug
+options and a fresh own checksum fixture. Capture
+`tmp/nam2-c3-idle-key-20261020` establishes:
+
+- At 10 s, global control is `05`, nesting depth is zero, and early input
+  works. At 13..30 s, control is `0a`, nesting remains zero, and the CPU
+  continues executing the supervisor loop rather than remaining suspended.
+- The seven-predicate chain at `2f8612..2f8648` reaches the all-idle branch
+  `2f866a`. The deep-sleep guard `2fac86` returns zero: flag `03` and
+  destination/current `7fff/34bb` pass, but the pending timer's adjusted
+  interval is `2`, below its signed `>=3` requirement at `2facd8`.
+  This measurement covers the first eight guarded iterations, not every
+  later timer value.
+- That branch calls clock helper `304c2e` with argument zero and loops via
+  `2f85fa`; it does not traverse the separate control-`05` restore at
+  `2f8658`. Timer/DSP FIQ bits accumulate (`19` at 14 s onward).
+- A physical Keypad-1 contact at 18 s changes IRQ pending from `00` to
+  `01`. IRQ0 remains pending through 30 s with local mask `a2` (unmasked)
+  and global control `0a` (delivery disabled). This is not a lost matrix
+  contact or an interrupt-nesting leak.
+
+The next contract to recover is how ordinary idle is expected to service
+pending work or restore global delivery when the deep-sleep guard declines.
+Do not auto-write control `05`, alter software timer results or change the
+credential on this evidence. The accepted-code presentation and persistent
+storage are independent of this still-open idle/interrupt boundary.
+
 ## Own v5.21 checksum fixture
 
 The complete Sharp-labelled v5.21 image (SHA-1
