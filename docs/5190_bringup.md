@@ -38,10 +38,21 @@ digit `2` reaches decoder `2af79e` and task 5 as packed statuses `40c8/40c9`
 with argument `2`. Receiver `2abd5c` extracts the argument count and normalizes
 the status to `00c8/00c9`; dispatcher `2abe10` passes it through its handler
 pipeline. The observed key-down remains `00c8` through `2528c0`, then
-`28e4a4` returns `057c`. The parent editor remains blank with 160 characters
-available. The next question is which branch in `28e4a4` selects that result
-and whether it is the intended text-entry context. This is not evidence of
-a missing DSP response or a diagnosed dictionary defect.
+`28e4a4` returns `057c`. Within that handler, translator `2733dc` already
+returns `057c` with input-mode byte `106424 == 1`. Its digit path calls
+`272f40`, then `272b70` submits operation `3`, argument `2`, to shared text
+API `25e20c` with object `101c48`. A fresh read-only run observes API result
+`9`: the early guard at `25e222..25e22e` reads halfword `1097e2 == 0`, not
+the required `1428`, and rejects this operation before processing its text.
+Operations `0`, `1` and `0a` bypass this guard; this is not a claim that all
+text API operations fail.
+
+The parent editor remains blank with 160 characters available. The next
+question is the initialization/writer contract of `1097e2`, including whether
+the qualified PPM A configuration supplies the expected text-engine setup.
+The field is not forced to its expected value. A missing initialization,
+resource problem or different input-mode contract remains to be distinguished;
+this is not evidence of a missing DSP response or a diagnosed dictionary defect.
 
 The separate Spell mode accepts physical letters and renders `ADA`, but the
 manual describes that mode as adding a dictionary word; returning to an empty

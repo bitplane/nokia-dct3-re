@@ -26,6 +26,13 @@ emu.register_frame_done(function()
         debugger:command('temp0=0')
         debugger:command('temp1=0')
         debugger:command('temp2=0')
+        debugger:command('temp3=0')
+        debugger:command('temp4=0')
+        debugger:command('bpset 25e20c,r14==272b87&&temp4<10,{temp4=temp4+1;logerror "nsb1_sms_text_api: object=%08x op=%08x argument=%04x validity=%04x observer_writes=0\\n",r0,d@r1,w@(r1+4),w@1097e2;g}')
+        debugger:command('bpset 272b86,temp4<10,{logerror "nsb1_sms_text_return: result=%08x observer_writes=0\\n",r0;g}')
+        for _, address in ipairs({'28e4ca','28e4d0','28e4d6'}) do
+            debugger:command('bpset ' .. address .. ',temp3<20,{temp3=temp3+1;logerror "nsb1_sms_translate: pc=%08x r0=%08x mode=%02x key=%08x editor=%08x buffer=%08x descriptor=%08x observer_writes=0\\n",pc,r0,b@106424,d@10b118,d@10c2d8,d@(10c2d8+10),d@(10c2d8+18);g}')
+        end
         -- Task 5 strips the packed argument count before this handler pipeline.
         -- Observe each return, not a guessed task-6 text-delivery contract.
         for _, address in ipairs({'2abe1c','2abe2a','2abe30','2abe36','2abe3c','2abe42','2abe48','2abe4e','2abe54'}) do
