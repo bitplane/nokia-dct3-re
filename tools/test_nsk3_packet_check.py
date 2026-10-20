@@ -1,9 +1,20 @@
 import struct
 import unittest
-from tools.nsk3_packet_check import parse, check_delivery, check_cache
+from tools.nsk3_packet_check import parse, check_delivery, check_cache, check_controller
 
 
 class PacketCensusTest(unittest.TestCase):
+    def test_controller_reply_and_wait(self):
+        trace='\n'.join((
+            'nsk3_043c_send: caller=00212c9f pointer=002c6750 cycles=10 observer_writes=0',
+            'nsk3_controller_result: value=043c cycles=20 observer_writes=0',
+            'nsk3_controller_wait: owner=0010ade0 selector=0047 status=043c cycles=30 observer_writes=0'))
+        self.assertEqual(check_controller(trace)['destination'],0x12)
+        for old,new in (('00212c9f','00214029'),('002c6750','00106750'),
+                        ('value=043c','value=09f0'),('cycles=20','cycles=40'),
+                        ('selector=0047','selector=0048')):
+            with self.subTest(old=old),self.assertRaises(ValueError):check_controller(trace.replace(old,new))
+
     def trace(self):
         packets=[bytes((0x18,2,0,kind)) for kind in (0x74,0x74,0x74,0x74,0x99)]
         body=b'\0\x20'+b''.join(struct.pack('>Hh',884-i,-148) for i in range(40))

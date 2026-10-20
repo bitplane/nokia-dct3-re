@@ -75,12 +75,28 @@ def check_cache(trace):
     return {'cached_pair_bytes':len(bytes.fromhex(data)),'processing_skipped_in_state3':True}
 
 
+def check_controller(trace):
+    """Qualify the observed transaction boundary, not its success semantics."""
+    sends=re.findall(r'nsk3_043c_send: caller=([0-9a-f]+) pointer=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0',trace)
+    results=re.findall(r'nsk3_controller_result: value=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0',trace)
+    waits=re.findall(r'nsk3_controller_wait: owner=([0-9a-f]+) selector=([0-9a-f]+) status=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0',trace)
+    if (len(sends)!=1 or sends[0][:2]!=('00212c9f','002c6750')
+            or len(results)!=1 or results[0][0]!='043c'
+            or len(waits)!=1 or waits[0][:3]!=('0010ade0','0047','043c')):
+        raise ValueError('controller ROM reply/result/wait boundary differs')
+    if not int(sends[0][2],16)<int(results[0][1],16)<int(waits[0][3],16):
+        raise ValueError('controller response ordering differs')
+    return {'rom_reply':'0x043c','destination':0x12,'wait_selector':'0x47',
+            'success_or_failure_semantics_proved':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source',type=Path)
     parser.add_argument('run',type=Path)
     parser.add_argument('--delivery',action='store_true',help='require same-object forward, dequeue and consumer observations')
     parser.add_argument('--cache',action='store_true',help='require exact body cache and state3 continuation')
+    parser.add_argument('--controller',action='store_true',help='require ROM reply, actual result and controller wait')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -92,6 +108,7 @@ def main():
         summary=parse(trace)
         if args.delivery:summary['delivery']=check_delivery(trace)
         if args.cache:summary['cache']=check_cache(trace)
+        if args.controller:summary['controller']=check_controller(trace)
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)

@@ -572,6 +572,18 @@ refer to it (212f68,2143a0), loaded by212c8e and214018 respectively; both
 pass it through237bea after the trace wrapper27e29a. Which producer runs,
 its controlling predicates and237bea's destination semantics remain to be
 verified. ROM residency must not be mistaken for a synthetic harness reply.
+The45s `tmp/nsk3-043c-producer` run identifies212c8e as the active candidate
+(r4=108dd4,r6=108b2c), then sender237bea caller212c9f withpointer2c6750.
+Candidate214018 is unobserved. Sender237bea explicitly posts to mailbox12
+hex via266a2c; this controller mailbox is distinct from measurement mailbox
+0c (decimal task12). The containing routine212c04 branches on227590 and,
+conditionally,2275a6's range check before converging on this reply. Those
+predicate meanings remain open:227590 reads record0605 through2a3994 into
+a stack byte;2275a6 returns halfword[10feaa]. These are independently
+anchored inputs, not yet identified as physical measurements or policy flags.
+`nsk3_packet_check.py --controller --cache`
+checks the measured send/result/wait ordering and retains unknown reply
+semantics; mutation tests reject wrong source, object, status, selector/order.
 
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
