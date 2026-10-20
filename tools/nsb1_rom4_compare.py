@@ -295,6 +295,25 @@ def prepare_cold_run(run, source, validate_card, inputs, ppm='A'):
     return run / 'inputs'
 
 
+def check_cold_link(run, source, inputs=INPUTS, ppm='A'):
+    """Requalify executable inputs and preceding saved-device hashes."""
+    manifest = json.loads((run / 'input_manifest.json').read_text())
+    if (manifest.get('inputs') != [{'source': name, 'sha1': digest} for name, digest in inputs]
+            or manifest.get('ppm', 'A') != ppm
+            or not manifest.get('synthetic_sim_inserted')
+            or not manifest.get('synthetic_retry_initialized')
+            or manifest.get('external_eeprom') != 'diagnostic checksum/retry control; calibration/identity not validated'):
+        raise ValueError('own cold-input provenance differs')
+    for name, digest in inputs:
+        if hashlib.sha1((run / 'inputs/nsb1r4t' / Path(name).name).read_bytes()).hexdigest() != digest:
+            raise ValueError('own executable/resident input changed')
+    storage = source / 'nvram' / storage_for_ppm(ppm)
+    hashes = {name: hashlib.sha256((storage / name).read_bytes()).hexdigest()
+              for name in ('flash', 'eeprom', 'sim_card')}
+    if manifest.get('cold_storage_sha256') != hashes:
+        raise ValueError('cold input hashes differ from preceding saved devices')
+
+
 def check_card_run(run, returncode, seconds, ppm='A'):
     image = (run / 'inputs/nsb1r4t' / Path(inputs_for_ppm(ppm)[0][0]).name).read_bytes()
     storage = run / 'nvram' / storage_for_ppm(ppm)

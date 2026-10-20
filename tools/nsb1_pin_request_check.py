@@ -1,6 +1,5 @@
 """Physical NSB-1 SIM security Off/On with linked cold request behavior."""
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -8,7 +7,7 @@ import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.nsb1_rom4_compare import INPUTS, check_card_run, check_frame
+from tools.nsb1_rom4_compare import check_card_run, check_frame, check_cold_link
 from tools.nsb1_pin_roundtrip import check_card, check_contacts, check_correct, ACCEPTED_RGB_SHA256
 from tools.sim_security_trace_check import statuses, ENABLED_OFFSET
 
@@ -63,13 +62,8 @@ def main():
         previous = args.seed
         check_card((previous / 'nvram/nsb1r4t/sim_card').read_bytes(), 3)
         for phase, run in enumerate((args.off, args.off_cold, args.on, args.on_cold)):
-            manifest = json.loads((run / 'input_manifest.json').read_text())
-            if manifest.get('inputs') != [{'source': name, 'sha1': digest} for name, digest in INPUTS]:
-                raise ValueError('own source provenance differs')
+            check_cold_link(run, previous)
             old = previous / 'nvram/nsb1r4t'
-            hashes = {name: hashlib.sha256((old / name).read_bytes()).hexdigest() for name in ('flash', 'eeprom', 'sim_card')}
-            if manifest.get('cold_storage_sha256') != hashes:
-                raise ValueError('cold input hashes differ from preceding saved devices')
             code = json.loads((run / 'exit_status.json').read_text())['returncode']
             trace, card = check_card_run(run, code, 54 if phase in (0, 2) else 28)
             if card != card_result((old / 'sim_card').read_bytes(), phase):

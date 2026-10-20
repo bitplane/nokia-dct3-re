@@ -17,6 +17,7 @@ if _G.nsb1_pin2_change then
         for _,digit in ipairs(number) do cells[#cells+1]=digits[digit] end
         cells[#cells+1]={1,4}
     end
+    if _G.nsb1_pin2_wrong then cells[9]={3,4} end -- Current5675, not5678.
 end
 local events={}
 for index,cell in ipairs(cells) do

@@ -5,6 +5,17 @@ from tools.sim_security_trace_check import CHV_OFFSET, padded_pin
 
 
 class Nsb1PinChangeTests(unittest.TestCase):
+    def test_wrong_current_pin_is_rejection_not_success(self):
+        value = '\n'.join(f'nsb1_pin_contact: phase={phase} index={i} down={down} t=12.0 physical_only=1'
+                          for phase, count in (('pin', 5), ('phone', 6)) for i in range(1, count + 1) for down in (1, 0))
+        value += '\nSIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        value += '\nSIM status ins=24 sw=9804 chv=3/2 puk=10/10 enabled=1\n'
+        value += '\n'.join(f'nsb1_pin_change_contact: index={i} down={down} t=26.0 physical_only=1'
+                           for i in range(1, 21) for down in (1, 0))
+        check_trace(value, rejected=True)
+        with self.assertRaises(ValueError):check_trace(value)
+        with self.assertRaises(ValueError):check_trace(value.replace('sw=9804', 'sw=9000'), rejected=True)
+
     def test_pin2_preserves_pin1_and_all_other_bytes(self):
         before = bytearray(make_profile(True))
         before.extend(bytes(3570 - len(before)))

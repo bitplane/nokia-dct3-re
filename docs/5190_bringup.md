@@ -78,7 +78,7 @@ and preserves the entire changed card without repeating the change command.
 The warm70s fixture uses `nsb1_pin_change.lua`; the cold28s fixture uses
 `nsb1_pin_changed_reload.lua`. Existing native/own-flash gates, reviewed PIN
 prompt/changed/accepted frames, physical contacts and linked cold-device hashes
-remain mandatory. Change-rejection controls remain separate acceptance items.
+remain mandatory. PIN1 change-rejection controls remain separate acceptance items.
 
 Ordinary PIN2 change is also independently accepted through own Menu4-2-5-2.
 The warm process authenticates5678, changes it to8765 and confirms; only PIN2
@@ -97,6 +97,24 @@ The70s phases use `nsb1_pin2_change.lua` and `nsb1_pin2_restore.lua`; these
 select physical PIN2 digits in the existing own Access codes fixture. The
 round-trip result proves persisted credential authentication, not cached CHV2
 verification or PIN2 exhaustion/PUK2 handling.
+
+The PIN2 round-trip gate additionally accepts `--rejected` and `--retry`.
+An independent same-input run physically enters wrong current5675, new8765
+and confirmation. CHANGE CHV returns9804 and Code error; the whole card changes
+only PIN2 retries3-to2, with all credentials intact. A linked cold process
+retains that counter, accepts current5678, changes PIN2 to8765 and restores
+retries to3 organically. No retry field is reset by preparation.
+
+```sh
+.venv/bin/python tools/nsb1_pin_change_check.py \
+  tmp/nsb1-pin-request-on-cold tmp/nsb1-pin2-change \
+  tmp/nsb1-pin2-restore-cold --pin2-roundtrip \
+  --rejected tmp/nsb1-pin2-change-wrong --retry tmp/nsb1-pin2-change-retry-cold
+```
+
+The new security gates share `check_cold_link`, which rehashes actual executable
+and resident input files as well as matching the manifest's saved-device
+hashes to the preceding process. A matching manifest alone is insufficient.
 
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled
