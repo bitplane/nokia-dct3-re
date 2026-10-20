@@ -176,8 +176,15 @@ restores the next cold PIN challenge and successful1234 authentication.
 All four runs preserve the saved card/EEPROM chain.
 `nsm1_pin_request_check.py OFF OFF_COLD ON ON_COLD` checks this cycle.
 The earlier no-PIN menu has its own captured icon-animation phase oracle.
-PIN2 and
-authenticated network services remain separately unaccepted on NSM-1.
+Change PIN2 uses the observed menu4-5-6 third entry. Physical authenticated
+5678/new8765/confirmation sends exact `A0 24 00 02 10` and9000; only PIN2
+bytes change. An independent cold process accepts8765 to restore5678.
+A separate wrong5675 control changes only PIN2 retries3->2 with9804;
+cold correct5678 restores retries and produces the exact positive card.
+`nsm1_pin2_check.py CHANGED RESTORED WRONG RETRY` checks all four runs,
+whole-card/EEPROM links, credential ordering, exact APDUs and own
+PIN2 code changed/Code error frames. PUK2 and protected application
+operations remain separate targets; network services are not accepted.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

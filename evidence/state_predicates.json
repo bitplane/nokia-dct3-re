@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_physical_pin2_change_cold_retry", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical authenticated PIN2 change survives cold boot and a wrong PIN2 changes only its retry counter before cold recovery",
+      "current": "Own menu4-5-6 third entry accepts physical5678/new8765/confirmation with exact A0 24 00 02 10 padded credentials,9000 and only PIN2-byte changes. A cold process accepts8765 to restore5678. A separate same-input wrong5675 control returns9804 and changes only PIN2 retries3->2; cold correct5678 restores its retries and reproduces the entire positive card. Physical startup PIN1/phone authentication, full card and EEPROM links, own flash, native record validity and own exact PIN2 code changed/Code error frames pass across four runs. PUK2 and protected application operations remain unaccepted, and no radio acceptance follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_pin2_change.lua", "tools/nsm1_pin2_restore.lua", "tools/nsm1_pin2_wrong.lua", "tools/nsm1_pin2_check.py", "tools/test_nsm1_pin2_check.py"]
+    },
+    {
       "id": "nsm1_physical_pin_request_cold_cycle", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical PIN-request Off/On changes only the card enable byte and controls the independent cold SIM challenge",
       "current": "Authenticated menu4-5-1 Off sends exact A0 26 00 01 08 plus padded1234,9000 and changes only enable1->0. Cold Off skips all credential APDUs, physically accepts the separate phone12345 and opens Messages. Physical menu On sends exact A0 28 00 01 08 plus padded1234,9000 and changes only enable0->1. The next independent cold boot challenges and accepts1234 with the entire card unchanged. Full card and EEPROM links, own flash, native record dialogue, physical authentication/contact order and exact Off/On/PIN/menu frames pass. The no-PIN Messages icon has an independently inspected earlier animation phase, not a borrowed frame hash. No radio or native speech claim follows.",
