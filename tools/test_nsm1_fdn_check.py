@@ -1,8 +1,19 @@
 import unittest
-from tools.nsm1_fdn_check import validity_targets
+from tools.nsm1_fdn_check import validity_targets,rejected_card
+from tools.sim_fdn_profile import EXTENDED_LENGTH
+from tools.sim_security_trace_check import ATTEMPTS_OFFSET
 
 
 class FdnCommandsTests(unittest.TestCase):
+    def test_rejected_activation_only_changes_pin2_retry(self):
+        before=bytearray(EXTENDED_LENGTH);before[3570:3578]=b'FDN\x01\x01\x01\x00\x00'
+        before[ATTEMPTS_OFFSET+1]=3
+        after=rejected_card(before)
+        self.assertEqual([(i,a,b) for i,(a,b) in enumerate(zip(before,after)) if a!=b],[(ATTEMPTS_OFFSET+1,3,2)])
+        with self.assertRaises(ValueError):rejected_card(after)
+        before[3575]=0
+        with self.assertRaises(ValueError):rejected_card(before)
+
     def test_selected_file_and_bodies_not_byte_pattern_search(self):
         tx=bytes.fromhex('ff1010 a0a40000027f10 a0a40000026f3a a004000000')
         self.assertEqual(validity_targets(tx,4),[0x6f3a])

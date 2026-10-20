@@ -255,6 +255,14 @@ flash and distinct26s frames are checked by
 Calling here establishes passage through local FDN validation only. There
 is no registered native radio link, connected call or native speech claim.
 
+Wrong-PIN2 activation is separately controlled: from FDN Off, physical5675
+returns9804, shows Code error, changes only PIN2 retries3->2 and sends no
+INVALIDATE/REHABILITATE or UPDATE. An independent cold process preserves
+that exact card/EEPROM, then physical5678 restores retries and enables FDN.
+The complete resulting card differs from the original input only in ADN
+validity. Add `--rejected WRONG --retry RETRY` to `nsm1_fdn_check.py` to
+verify both controls alongside the four-run activation cycle.
+
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \
   tmp/WRONG --pin-enabled

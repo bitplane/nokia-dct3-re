@@ -7,6 +7,9 @@ if _G.nsm1_fdn_disable then
 elseif _G.nsm1_fdn_observe then
     _G.nsm1_followup_contacts={{1,2,0x19},{2,4,4},{3,4,5},{4,2,3}}
 end
+if _G.nsm1_fdn_wrong_activation then
+    _G.nsm1_followup_contacts[11]={3,4,5}
+end
 dofile(source:match('^(.*[/\\])') .. 'nsm1_pin_menu.lua')
 local machine=manager.machine
 local memory=machine.devices[':maincpu'].spaces.program
