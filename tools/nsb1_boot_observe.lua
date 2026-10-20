@@ -68,6 +68,29 @@ _G.nsb1_lcd_tap = space:install_write_tap(0x20028, 0x2002f, 'nsb1_lcd_bus', func
 end)
 local released, result_reads, observing = false, 0, false
 local last_results = {}
+_G.nsb1_reason_tap = space:install_write_tap(0x10ff7c, 0x10ff7f, 'nsb1_reset_policy', function(offset, data, mask)
+    if cpu.state['R15'].value == 0x2a46b4 and (mask & 0xff000000) ~= 0 then
+        local sp = cpu.state['R13'].value
+        machine:logerror(string.format('nsb1_reset_policy: reason=%02x lr=%08x selector=%08x state=%02x policy=%02x setting=%02x t=%.9f observer_writes=0\n',
+            (data >> 24) & 255, cpu.state['R14'].value, cpu.state['R5'].value,
+            space:read_u8(0x10b57d), space:read_u8(sp), space:read_u8(sp + 1), machine.time:as_double()))
+    end
+end)
+_G.nsb1_lifecycle_tap = space:install_write_tap(0x10b57c, 0x10b57f, 'nsb1_reset_lifecycle', function(offset, data, mask)
+    if (mask & 0x00ff0000) ~= 0 then
+        machine:logerror(string.format('nsb1_reset_lifecycle: state=%02x pc=%08x t=%.9f observer_writes=0\n',
+            (data >> 16) & 255, cpu.state['R15'].value, machine.time:as_double()))
+    end
+end)
+local activity_reads = 0
+_G.nsb1_activity_tap = space:install_read_tap(0x10c538, 0x10c53b, 'nsb1_activity_check', function(offset, data, mask)
+    local pc = cpu.state['R15'].value
+    if pc >= 0x2aff04 and pc <= 0x2aff0a and activity_reads < 8 then
+        activity_reads = activity_reads + 1
+        machine:logerror(string.format('nsb1_activity_check: count=%04x pc=%08x t=%.9f observer_writes=0\n',
+            data & 0xffff, pc, machine.time:as_double()))
+    end
+end)
 _G.nsb1_release_tap = space:install_write_tap(0x20000, 0x20003, 'nsb1_dsp_release', function(offset, data, mask)
     if cpu.state['R15'].value == 0x2b1056 then
         machine:logerror(string.format('nsb1_reset_reason: reason=%08x lr=%08x t=%.9f observer_writes=0\n',

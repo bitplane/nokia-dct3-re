@@ -440,11 +440,41 @@ prompt belongs to the restarted boot, not an established phonebook lock.
 
 The passive observer now records this reset explicitly, and native acceptance
 rejects it even before a second upload is visible. Do not shorten the sustained
-gate or disable the watchdog to claim menu completion. Reason `68` is
-consistent with the mapped DSP-liveness reset family (`dsp_interface.md`),
-but the own timer/counter path and native DSP receive activity still need
-correlation before selecting a correction. Persistent phonebook testing
-follows sustained native operation; no SIM UPDATE RECORD has been established.
+gate or disable the watchdog to claim menu completion. Persistent phonebook
+testing follows sustained native operation; no SIM UPDATE RECORD has been
+established.
+
+The own reason producer is now known more precisely. At 31.000902077 s,
+`2a46b4` writes `68` to `10ff7c` with LR `2a39c3`. Caller `2a391a` receives
+selector one, reads record `0607` into its stack, and calls `231b08`.
+That helper tests lifecycle byte `10b57d`: states four/five return one;
+other states return two. A return of two plus record bit zero set selects
+reason `68` at `2a395a`; further policy/setting checks precede publication.
+Runtime locals are policy `ff`, setting `05`, lifecycle `02`. The own record
+entry `2cc0a0` maps `0607` to EEPROM `04a6`, length one. The lifecycle is
+initialized to two by `22fbe8` at 0.935189077 s and has no subsequent observed
+write before reset in this run.
+
+This is **not yet a proven DSP-heartbeat defect**. The observed producer
+does not itself test an MDI activity counter, and a shared numeric reset
+reason is insufficient to transfer that interpretation from another ROM.
+The erased policy enables this branch, but its normal provisioned value and
+the lifecycle state's subsystem meaning remain unresolved. No policy bit is
+cleared to suppress the reset. The archived `nsb1_3.pp` contains only
+`230200D0`, not an independently established value for this record.
+
+The caller census then reaches the activity boundary: two direct Thumb BLs
+call `2a391a`, `2079dc` with selector two and `2afdd0` with selector one;
+no aligned raw pointer to that function was found (not indirect-call closure).
+Receive loop `2afdc4` increments halfword `10c53a` at `2afdda` for ordinary
+non-`dd` messages. When event `dd` arrives, `2aff04` tests that counter:
+zero calls the selector-one policy routine; nonzero rearms through `267eea`
+and clears the count. Thus policy selection and receive inactivity are
+separate layers, rather than competing explanations. The passive read at
+`2aff04` observes count zero at 31.000204692 s, before the policy publication.
+The own decode now
+identifies the precise receive loop whose missing traffic matters; it still
+does not justify synthesizing a packet or clearing EEPROM policy bits.
 
 ### External reference leads, not provisioning evidence
 

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_reset_policy_producer", "owner": "nsb1_reset_policy", "status": "unresolved",
+      "predicate": "Own NSB-1 reason-68 producer is traced to its lifecycle and external-policy inputs before attributing it to a hardware peer",
+      "current": "Read-only observation sees 2a46b4 publish reason 68 with LR 2a39c3 around 31.001 seconds. Own 2a391a receives selector one, reads record 0607 (EEPROM 04a6/length one), and calls 231b08, which returns two unless lifecycle byte 10b57d is four/five. Runtime lifecycle is two, policy ff and setting 05; 22fbe8 initialized the lifecycle to two with no later observed write before reset. Erased policy bit zero enables reason-68 selection subject to later checks. Direct callers are 2079dc/selector two and 2afdd0/selector one. Receive loop 2afdc4 increments halfword 10c53a for ordinary non-dd messages; event dd tests it at 2aff04 and calls the policy routine on zero. Runtime observes zero at 31.000204692 seconds. This establishes receive inactivity plus a policy layer, not yet a specific DSP packet or peripheral defect. Normal policy provisioning, lifecycle semantics and transport-to-loop delivery remain unresolved. No EEPROM policy change or heartbeat injection is applied.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_sustained_native_ui", "owner": "nsb1_native_liveness", "status": "drift",
       "predicate": "Inserted-card NSB-1 native compatibility remains live beyond physical security acceptance and menu navigation",
       "current": "Physical Menu/Select opens Phone book and its Search/Add entry/Edit list at 26/28 seconds, but the 35-second sustained menu gate fails native acceptance. Firmware writes reset at 2b1056 at 31.972845538 seconds, reason 68 and LR 23ce6b, followed by a repeated own verifier upload. The same reset occurs with no menu input after the security fixture, falsifying attribution to Add entry. Later Security code is a restarted boot, not demonstrated phonebook security. The observer records the reset and check_trace rejects it; the gate is not shortened and no watchdog is disabled. Own timer/counter and DSP receive correlation remain open; persistent contacts and stable UI are not accepted.",
