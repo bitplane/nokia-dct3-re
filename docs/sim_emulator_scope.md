@@ -191,6 +191,42 @@ establishes a concrete requirement. Later work includes:
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
+### Fixed dialling implementation boundary
+
+FDN is an unimplemented card capability, not an accepted NSM-1 feature.
+[GSM 11.11 v5.3.0](https://www.etsi.org/deliver/etsi_gts/11/1111/05.03.00_60/gsmts_1111v050300p.pdf)
+sections8.14-8.15,10.3.1-10.3.2 and11.5.1 establish the contract:
+EF_FDN6f3b is linear-fixed, uses ADN-style records, requires CHV1 for
+reading and CHV2 for updating. Its own invalidation/rehabilitation is ADM.
+FDN enabling instead invalidates EF_ADN after CHV2 verification; disabling
+rehabilitates EF_ADN. Capability discovery combines service3 in EF_SST with
+ADN activation/validity. An invalid EF normally refuses application access;
+its file status may explicitly permit reads/updates while invalidated.
+
+The current model cannot represent this faithfully: `file_descriptor`
+has only CHV1-read and ADM-update booleans, FCP always reports valid files,
+and there is no EF_FDN body or persistent validity state. Do not implement
+this as a handset-specific latch or by changing EF_SST alone.
+
+Implementation order and acceptance:
+
+1. Extend access metadata for CHV2 without changing existing file policies.
+   Test authorization before/after VERIFY, activation and reset; FCP must
+   describe exactly the permissions the command handlers enforce.
+2. Add an explicitly configured FDN card profile, its records and ADN
+   validity. Keep the base profile's service advertisement unchanged.
+   Extend the existing staged NVRAM reader with a versioned tail; retain
+   complete legacy inputs, reject truncation/invalid flags atomically and
+   test both cold persistence and save/load. Existing3570-byte fixtures
+   must not silently acquire advertised FDN service.
+3. Implement selected-EF INVALIDATE/REHABILITATE parameter validation and
+   access checks. Verify that denial leaves contents and validity unchanged;
+   toggling validity must never erase ADN records.
+4. Exercise physical activation, FDN write/read and cold deactivation on
+   NSM-1. An FDN menu or successful PIN2 change is insufficient evidence.
+   Call enforcement needs a separately observed allowed/denied dial attempt;
+   do not claim native network or speech acceptance from that UI result.
+
 The implementation tracks current DF separately from selected EF and declares
 file parent, size, structure and record length as profile metadata. Subscriber
 identity, PLMN, operator presentation, access class and A3/A8 material now come
