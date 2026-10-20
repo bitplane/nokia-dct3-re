@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm9_v530_keypad_controller", "owner": "nhm9_board_keypad", "status": "satisfied",
+      "predicate": "Own NHM-9 key tables select a five-row matrix and column-bit-1 Power contact whose configured host contacts reproduce controller reads",
+      "current": "Pinned v5.30 normal/special maps at 45bd94/45bdb0 and decoder pointers at 3a956c establish the own contract; scanner 3a3568 indexes row*5+column. A fresh MMIO conformance run exercises all 18 physical contacts against five row drives, totaling 90 reads, and Power press/release. The fixture restores controller registers during the measured DSP wait and never writes firmware RAM. This does not prove organic scanner invocation, application key delivery or graphical boot.",
+      "evidence": ["docs/3350_bringup.md", "driver/nokia_dct3.cpp", "tools/nhm9_keypad_check.py", "tools/nhm9_keypad_conformance.lua", "tools/test_nhm9_keypad_check.py"]
+    },
+    {
       "id": "nhm9_v530_native_verifier_dependency", "owner": "nhm9_uploaded_dsp", "status": "unresolved",
       "predicate": "The own 247-word verifier completes through its explicit resident-program dependency without fabricated instructions or HLE acknowledgement",
       "current": "The separate nhm9stage configuration starts the own upload at 0f00 and rejects its immutable ff87 write probe. It terminates at unavailable program word 861f, PC 8620, at 0.129389 seconds under the declared unmeasured 13 MHz cadence. Hash-qualified source words at 0fd7..0fd8 are f074/861f, establishing an explicit CALL rather than an inferred corrupt return. The own 104-word fragment covers ff80..ffe7 and cannot supply this routine. No verifier publication, loader2 execution, runtime HLE handoff, graphical boot or native speech is claimed. The independent silent noki3350 MCU boundary remains reproducible.",

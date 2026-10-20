@@ -1023,6 +1023,9 @@ constexpr nokia_product_config PRODUCT_3610 = make_3610_config();
 constexpr nokia_product_config make_3350_config()
 {
 	nokia_product_config result;
+	// Own scanner 3a3568 drives five rows; special table 45bdb0
+	// selects column bit 1 for Power, independently of NHM-2.
+	result.keypad_wiring = { 5, 0x02 };
 	// Own ROM has a nine-bank, 96-byte LCD clear candidate. Show its full
 	// storage as a diagnostic view; panel selection/orientation is unproved.
 	result.display = { 96, 72, 96, 72, false };
@@ -3238,25 +3241,6 @@ static INPUT_PORTS_START( nmp5stage )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
 
-static INPUT_PORTS_START( noki3350 )
-	PORT_INCLUDE(dct3_network_config)
-	// Own matrix interface is mapped; physical key-name mapping is not.
-	PORT_START("COL.0")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("COL.1")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("COL.2")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("COL.3")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("COL.4")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("PWR")
-	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_START("CHARGER")
-	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
-INPUT_PORTS_END
-
 static INPUT_PORTS_START( noki6210 )
 	// Independently checked NPE-3 normal/special tables and board switches;
 	// reuse the identical logical matrix, not the NSM-5 hardware profile.
@@ -3556,6 +3540,14 @@ static INPUT_PORTS_START( noki3410 )
 
 	PORT_START("CHARGER")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( noki3350 )
+	// Own NHM-9 table 45bd94 and scanner 3a3568 establish the same
+	// logical contacts; this does not import NHM-2 board configuration.
+	PORT_INCLUDE(noki3410)
+	PORT_MODIFY("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
 
 void nokia_dct3_state::dct3_base(machine_config &config)

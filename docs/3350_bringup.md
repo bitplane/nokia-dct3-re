@@ -5,7 +5,7 @@
 `noki3350` is a fail-closed MCU research configuration, not a booting phone.
 Own v5.30 execution installs the exact 247-word DSP program and reaches its
 first ownership wait at `31dc82..31dc86`. No DSP completion, service or radio
-peer is enabled. Graphical boot, physical key-name mapping, SIM, registration,
+peer is enabled. Graphical boot, firmware UI input delivery, SIM, registration,
 calls and SMS remain unestablished. The package supplies no PMM record stream;
 the firmware creates its own catalogue headers from initially erased storage.
 Do not attach a 3330 or other donor's calibration tail. The external emulator's
@@ -58,10 +58,18 @@ The special map is `3e 0d 3e 3e 3e`, selecting Power on column bit 1.
 
 The bytes match the separately mapped NHM-2 key table, supporting the
 external emulator's shared-layout hypothesis with own-image evidence.
-This is a static decoder/wiring contract, not observed keypad scan or UI
-delivery: the current input-port stub still deliberately exposes no keys.
-The next independent step is to configure this five-row/bit-1 contract and
-prove physical contact/readback before claiming application interactivity.
+The machine selects its own five-row/bit-1 wiring contract and reuses only
+the matching host input layout. `nhm9_keypad_check.py` qualifies the own image,
+table bytes and decoder pointers, then exercises all 18 physical contacts
+against all five row drives (90 reads), plus Power press/release. This is
+MMIO controller conformance, not an organic firmware scan or UI-delivery
+claim. The fixture temporarily drives controller registers while firmware
+remains in its measured DSP ownership wait; it does not alter firmware RAM.
+
+```sh
+.venv/bin/python tools/nhm9_keypad_check.py \
+  mame/mame roms tmp/nhm9-keypad
+```
 
 `tools/nhm9_package_check.py` hash-qualifies the installer, walks every one of
 its 29 adjacent gzip members and strictly decodes all seven phone-record
