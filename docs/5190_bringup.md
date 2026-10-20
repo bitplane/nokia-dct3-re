@@ -212,6 +212,17 @@ changing CCONT reset causes or clearing the MAD2 power-up indication.
 Charging initialization and its report completion still need tracing from
 this cold-reset lifecycle.
 
+The subsequent boot-policy selector `2aa98e` takes its cold-reset `0a`
+branch at `2aa9d2`. Positive probes observe ADC selector 3 returning `280`,
+the scanner returning `ff` at `2aaa1a`, and packed serial read `90ff`
+returning `03` at `2aaa24`. The selector then returns 2 at `2aaa48`.
+Its shift/carry decisions test status bit 2 with `LSRS #3` and bit 1 with
+`LSRS #2`; they do not test bits 3 and 2. Thus the return 2 follows the
+observed bit-1-set status, not a nonzero charger ADC measurement. This
+disambiguates the boot-policy result from the separately stored ADC-derived
+controller mode at `10c4c4`, which also happens to be 2 in this fixture.
+Neither equality alone establishes a shared semantic meaning.
+
 Receive wrapper `220384` passes raw event `21` unchanged; the state dispatch
 at `221b16..221b1a` directs it to candidate block `221e88`. Two direct
 task-`14`, event-`21` publishers are `2232b0` and `2237bc`. Neither publisher
