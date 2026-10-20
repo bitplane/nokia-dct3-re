@@ -646,8 +646,18 @@ observed writes are21ad20,21d16a,21a88c and21ab50, all0.
 owner10ade0/flag0; entry21f358 is unobserved. Routine21d714 calls that
 shared entry at21d71a. Static dispatch21ca46 selects21d714 for0a22
 (literal21cd7c), but its actual input still needs a runtime check;
-shared-entry ownership must not be inferred from adjacent code. Mode1's
-domain meaning remains unproved, and no flag write is proposed.
+shared-entry ownership must not be inferred from adjacent code. Runtime
+`tmp/nsk3-mode-callsites` observes none of the five directBL sites; entry
+21d714 can also be reached by conditional branch21d678. The qualified
+`tmp/nsk3-controller-threshold` capture confirms that branch's comparison:
+owner10ade0 halfword+20 (10ae00) equals0176, threshold0176, selectingBGE.
+Writes after clear come from21ac3e and set0176 each time. Routine21ac20
+explicitly writes that sentinel when controller byte+11 is0, after filling
+a48-byte context withff and setting its first halfword003f. Its alternate
+byte+11!=0 path calls21ac94. Thus neither an observed0a22 input nor an
+erased halfword causes the mode branch: it is an explicit missing-context
+sentinel path. Context contents, the+11 lifecycle and mode1's domain meaning
+remain unproved; no sentinel/flag replacement is proposed.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
