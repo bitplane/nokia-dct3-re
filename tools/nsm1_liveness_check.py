@@ -7,7 +7,7 @@ import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.nsm1_v523_static_check import SHA1, instruction, read32
+from tools.nsm1_v523_static_check import SHA1, EEPROM_SHA256, instruction, read32
 from tools.nsm1_native_radio_check import samples, packets, PROGRAM_SHA256
 from tools.nsm1_published_record_check import records
 from tools.nsm1_pin_check import check_authenticated
@@ -63,9 +63,51 @@ def check_trace(trace):
         raise ValueError('restart request observed')
 
 
+def source_trace(trace):
+    requests = re.findall(r'nsm1_liveness_record: record=([0-9a-f]+) pointer=([0-9a-f]+) caller=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0', trace)
+    serial = re.findall(r'nsm1_liveness_serial: offset=([0-9a-f]+) pointer=([0-9a-f]+) length=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0', trace)
+    results = re.findall(r'nsm1_liveness_read_result: result=([0-9a-f]+) byte=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0', trace)
+    if len(requests) != 3 or len(serial) != 3 or [(a, b) for a, b, _ in results] != [('00000001', '00')] * 2:
+        raise ValueError('policy source census differs')
+    for index, (request, read) in enumerate(zip(requests, serial)):
+        record, pointer, caller, cycles = request
+        if record != '0607' or caller != ('002b4d21' if index == 0 else '002b4b8b') or read[:3] != ('03ca', pointer, '0001'):
+            raise ValueError('policy source descriptor/read differs')
+        if not int(cycles, 16) < int(read[3], 16):
+            raise ValueError('policy source read ordering differs')
+        if index and int(read[3], 16) >= int(results[index - 1][2], 16):
+            raise ValueError('policy read result preceded serial input')
+    for label, count in (('record', 3), ('serial', 3), ('read_result', 2)):
+        if trace.count(f'nsm1_liveness_{label}:') != count:
+            raise ValueError('policy source trace incomplete')
+
+
+def source_contract(image, original, repaired, before, after):
+    if hashlib.sha256(original).hexdigest() != EEPROM_SHA256:
+        raise ValueError('original repair template differs')
+    if hashlib.sha1(repaired).hexdigest() != '07335e492f72ba9da9c3436890c9eb4af67fd9a9':
+        raise ValueError('checksum-repaired template differs')
+    if any(len(value) != 0x4000 for value in (original, repaired, before, after)):
+        raise ValueError('policy EEPROM extent differs')
+    directory = read32(image, 0x2b8bd4)
+    if directory != 0x2da48c:
+        raise ValueError('own record directory differs')
+    group = image[directory - 0x200000 + 48:directory - 0x200000 + 56]
+    if group != bytes.fromhex('002da0c400080000'):
+        raise ValueError('own group6 directory differs')
+    if image[0xda0fc:0xda104] != bytes.fromhex('0000060703ca0001'):
+        raise ValueError('own0607 EEPROM descriptor differs')
+    if any(value[0x3ca] != 0 for value in (original, repaired, before, after)):
+        raise ValueError('policy bit does not match unchanged repair-template byte')
+    decoded = instruction(image, 0x2b8bc0)
+    if (decoded.mnemonic, decoded.op_str) != ('bl', '#0x2bcace'):
+        raise ValueError('own serial reader boundary differs')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
+    parser.add_argument('--policy-source', nargs=2, type=Path, metavar=('ORIGINAL', 'REPAIRED'))
     args = parser.parse_args()
     try:
         run = args.run
@@ -82,10 +124,17 @@ def main():
         if (run / 'initial_sim_card.bin').read_bytes() != (storage / 'sim_card').read_bytes():
             raise ValueError('card changed')
         frame_check(run / 'snap/nsm1_pin_menu.png', MENU)
+        if args.policy_source:
+            source_contract((storage / 'flash').read_bytes(),
+                            args.policy_source[0].read_bytes(), args.policy_source[1].read_bytes(),
+                            (run / 'initial_eeprom.bin').read_bytes(), (storage / 'eeprom').read_bytes())
+            source_trace(trace)
     except (ValueError, OSError) as error:
         print(f'NSM-1 supervision failed: {error}', file=sys.stderr)
         return 1
     print('NSM-1 empty-window policy bit0-clear suppression PASS; no policy edited, RF unqualified')
+    if args.policy_source:
+        print('NSM-1 record0607 reads unchanged repair-template EEPROM03ca=00; factory policy unproved')
     return 0
 
 

@@ -77,7 +77,7 @@ at2b4f34 identifies record0607. The first byte's bit0 is clear:2b4ba8/2b4baa
 branches past reason68 selection, then2b4bc8 reaches the rearm/clear tail.
 This explains the observed absence of the6130-style reset in this6150 fixture;
 it does not prove the policy bytes represent a factory default or fitted phone.
-Their storage/default provenance remains to be traced. No policy is changed.
+The policy source is now qualified below. No policy is changed.
 
 ```sh
 .venv/bin/python tools/nsm1_liveness_check.py tmp/nsm1-native-liveness
@@ -87,6 +87,28 @@ The gate pins own instructions/literals, the complete window/policy census and
 ordering, physical authentication/Menu, native packets/program, unchanged card
 and100s horizon. A configured packet-timeout bit or missing observations fails
 this specific fixture gate rather than being silently treated as equivalent.
+
+The own directory at2da48c selects group6 table2da0c4 (eight descriptors).
+Descriptor2da0fc is `00000607 03ca 0001`: a one-byte EEPROM field, not a
+firmware constant. Reader2b8b90 resolves it and calls raw serial reader2bcace.
+The independent100s `tmp/nsm1-native-liveness-source` capture observes the
+startup reader plus both empty-window requests; every raw read uses offset03ca
+and length1. Both policy reads return success1/byte00 before the policy sees
+0002. The second byte is supplied separately; it is not a two-byte0607 field.
+
+Byte03ca is00 in the hash-qualified original NokiX repair template, its
+checksum-repaired image, the pre-launch fixture and the saved EEPROM. Thus
+packet-timeout reset suppression is inherited template policy, not evidence of
+a healthy DSP link or an independently established factory setting. The165s
+repeated-scan result remains valid only under that explicit policy. No enabling
+or disabling fixture is introduced without an evidenced provisioning contract.
+
+```sh
+.venv/bin/python tools/nsm1_liveness_check.py tmp/nsm1-native-liveness-source \
+  --policy-source \
+  roms/research/nsm1-v523/original-eeprom/NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin \
+  roms/research/nsm1-v523/nsm1-security-checksum-valid.bin
+```
 
 The own45s live program SHA256 is
 `b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e`.

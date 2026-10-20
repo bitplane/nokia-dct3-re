@@ -1304,9 +1304,15 @@
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
     },
     {
+      "id": "nsm1_packet_timeout_policy_template_source", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "NSM-1 packet-timeout reset suppression reads a retained one-byte repair-template EEPROM field, not a firmware constant or proven factory setting",
+      "current": "Own record directory2da48c selects group6 table2da0c4; descriptor2da0fc maps0607 to EEPROM03ca/length1. A separate100s unchanged native capture observes the startup read and two empty-window policy reads through2b8b90 and raw serial reader2bcace, each requesting03ca/1. Both policy reads return success1/00 before policy0002 and no reset selection. Hash-qualified original NokiX repair template, checksum-repaired image, pre-launch fixture and saved EEPROM all retain03ca=00. This explains current-fixture supervision suppression and qualifies the165s repeated-scan result as template-policy-dependent; it does not establish factory policy, fitted DSP identity or RF acquisition. The separately produced second policy byte is not part of record0607. No policy mutation or counter injection is introduced.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_liveness_source.lua", "tools/nsm1_liveness_check.py", "tools/test_nsm1_liveness_check.py"]
+    },
+    {
       "id": "nsm1_empty_packet_window_policy", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "Own NSM-1 empty native packet windows select no reset reason because the observed record0607 policy bit0 is clear",
-      "current": "A100s unchanged physical PIN/phone/Menu capture observes own context112860 window counts0,1,0. Each empty window calls2b4b72(argument1) from2c1b95, reads policy bytes0002 and exits with reason0, without reaching the selected-reason block or restart request. Own instruction/literal anchors qualify the packet counter, timer09cd, record0607 and first-byte bit0 test that skips reason68 and rearms/clears the counter. The checker also preserves native packet/program, card/flash and physical Menu acceptance. This explains absence of packet-timeout reset in this fixture, not factory policy provenance, fitted hardware or RF acquisition; the record's storage/default origin remains unresolved. No policy, counter or guest state was changed.",
+      "current": "A100s unchanged physical PIN/phone/Menu capture observes own context112860 window counts0,1,0. Each empty window calls2b4b72(argument1) from2c1b95, reads policy bytes0002 and exits with reason0, without reaching the selected-reason block or restart request. Own instruction/literal anchors qualify the packet counter, timer09cd, record0607 and first-byte bit0 test that skips reason68 and rearms/clears the counter. The checker also preserves native packet/program, card/flash and physical Menu acceptance. The separately qualified source predicate establishes0607 as retained repair-template EEPROM03ca, not factory policy or RF evidence. No policy, counter or guest state was changed.",
       "evidence": ["docs/6150_bringup.md", "tools/nsm1_liveness_observe.lua", "tools/nsm1_liveness_check.py", "tools/test_nsm1_liveness_check.py"]
     },
     {
