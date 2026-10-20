@@ -4,11 +4,45 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.nsk1_phonebook_roundtrip import check_saved,check_reloaded,check_contacts,prepare_reload,SAVE_KEYS,SEARCH_KEYS
+from tools.nsk1_phonebook_roundtrip import check_saved,check_reloaded,check_contacts,prepare_reload,check_empty,SAVE_KEYS,SEARCH_KEYS,ERASE_KEYS
 from tools.nsk1_rom4_compare import INPUTS
 
 
 class Nsk1PhonebookTest(unittest.TestCase):
+    def test_erase_and_cold_empty_reject_storage_or_transport_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            self.setup_storage(run)
+            before = self.card()
+            empty = b'\xff'*1600+before[1600:]
+            card_path = run/'nvram/nsk1r4t/sim_card'
+            card_path.write_bytes(empty)
+            erase = (self.contacts('nsk1_phonebook_erase',ERASE_KEYS)
+                     +'\nins=dc p1=01 p2=04 p3=20 selected=6f3a'
+                     +'\nupdate fid=6f3a record=1 length=32\nSIM status ins=dc sw=9000')
+            cold = self.contacts('nsk1_phonebook_empty',SEARCH_KEYS)+'\nins=b2 p1=01 p2=04 p3=20 selected=6f3a'
+            with patch('tools.nsk1_phonebook_roundtrip.check_security'), \
+                    patch('tools.nsk1_phonebook_roundtrip.frame_check'):
+                with patch('tools.nsk1_phonebook_roundtrip.check_phase',return_value=({},erase)):
+                    self.assertTrue(check_empty(run,bytes(2048),before)[0]['physical_phonebook_erase'])
+                    card_path.write_bytes(before)
+                    with self.assertRaises(ValueError):
+                        check_empty(run,bytes(2048),before)
+                    card_path.write_bytes(empty[:-1]+b'\0')
+                    with self.assertRaises(ValueError):
+                        check_empty(run,bytes(2048),before)
+                    card_path.write_bytes(empty)
+                with patch('tools.nsk1_phonebook_roundtrip.check_phase',return_value=({},cold)):
+                    self.assertTrue(check_empty(run,bytes(2048),empty,True)[0]['physical_cold_empty_search'])
+                for invalid in (erase+'\nupdate fid=6f3a record=1 length=32',erase.replace('sw=9000','sw=9404')):
+                    with patch('tools.nsk1_phonebook_roundtrip.check_phase',return_value=({},invalid)):
+                        with self.assertRaises(ValueError):
+                            check_empty(run,bytes(2048),before)
+                for invalid in (cold.replace('ins=b2','ins=c0'),cold+'\nupdate fid=6f3a'):
+                    with patch('tools.nsk1_phonebook_roundtrip.check_phase',return_value=({},invalid)):
+                        with self.assertRaises(ValueError):
+                            check_empty(run,bytes(2048),empty,True)
+
     def card(self):
         data = bytearray([255])*3570
         data[:3] = b'ADA'

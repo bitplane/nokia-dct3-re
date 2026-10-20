@@ -19,15 +19,16 @@ physical `12345` acceptance and Menu/Select navigation into the Phone book
 list. This is native compatibility boot, SIM initialization and physical
 code/menu acceptance. A two-process gate additionally saves `ADA/123` to the
 SIM, cold-boots only its own persisted files and physically searches/renders
-the contact without rewriting it. Registration, calls and SMS remain unproved.
+the contact without rewriting it. The extended four-process gate physically
+deletes it and verifies erased ADN storage after another cold search.
+Registration, calls and SMS remain unproved.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
-The next software targets are contact deletion/cold-empty verification and
-the product's physical SIM-security workflows.
+The next software target is the product's physical SIM-security workflows.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -690,7 +691,7 @@ network registration, call, SMS or fitted-mask claim follows from this gate.
 
 ```sh
 .venv/bin/python tools/nsk1_phonebook_roundtrip.py mame/mame roms \
-  tmp/nsk1-profile-source tmp/nsk1-phonebook-roundtrip
+  tmp/nsk1-profile-source tmp/nsk1-phonebook-roundtrip --erase
 ```
 
 The first isolated process uses the qualified own external-input composition
@@ -719,7 +720,20 @@ unchanged executable flash, full readiness, code acceptance, exact physical
 keys and preserved identity/encoded-code EEPROM fields. Shared GSM 11.11 ADN
 validators are reused rather than giving this product a different record
 format. This proves contact save and cold read on the native compatibility
-composition, not deletion, full SIM security, network service or fitted mask.
+composition, not full SIM security, network service or fitted mask.
+
+With `--erase`, two further isolated processes complete the lifecycle.
+The third starts from the qualified saved card, physically selects
+Erase/one-by-one/ADA/confirmation and requires exactly one successful
+record-one UPDATE. All 50 ADN records must then be erased, with every byte
+outside ADN preserved. The confirmation and No phone numbers frames are
+checked independently. The fourth copies only persistent files from that
+verified deletion and physically searches prefix A. The first frame shows
+No phone numbers; two settled frames return to the Phone book list (RGB SHA256
+`3600e3d1cab564b185d03403552ea401e1e76edd07b110184716700828a5df2a`),
+not a persistent not-found dialog. Exact erased card bytes and absence of
+any UPDATE establish the cold-empty result; the menu image alone would not.
+Native/security/executable checks apply to all four processes.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.
