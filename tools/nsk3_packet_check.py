@@ -1,5 +1,6 @@
 """Bounded own NSK-3 packet activity and type8b routing, not radio acceptance."""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import struct
@@ -119,6 +120,33 @@ def check_completion_wait(trace):
             'all_possible_ingress_closed':False}
 
 
+def check_native_control(trace,expected_words):
+    writes=re.findall(r'nsk3_native_control_write: address=([0-9a-f]+) value=([0-9a-f]+) pc=([0-9a-f]+) t=([0-9.]+) observer_writes=0',trace)
+    samples=re.findall(r'nsk3_native_control_sample: t=([0-9.]+) pending=([0-9a-f]+) completed=([0-9a-f]+) control06e3=([0-9a-f]+) state1949=([0-9a-f]+) writes_pending=(\d+) writes_completed=(\d+) cap=64 observer_writes=0',trace)
+    words=re.findall(r'nsk3_native_live_words: address=([0-9a-f]+) words=([0-9a-f]+) observer_writes=0',trace)
+    if (len(writes)!=trace.count('nsk3_native_control_write:')
+            or len(samples)!=trace.count('nsk3_native_control_sample:')
+            or len(words)!=trace.count('nsk3_native_live_words:')
+            or len(samples)!=4 or len(words)!=4 or dict(words)!=expected_words):
+        raise ValueError('native control/program observation incomplete or changed')
+    pending=[int(value,16) for address,value,_,_ in writes if address=='06d0']
+    completed=[int(value,16) for address,value,_,_ in writes if address=='06d1']
+    if pending!=[0,1,2,8,3] or not completed or completed[-1]!=0x10e:
+        raise ValueError('native request/completion lifecycle differs')
+    if any(address not in ('06d0','06d1') for address,_,_,_ in writes):
+        raise ValueError('unexpected control address')
+    times=[float(row[3]) for row in writes]
+    if times!=sorted(times):raise ValueError('native write ordering differs')
+    for row,want in zip(samples,(5,20,40,45)):
+        time,p,c,gate,state,np,nc=row
+        if (abs(float(time)-want)>0.05 or (p,c,gate,state)!=('0003','010e','0000','0000')
+                or int(np)!=len(pending) or int(nc)!=len(completed)
+                or max(int(np),int(nc))>=64):
+            raise ValueError('native control samples/caps differ')
+    return {'request_indexes':pending[1:],'completed_word':'0x010e',
+            'live_regions_match_declared_rom':True,'fitted_mask_or_rf_contract_proved':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source',type=Path)
@@ -128,6 +156,7 @@ def main():
     parser.add_argument('--controller',action='store_true',help='require ROM reply, actual result and controller wait')
     parser.add_argument('--mode-chain',action='store_true',help='require measured09ec-to043c MCU sequence')
     parser.add_argument('--completion-wait',action='store_true',help='qualify the bounded empty server receive')
+    parser.add_argument('--native-control',type=Path,help='qualify control census against declared native program ROM')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -142,6 +171,13 @@ def main():
         if args.controller:summary['controller']=check_controller(trace)
         if args.mode_chain:summary['mode_chain']=check_mode_chain(trace)
         if args.completion_wait:summary['completion_wait']=check_completion_wait(trace)
+        if args.native_control:
+            program=args.native_control.read_bytes()
+            if hashlib.sha1(program).hexdigest()!='a05a1e96a8c36ec5a47e1ea059d15afa54ca5739':
+                raise ValueError('declared native compatibility program differs')
+            expected={f'{address:04x}':program[address*2:address*2+16].hex()
+                      for address in (0x3000,0x313f,0x47f6,0x4a49)}
+            summary['native_control']=check_native_control(trace,expected)
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)

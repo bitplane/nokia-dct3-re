@@ -7,6 +7,14 @@ reason68 restart at93.967473692s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
 below reproduces this failure; no keepalive or disabled watchdog is installed.
 
+**Active native boundary:** the last8b object is delivered intact and cached
+by mailbox0c in initial state3/phase1. The mapped acknowledgement server
+(mailbox0e) receives no input through45s. MCU work-queue routes are also
+dormant. These are measured boundaries, not proof that acquisition needs an
+injected acknowledgement. Native control capture and the remaining RF/data
+contracts are described below; registration, connected calls and speech remain
+unaccepted.
+
 The separate native compatibility instrument reaches **Insert SIM card** and
 rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
 With the synthetic SIM inserted and an own-initializer retry-byte fixture,
@@ -805,6 +813,32 @@ logical Send and that exact negative frame. Thus packed12345 in the prior
 EEPROM diff is not proof of usable call-history persistence. Cold EEPROM
 housekeeping changes are not declared history fidelity; the record contract
 and whether a successful call is required remain unresolved.
+
+### Native compatibility control census
+
+`nsk3_native_radio_observe.lua` adds passive DSP data-space write taps at
+06d0/06d1 and live program reads, composing the existing physical/menu and
+MCU observers without hardware/guest writes. Qualified45s capture
+`tmp/nsk3-native-control` observes pending values0,1,2,8,3; completion writes
+end at010e. Samples5/20/40/45s retain pending3,completed010e,06e3=0,1949=0.
+Counts5/12 remain below the64-write caps. No index4 request is observed.
+Live8-word regions3000,313f,47f6,4a49 match the declared NSE-1 ROM4 program
+byte-for-byte; the checker pins its acquired SHA1 before comparing them.
+This does not qualify the fitted NSK-3 mask, all uploaded program regions,
+physical RF inputs, a periodic-packet obligation or the semantics of every
+control word. Do not request index4 merely because a candidate completion
+publisher lies downstream in the sibling map.
+
+```sh
+.venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
+  tmp/nsk3-native-control --mode-chain --cache --completion-wait \
+  --native-control roms/nsk3r4t/nse1_rom4_dsp_program.bin
+```
+
+The next native work is the operation/request and RF-input contract, using
+live-code qualification before importing resident-only addresses. The MCU
+queue and acknowledgement findings constrain hypotheses but are not missing
+hardware events to manufacture.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
