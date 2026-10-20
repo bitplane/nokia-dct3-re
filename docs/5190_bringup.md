@@ -329,6 +329,20 @@ native receive stream still includes `8b`; execution/security/unchanged-flash
 checks pass. Next inspect the DSP type-80 publisher and its RF/codec input
 requirements, rather than inserting an MCU-side completion.
 
+The same resident image's receive prerequisites are already mapped in
+[the ROM4 integration contract](djr_dsp_integration.md): selector producers
+and operation routine `4c6f` ultimately depend on port-`27` sample processing
+and its activation/scheduling. A passive NSB-1 count at 60 seconds measures
+ring commit site `3805` 15 times (positive observation control), but `4c6f`,
+decode entry `4ef7`, and type-80 publishers `4f1c/50d5` zero times. Data
+`194f/1950/11fd` are all zero at that point. The byte-pinned resident contract
+and native/security/receive-activity/unchanged-flash checks pass. Thus the
+current failure precedes receive-operation/decode execution; it is not
+evidence of a successfully decoded block lost at the MCU transport. Separate
+unbound zero RF samples from activation prerequisites before designing a
+software RF fixture; arbitrary samples or manufactured type-80 packets
+would not demonstrate native reception.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns

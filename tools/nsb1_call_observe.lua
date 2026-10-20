@@ -163,6 +163,31 @@ _G.nsb1_call_result = memory:install_read_tap(0x10100,0x101c7,'nsb1_call_result'
     end
 end)
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
+local decode_sites = {0x3805,0x4c6f,0x4ef7,0x4f1c,0x50d5}
+local decode_counts, decode_taps = {}, {}
+for _, address in ipairs(decode_sites) do
+    decode_counts[address] = 0
+    decode_taps[#decode_taps+1] = dsp.spaces['program']:install_read_tap(address,address,
+        string.format('nsb1_decode_%04x',address),function(offset,data)
+            local pc = dsp.state['PC'].value
+            if pc == offset or pc == offset+1 then
+                decode_counts[address] = decode_counts[address]+1
+            end
+        end)
+end
+_G.nsb1_decode_taps = decode_taps
+local decode_reported = false
+emu.register_frame_done(function()
+    if decode_reported or machine.time:as_double() < 60 then return end
+    decode_reported = true
+    for _, address in ipairs(decode_sites) do
+        machine:logerror(string.format('nsb1_native_decode_count: pc=%04x count=%d observer_writes=0\n',
+            address,decode_counts[address]))
+    end
+    local data = dsp.spaces['data']
+    machine:logerror(string.format('nsb1_native_decode_selectors: primary=%04x secondary=%04x deferred=%04x observer_writes=0\n',
+        data:read_u16(0x194f),data:read_u16(0x1950),data:read_u16(0x11fd)))
+end,'NSB-1 native receive-decode census')
 local rx_count, rx_previous = 0, 0x80
 _G.nsb1_call_rx = dsp.spaces['data']:install_write_tap(0x08e4,0x08e4,'nsb1_call_rx',function(offset,data,mask)
     local old, new = rx_previous, data & 0xffff
