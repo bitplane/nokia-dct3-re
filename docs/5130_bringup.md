@@ -262,6 +262,14 @@ message byte +2 to r7 +18 and returns the unchanged input in r6 through
 the 20bd02 wait still requires the downstream lifecycle path, not just
 the presence of a finalizer call.
 
+For the mapped mode-1 continuation, 042f fails the explicit success comparison
+at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
+It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state
+19 and 20bb9e sets owner byte +15 to 1 before receiving again at 20bcfc.
+This is a static route for that continuation, not an observed delivery or
+closure of finalizer handling in every lifecycle state. The scan-finalizer
+path therefore cannot be substituted for the transaction's success report.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 
