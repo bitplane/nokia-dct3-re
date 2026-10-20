@@ -183,8 +183,18 @@ A separate wrong5675 control changes only PIN2 retries3->2 with9804;
 cold correct5678 restores retries and produces the exact positive card.
 `nsm1_pin2_check.py CHANGED RESTORED WRONG RETRY` checks all four runs,
 whole-card/EEPROM links, credential ordering, exact APDUs and own
-PIN2 code changed/Code error frames. PUK2 and protected application
-operations remain separate targets; network services are not accepted.
+PIN2 code changed/Code error frames.
+
+Two additional cold wrong-PIN2 attempts exhaust retries through9804 then
+9840. Physical PUK2 entry at the same menu sends `A0 2C 00 02 10`:
+wrong87654322 changes only PUK2 retries10->9; correct87654321 installs
+8765, restores PIN2 retries and returns9000. Firmware then automatically
+verifies the new PIN2. An independent cold process accepts8765 to restore
+5678. `nsm1_puk2_check.py FIRST SECOND EXHAUSTED WRONG RECOVERED COLD`
+checks physical authentication, exact command ordering, complete card and
+EEPROM links, native record validity and executable flash. Retry counters
+are never initialized by these fixtures. Protected application operations
+remain separate targets; network services are not accepted.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

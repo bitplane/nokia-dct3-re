@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_physical_pin2_exhaustion_puk2_cold_recovery", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physically exhausted PIN2 can be recovered with PUK2, and its new credential works in a cold process",
+      "current": "Two further cold wrong5675 changes consume PIN2 retries2->1->0,9804 then9840. From that same exhausted card, physical wrong PUK287654322/new8765/confirmation returns9804 and changes only PUK2 retries10->9. Correct87654321/new8765 returns9000, changes only PIN2 and its retry counter, then firmware automatically verifies8765. A separate cold process uses8765 to restore5678. Physical startup PIN1/phone authentication, exact UNBLOCK/automatic VERIFY order, complete card/EEPROM links, own flash and native record validity pass. No retry counters are seeded. Protected applications and network/native-speech acceptance remain separate.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_puk2_recover.lua", "tools/nsm1_puk2_wrong.lua", "tools/nsm1_puk2_check.py", "tools/test_nsm1_puk2_check.py"]
+    },
+    {
       "id": "nsm1_physical_pin2_change_cold_retry", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical authenticated PIN2 change survives cold boot and a wrong PIN2 changes only its retry counter before cold recovery",
       "current": "Own menu4-5-6 third entry accepts physical5678/new8765/confirmation with exact A0 24 00 02 10 padded credentials,9000 and only PIN2-byte changes. A cold process accepts8765 to restore5678. A separate same-input wrong5675 control returns9804 and changes only PIN2 retries3->2; cold correct5678 restores its retries and reproduces the entire positive card. Physical startup PIN1/phone authentication, full card and EEPROM links, own flash, native record validity and own exact PIN2 code changed/Code error frames pass across four runs. PUK2 and protected application operations remain unaccepted, and no radio acceptance follows.",
