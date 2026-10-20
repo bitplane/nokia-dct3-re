@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from tools.nsk1_fdn_record_check import expected_card, check_trace, RECORD
+from tools.nsk1_fdn_record_check import expected_card, edited_card, check_trace, RECORD
 from tools.nsk1_puk_roundtrip import exhaustion_profile
 from tools.sim_fdn_profile import extend
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET, padded_pin
@@ -46,6 +46,24 @@ class Nsk1FdnRecordTests(unittest.TestCase):
              patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()+bytes(4096)):
             with self.assertRaises(ValueError):
                 check_trace(self.trace(), 'write')
+
+    def test_edit_replaces_only_last_bcd_digit_in_existing_record(self):
+        saved = expected_card(extend(exhaustion_profile(), True))
+        edited = edited_card(saved)
+        self.assertEqual([i for i, pair in enumerate(zip(saved, edited)) if pair[0] != pair[1]], [3600])
+        self.assertEqual(edited[3600], 0xf6)
+        for invalid in (edited, saved[:-1], extend(exhaustion_profile(), True)):
+            with self.assertRaises(ValueError):
+                edited_card(invalid)
+        record = bytearray(RECORD)
+        record[22] = 0xf6
+        with patch('tools.nsk1_fdn_record_check.check_input'), \
+             patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()[:-32]+record):
+            check_trace(self.trace(), 'edit')
+        with patch('tools.nsk1_fdn_record_check.check_input'), \
+             patch('tools.nsk1_fdn_record_check.transmitted', return_value=self.transaction()):
+            with self.assertRaises(ValueError):
+                check_trace(self.trace(), 'edit')
 
 
 if __name__ == '__main__':

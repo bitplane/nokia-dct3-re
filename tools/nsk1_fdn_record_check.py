@@ -1,4 +1,4 @@
-"""Own NSK-1 protected FDN save, cold held-number read and PIN2 rejection."""
+"""Own NSK-1 protected FDN save/edit, cold held-number read and rejection."""
 import argparse
 from pathlib import Path
 import re
@@ -19,8 +19,10 @@ RECORD = bytes.fromhex('41ffffffffffffffffffffffffffffffffff04812143f5ffffffffff
 WRITE_KEYS = MENU + ['down','menu','down','menu','five','six','seven','eight','menu',
                      'two','menu','one','two','three','four','five','menu']
 READ_KEYS = MENU + ['down','menu','menu','menu','hash']
+EDIT_KEYS = READ_KEYS[:-1] + ['menu','menu','five','six','seven','eight','menu','menu','clear','six','menu']
 SAVED_LIST = 'cde17cf68445036ced7db33a3a93c978d5068388e8031c6dff9df305ba4ba970'
 NUMBER = '55bdfda888bb09881233e5b91ad607532185f77734260a1c5b813553ccbad9bd'
+EDITED_NUMBER = '72c38308118b60921e06f8b9fcc1feee03e2fba233a053c73cf66a818e417e4b'
 
 
 def expected_card(before, wrong=False):
@@ -35,10 +37,20 @@ def expected_card(before, wrong=False):
     return bytes(after)
 
 
+def edited_card(before):
+    if len(before) != 3898 or before[3575] != 1 or before[3578:3610] != RECORD:
+        raise ValueError('saved FDN-Off A/12345 record required')
+    after = bytearray(before)
+    after[3600] = 0xf6
+    return bytes(after)
+
+
 def check_trace(trace, mode):
-    if mode not in ('write', 'cold', 'wrong'):
+    if mode not in ('write', 'cold', 'wrong', 'edit'):
         raise ValueError('known record mode required')
     keys = READ_KEYS if mode == 'cold' else WRITE_KEYS[:]
+    if mode == 'edit':
+        keys = EDIT_KEYS
     if mode == 'wrong':
         keys = keys[:19]
         keys[17] = 'five'
@@ -50,7 +62,7 @@ def check_trace(trace, mode):
         raise ValueError('PIN1/PIN2 verification differs')
     if any(statuses(trace, ins) for ins in (4, 0x44, 0x24, 0x26, 0x28, 0x2c, 0xd6)):
         raise ValueError('unrelated validity/credential/file operation')
-    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode == 'write' else []):
+    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit') else []):
         raise ValueError('record update status differs')
     tx = transmitted(trace, 4096, 'nsk1_sim_tx')
     if len(tx) >= 4096 or tx.count(bytes.fromhex('a020000108') + padded_pin('1234')) != 1:
@@ -61,10 +73,13 @@ def check_trace(trace, mode):
     if mode != 'cold' and tx.count(pin2) != 1:
         raise ValueError('PIN2 payload differs')
     updates = re.findall(r'update fid=([0-9a-f]+) record=(\d+) length=(\d+)', trace)
-    if updates != ([('6f3b', '1', '32')] if mode == 'write' else []):
+    if updates != ([('6f3b', '1', '32')] if mode in ('write', 'edit') else []):
         raise ValueError('unexpected file update')
-    if mode == 'write':
-        command = bytes.fromhex('a0dc010420') + RECORD
+    if mode in ('write', 'edit'):
+        record = bytearray(RECORD)
+        if mode == 'edit':
+            record[22] = 0xf6
+        command = bytes.fromhex('a0dc010420') + record
         if tx.count(command) != 1 or tx.index(command) < tx.index(pin2):
             raise ValueError('protected record payload/order differs')
     elif mode == 'cold':
@@ -79,6 +94,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('seed', 'write', 'cold', 'wrong'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--edit', nargs=2, type=Path, metavar=('EDIT', 'COLD'))
     args = parser.parse_args()
     try:
         _, seed_trace = check_phase(args.seed, (args.seed / 'initial_eeprom.bin').read_bytes(), through=59, minimum_records=1)
@@ -94,10 +110,21 @@ def main():
                 raise ValueError('whole-card result differs')
             check_trace(trace, mode)
             frame_check(run / 'snap/nsk1_fdn_final.png', {'write': SAVED_LIST, 'cold': NUMBER, 'wrong': CODE_ERROR}[mode])
+        if args.edit:
+            edit, cold = args.edit
+            for run, previous, mode in ((edit, args.cold, 'edit'), (cold, edit, 'cold')):
+                check_cold_link(run, previous)
+                _, trace = check_phase(run, (run / 'initial_eeprom.bin').read_bytes(), through=59, minimum_records=1)
+                if (run / 'nvram/nsk1r4t/sim_card').read_bytes() != edited_card(saved):
+                    raise ValueError('in-place edit/cold card differs')
+                check_trace(trace, mode)
+                frame_check(run / 'snap/nsk1_fdn_final.png', SAVED_LIST if mode == 'edit' else EDITED_NUMBER)
     except (ValueError, OSError, KeyError) as error:
         print(f'NSK-1 protected FDN record failed: {error}', file=sys.stderr)
         return 1
     print('NSK-1 protected FDN save, cold read and rejected-write preservation PASS')
+    if args.edit:
+        print('NSK-1 in-place FDN edit and cold 12346 retrieval PASS')
     return 0
 
 

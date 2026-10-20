@@ -16,7 +16,7 @@ from tools.sim_fdn_profile import extend, expected_validity_card
 from tools.sim_fdn_protocol_check import check_phase
 
 MENU = 'menu down down down menu down down menu down menu'.split()
-KEY_CODES = {'menu': 0x19, 'down': 0x18, 'up': 0x17, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'hash': 0x0b}
+KEY_CODES = {'menu': 0x19, 'clear': 0x1a, 'down': 0x18, 'up': 0x17, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'hash': 0x0b}
 ON_FRAME = '1a85da1529f1469b41d424026cb0b489fc25e5dab64056b729566e0cf64fd53b'
 OFF_FRAME = 'aa1638502f5eef8a12434630a230ebd396607341405c96b147a43fecb5be7462'
 

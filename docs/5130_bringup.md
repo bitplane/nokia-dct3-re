@@ -1548,11 +1548,11 @@ results, not those images alone. The common expected-card validity transition
 now lives in `sim_fdn_profile.py`, shared with the NSB-1 gate; handset menus
 and native acceptance remain product-owned.
 
-Protected record save/read/rejection is independently qualified below;
-edit/erase and local dial enforcement remain pending. The compatibility-mask
+Protected record save/edit/read/rejection is independently qualified below;
+erase and local dial enforcement remain pending. The compatibility-mask
 and radio boundaries are unchanged.
 
-### Protected FDN record save and cold retrieval
+### Protected FDN record save/edit and cold retrieval
 
 ```sh
 .venv/bin/python tools/nsk1_fdn_record_check.py tmp/nsk1-fdn-off-cold \
@@ -1576,8 +1576,16 @@ The gate requalifies the cold Off seed, own native/storage, each cold link,
 physical and decoded input, credential/update payloads and ordering, selected
 file/record, complete card differences and exact list/number/error frames.
 Fixtures are `nsk1_fdn_write.lua`, `nsk1_fdn_read.lua` and
-`nsk1_fdn_write_wrong.lua`. This is not FDN edit/erase, dial enforcement,
-radio registration, connected calls or fitted-mask acceptance.
+`nsk1_fdn_write_wrong.lua`.
+
+Append `--edit tmp/nsk1-fdn-edit tmp/nsk1-fdn-edit-cold` to qualify in-place
+editing. Physical Search → Options → Edit, PIN25678, unchanged name, C/6 and
+Save issue one protected update to the same record1. Only byte3600 changes
+F5→F6: A/12345 becomes A/12346, with no new record or unrelated mutation.
+The separate cold process displays12346 using the same held-# Search route
+and leaves the complete card unchanged. `nsk1_fdn_edit.lua` keeps menu
+spacing separate from credential/number typing. These gates do not accept
+erase/cancel, dial enforcement, registration, connected calls or fitted mask.
 
 ### Ordinary PIN change
 

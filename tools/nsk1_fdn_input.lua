@@ -19,7 +19,7 @@ _G.nsk1_fdn_tx_tap=machine.devices[':maincpu'].spaces.program:install_write_tap(
         machine:logerror(string.format('nsk1_sim_tx: index=%d value=%02x t=%.9f observer_writes=0\n',count,(value>>8)&0xff,machine.time:as_double()))
     end
 end)
-local cells={menu={1,4},down={0,8},up={1,16},one={2,2},two={3,2},three={4,2},four={2,4},five={3,4},six={4,4},seven={2,8},eight={3,8},hash={4,16}}
+local cells={menu={1,4},clear={1,2},down={0,8},up={1,16},one={2,2},two={3,2},three={4,2},four={2,4},five={3,4},six={4,4},seven={2,8},eight={3,8},hash={4,16}}
 local keys={'menu','down','down','down','menu','down','down','menu','down','menu'}
 if _G.nsk1_fdn_cold then
     table.remove(keys)
