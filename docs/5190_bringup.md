@@ -7,10 +7,10 @@ MCU and PPM A/B streams. It is not a full phone dump and does not establish
 graphical boot or phone services. The separate `noki5190` MCU research
 configuration executes the own input, initializes the own EEPROM geometry,
 installs its exact ROM4-catalogue program and reaches a supervisor flag loop.
-The next work is that flag's scheduler/interrupt contract and the DSP release
-lifecycle. Do not equate this loop with a missing DSP acknowledgement without
-tracing its owner, or inherit the 5110 machine merely because the restore
-manifest names ROM4.
+The supervisor flag is cleared organically by FIQ; its sampled loop is not
+a blocked lifecycle. The next work is the DSP release/upload lifecycle and
+its own completion consumers. Do not inherit the 5110 machine merely because
+the restore manifest names ROM4.
 
 ## Qualified executable input
 
@@ -106,9 +106,13 @@ Fresh passive runs observe the following without firmware RAM/MMIO writes:
 - all 186 words installed at MCU `11e00` match the own descriptor at
   `2be564`, payload SHA-1 `e1e8f15a305bf32aea98f444074f30828d933fc4`;
 - 246 shared-memory writes occur before the observed supervisor park;
-- through five seconds PC is `2a4672..2a4678`, SP `10c6dc`, with EEPROM
-  geometry/catalogues stable. The loop tests flag `10c540`; its owner and
-  expected interrupt transition remain unresolved;
+- through five seconds sampled PC is `2a4672..2a4678`, SP `10c6dc`, with
+  EEPROM geometry/catalogues stable. This is ordinary supervisor idle:
+  FIQ entry `2acac4` clears flag `10c540` at `2acaca`, and the supervisor
+  re-arms it at `2a4668`. A five-second run observes 39 flag writes, with
+  repeated wake/re-arm pairs. Global control is `05` after startup, both
+  ARM interrupt-disable bits are clear, and local FIQ mask is `e3`.
+  Repeated samples in this loop therefore do not imply an interrupt deadlock;
 - persisted flash equals the normalized source. The 8 KiB EEPROM contains
   firmware-created writes, which are not proof of valid calibration or identity.
 
@@ -124,4 +128,7 @@ Use a fresh `RUN` directory:
 
 The checker pins the source, exact installed program, five ordered geometry/
 catalogue observations, stack bounds, supervisor park and unchanged executable
-flash. It is a boundary regression, not a graphical boot oracle.
+flash. It additionally requires repeated FIQ-owned flag clears and actual
+global interrupt-enable observations. Register `0b` is labeled `irqmask`,
+not global control (`0c`). It is a boundary regression, not a graphical boot
+oracle.

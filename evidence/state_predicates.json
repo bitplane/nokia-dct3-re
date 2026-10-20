@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_supervisor_fiq_wake", "owner": "nsb1_supervisor", "status": "satisfied",
+      "predicate": "The sampled NSB-1 supervisor loop wakes through organic FIQ entry and is not a globally disabled interrupt deadlock",
+      "current": "Own FIQ entry 2acac4 clears flag 10c540 at 2acaca; the supervisor re-arms it at 2a4668. Passive observation records repeated wake/re-arm pairs and 39 writes through five seconds. After startup actual global control 0c is 05, CPSR interrupt-disable bits are clear and FIQ mask is e3. The observer's former ctrl label read local IRQ mask 0b; it is corrected to irqmask, with actual global control independently reported. This closes the flag-owner question but does not identify the remaining DSP/application dependency or promote boot.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_boot_check.py", "tools/test_nsb1_boot_check.py"]
+    },
+    {
       "id": "nsb1_v671_mcu_upload_boundary", "owner": "nsb1_mcu_research", "status": "satisfied",
       "predicate": "Own NSB-1 MCU execution initializes its declared external EEPROM geometry and installs its own ROM4-catalogue program before a measured supervisor park",
-      "current": "Fresh noki5190 starts with erased 8 KiB EEPROM, no DSP acknowledgements or phone peers. Passive observation validates mode/page/capacity 1/20/2000, catalogue first pointers 2b35a4/2b94e4, family 4 and all 186 installed program words matching own descriptor 2be564. After 246 shared writes the observed supervisor loop at 2a4672..78 tests flag 10c540 through five seconds, with SP 10c6dc. Its owner and expected interrupt transition remain unresolved; it is not classified as a DSP wait. Persisted executable flash is unchanged; firmware-created EEPROM writes are not valid calibration or identity proof. SRAM is a minimal research window, fitted part/masks are unproved, and no graphical boot or service acceptance is promoted.",
+      "current": "Fresh noki5190 starts with erased 8 KiB EEPROM, no DSP acknowledgements or phone peers. Passive observation validates mode/page/capacity 1/20/2000, catalogue first pointers 2b35a4/2b94e4, family 4 and all 186 installed program words matching own descriptor 2be564. After 246 shared writes samples land in supervisor loop 2a4672..78 with SP 10c6dc, but the separately checked FIQ entry repeatedly clears its flag 10c540: this is not a stopped scheduler or a classified DSP wait. Persisted executable flash is unchanged; firmware-created EEPROM writes are not valid calibration or identity proof. SRAM is a minimal research window, fitted part/masks are unproved, and no graphical boot or service acceptance is promoted.",
       "evidence": ["docs/5190_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb1_boot_observe.lua", "tools/nsb1_boot_check.py", "tools/test_nsb1_boot_check.py"]
     },
     {

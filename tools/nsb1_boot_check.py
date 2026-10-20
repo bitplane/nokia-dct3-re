@@ -17,7 +17,7 @@ def check_trace(trace, program):
     if len(uploads) != 1 or bytes.fromhex(uploads[0]) != program:
         raise ValueError('installed program differs from own ROM4 catalogue')
     samples = re.findall(
-        r'nsb1_boot: t=([0-9.]+) pc=([0-9a-f]+) sp=([0-9a-f]+) ctrl=([0-9a-f]+) '
+        r'nsb1_boot: t=([0-9.]+) pc=([0-9a-f]+) sp=([0-9a-f]+) irqmask=([0-9a-f]+) '
         r'eeprom_mode=01 page=20 capacity=00002000 selector=00 dsp_family=0004 '
         r'catalogue0=002b35a4/002b94e4 shared_writes=(\d+) observer_writes=0', trace)
     if len(samples) != 5:
@@ -28,6 +28,15 @@ def check_trace(trace, program):
             raise ValueError('unexpected observation ordering or stack extent')
         if expected >= 0.5 and (int(pc, 16) not in (0x2a4672, 0x2a4674, 0x2a4676, 0x2a4678) or int(writes) != 246):
             raise ValueError('MCU no longer reproduces the measured supervisor park')
+    clears = re.findall(r'nsb1_supervisor_flag: value=00 pc=002acaca t=([0-9.]+) observer_writes=0', trace)
+    if len(clears) < 3 or any(float(a) >= float(b) for a, b in zip(clears, clears[1:])):
+        raise ValueError('missing repeated organic FIQ supervisor wakeups')
+    interrupts = re.findall(r'nsb1_interrupts: t=([0-9.]+) cpsr=([0-9a-f]+) ctrl=([0-9a-f]+)', trace)
+    if len(interrupts) != 5:
+        raise ValueError('missing actual global interrupt-control observations')
+    for time, cpsr, control in interrupts[1:]:
+        if int(control, 16) != 5 or int(cpsr, 16) & 0xc0:
+            raise ValueError('global interrupt delivery disabled after startup')
 
 
 def main():
