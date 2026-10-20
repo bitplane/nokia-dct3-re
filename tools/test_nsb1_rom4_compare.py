@@ -3,7 +3,7 @@ import struct
 import tempfile
 import unittest
 
-from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_lcd, check_trace, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -106,6 +106,19 @@ class LcdCompareTest(unittest.TestCase):
 
 
 class ChecksumControlTest(unittest.TestCase):
+    def test_late_presentation_rejects_early_or_blank(self):
+        from PIL import Image
+        with self.assertRaisesRegex(ValueError, 'readiness'):
+            check_late_presentation('', Path('.'))
+        trace = 'nsb1_late_ui: t=10.000000000 phase=03 reports=0f column_mask=20 observer_writes=0'
+        with self.assertRaisesRegex(ValueError, 'readiness'):
+            check_late_presentation(trace.replace('10.000', '5.000'), Path('.'))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            Image.new('RGB', (84, 48), 'white').save(root / 'nsb1_native_10s.png')
+            with self.assertRaisesRegex(ValueError, 'pixels'):
+                check_late_presentation(trace, root)
+
     def test_runtime_bit_retention(self):
         trace = '\n'.join(f'nsb1_presentation: t={time} selftest_flags={value} observer_writes=0'
                           for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', '40', '40', '40')))

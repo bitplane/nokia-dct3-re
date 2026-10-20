@@ -15,6 +15,20 @@ INPUTS = (
 )
 
 
+EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
+
+
+def check_late_presentation(trace, snapshots):
+    from PIL import Image
+    samples = re.findall(r'nsb1_late_ui: t=([0-9.]+) phase=03 reports=0f column_mask=20 observer_writes=0', trace)
+    if not any(10 <= float(value) < 10.1 for value in samples):
+        raise ValueError('missing late empty-socket readiness observation')
+    with Image.open(snapshots / 'nsb1_native_10s.png') as source:
+        frame = source.convert('RGB')
+        if frame.size != (84, 48) or hashlib.sha256(frame.tobytes()).hexdigest() != EMPTY_SOCKET_RGB_SHA256:
+            raise ValueError('late empty-socket Insert SIM card pixels changed')
+
+
 def checksum_control(source):
     """Own decoded integrity fields only; never claim erased contents are calibrated."""
     if len(source) != 8192:
@@ -173,6 +187,8 @@ def main():
                 check_lcd((run / 'error.log').read_text(), run / 'snap')
             else:
                 check_checksum_control((run / 'error.log').read_text())
+                if args.seconds >= 12:
+                    check_late_presentation((run / 'error.log').read_text(), run / 'snap')
             if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
                 raise ValueError('own executable flash changed')
             if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
@@ -180,7 +196,10 @@ def main():
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
     status = 'native continuation PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
-    qualifier = 'checksum diagnostic; presentation not accepted; ' if args.checksum_control_from else ''
+    qualifier = ''
+    if args.checksum_control_from:
+        qualifier = ('checksum diagnostic; graphical empty-socket frame accepted; no card/service acceptance; '
+                     if args.seconds >= 12 else 'checksum diagnostic; late presentation not tested; ')
     print(f'NSB-1 compatibility {status}; {qualifier}fitted mask/phone boot not promoted; evidence={run}')
 
 

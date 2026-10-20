@@ -13,16 +13,18 @@ program's resident-version publication to shared word `10004`, before the
 MCU begins sparse-flash handoffs. Separate `nsb1r4t` executes acquired NSE-1
 ROM4 as an explicit compatibility candidate: it passes own version selection,
 63 block handoffs and native loader/resident continuation. LCD bus/pixel
-acceptance reproduces firmware clear/fill/clear self-test, not application
-presentation. Fitted NSB-1 mask identity and DSP cadence remain unproved.
+acceptance reproduces firmware clear/fill/clear self-test with erased storage.
+The qualified checksum/nominal-input comparison additionally reaches the
+firmware's Insert SIM card screen. Fitted mask identity and DSP cadence remain unproved.
 No scheduler or ownership flag is injected.
 
 The compatibility instrument now uses an explicitly nominal ADC2 input of
 554. With the six-byte checksum diagnostic it completes ten acquisitions,
 posts readiness report `14` organically, and unmasks keypad columns. Physical
-Menu causes new scanner reads. The five-second raster is not a readable
-application screen; decoded-key/UI acceptance and fitted ADC routing remain
-unproved. The ordinary silent `noki5190` configuration is unchanged.
+Menu reaches logical decoder result `19`. The five-second raster is transient;
+the exact readable empty-socket frame is accepted at ten seconds. Menu/app
+navigation, inserted-card services and fitted ADC routing remain unproved.
+The ordinary silent `noki5190` configuration is unchanged.
 
 ## Qualified executable input
 
@@ -335,9 +337,10 @@ event `21`: the periodic event-26 acquisition lifecycle itself completes.
 By two seconds readiness is `0f`, phase is `03`, and column mask is `20`.
 Physical Menu from 3.0 to 3.25 seconds now produces scanner-register reads
 (77 total including bounded observer snapshots), unlike the full-scale
-control. Decoded key identity and application navigation remain unaccepted.
-The inspected five-second PNG has only a small black feature at its right
-edge, not a legible application screen. Do not call this graphical boot.
+control. Positive probes at decoder return `2af79e` additionally observe
+logical key `19` six times during that hold. Application navigation remains
+unaccepted. The five-second PNG's small right-edge feature is an early
+transient, not the settled boot frame.
 
 The nominal-input LCD stream contains 116 commands and 3054 data bytes
 through five seconds. An independent replay of all 3170 selection-21 bus
@@ -347,8 +350,30 @@ Firmware sends glyph-like nonzero data around 1.583 seconds, then issues
 further full-bank clear/init traffic around 1.584 and 1.595 seconds. The
 final sparse raster is therefore explained by the captured firmware traffic,
 not a demonstrated dropped-pixel or addressing defect in the LCD device.
-The next presentation question is the ownership/caller of those subsequent
-clears and the firmware context that should repaint them.
+Transfer `261600` reads framebuffer `107a00` and, when selected, ANDs away
+mask buffer `107808`; at five seconds the former contains seven nonzero
+bytes/28 set bits and the latter is all zero. This is a genuine sparse RAM
+frame, not an overlay hiding text. Rectangle renderer `260f80` clears central
+text, title and softkey areas under callers `247403` and `247673` before
+the later repaint. It must not be patched to preserve that transient text.
+
+An unattended run reaches Insert SIM card by ten seconds and retains exact
+identical RGB bytes at 10, 20 and 29 seconds: SHA-256
+`a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc`,
+84x48, 250 black pixels. Run the checksum comparison for at least 12 seconds
+to require the late readiness observation and exact ten-second frame:
+
+```sh
+.venv/bin/python tools/nsb1_rom4_compare.py mame/mame roms \
+  tmp/nsb1-empty-socket --seconds 12 \
+  --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+The six-second gate remains only native/bootstrap/readiness acceptance.
+The late gate explicitly accepts graphical **empty-socket** continuation;
+it does not prove inserted-card SIM security, menus, phonebook or radio.
+Next attach a card through the existing controller/device boundary and
+verify the own ATR/APDU lifecycle, without SIM-ready or UI-state injection.
 
 ### External reference leads, not provisioning evidence
 

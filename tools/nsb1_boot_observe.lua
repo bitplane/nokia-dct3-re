@@ -157,3 +157,13 @@ emu.register_frame_done(function()
     next_sample = next_sample + 1
     observing = false
 end, 'NSB-1 passive MCU boundary')
+
+local late_times, late_index = {10, 20}, 1
+emu.register_frame_done(function()
+    local now = machine.time:as_double()
+    if machine.system.name ~= 'nsb1r4t' or late_index > #late_times or now < late_times[late_index] then return end
+    machine.screens[':screen']:snapshot(string.format('nsb1_native_%ds.png', late_times[late_index]))
+    machine:logerror(string.format('nsb1_late_ui: t=%.9f phase=%02x reports=%02x column_mask=%02x observer_writes=0\n',
+        now, space:read_u8(0x10ffb0), space:read_u8(0x10c3f5), space:read_u8(0x20033)))
+    late_index = late_index + 1
+end, 'NSB-1 late empty-socket presentation')
