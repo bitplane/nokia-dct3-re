@@ -16,7 +16,7 @@ from tools.sim_fdn_profile import extend, expected_validity_card
 from tools.sim_fdn_protocol_check import check_phase
 
 MENU = 'menu down down down menu down down menu down menu'.split()
-KEY_CODES = {'menu': 0x19, 'down': 0x18, 'up': 0x17, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8}
+KEY_CODES = {'menu': 0x19, 'down': 0x18, 'up': 0x17, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'hash': 0x0b}
 ON_FRAME = '1a85da1529f1469b41d424026cb0b489fc25e5dab64056b729566e0cf64fd53b'
 OFF_FRAME = 'aa1638502f5eef8a12434630a230ebd396607341405c96b147a43fecb5be7462'
 
@@ -29,10 +29,9 @@ def phase_keys(phase):
     return MENU + ['up' if phase == 0 else 'down', 'menu', 'five', 'six', 'seven', 'eight', 'menu']
 
 
-def check_trace(trace, phase):
+def check_input(trace, keys):
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
-    keys = phase_keys(phase)
     contacts = re.findall(r'nsk1_fdn_contact: index=(\d+) key=(\w+) down=([01]) t=[0-9.]+ physical_only=1', trace)
     if contacts != [(str(i), key, edge) for i, key in enumerate(keys, 1) for edge in ('1', '0')] or len(contacts) != trace.count('nsk1_fdn_contact:'):
         raise ValueError('physical own FDN route differs')
@@ -43,6 +42,10 @@ def check_trace(trace, phase):
     expected = [1, 2, 3, 4, 0x19, 1, 2, 3, 4, 5, 0x19] + [KEY_CODES[key] for key in keys]
     if [int(key, 16) for key in decoded] != expected or len(decoded) != trace.count('nsk1_fdn_key:'):
         raise ValueError('decoded FDN input differs')
+
+
+def check_trace(trace, phase):
+    check_input(trace, phase_keys(phase))
     check_phase(trace, phase, 'nsk1_sim_tx')
 
 

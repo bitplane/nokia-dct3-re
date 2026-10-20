@@ -1548,8 +1548,36 @@ results, not those images alone. The common expected-card validity transition
 now lives in `sim_fdn_profile.py`, shared with the NSB-1 gate; handset menus
 and native acceptance remain product-owned.
 
-This does not yet accept protected FDN record save/edit/erase or local dial
-enforcement. The compatibility-mask and radio boundaries are unchanged.
+Protected record save/read/rejection is independently qualified below;
+edit/erase and local dial enforcement remain pending. The compatibility-mask
+and radio boundaries are unchanged.
+
+### Protected FDN record save and cold retrieval
+
+```sh
+.venv/bin/python tools/nsk1_fdn_record_check.py tmp/nsk1-fdn-off-cold \
+  tmp/nsk1-fdn-write tmp/nsk1-fdn-read tmp/nsk1-fdn-write-wrong
+```
+
+Own Fixed dialling → Numbers → Add accepts physical PIN25678, name A and
+number12345. Firmware issues exactly one PIN2-protected UPDATE RECORD to
+EF_FDN6f3b, record1, length32, with the expected ADN-format bytes. The
+complete card changes only that record; the settled frame lists A. No FDN
+record is preloaded into the card input. `nsk1_fdn_write.lua` uses two-second
+menu spacing and half-second digit entry, keeping the transaction below the
+known late native packet-supervision restart.
+
+A separate cold process uses Numbers → Search, submits an empty name, and
+holds physical # for four seconds to display12345. It reads record1,
+preserves the whole card and needs no PIN2 verification. An independent
+wrong-current5675 Add attempt from the same empty-card seed returns VERIFY
+9804 and Code error; only PIN2 retry3517 changes3→2, with no file write.
+The gate requalifies the cold Off seed, own native/storage, each cold link,
+physical and decoded input, credential/update payloads and ordering, selected
+file/record, complete card differences and exact list/number/error frames.
+Fixtures are `nsk1_fdn_write.lua`, `nsk1_fdn_read.lua` and
+`nsk1_fdn_write_wrong.lua`. This is not FDN edit/erase, dial enforcement,
+radio registration, connected calls or fitted-mask acceptance.
 
 ### Ordinary PIN change
 

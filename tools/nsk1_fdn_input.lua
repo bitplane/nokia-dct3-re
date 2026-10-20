@@ -19,7 +19,7 @@ _G.nsk1_fdn_tx_tap=machine.devices[':maincpu'].spaces.program:install_write_tap(
         machine:logerror(string.format('nsk1_sim_tx: index=%d value=%02x t=%.9f observer_writes=0\n',count,(value>>8)&0xff,machine.time:as_double()))
     end
 end)
-local cells={menu={1,4},down={0,8},up={1,16},five={3,4},six={4,4},seven={2,8},eight={3,8}}
+local cells={menu={1,4},down={0,8},up={1,16},one={2,2},two={3,2},three={4,2},four={2,4},five={3,4},six={4,4},seven={2,8},eight={3,8},hash={4,16}}
 local keys={'menu','down','down','down','menu','down','down','menu','down','menu'}
 if _G.nsk1_fdn_cold then
     table.remove(keys)
@@ -37,9 +37,11 @@ for index,name in ipairs(keys) do
         if candidate.mask==cell[2] then field=candidate end
     end
     assert(field,'own FDN contact missing')
-    events[#events+1]={32+index*2,field,1,index,name}
-    events[#events+1]={32.2+index*2,field,0,index,name}
-    frames[#frames+1]=32.5+index*2
+    local when=_G.nsk1_fdn_times and _G.nsk1_fdn_times[index] or 32+index*2
+    events[#events+1]={when,field,1,index,name}
+    local duration=index==#keys and _G.nsk1_fdn_hold_last or 0.2
+    events[#events+1]={when+duration,field,0,index,name}
+    frames[#frames+1]=when+0.5
 end
 local event,frame=1,1
 local final=false
@@ -55,7 +57,7 @@ emu.register_frame_done(function()
         machine.screens[':screen']:snapshot('nsk1_fdn_'..frame..'.png')
         frame=frame+1
     end
-    if not final and now>=(_G.nsk1_fdn_cold and 62 or 74) then
+    if not final and now>=(_G.nsk1_fdn_final_time or (_G.nsk1_fdn_cold and 62 or 74)) then
         final=true
         machine.screens[':screen']:snapshot('nsk1_fdn_final.png')
     end
