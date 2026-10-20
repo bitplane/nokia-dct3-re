@@ -18,11 +18,13 @@ def parse_range(value: str) -> tuple[int, int]:
 	return int(address, 0), int(length, 0)
 
 
-def relocation_mask(data: bytes) -> bytearray:
+def relocation_mask(data: bytes, byteorder: str = "little") -> bytearray:
+	if byteorder not in ("little", "big"):
+		raise ValueError("Thumb byte order must be little or big")
 	mask = bytearray([0xff]) * len(data)
 	for offset in range(0, len(data) - 3, 2):
-		first = int.from_bytes(data[offset:offset + 2], "little")
-		second = int.from_bytes(data[offset + 2:offset + 4], "little")
+		first = int.from_bytes(data[offset:offset + 2], byteorder)
+		second = int.from_bytes(data[offset + 2:offset + 4], byteorder)
 		if first & 0xf800 == 0xf000 and second & 0xe800 == 0xe800:
 			mask[offset:offset + 4] = bytes(4)
 	return mask
@@ -33,6 +35,8 @@ def main() -> None:
 	parser.add_argument("reference", type=Path)
 	parser.add_argument("target", type=Path)
 	parser.add_argument("region", type=parse_range, help="reference address:length")
+	parser.add_argument("--byteorder", choices=("little", "big"), default="little",
+			help="raw Thumb halfword byte order; big for native big-endian NSK images")
 	args = parser.parse_args()
 
 	reference = args.reference.read_bytes()
@@ -43,7 +47,7 @@ def main() -> None:
 		raise SystemExit("reference region is outside the image")
 
 	signature = reference[offset:offset + length]
-	mask = relocation_mask(signature)
+	mask = relocation_mask(signature, args.byteorder)
 	compared = sum(byte != 0 for byte in mask)
 	matches = []
 	for candidate in range(0, len(target) - length + 1, 2):

@@ -13,6 +13,15 @@ class RelocationMaskTests(unittest.TestCase):
 		data = bytes.fromhex("00 e0 12 34 78 56")
 		self.assertEqual(relocation_mask(data), bytearray((0xff,) * len(data)))
 
+	def test_big_endian_bl_and_exact_local_bytes(self):
+		data = bytes.fromhex("f0 00 f8 00 20 01 e0 00")
+		self.assertEqual(relocation_mask(data, "big"), bytearray((0, 0, 0, 0, 255, 255, 255, 255)))
+		self.assertNotEqual(relocation_mask(data), relocation_mask(data, "big"))
+
+	def test_invalid_byte_order(self):
+		with self.assertRaises(ValueError):
+			relocation_mask(b"", "swap16")
+
 
 if __name__ == "__main__":
 	unittest.main()

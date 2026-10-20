@@ -705,6 +705,17 @@ The first four select ROM template2c670c/header040c0000;281748/281950
 select2c6204 or2c6208 (040d0000/040d0300). The2820d2 path posts a dynamic
 object after lower-decoder tracing;287f3a is a separate constructor tail.
 Their ingress conditions and payload semantics are not yet established.
+
+Cross-ROM lookup now uses explicit raw byte order:
+`find_thumb_signature.py ... 0x23a728:20 --byteorder big` finds constructor
+24709c uniquely (16/20 exact bytes after relocatedBL masking). The sibling
+decoder269f28:20 finds own281e98 uniquely (20/20 exact), while a separate
+constructor26e25c:20 has no match; absence is retained, not fuzzed away.
+Own decoding independently confirms native type80 at2ab522..528 branches
+to2ab5cc and calls281e98. Its path2820ce..d2 selects mailbox0e. Packet-body
+predicates and any040b header rewrite remain to be decoded; the observed
+74/74/74/74/99/8b census contains no80. This is an available but unexercised
+transport route, not authority to fabricate its input.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.

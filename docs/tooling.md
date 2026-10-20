@@ -13,7 +13,9 @@
   - `findcalls.py ADDR...` — find `bl`/branch callers of an address
   - `find_thumb_signature.py REF TARGET ADDR:LEN` — locate a Thumb-1 region in
     another image while masking only relocated direct `BL`/`BLX` encodings;
-    reports exact compared-byte coverage and every match.
+    reports exact compared-byte coverage and every match. Halfwords default
+    to little-endian; use `--byteorder big` for raw big-endian NSK images.
+    A match is a candidate, not transferred function ownership or semantics.
   - `find_scalar_uses.py VALUE...` — enumerate exact Thumb-1 immediate,
     literal-pool and two-instruction scalar constructions with decode coverage.
   - `find_struct_access.py OFFSET...` — find and contextualize Thumb-1 loads and
