@@ -42,6 +42,27 @@ both memory views at1s. Its566 observed first opcode words all have decoded
 boundaries, including observed extension variants. These are short-run
 software/mapping qualifications, not native registration or speech proof.
 
+The full program-write census, not just the `2800..2fff` tap, observes2290
+writes to2289 distinct destinations during the first second. All2288 unique
+uploaded destinations below3000 retain their final uploaded words in program
+space. The sole higher destination is `ff87`: writes0004/0100 at exposed
+PC0f12/4a0d leave the acquired resident word0004 unchanged. Guest reads at
+exposed PC0f15/0f6a/4a11 each return0004. Live4a0b is
+`MVDP *AR2,ff87`, followed by `MVPD ff87,*AR3-` at4a0f; the latter result
+feeds the type74 report ending `0a090004`. This is an observed immutable-ROM
+read path, not evidence for an additional writable code bank or a new RF
+device. In particular, do not extend RAM toff87 just to retain every write.
+
+`nsk3_native_program_census.lua` composes the same physical fixture with
+`dct3_native_program_write_census.lua`; the latter suppresses its own memory
+sampling from the guest-read observer. Checker
+`nsk3_program_census_check.check_census` requires the complete14-page census,
+all uploaded-word visibility, the two high writes and exactly three guest
+identity reads. Its40s run also passes the existing input/SIM/whole-card and
+exact-frame checks. The write-retention inventory is explicitly a1s loader
+horizon, not a proof that no later runtime overlay can exist. No further
+program-memory geometry change is supported by this census.
+
 `nsk3_native_upload_long.lua` composes the same physical dial with existing
 passive native-control and liveness observers. The110s run uses own persisted
 EEPROM/SIM/flash/config only, with no new provisioning or guest writes.
