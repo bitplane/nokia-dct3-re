@@ -252,6 +252,26 @@ This identifies an absent lower transport family, not the meaning of a
 valid type-80 body, a complete producer census, or permission to synthesize
 one. Native RF sampling/decoding and alternate server inputs remain open.
 
+The server is not DSP-only. A full aligned direct-BL candidate inventory
+finds 346 calls to post primitive 255268. A deliberately narrow argument
+pattern (MOVS r0,13 in the final two halfwords) selects eight:
+
+| Post | Own input source |
+| --- | --- |
+| 212044, 212d8a, 212e58, 212f20 | Task-10 control paths post template 2ac8e0, header 040c0000. |
+| 2697d8, 2699e0 | Select template 2ac2f0/2ac2f4, headers 040d0000/040d0300. |
+| 26a162 | Conditional type-80 decoder delivery described above. |
+| 26e3ee | Separate constructor 26e25c sends dynamic inputs 05dd..05e3 or 060a/060b. This is not constructor 26def0. |
+
+Shared-tail, indirect and data-derived destinations are outside this narrow
+pattern; it is not a closed producer inventory. The constructor preserves
+the requested header, so these firmware IPC inputs must not be renamed
+DSP type-80 packets. The qualified empty receive applies to all inputs
+at the observed server, but their legitimate activation prerequisites
+remain independent questions. In particular, 05fa/05fb dispatch recognition
+alone does not establish an additional producer: the helper also returns
+05fb after its local context/timer cleanup at 23ac4e/23ac6c.
+
 There is also a nested-buffer decoder, not an equivalent completion code:
 05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
 Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3

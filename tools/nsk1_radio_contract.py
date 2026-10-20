@@ -89,7 +89,9 @@ def analyze(image):
               0x20bd84:0x0a03,0x20bd8c:0x07d5}
     checks.update({0x23af00:0x10858c,0x23befc:0x05e6,0x23bf00:0x05ed,
                    0x23c394:0x05e6,0x23c398:0x05ed,0x23c7bc:0x05e6,0x23c7c0:0x05ed,
-                   0x23aef0:0x040b,0x26a038:0x040b,0x26a4f0:0x040b})
+                   0x23aef0:0x040b,0x26a038:0x040b,0x26a4f0:0x040b,
+                   0x2ac8e0:0x040c0000,0x2ac2f0:0x040d0000,0x2ac2f4:0x040d0300,
+                   0x26e410:0x05dd})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -123,6 +125,10 @@ def analyze(image):
     completion_producers = [BASE+offset+10 for offset in range(0,len(image)-13,2)
                             if image[offset:offset+4] == bytes.fromhex('203f0140')
                             and BASE+offset+10 in completion_calls]
+    task13_posts = thumb_bl_candidates(image, (0x255268,))[0x255268]
+    task13_immediate = [site for site in task13_posts
+                        if image[site-BASE-2:site-BASE] == bytes.fromhex('200d')
+                        or image[site-BASE-4:site-BASE-2] == bytes.fromhex('200d')]
     return {'image_sha1':hashlib.sha1(image).hexdigest(),
             'rx_route':{'type':'0x8b','table':'0x2941c4','index':8,'handler':'0x26a440',
                         'status':'0x13b8','task':11,'consumer':'0x218996'},
@@ -169,6 +175,14 @@ def analyze(image):
                                          'delivery':'0x26a132','post':'0x26a162','destination_task':13,
                                          'server_dispatch':'0x23abdc',
                                          'scope':'conditional decoder delivery; RF payload semantics and all alternate sources unclosed'},
+            'task13_direct_post_inventory':{'primitive':'0x255268','direct_call_candidates':len(task13_posts),
+                                            'immediate_task13_candidates':[hex(site) for site in task13_immediate],
+                                            'reset_template':'0x2ac8e0:040c0000',
+                                            'other_templates':['0x2ac2f0:040d0000','0x2ac2f4:040d0300'],
+                                            'dynamic_constructor':'0x26e25c',
+                                            'dynamic_inputs':['0x05dd..0x05e3','0x060a','0x060b'],
+                                            'dynamic_post':'0x26e3ee',
+                                            'scope':'MOVS r0,#13 within final two halfwords only; excludes shared tails, register/data-driven and indirect callers'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',
