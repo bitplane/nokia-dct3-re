@@ -12,6 +12,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsk1_static_check import inspect
 from tools.nsk1_record_exchange_check import check as check_records
+from tools.nsk1_record_profile import build_from_capture,check_observation
 
 
 INPUTS = (
@@ -22,7 +23,7 @@ INPUTS = (
 )
 
 
-def prepare(root, run):
+def prepare(root, run, record_profile_from=None):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
     sources = [(root / name, digest) for name, digest in INPUTS]
@@ -31,16 +32,26 @@ def prepare(root, run):
             raise ValueError(f'NSK-1 compatibility input hash differs: {source.name}')
     for index, variant in enumerate(('standard', '2915')):
         inspect(sources[index][0].read_bytes(), variant)
+    initial_eeprom,profile_metadata = bytes([255])*2048,None
+    if record_profile_from is not None:
+        initial_eeprom,profile_metadata = build_from_capture(record_profile_from,INPUTS)
     target = run / 'inputs/nsk1r4t'
     target.mkdir(parents=True)
     for source, _ in sources:
         shutil.copyfile(source, target / source.name)
+    if profile_metadata is not None:
+        storage = run/'nvram/nsk1r4t'
+        storage.mkdir(parents=True)
+        (storage/'eeprom').write_bytes(initial_eeprom)
     (run / 'input_manifest.json').write_text(json.dumps({
         'inputs': [{'source': name, 'sha1': digest} for name, digest in INPUTS],
-        'external_eeprom': 'own erased 2048 bytes; no donor provisioning',
+        'external_eeprom': ('diagnostic published lock-record example; identity/calibration erased'
+                           if profile_metadata else 'own erased 2048 bytes; no donor provisioning'),
+        'record_profile':profile_metadata,
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
         'peer_completions': False, 'physical_keys': False,
     }, indent=2)+'\n')
+    return initial_eeprom
 
 
 def summarize(trace, image, variant):
@@ -63,9 +74,11 @@ def summarize(trace, image, variant):
         raise ValueError('missing synchronized LCD/startup observations')
     last = presentation[-1]
     decisions = re.findall(r'nsk1_record_decision: pointer=([0-9a-f]{8}) state=([0-9a-f]{8}) valid=([0-9a-f]{8}) observer_writes=0', trace)
+    accepted = re.findall(r'nsk1_record_accept: context=([0-9a-f]{8}) valid=00000001 copied=([0-9a-f]{48}) observer_writes=0',trace)
+    late = re.findall(r'nsk1_late: t=([0-9.]+) pc=([0-9a-f]{8}) dsp_pc=([0-9a-f]{4}) illegal=([01]) startup_reason=([0-9a-f]{2})',trace)
     return {'variant': variant, 'samples': len(samples),
             'last_mcu_pc': samples[-1][1],
-            'native_illegal_observed': any(row[2] != '0' for row in samples),
+            'native_illegal_observed': any(row[2] != '0' for row in samples) or any(row[3] != '0' for row in late),
             'releases': len(releases), 'own_slot25_payload_observed': True,
             'descriptor0_release_observed': len(releases) > 1,
             'lcd_commands': int(last[1]), 'lcd_data_bytes': int(last[2]),
@@ -73,6 +86,9 @@ def summarize(trace, image, variant):
             'startup_reasons': [row[4] for row in presentation],
             'record_decisions': [{'pointer': pointer, 'state': int(state,16), 'valid': int(valid,16)}
                                  for pointer,state,valid in decisions],
+            'record_accepts':[{'context':context,'copied':copied} for context,copied in accepted],
+            'late_samples':[{'time':float(time),'mcu_pc':pc,'dsp_pc':dsp_pc,'startup_reason':reason}
+                            for time,pc,dsp_pc,_,reason in late],
             'graphical_or_fitted_hardware_proved': False}
 
 
@@ -83,17 +99,23 @@ def main():
     parser.add_argument('run', type=Path)
     parser.add_argument('--variant', choices=('standard', '2915'), default='standard')
     parser.add_argument('--debug-startup', action='store_true', help='bounded read-only own startup entry traces')
+    parser.add_argument('--record-profile-from',type=Path,help='diagnostic external record example keyed only from a qualified own erased capture')
+    parser.add_argument('--seconds',type=int,choices=range(6,62),default=6)
     args = parser.parse_args()
     run = args.run.resolve()
+    if args.record_profile_from and args.variant != 'standard':
+        parser.error('record-profile experiment is not established for the 2915 family')
+    if args.record_profile_from and not args.debug_startup:
+        parser.error('record-profile experiment requires --debug-startup for own accepted-copy evidence')
     try:
-        prepare(args.roms.resolve(), run)
+        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from)
         script = Path(__file__).with_name('nsk1_boot_observe.lua').resolve()
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
                 str(args.binary.resolve()), 'nsk1r4t', '-bios',
                 '561a' if args.variant == 'standard' else '561a2915',
                 '-rompath', str(run / 'inputs'), '-noreadconfig', '-video', 'none',
-                '-sound', 'none', '-nothrottle', '-log', '-seconds_to_run', '6',
+                '-sound', 'none', '-nothrottle', '-log', '-seconds_to_run', str(args.seconds),
                 *(['-debug', '-debugger', 'none'] if args.debug_startup else []),
                 '-autoboot_delay', '0', '-autoboot_script', str(script),
             ], cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
@@ -109,9 +131,18 @@ def main():
         if len((storage/'eeprom').read_bytes()) != 2048:
             raise ValueError('own EEPROM storage capacity changed')
         summary = summarize(trace,image,args.variant)
+        required_late = [time for time in (10,20,30,50,59) if time <= args.seconds-1]
+        allowed_late = [time for time in (10,20,30,50,59) if time <= args.seconds]
+        if not len(required_late) <= len(summary['late_samples']) <= len(allowed_late) or any(
+                not expected <= sample['time'] < expected+0.1
+                for expected,sample in zip(allowed_late,summary['late_samples'])):
+            raise ValueError('missing or mistimed late native observation')
         summary['unchanged_flash'] = True
-        summary['record_arithmetic'] = (check_records(trace,initial_eeprom=bytes([255])*2048)
-                                        if args.variant == 'standard' else {'observed':False})
+        summary['record_arithmetic'] = (check_records(trace,minimum=1 if args.record_profile_from else 2,initial_eeprom=initial_eeprom)
+                                        if args.variant == 'standard' else {'comparison_performed':False,'reason':'2915 record lifecycle not qualified'})
+        if args.record_profile_from:
+            check_observation(summary,initial_eeprom,(storage/'eeprom').read_bytes())
+            summary['synthetic_record_conformance'] = True
         (run / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:

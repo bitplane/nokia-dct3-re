@@ -30,6 +30,12 @@ class Nsk1CompareTest(unittest.TestCase):
         decision = '\nnsk1_record_decision: pointer=00101bc8 state=00000002 valid=00000000 observer_writes=0'
         self.assertEqual([{'pointer':'00101bc8','state':2,'valid':0}],
                          summarize(trace+decision,image,'standard')['record_decisions'])
+        accepted = '\nnsk1_record_accept: context=0010ba34 valid=00000001 copied='+('00'*24)+' observer_writes=0'
+        self.assertEqual([{'context':'0010ba34','copied':'00'*24}],
+                         summarize(trace+accepted,image,'standard')['record_accepts'])
+        late = '\nnsk1_late: t=20.000000000 pc=00289408 dsp_pc=408d illegal=1 startup_reason=0a idle_flag=01 commands=68 data=2016 nonzero=504 observer_writes=0'
+        self.assertTrue(summarize(trace+late,image,'standard')['native_illegal_observed'])
+        self.assertEqual(20.0,summarize(trace+late,image,'standard')['late_samples'][0]['time'])
         second = '\nnsk1_release: index=2 command=01 pc=00273786 args=fd00ff8002440500007800000000 program=00'
         self.assertTrue(summarize(trace+second,image,'standard')['descriptor0_release_observed'])
         for bad in (trace.replace('00273504','00273506'),
@@ -64,6 +70,12 @@ class Nsk1CompareTest(unittest.TestCase):
                 self.assertEqual(4,len(list((run/'inputs/nsk1r4t').iterdir())))
                 with self.assertRaisesRegex(ValueError,'fresh'):
                     prepare(sources,run)
+                profile = bytes(2048)
+                with patch('tools.nsk1_rom4_compare.build_from_capture',return_value=(profile,{'classification':'diagnostic'})):
+                    probe = root/'probe'
+                    self.assertEqual(profile,prepare(sources,probe,run))
+                    self.assertEqual(profile,(probe/'nvram/nsk1r4t/eeprom').read_bytes())
+                    self.assertEqual({'classification':'diagnostic'},json.loads((probe/'input_manifest.json').read_text())['record_profile'])
                 (sources/'input3.bin').write_bytes(b'wrong mask')
                 with self.assertRaisesRegex(ValueError,'hash'):
                     prepare(sources,root/'rejected')

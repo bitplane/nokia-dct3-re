@@ -22,6 +22,7 @@ if machine.debugger then
     machine.debugger:command(string.format('bpset %x,temp0<80,{temp0=temp0+1;logerror "nsk1_record_reject: pointer=%%08x byte9=%%02x state=%%08x valid=%%08x selector=%%08x observer_writes=0\\n",r6,b@(r6+9),r12,r5,r0;g}', 0x25a992+shift))
     machine.debugger:command(string.format('bpset %x,temp1<60&&r0<120,{temp1=temp1+1;logerror "nsk1_eeprom_read: address=%%04x destination=%%08x bytes=%%08x caller=%%08x observer_writes=0\\n",r0,r1,r2,r14;g}', 0x28ef32+shift))
     machine.debugger:command(string.format('bpset %x,temp0<80,{temp0=temp0+1;logerror "nsk1_record_decision: pointer=%%08x state=%%08x valid=%%08x observer_writes=0\\n",r6,r12,r5;g}', 0x25a994+shift))
+    machine.debugger:command(string.format('bpset %x,temp0<80,{temp0=temp0+1;logerror "nsk1_record_accept: context=%%08x valid=%%08x copied=%%08x%%08x%%08x%%08x%%08x%%08x observer_writes=0\\n",r4,r5,d@(r4+1c),d@(r4+20),d@(r4+24),d@(r4+28),d@(r4+2c),d@(r4+30);g}', 0x25ab0c+shift))
     machine.debugger:command(string.format('bpset %x,temp2<30&&r0==3&&r1>=100000&&r1<110000,{temp2=temp2+1;logerror "nsk1_task3_post: caller=%%08x object=%%08x words=%%08x/%%08x/%%08x/%%08x/%%08x/%%08x tail=%%04x observer_writes=0\\n",r14,r1,d@r1,d@(r1+4),d@(r1+8),d@(r1+c),d@(r1+10),d@(r1+14),w@(r1+18);g}', 0x255268+shift))
 end
 local serial_selection, lcd_commands, lcd_bytes, lcd_nonzero = 0, 0, 0, 0
@@ -102,3 +103,13 @@ emu.register_frame_done(function()
     if next_sample == #times then machine.screens[':screen']:snapshot('nsk1_native_5s.png') end
     next_sample = next_sample+1
 end, 'NSK-1 passive native boundary')
+local late_times, late_index = {10,20,30,50,59},1
+emu.register_frame_done(function()
+    local now = machine.time:as_double()
+    if late_index > #late_times or now < late_times[late_index] then return end
+    machine:logerror(string.format('nsk1_late: t=%.9f pc=%08x dsp_pc=%04x illegal=%d startup_reason=%02x idle_flag=%02x commands=%d data=%d nonzero=%d observer_writes=0\n',
+        now,cpu.state['R15'].value,dsp.state['PC'].value,dsp.state['ILLEGAL'].value,
+        space:read_u8(reason_address),space:read_u8(idle_address),lcd_commands,lcd_bytes,lcd_nonzero))
+    machine.screens[':screen']:snapshot(string.format('nsk1_native_%ds.png',late_times[late_index]))
+    late_index = late_index+1
+end,'NSK-1 late passive boundary')

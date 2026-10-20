@@ -8,8 +8,12 @@ own erased EEPROM and acquired NSE-1 resident DSP input. The standard family
 reaches descriptor-0 transfers and native runtime; `2915` stops after its
 first loader exchange. Neither paints at five seconds. No graphical boot,
 physical input, SIM or radio acceptance is claimed.
-The next boundary is the standard family's low-NV record validation and
-the separate `2915` loader-result interpretation, not an absent LCD link.
+An explicit record-only external fixture now reaches the accepted-copy path
+and removes the standard family's reason-`04` restart, but remains blank
+through 20 seconds. Identity/calibration are still erased, and no phone
+service is accepted. The next boundary is ordinary startup after that
+accepted record, plus the separate `2915` loader-result interpretation,
+not an absent LCD link.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -208,7 +212,7 @@ blank frame rather than manufacturing a presentation or completion.
 Checkpoint validation: both isolated compatibility runs above reproduce;
 the NSB-1 native-bootstrap regression and default 3210 structural gate pass.
 All 24 MAME patches apply to the pinned upstream revision. The tools suite
-passes 3,725 tests with one skip; these do not establish NSK-1 UI support.
+passes 3,735 tests with one skip; these do not establish NSK-1 UI support.
 
 ## Presentation and low-NV validation
 
@@ -256,9 +260,8 @@ observed restart in firmware's own validation lifecycle, rather than
 proving an ADC failure, missing DSP reply or bad LCD geometry. No validity
 flag, branch, packed record or internal completion is patched.
 
-The next software task is to determine whether a coherent synthetic external
-profile can be generated from the own format constraints and independently
-observed inputs, without treating a format-valid record as factory data.
+The record-only experiment below is not a complete synthetic external
+profile and must not be treated as factory data.
 Do not reuse `make_5110_eeprom_profile.py`'s NSE-1 MSID, identity, FAID or
 fault-latch values: sharing capacity and a compatible resident DSP does not
 make those handset records NSK-1 evidence.
@@ -302,3 +305,47 @@ blocks and echoes. `dct3_rom4_record_codec.py` now single-homes the pure
 arithmetic used by both NSK-1 and NSM-1 checkers, without importing NSE-1
 identity/provisioning constants. Its encoder accepts explicit data and
 chip bytes; it does not select a passing policy or identity.
+
+### Constrained external record fixture
+
+The [2003 first-hand MBUS discussion](https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0)
+publishes a numeric example pair for MCC/MNC/MSIN and GID lock data:
+`0010100000000010007954c2` / `0000000029000000000054c2`.
+It is a specific 001-01 example, **not** original NSK-1 factory provisioning
+or a universal unlocked profile. The private marker `54c2` independently
+matches the acquired resident data word `b703`. No implementation from the
+post is transcribed: encoding uses the native-observed word transform.
+
+`nsk1_record_profile.py` requires a qualified own erased-control capture,
+rechecks its executable/resident hashes, unchanged persisted flash and
+erased low EEPROM, and derives the chip field from its actual MSID exchange.
+It starts a fresh 2-KiB erased image and writes only encoded example bytes
+`0020..0037` plus the own low-block checksum at `003c..003f`. Reader
+`25ac1a` compares `sum16(0000..003b)` against that big-endian 32-bit field.
+Identity, FAID, retry, fault-latch and calibration fields are not populated
+from NSE-1, another handset, or the source run's evolved storage. The
+manifest labels the fixture diagnostic and retains its data/trace hashes.
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms tmp/nsk1-profile-source
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-record-only-21s --record-profile-from tmp/nsk1-profile-source \
+  --debug-startup --seconds 21
+```
+
+This native run produces the expected decoded blocks and private markers,
+then reaches accepted copy `25ab08` -> `25ab0c`: 24 decoded bytes are copied
+into context `10ba34+1c`. The intermediate decision is state 2 / validity 1.
+The gate requires this real copied data, not only the intermediate flag,
+and unchanged final low 64 EEPROM bytes. There are two DSP releases rather
+than the erased control's three; reason `0a` remains through the 10- and
+20-second samples, with no sampled illegal DSP instruction. The reason-`04`
+restart is absent without changing a guest register, flag or reply.
+
+The LCD still clears to white: five-second counts are 68 commands / 2016
+pixel bytes / 504 nonzero bytes, unchanged at 20 seconds. This closes only
+the constrained record-format experiment, not useful graphical boot,
+complete provisioning, SIM acceptance or network service. The ordinary
+machine remains erased by default. Replace this diagnostic in favor of a
+complete independently grounded profile, rather than promoting its example
+policy or remaining erased fields to factory defaults.
