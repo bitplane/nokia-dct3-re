@@ -1293,6 +1293,7 @@ public:
 
 	void noki3330(machine_config &config);
 	void noki3350(machine_config &config);
+	void nhm9stage(machine_config &config);
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
 	void nam2c3(machine_config &config);
@@ -3716,6 +3717,18 @@ void nokia_dct3_state::noki3350(machine_config &config)
 	apply_product_config(PRODUCT_3350);
 }
 
+void nokia_dct3_state::nhm9stage(machine_config &config)
+{
+	noki3350(config);
+	// Own 247-word upload and MCU-supplied source-end argument. The staged
+	// execution rate is a research cadence, not a measured DSP clock contract.
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x1f0c54);
+	staged.set_verifier_program_words(247);
+	staged.set_verifier_source_end(0x8000);
+	staged.set_loader2_source(0x1f0d80, 629);
+}
+
 void nokia_dct3_state::noki3610(machine_config &config)
 {
 	// NAM-1's normalized MCU/PPM image requires the later 32-Mbit flash
@@ -4443,6 +4456,8 @@ ROM_START( noki3350 )
 			CRC(e0002771) SHA1(3d0dce9c098bdd619c6f3684f739796f64b66169))
 ROM_END
 
+#define rom_nhm9stage rom_noki3350
+
 ROM_START( noki3610 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -4935,6 +4950,7 @@ SYST( 2000, nsb6stage, noki8890, 0, nsb6stage, noki3310, nokia_dct3_state, empty
 SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki8890, nokia_dct3_state, empty_init, "Nokia", "8890 native uploads with runtime transport HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3350, 0,      0,      noki3350, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nhm9stage, noki3350, 0, nhm9stage, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 own uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

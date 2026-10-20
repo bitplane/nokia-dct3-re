@@ -23,6 +23,7 @@ public:
 		m_loader2_words = words;
 	}
 	void set_verifier_source_end(u16 end) { m_verifier_source_end = end; }
+	void set_verifier_program_words(u16 words) { m_verifier_program_words = words; }
 	void set_loader_control_address(u16 address) { m_loader_control_address = address; }
 	void set_cycle_guard_for_loader(bool enable) { m_cycle_guard_for_loader = enable; }
 	void set_observe_after_missing_code(bool enable) { m_observe_after_missing_code = enable; }
@@ -55,6 +56,7 @@ private:
 	u32 m_loader2_offset = 0;
 	u16 m_loader2_words = 613;
 	u16 m_verifier_source_end = 0xe800;
+	u16 m_verifier_program_words = 223;
 	u16 m_loader_control_address = 0x087f;
 	bool m_cycle_guard_for_loader = false;
 	bool m_loader2_verified = false;

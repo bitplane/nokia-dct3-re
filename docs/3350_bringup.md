@@ -10,6 +10,30 @@ calls and SMS remain unestablished. The package supplies no PMM record stream;
 the firmware creates its own catalogue headers from initially erased storage.
 Do not attach a 3330 or other donor's calibration tail.
 
+The separate `nhm9stage` research configuration executes the uploaded verifier
+with the product's own 104-word fragment and 247-word program extent. At the
+declared, unmeasured 13 MHz execution cadence it starts at `0f00` at
+0.127803 seconds, rejects the verifier's write to immutable fragment cell
+`ff87`, and stops on an unavailable program fetch at `861f` at 0.129389
+seconds. The qualified verifier itself contains `f074 861f` at DSP
+`0fd7..0fd8`: an explicit CALL to the missing address, not an inferred target
+from a corrupted return. The recovered 104-word fragment covers only
+`ff80..ffe7`; it does not supply `861f`. The call's implementation and its
+effect on the verifier remain unknown without a matching resident program
+source. This is not a completed handshake. No
+ready-bit projection, fabricated return or HLE completion is enabled.
+
+Reproduce this negative native boundary with a fresh run directory:
+
+```sh
+.venv/bin/python tools/nhm9_native_boundary_check.py \
+  mame/mame roms tmp/nhm9-native-boundary
+```
+
+The checker qualifies the source image and CALL words, requires the own
+247-word release and immutable-fragment probe, rejects crashes and any
+completion/handoff, and records the native output beside the MAME log.
+
 `tools/nhm9_package_check.py` hash-qualifies the installer, walks every one of
 its 29 adjacent gzip members and strictly decodes all seven phone-record
 streams. The MCU header and all six PPM headers independently identify

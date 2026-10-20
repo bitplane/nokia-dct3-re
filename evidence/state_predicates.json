@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm9_v530_native_verifier_dependency", "owner": "nhm9_uploaded_dsp", "status": "unresolved",
+      "predicate": "The own 247-word verifier completes through its explicit resident-program dependency without fabricated instructions or HLE acknowledgement",
+      "current": "The separate nhm9stage configuration starts the own upload at 0f00 and rejects its immutable ff87 write probe. It terminates at unavailable program word 861f, PC 8620, at 0.129389 seconds under the declared unmeasured 13 MHz cadence. Hash-qualified source words at 0fd7..0fd8 are f074/861f, establishing an explicit CALL rather than an inferred corrupt return. The own 104-word fragment covers ff80..ffe7 and cannot supply this routine. No verifier publication, loader2 execution, runtime HLE handoff, graphical boot or native speech is claimed. The independent silent noki3350 MCU boundary remains reproducible.",
+      "evidence": ["docs/3350_bringup.md", "driver/nokia_dsp_staged.cpp", "driver/nokia_dct3.cpp", "tools/nhm9_native_boundary_check.py", "tools/test_nhm9_native_boundary_check.py"]
+    },
+    {
       "id": "nhm9_v530_mcu_upload_boundary", "owner": "nhm9_mcu_bootstrap", "status": "satisfied",
       "predicate": "The fail-closed own-image 3350 MCU configuration installs its own DSP program, supplies its own arguments and remains at the first unacknowledged ownership transfer",
       "current": "Fresh noki3350 runs begin with all d0000 storage-tail bytes erased. Passive flash-bus observation records 200 firmware writes creating PMM/EEPROM headers, while persisted executable bytes remain unchanged. The 28-entry catalogue relocates to 120f8c, all 247 installed program words match the own source, and release at 31dc3a supplies 0100/0300/0019/8000/0001/0001/0200. The first transfer polls 31dc82..31dc86 through ten seconds with 543 shared writes, control 05 and no DSP acknowledgement. The MCU loop bound is 0cbf, not an inherited sibling exchange count. The configuration uses capacity-compatible flash, documented 256 KiB SRAM and separately missing internal masks; shared MCU boot-transfer HLE remains explicit. No calibrated PMM, key mapping, graphical boot, native DSP execution or phone service is promoted.",

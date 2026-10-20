@@ -23,6 +23,8 @@ void nokia_dsp_staged_device::device_add_mconfig(machine_config &config)
 void nokia_dsp_staged_device::device_start()
 {
 	m_guard = timer_alloc(FUNC(nokia_dsp_staged_device::check_execution), this);
+	if (!m_verifier_program_words || m_verifier_program_words > 0x100)
+		fatalerror("Staged DSP verifier must fit the uploaded 0f00..0fff window");
 	if (!m_fragment_offset || m_fragment_offset + m_fragment.size() * 2 > m_flash.bytes())
 		fatalerror("Staged DSP requires a configured product-local program fragment");
 	std::copy_n(&m_flash[m_fragment_offset / 2], m_fragment.size(), m_fragment.begin());
@@ -49,7 +51,7 @@ void nokia_dsp_staged_device::device_reset()
 	m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_active = false;
 	m_published = false;
-	m_program_end = 0x0fdf;
+	m_program_end = 0x0f00 + m_verifier_program_words;
 	m_verifier = true;
 	m_guard->adjust(attotime::never);
 	m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
@@ -90,7 +92,7 @@ void nokia_dsp_staged_device::reset_line_w(int released)
 	m_verifier = verifier;
 	if (loader)
 		m_loader2_verified = false;
-	m_program_end = verifier ? 0x0fdf : 0x0f7e;
+	m_program_end = verifier ? 0x0f00 + m_verifier_program_words : 0x0f7e;
 	m_cpu->set_input_line(INPUT_LINE_RESET, CLEAR_LINE);
 	// CPU input-line changes are synchronized by MAME. Set the uploaded
 	// entry after reset has actually completed, not before it overwrites PC.
