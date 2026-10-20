@@ -1,8 +1,19 @@
 import unittest
-from tools.nsk3_rf_queue_check import check
+from tools.nsk3_rf_queue_check import check,check_metric
 
 
 class QueueTest(unittest.TestCase):
+    def test_metric_requires_live_code_and_actual_return(self):
+        program=bytearray(131072)
+        for address,raw in {0x4701:'f0742424',0x47e6:'7712125477131255308a218a20823083',0x330a:'74d60027',0x0ae6:'6ff8219b0d20'}.items():
+            fragment=bytes.fromhex(raw);program[address*2:address*2+len(fragment)]=fragment
+        trace='\n'.join(f'nsk3_scan_metric: index={i} pc=0ae7 a=0000000000 threshold=0574 producer=1a00 consumer=1a00 t={39+i/100:.6f} observer_writes=0' for i in range(1,9))
+        self.assertEqual(check_metric(trace,program)['measurement_returns'],8)
+        for bad in (trace.replace('a=0000000000','a=0000000600'),trace.replace('pc=0ae7','pc=0ae6'),trace.replace('threshold=0574','threshold=0000')):
+            with self.assertRaises(ValueError):check_metric(bad,program)
+        program[0x4701*2]^=1
+        with self.assertRaises(ValueError):check_metric(trace,program)
+
     def test_activity_not_merely_equal_pointers(self):
         lines=[]
         for time,count in zip((5,20,40,45,65,90),(4,4,230,1300,5600,11000)):

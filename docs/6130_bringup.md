@@ -942,6 +942,23 @@ and live-program scan checks.
 .venv/bin/python tools/nsk3_rf_queue_check.py tmp/nsk3-rf-queue/error.log
 ```
 
+The live6130 measurement gate is independently observed, not inherited from
+the5130 interpretation. Eight program-fetch observations at0ae6 (exposed
+PC0ae7) between39.0285s and39.0608s return A=0 with threshold219b=0574;
+each has matching producer/consumer cursors advancing by four words. Live
+4701 calls2424, consumes the queue, and reduces intermediate values through
+47e6's multiply/accumulate path. The producer uses PORTR0027 at330a, which
+the backend routes to COBBA's unattached RF callback. This locates the
+zero-result boundary across native queue consumption and measurement return;
+it does not prove arithmetic silicon fidelity or the electrical sample format.
+`nsk3_scan_metric_observe.lua` captures live disassembly at45s; its checker
+pins live instruction fragments and rejects changed return/threshold values.
+
+```sh
+.venv/bin/python tools/nsk3_rf_queue_check.py tmp/nsk3-scan-metric/error.log \
+  --metric-program tmp/nsk3-scan-metric/nsk3_native_program_45s.bin
+```
+
 The modeled COBBA RF receive callback is unattached/deterministic silence;
 the active scan's zero qualifying results are not evidence for a real
 receiver's noise/offset contract. Its timeout has not expired at90s, before

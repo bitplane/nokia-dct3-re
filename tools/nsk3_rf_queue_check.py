@@ -30,11 +30,36 @@ def check(trace):
             'physical_rf_semantics_proved':False}
 
 
+def check_metric(trace,program):
+    # Pin live instructions before assigning resident-map meanings to observations.
+    fragments={0x4701:'f0742424',0x47e6:'7712125477131255308a218a20823083',
+               0x330a:'74d60027',0x0ae6:'6ff8219b0d20'}
+    if len(program)!=131072:raise ValueError('live DSP program extent differs')
+    for address,raw in fragments.items():
+        expected=bytes.fromhex(raw)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError(f'live measurement instruction differs at {address:04x}')
+    rows=re.findall(r'nsk3_scan_metric: index=(\d+) pc=([0-9a-f]+) a=([0-9a-f]+) threshold=([0-9a-f]+) producer=([0-9a-f]+) consumer=([0-9a-f]+) t=([0-9.]+) observer_writes=0',trace)
+    if len(rows)!=8 or len(rows)!=trace.count('nsk3_scan_metric: '):
+        raise ValueError('measurement return census missing or malformed')
+    for index,row in enumerate(rows,1):
+        n,pc,a,threshold,producer,consumer,time=row
+        if int(n)!=index or int(pc,16)!=0x0ae7 or int(a,16)!=0 or int(threshold,16)!=0x574:
+            raise ValueError('measurement return or qualification threshold differs')
+        if producer!=consumer or not 39<float(time)<40:
+            raise ValueError('measurement queue or observation window differs')
+    return {'measurement_returns':8,'accumulator':0,'threshold':0x574,
+            'physical_rf_semantics_proved':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace',type=Path)
+    parser.add_argument('--metric-program',type=Path)
     args=parser.parse_args()
-    try:print(check(args.trace.read_text()))
+    try:
+        trace=args.trace.read_text()
+        print(check_metric(trace,args.metric_program.read_bytes()) if args.metric_program else check(trace))
     except (ValueError,OSError) as error:
         print(f'NSK-3 RF queue qualification failed: {error}',file=sys.stderr)
         return 1
