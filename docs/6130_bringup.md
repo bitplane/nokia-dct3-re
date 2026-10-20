@@ -794,6 +794,17 @@ The retained slot10a82c (owner10a7d8+54) stays null in the baseline45s
 `tmp/nsk3-retained-buffer` capture. Own helper209a4a copies message+4 to
 that slot for decoded inputs09c9/09d5/09e2; this is a candidate session-input
 surface, not a proved required boot transition. No input is synthesized.
+
+Cold recent-number control `tmp/nsk3-recent-cold` copies the action run's
+persisted EEPROM/SIM/flash/config only. After physical phone-code acceptance,
+Menu/Back and one physical Send, frame23s says **No last dialled numbers**
+(RGB SHA256c713d38b2581c34f8cb87ee30f728712bd28d48c886fa1d3d595d5717a3a5299).
+`nsk3_recent_call_input.lua` types no post-unlock digits. Checker option
+`--recent-cold` verifies input EEPROM/SIM identity, own flash, physical recall,
+logical Send and that exact negative frame. Thus packed12345 in the prior
+EEPROM diff is not proof of usable call-history persistence. Cold EEPROM
+housekeeping changes are not declared history fidelity; the record contract
+and whether a successful call is required remain unresolved.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
