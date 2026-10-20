@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_phonebook_list_eeprom_text_source", "owner": "nsm1_firmware", "status": "unresolved",
+      "predicate": "Physical cold phonebook list renders the intended SIM contact name instead of stale EEPROM-backed text",
+      "current": "SIM A/12345 storage and cold Number details pass, but the cold17s list repeats the post-save glyph anomaly. Read/write observations first see A at111cb8, then memcpy2c3a0e caller259eed replaces it with2a079700. Own259ec8 requests record0728 with selector7ff0 indices0/1; successful32-byte responses match the original template at physical19d4, descriptor size37, including field+16. Physical SIM-card memory selection acknowledges but does not repair the subsequent cold list. The exact record lifecycle/cache semantics and faithful initialization path remain open. No field clearing or guessed text substitution is installed; font/LCD/SIM-decoder defects are not established by this finding.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_phonebook_reload.lua", "tools/nsm1_phonebook_name_observe.lua", "tools/nsm1_phonebook_name_check.py", "tools/nsm1_phonebook_memory.lua", "tools/test_nsm1_phonebook_name_check.py"]
+    },
+    {
       "id": "nsm1_physical_sim_phonebook_cold_details", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "Physical NSM-1 A/12345 entry persists to SIM EF_ADN and independent cold Details renders its number without rewriting the card",
       "current": "Own physical code/Names/Add contacts transmit one exact A0 DC 01 04 20 plus32-byte A/12345 record and receive9000. Remaining49 records stay erased. A separate cold process preserves complete saved EEPROM/card inputs, accepts12345 and navigates Search/List/Details to exact Number12345 pixels. No UPDATE RECORD occurs and the full card remains byte-identical. Own flash and native record validation remain qualified. The UART capture is explicitly bounded4096 bytes and fails on cap. Post-save list glyphs are anomalous and not promoted; name/list rendering, handset-local storage, other SIM operations and network/radio remain unaccepted.",

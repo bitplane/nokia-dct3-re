@@ -142,10 +142,34 @@ It performs no UPDATE RECORD and leaves the complete card byte-identical.
 Own flash, physical input sequence, code acceptance, native record dialogue,
 exact APDU payload and cold input links are checked independently.
 
-The post-save list displays unexpected glyphs rather than a qualified A
-entry. This rendering/cache behavior remains unresolved; successful storage
-and number Details do not qualify every list/name screen. Handset-local
-contact storage, delete/cancel, SIM security and radio services remain open.
+Both post-save and cold list frames display unexpected glyphs rather than a
+qualified A entry. The source is now narrowed: the correct A string reaches
+111cb8, then memcpy2c3a0e (caller259eed) overwrites it with bytes beginning
+2a079700 from stack1137b0. The preceding read259ec8 requests own record0728,
+selector7ff0, indices0/1; both return success and exactly the original repair
+template's first32 bytes at physical19d4 (descriptor size37). Its field+16
+begins2a079700. This is measured EEPROM-backed text replacement, not proof
+of a font, LCD, SIM-alpha decoder or arithmetic defect. The record's lifecycle
+and intended cache semantics remain open. Do not hand-clear its fields.
+
+Physical Names/Options/Memory in use/SIM card produces the acknowledged
+SIM card memory selected screen, but an independent cold list remains
+anomalous. Thus ordinary memory selection alone does not repair this fixture.
+The next target is the firmware's invalidation/initialization path for the
+selected record family, retaining the correct SIM contents as the control.
+Handset-local contacts, delete/cancel, SIM security and radio remain open.
+
+```sh
+.venv/bin/python tools/nsm1_phonebook_name_check.py \
+  tmp/nsm1-phonebook-name-records/error.log \
+  roms/research/nsm1-v523/nsm1-security-checksum-valid.bin \
+  roms/research/nsm1-v523/6150-v523-ppm-c.fls
+```
+
+`nsm1_phonebook_name_observe.lua` is the bounded active read/write/record
+observer; its retirement trigger is resolution of this name-record boundary.
+The menu-enumeration and full-RAM-dump probes were removed after extracting
+the source contract. Ordinary cold-read acceptance retains a17s list capture.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-qualified tmp/FRESH
