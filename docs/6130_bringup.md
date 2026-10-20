@@ -563,6 +563,16 @@ unresolved;043c has not been assigned success/failure semantics. The full
 packet/cache gate passes on the lifecycle run, and state3/phase1 remain
 unchanged. No missing-response conclusion follows merely from09f0 absence.
 
+The45s `tmp/nsk3-controller-wait` capture confirms continuation reaches
+receive loop21c86c with controller owner10ade0, selector47 andstatus043c;
+no later controller helper result is observed. Static branch decoding sends
+043c through21be34->21c86c, not onward through the cleanup following21cfa8.
+The received object is ROM-resident at2c6750. Two aligned pointer literals
+refer to it (212f68,2143a0), loaded by212c8e and214018 respectively; both
+pass it through237bea after the trace wrapper27e29a. Which producer runs,
+its controlling predicates and237bea's destination semantics remain to be
+verified. ROM residency must not be mistaken for a synthetic harness reply.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
