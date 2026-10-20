@@ -4189,6 +4189,8 @@ void nokia_dct3_state::nsb1r4t(machine_config &config)
 	// but fitted NSB-1 mask identity and DSP cadence remain unproved.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own executable upload reaches 2b38, including its 29e1 hook.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 

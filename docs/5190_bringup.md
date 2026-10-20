@@ -21,6 +21,27 @@ The qualified checksum/nominal-input comparison additionally reaches the
 firmware's Insert SIM card screen. Fitted mask identity and DSP cadence remain unproved.
 No scheduler or ownership flag is injected.
 
+### Executable upload extent
+
+The own loader writes 825 program words in `2800..2b38`, including
+`29e1=7714,29e2=085e,29e3=7194,29e4=1f2b,29e5=1284`.
+The former `2800` overlay boundary discarded those writes; a read-only tap
+observed the nonzero writes while program/data reads returned zero. The
+`nsb1r4t` configuration therefore selects a `3000` overlay extent, retaining
+the code in both views. This is an upload-derived bank model, not proof of
+the fitted DSP mask or full physical RAM size; `noki5190` is unchanged.
+
+`nsb1_native_upload_observe.lua` composes the qualified listed-FDN physical
+dial fixture. The 46-second corrected run passes
+`nsb1_native_upload_check.check_upload`, existing cold provenance/native/SIM
+checks, unchanged whole-card comparison, and the existing exact digit and
+progress frames. Its 566 distinct first opcode words all have decoded
+boundaries, including observed extension variants; opcode `0000` is absent.
+This is not exhaustive semantic qualification, registration or connected-call
+acceptance. The prior own-input control passes the same input/card/frame
+checks but fails upload visibility, distinguishing the mapping correction
+from an incidental change of fixture or provisioning.
+
 The compatibility instrument now uses an explicitly nominal ADC2 input of
 554. With the six-byte checksum diagnostic it completes ten acquisitions,
 posts readiness report `14` organically, and unmasks keypad columns. Physical
