@@ -133,6 +133,28 @@ the existing NSE-1 host layout; the active special table is
 `3e 3e 3e 3e 0d`, selecting Power on bit 4, not bit 1. These are independently
 mapped source facts; physical input/UI delivery has not yet been accepted.
 
+A bounded physical Menu test on the checksum-only native compatibility
+configuration holds row 2/column 1 from 3.0 to 3.25 seconds. Passive reads
+of `20030..20033` show 11 accesses, all before 0.281 seconds; scanner
+`2af050` is entered at startup, but neither that entry nor another keypad
+register read follows the held contact through five seconds. Debugger action
+expressions were checked for console errors. This does **not** demonstrate
+decoded Menu delivery or application rejection: interrupt enable/routing and
+scanner scheduling remain to be established for this lifecycle. A lack of
+repaint alone cannot close the input path.
+
+The subsequent routing observation identifies a firmware-owned local mask:
+routine `2af7a0`, entered with return address `26f3db`, ORs `1f` into
+column-mask register `20033` at store `2af7c6` (0.280282 seconds). Samples
+before, during and after the Menu hold retain mask `3f`, row signal `e0`
+and row direction `1f`. MAD2 pending IRQ remains zero, IRQ mask is `ce`,
+global control `05`, and CPSR interrupt-disable bits are clear. Thus this
+test is stopped by masked column-change detection before CPU interrupt
+delivery, not evidence of a broken MAD2 IRQ route. The firmware continuation
+that clears this mask remains unresolved; do not clear it diagnostically and
+claim ordinary input support. Register-observation reads in this second run
+are distinct from firmware reads and must not be counted as scanner activity.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
