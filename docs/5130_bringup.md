@@ -255,6 +255,13 @@ posts template 2ac904/status 042f to task 15; it does not directly post 07e5.
 The 05e6 producer/transport route and the actual finalizer-triggering DSP
 contract remain open and must be mapped without conflating these statuses.
 
+Finalizer delivery is also not a direct acknowledgement recode. Task-15
+helper dispatch 20931c selects 042f by 0410 +1f, reaches 209480, copies
+message byte +2 to r7 +18 and returns the unchanged input in r6 through
+20948a. It does not return 07e0. Any claim that scan completion releases
+the 20bd02 wait still requires the downstream lifecycle path, not just
+the presence of a finalizer call.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 

@@ -44,7 +44,8 @@ def analyze(image):
               0x2941e0:0x294218,0x26a500:0x1390,0x26a504:0x108a84,
               0x2128d8:0x1389,0x2125c8:0x212b28,
               0x26e898:0x0447,0x26e880:0x07e5,0x21147c:0x108a00,
-              0x23a8f0:0x05eb,0x23a8f4:0x05e6,0x23ebbc:0x0813}
+              0x23a8f0:0x05eb,0x23a8f4:0x05e6,0x23ebbc:0x0813,
+              0x24e3b8:0x109f00,0x24e094:0x03e9}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -116,6 +117,12 @@ def analyze(image):
                                           'command24_success_status':'0x0813',
                                           'constructor':'0x23a728','destination_task':16,
                                           'scope':'command 0x24 is not a demonstrated source of awaited 0x07e5; other parser commands and upstream buffer producers remain open'},
+            'scan_finalizer_delivery':{'input':'0x042f','destination_task':15,
+                                       'receiver_dispatch':'0x20931c',
+                                       'selector_arithmetic':'0x0410 + 0x1f',
+                                       'handler':'0x209480','effect':'copy message byte +2 to r7 +0x18',
+                                       'return':'0x20948a returns unchanged input in r6',
+                                       'scope':'not a helper recode to 0x07e0; downstream lifecycle handling remains open'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,
