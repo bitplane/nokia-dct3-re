@@ -12,6 +12,29 @@ from tools.c54x_rom4_port_census import direct_callers
 BASE = 0x200000
 
 
+def serial_publisher_contract(image):
+    sequences = {
+        0x8dd4:'7212 06c0 10f8 06b6 fa45 8dfb',
+        0x8ded:'f274 938b 7714 009b',
+        0x8df5:'f274 938b 7714 009a',
+        0x938d:'7713 06b6 1083 fc47',
+        0x9404:'f274 37ce 7713 1200',
+    }
+    for address,words in sequences.items():
+        expected = bytes.fromhex(words)
+        if image[address*2:address*2+len(expected)] != expected:
+            raise ValueError(f'live serial publisher sequence differs at {address:04x}')
+    callers = direct_callers(image,0x938b)
+    if callers != [(0x8ded,True),(0x8df5,True)]:
+        raise ValueError('serial helper direct caller census changed')
+    return {'publisher':'0x9404','helper':'0x938b','queued_count':'0x06b6',
+            'early_return':'queued count <= 0',
+            'direct_callers':[{'address':'0x8ded','packet_type':'0x9b'},
+                              {'address':'0x8df5','packet_type':'0x9a'}],
+            'scope':'two raw direct callers and checked argument/gate sequences; indirect callers and queue producer contract unclosed',
+            'unconditional_heartbeat_proved':False}
+
+
 def live_publisher_census(image, resident=None):
     if len(image) != 0x20000:
         raise ValueError('live page-zero snapshot must contain 65536 big-endian words')
@@ -273,6 +296,7 @@ def main():
         if args.live_dsp_program:
             result['live_publisher_census'] = live_publisher_census(
                 args.live_dsp_program.read_bytes(),args.dsp_program.read_bytes() if args.dsp_program else None)
+            result['live_serial_publisher'] = serial_publisher_contract(args.live_dsp_program.read_bytes())
         print(json.dumps(result,indent=2))
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSK-1 radio contract failed: {error}\n')

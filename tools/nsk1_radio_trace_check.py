@@ -37,8 +37,25 @@ def check_scan_qualification(text):
         raise ValueError('late scan qualification or negative-counter boundary changed')
     if any(right <= left for left,right in zip(counters,counters[1:])):
         raise ValueError('late scan counter is not progressing')
-    return {'measurement':0,'threshold':0x574,'observed_through':90,
-            'timeout_counter_still_negative':True,'qualified_results_observed':False}
+    result = {'measurement':0,'threshold':0x574,'observed_through':90,
+              'timeout_counter_still_negative':True,'qualified_results_observed':False}
+    if 'nsk1_publisher_entry:' in text:
+        result['serial_publishers'] = check_serial_publishers(text)
+    return result
+
+
+def check_serial_publishers(text):
+    rows = re.findall(r'nsk1_publisher_entry: address=([0-9a-f]{4}) index=(\d+) ar4=([0-9a-f]{4}) ar5=([0-9a-f]{4}) serial06b6=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    expected = [('3f50',str(i),'0000','0004','0000') for i in range(1,5)]
+    # AR5 is sampled before the publisher CALLD's length-setting delay slot.
+    expected.append(('4810','1','008b','03ff','0000'))
+    if [row[:5] for row in rows] != expected:
+        raise ValueError('serial publisher boundary or positive RSSI control changed')
+    times = [float(row[5]) for row in rows]
+    if not all(2 <= time < 3 for time in times[:4]) or not 38 < times[4] < 40:
+        raise ValueError('serial publisher observation timing changed')
+    return {'empty_queue_dispatch_samples':4,'rssi_positive_control':True,
+            'serial_publishers_observed':False}
 
 
 def check(text):

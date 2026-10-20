@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_serial_9404_is_unconditional_liveness_publisher",
+      "status": "disproven",
+      "hypothesis": "The unclassified data-driven native publisher9404 is an unconditional periodic packet producer that should satisfy DSP liveness during the scan",
+      "conclusion": "The two raw direct caller candidates of helper938b are8ded and8df5, whose CALLD delay slots set packet types9b and9a. Helper938b returns if signed queued count06b6 is nonpositive; its later9404 call publishes buffered serial data. A qualified passive run sees four3f50 dispatcher entries with count zero and no9404 or8e1c publication, while positive control4810 fires for the real RSSI packet. The pre-delay-slot AR5 value is not packet length. This excludes the unconditional-heartbeat interpretation of these checked paths, not indirect callers, all queue writers or an independent physical serial input contract.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_radio_contract.py", "tools/nsk1_scan_qualification.lua", "tools/nsk1_radio_trace_check.py", "tools/test_nsk1_radio_contract.py", "tools/test_nsk1_radio_trace_check.py"]
+    },
+    {
       "id": "nsk1_post_rssi_scan_is_permanently_waiting_for_empty_sample_queue",
       "status": "disproven",
       "hypothesis": "After native RSSI publication the uploaded scan routine cannot return from4701 because its sample queue never receives data",

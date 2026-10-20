@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, diagnose_liveness_reset
+from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, check_serial_publishers, diagnose_liveness_reset
 
 
 def fixture():
@@ -89,6 +89,15 @@ class NativeRadioTraceTest(unittest.TestCase):
 
 
 class ScanProgressTests(unittest.TestCase):
+    def test_serial_negative_requires_its_positive_control(self):
+        text = '\n'.join(f'nsk1_publisher_entry: address=3f50 index={i} ar4=0000 ar5=0004 serial06b6=0000 t={2+i*0.005:.6f} observer_writes=0' for i in range(1,5))
+        positive = 'nsk1_publisher_entry: address=4810 index=1 ar4=008b ar5=03ff serial06b6=0000 t=38.791415 observer_writes=0'
+        self.assertTrue(check_serial_publishers(text+'\n'+positive)['rssi_positive_control'])
+        with self.assertRaises(ValueError):
+            check_serial_publishers(text)
+        with self.assertRaises(ValueError):
+            check_serial_publishers(text+'\n'+positive.replace('4810','9404'))
+
     def test_zero_measurement_and_negative_timeout_are_bounded_observations(self):
         text = '\n'.join(f'nsk1_scan_metric: index={i+1} pc=0ae7 a=0000000000 threshold=0574 t={39+i*0.005:.6f} observer_writes=0' for i in range(8))
         text += '\n' + '\n'.join(f'nsk1_scan_late: t={65+5*i:.6f} counter_hi=ffff counter_lo={0xd7be+1000*i:04x} qualified=0000 flags=0000 observer_writes=0' for i in range(6))

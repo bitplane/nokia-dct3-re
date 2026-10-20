@@ -1,9 +1,25 @@
 import unittest
 
-from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census
+from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census,serial_publisher_contract
 
 
 class Nsk1RadioContractTest(unittest.TestCase):
+    def test_serial_publisher_has_typed_calls_and_a_queue_gate(self):
+        image = bytearray(0x20000)
+        for address,words in {0x8dd4:'721206c010f806b6fa458dfb',0x8ded:'f274938b7714009b',0x8df5:'f274938b7714009a',0x938d:'771306b61083fc47',0x9404:'f27437ce77131200'}.items():
+            data = bytes.fromhex(words)
+            image[address*2:address*2+len(data)] = data
+        result = serial_publisher_contract(image)
+        self.assertEqual([row['packet_type'] for row in result['direct_callers']],['0x9b','0x9a'])
+        self.assertFalse(result['unconditional_heartbeat_proved'])
+        image[0x20:0x24] = bytes.fromhex('f074938b')
+        with self.assertRaisesRegex(ValueError,'caller census'):
+            serial_publisher_contract(image)
+        image[0x20:0x24] = bytes(4)
+        image[0x938d*2] = 0
+        with self.assertRaisesRegex(ValueError,'sequence'):
+            serial_publisher_contract(image)
+
     def test_live_publisher_census_is_word_ordered_and_bounded(self):
         image = bytearray(0x20000)
         image[0x20:0x28] = bytes.fromhex('f27437cef07337ce')

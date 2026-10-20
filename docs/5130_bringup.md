@@ -559,6 +559,25 @@ RF-input and packet-production contract, including the data-driven serial
 publisher at9404 and eligibility of the existing control/result producers,
 not a justified clock multiplier or synthetic periodic packet.
 
+The live serial path is now bounded:8dd0 first checks queued count06b6,
+then control flags06f3 (0400 bypass,0100 selects8df5,0200 selects8ded).
+The only two raw direct caller candidates of938b are8ded and8df5; their
+CALLD delay slots load AR4 with009b and009a respectively. Helper938b itself
+returns when signed count06b6 is nonpositive. Its packet publication at9404
+therefore serves queued serial data on these paths, not an unconditional
+heartbeat. `serial_publisher_contract` checks the direct caller set and
+the count/argument/publication sequences in the captured live image;
+indirect entry and queue-producer ownership remain unclosed.
+
+The qualified passive probe in `tmp/nsk1-serial-contract-final` observes
+four3f50 dispatcher entries near2s with count06b6=0, no9404 or8e1c publisher
+entry, and the positive4810 RSSI entry near38.791s. Its AR5=03ff snapshot
+precedes CALLD's delay slot setting packet length00a2; it is not a changed
+wire length. The integrated scan fixture retains probe handles, bounds each
+site to four entries and checks the positive control before accepting the
+negative. These four count samples are not an all-writer census of06b6.
+The independent cold/storage/radio and90-second scan checks still pass.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression
