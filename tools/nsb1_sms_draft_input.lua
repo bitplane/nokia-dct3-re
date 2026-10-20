@@ -14,6 +14,9 @@ local sequence, times
 if reload then
     sequence = {{26,'menu'},{28,'two'},{30,'one'},{32,'two'},{36,'menu'}}
     times = {35,37,39}
+    if _G.nsb1_sms_empty then
+        times = {37}
+    end
 else
     sequence = {{26,'menu'},{28,'two'},{30,'one'},{32,'three'},{38,'two'},{40,'zero'},{42,'menu'}}
     -- Save is option 7; Dictionary precedes Send special in this own list.
@@ -37,7 +40,8 @@ emu.register_frame_done(function()
         index = index+1
     end
     if frame <= #times and now >= times[frame] then
-        machine.screens[':screen']:snapshot(string.format('sms_%s_%d.png',reload and 'reload' or 'draft',frame))
+        local label = _G.nsb1_sms_empty and 'empty' or (reload and 'reload' or 'draft')
+        machine.screens[':screen']:snapshot(string.format('sms_%s_%d.png',label,frame))
         frame = frame+1
     end
 end,'NSB-1 offline physical SMS draft')

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_offline_sms_erase_cold_empty", "owner": "nsb1_sim_sms", "status": "satisfied",
+      "predicate": "A physically composed and cold-read native SIM draft is physically deleted and remains absent after another cold boot",
+      "current": "The four-process PPM B --erase gate saves A-space, cold-reads its exact unsent record, then physically selects Options/Erase and confirms. One A0 DC 01 04 B0 succeeds; only EF_SMS record one's status changes 07 to 00, with payload and all other card bytes preserved. A fourth qualified cold process reads EF_SMS without update and physically opens an exact No messages in outbox frame. Each phase requires native execution, receive activity, phone-code contacts and unchanged flash. This is offline logical deletion, not payload scrubbing, network SMS, registration or fitted-mask proof.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_sms_draft_roundtrip.py", "tools/nsb1_sms_draft_erase.lua", "tools/nsb1_sms_draft_empty.lua", "tools/nsb1_sms_draft_input.lua", "tools/test_nsb1_sms_draft_roundtrip.py"]
+    },
+    {
       "id": "nsb1_v671_phonebook_erase_cold_empty", "owner": "nsb1_sim_phonebook", "status": "satisfied",
       "predicate": "A physically saved and cold-read SIM contact is physically erased and a fourth process verifies the durable empty book",
       "current": "The four-process --erase gate saves ADA/123, independently cold-searches it, then physically selects Erase/One by one/ADA and confirms. Exactly one EF_ADN record-one UPDATE RECORD succeeds; all 1600 ADN bytes are erased and unrelated SIM storage is unchanged. A fourth qualified cold process performs an empty-name Search, reads record one without rewriting, renders exact No phone numbers pixels and preserves the entire card. Each phase checks native execution, receive activity, phone-code/menu input and unchanged executable flash. No contact storage is seeded or deleted by the harness. Fitted mask, nominal ADC, synthetic EEPROM and absent native network limits remain.",

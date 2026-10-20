@@ -69,6 +69,17 @@ Saved/read pixels, the unsent EF_SMS record, physical contact order, phone-code
 acceptance, legal native execution, inactivity coverage and unchanged flash.
 This is offline storage, not registration or network SMS acceptance.
 
+Add `--erase` to extend the two-process draft gate through physical Options /
+Erase / confirmation and a fourth cold process. The erase phase first reads
+the exact stored `A ` draft, then issues one successful
+`A0 DC 01 04 B0` to EF_SMS record one. **Only its status changes from `07`
+to `00`; old TPDU/padding bytes remain.** All other card bytes are unchanged.
+The fourth process reads the persisted free record, physically selects
+Outbox, renders `No messages in outbox`, and preserves the complete card
+without UPDATE RECORD. Exact read/confirmation/empty frames, native
+execution, receive activity, physical phone-code input and unchanged flash
+pass in all four phases. Logical deletion is not secure payload erasure.
+
 ```sh
 .venv/bin/python tools/nsb1_sms_draft_roundtrip.py mame/mame roms tmp/NEW \
   --checksum-control-from tmp/QUALIFIED_B_ERASED_RUN
