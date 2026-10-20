@@ -569,6 +569,38 @@ storage is loaded. This accepts one physical SIM contact save/cold-read path,
 not handset-local storage, all editing operations, registration, calls or SMS.
 Fitted-mask, nominal-input and synthetic checksum/retry limitations remain.
 
+### Startup SIM PIN and cold retry persistence
+
+`nsb1_pin_roundtrip.py` creates the shared laboratory PIN-enabled card,
+without donor contents. Physical `4321` / OK produces VERIFY CHV1
+`A0 20 00 01 08`, status `9804`, and the exact Code error frame. The card
+persists two remaining CHV1 attempts; CHV2/PUK counters and PIN/PUK contents
+stay unchanged. A second, fresh MAME process loads only that qualified own
+storage, displays Enter PIN code again, and accepts physical `1234` / OK.
+VERIFY returns `9000` and restores the persistent attempt count to three.
+
+The phone then separately displays Security code; physical `12345` / OK
+produces its own Code accepted frame. This establishes startup CHV1 failure,
+durable retries, successful verification and the distinct phone-code flow,
+not PUK entry, PIN changes/toggling or every card-security operation.
+
+```sh
+.venv/bin/python tools/nsb1_pin_roundtrip.py mame/mame roms \
+  tmp/nsb1-pin-security --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+Both processes require qualified inputs, unchanged executable flash, correct
+EEPROM geometry and legal native CPU samples through the final complete
+second. The successful cold run lasts 60 seconds without reset. MCU inactivity
+branch coverage is separate: unlike the PIN-disabled menu control, the
+PIN-enabled cold run has no observed `2aff04` callback in that interval.
+A read-only watch sees timer `1d`'s record at `10029c` initialized during boot
+and queued at 14.755665692 s after PIN acceptance (relative-list halfword
+`02a8`, state byte two); its subsequent scheduling is unresolved. The result
+explicitly records this unobserved branch rather than claiming watchdog
+coverage. Menu and phonebook gates retain their nonzero activity requirements.
+No timer, retry state, firmware flag or PIN result is forced at runtime.
+
 ### External reference leads, not provisioning evidence
 
 The [independent emulator's current coverage table](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
