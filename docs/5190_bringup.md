@@ -174,6 +174,40 @@ the full state-writer surface remain unclosed. Statuses `13a5..13a7` instead
 enter `210bd4`, which is also unobserved in this run. Do not inject these inputs
 or skip state 3 to manufacture acquisition.
 
+The local writer/activation inventory is:
+
+| Store | Value / owner |
+| --- | --- |
+| `20f510` | Task-12 initialization sets 3. |
+| `213942` | Initializer `2138ec` sets 1 and copies its input to byte `+15`; under further gates it can consume the cached vector at `213a02`. |
+| `2143fc` | Reset/defer routine `2143e0` sets 3. |
+| `214708` | Scan progression in `21460c` sets 2. |
+
+Scope: the aligned-literal scan finds 16 pools for owner `106a88` and six
+for direct state byte `106a9c`; all 13 PC-relative loads of the latter are
+classified, including the two direct stores above. The `20f000..214fff`
+immediate member-store scan has eight `STRB [base,+14]` candidates: two own
+controller writes and six stores belonging to other message/per-cell owners.
+This does not close computed aliases, generic structure copies or indirect
+callers across the whole image. The fresh runtime watch remains the check
+for observed changes outside the classified sites.
+
+Initializer `2138ec` has two direct Thumb-BL callers in the aligned image
+scan: `20faba` and `21179c`. The first belongs to task-12 status `043f`
+at `20fa82`; when state is 3 it calls the initializer with message byte `+2`.
+The independently mapped constructor is `28ed24(043f)`: case `28edce` copies
+bytes `10c435/10c434` into message `+2/+3`, then explicitly posts to task 12
+via `268944`. Its literal caller `24dda2` is inside handler `24dd5c` for
+task-17 status `0834`. Upstream, `20eb90` supplies `0834` to constructor
+`208dd4`, whose case `209184` fills two control bytes and posts to task 17
+at `209236`. These are own-ROM routes, not imported task aliases.
+
+The 61-second physical Call/End run observes neither `24dd5c`, the `043f`
+constructor nor initializer `2138ec`; the probe stream is uncapped by other
+events in that run. The next predecessor to decode is the controller path
+selecting source label `20eb8a`, not an invented DSP reply. The semantics and
+ordinary provisioning of the two control-record bytes also remain unproved.
+
 The unreached candidate routine statically loops over 40 four-byte records,
 examines signed message byte `+9 + 4*i`, and counts values greater than `-106`.
 That is an own-ROM byte/threshold contract, not validated physical RSSI units,

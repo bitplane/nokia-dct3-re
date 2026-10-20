@@ -9,6 +9,11 @@ if machine.debugger then
     machine.debugger:command('focus :maincpu')
     machine.debugger:command('temp9=0')
     machine.debugger:command('temp8=0')
+    machine.debugger:command('temp7=0')
+    machine.debugger:command('bpset 28ed24,r0==43f&&temp7<10,{temp7=temp7+1;logerror "nsb1_call_release_construct: input=%04x mode=%02x option=%02x caller=%08x observer_writes=0\\n",r0,b@10c435,b@10c434,r14;g}')
+    for _, address in ipairs({'24dd5c','2138ec'}) do
+        machine.debugger:command('bpset ' .. address .. ',temp7<10,{temp7=temp7+1;logerror "nsb1_call_release_stage: pc=%08x r0=%08x caller=%08x observer_writes=0\\n",pc,r0,r14;g}')
+    end
     machine.debugger:command('bpset 268944,r0==c&&r1>=100000&&r1<110000&&w@r1==13b8&&temp9<10,{temp9=temp9+1;logerror "nsb1_call_result_post: task=%08x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
     for _, address in ipairs({'20f63c','20f68e','20f6b8','213a28','213a68','2143e0','210bd4'}) do
         machine.debugger:command('bpset ' .. address .. ',temp8<20,{temp8=temp8+1;logerror "nsb1_call_search_stage: pc=%08x r0=%08x r4=%08x state=%02x phase=%02x cycles=%016x observer_writes=0\\n",pc,r0,r4,b@106a9c,b@106aa1,totalcycles;g}')
