@@ -130,6 +130,43 @@ bounded read-only debugger instrument, not an acceptance gate; its temporary
 fixed-pool read watch does not establish allocator ownership. Task 6's observed
 eight-byte message is not classified as text delivery.
 
+## Native radio and ordinary-call boundary
+
+`tools/nsb1_call_observe.lua` is a bounded physical diagnostic, not call or
+registration acceptance. On qualified PPM A checksum/retry storage it types
+`5550100`, presses the Call softkey, then the same softkey labelled End at
+52 seconds. Dialed digits render, the attempt presents End, and End returns
+the Menu softkey. No connection or speech is established; an End-labelled
+screen is not proof of network signaling. The separate C/Names contact is
+not the End softkey in this context.
+
+The passive ring trace distinguishes boot search from the later user action:
+
+| Direction | Observed boundary |
+| --- | --- |
+| MCU TX | Own type `51` parameter blocks finish around 2.14 s. |
+| MCU TX | Type `1a`, length 68, starts `00419800` at 4.831 s; type `4a`, length 4, is `02000000` at 4.868 s. These precede dialing. |
+| Native RF | Port `27` samples observed at DSP PCs `324b/3251/3257/325d` are zero. RF-port `32` writes also begin before dialing. |
+| DSP RX | Native code at `3805` publishes type `8b`, length 162, at 41.052483 s, beginning `00400328ff6f0329ff6f`. Payload units/count semantics are not imported from sibling firmware. |
+| MCU RX | `28f7ea` reads the header at 41.052609 s; wrapper `28f836` feeds receive loop `2afdd6`. |
+| MCU route | The `83..8f` jump table sends `8b` to `2afe54` then `284222`, which rewrites the status to `13b8`; runtime confirms task `0c` post through `268944`, caller `28423b`, header `13b8a28b`. |
+
+No later TX-ring commit is observed from the physical Call/End actions in
+the 61-second interval; native execution remains legal, rings drain, the
+inactivity check is nonzero and flash remains unchanged. This does not close
+all other command paths or classify the call controller's internal lifecycle.
+The next consumer is task 12's `13b8` handler: determine how it classifies the
+native result and whether it selects any subsequent acquisition operation.
+
+The handset currently leaves COBBA's RF sample callback unbound, using its
+explicit zero default. There is no received laboratory cell waveform on this
+native path. Reaching this result therefore does not establish a broken
+mailbox or a missing HLE acknowledgement. Usable cell acquisition requires
+an evidenced RF sample/timing contract or a separately labelled HLE backend;
+neither may be replaced by injected MCU registration flags. The ring observer
+suppresses its own header reads from the MCU-consumer watch. Detailed taps
+have a retirement trigger once search-result ownership is accepted.
+
 ## Qualified executable input
 
 Source: [archived Nokia service package](https://archive.org/download/Nokia_DCT3_firmwares/5190e671.zip).
