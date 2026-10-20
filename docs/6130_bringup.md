@@ -680,6 +680,16 @@ The qualified45s `tmp/nsk3-completion-surface` capture observes neither a
 checks still pass.
 This is an MCU acknowledgement candidate, not a DSP opcode; other05e6
 literals in unrelated catalogues do not establish this mailbox's producers.
+
+Three own constructor calls24862a/248bb2/2492a6 select05e6 versus an
+alternate using owner byte+13a; constructor24709c copies owner byte0 to
+message byte2. Its receive call is24753e. The45s qualified capture
+`tmp/nsk3-completion-server` enters that call once but observes no return
+at247542, no24709c construction and no05e6 post to mailbox11. The
+`--completion-wait` checker requires a45s sample and rejects receive/output
+events; it does not claim all ingress routes are enumerated. Mutation tests
+anchor all three direct sites and the constructor/receiver. The active
+frontier is legitimate server ingress, not flipping+13a or injecting05e6.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.

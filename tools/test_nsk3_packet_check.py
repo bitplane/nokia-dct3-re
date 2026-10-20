@@ -1,9 +1,17 @@
 import struct
 import unittest
-from tools.nsk3_packet_check import parse, check_delivery, check_cache, check_controller, check_mode_chain
+from tools.nsk3_packet_check import parse, check_delivery, check_cache, check_controller, check_mode_chain, check_completion_wait
 
 
 class PacketCensusTest(unittest.TestCase):
+    def test_bounded_empty_server(self):
+        trace='nsk3_completion_wait: cycles=105d13c observer_writes=0\nnsk3_boot_sample: t=45.000000'
+        self.assertEqual(check_completion_wait(trace)['receive_returns'],0)
+        for bad in (trace.replace('45.000000','44.000000'),trace+'\nnsk3_completion_receive: object=1',
+                    trace+'\nnsk3_completion_construct: input=05e6',trace+'\n'+trace,
+                    trace.replace('nsk3_completion_wait:','missing:')):
+            with self.assertRaises(ValueError):check_completion_wait(bad)
+
     def test_mode_chain(self):
         events=(
             'nsk3_mode_decision: status=09ec flag=00000000 owner=0010a7d8 mode=01',

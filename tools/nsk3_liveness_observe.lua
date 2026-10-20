@@ -10,6 +10,9 @@ machine.debugger:command('bpset 2823c4,r1>=100000 && r1<10ff00,{logerror "nsk3_p
 machine.debugger:command('bpset 266eb0,d@(r13+4)>=100000 && d@(r13+4)<10ff00 && w@(d@(r13+4))==13b8,{logerror "nsk3_packet_receive: task=%02x pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",b@(r5+2),d@(r13+4),d@(d@(r13+4)),d@(r13+28),totalcycles;g}')
 machine.debugger:command('bpset 21a2ea,r5>=100000 && r5<10ff00,{logerror "nsk3_packet_consumer: pointer=%08x header=%08x owner=%08x state=%02x phase=%02x cache=%08x cycles=%016x observer_writes=0\\n",r5,d@r5,r6,b@(r6+14),b@(r6+19),d@(r4+28),totalcycles;g}')
 local writes=0
+machine.debugger:command('bpset 24709c,1,{logerror "nsk3_completion_construct: input=%04x owner=%08x result=%02x caller=%08x cycles=%016x observer_writes=0\\n",r0,r1,b@r1,r14,totalcycles;g}')
+machine.debugger:command('bpset 24753e,1,{logerror "nsk3_completion_wait: cycles=%016x observer_writes=0\\n",totalcycles;g}')
+machine.debugger:command('bpset 247542,1,{logerror "nsk3_completion_receive: object=%08x header=%08x cycles=%016x observer_writes=0\\n",r0,d@r0,totalcycles;g}')
 machine.debugger:command('bpset 266a2c,r0==11 && r1>=100000 && r1<300000 && w@r1==5e6,{logerror "nsk3_completion_post: pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",r1,d@r1,r14,totalcycles;g}')
 machine.debugger:command('wpset 10adf1,1,w,1,{logerror "nsk3_context_flag_write: data=%08x pc=%08x caller=%08x cycles=%016x observer_writes=0\\n",wpdata,pc,r14,totalcycles;g}')
 machine.debugger:command('bpset 21d676,1,{logerror "nsk3_controller_threshold: owner=%08x value=%04x threshold=%04x cycles=%016x observer_writes=0\\n",r4,r1,r0,totalcycles;g}')

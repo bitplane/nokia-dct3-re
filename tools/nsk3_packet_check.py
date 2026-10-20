@@ -108,6 +108,17 @@ def check_mode_chain(trace):
             'radio_command':'0x03e9','reply':'0x043c','mode_semantics_proved':False}
 
 
+def check_completion_wait(trace):
+    waits=re.findall(r'nsk3_completion_wait: cycles=([0-9a-f]+) observer_writes=0',trace)
+    samples=re.findall(r'nsk3_boot_sample: t=([0-9.]+)',trace)
+    if (len(waits)!=1 or not samples or max(map(float,samples))<45
+            or 'nsk3_completion_receive:' in trace or 'nsk3_completion_construct:' in trace
+            or 'nsk3_completion_post:' in trace):
+        raise ValueError('bounded empty completion-server observation differs')
+    return {'observed_seconds':45,'receive_entries':1,'receive_returns':0,
+            'all_possible_ingress_closed':False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source',type=Path)
@@ -116,6 +127,7 @@ def main():
     parser.add_argument('--cache',action='store_true',help='require exact body cache and state3 continuation')
     parser.add_argument('--controller',action='store_true',help='require ROM reply, actual result and controller wait')
     parser.add_argument('--mode-chain',action='store_true',help='require measured09ec-to043c MCU sequence')
+    parser.add_argument('--completion-wait',action='store_true',help='qualify the bounded empty server receive')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -129,6 +141,7 @@ def main():
         if args.cache:summary['cache']=check_cache(trace)
         if args.controller:summary['controller']=check_controller(trace)
         if args.mode_chain:summary['mode_chain']=check_mode_chain(trace)
+        if args.completion_wait:summary['completion_wait']=check_completion_wait(trace)
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)

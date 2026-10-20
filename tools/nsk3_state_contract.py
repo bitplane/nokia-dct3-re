@@ -11,7 +11,12 @@ def decode(image):
                0x21ac9a:'210102494288db0849e04288da05',
                0x21d670:'8c2120ff30774281da4c',
                0x2881e0:'48821a082800d100e77038ff38a02800d100e760',
-               0x2880b6:'78a02800d100e1024ec5e100'}
+               0x2880b6:'78a02800d100e1024ec5e100',
+               0x248616:'9d0420ff303b5d402800d10148dde00048dd1c29f7fefd37',
+               0x248b9e:'9d0420ff303b5d402800d10148eae00048ea1c29f7fefa73',
+               0x249292:'9d0420ff303b5d402800d101489ae000489a1c29f7fdfef9',
+               0x24709c:'b5f01c0d1c06200cf020fbd01c04782870a08026',
+               0x24753e:'f01ffb9f1c078838'}
     for address,encoded in fragments.items():
         expected=bytes.fromhex(encoded)
         if image[address-0x200000:address-0x200000+len(expected)]!=expected:
