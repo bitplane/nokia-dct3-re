@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_fdn_in_place_edit", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Own physical NSB-1 PIN2-protected FDN edit changes only the final number digit and persists visibly across cold boot",
+      "current": "From independently saved A/12345, own Search/Options/Edit accepts physical5678, retains the name and uses Clear/6/Save to issue one exact successful UPDATE RECORD. The complete card differs only at byte3600 F5-toF6. A linked fresh process holds # for four seconds to display12346, releases to the same name list, sends no UPDATE RECORD and preserves the complete edited card. The gate qualifies physical PIN1/phone/FDN contacts, PIN2 payload/order, own executable/native execution, linked cold devices and exact Saved/edited-number/list frames. FDN erase/cancel/local dial controls, fitted mask, registration and native speech remain unaccepted.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_fdn_edit.lua", "tools/nsb1_fdn_read.lua", "tools/nsb1_fdn_record_check.py", "tools/test_nsb1_fdn_record_check.py"]
+    },
+    {
       "id": "nsb1_v671_fdn_record_cold_view", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Physical NSB-1 PIN2-protected FDN Add saves A/12345 for visible cold retrieval while wrong PIN2 preserves record contents",
       "current": "Own Numbers/Add receives physical5678, A/12345 and issues one exact successful absolute UPDATE RECORD to FDN record1. The complete card changes only that32-byte ASCII/BCD object. A linked cold process searches the persisted entry, holds physical # for four seconds to display12345, releases to the same list, and leaves the entire card unchanged with no UPDATE RECORD. Independent same-input wrong5675 returns VERIFY9804/Code error, sends no UPDATE RECORD and changes only PIN2 retries3-to2. The gate requires own executable/resident hashes/native execution, linked cold devices, PIN1/phone/FDN contacts, bounded TX payloads/order, hold duration and exact Saved/number/list/error frames. No record prepopulation or guest-state forcing is used. FDN edit/erase/local dial controls, fitted mask, registration and native speech remain unaccepted.",

@@ -110,9 +110,24 @@ links. The shared card is not prepopulated to obtain these results.
 ```
 
 The78s save,54s cold view and60s rejection use `nsb1_fdn_write.lua`,
-`nsb1_fdn_read.lua` and `nsb1_fdn_write_wrong.lua`. FDN in-place edit/erase and
-local dial restrictions remain unaccepted on NSB-1; registration and native
-speech remain separate unresolved boundaries.
+`nsb1_fdn_read.lua` and `nsb1_fdn_write_wrong.lua`.
+
+In-place editing with FDN Off is independently accepted: own Search/Options/Edit,
+physical PIN2, unchanged name, Clear/6/Save issues one successful UPDATE RECORD.
+The whole card changes only byte3600 F5-toF6 (12345-to12346). A linked cold
+process holds `#` to display12346 and returns to the same name list, with no
+UPDATE RECORD and no card change. The gate requires the exact edited payload,
+PIN2 authorization, saved/number/list frames, input links and native execution.
+
+```sh
+.venv/bin/python tools/nsb1_fdn_record_check.py tmp/nsb1-fdn-off-cold \
+  tmp/nsb1-fdn-write tmp/nsb1-fdn-read-held tmp/nsb1-fdn-write-wrong \
+  --edit tmp/nsb1-fdn-edit --edit-cold tmp/nsb1-fdn-edit-cold
+```
+
+`nsb1_fdn_edit.lua` runs74s and the standard cold view runs54s. FDN erase/cancel
+and local dial restrictions remain unaccepted on NSB-1; registration and
+native speech remain separate unresolved boundaries.
 
 ### SIM credential changes and recovery
 

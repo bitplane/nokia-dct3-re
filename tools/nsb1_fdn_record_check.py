@@ -28,12 +28,20 @@ def card_result(before, wrong=False):
     return bytes(after)
 
 
+def edited_card(before):
+    if len(before) != EXTENDED_LENGTH or before[3575] != 1 or before[3578:3610] != RECORD:
+        raise ValueError('saved FDN-Off A/12345 record required')
+    after = bytearray(before)
+    after[3600] = 0xf6
+    return bytes(after)
+
+
 def check_trace(trace, mode):
-    if mode not in ('write', 'cold', 'wrong'):
+    if mode not in ('write', 'cold', 'wrong', 'edit'):
         raise ValueError('known FDN record mode required')
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
-    count = {'write': 23, 'cold': 11, 'wrong': 15}[mode]
+    count = {'write': 23, 'cold': 11, 'wrong': 15, 'edit': 21}[mode]
     contacts = re.findall(r'nsb1_fdn_contact: index=(\d+) down=([01]) ', trace)
     if contacts != [(str(i), down) for i in range(1, count + 1) for down in ('1', '0')]:
         raise ValueError('physical FDN record input differs')
@@ -59,10 +67,13 @@ def check_trace(trace, mode):
         pin2 = bytes.fromhex('a020000208') + padded_pin('5675' if mode == 'wrong' else '5678')
         if tx.count(pin2) != 1:
             raise ValueError('PIN2 payload differs')
-    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode == 'write' else []):
+    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit') else []):
         raise ValueError('FDN update result differs')
-    if mode == 'write':
-        command = bytes.fromhex('a0dc010420') + RECORD
+    if mode in ('write', 'edit'):
+        body = bytearray(RECORD)
+        if mode == 'edit':
+            body[22] = 0xf6
+        command = bytes.fromhex('a0dc010420') + body
         if tx.count(command) != 1 or tx.index(command) < tx.index(pin2):
             raise ValueError('protected FDN record payload/order differs')
     elif bytes.fromhex('a0dc') in tx:
@@ -77,6 +88,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('seed', 'write', 'cold', 'wrong'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--edit', type=Path)
+    parser.add_argument('--edit-cold', type=Path)
     args = parser.parse_args()
     try:
         before = (args.seed / 'nvram/nsb1r4t/sim_card').read_bytes()
@@ -93,16 +106,35 @@ def main():
         check_frame(args.cold / 'snap/nsb1_fdn_49.png', NUMBER_FRAME)
         check_frame(args.cold / 'snap/nsb1_fdn_51.png', NAME_FRAME)
         check_frame(args.wrong / 'snap/nsb1_fdn_55.png', WRONG_RGB_SHA256)
+        if bool(args.edit) != bool(args.edit_cold):
+            raise ValueError('edit/cold controls must be paired')
+        if args.edit:
+            edited = edited_card(saved)
+            previous = args.cold
+            for run, cold in ((args.edit, False), (args.edit_cold, True)):
+                check_cold_link(run, previous)
+                code = json.loads((run / 'exit_status.json').read_text())['returncode']
+                trace, card = check_card_run(run, code, 54 if cold else 74)
+                if card != edited:
+                    raise ValueError('in-place edit changed unrelated card bytes')
+                check_trace(trace, 'cold' if cold else 'edit')
+                previous = run
+            check_frame(args.edit / 'snap/nsb1_fdn_67.png', SAVED_FRAME)
+            check_frame(args.edit_cold / 'snap/nsb1_fdn_49.png', EDITED_NUMBER_FRAME)
+            check_frame(args.edit_cold / 'snap/nsb1_fdn_51.png', NAME_FRAME)
     except (OSError, ValueError, KeyError) as error:
         print(f'NSB-1 FDN record failed: {error}', file=sys.stderr)
         return 1
     print('NSB-1 physical PIN2-protected FDN save, cold12345 view and rejected-write preservation PASS')
+    if args.edit:
+        print('NSB-1 physical in-place FDN edit and unchanged cold12346 view PASS')
     return 0
 
 
 SAVED_FRAME = '8c01f87b60e87cb07ab22ffe2418b7a4510554681ede41c423e85abecaca5231'
 NUMBER_FRAME = 'f7b1397133d10be7ddad9597bf4acdc99928be48d1d9e28e21d432a48a09679e'
 NAME_FRAME = 'cb43bd52bd90957fce71d365b0b4c2ed69079f6f6470aa702058ab4824006db5'
+EDITED_NUMBER_FRAME = 'ad7b28c5c7bb2ce2093492172567c7d2b60c8961e2db5dad0f966da0516ae759'
 
 if __name__ == '__main__':
     raise SystemExit(main())
