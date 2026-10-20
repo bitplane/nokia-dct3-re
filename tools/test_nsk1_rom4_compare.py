@@ -7,10 +7,37 @@ import unittest
 import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
-from tools.nsk1_rom4_compare import prepare,summarize,check_nominal_startup
+from tools.nsk1_rom4_compare import prepare,summarize,check_nominal_startup,check_card_startup
 
 
 class Nsk1CompareTest(unittest.TestCase):
+    def test_card_gate_requires_dcs_reads_complete_scan_and_prompt(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            snapshots = Path(directory)
+            frame = Image.new('RGB',(84,48),'white')
+            digest = hashlib.sha256(frame.tobytes()).hexdigest()
+            for seconds in (10,20):
+                frame.save(snapshots/f'nsk1_native_{seconds}s.png')
+            lines = ['sim_device: body ins=a4 length=2 requested=7f21 selected=7f21 result=ok']
+            for fid,length in (('2fe2','0a'),('6fae','01'),('6f38','08'),('6f07','09')):
+                lines.append(f'sim_device: header cla=a0 ins=b0 p1=00 p2=00 p3={length} selected={fid}')
+            lines.extend(f'sim_device: header cla=a0 ins=b2 p1={index:02x} p2=04 p3=20 selected=6f3a'
+                         for index in range(1,51))
+            trace = '\n'.join(lines)
+            with patch('tools.nsk1_rom4_compare.check_nominal_readiness') as readiness, \
+                    patch('tools.nsk1_rom4_compare.SECURITY_PROMPT_RGB_SHA256',digest):
+                self.assertEqual(50,check_card_startup({},trace,snapshots)['adn_records_read'])
+                readiness.assert_called_once_with({})
+                for changed in (trace.replace('selected=6f07','selected=6f05'),
+                                trace.replace('p1=32','p1=31'),trace+'\nsim_device: header malformed',
+                                trace+'\nSIM status ins=b2 sw=9402',trace.replace('result=ok','result=not-found')):
+                    with self.assertRaises(ValueError):
+                        check_card_startup({},changed,snapshots)
+                Image.new('RGB',(84,48),'black').save(snapshots/'nsk1_native_20s.png')
+                with self.assertRaisesRegex(ValueError,'pixels'):
+                    check_card_startup({},trace,snapshots)
+
     def test_nominal_graphical_gate_requires_pixels_reports_and_physical_keys(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as directory:
@@ -120,10 +147,18 @@ class Nsk1CompareTest(unittest.TestCase):
                     self.assertEqual(':RESEARCH_ADC2',port.get('tag'))
                     self.assertEqual('554',port.get('value'))
                     self.assertEqual(554,json.loads((nominal/'input_manifest.json').read_text())['adc2_source'])
+                    inserted = root/'inserted'
+                    prepare(sources,inserted,run,True,True,True,True)
+                    ports = ET.parse(inserted/'cfg/nsk1r4t.cfg').findall('./system/input/port')
+                    socket = next(port for port in ports if port.get('tag') == ':SIM_REMOVED')
+                    self.assertEqual('0',socket.get('value'))
+                    self.assertTrue(json.loads((inserted/'input_manifest.json').read_text())['inserted_synthetic_sim'])
                 with self.assertRaisesRegex(ValueError,'qualified record'):
                     prepare(sources,root/'invalid-checksum',security_checksum=True)
                 with self.assertRaisesRegex(ValueError,'checksum control'):
                     prepare(sources,root/'invalid-adc',nominal_adc2=True)
+                with self.assertRaisesRegex(ValueError,'nominal-input control'):
+                    prepare(sources,root/'invalid-card',insert_sim=True)
                 (sources/'input3.bin').write_bytes(b'wrong mask')
                 with self.assertRaisesRegex(ValueError,'hash'):
                     prepare(sources,root/'rejected')

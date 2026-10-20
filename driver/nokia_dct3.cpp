@@ -3501,6 +3501,9 @@ INPUT_PORTS_END
 
 static INPUT_PORTS_START( nsk1r4t )
 	PORT_INCLUDE(noki5110)
+	PORT_MODIFY("SIM_REMOVED")
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 	PORT_START("RESEARCH_ADC2")
 	// Explicit analog-input comparison, not measured NSK-1 calibration.
 	// 554 is the nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis.
@@ -4182,6 +4185,10 @@ void nokia_dct3_state::nsk1r4t(machine_config &config)
 	// Own 290886 samples SDA bit 0; START/STOP drive SCL bit 2.
 	research.pup_eeprom_scl_bit = 2;
 	research.keypad_wiring = KEYPAD_NSK1;
+	// Own 280ff8 uses IIR/control 38/39, FIFO controls 3d/3e,
+	// clock bit 5 and FIQ6/7. Default socket remains physically empty.
+	research.simi_controller = true;
+	research.synthetic_sim_card = true;
 	// Own 291830 selects 22 at 28, commands at 2a, polls 29 bit 2,
 	// receives at 2d; LCD command/data use 2c/2b at 292182/2921d8.
 	research.gensio_wiring = GENSIO_NSE1;

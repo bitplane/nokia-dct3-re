@@ -43,6 +43,7 @@ def build_from_capture(source, expected_inputs):
     if (manifest.get('inputs') != expected or manifest.get('peer_completions') is not False
             or manifest.get('physical_keys') is not False
             or manifest.get('adc2_source',1023) != 1023
+            or manifest.get('inserted_synthetic_sim',False) is not False
             or manifest.get('external_eeprom') != 'own erased 2048 bytes; no donor provisioning'):
         raise ValueError('record profile requires qualified own erased NSK-1 capture')
     for name,digest in expected_inputs:

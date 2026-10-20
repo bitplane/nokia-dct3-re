@@ -101,6 +101,9 @@ class Nsk1StaticTest(unittest.TestCase):
             (0x293424, '203143d7550720305d0006c00ec006000e004681281f'),
             (0x29346a, '2805dbe8203155021c4806000e012905dbcf'),
             (0x293558, '00020000'),
+            (0x281008, '213820ff550820c07220f00afd6c7aa006400e4072a0f00afd73f00afd6420bf7aa1400872a0f00afd6b213a20035508f00afd5920207b6143087360f00afd60213d201855082012550820065508213e201a550820105508200455082039213255012001'),
+            (0x281188, '00020000'),
+            (0x280c22, '203919012080780a43107008'),
         )
         for variant,shift in (('standard',0),('2915',-0x10)):
             image = bytearray(0x100000)
@@ -110,6 +113,7 @@ class Nsk1StaticTest(unittest.TestCase):
             result = read_peripheral_contract(image,variant)
             self.assertEqual(0,result['eeprom_sda_input_bit'])
             self.assertEqual(2,result['ccont_ready_bit'])
+            self.assertEqual([6,7],result['simi_initial_fiq_mask_bits'])
             self.assertFalse(result['electrical_timing_proved'])
             for address,_ in fragments:
                 offset = address+shift-0x200000

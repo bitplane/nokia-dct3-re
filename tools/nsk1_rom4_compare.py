@@ -25,11 +25,11 @@ INPUTS = (
 )
 
 EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
+SECURITY_PROMPT_RGB_SHA256 = 'f82d19b12314200132f0d19ab17a2d86b202d65ba7bc817d1a5c6cbb90a59dfc'
 
 
-def check_nominal_startup(summary, snapshots):
-    """Own bounded graphical/input acceptance, not SIM or radio acceptance."""
-    from PIL import Image
+def check_nominal_readiness(summary):
+    """Common report and physical-key contract for the nominal-input trials."""
     observed = summary.get('physical_input_observation',{})
     contacts = observed.get('contacts',[])
     reports = {row['value'] for row in observed.get('task1_scalars',[])}
@@ -41,6 +41,12 @@ def check_nominal_startup(summary, snapshots):
             or not windows or any(row['sample'] != 554*1500//232 for row in windows)
             or contacts[-1]['simi_reads'] == 0):
         raise ValueError('nominal-input report/checklist/physical-key boundary changed')
+
+
+def check_nominal_startup(summary, snapshots):
+    """Own bounded graphical/input acceptance, not SIM or radio acceptance."""
+    from PIL import Image
+    check_nominal_readiness(summary)
     for seconds in (10,20):
         with Image.open(snapshots/f'nsk1_native_{seconds}s.png') as source:
             frame = source.convert('RGB')
@@ -50,13 +56,40 @@ def check_nominal_startup(summary, snapshots):
             'scope':'native compatibility graphical boot and physical key forwarding; not fitted mask, SIM acceptance or radio'}
 
 
-def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False, nominal_adc2=False):
+def check_card_startup(summary, trace, snapshots):
+    """Require the real DCS directory/file conversation, not merely a prompt."""
+    from PIL import Image
+    check_nominal_readiness(summary)
+    headers = re.findall(r'sim_device: header cla=([0-9a-f]{2}) ins=([0-9a-f]{2}) p1=([0-9a-f]{2}) p2=([0-9a-f]{2}) p3=([0-9a-f]{2}) selected=([0-9a-f]{4})',trace)
+    if len(headers) != trace.count('sim_device: header '):
+        raise ValueError('unrecognized card header trace')
+    reads = {(ins,fid,length) for cla,ins,p1,p2,length,fid in headers if cla == 'a0' and p1 == p2 == '00'}
+    required_reads = {('b0','2fe2','0a'),('b0','6fae','01'),('b0','6f38','08'),('b0','6f07','09')}
+    adn = [int(p1,16) for cla,ins,p1,p2,length,fid in headers
+           if (cla,ins,p2,length,fid) == ('a0','b2','04','20','6f3a')]
+    if (not required_reads <= reads or adn != list(range(1,51))
+            or 'requested=7f21 selected=7f21 result=ok' not in trace
+            or 'SIM status ins=b2' in trace):
+        raise ValueError('missing DCS application reads or complete empty-ADN scan')
+    for seconds in (10,20):
+        with Image.open(snapshots/f'nsk1_native_{seconds}s.png') as source:
+            frame = source.convert('RGB')
+            if frame.size != (84,48) or hashlib.sha256(frame.tobytes()).hexdigest() != SECURITY_PROMPT_RGB_SHA256:
+                raise ValueError('own NSK-1 security-prompt pixels changed')
+    return {'apdu_headers':[list(row) for row in headers], 'adn_records_read':len(adn),
+            'security_prompt_rgb_sha256':SECURITY_PROMPT_RGB_SHA256,
+            'scope':'native compatibility SIM initialization and security-prompt presentation; not phone-code acceptance, menu, radio or fitted-mask proof'}
+
+
+def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False, nominal_adc2=False, insert_sim=False):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
     if security_checksum and record_profile_from is None:
         raise ValueError('checksum-only comparison requires the qualified record fixture')
     if nominal_adc2 and not security_checksum:
         raise ValueError('nominal ADC2 comparison requires checksum control')
+    if insert_sim and not nominal_adc2:
+        raise ValueError('inserted-card observation requires nominal-input control')
     sources = [(root / name, digest) for name, digest in INPUTS]
     for source, digest in sources:
         if hashlib.sha1(source.read_bytes()).hexdigest() != digest:
@@ -88,6 +121,8 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
         system = ET.SubElement(config,'system',name='nsk1r4t')
         inputs = ET.SubElement(system,'input')
         ET.SubElement(inputs,'port',tag=':RESEARCH_ADC2',type='CONFIG',mask='1023',defvalue='1023',value='554')
+        if insert_sim:
+            ET.SubElement(inputs,'port',tag=':SIM_REMOVED',type='OTHER',mask='1',defvalue='1',value='0')
         (run/'cfg').mkdir()
         ET.ElementTree(config).write(run/'cfg/nsk1r4t.cfg',encoding='utf-8',xml_declaration=True)
     (run / 'input_manifest.json').write_text(json.dumps({
@@ -98,6 +133,7 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
         'security_checksum':checksum_metadata,
         'adc2_source':554 if nominal_adc2 else 1023,
         'adc2_scope':'nominal CCONT transfer hypothesis, not measured NSK-1 calibration' if nominal_adc2 else 'generic saturated research control',
+        'inserted_synthetic_sim':insert_sim,
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
         'peer_completions': False, 'physical_keys': physical_keys,
     }, indent=2)+'\n')
@@ -154,6 +190,7 @@ def main():
     parser.add_argument('--physical-keys',action='store_true',help='physical Menu/Up/C probe on independently mapped contacts')
     parser.add_argument('--security-checksum',action='store_true',help='repair only 011e/011f in the qualified external record fixture')
     parser.add_argument('--nominal-adc2',action='store_true',help='explicit 554-count CCONT nominal-input hypothesis, no guest sample writes')
+    parser.add_argument('--insert-sim',action='store_true',help='cold physical insertion of the explicit synthetic card; no service acceptance claim')
     args = parser.parse_args()
     run = args.run.resolve()
     if args.record_profile_from and args.variant != 'standard':
@@ -166,8 +203,10 @@ def main():
         parser.error('checksum comparison requires --record-profile-from and --physical-keys')
     if args.nominal_adc2 and not args.security_checksum:
         parser.error('nominal ADC2 comparison requires --security-checksum')
+    if args.insert_sim and not args.nominal_adc2:
+        parser.error('inserted-card observation requires --nominal-adc2')
     try:
-        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys,args.security_checksum,args.nominal_adc2)
+        initial_eeprom = prepare(args.roms.resolve(), run,args.record_profile_from,args.physical_keys,args.security_checksum,args.nominal_adc2,args.insert_sim)
         script = Path(__file__).with_name('nsk1_input_fixture.lua' if args.physical_keys else 'nsk1_boot_observe.lua').resolve()
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
@@ -175,6 +214,7 @@ def main():
                 '561a' if args.variant == 'standard' else '561a2915',
                 '-rompath', str(run / 'inputs'), '-noreadconfig', '-video', 'none',
                 '-sound', 'none', '-nothrottle', '-log', '-seconds_to_run', str(args.seconds),
+                *(['-verbose'] if args.insert_sim else []),
                 *(['-debug', '-debugger', 'none'] if args.debug_startup else []),
                 '-autoboot_delay', '0', '-autoboot_script', str(script),
             ], cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
@@ -230,8 +270,10 @@ def main():
             summary['synthetic_record_conformance'] = True
         if args.physical_keys:
             summary['physical_input_observation'] = check_input(trace)
-        if args.nominal_adc2:
+        if args.nominal_adc2 and not args.insert_sim:
             summary['nominal_input_presentation'] = check_nominal_startup(summary,run/'snap')
+        if args.insert_sim:
+            summary['card_present_observation'] = check_card_startup(summary,trace,run/'snap')
         (run / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:

@@ -11,18 +11,21 @@ security-checksum repair activates the eleven application tasks/report `15`;
 and a declared nominal CCONT ADC2 hypothesis supplies report `14` and reaches
 the complete checklist `0f`. The combined fixture renders exact **Insert SIM
 card** pixels at 10 and 20 seconds and forwards physical Menu/Up/C contacts
-as logical `19/17/1a`. This is graphical boot and key-forwarding acceptance
-on an unproved native-mask compatibility instrument, not usable menu, SIM,
-registration, calls or SMS acceptance.
+as logical `19/17/1a`. The own SIMI register/clock/FIQ setup now selects the
+shared controller. With the explicit synthetic card inserted, native T=0
+initialization reads identity/service files and scans fifty ADN records,
+then renders **Security code**. This is native compatibility boot, SIM
+initialization and key-forwarding acceptance, not phone-code acceptance,
+usable menu, registration, calls or SMS acceptance.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
-The next boundary is the independently recovered NSK-1 SIM controller/card
-composition and ordinary SIM-present startup. Fitted-mask, physical-clock
-and measured analog calibration evidence remain incomplete.
+The next boundary is physical phone-code acceptance and normal menu use.
+Fitted-mask, physical-clock and measured analog calibration evidence remain
+incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
@@ -589,6 +592,47 @@ Their RGB SHA256 is
 The saturated checksum control still reproduces `0e` and blank presentation.
 This is an explicit research-input acceptance, not promotion of 554 to an
 evidenced board default or proof that a fitted NSK-1 DSP mask matches NSE-1.
+
+## SIM controller and inserted-card contract
+
+Own initializer `280ff8` acknowledges IIR `38`, programs SIM clock `3a`,
+manages MAD2 FIQ mask bits 6/7, enables clock-control bit 5, initializes FIFO
+controls `3d/3e`, and writes control `39=32`. Activation at `280c22` sets
+control bit 7; RX data is read from `37`. These fragments and the base
+literal `281188=20000` are pinned independently on both firmware variants,
+with mutation tests. The reused SIMI model owns the FIFOs, serial cadence,
+FIQ6 and card activation. Cold insertion exercises UART delivery, not the
+separately unvalidated hot-plug/FIQ7 lifecycle.
+
+The research machine enables that controller and an explicitly synthetic
+card peer, but defaults the physical socket to empty. The unchanged
+empty-socket graphical gate still passes after controller enablement.
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-card-comparison --record-profile-from tmp/nsk1-profile-source \
+  --security-checksum --nominal-adc2 --insert-sim \
+  --debug-startup --seconds 21 --physical-keys
+```
+
+The runner configures insertion before boot, rather than posting an internal
+SIM event. The handset selects legacy DCS application directory `7f21`.
+The card applies [GSM 09.91 option 1](https://www.etsi.org/deliver/etsi_etr/100_199/174/01_60/etr_174e01p.pdf):
+one backing GSM application, with visible `7f21` preserved in directory
+responses. The prior empty `7f21` directory accepted selection but rejected
+its EFs; it was not a missing MCU event or native DSP reply. The shared card
+conformance gate separately verifies directory identity/restoration,
+authentication and Telecom isolation.
+
+The inserted-card gate requires own `A0 B0` reads of ICCID (`2fe2`, ten
+bytes), phase (`6fae`, one), the requested eight-byte SST prefix (`6f38`),
+and IMSI (`6f07`, nine). It requires exactly the ordered absolute ADN scan
+1..50 at `6f3a`, without a failed READ RECORD, plus the same complete
+readiness/physical-key predicates as the empty control. Frames at 10 and
+20 seconds must match the 84x48 Security code prompt RGB SHA256
+`f82d19b12314200132f0d19ab17a2d86b202d65ba7bc817d1a5c6cbb90a59dfc`.
+This is phone-lock presentation, not successful code entry, CHV verification,
+persistent contact mutation or radio/service acceptance.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

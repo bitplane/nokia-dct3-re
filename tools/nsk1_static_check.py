@@ -55,6 +55,9 @@ def read_peripheral_contract(image, variant):
         (0x293424, '203143d7550720305d0006c00ec006000e004681281f'),
         (0x29346a, '2805dbe8203155021c4806000e012905dbcf'),
         (0x293558, '00020000'),
+        (0x281008, '213820ff550820c07220f00afd6c7aa006400e4072a0f00afd73f00afd6420bf7aa1400872a0f00afd6b213a20035508f00afd5920207b6143087360f00afd60213d201855082012550820065508213e201a550820105508200455082039213255012001'),
+        (0x281188, '00020000'),
+        (0x280c22, '203919012080780a43107008'),
     )
     for address, encoded in fragments:
         offset = address+shift-0x200000
@@ -70,6 +73,10 @@ def read_peripheral_contract(image, variant):
             'lcd_ready_bit': 0, 'keypad_scan_entry': hex(0x2933c4+shift),
             'keypad_rows': 5, 'keypad_row_signal_offset': '0x31',
             'keypad_row_direction_offset': '0x2f', 'keypad_column_input_offset': '0x30',
+            'simi_init_entry':hex(0x280ff8+shift),'simi_control_offset':'0x39',
+            'simi_iir_offset':'0x38','simi_rx_fifo_control_offset':'0x3d','simi_tx_fifo_control_offset':'0x3e',
+            'simi_clock_enable_bit':5,'simi_initial_fiq_mask_bits':[6,7],
+            'simi_control_activate_bit':7,
             'physical_key_mapping_proved': False, 'electrical_timing_proved': False}
 
 
