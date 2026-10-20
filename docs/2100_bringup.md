@@ -129,6 +129,19 @@ identity and this firmware's expected erase span remain to be established.
 An 8 KiB PMM segment spacing or a Sharp filename alone is not evidence for
 changing that silicon geometry. No flash behavior is altered by this capture.
 
+The independent ID-mode bus capture
+`tmp/nam2-v521-flash-id-caller-20261020/error.log` establishes what the MCU
+actually sees, not the fitted part's identity. At 0.033089077 s the RAM stub
+writes `0090` to `200000`; reads at PCs `13520a` and `135226` return `00b0`
+from the upper halfword, PC `13522a` reads `00d0` from the lower halfword,
+and PC `13522e` reads zero at `200004`. An `00ff` write leaves ID mode.
+Thus this transaction has no observed manufacturer/device byte-lane mismatch.
+The saved LR `2e678f` belongs to a shared wrapper (`2e6774..2e678e`), not
+an identified part-selection routine. Neither the ID values nor this wrapper
+establish the firmware's selected erase geometry; that selection remains the
+next static/runtime boundary to recover. Do not infer an 8 KiB erase unit
+from the PMM spacing or change all Sharp `b0/d0` devices on this evidence.
+
 ## Established contracts
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the
