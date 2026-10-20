@@ -40,6 +40,36 @@ _G.nsk1_lcd_tap = space:install_write_tap(0x20028, 0x2002f, 'nsk1_lcd', function
     end
 end)
 local releases, released, shared_writes = 0, false, 0
+local record_handles, record_requests, record_replies = {}, 0, 0
+local function ram_bytes(pointer, count)
+    assert(pointer >= 0x100000 and pointer+count <= 0x110000)
+    local bytes = {}
+    for index = 0, count-1 do bytes[#bytes+1] = string.format('%02x', space:read_u8(pointer+index)) end
+    return table.concat(bytes)
+end
+local sender = 0x255268+shift
+record_handles[#record_handles+1] = space:install_read_tap(sender & ~3, (sender & ~3)+3, 'nsk1_record_request', function()
+    if cpu.state['R15'].value ~= sender or cpu.state['R0'].value ~= 3 or record_requests >= 16 then return end
+    local pointer = cpu.state['R1'].value
+    if pointer < 0x100000 or pointer+32 > 0x110000 or space:read_u8(pointer+3) ~= 0x70 then return end
+    local command, length = space:read_u8(pointer+4), space:read_u8(pointer+5)
+    if command < 0x13 or command > 0x16 then return end
+    assert(length <= 24)
+    record_requests = record_requests+1
+    machine:logerror(string.format('nsk1_record_request: command=%02x bytes=%s caller=%08x t=%.9f observer_writes=0\n',
+        command, ram_bytes(pointer,6+length), cpu.state['R14'].value, machine.time:as_double()))
+end)
+for _, definition in ipairs({{0x25a620,16}, {0x25a814,52}}) do
+    local address, length = definition[1]+shift, definition[2]
+    record_handles[#record_handles+1] = space:install_read_tap(address & ~3, (address & ~3)+3, 'nsk1_record_reply', function()
+        if cpu.state['R15'].value ~= address or record_replies >= 16 then return end
+        record_replies = record_replies+1
+        local pointer = cpu.state['R0'].value
+        machine:logerror(string.format('nsk1_record_reply: consumer=%08x envelope=%s payload=%s t=%.9f observer_writes=0\n',
+            address, ram_bytes(pointer,8), ram_bytes(pointer+8,length), machine.time:as_double()))
+    end)
+end
+_G.nsk1_record_handles = record_handles
 _G.nsk1_release_tap = space:install_write_tap(0x20000, 0x20003, 'nsk1_release', function(offset, data, mask)
     if (mask & 0xff00) == 0 then return end
     local command = (data >> 8) & 255

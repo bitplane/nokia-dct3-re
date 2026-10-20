@@ -245,8 +245,8 @@ Its byte 9 is `32`; the validator examines the packed bytes beginning at
 offset `0c` and reaches decision `25a994` with state 2 and validity 0.
 Its first observed payload begins `b2ade0d9 99085170 cbb40000`; the later
 warm-lifecycle object differs. These are transformed results, not plaintext
-EEPROM fields. Their exact key/transform and identity meaning must be
-established before generating an alternative profile.
+EEPROM fields. The arithmetic and modeled key provenance are checked below;
+their complete storage-policy meaning remains distinct.
 
 The same routine's continuation calls restart entry `295136` with reason
 `04` from `25a9f4`; subsequent startup retains reason `04`. The guard at
@@ -256,9 +256,49 @@ observed restart in firmware's own validation lifecycle, rather than
 proving an ADC failure, missing DSP reply or bad LCD geometry. No validity
 flag, branch, packed record or internal completion is patched.
 
-The next software task is to recover the low-record transform and its own
-key provenance, then determine whether a coherent synthetic external
-profile can be generated from this machine's independently observed inputs.
+The next software task is to determine whether a coherent synthetic external
+profile can be generated from the own format constraints and independently
+observed inputs, without treating a format-valid record as factory data.
 Do not reuse `make_5110_eeprom_profile.py`'s NSE-1 MSID, identity, FAID or
 fault-latch values: sharing capacity and a compatible resident DSP does not
 make those handset records NSK-1 evidence.
+
+### Record exchange arithmetic
+
+The complete captured command-`13` response is
+`340e00829f623628a1e763cc898cb419`. The independently tested MSID codec
+decodes it to `e688a8f2 00160010 a8a9aa26`: its first word matches the
+own command-`13` request, and its chip field matches the compatibility
+backend's modeled COBBA serial. It is unchanged across both observed
+lifecycles. This is evidence about the virtual compatibility machine,
+not an original NSK-1 serial or fitted-mask identification.
+
+The rejected `35/32` response corresponds to command **`16`**, not a
+direct reply to `15`. It contains two decoded blocks and the echoed
+24-byte encoded request. The acquired ROM4 lock table at data `b6df` and
+encoding schedule at `b6f7`, keyed with the observed chip field, reproduce
+both complete replies byte-for-byte. Each decoded block's private marker
+is removed by the native response builder: the arithmetic recovers
+`b35b` cold and `f7db` warm, while the response carries zero in those
+two bytes. Neither marker is thereby a valid stored record.
+
+Own MCU helper `259782` explains the input difference. It reads twelve
+EEPROM bytes at zero, duplicates them, replaces each adjacent byte pair
+with its unsigned product low-byte-first, reverses byte order while
+bit-reversing/complementing, then XORs the resulting 24-byte pad into
+the request. Erased input produces cold request `7f80` repeated twelve
+times; the warm request is the raw 24 `ff` bytes. The independent helper
+reproduces both. This is not nondeterministic DSP key material or transport
+corruption, and does not authorize changing the firmware's staging flag.
+
+```sh
+.venv/bin/python tools/nsk1_record_exchange_check.py \
+  tmp/nsk1-record-exchanges/error.log --initial-erased
+```
+
+The ordinary standard-family runner also requires this comparison. It
+rejects changed envelopes, ordering, input mapping, MSID checksum, decoded
+blocks and echoes. `dct3_rom4_record_codec.py` now single-homes the pure
+arithmetic used by both NSK-1 and NSM-1 checkers, without importing NSE-1
+identity/provisioning constants. Its encoder accepts explicit data and
+chip bytes; it does not select a passing policy or identity.

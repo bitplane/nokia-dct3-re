@@ -9,15 +9,13 @@ import argparse
 import json
 from pathlib import Path
 import re
-import struct
 import sys
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.dct3_msid_codec import decode_msid
-from tools.make_5110_eeprom_profile import ENCOD, LOCK_ENC_82
-from tools.nse5_transform_trace_check import inverse_transform_words
+from tools.dct3_rom4_record_codec import decode_record, retained_record_transform
 
 
 REQUEST = re.compile(r"nsm1_record_request: .*?bytes=([0-9a-f]+)\b")
@@ -50,34 +48,6 @@ def check_validation(text: str, records: list[dict]) -> dict:
             raise ValueError("classified rejecting byte is inside the accepted range")
     return {"observed": True, "rejections": len(records), "path": [hex(pc) for pc in path],
             "scope": "known incompatible-template rejection, not boot acceptance"}
-
-
-def retained_record_transform(record: bytes, identity_record: bytes) -> bytes:
-    """Reproduce NSM-1 0x27d4ac for a captured request, without provisioning."""
-    if len(record) != 24 or len(identity_record) != 12:
-        raise ValueError("request/identity record must contain twenty-four/twelve bytes")
-    work = bytearray(identity_record * 2)
-    for index in range(0, 24, 2):
-        product = work[index] * work[index + 1]
-        work[index:index + 2] = product.to_bytes(2, "little")
-    pad = []
-    for value in reversed(work):
-        reversed_complement = 0
-        for bit in range(8):
-            reversed_complement = (reversed_complement << 1) | (1 ^ ((value >> bit) & 1))
-        pad.append(reversed_complement)
-    return bytes(value ^ mask for value, mask in zip(record, pad))
-
-
-def decode_record(encoded: bytes, chip: bytes) -> bytes:
-    if len(encoded) != 12 or len(chip) != 4:
-        raise ValueError("record/chip must contain twelve/four bytes")
-    table = bytes(value ^ (chip[index] if index < 4 else 0)
-                  for index, value in enumerate(LOCK_ENC_82))
-    words = inverse_transform_words(
-        struct.unpack(">6H", encoded), struct.unpack(">6H", table),
-        tuple(value * 0x101 for value in ENCOD))
-    return struct.pack(">6H", *words)
 
 
 def check(text: str, *, minimum: int = 2) -> dict:

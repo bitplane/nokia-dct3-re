@@ -11,6 +11,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsk1_static_check import inspect
+from tools.nsk1_record_exchange_check import check as check_records
 
 
 INPUTS = (
@@ -109,6 +110,8 @@ def main():
             raise ValueError('own EEPROM storage capacity changed')
         summary = summarize(trace,image,args.variant)
         summary['unchanged_flash'] = True
+        summary['record_arithmetic'] = (check_records(trace,initial_eeprom=bytes([255])*2048)
+                                        if args.variant == 'standard' else {'observed':False})
         (run / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
