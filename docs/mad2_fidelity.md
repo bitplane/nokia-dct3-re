@@ -181,6 +181,34 @@ delivery disabled and does not make its security editor consume keys.
 The firmware's subsequent interrupt-restoration contract remains open;
 the device must not silently write control `05` as a boot workaround.
 
+### Archived interrupt reference
+
+Wumpus and the Project Blacksphere contributors' original
+[331x interrupt notes](https://web.archive.org/web/20160119231543/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_331x/sub_interrupts.htm)
+identify IRQ3 as wake from sleep. The companion
+[primary I/O table](https://web.archive.org/web/20160119231739/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_331x/sub_iomap/sub_00.htm)
+names control-register bits `01/02` FIQ enable/disable and `04/08` IRQ
+enable/disable. These are firsthand reverse-engineering notes for 331x/3330,
+not a manufacturer specification or independent NAM-2 hardware measurement.
+They corroborate interrupt roles but do not establish command-vs-state
+readback, write-zero behavior, automatic global enable on wake, or IRQ3's
+precise generating edge/latency. Clock bit 1 is explicitly uncertain there.
+The table calls IRQ8 bit `40` a mask, whereas the paired 3210 dispatcher
+evidence above assigns acknowledgement behavior; retain that discrepancy
+rather than silently importing the older table as a universal register model.
+
+Original HTML is retained in ignored `roms/reference-docs/blacksphere-ctsi/`:
+
+| File | SHA256 |
+| --- | --- |
+| `interrupts-20160119.html` | `b56ff51dc1f027f59c8ed62014cbc0afdedc9e190aefc72716d7b6762da40b30` |
+| `iomap-00-20160119.html` | `1c9b6f28b9f9f1af1453a787a636be3c9e09260e29abf1f01b59208bf91ca26c` |
+
+The archive index timestamps are `20160119231543` and `20160119231739`;
+both source pages identify their own update as 2005-02-21. Reference names
+do not justify enabling a new controller behavior without a matched consumer
+and runtime test. The current NAM-2 boundary remains wake without service.
+
 `make verify-mad2-sleep` validates this contract on both ROMs with an MMIO
 controller fixture: Timer 1 continues while the ARM is suspended, reaches
 destination `0x7fff`, raises FIQ5 and wakes the CPU. Each run saves and reloads

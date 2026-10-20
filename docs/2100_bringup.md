@@ -240,6 +240,11 @@ remaining contract is how a real clock wake permits firmware service from
 this disabled-delivery lifecycle; neither forcing05 nor suppressing the
 physical wake source is an evidenced repair.
 
+The independent archived Blacksphere IRQ3 and control-bit reference is
+qualified in [MAD2 fidelity](mad2_fidelity.md#archived-interrupt-reference).
+Its 331x labels corroborate the sleep-related source but do not specify the
+missing NAM-2 wake/readback transition.
+
 The bounded post-wake flow is now independently captured by
 `nam2_c3_wake_flow_observe.lua`. After the 8.95 s physical IRQ wake, 64
 positive fetch observations cover 16 repetitions of supervisor PCs
