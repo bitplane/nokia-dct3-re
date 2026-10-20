@@ -21,6 +21,7 @@ and radio remain unaccepted.
 Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
 Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
 Outbox read displays it without changing card bytes. Network SMS is unproved.
+Physical Erase/cancel and a cold empty-Outbox check also pass.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -408,6 +409,30 @@ storage, cold identity and exact editor/read frames. SMS experiments explicitly
 raise the passive TX capture bound to4096 bytes; existing phonebook captures
 retain their1024 bound. This is offline application/storage acceptance only,
 not SMS-SUBMIT delivery, network registration, RF or native speech.
+
+### Offline draft deletion
+
+From the persisted Outbox A view, Options -> Erase presents Erase message?.
+Physical OK performs one successful176-byte UPDATE RECORD; physical Back in
+an independent cancel run performs none and returns to A. Confirmation changes
+only the record status07->00, retaining its old payload in the free slot. This
+is logical deletion, not secure wiping or whole-record erasure.
+
+A separate cold process starts from the deleted card and physically opens
+Outbox. The exact16.5s frame says No messages in outbox. It sends no UPDATE
+RECORD and preserves the complete card; the pre-launch snapshot matches the
+confirmed deletion. The cancel run preserves the original complete saved card.
+
+```sh
+.venv/bin/python tools/nsk3_sms_delete_check.py roms/noki6130/source \
+  tmp/nsk3-sms-save-qualified tmp/nsk3-sms-erased \
+  tmp/nsk3-sms-erase-cancel tmp/nsk3-sms-erased-cold
+```
+
+The gate checks own flash/native upload, physical confirmation/cancel contacts,
+exact confirmation/read/empty frames, update payload/status and whole-card
+transitions. No network delivery, SMS reception or radio completion follows
+from this offline lifecycle.
 
 ## Own firmware inputs
 

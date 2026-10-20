@@ -3,9 +3,18 @@ from tools.nsk3_sms_check import check_card,DRAFT,SMS_OFFSET,SMS_RECORD_SIZE
 from tools.make_sim_card_profile import make_profile
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
 from tools.nsk3_phonebook_check import transmitted
+from tools.nsk3_sms_delete_check import deleted_card
 
 
 class OfflineSmsTest(unittest.TestCase):
+    def test_deletion_frees_status_without_wiping_payload(self):
+        card=bytearray(make_profile(False).ljust(CURRENT_NVRAM_LENGTH,b'\xff'))
+        card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]=DRAFT
+        deleted=deleted_card(card)
+        self.assertEqual([(i,x,y) for i,(x,y) in enumerate(zip(card,deleted)) if x!=y],[(SMS_OFFSET,7,0)])
+        self.assertEqual(deleted[SMS_OFFSET+1:SMS_OFFSET+SMS_RECORD_SIZE],DRAFT[1:])
+        with self.assertRaises(ValueError):deleted_card(deleted)
+
     def test_exact_sms_not_phonebook_save(self):
         card=bytearray(make_profile(False).ljust(CURRENT_NVRAM_LENGTH,b'\xff'))
         card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]=DRAFT

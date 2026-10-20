@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_offline_sms_delete_cancel", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 offline SMS Erase/cancel distinguish one free-status write from preservation and cold Outbox observes deletion",
+      "current": "Own physical Options/Erase yields exact confirmation. OK writes one176-byte UPDATE RECORD with9000 and changes only status07->00; old payload remains in the free slot. Back in a separate cancel process sends no update and preserves all card bytes while returning to A. Qualified cold copy of deleted card displays No messages in outbox, sends no update and preserves initial/current card identity. Own flash, native upload, input sequence, update payload and exact confirmation/read/empty frames are checked. This is logical offline deletion, not secure wiping or network SMS/radio acceptance.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_sms_delete.lua", "tools/nsk3_sms_cancel.lua", "tools/nsk3_sms_empty.lua", "tools/nsk3_sms_reload.lua", "tools/nsk3_sms_delete_check.py", "tools/test_nsk3_sms_check.py"]
+    },
+    {
       "id": "nsk3_physical_offline_sms_cold_read", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 offline SMS composition writes one exact unsent A record and a separate cold Outbox read preserves it",
       "current": "Observed Messages/Write messages/Options/Save contacts issue one exact176-byte UPDATE RECORD to EF_SMS6f3c with9000. Record1 is unsent A with no recipient, remaining9 SMS slots and ADN stay empty. Qualified cold snapshot matches saved card; physical Outbox read renders exact A frame, sends no UPDATE RECORD and preserves the whole card. A second isolated save/read pair reproduces the gate. Own flash, native upload, physical code/command sequence and independent storage/frame checks pass. A generic Saved to SIM card frame alone is not accepted as SMS evidence. Network SMS, registration, RF and speech remain outside this predicate.",
