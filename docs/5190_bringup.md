@@ -185,6 +185,22 @@ the semantic owner of that routine. The next boundary is this report's
 organic producer lifecycle, not a missing column IRQ or an arbitrary delay
 before pressing Menu. No report or readiness byte has been injected.
 
+The own image contains diagnostic state strings passed through `2afd0a`.
+A bounded 30-second instruction trace of that helper records these positive
+labels in the `221000..2253ff` region: `CHECK TEST MODE`, `CHECK POWER ON
+REASON`, `INIT CHARGING`, `DO INIT CHARGING`, periodic connection/mode checks,
+then `BOOT UP CHARGE`, `INITIALIZE`, `WAIT CHARGER VOLTAGE SETTING`, and
+`CHARGER DISCONNECTED`. Their source string addresses are respectively
+`2240c4`, `2241c4`, `2241ec`, `2241fc`, `223c34`/`224a74`, `224380`,
+`2243cc`, `224390`, and `2243b0`. No report-14 wrapper entry is observed;
+the candidate blocks `221e88`, `221efc`, and `221f08` are also unobserved.
+This ties the current investigation to a positively identified charging
+lifecycle, but does not prove which physical input should select a different
+path. Generic ADC inputs and power-on/CCONT status semantics remain candidate
+causes, not established defects. Some other diagnostic calls point at binary
+or empty data rather than plain ASCII; do not assign names by treating every
+helper argument as a zero-terminated string.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
