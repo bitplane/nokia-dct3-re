@@ -20,7 +20,7 @@ Parallel-store carry and physical bus phases remain unvalidated.
 
 ## NSK-1 zero-word execution boundary
 
-The own-input NSK-1 listed-FDN run observes 629 distinct first opcode words;
+The pre-correction own-input NSK-1 listed-FDN run observes 629 distinct first opcode words;
 this is not the NSE-1 cold-boot inventory. `63f8` and `f166` require immediate
 multiply disassembly (three and two words respectively). The decoder now
 formats these existing execution forms, with the address extension before
@@ -30,14 +30,27 @@ multiply-execution or native-radio qualification.
 An execution-breakpoint observer across all 128 XPC pages confirms execution
 at page-zero `29d3`, not merely a data read or a truncated nonzero-page PC.
 Observed PMST is `ffac`; program words `29d3/29d4` and data word `29d3` are
-all zero. First captured SP values are `1eab` and `1ea7`, with stack heads
-`3798/00fa/3073/3073` and `38ca/3976/3923/30bc`. Thus extending the program
-overlay alone would not reveal nonzero data at these observed entries.
-The caller/control-flow explanation remains unresolved; no overlay geometry
-or firmware state was changed.
+all zero under the old `2800` overlay extent. First captured SP values are `1eab` and `1ea7`, with stack heads
+`3798/00fa/3073/3073` and `38ca/3976/3923/30bc`. Zero data reads do not
+exclude discarded uploads: `program_w` ignores writes outside the overlay.
 Live disassembly identifies `3798` and `38ca` as return addresses immediately
-after calls to ROM routine `a51b`. This narrows the investigation to that
-routine and its callees; it does not yet establish a direct branch to `29d3`.
+after calls to ROM routine `a51b`. A bounded instruction trace follows
+`a539 -> 24cf -> 26c3`, the return-address comparison against `a53b`, and
+`26d0 B 29d3`. A program-write observer sees 811 writes in `2800..2b2a`,
+including `29d3=7714,29d4=085e,29d5=7194,29d6=1f2b,29d7=1284` at
+approximately 0.150281 s. The old mapping discards this own-firmware code.
+The NSK-1 research configuration selects a `3000` overlay extent; this is
+an upload-derived minimum bank model, not fitted-mask
+identification or proof of the full physical RAM size. Other products are
+not changed by this observation.
+The corrected 65-second run passes `nsk1_native_upload_check.check_upload`,
+the existing native boot/storage predicates, physical listed-FDN dial/SIM
+checks, unchanged whole-card comparison and the previous exact digit/progress
+frame hashes. The zero-entry probe no longer fires. No registration, connected
+call, speech or full physical-memory qualification follows from this fix.
+The corrected run observes 636 distinct first opcode words, all with decoded
+boundaries (including observed extension variants); opcode `0000` is absent.
+This is decoding coverage, not independent semantic proof for every instruction.
 
 Reproduction uses `make_c54x_entry_script.py 0x29d3 OUTPUT`, copied as
 `native_entry.cmd` into an isolated qualified NSK-1 FDN-enabled cold run, and

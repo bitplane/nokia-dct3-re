@@ -4260,6 +4260,9 @@ void nokia_dct3_state::nsk1r4t(machine_config &config)
 	// Explicit NSE-1 resident mask/clock compatibility input. No NSK-1
 	// fitted-mask, physical-clock, keypad or SIM acceptance is implied.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own loader writes executable words through 2b2a; its 26d0 hook
+	// branches to uploaded 29d3. The default 2800 extent drops this code.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
