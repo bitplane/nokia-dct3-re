@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_nominal_input_graphical_startup", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "The explicit native compatibility and nominal ADC2 hypothesis reaches own graphical startup and physical matrix rescan without guest-state forcing",
+      "current": "Own boot4 conversion anchors source7 to ADC2, gain/offset live1/0 and scale1500/232. Saturated1023 produces rejected6614 and leaves readiness0e. Opt-in554 produces accepted3581, drains the ten-sample counter, organically posts14 and completes readiness0f. Firmware presents Insert SIM card and a physical raw contact raises scan/row counts. Own executable flash and persisted diagnostic EEPROM remain unchanged; exact5/15s frames are pinned. The rebuilt default saturated control remains blank. This is not measured electrical calibration, fitted DSP/clock identification, logical key acceptance, SIM, registration, call, SMS or speech acceptance; ordinary noki6130 is unchanged.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_analog_contract.py", "tools/nsk3_nominal_input.py", "tools/nsk3_nominal_check.py", "tools/test_nsk3_nominal_input.py", "tools/nsk3_ui_observe.lua", "driver/nokia_dct3.cpp"]
+    },
+    {
       "id": "nsk3_diagnostic_record_cold_persistence", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "An explicitly diagnostic published numeric record is updated by the native compatibility peer, persisted by own firmware and accepted by a separate cold process",
       "current": "The fixture uses own erased-source storage and decoded chip identity, not donor provisioning. Native 3534 carries a verified checksum and encoded update; firmware accepts and stores it, restarting through 23d836 rather than the invalid-record caller. The cold process performs one complete upload, accepts the stored record without restart and leaves the entire EEPROM unchanged. Own flash and blank frames remain exact. This proves diagnostic record persistence only, not factory content, fitted DSP identity, idle, physical input, registration, calls or speech.",

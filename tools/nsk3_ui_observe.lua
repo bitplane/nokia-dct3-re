@@ -37,7 +37,7 @@ machine.debugger:command('bpset 235694,temp3<40 && r0!=26 && r4>=100000 && r4<10
 for _,site in ipairs({0x2358ec,0x23592e,0x235954,0x235962}) do
     machine.debugger:command(string.format('bpset %x,temp9<80,{temp9=temp9+1;logerror "nsk3_ui_analog_progress: site=%08x r0=%%08x flag=%%02x cycles=%%016x observer_writes=0\\n",r0,b@10a689,totalcycles;g}',site,site))
 end
-machine.debugger:command('bpset 278518,temp3<80 && r4>=100000 && r4<110000 && r5>=100000 && r5<110000,{temp3=temp3+1;logerror "nsk3_ui_analog_sample: accepted=%02x first=%04x second=%04x cycles=%016x observer_writes=0\\n",r0,w@r5,w@r4,totalcycles;g}')
+machine.debugger:command('bpset 278518,temp3<80 && r4>=100000 && r4<110000 && r5>=100000 && r5<110000,{temp3=temp3+1;logerror "nsk3_ui_analog_sample: accepted=%02x first=%04x second=%04x gain=%08x offset=%08x cycles=%016x observer_writes=0\\n",r0,w@r5,w@r4,d@10fe34,d@10fe38,totalcycles;g}')
 local field
 for _,candidate in pairs(machine.ioport.ports[':COL.1'].fields) do
     if candidate.mask==4 then field=candidate end

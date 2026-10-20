@@ -2,6 +2,13 @@
 
 ## Current result
 
+The separate native compatibility instrument reaches **Insert SIM card** and
+rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
+The saturated control remains blank after diagnostic record acceptance.
+Neither fixture proves fitted calibration, logical key mapping, SIM operation,
+registration, calls or speech. Ordinary `noki6130` remains the conservative
+erased-source failure checkpoint, not a supported phone profile.
+
 The acquired v5.61 installer contains two independently qualified MCU/PPM-A
 pairs. Both normalize to a1MiB flash extent200000..2fffff. Conservative
 `noki6130` executes both variants from erased external storage and renders
@@ -108,6 +115,37 @@ the1500/232 scale and1800..5500 inclusive validator. Gain/offset are read at
 match into a calibration claim. The existing NSK-1 nominal3.6-V/typical6.5-mV
 input is a possible explicitly labeled comparison, not measured NSK-3 data or
 an authorized product default.
+
+### Nominal-input graphical comparison
+
+Live coefficients are3f800000/00000000 (gain1/offset0), captured in
+`tmp/nsk3-analog-coefficients`. The research-only `nsk3r4t` input port defaults
+to1023 and offers554 as the pre-existing nominal3.6-V/typical6.5-mV-per-count
+CCONT hypothesis. This is not a measured NSK-3 electrical transfer contract.
+The normal `noki6130` configuration has no such port.
+
+The isolated `tmp/nsk3-nominal-input` run converts554 to0dfd, accepts both
+samples, drains the counter, organically receives report14 and completes the
+second readiness group0f. Firmware restores column interrupts and presents
+Insert SIM card. The raw contact at8s increases scan reads6->42 and row
+writes13->79. Logical key identity and application response are not accepted
+from this scan-only observation. EEPROM is byte-identical to the qualified
+cold record, and executable flash remains unchanged. Exact frames at5/15s
+are separately pinned; their differing hashes are not collapsed into one oracle.
+
+```sh
+.venv/bin/python tools/nsk3_nominal_input.py roms/noki6130/source \
+  tmp/nsk3-startup-checksum-control roms/nsk3r4t \
+  tmp/nsk3-record-qualified tmp/nsk3-record-cold-qualified tmp/NEW-NOMINAL
+# Run nsk3r4t in that isolated directory with nsk3_ui_observe.lua, for16s.
+.venv/bin/python tools/nsk3_nominal_check.py roms/noki6130/source \
+  tmp/nsk3-startup-checksum-control roms/nsk3r4t \
+  tmp/nsk3-record-qualified tmp/nsk3-record-cold-qualified tmp/NEW-NOMINAL
+```
+
+The rebuilt saturated control `tmp/nsk3-saturated-post-input` still passes the
+strict blank-frame/record-persistence gate. The next functional boundary is
+own-ROM key translation and physical SIM insertion, not synthetic report14.
 
 ## Own firmware inputs
 

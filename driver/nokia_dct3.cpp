@@ -3501,17 +3501,26 @@ static INPUT_PORTS_START( nsb1r4t )
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 INPUT_PORTS_END
 
-static INPUT_PORTS_START( nsk1r4t )
-	PORT_INCLUDE(noki5110)
-	PORT_MODIFY("SIM_REMOVED")
-	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
-	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
+static INPUT_PORTS_START( dct3_research_adc2 )
 	PORT_START("RESEARCH_ADC2")
-	// Explicit analog-input comparison, not measured NSK-1 calibration.
+	// Explicit analog-input comparison, not measured handset calibration.
 	// 554 is the nominal 3.6-V / typical CCONT 6.5-mV-per-bit hypothesis.
 	PORT_CONFNAME(0x03ff, 0x03ff, "Research CCONT ADC2 source")
 	PORT_CONFSETTING(0x03ff, "Saturated control (1023)")
 	PORT_CONFSETTING(554, "Nominal input hypothesis (554)")
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nsk1r4t )
+	PORT_INCLUDE(noki5110)
+	PORT_INCLUDE(dct3_research_adc2)
+	PORT_MODIFY("SIM_REMOVED")
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nsk3r4t )
+	PORT_INCLUDE(noki5110)
+	PORT_INCLUDE(dct3_research_adc2)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki6110 )
@@ -5163,7 +5172,7 @@ SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "N
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 1998, nsk3r4t, noki6130, 0, nsk3r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSK-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsk3r4t, noki6130, 0, nsk3r4t, nsk3r4t, nokia_dct3_state, empty_init, "Research", "NSK-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
