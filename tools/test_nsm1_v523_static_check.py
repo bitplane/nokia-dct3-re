@@ -5,6 +5,20 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_entry_surface_includes_interior_branches_and_thumb_pointers(self):
+        image=bytearray(0x80)
+        image[0x20:0x22]=bytes.fromhex('e000')
+        image[0x40:0x44]=(check.BASE+0x25).to_bytes(4,'big')
+        result=check.entry_surface(image,check.BASE+0x24,check.BASE+0x28)
+        self.assertIn({'site':check.BASE+0x20,'kind':'b','target':check.BASE+0x24},result['direct_transfers'])
+        self.assertEqual(result['aligned_pointer_words'],[check.BASE+0x40])
+        self.assertFalse(result['all_computed_or_table_producers_closed'])
+        image[0x20:0x22]=bytes.fromhex('e002')
+        image[0x40:0x44]=(check.BASE+0x29).to_bytes(4,'big')
+        result=check.entry_surface(image,check.BASE+0x24,check.BASE+0x28)
+        self.assertEqual(result['direct_transfers'],[])
+        self.assertEqual(result['aligned_pointer_words'],[])
+
     def test_own_keypad_scanner_and_power_table_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

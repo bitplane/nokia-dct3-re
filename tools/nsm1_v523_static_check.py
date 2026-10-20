@@ -246,6 +246,26 @@ def readiness(first: int, selector: int, second: int, third: int) -> bool:
     return bool(first and third and (second == 1 if selector == 0 else second != 0))
 
 
+def entry_surface(image: bytes, start: int, end: int) -> dict:
+    """Aligned direct Thumb transfers and raw pointer words, not indirect closure."""
+    decoder=capstone.Cs(capstone.CS_ARCH_ARM,capstone.CS_MODE_THUMB|capstone.CS_MODE_BIG_ENDIAN)
+    limit=min(len(image),0xE0F00)
+    transfers=[]
+    for offset in range(0,limit-1,2):
+        word=int.from_bytes(image[offset:offset+2],'big')
+        if word&0xf800 not in (0xe000,0xf000) and word&0xf000!=0xd000:continue
+        insn=next(decoder.disasm(image[offset:offset+4],BASE+offset,count=1),None)
+        if not insn or not insn.mnemonic.startswith('b') or not insn.op_str.startswith('#'):continue
+        try:target=int(insn.op_str[1:],0)
+        except ValueError:continue
+        if start<=target<end:transfers.append({'site':insn.address,'kind':insn.mnemonic,'target':target})
+    pointers=[BASE+offset for offset in range(0,len(image)-3,4)
+              if start<=int.from_bytes(image[offset:offset+4],'big')&~1<end]
+    return {'direct_transfers':transfers,'aligned_pointer_words':pointers,
+            'thumb_halfwords_scanned':limit//2,'pointer_words_scanned':len(image)//4,
+            'all_computed_or_table_producers_closed':False}
+
+
 def verify(image: bytes) -> dict:
     if len(image) != SIZE or hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("not the normalized NSM-1 v5.23 PPM C image")
@@ -487,7 +507,8 @@ def verify(image: bytes) -> dict:
                              "state": literal(image, 0x281206), "report": 0x14,
                              "bit": 1, "wrapper": 0x2BC4D4,
                              "scalar_sender": 0x275CB0,
-                             "call_candidates": direct_call_candidates(image, 0x2BC4D4)},
+                             "call_candidates": direct_call_candidates(image, 0x2BC4D4),
+                             "wrapper_entry_surface": entry_surface(image,0x2BC4D4,0x2BC4E8)},
                          "scalar_init_producers": {
                              "sender": 0x275CB0,
                              "direct_call_candidates": len(direct_call_candidates(image, 0x275CB0)),

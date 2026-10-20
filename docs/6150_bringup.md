@@ -382,6 +382,16 @@ scalar sender `0x275cb0` at `0x2bc4e2`. The bounded direct call scan finds
 one candidate at `0x223a74`. This closes the missing-bit interpretation,
 not the report's hardware ownership or all indirect producers.
 
+The expanded wrapper-entry census scans460672 halfword positions in the
+bounded code extent200000..2e0eff for direct conditional/unconditional
+branches and calls into2bc4d4..2bc4e7, plus524288 aligned pointer words
+across the full2MiB image. Only BL223a74 ->2bc4d4 is found; no interior
+entry or aligned pointer names the wrapper. This rules out those simple
+alias mechanisms, not computed destinations, unaligned data pointers,
+argument-driven scalar posting or another report implementation. The static
+report now emits coverage and transfer kinds rather than presenting the
+one-call list as complete producer ownership.
+
 The report-`0x14` caller belongs to entry `0x223520`, running as task
 `0x14` (20). Its report branch calls `0x28b760` at `0x223a68`, sets bit
 6 in byte `0x110894`, then calls the report wrapper at `0x223a74`.
