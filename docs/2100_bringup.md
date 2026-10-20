@@ -96,6 +96,29 @@ Do not auto-write control `05`, alter software timer results or change the
 credential on this evidence. The accepted-code presentation and persistent
 storage are independent of this still-open idle/interrupt boundary.
 
+The last permission transition is now localized, not an unidentified peer
+event. A change-only return trace in
+`tmp/nam2-c3-gate-transitions-20261020` finds the third predicate,
+`2c85a4` (return observed at `2f8626`), changing from zero to one. Its exact
+condition is `byte[10ef46] != 0 && query_29a9cc() != 0 && byte[10917b] != 0`.
+The query selects `109173 == 1` when `107b8b == 0`, otherwise
+`109173 != 0`. The fresh run has `107b8b=2,109173=1` before the transition.
+The remaining predicates are nonzero when subsequently reached.
+
+Passive byte-lane-aware watches in
+`tmp/nam2-c3-banked-idle-owners-20261020` reproduce the final writers:
+
+| State | Final writer | Observed meaning |
+| --- | --- | --- |
+| `10ef46: 0 -> 1` at 12.760697154 s | `21d364` | Flag set before receive call `2ac49c`; `21d36e` clears it after that call returns. It is not independently a startup-readiness report. |
+| `10917b: 0 -> 1` at 12.771119462 s | `2b7fd6` | SIM-side idle permission. Its routine `2b7f74` invokes SIM clock/control helpers; `2e6e68` clears CTSI clock bit 5 and uses SIMI clock-control register `3a` for ASIC-specific handling. |
+
+Thus the receive/SIM idle contract permits the branch after the accepted-code
+transaction. The observation does not show an interrupt nesting leak or an
+unproduced registration event, nor does it justify holding the SIM busy to
+avoid the branch. Resume at the controller/clock behavior when these genuine
+permissions allow ordinary idle; do not suppress their firmware-owned writes.
+
 The extended capture `tmp/nam2-c3-idle-timer-late-20261020` excludes a
 stopped Timer 0 or permanently fixed interval of 2: the hardware counter
 advances from `068f` at 13 s to `0f22` at 30 s while software timestamp

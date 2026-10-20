@@ -18,7 +18,7 @@ local commands = {
     {0x2530a4, 'reference', 'computed=%04x stored=%04x secondary=%04x',
         'r5,r0,w@(r13+2)'},
     {0x25312a, 'failed_item', 'index=%d value=%02x pointer=%08x', 'r1,r0,r2'},
-    {0x2f84aa, 'release', 'result=%08x flag=%02x ready=%02x service=%02x mode=%02x',
+    {0x2f84aa, 'release', 'result=%08x flag=%02x recv_wait=%02x service=%02x mode=%02x',
         'r0,b@13fdaf,b@10ef46,b@10e9f4,b@10fbf1'},
     {0x304c2e, 'sleep_arg', 'arg=%08x caller=%08x ctrl=%02x fmask=%02x imask=%02x',
         'r0,r14,b@2000c,b@2000a,b@2000b'},

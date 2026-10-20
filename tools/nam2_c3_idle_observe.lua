@@ -3,6 +3,24 @@ local machine = manager.machine
 assert(machine.system.name == 'nam2c3')
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
+local owner_taps = {}
+for _, address in ipairs({0x10ef46, 0x10917b, 0x107b8b, 0x109173}) do
+    local shift = (3 - (address & 3)) * 8
+    local last = memory:read_u8(address)
+    local count = 0
+    owner_taps[#owner_taps + 1] = memory:install_write_tap(
+        address & ~3, address | 3, 'nam2_idle_owner', function(offset, value, mask)
+            if count >= 16 or (mask & (0xff << shift)) == 0 then return end
+            local next_value = (value >> shift) & 0xff
+            if machine.time:as_double() >= 10 and next_value ~= last then
+                count = count + 1
+                machine:logerror(string.format('nam2_idle_owner: address=%08x before=%02x after=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    address, last, next_value, cpu.state['PC'].value, machine.time:as_double()))
+            end
+            last = next_value
+        end)
+end
+_G.nam2_c3_idle_owner_taps = owner_taps
 local sites = {
     {0x2f8688, 'idle_guard_return', 'r0'},
     {0x2fac8e, 'sleep_flag', 'r0'},
@@ -11,6 +29,7 @@ local sites = {
     {0x2f864a, 'restore_branch', 'r0'},
     {0x2f866a, 'sleep_branch', 'r0'},
     {0x2facd8, 'timer_queue_late', 'r0', 'f800000'},
+    {0x2f8626, 'sim_idle_gate_true', 'r0', '7c00000', 'r0!=0'},
 }
 -- Start after roughly ten seconds at the configured 13 MHz ARM clock.
 for i, site in ipairs(sites) do
@@ -18,8 +37,8 @@ for i, site in ipairs(sites) do
     machine.debugger:command(counter .. '=0')
     local format = site[3]:find(',') and 'a=%08x b=%08x' or 'a=%08x'
     machine.debugger:command(string.format(
-        'bpset %x,totalcycles>%s && %s<8,{%s=%s+1;logerror "nam2_idle_%s: %s cycles=%%016x\\n",%s,totalcycles;g}',
-        site[1], site[4] or '7c00000', counter, counter, counter, site[2], format, site[3]))
+        'bpset %x,totalcycles>%s && %s<8 && (%s),{%s=%s+1;logerror "nam2_idle_%s: %s cycles=%%016x\\n",%s,totalcycles;g}',
+        site[1], site[4] or '7c00000', counter, site[5] or '1', counter, counter, site[2], format, site[3]))
 end
 local next_time = 10
 emu.register_frame_done(function()
