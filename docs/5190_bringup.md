@@ -49,8 +49,17 @@ with `A0 20/9000`, then independently enters phone code `12345`.
 
 Both processes check exact reviewed UI frames, physical contact order,
 durable card contents, legal native execution and unchanged flash. This
-proves successful CHV1 unblock/reauthentication, not wrong-PUK recovery,
-permanently exhausted PUK handling, registration or fitted DSP compatibility.
+proves successful CHV1 unblock/reauthentication, not permanently exhausted
+PUK handling, registration or fitted DSP compatibility.
+
+Add `--wrong-puk-first` for a three-process rejection/persistence control.
+Physical wrong PUK `87654321` followed by the new-PIN prompts produces one
+`A0 2C/9804`, leaves all credentials unchanged and persists counters
+`0/3/9/10`. The reviewed failure frame says `SIM card blocked`; that wording
+does not mean PUK exhaustion. A cold process copies those exact devices,
+successfully enters the correct PUK and new PIN, and the final cold process
+verifies the new PIN. This complete variant passes without retry resets by
+the harness between processes.
 
 ### Offline SMS draft and text-resource contract
 

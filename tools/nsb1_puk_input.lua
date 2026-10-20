@@ -3,11 +3,12 @@ local source = debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])')..'nsb1_boot_observe.lua')
 local machine = manager.machine
 local mode = _G.nsb1_puk_phase or 'unblock'
-assert(mode == 'unblock' or mode == 'cold','unknown PUK phase')
+assert(mode == 'unblock' or mode == 'wrong' or mode == 'cold','unknown PUK phase')
 local cells = {['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},
     ['5']={3,4},['6']={4,4},['7']={2,8},['8']={3,8},ok={1,4}}
-local phases = mode == 'unblock' and
-    {{12,'puk','12345678'},{20,'new','4321'},{26,'confirm','4321'}} or
+local phases = mode ~= 'cold' and
+    {{12,'puk',mode == 'wrong' and '87654321' or '12345678'},
+        {20,'new','4321'},{26,'confirm','4321'}} or
     {{12,'pin','4321'},{18,'phone','12345'}}
 local events = {}
 for _,phase in ipairs(phases) do
@@ -26,7 +27,7 @@ for _,phase in ipairs(phases) do
     end
 end
 local index,frame = 1,1
-local times = mode == 'unblock' and {10,18,24,30} or {10,15,17,22}
+local times = mode ~= 'cold' and {10,18,24,30} or {10,15,17,22}
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     while index <= #events and now >= events[index][1] do

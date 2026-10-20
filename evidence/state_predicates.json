@@ -5,8 +5,8 @@
     {
       "id": "nsb1_v671_sim_unblock_cold_pin", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Physical PUK/new-PIN entry unblocks the laboratory SIM and a separate cold process verifies its persisted new PIN",
-      "current": "The initial synthetic card changes only CHV1 retries to zero. Physical 12345678/4321/4321 yields exactly one A0 2C/9000, restores counters to 3/3/10/10 and persists only the expected new CHV1 credential. A qualified cold process copies own devices and physically submits 4321 for A0 20/9000, followed by the separate phone-code flow. Both phases require exact prompt/acceptance frames, complete physical contacts, native execution and unchanged flash. Wrong-PUK recovery, PUK exhaustion, network registration and fitted-mask identity remain unproved.",
-      "evidence": ["docs/5190_bringup.md", "tools/nsb1_puk_roundtrip.py", "tools/nsb1_puk_input.lua", "tools/nsb1_puk_reload.lua", "tools/test_nsb1_puk_roundtrip.py"]
+      "current": "The initial synthetic card changes only CHV1 retries to zero. Physical 12345678/4321/4321 yields exactly one A0 2C/9000, restores counters to 3/3/10/10 and persists only the expected new CHV1 credential. A qualified cold process copies own devices and physically submits 4321 for A0 20/9000, followed by the separate phone-code flow. The three-process wrong-PUK-first variant additionally proves 87654321 produces 9804, unchanged credentials and counters 0/3/9/10; those persisted devices cold-boot into successful correct-PUK recovery before the final new-PIN boot. All phases require reviewed exact frames, physical contacts, native execution and unchanged flash. The SIM card blocked failure text is not permanent-exhaustion evidence. PUK exhaustion, network registration and fitted-mask identity remain unproved.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_puk_roundtrip.py", "tools/nsb1_puk_input.lua", "tools/nsb1_puk_reload.lua", "tools/nsb1_puk_wrong.lua", "tools/test_nsb1_puk_roundtrip.py"]
     },
     {
       "id": "nsb1_v671_search_controller_release", "owner": "nsb1_task12_lifecycle", "status": "unresolved",
