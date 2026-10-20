@@ -45,8 +45,15 @@ def check(text):
     stack = 'words=0e13,008b,00a2,4814,0a2e,30ed,38ca,3976'
     if not re.search(r'nsk1_radio_native_rx_stack: pc=3805 sp=[0-9a-f]{4} ' + stack, text):
         raise ValueError('missing live RSSI publisher stack')
+    returns = re.findall(r'nsk1_rssi_return: pc=([0-9a-f]{4}) st0=([0-9a-f]{4}) st1=[0-9a-f]{4} control06be=([0-9a-f]{4}) control06e1=([0-9a-f]{4}) control06e3=([0-9a-f]{4}) list11f9=([0-9a-f]{4}) list11fa=([0-9a-f]{4})', text)
+    if 'nsk1_rssi_return:' in text:
+        if [row[0] for row in returns] != ['0a2e','0a2f','30ed','30f0','30f2']:
+            raise ValueError('post-RSSI return path changed or truncated')
+        if any(int(row[1],16) & 0x1000 or tuple(row[2:]) != ('0020','0000','0000','03ff','03ff') for row in returns):
+            raise ValueError('post-RSSI TC/control/list state changed')
     return {'tx': len(tx), 'rx': len(rx), 'pending_indexes': [1, 2, 8, 3],
-            'live_rssi_stack': True, 'registration_proved': False, 'rf_validity_proved': False}
+            'live_rssi_stack': True, 'post_rssi_return_observed':bool(returns),
+            'registration_proved': False, 'rf_validity_proved': False}
 
 
 def diagnose_liveness_reset(text):

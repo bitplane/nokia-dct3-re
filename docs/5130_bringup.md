@@ -459,11 +459,25 @@ SP=1e82 contains `0e13,008b,00a2,4814,0a2e,30ed,38ca,3976`.
 Live DSP disassembly confirms CALL 47f6 at 0a2c, returning to 0a2e;
 the acquired resident image instead has that call at 0a17. The uploaded
 program, not the resident-only caller census, is authoritative for this
-execution. Live 0a2e clears OVM and conditionally returns on NTC; the
+execution. Live 0a2e clears TC (ST0 bit12) and conditionally returns on NTC; the
 alternate tail writes sentinel 7fff and updates 11f9/11fa. No type-8a
 publication is implied by this RSSI return. The existing candidate 8a
 mapping must not be promoted to a required scan completion without its
 own operation/request evidence.
+
+Qualified cold capture `tmp/nsk1-rssi-return-qualified` follows publication
+with exact DSP breakpoints at 0a2e ->0a2f ->30ed ->30f0 ->30f2. ST0=081f
+has TC clear throughout; 06be=0020, 06e1=0000, 06e3=0000 and both list
+pointers11f9/11fa=03ff. The conditional return is taken, not stalled at the
+publisher; the 06be bit0400 test is clear and execution falls to30f2.
+The marker-writing tail0a30 is not observed. The bounded return trace is
+armed by actual type8b publication and has separate debugger bits from the
+candidate-entry count, so it does not suppress that observation. Native
+boot/storage and packet/mailbox/stack checks pass. TI SPRU172C's RSBX
+definition and SPRU131G table4-1 establish that F4BC clears ST0 bit12 (TC),
+not OVM. Neither this return nor the pointer values prove completion of
+the wider native scan lifecycle; its subsequent work/list progression
+remains the next question.
 
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive

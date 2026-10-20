@@ -19,6 +19,12 @@ def fixture():
 
 
 class NativeRadioTraceTest(unittest.TestCase):
+    def test_post_rssi_return_is_checked_when_observed(self):
+        rows = '\n'.join(f'nsk1_rssi_return: pc={pc} st0=081f st1=6103 control06be=0020 control06e1=0000 control06e3=0000 list11f9=03ff list11fa=03ff' for pc in ('0a2e','0a2f','30ed','30f0','30f2'))
+        self.assertTrue(check(fixture()+'\n'+rows)['post_rssi_return_observed'])
+        with self.assertRaisesRegex(ValueError, 'TC/control'):
+            check(fixture()+'\n'+rows.replace('st0=081f','st0=181f',1))
+
     def liveness_fixture(self):
         return '\n'.join([
             'nsk1_supervisor_write: address=0010fdea value=01',

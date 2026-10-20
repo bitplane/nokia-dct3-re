@@ -44,7 +44,12 @@ for _,address in ipairs({'218996','2189d6','218a02'}) do
     machine.debugger:command('bpset '..address..',temp5<12,{temp5=temp5+1;logerror "nsk1_radio_consumer: pc=%08x object=%08x owner=%08x state=%02x phase=%02x cache=%08x observer_writes=0\\n",pc,r5,r6,b@(r6+14),b@(r6+19),d@(r4+28);g}')
 end
 machine.debugger:command('temp4=0')
-machine.debugger:command('bpset 215d4c,temp4<8,{temp4=temp4+1;logerror "nsk1_radio_candidate: object=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
+-- Low byte counts candidate entries; upper bits bound the post-RSSI probe.
+machine.debugger:command('bpset 215d4c,(temp4&ff)<8,{temp4=temp4+1;logerror "nsk1_radio_candidate: object=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
+for index,address in ipairs({'0a2e','0a2f','0a30','0a3b','30ed','30f0','30f2'}) do
+    local bit = string.format('%x', 1 << (index+8))
+    machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp4&100)!=0&&(temp4&'..bit..')==0,{temp4=temp4|'..bit..';logerror "nsk1_rssi_return: pc='..address..' st0=%04x st1=%04x control06be=%04x control06e1=%04x control06e3=%04x list11f9=%04x list11fa=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@6,dsp_c54x:cpu.dw@7,dsp_c54x:cpu.dw@6be,dsp_c54x:cpu.dw@6e1,dsp_c54x:cpu.dw@6e3,dsp_c54x:cpu.dw@11f9,dsp_c54x:cpu.dw@11fa;g}')
+end
 machine.debugger:command('temp3=0')
 for _,address in ipairs({'2177a0','218d20'}) do
     machine.debugger:command('bpset '..address..',temp3<12,{temp3=temp3+1;logerror "nsk1_radio_activation: pc=%08x r0=%08x caller=%08x observer_writes=0\\n",pc,r0,r14;g}')
@@ -151,6 +156,9 @@ local function packets(direction,old,new,start,finish,pc)
                 payload[#payload+1] = string.format('%02x',byte%2 == 0 and word >> 8 or word & 255)
             end
             machine:logerror(string.format('nsk1_radio_packet: direction=%s index=%d type=%02x length=%d data=%s pc=%08x t=%.9f observer_writes=0\n',direction,counts[direction],header & 255,length,table.concat(payload),pc,machine.time:as_double()))
+            if direction == 'rx' and (header & 255) == 0x8b then
+                machine.debugger:command('temp4=temp4|100')
+            end
         end
         cursor,walked = start+(cursor-start+words)%size,walked+words
     end
