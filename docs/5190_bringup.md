@@ -339,6 +339,17 @@ control. Decoded key identity and application navigation remain unaccepted.
 The inspected five-second PNG has only a small black feature at its right
 edge, not a legible application screen. Do not call this graphical boot.
 
+The nominal-input LCD stream contains 116 commands and 3054 data bytes
+through five seconds. An independent replay of all 3170 selection-21 bus
+writes, including address-mode/bank/column changes and zero bytes, reconstructs
+the observed 84x48 PNG with **zero differing pixels** and 28 black pixels.
+Firmware sends glyph-like nonzero data around 1.583 seconds, then issues
+further full-bank clear/init traffic around 1.584 and 1.595 seconds. The
+final sparse raster is therefore explained by the captured firmware traffic,
+not a demonstrated dropped-pixel or addressing defect in the LCD device.
+The next presentation question is the ownership/caller of those subsequent
+clears and the firmware context that should repaint them.
+
 ### External reference leads, not provisioning evidence
 
 The [independent emulator's current coverage table](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
