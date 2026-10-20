@@ -168,13 +168,28 @@ def check_lcd(trace, snapshots):
                 raise ValueError(f'LCD self-test pixels mismatch: {name}')
 
 
-def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=False):
+def inputs_for_ppm(ppm):
+    if ppm == 'A':
+        return INPUTS
+    if ppm == 'B':
+        return (('noki5190/5190f671b.fls', '49987333223932f13dd4fb8e71a9645497894f73'), *INPUTS[1:])
+    raise ValueError('unsupported NSB-1 PPM selection')
+
+
+def storage_for_ppm(ppm):
+    inputs_for_ppm(ppm)
+    return 'nsb1r4t' if ppm == 'A' else 'nsb1r4t_1'
+
+
+def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=False, ppm='A'):
+    inputs = inputs_for_ppm(ppm)
+    storage_name = storage_for_ppm(ppm)
     if initialized_retry and (checksum_from is None or not insert_sim):
         raise ValueError('initialized retry requires an inserted-card checksum-control experiment')
     if run.exists():
         raise ValueError('use a fresh comparison directory; no prior EEPROM is admitted')
     qualified = []
-    for name, expected in INPUTS:
+    for name, expected in inputs:
         data = (root / name).read_bytes()
         if hashlib.sha1(data).hexdigest() != expected:
             raise ValueError(f'unqualified comparison input: {name}')
@@ -182,18 +197,19 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
     fixture = None
     if checksum_from:
         previous = json.loads((checksum_from / 'input_manifest.json').read_text())
-        if (previous.get('inputs') != [{'source': name, 'sha1': expected} for name, expected in INPUTS]
+        if (previous.get('inputs') != [{'source': name, 'sha1': expected} for name, expected in inputs]
                 or previous.get('external_eeprom') != 'erased 8 KiB; no donor storage'):
             raise ValueError('checksum source must be a qualified own erased-storage comparison')
-        if hashlib.sha1((checksum_from / 'nvram/nsb1r4t/flash').read_bytes()).hexdigest() != INPUTS[0][1]:
+        if hashlib.sha1((checksum_from / 'nvram' / storage_name / 'flash').read_bytes()).hexdigest() != inputs[0][1]:
             raise ValueError('checksum source executable differs')
-        original = (checksum_from / 'nvram/nsb1r4t/eeprom').read_bytes()
+        original = (checksum_from / 'nvram' / storage_name / 'eeprom').read_bytes()
         fixture = checksum_control(original, initialized_retry)
     target = run / 'inputs/nsb1r4t'
     target.mkdir(parents=True)
     for name, data, expected in qualified:
         (target / Path(name).name).write_bytes(data)
     manifest = {'inputs': [{'source': name, 'sha1': expected} for name, _, expected in qualified],
+                'ppm': ppm, 'bios': '671' + ppm.lower(), 'storage_name': storage_name,
                 'external_eeprom': 'erased 8 KiB; no donor storage',
                 'resident_mask': 'NSE-1 compatibility candidate; NSB-1 fitted identity unproved',
                 'dsp_clock_hz': 52000000, 'physical_dsp_clock_proved': False,
@@ -203,7 +219,7 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
                 'synthetic_retry_initialized': initialized_retry,
                 'boot_claim': False}
     if fixture is not None:
-        storage = run / 'nvram/nsb1r4t'
+        storage = run / 'nvram' / storage_name
         storage.mkdir(parents=True)
         (storage / 'eeprom').write_bytes(fixture)
         manifest['external_eeprom'] = ('diagnostic checksum/retry control; calibration/identity not validated'

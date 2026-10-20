@@ -11,6 +11,43 @@ from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, ch
 
 
 class NativeCompareTest(unittest.TestCase):
+    def test_ppm_selection_pins_own_variant_and_preserves_resident_inputs(self):
+        from tools.nsb1_rom4_compare import INPUTS, inputs_for_ppm, storage_for_ppm
+        self.assertEqual(INPUTS, inputs_for_ppm('A'))
+        variant = inputs_for_ppm('B')
+        self.assertEqual(('noki5190/5190f671b.fls',
+                          '49987333223932f13dd4fb8e71a9645497894f73'), variant[0])
+        self.assertEqual(INPUTS[1:], variant[1:])
+        self.assertEqual('nsb1r4t', storage_for_ppm('A'))
+        self.assertEqual('nsb1r4t_1', storage_for_ppm('B'))
+        with self.assertRaisesRegex(ValueError, 'selection'):
+            inputs_for_ppm('C')
+
+    def test_b_checksum_source_and_storage_are_variant_specific(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = b'own B test image'
+            (root / 'own-b.bin').write_bytes(image)
+            inputs = (('own-b.bin', hashlib.sha1(image).hexdigest()),)
+            source = root / 'source'
+            storage = source / 'nvram/nsb1r4t_1'
+            storage.mkdir(parents=True)
+            (storage / 'flash').write_bytes(image)
+            (storage / 'eeprom').write_bytes(b'\xff' * 8192)
+            manifest = {'inputs': [{'source': inputs[0][0], 'sha1': inputs[0][1]}],
+                        'external_eeprom': 'erased 8 KiB; no donor storage'}
+            (source / 'input_manifest.json').write_text(json.dumps(manifest))
+            with patch('tools.nsb1_rom4_compare.inputs_for_ppm', return_value=inputs):
+                run = root / 'accepted'
+                prepare(root, run, source, True, True, ppm='B')
+                self.assertTrue((run / 'nvram/nsb1r4t_1/eeprom').exists())
+                self.assertFalse((run / 'nvram/nsb1r4t/eeprom').exists())
+                manifest['inputs'][0]['sha1'] = 'wrong variant'
+                (source / 'input_manifest.json').write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, 'qualified own'):
+                    prepare(root, root / 'rejected', source, True, True, ppm='B')
+                self.assertFalse((root / 'rejected').exists())
+
     def test_native_execution_is_separate_from_bootstrap(self):
         sample = 'nsb1_native_execution: t=5.0 pc=31a5 illegal=0 idle=1 tx=0041/0041 rx=00a6/00a6 observer_writes=0'
         check_native_execution(sample)
@@ -102,6 +139,7 @@ class NativeCompareTest(unittest.TestCase):
                     manifest = json.loads((run / 'input_manifest.json').read_text())
                     self.assertEqual(manifest['synthetic_sim_inserted'], inserted)
                     self.assertFalse(manifest['boot_claim'])
+                    self.assertEqual(('A', '671a'), (manifest['ppm'], manifest['bios']))
                     config = run / 'cfg/nsb1r4t.cfg'
                     self.assertEqual(config.exists(), inserted)
                     if inserted:

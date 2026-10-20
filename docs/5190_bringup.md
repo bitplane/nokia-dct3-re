@@ -63,12 +63,21 @@ The acquired package independently distinguishes the resources:
 
 These addresses/lengths come from the own big-endian PPM chunk chain beginning
 at `2e0030`, not a search for arbitrary text. The normalized B input SHA-1 is
-`49987333223932f13dd4fb8e71a9645497894f73`; neither its boot nor SMS behavior
-is accepted yet. The next experiment must qualify B separately and trace its
-resource selection/initialization before claiming text entry. Preserve A as
-its own accepted profile; do not silently replace its flash input or force the
-validity field. A's ordinary non-dictionary input path also remains to be
-distinguished from this mode-1 attempt. No missing DSP reply is established.
+`49987333223932f13dd4fb8e71a9645497894f73`. Both `noki5190` and `nsb1r4t`
+offer explicit BIOS choices `671a` (unchanged default) and `671b`. B requires
+its own normalized `5190f671b.fls`; it is not renamed as A. MAME stores its
+NVRAM in `nsb1r4t_1`, not `nsb1r4t`. Comparison preparation pins the selected
+variant and rejects checksum-source flash/manifests from another variant.
+
+A qualified B run with checksums derived from its own erased-storage boot
+accepts the physical phone code, reaches the editor, sustains legal native
+execution through 40 seconds and leaves executable flash unchanged. It still
+selects base zero, reads header version zero and returns text-API result `9`.
+Thus adding the full database does not by itself select it. A's exact physical
+Phone book menu acceptance also passes after adding the BIOS choices. The next
+question is language-resource selection upstream of `10642c`; A's ordinary
+non-dictionary input path remains independently open. Neither SMS text entry
+nor a missing DSP reply is established, and the validity field is not forced.
 
 The separate Spell mode accepts physical letters and renders `ADA`, but the
 manual describes that mode as adding a dictionary word; returning to an empty
