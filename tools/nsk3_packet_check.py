@@ -116,7 +116,7 @@ def check_completion_wait(trace):
             or 'nsk3_completion_receive:' in trace or 'nsk3_completion_construct:' in trace
             or 'nsk3_completion_post:' in trace):
         raise ValueError('bounded empty completion-server observation differs')
-    return {'observed_seconds':45,'receive_entries':1,'receive_returns':0,
+    return {'observed_seconds':max(map(float,samples)),'receive_entries':1,'receive_returns':0,
             'all_possible_ingress_closed':False}
 
 
@@ -127,7 +127,7 @@ def check_native_control(trace,expected_words):
     if (len(writes)!=trace.count('nsk3_native_control_write:')
             or len(samples)!=trace.count('nsk3_native_control_sample:')
             or len(words)!=trace.count('nsk3_native_live_words:')
-            or len(samples)!=4 or len(words)!=4 or dict(words)!=expected_words):
+            or len(samples) not in (4,6) or len(words)!=4 or dict(words)!=expected_words):
         raise ValueError('native control/program observation incomplete or changed')
     pending=[int(value,16) for address,value,_,_ in writes if address=='06d0']
     completed=[int(value,16) for address,value,_,_ in writes if address=='06d1']
@@ -137,7 +137,7 @@ def check_native_control(trace,expected_words):
         raise ValueError('unexpected control address')
     times=[float(row[3]) for row in writes]
     if times!=sorted(times):raise ValueError('native write ordering differs')
-    for row,want in zip(samples,(5,20,40,45)):
+    for row,want in zip(samples,(5,20,40,45,65,90)):
         time,p,c,gate,state,np,nc=row
         if (abs(float(time)-want)>0.05 or (p,c,gate,state)!=('0003','010e','0000','0000')
                 or int(np)!=len(pending) or int(nc)!=len(completed)
@@ -145,6 +145,36 @@ def check_native_control(trace,expected_words):
             raise ValueError('native control samples/caps differ')
     return {'request_indexes':pending[1:],'completed_word':'0x010e',
             'live_regions_match_declared_rom':True,'fitted_mask_or_rf_contract_proved':False}
+
+
+SCAN_FRAGMENTS={0x2420:'f0730a71',0x0a71:'76f812511a80e800',
+                0x0ae6:'6ff8219b0d2077151266fa4f0b08771412576bf8134400016ff8198d0d20fa4f',
+                0x0b08:'77161262e80150866b8c0001f8460cb84e8661850001f8200ae410f8'}
+
+
+def check_native_scan(trace,program):
+    if len(program)!=131072:raise ValueError('live program capture extent differs')
+    for address,raw in SCAN_FRAGMENTS.items():
+        expected=bytes.fromhex(raw)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError('live uploaded scan gateway/qualification code differs')
+    rows=re.findall(r'nsk3_native_scan_sample: t=([0-9.]+) counter=([0-9a-f]{8}) qualified=([0-9a-f]+) flags=([0-9a-f]+) producer=([0-9a-f]+) consumer=([0-9a-f]+) threshold=([0-9a-f]+) observer_writes=0',trace)
+    if len(rows)!=6 or len(rows)!=trace.count('nsk3_native_scan_sample:'):
+        raise ValueError('native scan observation incomplete')
+    late=[]
+    for row,want in zip(rows,(5,20,40,45,65,90)):
+        time,counter,qualified,flags,producer,consumer,threshold=row
+        if abs(float(time)-want)>0.05 or (qualified,flags,threshold)!=('0000','0000','0574'):
+            raise ValueError('native scan qualification/timing differs')
+        if want>=40:
+            value=int(counter,16)
+            if not value&0x80000000 or producer!=consumer:
+                raise ValueError('late scan counter/queue boundary differs')
+            late.append(value)
+    if any(a>=b for a,b in zip(late,late[1:])):raise ValueError('scan counter is not advancing')
+    return {'observed_through_seconds':90,'late_counter_steps':late[-1]-late[0],
+            'qualifying_results':0,'sampled_queue_cursors_match':True,
+            'rf_fidelity_or_timeout_cause_proved':False}
 
 
 def main():
@@ -157,6 +187,7 @@ def main():
     parser.add_argument('--mode-chain',action='store_true',help='require measured09ec-to043c MCU sequence')
     parser.add_argument('--completion-wait',action='store_true',help='qualify the bounded empty server receive')
     parser.add_argument('--native-control',type=Path,help='qualify control census against declared native program ROM')
+    parser.add_argument('--native-scan',type=Path,help='qualify90s scan samples against captured live program')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -178,6 +209,7 @@ def main():
             expected={f'{address:04x}':program[address*2:address*2+16].hex()
                       for address in (0x3000,0x313f,0x47f6,0x4a49)}
             summary['native_control']=check_native_control(trace,expected)
+        if args.native_scan:summary['native_scan']=check_native_scan(trace,args.native_scan.read_bytes())
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)

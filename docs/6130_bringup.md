@@ -839,6 +839,32 @@ The next native work is the operation/request and RF-input contract, using
 live-code qualification before importing resident-only addresses. The MCU
 queue and acknowledgement findings constrain hypotheses but are not missing
 hardware events to manufacture.
+
+The separate90s qualification `tmp/nsk3-native-scan` samples the scan counter,
+result fields and RF-sample queue. At40/45/65/90s, counter1262/1263 is
+ffff:c292/c6cd/d7bb/ece3, advancing10833 steps while still negative.
+Fields1344 and1266 remain0, threshold219b is0574, and producer06b7 and
+consumer06b8 match at each late sample. This rules out a permanent empty
+sample-queue stall at the sampled boundary; it does not prove physical RF
+encoding. Live45s program capture is131072 bytes, SHA256
+bcf379e954b2a7a17a47e5e4c92a9b3368feafe048b2f7fc3c93aa06944ec3b7.
+The gateway2420 isf073/0a71, targeting uploaded initializer0a71 rather than
+the resident-only0a5c address. The checker anchors its live qualification
+and counter instructions at0ae6/0b08, with mutation tests.
+
+The modeled COBBA RF receive callback is unattached/deterministic silence;
+the active scan's zero qualifying results are not evidence for a real
+receiver's noise/offset contract. Its timeout has not expired at90s, before
+the independently observed~94s packet-supervision reset. That timeline
+mismatch does not identify a clock defect or justify changing thresholds,
+speeding the scan, fabricating RF samples or adding periodic traffic.
+
+```sh
+.venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
+  tmp/nsk3-native-scan --mode-chain --cache --completion-wait \
+  --native-control roms/nsk3r4t/nse1_rom4_dsp_program.bin \
+  --native-scan tmp/nsk3-native-scan/nsk3_native_program_45s.bin
+```
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.

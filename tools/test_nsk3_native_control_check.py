@@ -1,8 +1,24 @@
 import unittest
-from tools.nsk3_packet_check import check_native_control
+from tools.nsk3_packet_check import check_native_control, check_native_scan, SCAN_FRAGMENTS
 
 
 class NativeControlTest(unittest.TestCase):
+    def test_live_scan_code_counter_and_queue(self):
+        program=bytearray(131072)
+        for address,raw in SCAN_FRAGMENTS.items():
+            data=bytes.fromhex(raw);program[address*2:address*2+len(data)]=data
+        rows=[]
+        for i,time in enumerate((5,20,40,45,65,90)):
+            rows.append(f'nsk3_native_scan_sample: t={time}.0 counter={0xffff0000+i:08x} qualified=0000 flags=0000 producer=1a00 consumer=1a00 threshold=0574 observer_writes=0')
+        trace='\n'.join(rows)
+        self.assertEqual(check_native_scan(trace,program)['qualifying_results'],0)
+        for old,new in (('t=90.0','t=89.0'),('qualified=0000','qualified=0001'),
+                        ('consumer=1a00','consumer=1a04'),('counter=ffff0005','counter=ffff0001')):
+            with self.subTest(old=old),self.assertRaises(ValueError):check_native_scan(trace.replace(old,new),program)
+        for address in SCAN_FRAGMENTS:
+            changed=bytearray(program);changed[address*2]^=1
+            with self.assertRaises(ValueError):check_native_scan(trace,changed)
+
     def fixture(self):
         rows=[]
         pending=[0,1,2,8,3]
