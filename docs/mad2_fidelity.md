@@ -158,10 +158,28 @@ The same paired-ROM census resolves the separate ARM clock-stop path. The
 helper at v6.00 `0x2b4e7a` / v5.01 `0x2b222e` clears bit 0 and, for a nonzero
 argument, pulses bit 1. Its callers are the task-0 idle-supervisor loop and the
 masked shutdown path. The device therefore stores `0x0d` without bit 1 and
-suspends the ARM only when the request arrives with no already-routed IRQ/FIQ.
-Any subsequently routed IRQ or FIQ resumes it; pending-but-masked sources do
-not. This is a clock-stop model, not a complete power-rail or oscillator-startup
+suspends the ARM only when no locally unmasked IRQ/FIQ is pending.
+A locally unmasked source resumes it independently of global CPU interrupt
+delivery; locally masked sources do not. Global control still gates the CPU
+lines and is not rewritten by wake. NAM-2 v5.21's ordinary supervisor makes
+the distinction observable: `2f868c -> 2fad22`, then `r0=1` at `2f8690`
+branches directly to the call at `2f85f6`, bypassing the adjacent `r0=0` at
+`2f85f4`. Its clock-stop helper `304c2e` runs with control `0a`, FIQ mask
+`08` and IRQ mask `a2`. The source masks are active-low: IRQ0 is eligible,
+not masked. Qualifying wake only through the globally gated CPU line
+incorrectly prevented any local source from restarting that clock.
+This is a firmware-derived clock-stop model, not a complete power-rail or oscillator-startup
 model.
+
+`make verify-mad2-wake-gates` separately covers an eligible physical keypad
+edge, a masked edge retained until local unmask, and extended FIQ8, all with
+global control `0a`. The controller must wake without asserting a globally
+disabled CPU interrupt; the fixtures do not enable the global gate to make
+the wake happen. These are MMIO conformance tests, not proof of measured
+silicon timing. In NAM-2, restarting the clock alone still leaves global
+delivery disabled and does not make its security editor consume keys.
+The firmware's subsequent interrupt-restoration contract remains open;
+the device must not silently write control `05` as a boot workaround.
 
 `make verify-mad2-sleep` validates this contract on both ROMs with an MMIO
 controller fixture: Timer 1 continues while the ARM is suspended, reaches

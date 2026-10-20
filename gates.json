@@ -16260,6 +16260,41 @@
                  "before_script": [], "script": "tools/run_noki6210_sip_cancel.py",
                  "arguments": ["$(RUN_DIR)", "--restore-incoming-connected-signaling",
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-mad2-wake-gates", "prerequisites": ["build"], "variables": {},
+      "steps": [
+        {"step": "run", "silent": true, "make_flags": ["--no-print-directory"],
+         "run_target": "run-prebuilt-captured",
+         "tokens": ["RUN_DIR=$(RUN_DIR)_wake_keypad", "SECONDS=1", "RUN_VERBOSE=1",
+                    "RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-gated'"],
+         "parameters": {"RUN_DIR": "$(RUN_DIR)_wake_keypad", "SECONDS": "1", "RUN_VERBOSE": "1",
+                        "RUN_ENV": "'NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-gated'"}},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/mad2_sleep_trace_check.py",
+         "arguments": ["$(RUN_DIR)_wake_keypad/error.log", "--source", "keypad-gated"],
+         "options": ["--source"]},
+        {"step": "run", "silent": true, "make_flags": ["--no-print-directory"],
+         "run_target": "run-prebuilt-captured",
+         "tokens": ["RUN_DIR=$(RUN_DIR)_wake_masked", "SECONDS=1", "RUN_VERBOSE=1",
+                    "RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-masked-gated'"],
+         "parameters": {"RUN_DIR": "$(RUN_DIR)_wake_masked", "SECONDS": "1", "RUN_VERBOSE": "1",
+                        "RUN_ENV": "'NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-masked-gated'"}},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/mad2_sleep_trace_check.py",
+         "arguments": ["$(RUN_DIR)_wake_masked/error.log", "--source", "keypad-masked-gated"],
+         "options": ["--source"]},
+        {"step": "run", "silent": true, "make_flags": ["--no-print-directory"],
+         "run_target": "run-prebuilt-captured",
+         "tokens": ["RUN_DIR=$(RUN_DIR)_wake_fiq8", "SECONDS=1", "RUN_VERBOSE=1",
+                    "RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2005 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=fiq8-gated'"],
+         "parameters": {"RUN_DIR": "$(RUN_DIR)_wake_fiq8", "SECONDS": "1", "RUN_VERBOSE": "1",
+                        "RUN_ENV": "'NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2005 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=fiq8-gated'"}},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/mad2_sleep_trace_check.py",
+         "arguments": ["$(RUN_DIR)_wake_fiq8/error.log", "--source", "fiq8-gated"],
+         "options": ["--source"]}
+      ]
     }
   ]
 }

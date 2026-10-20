@@ -73,6 +73,8 @@ private:
 	TIMER_CALLBACK_MEMBER(timer1_tick);
 	TIMER_CALLBACK_MEMBER(fiq8_tick);
 	void ack_irq(u16 mask);
+	bool fiq_pending_unmasked() const;
+	bool irq_pending_unmasked() const;
 	void update_fiq_line();
 	void update_irq_line();
 	void update_timer0_compare();

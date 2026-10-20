@@ -68,10 +68,66 @@ with `tools/noki2100_v521_security_input.lua` (26 seconds, without the debugger)
 presses `12345`/left softkey at seconds 14 through 19. It does not render
 masked digits or change the prompt. Device tracing observes IRQ0 asserted
 and retained across those contacts while the IRQ mask is `a2` and control
-is `0a`; IRQ0 is masked. This is not an observed wrong-code result and does
-not justify changing the security verifier. Decode this version's interrupt
-and input-enable lifecycle before treating the input fixture as a credential
-test. No keypad mask or task event is to be forced.
+is `0a`. Masks are active-low, so IRQ0 is locally unmasked; global delivery
+is disabled by control `0a`. The PC is parked at the clock-stop helper's
+return (`304c58`), with a MAD2 sleep request at 11.741268 seconds.
+The ordinary supervisor explicitly selects that stop request: the nonzero
+result from `2fac86` at `2f8688` calls `2fad22`, sets `r0=1`, and branches
+to the shared call at `2f85f6`. It bypasses the immediately preceding
+`r0=0`; looking only at instructions adjacent to the call would misclassify
+its argument. Runtime breakpoints observe argument 1, caller `2f85fb`,
+control `0a`, FIQ mask `08` and IRQ mask `a2`.
+
+Separating local-source clock wake from globally gated CPU-line delivery in
+MAD2 restarts the ARM when an unmasked FIQ becomes pending at second 12.
+It does not resolve input: firmware continues executing with global control
+`0a`, and physical keys still do not render digits. The next contract is
+global interrupt restoration across this ordinary idle continuation, not an
+absent keypad edge. Neither automatically writing `05` at wake nor changing
+the security verifier is justified by this experiment. No keypad mask or
+task event is to be forced.
+
+An early-input control independently proves the physical matrix and editor:
+`tools/noki2100_v521_early_security_input.lua` presses the same six contacts
+at seconds `8, 8.5, 9, 9.5, 10, 10.5`, before the observed idle transition.
+Every IRQ0 assertion is followed by firmware acknowledgement; the screen
+renders five masked digits and then localized `Wrong code!` after confirmation.
+This is a real credential rejection, unlike the late-input control. It does
+not establish why `12345` is rejected, a valid replacement credential,
+usable idle or persistent PMM. The default late fixture remains at seconds
+14 through 19; the early wrapper changes only physical input timing.
+
+Run the corrected image as above with `-seconds_to_run 20`, omit debugger
+options, and use `../tools/noki2100_v521_early_security_input.lua`. Then:
+
+```sh
+.venv/bin/python tools/noki2100_v521_security_check.py \
+  roms/noki2100/2100f521sharp.fls RUN
+```
+
+The checker requires the own source/executable, 992-exchange bootstrap, all
+six physical contacts and IRQ service windows, and reviewed 96x65 prompt,
+five-digit and rejection pixels. Fresh captures
+`tmp/nam2-v521-early-security-20261020` and
+`tmp/nam2-v521-flash-20261020` both pass. The latter's passive flash observer
+reached its 8192-write cap and cannot support an absence conclusion. Post-run
+flash preserves the executable but no longer contains the original PMM
+catalogues; new top-partition data is present. Thus the initial checksum must
+not be assumed to persist at its original address, and cold-storage validity
+is not accepted. Audit the actual erase/program lifecycle before attributing
+that result to part geometry or interpreting it as intended compaction.
+
+The uncapped command-filtered bus capture
+`tmp/nam2-v521-erase-20261020/error.log` covers 20.016667 seconds and 20,910
+top-partition writes. Seven writes contain a `0020` or `00d0` halfword;
+the first four are program data at RAM-stub PC `135206`. The command pair
+is `0020` at `3fff00` (PC `13524e`, 3.230879385 s), followed by `00d0` at
+`3fa000` (PC `135252`, 3.230879846 s). Another `00d0` at the same address
+occurs at 4.233167308 s without a second captured `0020` setup. The current
+generic flash part erases the entire containing 64 KiB block; its fitted-part
+identity and this firmware's expected erase span remain to be established.
+An 8 KiB PMM segment spacing or a Sharp filename alone is not evidence for
+changing that silicon geometry. No flash behavior is altered by this capture.
 
 ## Established contracts
 

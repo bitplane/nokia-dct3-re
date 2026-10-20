@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 734 gates: 536 generated from typed steps, 198 copied verbatim (shell).
+# 735 gates: 537 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -446,7 +446,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-sip-incoming-connected-signaling \
 	verify-8890-sip-connected-outgoing-restore \
 	verify-8890-sip-connected-incoming-restore \
-	verify-6210-sip-connected-incoming-restore
+	verify-6210-sip-connected-incoming-restore verify-mad2-wake-gates
 
 verify-8210-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --mame $(MAME_DIR)/mame
@@ -5204,3 +5204,11 @@ verify-8890-sip-connected-incoming-restore: build
 
 verify-6210-sip-connected-incoming-restore: build
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki6210_sip_cancel.py $(RUN_DIR) --restore-incoming-connected-signaling --pjsua $(SIP_PJSUA_BIN) --mame $(MAME_DIR)/mame
+
+verify-mad2-wake-gates: build
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)_wake_keypad SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-gated'
+	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_wake_keypad/error.log --source keypad-gated
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)_wake_masked SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad-masked-gated'
+	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_wake_masked/error.log --source keypad-masked-gated
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)_wake_fiq8 SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2005 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=fiq8-gated'
+	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_wake_fiq8/error.log --source fiq8-gated

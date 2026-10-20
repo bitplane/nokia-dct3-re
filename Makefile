@@ -522,6 +522,7 @@ help:
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make verify-mad2-clocks check reset/clock/watchdog boot contracts in both 3210 ROMs"
 	@echo "make verify-mad2-sleep  check Timer-1 and physical-key wake from MAD2 clock stop"
+	@echo "make verify-mad2-wake-gates  check local wake versus global interrupt delivery"
 	@echo "make verify-mad2-timer1 check Timer-1 destination/FIQ5 at accelerated controller time"
 	@echo "make verify-mad2-reset check software/MAD2/CCONT watchdog reset domains and retained state"
 	@echo "make verify-mbus    check two-ROM MBUS init and external RX/FIQ2 contracts"

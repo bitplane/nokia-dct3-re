@@ -1026,7 +1026,27 @@ if mad2_sleep_fixture_at >= 0 then
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
 		local old_clock = space:read_u8(0x2000d)
 		local old_fiq8 = space:read_u8(0x20016) & 0x05
-		if mad2_sleep_fixture_source == "timer1" then
+		local gated_keypad = mad2_sleep_fixture_source == "keypad-gated" or
+				mad2_sleep_fixture_source == "keypad-masked-gated"
+		local keypad_source = gated_keypad or mad2_sleep_fixture_source == "keypad"
+		local gated_fiq8 = mad2_sleep_fixture_source == "fiq8-gated"
+		if gated_keypad then
+			-- Qualify oscillator wake independently of disabled CPU delivery.
+			space:write_u8(0x2000c, 0x0a)
+			space:write_u8(0x2000a, 0xff)
+			space:write_u8(0x2000b, 0xff)
+			space:write_u8(0x20016, 0x07)
+			space:write_u8(0x20008, 0xff)
+			space:write_u8(0x20009, 0xff)
+			if mad2_sleep_fixture_source == "keypad-gated" then
+				space:write_u8(0x2000b, 0xfe)
+			end
+		elseif gated_fiq8 then
+			space:write_u8(0x2000c, 0x0a)
+			space:write_u8(0x2000a, 0xff)
+			space:write_u8(0x2000b, 0xff)
+			space:write_u8(0x20016, 0x03)
+		elseif mad2_sleep_fixture_source == "timer1" then
 			-- Timer 1/FIQ5 is the internal sleep-counter wake source. Its 0x7fff
 			-- destination is hardware-owned and read-only, so this fixture waits
 			-- for the real product-rate counter rather than changing either one.
@@ -1044,17 +1064,39 @@ if mad2_sleep_fixture_at >= 0 then
 			space:write_u8(0x2000c, old_ctrl | 0x01)
 		end
 		space:write_u8(0x2000d, old_clock | 0x02)
-		if mad2_sleep_fixture_source == "keypad" then
+		if keypad_source then
 			emu.wait(0.05)
+			if gated_keypad then
+				machine:logerror(string.format("mad2_wake_fixture: phase=edge source=%s ctrl=%02x mask=%02x t=%.6f\n",
+					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
+			end
 			press("up")
+			if mad2_sleep_fixture_source == "keypad-gated" then
+				machine:logerror(string.format("mad2_wake_fixture: phase=qualified source=%s ctrl=%02x mask=%02x t=%.6f\n",
+					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
+			end
 			emu.wait(0.02)
 			release("up")
+			if mad2_sleep_fixture_source == "keypad-masked-gated" then
+				machine:logerror(string.format("mad2_wake_fixture: phase=unmask source=%s ctrl=%02x mask=%02x t=%.6f\n",
+					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
+				space:write_u8(0x2000b, 0xfe)
+				machine:logerror(string.format("mad2_wake_fixture: phase=qualified source=%s ctrl=%02x mask=%02x t=%.6f\n",
+					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
+			end
+			if gated_keypad then
+				emu.wait(0.02)
+				machine:logerror(string.format("mad2_wake_fixture: phase=delivery source=%s ctrl=%02x mask=%02x t=%.6f\n",
+					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
+				space:write_u8(0x2000c, 0x05)
+				emu.wait(0.001)
+			end
 		else
 			emu.wait(0.05)
 		end
 		space:write_u8(0x2000a, old_fiq_mask)
 		space:write_u8(0x2000b, old_irq_mask)
-		if mad2_sleep_fixture_source == "fiq8" then
+		if mad2_sleep_fixture_source == "fiq8" or gated_keypad or gated_fiq8 then
 			space:write_u8(0x2000c, old_ctrl & 0xfe)
 			space:write_u8(0x20016, 0x07)
 			space:write_u8(0x20016, old_fiq8)
