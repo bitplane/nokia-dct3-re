@@ -1549,8 +1549,8 @@ now lives in `sim_fdn_profile.py`, shared with the NSB-1 gate; handset menus
 and native acceptance remain product-owned.
 
 Protected record save/edit/read/rejection is independently qualified below;
-selected-record erase/cancel is qualified below; local dial enforcement
-remains pending. The compatibility-mask
+selected-record erase/cancel and local dial permission are qualified below.
+The compatibility-mask
 and radio boundaries are unchanged.
 
 ### Protected FDN record save/edit and cold retrieval
@@ -1585,9 +1585,8 @@ Save issue one protected update to the same record1. Only byte3600 changes
 F5→F6: A/12345 becomes A/12346, with no new record or unrelated mutation.
 The separate cold process displays12346 using the same held-# Search route
 and leaves the complete card unchanged. `nsk1_fdn_edit.lua` keeps menu
-spacing separate from credential/number typing. These gates do not accept
-the later erase/cancel gates, dial enforcement, registration, connected calls
-or fitted mask on their own.
+spacing separate from credential/number typing. These are file-operation
+checks, not dial-permission, network or fitted-mask acceptance.
 
 ### Selected FDN erase and cancellation
 
@@ -1611,6 +1610,29 @@ actions, PIN2/update payloads and confirmation frames remain required.
 Fixtures are `nsk1_fdn_erase.lua`, `nsk1_fdn_cancel.lua` and
 `nsk1_fdn_empty.lua`. This proves selected-record erasure, not a command
 to erase every FDN/ADN record or any network/call support.
+
+### Local FDN dial permission
+
+```sh
+.venv/bin/python tools/nsk1_fdn_dial_check.py tmp/nsk1-fdn-edit-cold \
+  tmp/nsk1-fdn-dial-enabled tmp/nsk1-fdn-dial-listed \
+  tmp/nsk1-fdn-dial-unlisted tmp/nsk1-fdn-dial-disabled \
+  tmp/nsk1-fdn-dial-unlisted-off
+```
+
+With the physically saved A/12346 record, a menu-driven FDN enable changes
+only ADN validity. Independent cold copies type12346 and54321 followed by
+the single-Navi Call action. The listed number reaches call-progress UI;
+the unlisted number displays `Call not allowed`. After physical FDN disable,
+a further cold process types the same54321 and reaches the identical progress
+frame as the listed control. Each dial preserves the complete card; toggles
+change only3575. Exact digit previews, physical/decoded contacts, source/cold
+links, native/storage checks, SIM identity handshakes and reviewed outcomes
+are required. Fixtures are `nsk1_fdn_dial.lua` and
+`nsk1_fdn_dial_unlisted.lua` over the same physical-input harness.
+
+This is local permission handling only. There is no laboratory registration,
+connected call, native speech or fitted-mask promotion in these results.
 
 ### Ordinary PIN change
 
