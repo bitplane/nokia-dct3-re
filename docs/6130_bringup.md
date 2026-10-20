@@ -497,6 +497,14 @@ the leading word). The branch21a35c then skips processing2176a0 with state3
 and phase1 unchanged. The state/phase lifecycle and subsequent native requests
 remain unresolved; this does not establish why that lifecycle was selected.
 
+Read-only byte write-watches on106cfc and106d01 identify task12's own
+initialization stores21a1a6 (state3) and21a1b2 (phase1), after the initial
+RAM clear20010e. No further writes to either byte occur through45s in
+`tmp/nsk3-owner-writers`. Static decoding confirms literal3/1 stores before
+the receive loop266c80. These are initial values, not an observed transition
+into an error state. This watch covers this run and qualified owner address;
+it is not an exhaustive static writer census or a meaning assigned to state3.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
