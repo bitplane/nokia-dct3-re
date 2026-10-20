@@ -49,6 +49,21 @@ their stricter failure expectations. The next unresolved question is what keeps
 this accepted-record lifecycle from presenting an interactive UI; record validity
 alone is not evidence of correct display, power or application initialization.
 
+### Accepted-record UI observation
+
+`nsk3_ui_observe.lua` extends the cold observer with passive LCD-write and
+matrix-scan counters and one physical column1/mask04 contact at8.0..8.2s.
+This is a raw matrix contact, not an accepted NSK-3 logical key mapping.
+The retained `tmp/nsk3-ui-cold-contact` run starts from the qualified persistent
+record. Startup join `23ad9c` observes flags00 at own pointer10ff84. LCD traffic
+reaches1040 writes by1s and2084 by2s, then stops through16s; matrix reads remain6
+and row writes13 throughout the sampled interval, including the contact.
+Thus the blank frame is not yet attributable to a display-controller failure:
+no subsequent scan or redraw responds to this contact. The next census should
+follow application startup/readiness and the keypad-interrupt enable path, not
+assume that accepted security records imply a live UI. The scan counter and
+logical key mapping remain research observations, not physical-input acceptance.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from
