@@ -500,6 +500,39 @@ is activation evidence, not graphical boot, factory provisioning or complete
 record-update conformance. The next frontier is the report-14 caller's own
 preceding lifecycle and the now-active SIM controller contract.
 
+### Report-14 power lifecycle
+
+Own task descriptor 19 selects entry `229e24`, which loads context `10b2d0`.
+The context stores its event at `+32` and state at `+34`. Dispatcher
+`22b6fe..22b710` bounds the state to `0..1d` and selects one of thirty BE32
+targets at `22b714`. It is not an ordinary returning helper: continuation
+code receives another event and redispatches, sometimes through separate
+receive tails. An entry-only ROM tap is therefore not a complete event
+trace. The fixture instead watches the actual state/event RAM writes and
+captures late snapshots; repeated identical writes are suppressed and the
+transition log is capped at 128 records.
+
+The checksum fixture observes states `18 -> 1a`, then the firmware restart,
+then `18 -> 1a -> 4 -> 3`; states 4 and 3 first appear at approximately
+4.821 and 6.307 seconds. All six 12..16.2-second snapshots show state 3,
+event `26`, sample `10fe58=03ff`. Other observed event values include
+`49/4a/4b`. This is a live power-state machine, not an unscheduled task.
+The numeric events are not yet assigned hardware semantics.
+
+Reader `289ca0` calls `295ab0` with selector 2, applies the live floating
+gain/offset and returns the 16-bit sample. The current research board's
+CCONT channel 2 default is `03ff`; it is not an evidenced NSK-1 battery
+voltage. The state-26 handler at `22b998` uses a **signed** comparison of
+the sample with `01fe` and a four-count startup window before entering the
+state-4 path through `22b2ce`. This identifies an input-dependent lifecycle,
+not proof that changing the sample produces report `14`.
+
+The report-14 block `22a192..22a1c4` sets a byte state to `0a`, manages
+timers `a8/a7`, calls `263610`, and publishes through `291ad2`. Its exact
+predecessor conditions still need decoding; do not infer a normal battery
+setting by choosing values merely to reach that block. Independently ground
+the NSK-1 board input/transfer contract before a nominal-voltage fixture.
+
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.
 It explicitly does not certify interactive input. Redundant raw-record

@@ -28,8 +28,11 @@ def check(text):
     gates = re.findall(r'nsk1_application_gate: predicate=([0-9a-f]{2}) boot_reason=([0-9a-f]{2}) class=([0-9a-f]{2}) flags=([0-9a-f]{2}) stage=([0-9a-f]{2}) startup=([0-9a-f]{2}) cycles=[0-9a-f]{16} observer_writes=0',text)
     statuses = re.findall(r'nsk1_activation_status: value=([0-9a-f]{2}) pc=([0-9a-f]{8}) caller=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0',text)
     checksums = re.findall(r'nsk1_security_checksum: computed=([0-9a-f]{4}) stored=([0-9a-f]{4}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    power_writes = re.findall(r'nsk1_power_write: field=(state|event) value=([0-9a-f]{4}) pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0',text)
+    power_snapshots = re.findall(r'nsk1_power_snapshot: state=([0-9a-f]{4}) event=([0-9a-f]{4}) sample=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
     for marker,matches in (('task_activate',activations),('application_gate',gates),
-                           ('activation_status',statuses),('security_checksum',checksums)):
+                           ('activation_status',statuses),('security_checksum',checksums),
+                           ('power_write',power_writes),('power_snapshot',power_snapshots)):
         if len(matches) != text.count(f'nsk1_{marker}:'):
             raise ValueError('unrecognized activation trace format')
     for name,rows_ in (('input',ready_inputs),('flags_snapshot',ready_snapshots),('flag_write',ready_writes)):
@@ -51,4 +54,7 @@ def check(text):
                                          (int(value,16) for value in row))) for row in gates],
             'activation_status_writes':[{'value':int(value,16),'pc':pc,'caller':caller} for value,pc,caller in statuses],
             'security_checksums':[{'computed':int(computed,16),'stored':int(stored,16)} for computed,stored in checksums],
+            'power_writes':[{'field':field,'value':int(value,16),'pc':pc,'time':float(time)} for field,value,pc,time in power_writes],
+            'power_snapshots':[{'state':int(state,16),'event':int(event,16),'sample':int(sample,16),'time':float(time)}
+                               for state,event,sample,time in power_snapshots],
             'scope':'physical-contact and passive startup observation, not interactive UI acceptance'}

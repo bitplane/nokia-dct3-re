@@ -32,6 +32,18 @@ for _,field in pairs(machine.ioport.ports[':COL.1'].fields) do fields[field.mask
 local events = {{12,4,1},{12.2,4,0},{14,16,1},{14.2,16,0},{16,2,1},{16.2,2,0}}
 local next_event,reads,writes = 1,0,0
 local handles = {}
+local power_writes = 0
+local power_previous = {}
+handles[#handles+1] = space:install_write_tap(0x10b300,0x10b307,'nsk1_power_state',function(offset,data,mask)
+    local field,value
+    if offset == 0x10b300 and (mask & 0xffff) ~= 0 then field,value = 'event',data & 0xffff end
+    if offset == 0x10b304 and (mask & 0xffff0000) ~= 0 then field,value = 'state',(data >> 16) & 0xffff end
+    if not field or power_writes >= 128 or power_previous[field] == value then return end
+    power_previous[field] = value
+    power_writes = power_writes+1
+    machine:logerror(string.format('nsk1_power_write: field=%s value=%04x pc=%08x t=%.9f observer_writes=0\n',
+        field,value,cpu.state['R15'].value,machine.time:as_double()))
+end)
 local function simi(offset,data,mask,write)
     for lane = 0,3 do
         local address,shift = offset+lane,(3-lane)*8
@@ -91,6 +103,8 @@ emu.register_frame_done(function()
         assert(fields[event[2]],'physical NSK-1 contact missing')
         fields[event[2]]:set_value(event[3])
         local flags = {}
+        machine:logerror(string.format('nsk1_power_snapshot: state=%04x event=%04x sample=%04x t=%.9f observer_writes=0\n',
+            space:read_u16(0x10b304),space:read_u16(0x10b302),space:read_u16(0x10fe58),now))
         for index = 0,10 do flags[#flags+1] = string.format('%02x',space:read_u8(ready_flags+index)) end
         machine:logerror(string.format('nsk1_ready_flags_snapshot: flags=%s t=%.9f observer_writes=0\n',table.concat(flags),now))
         machine:logerror(string.format('nsk1_key_contact: mask=%02x down=%d irq=%02x irqmask=%02x ctrl=%02x column_mask=%02x root_byte=%02x checklist=%02x layout=%02x simi_reads=%d simi_writes=%d t=%.9f physical_only=1\n',
