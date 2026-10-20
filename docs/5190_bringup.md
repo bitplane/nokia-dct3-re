@@ -31,6 +31,27 @@ retry recovery are accepted in this compatibility configuration. General app
 coverage, radio services and fitted ADC routing remain unproved.
 The ordinary silent `noki5190` configuration is unchanged.
 
+### SIM unblock and cold new-PIN verification
+
+The native compatibility configuration also accepts an explicitly synthetic
+PIN-blocked card. Its initial image differs from the laboratory PIN-enabled
+profile only in CHV1 retries (`0`); no handset state is changed. Physical
+PUK `12345678`, new PIN `4321` and confirmation produce one `A0 2C` response
+`9000`, restore CHV1/PUK1 retries to `3/10`, and persist the new PIN while
+leaving CHV2/PUK1/PUK2 credentials and counters intact. A separate cold
+process copies qualified own persisted devices, physically verifies `4321`
+with `A0 20/9000`, then independently enters phone code `12345`.
+
+```sh
+.venv/bin/python tools/nsb1_puk_roundtrip.py mame/mame roms tmp/NEW \
+  --checksum-control-from tmp/QUALIFIED_A_ERASED_RUN
+```
+
+Both processes check exact reviewed UI frames, physical contact order,
+durable card contents, legal native execution and unchanged flash. This
+proves successful CHV1 unblock/reauthentication, not wrong-PUK recovery,
+permanently exhausted PUK handling, registration or fitted DSP compatibility.
+
 ### Offline SMS draft and text-resource contract
 
 PPM B with an explicitly synthetic English preference accepts physical text

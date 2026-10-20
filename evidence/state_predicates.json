@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_sim_unblock_cold_pin", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Physical PUK/new-PIN entry unblocks the laboratory SIM and a separate cold process verifies its persisted new PIN",
+      "current": "The initial synthetic card changes only CHV1 retries to zero. Physical 12345678/4321/4321 yields exactly one A0 2C/9000, restores counters to 3/3/10/10 and persists only the expected new CHV1 credential. A qualified cold process copies own devices and physically submits 4321 for A0 20/9000, followed by the separate phone-code flow. Both phases require exact prompt/acceptance frames, complete physical contacts, native execution and unchanged flash. Wrong-PUK recovery, PUK exhaustion, network registration and fitted-mask identity remain unproved.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_puk_roundtrip.py", "tools/nsb1_puk_input.lua", "tools/nsb1_puk_reload.lua", "tools/test_nsb1_puk_roundtrip.py"]
+    },
+    {
       "id": "nsb1_v671_search_controller_release", "owner": "nsb1_task12_lifecycle", "status": "unresolved",
       "predicate": "The ordinary firmware lifecycle releases task 12's initial state 3 and processes its organically cached native search vector",
       "current": "The 61-second physical Call/End run retains task-12 state 3 and caches native 13b8. The bounded activation chain 0a30 -> 0834 -> 043f -> 2138ec is not exercised. Earlier 09ec/argument one reaches controller 17 through 07d6 and starts task-11 03e9/argument one. Its consumer 219c60/219e52 returns normally; tail 2188f0(2) produces the measured task-3 type-1a/length-44 request. Controller-17 success statuses 0811/0812/0813 can be selected by nested-buffer parser 2505d0, whose sole aligned direct BL caller is receive helper 28f318. Outer inputs 05ea/05eb carry a pointer at +8; low nibble of nested byte 4 must be 6. No selector or completion publication is observed. A task-11 reply is not established as required; the next boundary is the legitimate outer-message/nested-buffer producer. Writer/producer scans do not close computed aliases or indirect calls. Field 012b is a bitmap count, not a proven retry setting. No state, message or RF result is injected; default-zero RF remains a separate limitation.",
