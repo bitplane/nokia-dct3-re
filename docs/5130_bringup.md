@@ -227,6 +227,23 @@ literal 0447 at 26e898 plus the decoded subtract offset 019f establishes
 observed mode-1 request does not take. Neither is evidence that DSP type 8a
 alone satisfies this acknowledgement.
 
+There is also a nested-buffer decoder, not an equivalent completion code:
+05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
+Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3
+passed separately. Its command-byte +5 value 24 selects 23e784; the success
+return at 23e86e is 0813 (literal 23ebbc), not 07e5. Constructor 23a728
+allocates the outer message and posts through 255268 to task 16. These
+own-ROM paths corroborate the sibling decoder structure but do not establish
+that this command completes task-16 state 1d. Other parser commands and
+upstream buffer producers remain to be classified.
+
+The qualified unattended capture `tmp/nsk1-radio-buffer-source` retains the
+61-second native run with a read-only breakpoint at constructor 23a728 for
+inputs 05ea/05eb: zero hits. Its transport census remains nine TX packets
+and one RX packet through 59 seconds, and `check_phase(..., through=59)`
+passes. This excludes observed use of this constructor in that boot only;
+it is not an absence proof for every producer or a test of received RF data.
+
 Shared scan-state byte 108a8d belongs to builder base 108a00 +8d;
 task-10 catalogue base 10885c is a distinct owner. Runtime initialization sets 16;
 builder 21151a sets 12 at 5.923710 seconds. Native 8b consumption at 21899e

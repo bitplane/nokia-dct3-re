@@ -32,6 +32,7 @@ machine.debugger:command('bpset 20c5e0,temp1<32,{temp1=temp1+1;logerror "nsk1_ra
 machine.debugger:command('temp8=0')
 machine.debugger:command('bpset 221236,temp8<40,{temp8=temp8+1;logerror "nsk1_radio_controller_output: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
 machine.debugger:command('bpset 26dc28,temp8<40,{temp8=temp8+1;logerror "nsk1_radio_task16_output: input=%04x r1=%08x r2=%08x r3=%08x caller=%08x observer_writes=0\\n",r0,r1,r2,r3,r14;g}')
+machine.debugger:command('bpset 23a728,r0==5ea||r0==5eb,{logerror "nsk1_radio_buffer_construct: input=%04x owner=%08x caller=%08x observer_writes=0\\\\n",r0,r1,r14;g}')
 machine.debugger:command('temp9=0')
 machine.debugger:command('bpset 22137e,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_controller_receive: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10);g}')
 machine.debugger:command('bpset 26e642,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_task16_receive: object=%08x header=%08x caller=%08x waitmode=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10),r5;g}')
