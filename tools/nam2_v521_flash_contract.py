@@ -35,6 +35,16 @@ def inspect(image):
         "rows": rows,
         "observed_id": [0xB0, 0xD0, 0],
         "selected_family": select_family(rows, 0xB0, 0xD0, 0),
+        "intel_c3_top_candidate": {
+            "manufacturer": 0x89, "device": 0x88C2,
+            "selected_family": select_family(rows, 0x89, 0x88C2, 0),
+            "source": "0x33e1a8", "length": 0x174,
+            "program": "0x1351f1", "erase": "0x135249",
+            "geometry_bytes": {"main": 0x10000, "parameter": 0x2000,
+                               "parameter_count": 8, "size": 0x200000},
+            "requires": "C3 block unlock/lock and lock-status semantics",
+            "fitted_part_proven": False,
+        },
         "family_1": {
             "source": "0x33e064", "length": 0x144,
             "destination": "0x1351f0",

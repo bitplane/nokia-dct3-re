@@ -27,3 +27,6 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertEqual(10, len(result["rows"]))
         self.assertEqual((1, 0xB0, 0xFFFF, 0xFFFF), result["rows"][2])
         self.assertEqual(1, result["selected_family"])
+        candidate = result["intel_c3_top_candidate"]
+        self.assertEqual(3, candidate["selected_family"])
+        self.assertFalse(candidate["fitted_part_proven"])

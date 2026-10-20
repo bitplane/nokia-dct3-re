@@ -173,6 +173,23 @@ proof that this part is suitable for NAM-2. Recover a supported boot-block
 part's identity/geometry before replacing it; do not change the shared
 uniform-block device to fit these descriptors.
 
+There is a concrete supported alternative, not yet selected by the machine:
+Intel `0089/88c2` selects family 3 via the explicit record at `33d780`.
+That branch copies `0x174` bytes from `33e1a8`, with erase entry `135249`;
+unlike family 1, its routines issue `60/d0` unlock and `60/01` lock sequences.
+Intel's [C3 datasheet, 290645-011](https://www.ersinelektronik.com/class/INNOVAEditor/assets/Datasheets/TE28F160C3.pdf)
+identifies `88c2` as 16-Mbit top boot, with eight 8 KiB parameter blocks
+and 31 64 KiB main blocks (sections 2.2, 3.3 and appendix F). All blocks
+reset locked; a geometry-only substitute or the existing adapter's
+acknowledge-only lock handling would not implement that contract.
+The reference is retained locally as
+`roms/reference-docs/Intel-28FxxxC3-290645-011.pdf`, SHA-256
+`f5977db4c0c9c044dd1cc18503d6763d3095c2f645e2d4b74303299fdd229532`.
+Next implementation boundary: a distinct generic C3 part with executable
+ID, parameter-erase isolation, per-block lock/reset/status and save-state
+tests, followed by an isolated NAM-2 configuration trial. This is a
+firmware-supported part candidate, not proof of the acquired board's chip.
+
 ## Established contracts
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the
