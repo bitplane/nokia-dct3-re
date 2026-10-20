@@ -136,6 +136,16 @@ implements:
 - persistent mutable `EF_ADN`, `EF_SMS`, `EF_SMSP` and cyclic `EF_ACM`
   contents through MAME device NVRAM.
 
+The synthetic card implements [GSM 09.91 section 5.1.1 option 1](https://www.etsi.org/deliver/etsi_etr/100_199/174/01_60/etr_174e01p.pdf)
+for legacy DCS1800 MEs: selecting `7f21` uses the same backing application
+as `7f20`, while SELECT/GET RESPONSE and STATUS retain visible identifier
+`7f21`. EF parent/access checks and RUN GSM ALGORITHM use the canonical
+application; Telecom remains a separate directory. There is no duplicate
+mutable application store or NVRAM-format change. The controller/card gate
+checks visible FID, selection save/restore, EF_PHASE access, authentication,
+and failure to select that EF from Telecom. This is an issuer-selected
+compatibility policy, not a claim that every real card aliases the directories.
+
 SIM NVRAM loading validates the complete serialized record before installing
 card fields. The supported append-only layouts retain base files, then SMS/SMSP,
 then security state, then EF_ACM, then preferred/forbidden PLMN lists, then

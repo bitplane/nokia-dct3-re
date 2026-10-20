@@ -25,11 +25,12 @@ PUCT_PASS = "SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unveri
 SMSS_PASS = "SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
 ADM_PASS = "SIM administrative updates: PASS files=4 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0"
 AOC_PASS = "SIM AoC binary updates: PASS files=2 blocked_pin_denied=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
+DCS_PASS = "SIM DCS directory alias: PASS visible_fid=7f21 shared_application=1 selection_restore=1 authentication=1 telecom_isolation=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, ADM_PASS, AOC_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, ADM_PASS, AOC_PASS, DCS_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -68,6 +69,7 @@ def main():
             "aoc_binary_update_files": 2, "aoc_update_restore": True,
             "aoc_serialized_exactly": True,
             "administrative_update_files": 4, "verified_pin_not_adm": True,
+            "dcs_directory_alias":True,"dcs_directory_restore":True,
             "additional_protected_binary_files": 9,
             "authentication_access": True, "authentication_directory": True,
             "disabled_chv_blocking": True, "unblock_recovery": True,
@@ -109,6 +111,7 @@ def main():
     print(SMSS_PASS)
     print(ADM_PASS)
     print(AOC_PASS)
+    print(DCS_PASS)
 
 
 if __name__ == "__main__":

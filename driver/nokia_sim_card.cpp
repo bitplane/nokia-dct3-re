@@ -572,7 +572,7 @@ void nokia_sim_card_device::finish_body()
 	const u16 requested_file = m_tx_len >= 2 ? u16(m_tx[0] << 8) | m_tx[1] : 0;
 	const file_descriptor *requested = find_file(requested_file);
 	const bool select_ok = m_ins != 0xa4 || (m_tx_len == 2 && is_known_file(requested_file) &&
-		(requested_file == 0x3f00 || requested->parent == m_selected_df ||
+		(requested_file == 0x3f00 || requested->parent == canonical_df(m_selected_df) ||
 		 is_directory(requested_file)));
 	if (m_ins == 0xa4 && select_ok)
 	{
@@ -1176,7 +1176,7 @@ void nokia_sim_card_device::run_gsm_algorithm()
 		return;
 	}
 	// GSM 11.11 8.16: authentication belongs to DFGSM and requires CHV1.
-	if (m_selected_df != 0x7f20)
+	if (canonical_df(m_selected_df) != 0x7f20)
 	{
 		queue_status(0x94, 0x08);
 		return;

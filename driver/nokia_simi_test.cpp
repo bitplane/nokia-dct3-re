@@ -366,6 +366,22 @@ private:
 		{0xb0, 0, 0, 3, 0xff, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
 		{0xb0, 0, 0, 5, 0xff, 0x90, 0},
+		// GSM 09.91 option 1: DCS1800 selects the same backing application,
+		// but GET RESPONSE/STATUS retain the externally selected identifier.
+		{0xa4, 0, 0, 2, 0x7f21, 0x9f, 22},
+		{0xc0, 0, 0, 22, 0x7f21, 0x90, 0, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xf2, 0, 0, 22, 0x7f20, 0x90, 0, false, true},
+		{0xf2, 0, 0, 22, 0x7f21, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6fae, 0x9f, 15},
+		{0xb0, 0, 0, 1, 2, 0x90, 0},
+		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
+		{0xc0, 0, 0, 12, 0, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6fae, 0x94, 4},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6fae, 0x9f, 15},
+		{0xb0, 0, 0, 1, 2, 0x90, 0},
 		// Only the final activation leaves these serial-written values for
 		// the independent cold NVRAM loader gate.
 		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
@@ -763,7 +779,7 @@ private:
 					expect(m_bytes[9] == 0x11, "SMSS advertises CHV1 READ and UPDATE");
 				if (item.body == 0x6f37 || item.body == 0x6f41)
 					expect(m_bytes[9] == 0x11, "AoC files advertise administered CHV1 READ and UPDATE");
-				if (m_write_case >= 147)
+				if (m_write_case >= 147 && item.length == 15)
 					expect((m_bytes[9] & 0xf0) == 0x10, "GSM file advertises CHV1 READ");
 			}
 			else if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
@@ -849,6 +865,7 @@ private:
 			osd_printf_info("SIM AoC binary updates: PASS files=2 blocked_pin_denied=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM administrative updates: PASS files=4 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0\n");
+			osd_printf_info("SIM DCS directory alias: PASS visible_fid=7f21 shared_application=1 selection_restore=1 authentication=1 telecom_isolation=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

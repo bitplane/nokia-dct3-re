@@ -89,6 +89,9 @@ private:
 	// caller only has to return. Keep them in the order the original commands
 	// tested in: which status a malformed command receives depends on it.
 	const file_descriptor *selected_file_for(access_shape shape);
+	// GSM 09.91 5.1.1 option 1: one backing application, while
+	// m_selected_df retains the directory identifier presented to the ME.
+	static u16 canonical_df(u16 fid) { return fid == 0x7f21 ? 0x7f20 : fid; }
 	bool write_permitted(const file_descriptor &file);
 	bool read_permitted(const file_descriptor &file);
 	u8 *writable_body(const file_descriptor &file);
