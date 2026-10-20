@@ -40,7 +40,9 @@ def analyze(image):
               0x26e234:0x03e9,0x26e230:0x10be77,0x2086c4:0x10a444,
               0x20c914:0x0834,0x20c970:0x20a590,0x221374:0x09ec,
               0x26dec4:0x07d9,0x24e074:0x24dd0a,0x24df58:0x07e5,
-              0x24d6e0:0x07d6,0x26df38:0x26e20c}
+              0x24d6e0:0x07d6,0x26df38:0x26e20c,
+              0x2941e0:0x294218,0x26a500:0x1390,0x26a504:0x108a84,
+              0x2128d8:0x1389,0x2125c8:0x212b28}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -94,6 +96,14 @@ def analyze(image):
                               'state29_handler':'0x24dd0a','expected_input':'0x07e5',
                               'request_constructor':'0x26def0','request':'0x03e9','destination_task':10,
                               'scope':'static nested route; runtime values require observation'},
+            'task10_scan':{'request_handler':'0x2132e8','pending_owner':'0x108a84',
+                           'pending_flag_bit':25,'immediate_processor':'0x212588',
+                           'mode1_entry':'0x2127f2','builder':'0x2112b0','builder_mode':2,
+                           'post':'0x2114f4','transport_task':3,'packet_type':'0x1a',
+                           'scope':'static path; no registration or completion claim'},
+            'candidate_completion':{'rx_type':'0x8a','route':'0x26a2ec','status':'0x1390',
+                                    'task':10,'processor_case':'0x212b28',
+                                    'scope':'static counter-processing route; relation to required completion unproved'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,

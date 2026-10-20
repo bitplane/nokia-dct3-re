@@ -197,6 +197,27 @@ the ordinary route back to 07e5. The 07e0 producers are downstream of this
 transaction and must not be replayed to skip it. Mode/counter fields are
 observations, not values to write into firmware or synthesized replies.
 
+Task 10 accepts this request at 2132e8 with owner 108a84 flags 80000000.
+The LSRS-26 test examines bit 25, which is clear, so it calls immediate
+processor 212588 through 21356a rather than retaining the pending request.
+Own message-mode-1 branch 2127f2 reaches builder 2112b0 with argument 2.
+Runtime 2114f4 posts object 101e14/header 0002441a to transport task 3,
+with bytes +5/+6 = 21/98, matching the subsequent native ring type-1a
+payload prefix 00219800. This is a real MCU request, not a missing mailbox
+delivery or an injected scan session.
+
+The no-call run observes only the 03e9 message in task 10's receive loop
+through 61 seconds. The separate native 8b vector still reaches task 11.
+One static completion candidate is type 8a: table 2941c4 index 7 selects
+294218 -> 26a2ec, whose normal branch posts status 1390 to task 10 (unless
+its owner byte +3 is 1, where it frees the object). The task-10 outer
+dispatcher routes 1390 through 2134dc, then, under its gates, processor
+212588 selects table index 2 -> 212b28. That case increments a counter and
+compares a limit before continuing; its payload meaning and relationship
+to the required 07e5 completion are not yet proved. It must not be treated
+as a recipe for fabricating 8a. The next questions are the actual completion
+publisher and which native DSP operation can produce its required input.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 
