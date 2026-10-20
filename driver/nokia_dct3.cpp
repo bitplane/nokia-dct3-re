@@ -215,6 +215,7 @@ struct nokia_product_config
 	bool mbus_timer_enabled = false;
 	bool mbus_terminal = false;
 	bool mad2_clock_stop = true;
+	bool mad2_sleep_wake_irq3 = false;
 	u32 flash_persistent_start = 0;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
@@ -619,6 +620,8 @@ constexpr nokia_product_config make_3210_config()
 constexpr nokia_product_config make_3310_config()
 {
 	nokia_product_config result;
+	// Project Blacksphere's 331x interrupt table identifies IRQ3 as wake.
+	result.mad2_sleep_wake_irq3 = true;
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
@@ -667,6 +670,7 @@ constexpr nokia_product_config make_3310_config()
 constexpr nokia_product_config make_3330_config()
 {
 	nokia_product_config result;
+	result.mad2_sleep_wake_irq3 = true;
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
@@ -1675,6 +1679,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 		m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_mad2->set_clock_stop_enabled(product.mad2_clock_stop);
+	m_mad2->set_sleep_wake_irq3(product.mad2_sleep_wake_irq3);
 	m_mbus->set_timer_clock_enabled(product.mbus_timer_enabled);
 	m_mbus_terminal->set_enabled(product.mbus_terminal);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);

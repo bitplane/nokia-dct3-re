@@ -193,6 +193,38 @@ not a manufacturer specification or independent NAM-2 hardware measurement.
 They corroborate interrupt roles but do not establish command-vs-state
 readback, write-zero behavior, automatic global enable on wake, or IRQ3's
 precise generating edge/latency. Clock bit 1 is explicitly uncertain there.
+The 3310 and 3330 product configurations now select a logical IRQ3 wake
+notification: leaving an actual clock-stop state latches this source without
+changing global delivery enables. Other products retain their existing model;
+this qualification scope does not establish that their silicon lacks IRQ3.
+The generating transition is a model interpretation of the documented role,
+not a measured oscillator-startup delay.
+
+`tools/mad2_wake_report_fixture.lua` is a dedicated MMIO conformance test,
+not a firmware startup fixture. It configures matrix pins and samples a physical
+Up contact synchronously, then tests a real clock-stop interval. IRQ3 latches
+even while locally masked; acknowledging it preserves keypad IRQ0. An awake
+keypress and a sleep request rejected because IRQ0 is pending do not produce
+another notification. The global control remains `0a` throughout. The checker
+`tools/mad2_wake_report_check.py LOG --product PRODUCT` accepts the 3310/3330
+notification and the unchanged 3210 control separately. This tests the selected
+device contract, not physical timing or the NAM-2 restoration problem.
+Run it in an isolated working directory with the acquired BIOS selected, e.g.:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/3310-wake-report -- noki3310 -bios 639 -rompath ../roms \
+  -video none -sound none -nothrottle -seconds_to_run 1 -log \
+  -autoboot_delay 0 -autoboot_script ../tools/mad2_wake_report_fixture.lua
+.venv/bin/python tools/mad2_wake_report_check.py \
+  tmp/3310-wake-report/error.log --product noki3310
+```
+
+Use `noki3330 -bios 450e` for the second notification profile and `noki3210`
+without a BIOS override for the unchanged control. Normal graphical acceptance
+remains `verify-3310-frontier`, `verify-3330-frontier`, `verify`, and
+`verify-frontier`; the conformance fixture is not a substitute for those gates.
+
 The table calls IRQ8 bit `40` a mask, whereas the paired 3210 dispatcher
 evidence above assigns acknowledgement behavior; retain that discrepancy
 rather than silently importing the older table as a universal register model.

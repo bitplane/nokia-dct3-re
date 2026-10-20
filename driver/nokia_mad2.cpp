@@ -363,6 +363,11 @@ void nokia_mad2_device::leave_sleep(const char *domain)
 	if (!m_sleeping)
 		return;
 	m_sleeping = false;
+	// The documented 331x wake report is a separate latched source, not
+	// permission to change the global CPU delivery gates. Clear sleeping
+	// first so asserting this source cannot recursively report another wake.
+	if (m_sleep_wake_irq3)
+		assert_irq(3);
 	if (m_clock_trace && m_clock_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2, "mad2_sleep: event=wake domain=%s fiq=%03x irq=%03x timer0=%04x timer1=%04x t=%.9f ctrl=%02x\n",
 				domain, m_fiq_status, m_irq_status, m_timer0_counter,
