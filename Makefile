@@ -609,6 +609,12 @@ normalize-3350:
 
 .PHONY: normalize-3350
 
+normalize-5190:
+	$(PYTHON) tools/nsb1_package_check.py roms/archive-dct3-packages/5190e671.zip \
+		--ppm A --output roms/noki5190/5190f671a.fls
+
+.PHONY: normalize-5190
+
 normalize-2100:
 	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.840 | cut -d' ' -f1)" = "6382beb1f8ba2d768f53ccc3111586657f26eff961900249c69061cb710db283"
 	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.84E | cut -d' ' -f1)" = "0e2f2d90d297946522934cfbefe180ce2b7727e331b04f972e48f5a1231502be"

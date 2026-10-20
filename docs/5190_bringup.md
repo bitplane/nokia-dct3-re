@@ -4,10 +4,13 @@
 
 The acquired service package supplies independently identified NSB-1 v6.71
 MCU and PPM A/B streams. It is not a full phone dump and does not establish
-graphical boot, hardware configuration, input or phone services. No MAME
-machine is declared yet. The next work is the own MCU entry/upload contract,
-physical memory/EEPROM topology and fitted ASIC evidence; do not inherit the
-5110 machine merely because the restore manifest names ROM4.
+graphical boot or phone services. The separate `noki5190` MCU research
+configuration executes the own input, initializes the own EEPROM geometry,
+installs its exact ROM4-catalogue program and reaches a supervisor flag loop.
+The next work is that flag's scheduler/interrupt contract and the DSP release
+lifecycle. Do not equate this loop with a missing DSP acknowledgement without
+tracing its owner, or inherit the 5110 machine merely because the restore
+manifest names ROM4.
 
 ## Qualified executable input
 
@@ -67,3 +70,58 @@ the first `11c`, and compares the resulting 16-bit sum with the big-endian
 32-bit field at `11c`. This confirms one external checksum clue without
 supplying the absent calibration/identity contents. The separate checksum
 at `1fe` still requires its complete producer/reader derivation.
+
+## MCU research configuration
+
+The own ARM entry at `200040` initializes stacks using `10fc54` and
+switches to Thumb at `2000e8`. The trial maps only the minimum 64 KiB SRAM
+window covering these stacks, not the generic driver's larger window;
+physical fitted capacity and aliases remain unproved. Flash uses a
+capacity-compatible 1 MiB trial part. The external I2C device implements
+the own 8 KiB/32-byte-page protocol, with erased initial contents and an
+unmeasured 5 ms write cycle. Boot/DSP masks and EEPROM dump remain separate
+`NO_DUMP` entries. Shared MCU boot-transfer HLE remains explicit; no DSP
+acknowledgement, service, radio or SIM peer is enabled.
+
+Own serial routine `2ad4b0` selects control `22` at `20028`, sends at
+`2002a`, polls `20029` bit 2 and reads `2002d`. LCD clear `2ae0ac` shares
+selection/status at `28/29`, command `2c`, data `2b`, six banks and 84 columns.
+EEPROM byte transfer `2ac704` independently drives PUP signal `20020` bit 0
+as SDA and bit 2 as SCL, releasing SDA through direction `20024` bit 0.
+These port-level contracts justify the existing device composition, not
+measured serial timing or fitted controller identification.
+
+Key scanner `2af050` uses five rows, signal `31`, direction `2f`, columns
+`30` and mask `33`. Decoder `2af768` selects normal table `2d2984` and
+special table `2d29a0` using selector byte `10c466`. The normal table matches
+the existing NSE-1 host layout; the active special table is
+`3e 3e 3e 3e 0d`, selecting Power on bit 4, not bit 1. These are independently
+mapped source facts; physical input/UI delivery has not yet been accepted.
+
+Fresh passive runs observe the following without firmware RAM/MMIO writes:
+
+- runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
+- both own catalogues initialize at `10adc0` and `10ad50`, whose first
+  pointers are `2b35a4` and `2b94e4`; family selector is 4;
+- all 186 words installed at MCU `11e00` match the own descriptor at
+  `2be564`, payload SHA-1 `e1e8f15a305bf32aea98f444074f30828d933fc4`;
+- 246 shared-memory writes occur before the observed supervisor park;
+- through five seconds PC is `2a4672..2a4678`, SP `10c6dc`, with EEPROM
+  geometry/catalogues stable. The loop tests flag `10c540`; its owner and
+  expected interrupt transition remain unresolved;
+- persisted flash equals the normalized source. The 8 KiB EEPROM contains
+  firmware-created writes, which are not proof of valid calibration or identity.
+
+Use a fresh `RUN` directory:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  noki5190 -rompath ../roms -video none -sound none -nothrottle \
+  -seconds_to_run 6 -log -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb1_boot_observe.lua
+.venv/bin/python tools/nsb1_boot_check.py roms/noki5190/5190f671a.fls RUN
+```
+
+The checker pins the source, exact installed program, five ordered geometry/
+catalogue observations, stack bounds, supervisor park and unchanged executable
+flash. It is a boundary regression, not a graphical boot oracle.

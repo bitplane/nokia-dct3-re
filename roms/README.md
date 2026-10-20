@@ -372,7 +372,8 @@ streams, not a full handset dump. `tools/nsb1_package_check.py` creates
 `2d2d00..2dffff` range explicitly erased. The normalized A SHA-1 is
 `27b8f0cb8640e5b423960b206e9aee065f32d726`. No provisioning or resident mask
 is supplied. Source hashes, exact spans and reproduction are authoritative
-in `docs/5190_bringup.md`; no machine/boot support is claimed.
+in `docs/5190_bringup.md`. The separate MCU research configuration validates
+the own upload and supervisor boundary, not a graphical phone boot.
 
 ### Nokia 3350 NHM-9 v5.30
 

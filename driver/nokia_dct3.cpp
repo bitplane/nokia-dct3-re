@@ -1033,6 +1033,19 @@ constexpr nokia_product_config make_3350_config()
 	return result;
 }
 constexpr nokia_product_config PRODUCT_3350 = make_3350_config();
+constexpr nokia_product_config make_5190_config()
+{
+	nokia_product_config result;
+	// Own scanner 2af050 and maps 2d2984/2d29a0 establish this layout.
+	result.keypad_wiring = { 5, 0x10, 0x31, 0x30, 0x33, 0x2f };
+	// Own 2ad4b0 selects 22 at 28, sends through 2a, polls 29 bit 2
+	// and receives at 2d. LCD 2ae0ac shares the serial selection block.
+	result.gensio_wiring = { 0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true };
+	// Own EEPROM byte transfer 2ac704: SDA bit 0, SCL bit 2.
+	result.pup_eeprom_scl_bit = 2;
+	return result; // No DSP acknowledgement, SIM or application peer.
+}
+constexpr nokia_product_config PRODUCT_5190 = make_5190_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config make_8xxx_config()
 {
@@ -1301,6 +1314,7 @@ public:
 	void noki2100(machine_config &config);
 	void nam2c3(machine_config &config);
 	void noki5110(machine_config &config);
+	void noki5190(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
 	void nse6stage(machine_config &config);
@@ -1377,6 +1391,7 @@ private:
 
 	void dct3_map(address_map &map) ATTR_COLD;
 	void dct3_nhm9_map(address_map &map) ATTR_COLD;
+	void dct3_nsb1_map(address_map &map) ATTR_COLD;
 	void dct3_nse3_map(address_map &map) ATTR_COLD;
 	void dct3_nsm1_research_map(address_map &map) ATTR_COLD;
 	void dct3_nse6_research_map(address_map &map) ATTR_COLD;
@@ -2738,6 +2753,14 @@ void nokia_dct3_state::dct3_nhm9_map(address_map &map)
 	map(0x00140000, 0x0017ffff).unmaprw();
 }
 
+void nokia_dct3_state::dct3_nsb1_map(address_map &map)
+{
+	dct3_map(map);
+	// Minimum research window covering own startup stacks through 10fd44.
+	// Fitted SRAM size and upper aliases are not yet established.
+	map(0x00110000, 0x0017ffff).unmaprw();
+}
+
 void nokia_dct3_state::dct3_nse3_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
@@ -4072,6 +4095,21 @@ void nokia_dct3_state::noki5110(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::noki5190(machine_config &config)
+{
+	dct3_base(config);
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nsb1_map);
+	// Capacity-compatible trial part; exact fitted identity is unproved.
+	INTEL_28F800B3T(config.replace(), "flash");
+	// Own ROM descriptor f4 declares two-byte addressing/32-byte pages/8 KiB.
+	I2C_24C64(config, m_eeprom);
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
+	apply_product_config(PRODUCT_5190);
+}
+
 void nokia_dct3_state::noki6110(machine_config &config)
 {
 	dct3_base(config);
@@ -4370,6 +4408,18 @@ ROM_START( noki5110 )
 	ROM_REGION(0x00800, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("nse-1.bin", 0x00000, 0x00800,
 			CRC(3afc0f61) SHA1(756bcf317d88aa6574b00ec93082d24053151711))
+ROM_END
+
+ROM_START( noki5190 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb1_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nsb1_dsp.bin", 0, 0x20000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("5190f671a.fls", 0, 0x100000,
+			CRC(c8894273) SHA1(27b8f0cb8640e5b423960b206e9aee065f32d726))
+	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb1_eeprom.bin", 0, 0x2000, NO_DUMP)
 ROM_END
 
 ROM_START( noki6110 )
@@ -4906,6 +4956,7 @@ SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empt
 SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init, "Research", "NAM-2 Intel C3 flash configuration (fitted part unproved)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
+SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

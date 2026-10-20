@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_mcu_upload_boundary", "owner": "nsb1_mcu_research", "status": "satisfied",
+      "predicate": "Own NSB-1 MCU execution initializes its declared external EEPROM geometry and installs its own ROM4-catalogue program before a measured supervisor park",
+      "current": "Fresh noki5190 starts with erased 8 KiB EEPROM, no DSP acknowledgements or phone peers. Passive observation validates mode/page/capacity 1/20/2000, catalogue first pointers 2b35a4/2b94e4, family 4 and all 186 installed program words matching own descriptor 2be564. After 246 shared writes the observed supervisor loop at 2a4672..78 tests flag 10c540 through five seconds, with SP 10c6dc. Its owner and expected interrupt transition remain unresolved; it is not classified as a DSP wait. Persisted executable flash is unchanged; firmware-created EEPROM writes are not valid calibration or identity proof. SRAM is a minimal research window, fitted part/masks are unproved, and no graphical boot or service acceptance is promoted.",
+      "evidence": ["docs/5190_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb1_boot_observe.lua", "tools/nsb1_boot_check.py", "tools/test_nsb1_boot_check.py"]
+    },
+    {
       "id": "nsb1_v671_eeprom_firmware_geometry", "owner": "nsb1_external_storage", "status": "satisfied",
       "predicate": "Own NSB-1 initialization declares external EEPROM address width, page size and capacity rather than inheriting the NSE-1 fixture",
       "current": "Initializer 2ab168 reads own ROM descriptor f4 at 200005 and builds descriptor 10c4a4 with mode 1, page 32 and capacity 8192. Address setup 2aaf58 bounds against that capacity and, in nonzero mode, sends slave a0, high and low address bytes, then repeated START/a1 for reads. This is a firmware contract, not fitted-part identification. Validator 26cc4c independently compares the 16-bit byte sum over 0..11b against the big-endian u32 at 11c. No EEPROM contents, successful checksum result, machine configuration or boot is promoted.",
