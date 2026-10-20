@@ -553,9 +553,15 @@ This is pattern coverage, not exhaustive construction coverage. Runtime
 arithmetic maps043c to21ab4c, which clears context byte6 and rejoins cleanup;
 the helper retains nonzero status043c for return. Therefore this object must
 not be described as a missing09ec response merely because it differs from
-the caller's09f0 success test. The caller's subsequent21ca46 path and later
-controller lifecycle remain to be traced. The full packet/cache gate still
-passes on this45s run, and state3/phase1 remain unchanged.
+the caller's09f0 success test. A separate45s trace
+`tmp/nsk3-controller-result` confirms actual helper return043c at21f394,
+entry21ca46 withstatus043c, then shared tail21cf96 withvalue47.
+That tail stores the diagnostic/status halfword at[r4+22] and continues
+through21bd76 rather than returning like a standalone C function. The
+internal dispatcher continuation and its next receive boundary remain
+unresolved;043c has not been assigned success/failure semantics. The full
+packet/cache gate passes on the lifecycle run, and state3/phase1 remain
+unchanged. No missing-response conclusion follows merely from09f0 absence.
 
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
