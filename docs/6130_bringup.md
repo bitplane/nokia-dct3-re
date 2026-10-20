@@ -613,6 +613,15 @@ returns to254181. The07e5 comparison is an alternate route, not proof of
 the input that executed; no07e5 queued post or2880b6 translation is observed
 through45s. The source/meaning of actual07d6 and its causal relation to09ec
 remain open. No native response format follows from this internal namespace.
+
+The07d6 input is a real queued object, not merely a helper translation:
+`tmp/nsk3-07d6-caller` observes constructor208a48 caller20e397 withr0=07d6,
+then post208e3a to mailbox11 withobject101760/header07d601fb, followed by
+the same object at helper receive28818e and result07d6. Producer20e392
+is reached through20e388 when the preceding mode/status predicates do not
+take the209d6c path. Its controlling received status and mode-byte provenance
+remain unresolved. This measured route replaces a search for an imaginary
+07e5 message producer; it still does not close computed/indirect producers.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
