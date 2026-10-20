@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.nsk1_static_check import PROFILES
 from tools.nse5_roller_contract import thumb_bl_candidates
+from tools.c54x_rom4_port_census import direct_callers
 
 
 BASE = 0x200000
@@ -20,11 +21,19 @@ def native_completion_contract(image):
     selector = bytes.fromhex('e80f 08f8 0012 880e fe00 34f8 06d1')
     if image[0x31ae*2:0x31ae*2+len(selector)] != selector:
         raise ValueError('native control selector sequence differs')
+    setter = bytes.fromhex('7712 06d0 3292 e801 f482 1a82 8082')
+    if image[0x31e7*2:0x31e7*2+len(setter)] != setter:
+        raise ValueError('native control completion setter differs')
+    request4 = [hex(address) for address, delayed in direct_callers(image, 0x318e)
+                if delayed and image[(address+2)*2:(address+4)*2] == bytes.fromhex('7712 0004')]
     return {'publisher_call':'0x314d','publisher':'0x37ce','packet_type':'0x8a',
             'delay_slot':'0x314f sets AR4 to 0x008a',
             'payload':'two bytes at data 0x1200, copied from data 0x1867',
             'gate':'0x313f tests data 0x1949 bit 0x0080; set branches to 0x3153 instead',
             'preceding_control':'0x3078 calls 0x31ae with AR2=4; BITT uses T=15-AR2 against data 0x06d1, selecting physical bit 4',
+            'completion_setter':'0x31e7..0x31ed ORs 1 shifted by pending index data 0x06d0 into data 0x06d1',
+            'request_helper':'0x318e',
+            'index4_delayed_call_candidates':request4,
             'scope':'resident ROM4 static path; neither execution nor fitted DSP mask is established by this contract'}
 
 

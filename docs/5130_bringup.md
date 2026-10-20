@@ -288,6 +288,19 @@ The sampled control word leaves bit 4 clear. Its legitimate setter and the
 operation that requests it are the next boundary; neither a guessed packet
 nor a changed DSP control word is justified.
 
+The setter is generic, not a missing literal store. After the mailbox-0872
+comparison with 4 succeeds, 31e7..31ed loads the pending index from 06d0,
+forms `1 << index`, and ORs it into 06d1. Request helper 318e tests the
+corresponding bit, stores its index to 06d0 at 3191, and calls publisher
+382f with pointer 0871. The qualified `tmp/nsk1-radio-native-control-writers`
+run passes the 61-second boot/storage checks and observes post-restart
+pending indexes 1, 2, 8 and 3, with completion writes 0002, 0006, 0106 and
+010e. No pending index 4 is observed; neither 32-write cap is reached.
+An aligned resident CALL/CALLD candidate scan finds six calls to 318e.
+Exactly one has the immediate delay-slot assignment AR2=4: CALLD at 4a49,
+followed by STM at 4a4b. This is the next static caller to classify, not
+proof of its ordinary execution or the payload semantics of mailbox 0872.
+
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
 It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state

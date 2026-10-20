@@ -6,6 +6,17 @@ local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local dsp = machine.devices[':dsp_c54x:cpu']
 local memory = cpu.spaces.program
+local control_taps, control_counts = {}, {}
+for _, address in ipairs({0x06d0, 0x06d1}) do
+    control_taps[#control_taps + 1] = dsp.spaces.data:install_write_tap(
+        address, address, 'nsk1_native_control_' .. address, function(_, value)
+            control_counts[address] = (control_counts[address] or 0) + 1
+            if control_counts[address] > 32 then return end
+            machine:logerror(string.format('nsk1_radio_native_control_write: address=%04x value=%04x pc=%04x t=%.9f observer_writes=0\n',
+                address, value, dsp.state['PC'].value, machine.time:as_double()))
+        end)
+end
+_G.nsk1_native_control_taps = control_taps
 machine.debugger:command('temp0=0')
 for index, address in ipairs({'3000','3076','30bf','30f5','3d5e','313f','3153'}) do
     local bit = string.format('%x', 1 << (index - 1))
