@@ -16,9 +16,9 @@ MENU='51a20a16acead610184225c78632724f9f20025565bd29a93beffec0c271d3a3'
 ERROR='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
-def check_trace(trace,accepted):
+def check_trace(trace,accepted,following_keys=(0x19,)):
     contacts=re.findall(r'nsm1_security_contact: key=([0-9a-f]+) down=(\d) ',trace)
-    if contacts!=[(f'{key:02x}',str(down)) for key in (1,2,3,4,5,0x19,0x19) for down in (1,0)]:
+    if contacts!=[(f'{key:02x}',str(down)) for key in (1,2,3,4,5,0x19)+tuple(following_keys) for down in (1,0)]:
         raise ValueError('physical code/menu input sequence differs')
     submissions=re.findall(r'nsm1_security_submit: text=([0-9a-f]+) caller=([0-9a-f]+)',trace)
     expected=[('3132333435000000','0029faf3')]

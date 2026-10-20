@@ -32,8 +32,8 @@ def check_card(data):
         raise ValueError('A/12345 record or erased remainder differs')
 
 
-def transmitted(trace,limit=1024):
-    rows=re.findall(r'nsk3_sim_tx: index=(\d+) value=([0-9a-f]+)',trace)
+def transmitted(trace,limit=1024,label='nsk3_sim_tx'):
+    rows=re.findall(re.escape(label)+r': index=(\d+) value=([0-9a-f]+)',trace)
     if not rows or len(rows)>=limit or [int(i) for i,_ in rows]!=list(range(1,len(rows)+1)):
         raise ValueError('TX stream incomplete or capture cap reached')
     return bytes(int(value,16) for _,value in rows)

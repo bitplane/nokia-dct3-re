@@ -13,12 +13,14 @@ from tools.nsm1_analog_contract import inspect
 from tools.nsm1_v523_static_check import SHA1
 from tools.dct3_rom4_record_codec import retained_record_transform
 from tools.nsm1_security_contract import inspect as inspect_security
+from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('cold',type=Path);parser.add_argument('output',type=Path)
     parser.add_argument('--initialize-phone-retry',action='store_true')
+    parser.add_argument('--preserve-sim',action='store_true')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('fresh output required')
@@ -39,8 +41,14 @@ def main():
         target=args.output/'nvram/nsm1r4t/eeprom'
         target.parent.mkdir(parents=True);target.write_bytes(eeprom)
         (args.output/'initial_eeprom.bin').write_bytes(eeprom)
+        if args.preserve_sim:
+            card=(storage/'sim_card').read_bytes()
+            if len(card)!=CURRENT_NVRAM_LENGTH:raise ValueError('current synthetic card extent required')
+            (target.parent/'sim_card').write_bytes(card)
+            (args.output/'initial_sim_card.bin').write_bytes(card)
         (args.output/'input.json').write_text(json.dumps({'adc2':554,'physical_units_proved':False,
-            'phone_retry_initialized':args.initialize_phone_retry,'donor_provisioning':False},indent=2)+'\n')
+            'phone_retry_initialized':args.initialize_phone_retry,'sim_preserved':args.preserve_sim,
+            'donor_provisioning':False},indent=2)+'\n')
         root=ET.Element('mameconfig',version='10')
         inputs=ET.SubElement(ET.SubElement(root,'system',name='nsm1r4t'),'input')
         ET.SubElement(inputs,'port',tag=':RESEARCH_ADC2',type='CONFIG',mask='1023',defvalue='1023',value='554')

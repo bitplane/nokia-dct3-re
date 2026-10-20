@@ -21,7 +21,8 @@ The separately labelled nominal ADC2 comparison now reaches a readable
 **Security code** frame and organic SIM SELECT traffic. Saturated controls
 retain the blank display and readiness inputs `01/ff/00/01`. Physical key
 entry, accepted phone code and the Messages menu additionally pass the own
-retry-initializer contrast below; downstream services remain unaccepted.
+retry-initializer contrast below. Physical SIM contact save and cold number
+readback also pass; list rendering and network services remain unaccepted.
 No readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -114,8 +115,8 @@ the retry byte and repeats code acceptance and exact menu pixels. The
 security block remains unchanged by both accepted runs; other housekeeping
 writes occur and are not declared fully understood. Own flash stays exact.
 No software input event, callback result or firmware RAM byte is injected.
-Phonebook persistence, full SIM/security parity, network/calls/SMS and stable
-native radio remain unaccepted; the next target is physical SIM phonebook use.
+Full SIM/security parity, network/calls/SMS and stable native radio remain
+unaccepted. Physical phonebook persistence is separately qualified below.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-published-record-cold \
@@ -123,6 +124,35 @@ native radio remain unaccepted; the next target is physical SIM phonebook use.
 # Run22s with nsm1_security_input.lua and -debug -debugger none.
 .venv/bin/python tools/nsm1_security_check.py tmp/nsm1-security-physical \
   tmp/nsm1-security-qualified tmp/nsm1-security-cold-qualified
+```
+
+### Physical SIM phonebook persistence
+
+`nsm1_phonebook_input.lua` drives own Names/Add entry contacts after accepted
+phone code, entering A and12345. The actual UART stream contains exactly one
+`A0 DC 01 04 20` plus the expected32-byte EF_ADN record; card status is9000.
+Record1 contains name byte41, length/type/BCD04812143f5 and erased padding;
+records2..50 remain erased. The capture uses a4096-byte bound because the
+complete write conversation exceeds1024 bytes; a reached cap fails the gate.
+
+The independent cold process copies the complete saved EEPROM and synthetic
+card, accepts the phone code again, and drives Names/Search/List/Details.
+Its full84x48 Number frame renders12345 (RGB SHA256a089a5b358dd43b2f090d972dadb617c935180f95923efa43f99e9e330c055d0).
+It performs no UPDATE RECORD and leaves the complete card byte-identical.
+Own flash, physical input sequence, code acceptance, native record dialogue,
+exact APDU payload and cold input links are checked independently.
+
+The post-save list displays unexpected glyphs rather than a qualified A
+entry. This rendering/cache behavior remains unresolved; successful storage
+and number Details do not qualify every list/name screen. Handset-local
+contact storage, delete/cancel, SIM security and radio services remain open.
+
+```sh
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-qualified tmp/FRESH
+# Run31s with nsm1_phonebook_input.lua and debugger enabled.
+.venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-phonebook-write tmp/COLD --preserve-sim
+# Run24s with nsm1_phonebook_reload.lua and debugger enabled.
+.venv/bin/python tools/nsm1_phonebook_check.py tmp/nsm1-phonebook-write tmp/nsm1-phonebook-cold
 ```
 
 The independent60s cold run `tmp/nsm1-startup-qualified` preserves the
