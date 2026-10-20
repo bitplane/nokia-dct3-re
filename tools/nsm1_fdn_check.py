@@ -14,6 +14,7 @@ from tools.nsk3_phonebook_check import transmitted
 from tools.sim_security_trace_check import statuses,padded_pin,ATTEMPTS_OFFSET
 from tools.sim_fdn_profile import EXTENDED_LENGTH
 from tools.nsk1_phonebook_roundtrip import frame_check
+from tools.sim_fdn_protocol_check import validity_targets,check_phase
 
 PREFIX=(0x19,4,5,3)
 FRAMES=('7338f017b8f3789ad3d0fbce0e843e05ec100d2b1e49f3baa01b82b08d578a37',
@@ -29,25 +30,6 @@ def rejected_card(before):
     return bytes(expected)
 
 
-def validity_targets(tx,instruction):
-    offset=0;selected=None;targets=[]
-    incoming={0xa4,0x20,0x24,0x26,0x28,0x2c,0xdc,0xd6,0x10,0x14,0xc2,0x88,0x32,0xa2}
-    while offset<len(tx):
-        if tx[offset]==0xff:
-            if offset+3>len(tx):raise ValueError('truncated PPS')
-            offset+=3;continue
-        if offset+5>len(tx) or tx[offset]!=0xa0:raise ValueError('truncated/unknown APDU header')
-        _,ins,p1,p2,length=tx[offset:offset+5];offset+=5
-        count=length if ins in incoming else 0
-        if offset+count>len(tx):raise ValueError('truncated command body')
-        body=tx[offset:offset+count];offset+=count
-        if ins==0xa4 and len(body)==2:selected=int.from_bytes(body,'big')
-        if ins==instruction:
-            if p1 or p2 or length:raise ValueError('validity parameters differ')
-            targets.append(selected)
-    return targets
-
-
 def check_trace(trace,phase):
     if phase not in range(4):raise ValueError('unknown FDN phase')
     keys=PREFIX if phase%2 else PREFIX+(0x19,0x17 if phase==0 else 0x18,0x19,5,6,7,8,0x19)
@@ -60,21 +42,7 @@ def check_trace(trace,phase):
     contacts=re.findall(r'nsm1_pin_contact: correct=1 key=([0-9a-f]+) down=([01]) ',trace)
     if contacts!=[(f'{key:02x}',down) for key in (1,2,3,4,0x19) for down in ('1','0')]:
         raise ValueError('physical startup PIN differs')
-    if statuses(trace,0x20)!=[(0x9000,3,10)]*(1 if phase%2 else 2):raise ValueError('VERIFY results differ')
-    if any(statuses(trace,ins) for ins in (0x24,0x26,0x28,0x2c)):
-        raise ValueError('unexpected credential mutation')
-    expected_rehab=([0x6f7e,0x6f07],[0x6f7e,0x6f07],[0x6f7e,0x6f07,0x6f3a],[])[phase]
-    tx=transmitted(trace,4096,'nsm1_sim_tx')
-    if validity_targets(tx,0x44)!=expected_rehab:raise ValueError('identity/ADN rehabilitation route differs')
-    if validity_targets(tx,4)!=([0x6f3a] if phase==0 else []):raise ValueError('ADN invalidation route differs')
-    if statuses(trace,0x44)!=[(0x9000,3,10)]*len(expected_rehab):raise ValueError('rehabilitation result differs')
-    if statuses(trace,4)!=([(0x9000,3,10)] if phase==0 else []):raise ValueError('invalidation result differs')
-    pin1=bytes.fromhex('a020000108')+padded_pin('1234')
-    if tx.count(pin1)!=1:raise ValueError('startup PIN APDU differs')
-    pin2=bytes.fromhex('a020000208')+padded_pin('5678')
-    if tx.count(pin2)!=(0 if phase%2 else 1):raise ValueError('PIN2 APDU differs')
-    if not phase%2:
-        tx.index(bytes((0xa0,4 if phase==0 else 0x44,0,0,0)),tx.index(pin2)+len(pin2))
+    check_phase(trace,phase,'nsm1_sim_tx')
 
 
 def main():

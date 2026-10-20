@@ -38,6 +38,13 @@ prompt/recovery and recovered-PIN2 cold authentication are separately checked.
 Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
 Outbox read displays it without changing card bytes. Network SMS is unproved.
 Physical Erase/cancel and a cold empty-Outbox check also pass.
+Physical FDN activation and deactivation now pass on an explicit laboratory
+FDN-capable card, including cold retention of the complete card image and
+the IMSI/LOCI rehabilitation handshake. PIN1 authentication precedes phone
+authentication; PIN2 authorizes the ADN validity change. Cold captures show
+the selectable On/Off/Numbers list, not a current-state caption: its highlight
+is not used as a state oracle. FDN record editing and local dial enforcement
+remain unaccepted on this product.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -57,6 +64,28 @@ The separate published-record diagnostic now reaches native record acceptance
 and persistence across a cold process. It still renders only a blank frame:
 input, idle and phone services remain unproved. This fixture is not factory
 provisioning and is not promoted into the handset configuration.
+
+### FDN acceptance
+
+The shared `sim_fdn_protocol_check.py` owns only standard APDU ordering,
+credentials and selected-file validity checks. `nsk3_fdn_check.py` retains
+own-ROM qualification, physical phone/PIN contacts, upload handoff checks,
+whole-card transitions and EEPROM cold links. No menu layout or firmware
+address is imported from the 6150 checker.
+
+```sh
+.venv/bin/python tools/nsk3_fdn_check.py roms/noki6130/source \
+  tmp/nsk3-fdn-complete-on tmp/nsk3-fdn-complete-on-cold \
+  tmp/nsk3-fdn-complete-off tmp/nsk3-fdn-complete-off-cold
+```
+
+Each capture runs for34s using `nsk3_fdn_input.lua`, `nsk3_fdn_cold.lua`,
+`nsk3_fdn_disable.lua`, then `nsk3_fdn_cold.lua`. Preparation uses
+`nsk3_cold_input.py`; only the first preparation adds `--fdn --fdn-adn-access`.
+Later inputs copy the preceding saved card and EEPROM, not RAM or save states.
+The fixture raises its transmit observation cap to4096 bytes; the old1024-byte
+captures were insufficient to qualify the complete exchange. The gate rejects
+cap saturation. These short runs do not supersede the native restart limit.
 
 ### Diagnostic record persistence
 

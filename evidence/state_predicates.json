@@ -1304,6 +1304,12 @@
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
     },
     {
+      "id": "nsk3_physical_fdn_cold_validity", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 FDN activation and deactivation preserve the full card across linked cold processes with the standard identity-session handshake",
+      "current": "Four isolated34s runs authenticate PIN1 and the own phone code through physical contacts. Activation authenticates PIN2 and invalidates ADN; cold enabled boot rehabilitates LOCI and IMSI. Deactivation authenticates PIN2 and rehabilitates ADN; cold disabled boot performs neither identity rehabilitation nor a validity change. Whole-card comparisons permit only the ADN-validity byte to change in the two warm runs; EEPROM/card cold inputs exactly match the preceding saved outputs and own executable flash remains unchanged. The4096-byte observation cap is not saturated. Cold menus expose selectable options, not a current-state caption; no state is inferred from their highlight. This does not establish FDN record editing, local dial enforcement, native stability beyond the existing restart limit, registration or calls on NSK-3.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_fdn_check.py", "tools/test_nsk3_fdn_check.py", "tools/nsk3_fdn_input.lua", "tools/nsk3_fdn_cold.lua", "tools/nsk3_fdn_disable.lua", "tools/nsk3_cold_input.py", "tools/sim_fdn_protocol_check.py"]
+    },
+    {
       "id": "nsk3_physical_sim_phonebook_cold_read", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 Add entry saves A/12345 to SIM and a separate cold process displays the persisted number without rewriting the card",
       "current": "Own table/asserted contacts drive Names, Down, Add entry, A/12345 and Save after physical code acceptance. The complete bounded TX stream contains one exact absolute UPDATE RECORD payload. Card record1 matches GSM ADN ASCII A and BCD12345, with all49 other records erased. The separate cold process unlocks, searches and renders exact Details12345, sends no UPDATE RECORD and leaves the entire card unchanged. Exact Saved/Details frames, own unchanged flash and native upload are checked. Research native-mask/nominal-ADC/retry fixtures remain explicit; other SIM security, handset-local storage, idle content and radio remain unaccepted.",
