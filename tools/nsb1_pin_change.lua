@@ -14,6 +14,7 @@ if _G.nsb1_pin2_change then
         [5]={3,4},[6]={4,4},[7]={2,8},[8]={3,8}}
     local old=_G.nsb1_pin2_puk and {8,7,6,5,4,3,2,1} or
         (_G.nsb1_pin2_restore and {8,7,6,5} or {5,6,7,8})
+    if _G.nsb1_pin2_wrong_puk then old={8,7,6,5,4,3,2,2} end
     local new=_G.nsb1_pin2_restore and {5,6,7,8} or {8,7,6,5}
     for _,number in ipairs({old,new,new}) do
         for _,digit in ipairs(number) do cells[#cells+1]=digits[digit] end

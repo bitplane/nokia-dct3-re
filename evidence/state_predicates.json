@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_wrong_puk2_cold_recovery", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Wrong physical NSB-1 PUK2 changes only its retry counter and a linked cold recovery persists a usable PIN2",
+      "current": "An independent branch begins with the organically PIN2-exhausted saved card. Physical wrong87654322/new8765/confirmation returns UNBLOCK9804 and exact Code error; only PUK2 retries10-to9 change. A fresh process retains those exact input hashes, correctly unblocks with87654321, restores PIN2/PUK2 retries3/10 and changes only PIN2 credential8765 relative to the healthy seed. A final cold ordinary change authenticates8765 and restores5678, returning the complete card to the original healthy seed. Every phase qualifies own inputs/native execution, physical PIN1/phone/PUK contacts, frames, ordered recovery VERIFY and whole-card effects. No preparation counter reset or guest-state injection occurs. Permanent PUK2 exhaustion, fitted mask and native radio remain unaccepted.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_puk2_wrong.lua", "tools/nsb1_pin_change.lua", "tools/nsb1_puk2_check.py", "tools/test_nsb1_puk2_check.py"]
+    },
+    {
       "id": "nsb1_v671_organic_pin2_exhaustion_puk2", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Own physical NSB-1 wrong changes organically exhaust PIN2 across cold processes, then PUK2 recovery persists a usable credential",
       "current": "Three linked cold-seeded wrong5675 changes decrement only PIN2 retries3-to2-to1-to0. Replies9804/9804/9840 and the exact PIN2 code blocked frame are checked. A fresh process starts with the saved exhausted card; own Access codes asks PUK2 and physical87654321/new8765/confirmation produces UNBLOCK9000 followed by VERIFY9000. The complete recovered card equals the healthy seed except PIN2 credential8765, with retries restored3. A final cold ordinary change correctly authenticates8765 and restores5678, returning the complete card to the healthy seed. Every phase qualifies physical PIN1/phone input, own executable/native execution, reviewed frames and linked saved-device inputs. No preparation counter reset, state forcing or invented peer response is used. Wrong/permanently exhausted PUK2, fitted mask and native radio remain unaccepted.",

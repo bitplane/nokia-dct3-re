@@ -137,8 +137,25 @@ frames, all cold-input links and native execution in every phase.
 ```
 
 Wrong phases and final restore run70s; `nsb1_puk2_recover.lua` runs80s from
-the saved exhausted card. No counter is changed by preparation. Wrong-PUK2
-and permanent PUK2 exhaustion remain separate acceptance items.
+the saved exhausted card. No counter is changed by preparation. Permanent PUK2
+exhaustion remains a separate acceptance item.
+
+The gate's `--wrong-puk-cycle WRONG RECOVER COLD` branch is independently
+seeded from the saved PIN2-exhausted card. Physical wrong87654322/new8765 and
+confirmation returns UNBLOCK9804 and Code error, changing only PUK2 retries
+10-to9. Correct PUK2 recovery in a fresh process retains that decrement as its
+input, restores retries10 and PIN2 retries3, and sets PIN2 to8765. A final cold
+ordinary change authenticates8765 and restores5678, returning the complete
+card to the healthy seed. All three phases retain the normal own-input,
+native-execution, physical-contact, frame and complete-card checks.
+
+```sh
+.venv/bin/python tools/nsb1_puk2_check.py tmp/nsb1-pin-request-on-cold \
+  tmp/nsb1-pin2-change-wrong tmp/nsb1-pin2-exhaust-one \
+  tmp/nsb1-pin2-exhaust-zero tmp/nsb1-puk2-recovery tmp/nsb1-puk2-restored-cold \
+  --wrong-puk-cycle tmp/nsb1-puk2-wrong tmp/nsb1-puk2-after-wrong \
+  tmp/nsb1-puk2-after-wrong-cold
+```
 
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled

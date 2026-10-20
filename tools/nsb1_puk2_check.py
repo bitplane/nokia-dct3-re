@@ -24,10 +24,17 @@ def exhausted_card(before, remaining):
     return bytes(result)
 
 
+def rejected_puk_card(before):
+    result = bytearray(exhausted_card(before, 0))
+    result[ATTEMPTS_OFFSET + 3] = 9
+    return bytes(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('seed', 'two', 'one', 'zero', 'recover', 'cold'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--wrong-puk-cycle', nargs=3, type=Path, metavar=('WRONG', 'RECOVER', 'COLD'))
     args = parser.parse_args()
     try:
         before = (args.seed / 'nvram/nsb1r4t/sim_card').read_bytes()
@@ -53,10 +60,27 @@ def main():
             check_frame(run / 'snap' / ('nsb1_pin_change_45.png' if recovering else 'nsb1_pin_change_65.png'),
                         PUK_FRAME if recovering else PIN2_CHANGED_FRAME)
             previous = run
+        if args.wrong_puk_cycle:
+            previous = args.zero
+            for phase, run in enumerate(args.wrong_puk_cycle):
+                check_cold_link(run, previous)
+                code = json.loads((run / 'exit_status.json').read_text())['returncode']
+                trace, card = check_card_run(run, code, 70 if phase == 2 else 80)
+                expected = (rejected_puk_card(before), recovered, before)[phase]
+                if card != expected:
+                    raise ValueError('wrong-PUK2/cold recovery changed unrelated card state')
+                check_operation(trace, 0x24 if phase == 2 else 0x2c,
+                                0x9804 if phase == 0 else 0x9000, 20 if phase == 2 else 24)
+                expected_frame = (WRONG_RGB_SHA256, PUK_FRAME, PIN2_CHANGED_FRAME)[phase]
+                time = (75, 45, 65)[phase]
+                check_frame(run / 'snap' / f'nsb1_pin_change_{time}.png', expected_frame)
+                previous = run
     except (ValueError, OSError, KeyError) as error:
         print(f'NSB-1 PUK2 cycle failed: {error}', file=sys.stderr)
         return 1
     print('NSB-1 organic PIN2 exhaustion, cold PUK2 recovery and cold ordinary restore PASS; native radio unproved')
+    if args.wrong_puk_cycle:
+        print('NSB-1 wrong-PUK2 rejection, cold retry persistence and recovery PASS')
     return 0
 
 

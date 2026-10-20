@@ -1,11 +1,19 @@
 import unittest
-from tools.nsb1_puk2_check import exhausted_card
+from tools.nsb1_puk2_check import exhausted_card, rejected_puk_card
 from tools.nsb1_pin_change_check import check_operation
 from tools.make_sim_card_profile import make_profile
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET
 
 
 class Nsb1Puk2Tests(unittest.TestCase):
+    def test_wrong_puk_preserves_exhausted_pin_and_credentials(self):
+        base = bytearray(make_profile(True))
+        base.extend(bytes(3570 - len(base)))
+        before = exhausted_card(base, 0)
+        after = rejected_puk_card(base)
+        self.assertEqual([(i, a, b) for i, (a, b) in enumerate(zip(before, after)) if a != b],
+                         [(ATTEMPTS_OFFSET + 3, 10, 9)])
+
     def test_successful_unblock_requires_ordered_followup_verify(self):
         value = '\n'.join(f'nsb1_pin_contact: phase={phase} index={i} down={down} t=12.0 physical_only=1'
                           for phase, count in (('pin', 5), ('phone', 6)) for i in range(1, count + 1) for down in (1, 0))
@@ -15,6 +23,9 @@ class Nsb1Puk2Tests(unittest.TestCase):
         contacts = '\n' + '\n'.join(f'nsb1_pin_change_contact: index={i} down={down} t=26.0 physical_only=1'
                                     for i in range(1, 25) for down in (1, 0))
         check_operation(value + start + unblock + follow + contacts, 0x2c, 0x9000, 24)
+        failed = value + start + unblock.replace('sw=9000', 'sw=9804') + contacts
+        check_operation(failed, 0x2c, 0x9804, 24)
+        with self.assertRaises(ValueError):check_operation(failed, 0x2c, 0x9000, 24)
         for bad in (value + start + unblock + contacts, value + start + follow + unblock + contacts):
             with self.assertRaises(ValueError):check_operation(bad, 0x2c, 0x9000, 24)
 
