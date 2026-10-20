@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.nsk3_packet_check import parse, check_delivery
+from tools.nsk3_packet_check import parse, check_delivery, check_cache
 
 
 class PacketCensusTest(unittest.TestCase):
@@ -38,6 +38,19 @@ class PacketCensusTest(unittest.TestCase):
                         ('owner=00106ce8','pointer=00102004')):
             with self.subTest(old=old),self.assertRaises(ValueError):
                 check_delivery(trace.replace(old,new))
+
+    def test_exact_cache_body(self):
+        trace=self.trace()+'\n'+ '\n'.join((
+            'nsk3_packet_forward: target=0c pointer=00102000 header=13b8a28b cycles=10 observer_writes=0',
+            'nsk3_packet_receive: task=0c pointer=00102000 header=13b8a28b caller=0021a1dd cycles=20 observer_writes=0',
+            'nsk3_packet_consumer: pointer=00102000 header=13b8a28b owner=00106ce8 state=03 phase=01 cache=00000000 cycles=30 observer_writes=0'))
+        body=b''.join(struct.pack('>Hh',884-i,-148) for i in range(40)).hex()
+        trace+=f'\nnsk3_packet_cache: pointer=00103000 source=00102000 data={body} cycles=40 observer_writes=0'
+        trace+='\nnsk3_packet_park: state=03 phase=01 cache=00103000 cycles=50 observer_writes=0'
+        self.assertEqual(check_cache(trace)['cached_pair_bytes'],160)
+        for old,new in ((body,body[:-2]),('source=00102000','source=00102004'),
+                        ('cycles=50','cycles=35'),('cache=00103000','cache=00103004')):
+            with self.subTest(old=old),self.assertRaises(ValueError):check_cache(trace.replace(old,new))
 
 
 if __name__=='__main__':unittest.main()

@@ -491,19 +491,21 @@ through266a2c. Argumenta8 belongs to the gated trace wrapper27e270, not the
 queued message namespace. Runtime observation confirms the same object and
 header13b8a28b at posting, dequeue266eb0 (caller21a1dd), and dispatch21a2ea.
 The consumer enters with owner106ce8 in state03/phase01 and no cached object.
-Static decoding of this branch selects a160-byte body copy into an allocated
-cache and skips processing2176a0 while state remains3. Cache-copy completion,
-the state/phase lifecycle and subsequent native requests remain unverified.
+Runtime observation at21a32e confirms a160-byte body copy into allocated
+cache102eb4, byte-identical to packet+6 (the40 serialized pairs, excluding
+the leading word). The branch21a35c then skips processing2176a0 with state3
+and phase1 unchanged. The state/phase lifecycle and subsequent native requests
+remain unresolved; this does not establish why that lifecycle was selected.
 
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
-  tmp/nsk3-task12-consumer --delivery
+  tmp/nsk3-cache-qualified --delivery --cache
 ```
 
 The checker rejects incomplete captures, including the initial32-byte probe,
 and distinguishes observed body fields from radio/physical-unit acceptance.
-The next bounded trace should verify the cache copy and identify legitimate
-writers/transitions of the task12 state/phase before inventing an RF stimulus
+The next bounded trace should identify legitimate writers/transitions of
+the task12 state/phase before inventing an RF stimulus
 or periodic response.
 
 ## Own firmware inputs

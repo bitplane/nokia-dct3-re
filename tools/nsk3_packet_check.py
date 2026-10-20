@@ -59,11 +59,28 @@ def check_delivery(trace):
             'cache':consume[0][5],'header':'0x13b8','task':12,'dispatch_case':'0x21a2ea'}
 
 
+def check_cache(trace):
+    delivery=check_delivery(trace)
+    copies=re.findall(r'nsk3_packet_cache: pointer=([0-9a-f]+) source=([0-9a-f]+) data=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0',trace)
+    parks=re.findall(r'nsk3_packet_park: state=([0-9a-f]+) phase=([0-9a-f]+) cache=([0-9a-f]+) cycles=([0-9a-f]+) observer_writes=0',trace)
+    if len(copies)!=1 or len(parks)!=1:raise ValueError('cache/park observation missing or repeated')
+    pointer,source,data,cycle=copies[0]
+    packets=re.findall(r'nsk3_liveness_packet: pointer=([0-9a-f]+) data=([0-9a-f]+)',trace)
+    if (source!=packets[-1][0] or data!=packets[-1][1][12:]
+            or not 0x100000<=int(pointer,16)<0x10ff00
+            or delivery['state']!='03' or delivery['phase']!='01'
+            or parks[0][:3]!=('03','01',pointer)
+            or int(cycle,16)>=int(parks[0][3],16)):
+        raise ValueError('cache body or parked continuation differs')
+    return {'cached_pair_bytes':len(bytes.fromhex(data)),'processing_skipped_in_state3':True}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source',type=Path)
     parser.add_argument('run',type=Path)
     parser.add_argument('--delivery',action='store_true',help='require same-object forward, dequeue and consumer observations')
+    parser.add_argument('--cache',action='store_true',help='require exact body cache and state3 continuation')
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -74,6 +91,7 @@ def main():
         trace=(args.run/'error.log').read_text()
         summary=parse(trace)
         if args.delivery:summary['delivery']=check_delivery(trace)
+        if args.cache:summary['cache']=check_cache(trace)
         if (args.run/'nvram/nsk3r4t/flash').read_bytes()!=image:
             raise ValueError('own executable flash changed')
         print(summary)
