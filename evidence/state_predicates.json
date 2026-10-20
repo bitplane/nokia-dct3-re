@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_published_record_native_cold_validation", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "An explicitly diagnostic published record passes own native validation/update and persists across an independent cold process",
+      "current": "The own repair-template control still rejects its decoded record. The attributed numeric diagnostic changes only record0020..0037 and checksum003c..003f, preserving identity/calibration. Native3532/3534/3532 responses agree with independently decoded arithmetic, markers and update checksum; validator27e798 retains validity1 and the initial process requests exactly one reason04 restart from242c91. A separate cold process emits one3532, no update/restart and preserves the entire16KiB EEPROM byte-for-byte. LCD remains blank and readiness second input remains zero; this is not factory provisioning, fitted-mask identification, full accepted-context verification or phone-feature acceptance.",
+      "evidence": ["docs/6150_bringup.md", "tools/make_nsm1_record_profile.py", "tools/nsm1_published_record_check.py", "tools/test_make_nsm1_record_profile.py", "tools/test_nsm1_published_record_check.py"]
+    },
+    {
       "id": "nsk1_v561_physical_permanent_puk_block", "owner": "nsk1_sim_security", "status": "satisfied",
       "predicate": "Normal laboratory retry counts are physically exhausted and the permanently blocked card remains rejected with identical storage after a cold native-compatibility boot",
       "current": "The twelve-process --exhaust-puk gate starts with current-format3570-byte storage, CHV1 retries3 and PUK1 retries10. Three physical wrong PINs change only CHV1 retries. Ten independently cold wrong-PUK/new-PIN/confirmation workflows decrement only PUK1 retries, returning9804 for the first nine and9840 for the last. Original credentials, CHV2/PUK2 and unrelated files are byte-identical. The final attempt renders Code error then exact SIM card rejected pixels at35/40 seconds. A cold process reproduces the unmasked full frame at10/20/30/40 seconds, sends no VERIFY/UNBLOCK and preserves the complete exhausted card. All phases independently retain boot/storage/native-execution checks. No blocked state, firmware result or APDU is injected. Fitted DSP, long-run stability and network acceptance are not promoted.",

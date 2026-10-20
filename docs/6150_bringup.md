@@ -12,16 +12,49 @@ support and graphical boot are not promoted. An explicitly separate
 The next prerequisite is establishing matching resident DSP behavior and
 runtime validity of the explicitly derived product-local EEPROM fixture,
 plus fitted flash attributes and address aliases.
-The first concrete runtime compatibility question is task 2's rejection
-of a type-`0x74`/`35 32` decoded storage record and explicit reason-4 restart.
-The measured response agrees with the recovered ROM4 codec arithmetic;
-the historical repair template's record semantics and consistency with
-the modeled chip remain unproved. Resolve that storage/validation boundary
-before supplying downstream SIM or battery-readiness inputs.
+The historical repair-template control rejects its decoded storage record.
+A separately labelled published-record diagnostic now passes that validator,
+receives a native record update, persists it and validates it again in a
+separate cold process. This is not factory provisioning or fitted-chip proof.
+The current downstream boundary remains blank display and readiness inputs
+`01/ff/00/01` at eight seconds; SIM activation is not yet observed. No
+downstream readiness event or firmware flag is synthesized.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
 ## Executable compatibility boundary
+
+### Published-record diagnostic acceptance
+
+`make_nsm1_record_profile.py` requires the exact checksum-consistent own
+repair template and a fresh control whose native exchanges match the
+independent ROM4 arithmetic. It encodes the repository's attributed public
+numeric example with the measured compatibility-chip field00160010, applies
+the own retained-record transform and updates the low-block checksum.
+Only EEPROM0020..0037 and003c..003f change; identity/calibration are preserved.
+This external input is an explicit diagnostic, not a donor or factory image.
+
+In `tmp/nsm1-published-record`, the validator reaches27e798 with validity1
+for3532, native3534 update and post-restart3532, without taking the prior
+27e796 rejection. Firmware requests exactly one reason04 restart from242c91.
+The separate `tmp/nsm1-published-record-cold` process receives only saved
+EEPROM, validates one3532 with no update/restart, and leaves the entire16KiB
+EEPROM byte-identical. Decoded record fields, private markers, update checksum,
+retained encoded echoes and final storage checksum pass executable checks.
+This does not yet qualify a copied accepted-context object or graphical boot.
+
+```sh
+.venv/bin/python tools/make_nsm1_record_profile.py tmp/nsm1-record-baseline \
+  roms/research/nsm1-v523/nsm1-security-checksum-valid.bin \
+  tmp/FRESH/nvram/nsm1r4t/eeprom
+.venv/bin/python tools/nsm1_published_record_check.py \
+  tmp/nsm1-published-record tmp/nsm1-published-record-cold
+```
+
+The earlier rejection traces below remain negative controls of the unmodified
+template, not the current diagnostic frontier. The next task is the own
+post-validation startup/readiness lifecycle; do not adjust physical inputs
+until their own readers and units are established.
 
 `nsm1r4t` uses the own normalized flash and checksum-consistent EEPROM,
 128 KiB SRAM and the acquired NSE-1 ROM4 native DSP program/data. That mask
@@ -694,11 +727,11 @@ The original page is retained beside the other Blacksphere references as
 `blacksphere-local-20160119.html`, SHA-256
 `c03783b4c845ca71559d781fca8fd0e048f6fac40afeb96bde07ae634bc265b4`.
 
-Next: recover the NSM-1 record semantics and task-2 validation contract,
-including the retained-marker transform and the compatibility required
-between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace
-as a measured downstream dependency, not proof that synthesizing its
-missing report would repair this earlier boundary. Keep validating NSM-1
+The repair-template rejection is now a negative control: the separately
+qualified published example above passes the native update/cold-validation
+path. Factory record semantics and fitted COBBA compatibility remain unproved.
+Continue the SIM/readiness backtrace from that validated diagnostic lifecycle,
+not by synthesizing its missing report. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force readiness,
 replace a verifier/packet result or infer a missing DSP message solely
 from the blank display.
