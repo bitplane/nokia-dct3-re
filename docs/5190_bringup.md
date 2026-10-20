@@ -249,6 +249,20 @@ semantics and valid factory contents remain unproved. In particular,
 `04b0+1f=04cf` is only an address relationship until its reader/validator
 is recovered, not permission to clear a purported lock field.
 
+In the checksum-control native run, wrapper `2b245a` actually reads `0702`
+to `10fcd6` (return `2b2467`) and `0701` to `10c494` (return `2b2471`).
+Consequently EEPROM `04cf` corresponds to RAM `10fcf5`. A passive byte-lane
+read watch observes exactly two accesses through five seconds: generic
+settings-table validation at `28c040` and EEPROM serialization at `2ab072`.
+The final byte is `11`, not erased `ff`. The settings table at `2cfbf4`
+contains `{35,11,02,39}`; its RAM base is `10fcc0`, so offset `35` names
+this byte. The validator tests table flags and maximum before assigning a
+default. These observations establish generic settings ownership, **not** a
+security-level interpretation or a lock decision at the current frontier.
+The watch excludes its own final snapshot read; no guest state is written.
+Do not import the external profile's field name or clear the byte merely
+because that profile reaches standby.
+
 Public catalogues also list a [5190 system-module document, `sysa3.pdf`](https://www.eserviceinfo.com/downloadsm/233124/NOKIA_sysa3.html).
 Its contents have not been acquired or verified here; the listing alone
 does not establish ADC nets or fitted component identities.
