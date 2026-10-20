@@ -278,7 +278,38 @@ Returned status goes into `r6` at `28f31c`, then the common receive tail
 returns nonzero `r6` at `28f580`. These are decoded-input results, not proof
 of task-11 acknowledgement messages. The next query is which outer message
 and nested buffer legitimately reach this parser; do not synthesize the
-completion IDs to skip the receive transaction.
+completion IDs to skip the receive transaction. The outer receive cascade
+at `28f48c` loads `0447` from literal `28f62c`, subtracts `019f` and then
+four single steps; the final `<=1` comparison at `28f4ba` selects `05ea`
+and `05eb` for `28f2e4`. Raw occurrences of those constants elsewhere also
+serve unrelated return/report namespaces, so they are not producer evidence
+without a destination and nested-buffer contract.
+
+Constructor `2405e4` satisfies that contract. It allocates a 12-byte outer
+message, stores its status at offset 0, and posts to task `11` (hex) at
+`24075e`. For `05eb`, branch `240684` allocates the nested buffer, copies
+payload from owner `+0114` and length from `+012b`, and stores its pointer at
+outer `+8`. For `05ea`, branch `2406f6` copies owner `+18` using length
+`+0113`, again behind a four-byte nested header. Its callers include
+`240c2a` (`05eb`) and `241ccc/24206a` (`05ea`). The latter advance the
+owner's byte `+b` modulo 8 before publication. These are byte-layout and
+control-flow observations, not a completed protocol identification.
+Neither this constructor (any status) nor the nested-buffer consumer
+`28f2e4` fires during the 61-second physical Call/End run. Native execution,
+security acceptance, RX activity and unchanged flash still pass. Follow
+the receive-side input of this owner rather than injecting a buffer or
+assuming that the cached `8b` search result is sufficient for activation.
+
+The enclosing server starts at `241040` and initializes task id `0e` at
+`241166`. Runtime confirms its entry, receive helper `240a6c`, and queue
+call `240a86 -> 268b98`; the return at `240a8a` is not observed through
+61 seconds. Thus this is a live server waiting for input, not an unstarted
+task or a demonstrated payload rejection. Main loop `2429ba` consumes the
+helper's returned event. The helper routes ordinary messages through
+`240438`; its subtract cascade starts at literal `05dd` (`2407a4`), with
+other special inputs handled before that path. The next producer query is
+task-14 input delivery, upstream of `2405e4`, not fabrication of a task-17
+completion. No receive-path closure or fitted RF compatibility is claimed.
 
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset

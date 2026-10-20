@@ -17,6 +17,12 @@ if machine.debugger then
     machine.debugger:command('temp2=0')
     machine.debugger:command('temp0=0')
     machine.debugger:command('temp1=0')
+    for _, address in ipairs({'241040','240a6c','240a86'}) do
+        machine.debugger:command('bpset ' .. address .. ',temp6<20,{temp6=temp6+1;logerror "nsb1_call_link_entry: pc=%08x caller=%08x observer_writes=0\\n",pc,r14;g}')
+    end
+    machine.debugger:command('bpset 240a8a,r0>=100000&&r0<110000&&temp6<20,{temp6=temp6+1;logerror "nsb1_call_link_receive: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,d@(r13+14);g}')
+    machine.debugger:command('bpset 2405e4,temp6<20,{temp6=temp6+1;logerror "nsb1_call_buffer_construct: status=%04x owner=%08x caller=%08x observer_writes=0\\n",r0,r1,r14;g}')
+    machine.debugger:command('bpset 28f2e4,temp6<20,{temp6=temp6+1;logerror "nsb1_call_buffer_consume: object=%08x header=%08x buffer=%08x observer_writes=0\\n",r4,d@r4,d@(r4+8);g}')
     machine.debugger:command('bpset 27fcda,r0>=811&&r0<=813&&temp1<30,{temp1=temp1+1;logerror "nsb1_call_completion_publish: status=%04x r1=%08x r2=%08x caller=%08x observer_writes=0\\n",r0,r1,r2,r14;g}')
     machine.debugger:command('bpset 251772,temp1<30,{temp1=temp1+1;logerror "nsb1_call_completion_select: status=%04x context=%08x observer_writes=0\\n",r6,r8;g}')
     machine.debugger:command('bpset 2188f0,temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_start: mode=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
