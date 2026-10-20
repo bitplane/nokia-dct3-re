@@ -158,6 +158,21 @@ Fresh isolated capture `tmp/nam2-v521-family-20261020/error.log` confirms
 family `1`, ID tuple `0000/b0/d0/0000`, program `1351f1`, erase `135239`,
 and both extra dispatch slots zero. Its observer makes no firmware writes.
 
+The PMM erase wrapper `2e6998` indexes eight 24-byte descriptors at
+`10b27c`, loads the first word as the erase address, and calls the installed
+erase slot at `2e69b4`. Fresh capture
+`tmp/nam2-v521-pmm-layout-20261020/error.log` observes index 7 with descriptor
+addresses `3fc000,3fe000,3f0000,3f2000,3f4000,3f6000,3f8000,3fa000`.
+All eight fall inside one current 64 KiB erase block. The wrapper then
+reprograms only the selected descriptor's header (`2e69ba..2e69f8`), not
+the other seven headers. This is direct evidence of a storage-composition
+mismatch worth resolving, stronger than segment spacing inferred from an
+image. It still does not identify the physical chip: the `b0/d0` identity is
+the emulator's configured part, and its broad algorithm-family match is not
+proof that this part is suitable for NAM-2. Recover a supported boot-block
+part's identity/geometry before replacing it; do not change the shared
+uniform-block device to fit these descriptors.
+
 ## Established contracts
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the

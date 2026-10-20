@@ -5,6 +5,8 @@ local debugger = machine.debugger
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 local commands = {
+    {0x2e6998, 'pmm_erase', 'index=%08x p0=%08x p1=%08x p2=%08x p3=%08x p4=%08x p5=%08x p6=%08x p7=%08x',
+        'r0,d@10b27c,d@10b294,d@10b2ac,d@10b2c4,d@10b2dc,d@10b2f4,d@10b30c,d@10b324'},
     {0x305b82, 'flash_family', 'family=%08x id0=%04x maker=%04x device=%04x third=%04x',
         'r0,w@r13,w@(r13+2),w@(r13+4),w@(r13+6)'},
     {0x305bea, 'flash_dispatch', 'program=%08x erase=%08x extra0=%08x extra1=%08x',
