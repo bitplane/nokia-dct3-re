@@ -401,6 +401,22 @@ time would conflate block consumption with acquisition. Recover component
 ordering and buffered sample-time progression before wiring such a source;
 do not derive either from the minimum read spacing or these diagnostic gaps.
 
+Live DSP disassembly confirms the shared resident reader contract on NSB-1:
+`322a` can bypass mode dispatch while the `00ac` countdown is nonzero;
+otherwise `00ac == 1` selects `32f4`, `== 2` selects `33b4`, and other
+values take the `3236` path. Direct reader `32c5` uses BK=16, AR4=`0080`,
+and eight iterations of four port reads into a circular history buffer.
+The mode-1 filter reads 32 words and writes 16 intermediate words at `1a48`
+through paired A/B accumulators. Its later `06fd`-selected reduction has
+separate signed-add/subtract paths before the `06b7` queue publication.
+This establishes software ordering and buffer ownership, not an I/Q label,
+physical oversampling ratio or ADC resolution. Existing byte contracts
+`receive_holdoff_before_mode_dispatch`, `receive_holdoff_history_and_commit`
+and `receive_scan_filter_word_consumption` cover these exact instructions;
+the real resident image and all 45 codec-contract tests pass. Do not add
+duplicate assertions or reuse NSE-1 uploaded addresses to express this
+shared resident behavior.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns
