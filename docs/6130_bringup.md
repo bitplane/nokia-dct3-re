@@ -166,10 +166,32 @@ Own normal key table2c7a30 has five rows:
 `3e3e3e3e3e / 1119010203 / 0e17040506 / 0f18070809 / 101a0c0a0b`.
 Thus the inherited column1/mask04 contact means logical17, not its host Menu
 label. The separate `tmp/nsk3-security-physical` probe verifies decoded digits
-1..5 and candidate command19 from physical contacts. The Security code prompt
-remains afterward; neither the candidate's submit meaning nor accepted-code
-status is proved. Do not rename19 as OK based on another handset. Next resolve
-the own editor command mapping and its validation result before claiming unlock.
+1..5 and command19 from physical contacts. Own validator tracing confirms19
+submits ASCII12345; this meaning is not inferred from another handset's labels.
+
+### Phone-code retry contrast
+
+Own validator2a6510 submits ASCII12345 from28a1d2. At2a64c0 the comparison
+result is1, but retry RAM10c520 isff. The guard rejects counts>=5 before
+testing the matching result. Directory2c1aa0/group7 at2c1798 maps record070a
+to EEPROM03b4,length1; record0709 maps encoded code03b0,length4, inside
+record0701's eight-byte context. Own helper2a63c4 clears context+4 and writes
+070a through2a394e. `nsk3_security_contract.py` anchors these independent
+code, literal and directory facts, with mutation tests.
+
+The explicit `--initialize-phone-retry` fixture changes only03b4 fromff to00
+in the external EEPROM before startup, using this own initializer value rather
+than donor data. It does not change the credential, RAM, messages or branches.
+`tmp/nsk3-security-validator` records matching code/retryff with no accepted
+return; `tmp/nsk3-security-accepted` records matching code/retry00 and reaches
+the validator's result1 return at2a650e. `nsk3_security_check.py` checks this
+contrast and the physical input/ASCII submission chain. This is a retry-state
+diagnostic, not a factory-default claim.
+
+After acceptance the frame is malformed (repeated glyphs), not an accepted idle
+screen. The next boundary is the own post-security UI/render lifecycle; do not
+claim phone usability, full SIM security or correct display resources from the
+validator result alone.
 
 ## Own firmware inputs
 

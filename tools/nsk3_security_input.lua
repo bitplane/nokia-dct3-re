@@ -3,6 +3,9 @@ local source=debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsk3_sim_observe.lua')
 local machine=manager.machine
 local memory=machine.devices[':maincpu'].spaces.program
+machine.debugger:command('bpset 2a64c0,temp8<40,{temp8=temp8+1;logerror "nsk3_security_gate: match=%08x retry_pointer=%08x retry=%02x cycles=%016x observer_writes=0\\n",r0,r1,b@r1,totalcycles;g}')
+machine.debugger:command('bpset 2a6510,temp8<40 && r0>=100000 && r0<10fff8,{temp8=temp8+1;logerror "nsk3_security_submit: pointer=%08x text=%08x%08x caller=%08x cycles=%016x observer_writes=0\\n",r0,d@r0,d@(r0+4),r14,totalcycles;g}')
+machine.debugger:command('bpset 2a650e,temp8<40,{temp8=temp8+1;logerror "nsk3_security_accepted: result=%08x cycles=%016x observer_writes=0\\n",r0,totalcycles;g}')
 local cells={{2,2,1},{3,2,2},{4,2,3},{2,4,4},{3,4,5},{1,2,0x19}}
 local events={}
 for i,cell in ipairs(cells) do

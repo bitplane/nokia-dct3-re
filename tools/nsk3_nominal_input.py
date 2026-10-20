@@ -12,6 +12,7 @@ if __package__ in (None,''):
 from tools.nsk3_record_check import check
 from tools.nsk3_analog_contract import inspect
 from tools.nsk3_static_check import inspect as inspect_source
+from tools.nsk3_security_contract import inspect as inspect_security
 
 
 def config(insert_sim=False):
@@ -31,6 +32,7 @@ def main():
     for name in ('source','control','native_roms','initial','cold','output'):
         parser.add_argument(name,type=Path)
     parser.add_argument('--insert-sim',action='store_true',help='cold physical insertion of the explicit synthetic card')
+    parser.add_argument('--initialize-phone-retry',action='store_true',help='external one-byte retry fixture derived from own initializer, not factory data')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('comparison requires a fresh output directory')
@@ -39,11 +41,21 @@ def main():
         contract=inspect(image)
         storage=args.cold/'nvram/nsk3r4t'
         shutil.copytree(storage,args.output/'nvram/nsk3r4t')
+        security=None
+        if args.initialize_phone_retry:
+            security=inspect_security(image)
+            eeprom=args.output/'nvram/nsk3r4t/eeprom'
+            data=bytearray(eeprom.read_bytes())
+            if data[security['retry_eeprom']]!=0xff:
+                raise ValueError('retry comparison requires own erased retry byte')
+            data[security['retry_eeprom']]=0
+            eeprom.write_bytes(data)
         (args.output/'cfg').mkdir()
         config(args.insert_sim).write(args.output/'cfg/nsk3r4t.cfg',encoding='utf-8',xml_declaration=True)
         metadata={'classification':'nominal external-input hypothesis, not fitted calibration',
                   'raw_adc2':554,'basis':'nominal 3.6 V / typical 6.5 mV per count',
                   'inserted_synthetic_sim':args.insert_sim,
+                  'phone_retry_fixture':security,
                   'own_static_contract':contract,
                   'seed':str(args.cold.resolve()),
                   'seed_eeprom_sha256':hashlib.sha256((storage/'eeprom').read_bytes()).hexdigest(),

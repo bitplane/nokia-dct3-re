@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_phone_code_retry_contrast", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Own physical ASCII12345 submission distinguishes an erased retry guard from a successful matching-code validator return",
+      "current": "Own key translation and editor submission show logical19 submits ASCII12345. The comparison matches, but retryff at10c520 rejects before success. Own record070a maps to EEPROM03b4 and own helper2a63c4 initializes it to zero. An explicit one-byte external-storage fixture preserves the credential and reaches result1 at2a650e with retry00. The post-acceptance frame is malformed, not accepted idle. This is a retry-state diagnostic under the existing native/nominal-input hypotheses, not factory provisioning or full SIM/phone usability proof.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_security_contract.py", "tools/nsk3_security_check.py", "tools/nsk3_security_input.lua", "tools/nsk3_nominal_input.py", "tools/test_nsk3_security_contract.py"]
+    },
+    {
       "id": "nsk3_nominal_input_graphical_startup", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "The explicit native compatibility and nominal ADC2 hypothesis reaches own graphical startup and physical matrix rescan without guest-state forcing",
       "current": "Own boot4 conversion anchors source7 to ADC2, gain/offset live1/0 and scale1500/232. Saturated1023 produces rejected6614 and leaves readiness0e. Opt-in554 produces accepted3581, drains the ten-sample counter, organically posts14 and completes readiness0f. Firmware presents Insert SIM card and a physical raw contact raises scan/row counts. Own executable flash and persisted diagnostic EEPROM remain unchanged; exact5/15s frames are pinned. The rebuilt default saturated control remains blank. This is not measured electrical calibration, fitted DSP/clock identification, logical key acceptance, SIM, registration, call, SMS or speech acceptance; ordinary noki6130 is unchanged.",
