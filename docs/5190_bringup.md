@@ -363,6 +363,29 @@ source/format and activation contract, not adjustment of threshold `0574`
 or the zero selectors. The observer asserts the relocated instruction words
 when those probe sites execute to catch future upload/address drift.
 
+### Software RF source contract
+
+The air-interface waveform and the handset sample interface are separate
+contracts. [ETSI TS 145 004, section 2](https://www.etsi.org/deliver/etsi_ts/145000_145099/145004/18.00.00_60/ts_145004v180000p.pdf)
+specifies GMSK at `1625/6` ksymbols/s, differential encoding, `BT=0.3`
+filtering and modulation index `1/2`. This grounds waveform generation;
+it does not identify COBBA sample-word packing or clocking.
+
+| Required fixture input | Current evidence / remaining work |
+| --- | --- |
+| Sample arithmetic | Shared impulse/mixed-word tests establish signed 16-bit filter arithmetic, not the physical ADC resolution or alignment. |
+| Component order | Four successive port-27 reads feed two filter phases. Establish their time/component interpretation before calling a buffer standard I/Q. |
+| Sample cadence | Current callback advances on reads. Derive sample-time progression from the active frame/read schedule, not the calibrated DSP execution clock alone. |
+| Receive window | Correlate RF control writes and queued sample processing with the requested channel/window; do not stream a waveform independently of tuning. |
+| Acceptance | First require an independently predicted filter/score result, then organic acquisition/decode and MCU delivery. Merely exceeding `0574` is not proof of GSM reception. |
+
+An own-model [NSB-1 system-manual listing](https://www.eserviceinfo.com/downloadsm/233124/NOKIA_sysa3.html)
+identifies `sysa3.pdf`, System Module UR4U; the full PDF has not been
+retrieved or verified. Sibling COBBA manuals are leads, not permission to
+import their bus width, clocks or ADC assumptions into NSB-1. No amplitude
+sweep, threshold change or synthetic decoded packet resolves these missing
+sample-interface facts.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns
