@@ -2,6 +2,11 @@
 
 ## Current result
 
+**Long-run limit:** the declared native compatibility composition requests a
+reason68 restart at93.967473692s. Short physical UI/storage/security gates do
+not establish sustained native operation. The own packet-supervision contract
+below reproduces this failure; no keepalive or disabled watchdog is installed.
+
 The separate native compatibility instrument reaches **Insert SIM card** and
 rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
 With the synthetic SIM inserted and an own-initializer retry-byte fixture,
@@ -433,6 +438,38 @@ The gate checks own flash/native upload, physical confirmation/cancel contacts,
 exact confirmation/read/empty frames, update payload/status and whole-card
 transitions. No network delivery, SMS reception or radio completion follows
 from this offline lifecycle.
+
+### Native packet-supervision limit
+
+The120s physical-menu capture `tmp/nsk3-native-long` requests reason68 through
+restart caller23d83b at93.967473692s. A separate96s instrumented run,
+`tmp/nsk3-native-liveness`, independently localizes the condition:
+
+| Own boot4 site | Observed contract |
+| --- | --- |
+| `2ab4fc` / `2ab512` | Packet dispatcher increments halfword10c5a6, context10c5a4 |
+| `2ab64a` | Window reads count; zero selects2ab506 |
+| `2ab652..2ab65a` | Nonzero rearms timer1c/ticks09cd and clears count |
+| `2a2a4a` | Argument1 policy from2ab50d selects reason68 |
+| `23d83b` / `2ac696` | Restart caller and actual MCU reset command05 |
+
+Configured-clock windows at about31/62/93s contain1,1,0. Counter clears at
+31.000258077s, a later packet increments it at38.808311231s, the62s window
+clears it, and the empty third window selects the policy and delayed reset.
+Earlier startup clears/increments are separately visible; the count is not
+assumed to have been1 since reset. Physical wall-clock calibration is unproved.
+
+```sh
+.venv/bin/python tools/nsk3_liveness_check.py roms/noki6130/source \
+  tmp/nsk3-native-liveness
+```
+
+This command qualifies a known failure and explicitly reports stable_boot=false;
+it is not a long-run acceptance gate. Opcode/literal anchors and mutation tests
+bind the ownership to this own ROM rather than importing the5130 addresses.
+The next question is the legitimate native post-initialization packet-producing
+lifecycle and its radio/clock inputs. No arbitrary heartbeat, counter write,
+disabled supervision or foreign packet replay is justified by this evidence.
 
 ## Own firmware inputs
 
