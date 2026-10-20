@@ -155,8 +155,30 @@ No later TX-ring commit is observed from the physical Call/End actions in
 the 61-second interval; native execution remains legal, rings drain, the
 inactivity check is nonzero and flash remains unchanged. This does not close
 all other command paths or classify the call controller's internal lifecycle.
-The next consumer is task 12's `13b8` handler: determine how it classifies the
-native result and whether it selects any subsequent acquisition operation.
+Task 12 consumes the status at `20f534`. Its own subtract/jump-table path
+(`13a3` base, `13b8` index 14) selects `20f63c`. Runtime enters that branch
+with controller state `106a9c == 3` and phase `106aa1 == 1`. It copies 160
+bytes from message `+6` into a cached object at `20f67e..20f68a`; at `20f6b8`
+state 3 then bypasses candidate processing. Candidate routine `213a28` is not
+entered in the observed interval. The result is **deferred**, not measured as
+an empty or usable candidate set by this controller path.
+
+The state watch sees bootstrap clearing, followed by `20f510` explicitly
+initializing state 3 at 0.997345 seconds; no further state write is observed
+through 61 seconds, including physical Call/End. State 3 is therefore the
+firmware's retained initial lifecycle, not a fabricated native-DSP reply.
+The open software question is what ordinary input releases/changes it and
+consumes the cached vector. One mapped dispatcher entrance is status `13a3`
+at `20f8d6`, which passes message byte `+2` to `2116fc`; its runtime role and
+the full state-writer surface remain unclosed. Statuses `13a5..13a7` instead
+enter `210bd4`, which is also unobserved in this run. Do not inject these inputs
+or skip state 3 to manufacture acquisition.
+
+The unreached candidate routine statically loops over 40 four-byte records,
+examines signed message byte `+9 + 4*i`, and counts values greater than `-106`.
+That is an own-ROM byte/threshold contract, not validated physical RSSI units,
+nor evidence that the observed vector passed or failed it. No classification
+may be inferred solely by treating payload `ff6f` as a signed 16-bit dBm value.
 
 The handset currently leaves COBBA's RF sample callback unbound, using its
 explicit zero default. There is no received laboratory cell waveform on this

@@ -8,7 +8,11 @@ local memory = cpu.spaces['program']
 if machine.debugger then
     machine.debugger:command('focus :maincpu')
     machine.debugger:command('temp9=0')
+    machine.debugger:command('temp8=0')
     machine.debugger:command('bpset 268944,r0==c&&r1>=100000&&r1<110000&&w@r1==13b8&&temp9<10,{temp9=temp9+1;logerror "nsb1_call_result_post: task=%08x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
+    for _, address in ipairs({'20f63c','20f68e','20f6b8','213a28','213a68','2143e0','210bd4'}) do
+        machine.debugger:command('bpset ' .. address .. ',temp8<20,{temp8=temp8+1;logerror "nsb1_call_search_stage: pc=%08x r0=%08x r4=%08x state=%02x phase=%02x cycles=%016x observer_writes=0\\n",pc,r0,r4,b@106a9c,b@106aa1,totalcycles;g}')
+    end
 end
 local observing = false
 local function shared_read(address)
@@ -74,6 +78,25 @@ _G.nsb1_call_tx = memory:install_write_tap(0x100a4,0x100a7,'nsb1_call_tx',functi
     end
 end)
 local result_reads = 0
+local status_reads = 0
+local state_writes = 0
+_G.nsb1_call_search_state = memory:install_write_tap(0x106a9c,0x106a9f,'nsb1_call_search_state',function(offset,data,mask)
+    if mask & 0xff000000 ~= 0 and state_writes < 24 then
+        state_writes = state_writes+1
+        machine:logerror(string.format('nsb1_call_search_state: value=%02x pc=%08x caller=%08x t=%.9f observer_writes=0\n',
+            (data >> 24) & 255,cpu.state['R15'].value,cpu.state['R14'].value,machine.time:as_double()))
+    end
+end)
+_G.nsb1_call_status = memory:install_read_tap(0x102a48,0x102a4b,'nsb1_call_status',function(offset,data,mask)
+    -- Observed fixed-pool object in this fixture, not an allocator closure.
+    if not observing and cpu.state['R15'].value ~= 0x268944 and
+            machine.time:as_double() >= 40 and status_reads < 8 and
+            mask & 0xffff0000 ~= 0 and (data >> 16) & 0xffff == 0x13b8 then
+        status_reads = status_reads+1
+        machine:logerror(string.format('nsb1_call_status_read: pc=%08x caller=%08x t=%.9f observer_writes=0\n',
+            cpu.state['R15'].value,cpu.state['R14'].value,machine.time:as_double()))
+    end
+end)
 _G.nsb1_call_result = memory:install_read_tap(0x10100,0x101c7,'nsb1_call_result',function(offset,data,mask)
     if not observing and machine.time:as_double() >= 40 and result_reads < 8 and
             ((mask & 0xffff0000 ~= 0 and (data >> 16) & 0xffff == 0xa28b) or
