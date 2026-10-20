@@ -88,7 +88,8 @@ def analyze(image):
               0x20bfb0:0x09ef,0x20bd7c:0x09ec,0x20bd80:0x0a02,
               0x20bd84:0x0a03,0x20bd8c:0x07d5}
     checks.update({0x23af00:0x10858c,0x23befc:0x05e6,0x23bf00:0x05ed,
-                   0x23c394:0x05e6,0x23c398:0x05ed,0x23c7bc:0x05e6,0x23c7c0:0x05ed})
+                   0x23c394:0x05e6,0x23c398:0x05ed,0x23c7bc:0x05e6,0x23c7c0:0x05ed,
+                   0x23aef0:0x040b,0x26a038:0x040b,0x26a4f0:0x040b})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -102,7 +103,8 @@ def analyze(image):
                  0x2212ce:'200fe7f9',0x23a736:'782870a08026',
                  0x23bb6e:'21ff313b5c082800d10148e0',
                  0x23bffe:'21ff313b5c082800d10148e2',
-                 0x23c59c:'20ff303b46595c402800d1014884'}
+                 0x23c59c:'20ff303b46595c402800d1014884',
+                 0x26a15e:'200d4641f7ebf881'}
     for address,encoded in fragments.items():
         expected = bytes.fromhex(encoded)
         if image[address-BASE:address-BASE+len(expected)] != expected:
@@ -162,6 +164,11 @@ def analyze(image):
                                              'message_byte2':'constructor copies owner byte +0',
                                              'receive_call':'0x23abca','receive_owner':'0x10858c',
                                              'scope':'three checked direct selector sites, not all indirect or computed producers'},
+            'completion_server_ingress':{'rx_type':'0x80','dispatch':'0x294250',
+                                         'decoder':'0x269f28','input':'0x040b',
+                                         'delivery':'0x26a132','post':'0x26a162','destination_task':13,
+                                         'server_dispatch':'0x23abdc',
+                                         'scope':'conditional decoder delivery; RF payload semantics and all alternate sources unclosed'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',

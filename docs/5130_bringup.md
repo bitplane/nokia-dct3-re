@@ -240,6 +240,18 @@ This bounds this boot and these direct sites, not all producers. The next
 boundary is the server's legitimate ingress; changing +13a would not make
 an absent receive occur.
 
+One own-ROM transport ingress is established: type 80 selects 294250,
+which calls decoder 269f28. Its conditional 040b construction at 26a132
+reaches 26a15e/26a162, posting through 255268 to task 13. Another 040b
+construction at 269d84 also selects task 13; a separate branch selects
+task 12 and must not be conflated with this destination. Server dispatch
+23abdc uses base 040b at pool 23aef0, then recognizes 040c/040d and
+05fa/05fb through its subtract cascade. The qualified cold packet census
+contains only type 8b, not 80; its server receive remains unreturned.
+This identifies an absent lower transport family, not the meaning of a
+valid type-80 body, a complete producer census, or permission to synthesize
+one. Native RF sampling/decoding and alternate server inputs remain open.
+
 There is also a nested-buffer decoder, not an equivalent completion code:
 05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
 Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3
