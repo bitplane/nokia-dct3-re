@@ -241,6 +241,18 @@ to task `14`; no resolved event-`21` call has an unknown destination. This
 does not close those 31 calls, other transport APIs, indirect calls, or
 table-driven production. The JSON explicitly sets `absence_proved=false`.
 
+Of the 31 incomplete calls, 30 have known destinations other than task `14`.
+The remaining call `2a17be` routes an object from `r5`, matching its byte 6
+against five eight-byte entries at `2ced48`: destination words are `2`, `1`,
+`17`, callback `2b2891`, and `8`. Values below `18` select task delivery;
+larger values are called as functions. None directly selects task `14`.
+The same optional census additionally reports 28 direct calls to `269200`
+(14 with both arguments recovered) and 376 to `268944` (83 with both).
+Every destination in these additional calls is recovered; the only task-14
+call among them is `2a4f20`, with scalar `30`. No additional recovered
+scalar `21` candidate appears. Object pointers are not semantically treated
+as event IDs, and indirect/tail-call/other-API coverage remains open.
+
 A single host charger-contact diagnostic connects at 3 seconds and removes
 at 6 seconds, using the existing configured connected raw value `3ff`
 (physical voltage not validated). It still observes `{phase=06,reports=0e,

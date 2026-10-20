@@ -18,6 +18,7 @@ class PackageTest(unittest.TestCase):
         self.assertEqual((4, 2, 2), (report['direct_calls'], report['both_arguments_recovered'],
                                      report['incomplete_arguments']))
         self.assertEqual(calls[:2], report['event_21_candidates'])
+        self.assertEqual([calls[1]], report['unknown_destination_calls'])
         self.assertFalse(report['absence_proved'])
 
     def test_security_directory_uses_32_bit_ids(self):

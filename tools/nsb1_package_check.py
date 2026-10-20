@@ -53,6 +53,7 @@ def post_coverage(calls):
     candidates = [call for call in calls if call['arguments']['event'] == 0x21]
     return {'direct_calls': len(calls), 'both_arguments_recovered': len(resolved),
             'incomplete_arguments': len(calls) - len(resolved),
+            'unknown_destination_calls': [call for call in calls if call['arguments']['task'] is None],
             'event_21_candidates': candidates,
             'absence_proved': False,
             'scope': 'direct BL to 0x268a94 only; no indirect or data-driven closure'}
@@ -63,10 +64,19 @@ def startup_post_census(image):
     # The shared census reads swap16 bytes, whereas this normalizer emits CPU order.
     swapped = bytearray(image)
     swapped[0::2], swapped[1::2] = image[1::2], image[0::2]
-    profile = {'apis': [{'address': '0x268a94', 'name': 'nsb1_task_post',
-                         'kind': 'task_message', 'arguments': {'task': 'r0', 'event': 'r1'}}]}
+    addresses = (0x268a94, 0x269200, 0x268944)
+    profile = {'apis': [{'address': hex(address), 'name': f'nsb1_post_{address:x}',
+                         'kind': 'task_message', 'arguments': {'task': 'r0', 'event': 'r1'}}
+                        for address in addresses]}
     instructions = decode_image(swapped, 0x200000)
-    return post_coverage(extract_calls(profile, instructions, swapped, 0x200000))
+    calls = extract_calls(profile, instructions, swapped, 0x200000)
+    result = post_coverage([call for call in calls if call['api_address'] == addresses[0]])
+    result['other_transports'] = [
+        {'address': hex(address), **post_coverage([call for call in calls if call['api_address'] == address])}
+        for address in addresses[1:]]
+    for item in result['other_transports']:
+        item['scope'] = 'direct BL only; r1 may be a scalar or object pointer; no indirect closure'
+    return result
 
 
 def flash_integrity(image):
