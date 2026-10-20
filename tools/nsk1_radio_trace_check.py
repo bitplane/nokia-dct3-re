@@ -19,6 +19,28 @@ def check_scan_progress(text):
             'qualified_results_observed':False}
 
 
+def check_scan_qualification(text):
+    metrics = re.findall(r'nsk1_scan_metric: index=(\d+) pc=([0-9a-f]{4}) a=([0-9a-f]{10}) threshold=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    if len(metrics) != 8 or [int(row[0]) for row in metrics] != list(range(1,9)):
+        raise ValueError('missing bounded scan measurement observations')
+    if any((pc,a,threshold) != ('0ae7','0000000000','0574') or not 39 <= float(time) < 40
+           for _,pc,a,threshold,time in metrics):
+        raise ValueError('scan measurement CPU scope, value or threshold changed')
+    times = [float(row[4]) for row in metrics]
+    if times != sorted(set(times)):
+        raise ValueError('scan measurement times are not ordered')
+    rows = re.findall(r'nsk1_scan_late: t=([0-9.]+) counter_hi=([0-9a-f]{4}) counter_lo=([0-9a-f]{4}) qualified=([0-9a-f]{4}) flags=([0-9a-f]{4}) observer_writes=0',text)
+    if len(rows) != 6 or [float(row[0]) for row in rows] != [65,70,75,80,85,90]:
+        raise ValueError('missing late scan observation horizon')
+    counters = [int(hi+lo,16) for _,hi,lo,_,_ in rows]
+    if any(hi != 'ffff' or qualified != '0000' or flags != '0000' for _,hi,_,qualified,flags in rows):
+        raise ValueError('late scan qualification or negative-counter boundary changed')
+    if any(right <= left for left,right in zip(counters,counters[1:])):
+        raise ValueError('late scan counter is not progressing')
+    return {'measurement':0,'threshold':0x574,'observed_through':90,
+            'timeout_counter_still_negative':True,'qualified_results_observed':False}
+
+
 def check(text):
     packets = re.findall(r'nsk1_radio_packet: direction=(tx|rx) index=(\d+) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+)', text)
     tx = [(kind, int(length)) for direction, _, kind, length, _ in packets if direction == 'tx']
@@ -114,10 +136,16 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('--diagnose-liveness-reset', action='store_true',
                         help='classify the known late failure; does not qualify stability')
+    parser.add_argument('--scan-qualification', action='store_true',
+                        help='also require the passive 92-second scan qualification fixture')
     args = parser.parse_args()
     try:
         checker = diagnose_liveness_reset if args.diagnose_liveness_reset else check
-        print(json.dumps(checker(args.log.read_text()), indent=2))
+        text = args.log.read_text()
+        result = checker(text)
+        if args.scan_qualification:
+            result['scan_qualification'] = check_scan_qualification(text)
+        print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSK-1 radio boundary: FAIL: {error}\n')
 

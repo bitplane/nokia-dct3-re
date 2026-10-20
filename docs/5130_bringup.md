@@ -516,6 +516,29 @@ qualification/termination contract, including how its duration relates to
 the independently proved packet-liveness reset. Do not disable that reset
 or invent sample/heartbeat traffic to make the two timelines compose.
 
+The live qualification contract is narrower than a missing-completion claim:
+4701 returns a measurement in A;0ae6 subtracts data219b into B. Only a
+positive difference increments1344, and a new maximum over198d sets1266
+bit0. The initializer seeds1262/1263 withffff/c1bf;0b08..0b10 increments
+that double word and exits at0cb8 when it becomes positive. With bit0
+clear,0b13 returns directly to the next measurement, bypassing the later
+500-qualifying-observation and subsequent candidate-processing exits.
+In `tmp/nsk1-scan-qualification-final`, eight passive observations at39s
+read A=0,219b=0574 at fetched PC0ae7. Late samples65..90s retain zero1344
+and1266, while the timeout counter advancesffff:d7be ->ffff:ece7 and is
+still negative. Thus this no-result scan has not timed out before the
+separately observed93.974s reboot. This identifies a timeline mismatch,
+not its cause: sample cadence, other native packet producers and the
+borrowed resident-mask compatibility remain distinct questions. It does
+not justify changing thresholds, shortening the timeout, supplying guessed
+RF samples or disabling packet supervision.
+
+`tools/nsk1_scan_qualification.lua` reproduces the passive extension of the
+initialized cold fixture for92 seconds. In addition to the ordinary native
+boot/storage checks, run `python -m tools.nsk1_radio_trace_check LOG
+--scan-qualification` to require its measurement and late-counter evidence.
+The ordinary61-second radio gate alone does not cover this longer horizon.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

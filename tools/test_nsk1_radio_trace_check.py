@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check, check_scan_progress, diagnose_liveness_reset
+from tools.nsk1_radio_trace_check import check, check_scan_progress, check_scan_qualification, diagnose_liveness_reset
 
 
 def fixture():
@@ -89,6 +89,14 @@ class NativeRadioTraceTest(unittest.TestCase):
 
 
 class ScanProgressTests(unittest.TestCase):
+    def test_zero_measurement_and_negative_timeout_are_bounded_observations(self):
+        text = '\n'.join(f'nsk1_scan_metric: index={i+1} pc=0ae7 a=0000000000 threshold=0574 t={39+i*0.005:.6f} observer_writes=0' for i in range(8))
+        text += '\n' + '\n'.join(f'nsk1_scan_late: t={65+5*i:.6f} counter_hi=ffff counter_lo={0xd7be+1000*i:04x} qualified=0000 flags=0000 observer_writes=0' for i in range(6))
+        self.assertTrue(check_scan_qualification(text)['timeout_counter_still_negative'])
+        for before,after in [('pc=0ae7','pc=0ae6'),('threshold=0574','threshold=0000'),('a=0000000000','a=0000000575'),('90.000000','89.000000'),('counter_hi=ffff','counter_hi=0000'),('qualified=0000','qualified=0001')]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                check_scan_qualification(text.replace(before,after))
+
     def test_progress_is_not_registration_or_an_empty_queue_stall(self):
         text = '\n'.join(f'nsk1_scan_progress: t={40+5*i:.6f} counter_hi=ffff counter_lo={0xc296+1000*i:04x} qualified=0000 flags=0000 producer=1a00 consumer=1a00 observer_writes=0' for i in range(5))
         self.assertEqual(check_scan_progress(text), {'samples':5,'counter_advance':4000,'qualified_results_observed':False})

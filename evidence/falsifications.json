@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_post_rssi_scan_is_permanently_waiting_for_empty_sample_queue",
+      "status": "disproven",
+      "hypothesis": "After native RSSI publication the uploaded scan routine cannot return from4701 because its sample queue never receives data",
+      "conclusion": "Qualified cold execution reaches4701,4717,3360,4742 and returns to0ae6. Producer06b7 advances1a00 to1a04 and consumer06b8 catches up. The scan timeout counter advances4333 steps from40 to60 seconds, with matched sampled cursors. Eight measurements at39 seconds return zero against threshold219b=0574; qualified count1344 and flag1266 remain zero through90 seconds. Thus this is a progressing no-qualifying-result loop, not a permanent empty-queue stall. Active sample processing does not prove RF encoding, valid reception, correct cadence or compatibility of the borrowed resident mask. The still-negative timeout at90 seconds and independent later packet-liveness reboot require further reconciliation without fabricated RF data or supervision bypass.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_radio_observe.lua", "tools/nsk1_scan_qualification.lua", "tools/nsk1_radio_trace_check.py", "tools/test_nsk1_radio_trace_check.py"]
+    },
+    {
       "id": "nsk1_scan_wait_uses_stale_resident_2420_gateway",
       "status": "disproven",
       "hypothesis": "The acquired NSE-1 resident gateway2420 still jumps to0a5c despite the NSK-1 upload relocating the scan initializer to0a71, causing the observed post-RSSI wait",
