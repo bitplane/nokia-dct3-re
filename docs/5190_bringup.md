@@ -75,9 +75,17 @@ execution through 40 seconds and leaves executable flash unchanged. It still
 selects base zero, reads header version zero and returns text-API result `9`.
 Thus adding the full database does not by itself select it. A's exact physical
 Phone book menu acceptance also passes after adding the BIOS choices. The next
-question is language-resource selection upstream of `10642c`; A's ordinary
-non-dictionary input path remains independently open. Neither SMS text entry
-nor a missing DSP reply is established, and the validity field is not forced.
+question is the user/stored language preference, not database presence.
+Selector `272c70` calls the PPM lookup `2ace64` with resource tag `LDB` and
+language byte `10fced == ff`; the lookup returns zero, which `272ca2` stores
+to `10642c`. A read-only startup watch observes that byte first cleared by
+`28bbc6`, then loaded as `ff` by EEPROM reader `2ab110` at approximately
+0.197 seconds. Its external-record mapping and valid preference values are
+not yet decoded. Physical Options navigation on B has not yet established a
+successful Dictionary/language selection; do not label the resulting unrelated
+screen as a dictionary failure. A's ordinary non-dictionary input path remains
+independently open. Neither SMS text entry nor a missing DSP reply is
+established, and neither the preference nor validity field is forced.
 
 The separate Spell mode accepts physical letters and renders `ADA`, but the
 manual describes that mode as adding a dictionary word; returning to an empty
