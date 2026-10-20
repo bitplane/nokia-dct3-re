@@ -2,20 +2,25 @@
 
 ## Current result
 
-**Pre-overlay-correction long-run limit:** the declared native compatibility composition requests a
-reason68 restart at93.967473692s. Short physical UI/storage/security gates do
+**Long-run limit:** the corrected native compatibility composition requests a
+reason68 restart at93.975196s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
 below reproduces this failure; no keepalive or disabled watchdog is installed.
-The uploaded-bank correction below is qualified through40s; its longer-run
-supervision behavior has not yet been requalified.
+The110s own FDN-enabled cold fixture retains the corrected upload and reproduces
+packet windows1/1/0 through `nsk3_liveness_check.py`. The reboot limit therefore
+survives the upload-bank correction; the old93.967473692s measurement belongs
+to the earlier fixture and is not a timing target.
 
-**Pre-correction native packet boundary:** the last8b object is delivered intact and cached
+**Native packet boundary:** the last8b object is delivered intact and cached
 by mailbox0c in initial state3/phase1. The mapped acknowledgement server
 (mailbox0e) receives no input through45s. MCU work-queue routes are also
 dormant. These are measured boundaries, not proof that acquisition needs an
 injected acknowledgement. Native control capture and the remaining RF/data
 contracts are described below; registration, connected calls and speech remain
 unaccepted.
+In the corrected authenticated/FDN-enabled fixture the packet arrives at
+45.796785s, still entering state3/phase1 and the cache path. The pre-correction
+38..40s timing must not be imposed on that distinct input composition.
 
 ### Executable upload bank
 
@@ -36,6 +41,24 @@ whole-card and exact-frame checks pass in both. Only the corrected run passes
 both memory views at1s. Its566 observed first opcode words all have decoded
 boundaries, including observed extension variants. These are short-run
 software/mapping qualifications, not native registration or speech proof.
+
+`nsk3_native_upload_long.lua` composes the same physical dial with existing
+passive native-control and liveness observers. The110s run uses own persisted
+EEPROM/SIM/flash/config only, with no new provisioning or guest writes.
+The first lifecycle (trace prefix before `nsk3_restart_entry`) passes the
+existing dial/SIM, unchanged-card, exact26s frame and retained-upload checks.
+Applying a one-boot APDU checker to the full rebooting trace correctly fails
+its transaction cardinality; do not weaken it to accept multiple boots.
+Native pending/completed remains3/010e with5/8 writes. At65/90s the scan
+counter advances from `ffffd1d0` to `ffffe6f9` with matching producer/consumer
+cursors and no qualifying result. The45s program capture remains available
+for live-code analysis. These observations do not establish an absent RF
+contract or justify manufacturing a keepalive.
+
+```sh
+.venv/bin/python tools/nsk3_liveness_check.py roms/noki6130/source \
+  tmp/nsk3-native-upload-long
+```
 
 The separate native compatibility instrument reaches **Insert SIM card** and
 rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
