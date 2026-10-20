@@ -52,7 +52,9 @@ emu.register_frame_done(function()
     next_time = next_time + 1
 end)
 local directory = assert(debug.getinfo(1, 'S').source:sub(2):match('^(.*[/])'))
-dofile(directory .. 'noki2100_v521_early_security_input.lua')
+if not _G.nam2_c3_idle_no_early_keys then
+    dofile(directory .. 'noki2100_v521_early_security_input.lua')
+end
 local late = coroutine.create(function()
     if not emu.wait(18) then return end
     local key = assert(machine.ioport.ports[':COL.2'].fields['Keypad 1'])

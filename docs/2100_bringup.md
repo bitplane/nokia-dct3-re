@@ -119,6 +119,23 @@ unproduced registration event, nor does it justify holding the SIM busy to
 avoid the branch. Resume at the controller/clock behavior when these genuine
 permissions allow ordinary idle; do not suppress their firmware-owned writes.
 
+The physical no-SIM control isolates this from the security transaction and
+the SIM clock-stop write. Run
+`tools/nam2_c3_no_sim_idle_observe.lua` with the same fresh checksum fixture
+and debug options. In `tmp/nam2-c3-no-sim-20261020`, firmware renders the
+localized Insert-SIM screen without early code contacts. The permission
+predicate already returns one at 10 s; control remains `0a` through 30 s,
+the timer advances and the 18 s physical key remains pending. Clock control
+stays `2c`, unlike the card-present run's `0c`. Therefore clearing the SIM
+clock bit or accepting a security code is not required for the failure.
+
+A separate NSE-8 no-SIM comparison
+(`tmp/nse8-no-sim-gate-control-20261020`) retains control `05` at 10..30 s,
+but it does **not** validate the disputed idle branch: its first supervisor
+predicate `2b03d8` returns zero at `2a930e`, selecting the explicit enable
+path. A working sibling's interrupt delivery cannot be used as proof of the
+unexercised NAM-2 idle/clock contract.
+
 The extended capture `tmp/nam2-c3-idle-timer-late-20261020` excludes a
 stopped Timer 0 or permanently fixed interval of 2: the hardware counter
 advances from `068f` at 13 s to `0f22` at 30 s while software timestamp

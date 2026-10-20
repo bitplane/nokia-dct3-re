@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nam2_idle_stall_requires_sim_clock_stop_or_security_acceptance",
+      "status": "disproven",
+      "hypothesis": "The NAM-2 global-delivery stall requires the card-present SIM clock-stop transaction or accepted security-code completion",
+      "conclusion": "A fresh own-checksum C3 run physically removes the card before SIM startup and sends no early code contacts. Firmware renders Insert SIM, the third supervisor permission is already nonzero at ten seconds, and control remains 0a through thirty seconds. Clock control stays 2c rather than the card-present path's 0c. A physical key at eighteen seconds remains pending as IRQ0=1 with local mask a2 and zero nesting depth. Thus neither the SIM clock-bit clear nor credential acceptance is necessary for the stall. The NSE-8 no-SIM comparison retains control 05 but its first supervisor predicate returns zero, so it does not validate the same idle branch. Do not keep SIM busy, change APDU replies or alter credentials to bypass this controller/idle boundary.",
+      "evidence": ["docs/2100_bringup.md", "tools/nam2_c3_no_sim_idle_observe.lua", "tools/nam2_c3_idle_observe.lua"]
+    },
+    {
       "id": "nsm3_late_pin_is_blocked_at_nonzero_completion_phase",
       "status": "disproven",
       "hypothesis": "Late-PIN DCS recovery reaches completion dispatch 21c41c but is blocked by a nonzero phase word, requiring its legitimate zero setter",
