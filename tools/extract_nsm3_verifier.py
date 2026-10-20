@@ -22,29 +22,43 @@ NSM3D_LOADER_SHA1 = "1250a9e17ce44ec8cc373f222a817f99f505bcdf"
 NHM3_FLASH_SHA1 = "95607ce39c383bda75f1e6aeae67a214b787b0a1"
 NHM5_FLASH_SHA1 = "d5da65f417595200314eb0115bf46ca1fbf53128"
 NHM5_DESCRIPTOR_OFFSET = 0x1091d8
+NHM9_FLASH_SHA1 = "3d0dce9c098bdd619c6f3684f739796f64b66169"
+NHM9_DESCRIPTOR_OFFSET = 0x1f1e30
+NHM9_PROGRAM_SHA1 = "1fc2116ac98a106df41f3822322377a3101aabd5"
+NHM9_LOADER_SHA1 = "dc3c2a37913e07a2962d09f6a17cde676a04dd76"
 
 
-def extract_program_fragment(image):
-    if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:
-        raise ValueError("not the pinned 8250 flash")
-    if struct.unpack_from(">6H", image, 0x117700) != (0xff80, 0xff80, 104, 0x200, 0x8c, 0):
+def extract_program_fragment(image, product="8250"):
+    profiles = {"8250": (NSM3D_FLASH_SHA1, 0x117700),
+                "3350": (NHM9_FLASH_SHA1, 0x1f0c48)}
+    if product not in profiles:
+        raise ValueError("unsupported fragment product")
+    expected, offset = profiles[product]
+    if hashlib.sha1(image).hexdigest() != expected:
+        raise ValueError(f"not the pinned {product} flash")
+    if struct.unpack_from(">6H", image, offset) != (0xff80, 0xff80, 104, 0x200, 0x8c, 0):
         raise ValueError("unexpected bootstrap fragment descriptor")
-    fragment = image[0x11770c:0x1177dc]
+    fragment = image[offset + 12:offset + 12 + 208]
     if hashlib.sha1(fragment).hexdigest() != "440bf49f1eba4cadb12f7f7581c992b0025807d6":
         raise ValueError("unexpected bootstrap program fragment")
     return fragment
 
 
-def extract_loader(image):
-    """Return the whole NSM-3D upload, including its table and code tail."""
-    if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:
-        raise ValueError("not the pinned 8250 flash")
-    if struct.unpack_from(">6H", image, NSM3D_LOADER_OFFSET) != (
+def extract_loader(image, product="8250"):
+    """Return the whole owned upload, including its table and code tail."""
+    profiles = {"8250": (NSM3D_FLASH_SHA1, NSM3D_LOADER_OFFSET, NSM3D_LOADER_SHA1),
+                "3350": (NHM9_FLASH_SHA1, 0x1ead0c, NHM9_LOADER_SHA1)}
+    if product not in profiles:
+        raise ValueError("unsupported loader product")
+    expected, offset, program_sha1 = profiles[product]
+    if hashlib.sha1(image).hexdigest() != expected:
+        raise ValueError(f"not the pinned {product} flash")
+    if struct.unpack_from(">6H", image, offset) != (
             0xfd00, 0xff80, 0x027e, 0x0500, 0x0078, 0):
         raise ValueError("unexpected loader descriptor")
-    start = NSM3D_LOADER_OFFSET + 12
+    start = offset + 12
     payload = image[start:start + 638 * 2]
-    if hashlib.sha1(payload).hexdigest() != NSM3D_LOADER_SHA1:
+    if hashlib.sha1(payload).hexdigest() != program_sha1:
         raise ValueError("unexpected loader upload")
     return payload
 
@@ -63,6 +77,8 @@ def extract(image, product="8210"):
                  (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
         "3310": (NHM5_FLASH_SHA1, NHM5_DESCRIPTOR_OFFSET, PROGRAM_WORDS,
                  (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
+        "3350": (NHM9_FLASH_SHA1, NHM9_DESCRIPTOR_OFFSET, 247,
+                 (0x0f00, 0, 247, 0x0f00, 0x00dc, 0), NHM9_PROGRAM_SHA1),
     }
     if product not in profiles:
         raise ValueError("unsupported verifier product")
@@ -83,18 +99,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flash", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250", "6250", "3310"), default="8210")
-    parser.add_argument("--loader", action="store_true", help="extract the 8250 second-stage upload")
+    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250", "6250", "3310", "3350"), default="8210")
+    kind = parser.add_mutually_exclusive_group()
+    kind.add_argument("--loader", action="store_true", help="extract the 8250/3350 second-stage upload")
+    kind.add_argument("--fragment", action="store_true", help="extract the owned 8250/3350 bootstrap fragment")
     args = parser.parse_args()
     try:
-        if args.loader and args.product != "8250":
-            raise ValueError("loader extraction is only recovered for 8250")
-        program = extract_loader(args.flash.read_bytes()) if args.loader else extract(args.flash.read_bytes(), args.product)
+        if args.output.resolve() == args.flash.resolve():
+            raise ValueError("output must not overwrite the source flash")
+        image = args.flash.read_bytes()
+        program = (extract_loader(image, args.product) if args.loader else
+                   extract_program_fragment(image, args.product) if args.fragment else
+                   extract(image, args.product))
     except (OSError, ValueError) as error:
         parser.exit(1, f"NSM-3 verifier extraction failed: {error}\n")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(program)
-    kind = "loader upload" if args.loader else "verifier"
+    kind = "loader upload" if args.loader else "bootstrap fragment" if args.fragment else "verifier"
     print(f"{args.product} {kind}: {len(program) // 2} words, SHA-1 {hashlib.sha1(program).hexdigest()}")
 
 

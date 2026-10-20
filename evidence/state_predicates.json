@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm9_v530_own_dsp_upload_assets", "owner": "nhm9_static_firmware", "status": "satisfied",
+      "predicate": "The pinned NHM-9 v5.30 PPM-A executable contains independently extractable own loader, bootstrap fragment and verifier-format program",
+      "current": "The 28-pointer catalogue at 3c2248 includes slot 0 descriptor 3ead0c with 638 payload words, slot 15 descriptor 3f0c48 with 104 words and slot 27 descriptor 3f1e30 with 247 words. Full image, six-halfword headers and payload hashes are checked independently. Only the 104-word fragment is byte-identical to the separately qualified 8250 input; neither its loader nor the 223-word sibling verifier is substituted. These are static source assets, not observed MCU transfer, native execution, fitted-mask identity, a complete ROM6 mask or boot acceptance. Physical hardware and remaining runtime boundaries are documented separately.",
+      "evidence": ["docs/3350_bringup.md", "roms/README.md", "tools/extract_nsm3_verifier.py", "tools/test_extract_nsm3_verifier.py"]
+    },
+    {
       "id": "nhm9_v530_executable_baseline", "owner": "nhm9_source_qualification", "status": "satisfied",
       "predicate": "The acquired NHM-9 v5.30 installer supplies identified contiguous own MCU and PPM records without importing provisioning",
       "current": "The SHA-256-qualified installer contains 29 complete adjacent gzip members, seven strictly decoded phone-record streams: 312 MCU records covering 200000..46ffff and six 96-record PPM packs covering 470000..52ffff. Each embedded header identifies v5.30/15-03-03/NHM-9; each PPM header supplies its A-F identity. Combined A is 330000 bytes with SHA-1 3d0dce9c098bdd619c6f3684f739796f64b66169. No PMM stream or fabricated tail is supplied. The duplicate installer wrapper is not independent evidence. No hardware configuration, fitted mask, boot or handset service is promoted.",

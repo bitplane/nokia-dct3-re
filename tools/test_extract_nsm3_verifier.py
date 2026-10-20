@@ -1,11 +1,54 @@
 import struct
 import unittest
+import contextlib
+import io
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from tools import extract_nsm3_verifier as verifier
 
 
 class VerifierExtractionTest(unittest.TestCase):
+    def test_cli_cannot_overwrite_source_flash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'original.fls'
+            source.write_bytes(b'preserve original')
+            with patch('sys.argv', ['extract', str(source), str(source)]), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as caught:
+                    verifier.main()
+            self.assertEqual(1, caught.exception.code)
+            self.assertEqual(b'preserve original', source.read_bytes())
+
+    def test_3350_own_uploads_when_available(self):
+        source = Path(__file__).resolve().parents[1] / 'roms/noki3350/3350f530a.fls'
+        if not source.exists():
+            self.skipTest('normalized NHM-9 input absent')
+        image = source.read_bytes()
+        self.assertEqual(494, len(verifier.extract(image, '3350')))
+        self.assertEqual(1276, len(verifier.extract_loader(image, '3350')))
+        self.assertEqual(208, len(verifier.extract_program_fragment(image, '3350')))
+        with self.assertRaisesRegex(ValueError, 'pinned 8250'):
+            verifier.extract_loader(image, '8250')
+
+    def test_3350_uses_247_word_descriptor(self):
+        image = bytearray(verifier.NHM9_DESCRIPTOR_OFFSET + 12)
+        struct.pack_into('>6H', image, verifier.NHM9_DESCRIPTOR_OFFSET,
+                         0x0f00, 0, 247, 0x0f00, 0xdc, 0)
+        image += b'\x12\x34' * 247
+        with patch.object(verifier.hashlib, 'sha1', side_effect=[
+                self.digest(verifier.NHM9_FLASH_SHA1), self.digest(verifier.NHM9_PROGRAM_SHA1)]):
+            self.assertEqual(b'\x12\x34' * 247, verifier.extract(image, '3350'))
+        struct.pack_into('>H', image, verifier.NHM9_DESCRIPTOR_OFFSET + 4, 223)
+        with patch.object(verifier.hashlib, 'sha1', return_value=self.digest(verifier.NHM9_FLASH_SHA1)):
+            with self.assertRaisesRegex(ValueError, 'descriptor'):
+                verifier.extract(image, '3350')
+
+    def test_loader_and_fragment_reject_unknown_products(self):
+        for extract in (verifier.extract_loader, verifier.extract_program_fragment):
+            with self.assertRaisesRegex(ValueError, 'unsupported'):
+                extract(b'', 'unknown')
+
     def test_3310_uses_own_descriptor_and_rejects_wrong_product(self):
         image = bytearray(verifier.NHM5_DESCRIPTOR_OFFSET + 12)
         struct.pack_into(">6H", image, verifier.NHM5_DESCRIPTOR_OFFSET,

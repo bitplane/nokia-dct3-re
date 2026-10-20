@@ -382,6 +382,13 @@ The normalized CPU-order file is `0x330000` bytes, SHA-1
 `3d0dce9c098bdd619c6f3684f739796f64b66169`, covering `0x200000..0x52ffff`.
 No erased or donor tail is appended. This is a qualified analysis input,
 not a declared MAME set or boot result; see `docs/3350_bringup.md`.
+Own 247-word verifier-format code, the 638-word loader and the 104-word
+bootstrap fragment are additionally extracted into `roms/research/nhm9/` by
+`tools/extract_nsm3_verifier.py --product 3350` (and `--loader`/`--fragment`).
+Their source descriptors and hashes are in the bring-up contract. The fragment
+matches the acquired 8250 fragment, but this does not supply a complete ROM6
+mask or establish native execution. Nokia's combined product/system manuals
+are retained under `reference-docs/nhm9/` with hashes in that same contract.
 
 ### Nokia 3410 NHM-2 v5.46
 
