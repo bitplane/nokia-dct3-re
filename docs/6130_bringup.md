@@ -589,6 +589,16 @@ rejoin212c56, and argument!=1 continues to the043c publication. Thus erased
 unevidenced fixture. Caller2144b0 supplies argument2, while the separate
 2144b4 selector can supply1 via2144c6. Their upstream dispatch/predicates
 remain open; this observation does not establish that either is defective.
+
+Shared-tail runtime qualification matters here: `tmp/nsk3-radio-context`
+observes neither138f case214496 nor its2144a0 pointer test. The separate
+`tmp/nsk3-radio-argument` run observes2144b0 with original object102eb4,
+header03e90100. Header03e9 reaches213f54, byte2=1 selects214146,
+and the later2141d8 comparison branches to2144b0 because1!=7. Therefore
+the actual argument2 is not caused by138f's non-null context pointers.
+This is a concrete MCU mode command; its producer and relation to controller
+request09ec remain to be proved. The138f path is an alternate static route,
+not the observed cause. Do not edit the unrelated context pointers to test it.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
