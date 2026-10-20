@@ -61,7 +61,7 @@ cold runs use `nsb1_security_fixture.lua`/`nsb1_pin_reload.lua` for28s. The
 5190's Menu/Navi contact is column1/mask04 and Up is column1/mask10; the 6130's
 softkey/navigation cells are not inherited by these fixtures.
 
-### SIM unblock and cold new-PIN verification
+### SIM credential changes and recovery
 
 An ordinary physical PIN1 change is separately accepted through own Menu4-2-5-1
 (Access codes). Current1234, new4321 and confirmation produce one CHANGE CHV
@@ -78,8 +78,25 @@ and preserves the entire changed card without repeating the change command.
 The warm70s fixture uses `nsb1_pin_change.lua`; the cold28s fixture uses
 `nsb1_pin_changed_reload.lua`. Existing native/own-flash gates, reviewed PIN
 prompt/changed/accepted frames, physical contacts and linked cold-device hashes
-remain mandatory. This does not establish PIN2 change or change-rejection
-controls, which remain separate acceptance items.
+remain mandatory. Change-rejection controls remain separate acceptance items.
+
+Ordinary PIN2 change is also independently accepted through own Menu4-2-5-2.
+The warm process authenticates5678, changes it to8765 and confirms; only PIN2
+credential bytes change. A separate cold process authenticates8765 by changing
+it back to5678. Both use CHANGE CHV/9000, never UNBLOCK CHV, and the final whole
+card equals the original input. The reviewed PIN2 code changed frame, native
+execution, physical contacts and linked storage are checked in each process.
+
+```sh
+.venv/bin/python tools/nsb1_pin_change_check.py \
+  tmp/nsb1-pin-request-on-cold tmp/nsb1-pin2-change \
+  tmp/nsb1-pin2-restore-cold --pin2-roundtrip
+```
+
+The70s phases use `nsb1_pin2_change.lua` and `nsb1_pin2_restore.lua`; these
+select physical PIN2 digits in the existing own Access codes fixture. The
+round-trip result proves persisted credential authentication, not cached CHV2
+verification or PIN2 exhaustion/PUK2 handling.
 
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled

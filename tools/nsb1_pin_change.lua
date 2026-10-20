@@ -8,6 +8,16 @@ local cells={
     {2,4},{4,2},{3,2},{2,2},{1,4}, -- New4321
     {2,4},{4,2},{3,2},{2,2},{1,4}  -- Confirm4321
 }
+if _G.nsb1_pin2_change then
+    cells={{1,4},{2,4},{3,2},{3,4},{3,2}} -- Own Menu4-2-5-2
+    local digits={[5]={3,4},[6]={4,4},[7]={2,8},[8]={3,8}}
+    local old=_G.nsb1_pin2_restore and {8,7,6,5} or {5,6,7,8}
+    local new=_G.nsb1_pin2_restore and {5,6,7,8} or {8,7,6,5}
+    for _,number in ipairs({old,new,new}) do
+        for _,digit in ipairs(number) do cells[#cells+1]=digits[digit] end
+        cells[#cells+1]={1,4}
+    end
+end
 local events={}
 for index,cell in ipairs(cells) do
     local field

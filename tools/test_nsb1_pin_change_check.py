@@ -5,6 +5,15 @@ from tools.sim_security_trace_check import CHV_OFFSET, padded_pin
 
 
 class Nsb1PinChangeTests(unittest.TestCase):
+    def test_pin2_preserves_pin1_and_all_other_bytes(self):
+        before = bytearray(make_profile(True))
+        before.extend(bytes(3570 - len(before)))
+        after = changed_card(before, True)
+        offset = CHV_OFFSET + 8
+        self.assertEqual(after[:offset], before[:offset])
+        self.assertEqual(after[offset:offset + 8], padded_pin('8765'))
+        self.assertEqual(after[offset + 8:], before[offset + 8:])
+
     def test_only_pin1_is_changed(self):
         before = bytearray(make_profile(True))
         before.extend(bytes(3570 - len(before)))

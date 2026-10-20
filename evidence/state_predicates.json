@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_ordinary_pin2_change", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Physical NSB-1 PIN2 change persists8765 and a separate cold process authenticates it by restoring5678",
+      "current": "Own PPM-A Menu4-2-5-2 receives current5678, new8765 and confirmation through physical contacts, produces one successful CHANGE CHV and renders PIN2 code changed. The complete card changes only PIN2 credential bytes. A linked cold process physically uses8765 as current PIN2 and restores5678 with another CHANGE CHV9000; the final whole card equals the original seed. Both qualify own executable/native execution, startup PIN1 and separate phone code, reviewed PIN2/accepted frames, contact sequences and preceding saved-device hashes. UNBLOCK, request toggles and file mutation are forbidden. This does not establish PIN2 exhaustion/PUK2 recovery, rejected changes, fitted mask, native radio or calls.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_pin_change.lua", "tools/nsb1_pin2_change.lua", "tools/nsb1_pin2_restore.lua", "tools/nsb1_pin_change_check.py", "tools/test_nsb1_pin_change_check.py"]
+    },
+    {
       "id": "nsb1_v671_ordinary_pin_change", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Physical NSB-1 ordinary PIN1 change persists4321 for independent cold authentication without changing other card state",
       "current": "Own PPM-A Menu4-2-5-1 physically receives current1234, new4321 and confirmation, issues exactly one CHANGE CHV9000 and displays PIN code changed. The entire saved card differs only in PIN1 credential bytes; PIN2/PUK credentials, request state and retry counters are preserved. A linked cold process displays the PIN prompt, physically verifies4321, independently enters phone code12345 and preserves the complete card without another CHANGE or UNBLOCK. Both runs qualify own executable/native execution, physical contacts, reviewed frames and preceding saved-device hashes. This does not establish PIN2 change, rejected-change controls, fitted mask, native radio or connected calls.",
