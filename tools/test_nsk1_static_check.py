@@ -3,7 +3,7 @@ import struct
 import unittest
 from unittest.mock import patch
 
-from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract,read_peripheral_contract,read_keymap_contract
+from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract,read_peripheral_contract,read_keymap_contract,phonecode_contract
 
 
 class Nsk1StaticTest(unittest.TestCase):
@@ -34,7 +34,8 @@ class Nsk1StaticTest(unittest.TestCase):
         with patch('tools.nsk1_static_check.PROFILES',profiles), \
                 patch('tools.nsk1_static_check.read_eeprom_output_contract',return_value={}), \
                 patch('tools.nsk1_static_check.read_peripheral_contract',return_value={}), \
-                patch('tools.nsk1_static_check.read_keymap_contract',return_value={}):
+                patch('tools.nsk1_static_check.read_keymap_contract',return_value={}), \
+                patch('tools.nsk1_static_check.phonecode_contract',return_value={}):
             result = inspect(image,'test')
             self.assertEqual('0x2000ec',result['thumb_entry'])
             self.assertFalse(result['boot_or_fitted_hardware_proved'])
@@ -61,6 +62,24 @@ class Nsk1StaticTest(unittest.TestCase):
     def test_unknown_variant_rejected(self):
         with self.assertRaisesRegex(ValueError,'variant'):
             inspect(b'','unknown')
+
+    def test_phone_retry_uses_own_record_directory(self):
+        for variant,shift in (('standard',0),('2915',-0x10)):
+            image = bytearray(0x100000)
+            image[0x8f4e0+shift:0x8f4ec+shift] = bytes.fromhex('b510493e78092905db05202c')
+            for offset,value in ((0x8f5dc,0x10bee8),(0x8f5d4,0x10bee4),(0x8f5e8,0x709),(0x8ca64,0x200100)):
+                struct.pack_into('>I',image,offset+shift,value)
+            struct.pack_into('>IHH',image,0x138,0x200200,9,0)
+            for index,offset,length in ((1,0x2a0,8),(8,0x2a0,4),(9,0x2a4,1)):
+                struct.pack_into('>IHH',image,0x200+index*8,0x700+index,offset,length)
+            result = phonecode_contract(image,variant)
+            self.assertEqual('0x2a4',result['retry_eeprom'])
+            self.assertEqual(5,result['rejected_count_at_least'])
+            for offset in (0x8f4e0+shift,0x8f5dc+shift,0x8f5e8+shift,0x138,0x24f):
+                image[offset] ^= 1
+                with self.subTest(variant=variant,offset=offset),self.assertRaises(ValueError):
+                    phonecode_contract(image,variant)
+                image[offset] ^= 1
 
     def test_gpio_contract_and_each_fragment_mutation(self):
         fragments = (

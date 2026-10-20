@@ -10,6 +10,7 @@ import json
 
 from tools.dct3_rom4_record_codec import encode_record,retained_record_transform,LOCK_TABLE_82,ENCODE_SCHEDULE
 from tools.nsk1_record_exchange_check import check
+from tools.nsk1_static_check import phonecode_contract
 
 
 SOURCE = 'https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0'
@@ -23,6 +24,15 @@ def repair_security_checksum(image):
     result = bytearray(image)
     checksum = (sum(image[0x40:0x11e])-sum(image[0x74:0x76])) & 0xffff
     result[0x11e:0x120] = checksum.to_bytes(2,'big')
+    return bytes(result)
+
+
+def initialize_phone_retry(image, flash):
+    if len(image) != 2048:
+        raise ValueError('phone retry fixture requires own 2048-byte EEPROM')
+    contract = phonecode_contract(flash,'standard')
+    result = bytearray(image)
+    result[int(contract['retry_eeprom'],16)] = 0
     return bytes(result)
 
 

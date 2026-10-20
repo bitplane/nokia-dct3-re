@@ -7,10 +7,18 @@ import unittest
 from unittest.mock import patch
 
 from tools.dct3_rom4_record_codec import decode_record,retained_record_transform,LOCK_TABLE_82,ENCODE_SCHEDULE
-from tools.nsk1_record_profile import build_profile,build_from_capture,check_observation,EXAMPLE_RECORDS,repair_security_checksum
+from tools.nsk1_record_profile import build_profile,build_from_capture,check_observation,EXAMPLE_RECORDS,repair_security_checksum,initialize_phone_retry
 
 
 class Nsk1RecordProfileTest(unittest.TestCase):
+    def test_retry_initialization_only_changes_decoded_field(self):
+        original = bytes([255])*2048
+        with patch('tools.nsk1_record_profile.phonecode_contract',return_value={'retry_eeprom':'0x2a4'}):
+            result = initialize_phone_retry(original,b'own flash')
+        self.assertEqual([0x2a4],[index for index,(before,after) in enumerate(zip(original,result)) if before != after])
+        self.assertEqual(0,result[0x2a4])
+        with self.assertRaises(ValueError):
+            initialize_phone_retry(original[:-1],b'')
     def test_security_checksum_changes_only_checksum_and_excludes_word_74(self):
         image = bytes([255])*2048
         repaired = repair_security_checksum(image)

@@ -13,7 +13,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsk1_static_check import inspect
 from tools.nsk1_record_exchange_check import check as check_records
-from tools.nsk1_record_profile import build_from_capture,check_observation,repair_security_checksum
+from tools.nsk1_record_profile import build_from_capture,check_observation,repair_security_checksum,initialize_phone_retry
 from tools.nsk1_input_check import check as check_input
 
 
@@ -81,7 +81,7 @@ def check_card_startup(summary, trace, snapshots):
             'scope':'native compatibility SIM initialization and security-prompt presentation; not phone-code acceptance, menu, radio or fitted-mask proof'}
 
 
-def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False, nominal_adc2=False, insert_sim=False):
+def prepare(root, run, record_profile_from=None, physical_keys=False, security_checksum=False, nominal_adc2=False, insert_sim=False, initialized_retry=False):
     if run.exists():
         raise ValueError('NSK-1 observation requires a fresh run directory')
     if security_checksum and record_profile_from is None:
@@ -90,6 +90,8 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
         raise ValueError('nominal ADC2 comparison requires checksum control')
     if insert_sim and not nominal_adc2:
         raise ValueError('inserted-card observation requires nominal-input control')
+    if initialized_retry and not insert_sim:
+        raise ValueError('phone retry comparison requires inserted-card control')
     sources = [(root / name, digest) for name, digest in INPUTS]
     for source, digest in sources:
         if hashlib.sha1(source.read_bytes()).hexdigest() != digest:
@@ -108,6 +110,13 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
                              'stored_after':initial_eeprom[0x11e:0x120].hex(),
                              'written_range':'011e..011f',
                              'eeprom_sha256':hashlib.sha256(initial_eeprom).hexdigest()}
+    retry_metadata = None
+    if initialized_retry:
+        before = initial_eeprom
+        initial_eeprom = initialize_phone_retry(before,sources[0][0].read_bytes())
+        retry_metadata = {'classification':'diagnostic own retry initialization, not a credential change',
+                          'written_range':'02a4','before':before[0x2a4], 'after':initial_eeprom[0x2a4],
+                          'eeprom_sha256':hashlib.sha256(initial_eeprom).hexdigest()}
     target = run / 'inputs/nsk1r4t'
     target.mkdir(parents=True)
     for source, _ in sources:
@@ -134,6 +143,7 @@ def prepare(root, run, record_profile_from=None, physical_keys=False, security_c
         'adc2_source':554 if nominal_adc2 else 1023,
         'adc2_scope':'nominal CCONT transfer hypothesis, not measured NSK-1 calibration' if nominal_adc2 else 'generic saturated research control',
         'inserted_synthetic_sim':insert_sim,
+        'phone_retry':retry_metadata,
         'resident_mask_and_52mhz_clock': 'NSE-1 compatibility inputs, unproved on NSK-1',
         'peer_completions': False, 'physical_keys': physical_keys,
     }, indent=2)+'\n')

@@ -14,16 +14,18 @@ card** pixels at 10 and 20 seconds and forwards physical Menu/Up/C contacts
 as logical `19/17/1a`. The own SIMI register/clock/FIQ setup now selects the
 shared controller. With the explicit synthetic card inserted, native T=0
 initialization reads identity/service files and scans fifty ADN records,
-then renders **Security code**. This is native compatibility boot, SIM
-initialization and key-forwarding acceptance, not phone-code acceptance,
-usable menu, registration, calls or SMS acceptance.
+then renders **Security code**. A separately decoded retry-byte fixture permits
+physical `12345` acceptance and Menu/Select navigation into the Phone book
+list. This is native compatibility boot, SIM initialization and physical
+code/menu acceptance, not contact persistence, registration, calls or SMS.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
-The next boundary is physical phone-code acceptance and normal menu use.
+The next boundary is a physical contact save and independently cold-read
+SIM phonebook transaction.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -633,6 +635,54 @@ readiness/physical-key predicates as the empty control. Frames at 10 and
 `f82d19b12314200132f0d19ab17a2d86b202d65ba7bc817d1a5c6cbb90a59dfc`.
 This is phone-lock presentation, not successful code entry, CHV verification,
 persistent contact mutation or radio/service acceptance.
+
+## Phone security and menu contract
+
+Own validator `28f534` accepts five-character input, encodes/compares it and
+passes its Boolean result to retry gate `28f4e0`. The latter loads byte
+`10bee8` and rejects all results at counts at least five. Below five, a
+failed comparison increments the byte, while a successful comparison clears
+a nonzero count. Both persist through record `0709` via `28c9da`.
+
+Own lookup `28c690` uses directory `2a8b34`; group 7 points to `2a88bc`.
+Its direct entries map `0701` to eight bytes at EEPROM `02a0`, encoded-code
+view `0708` to four bytes at `02a0`, and retry `0709` to one byte at `02a4`.
+The static checker validates the gate, literals, directory and overlapping
+field extents independently on both variants. The NSK-1 offset is **not**
+the NSB-1 offset `04ac`.
+
+The erased-retry control physically enters `12345` and reaches the own gate
+with `match=1/retry=ff`: the code matches, but the retry gate refuses it.
+The positive fixture changes **only `02a4` to zero** beyond the existing
+record/checksum inputs, before execution. The same physical code then reaches
+`match=1/retry=0`. Three subsequent physical Menu contacts complete the UI
+continuation, open the Phone book menu and select its list. This is explicit
+synthetic retry initialization, not a recovered factory default, credential
+change or live firmware-state bypass.
+
+```sh
+# Negative control: matching code, erased retry counter, remains locked.
+.venv/bin/python tools/nsk1_security_compare.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-security-negative
+# Positive control: only the independently mapped retry byte is initialized.
+.venv/bin/python tools/nsk1_security_compare.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-security-positive --initialized-retry
+```
+
+Both isolated 31-second runs require all eighteen physical contacts, the
+exact decoded nine-key sequence, matching-code/retry observations, full
+checklist snapshots, legal native execution samples through 30 seconds,
+both complete record read exchanges, unchanged executable flash, preserved
+identity and encoded-code bytes, and the expected persisted retry byte.
+The intervening native record-update notification remains separately retained,
+not silently treated as a read response.
+
+The negative gate requires Code error at 26 seconds and the unchanged
+Security code prompt at 28/30 seconds. The positive gate requires exact
+84x48 Phone book list pixels at 26/28/30 seconds, RGB SHA256
+`3600e3d1cab564b185d03403552ea401e1e76edd07b110184716700828a5df2a`.
+The list exposes Search / Add entry / Erase; no persistent contact write,
+network registration, call, SMS or fitted-mask claim follows from this gate.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

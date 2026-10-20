@@ -80,6 +80,45 @@ def read_peripheral_contract(image, variant):
             'physical_key_mapping_proved': False, 'electrical_timing_proved': False}
 
 
+def phonecode_contract(image, variant):
+    """Own retry gate and record directory; no credential/provisioning inference."""
+    shift = {'standard':0,'2915':-0x10}[variant]
+    start = 0x8f4e0+shift
+    if image[start:start+12] != bytes.fromhex('b510493e78092905db05202c'):
+        raise ValueError('own phone-code retry gate differs')
+    def word(address):
+        offset = address+shift-0x200000
+        if offset < 0 or offset+4 > len(image):
+            raise ValueError('phone-code literal outside image')
+        return struct.unpack_from('>I',image,offset)[0]
+    if word(0x28f5e8) != 0x709:
+        raise ValueError('own retry record identifier differs')
+    directory = word(0x28ca64)
+    group = directory-0x200000+7*8
+    if group < 0 or group+8 > len(image):
+        raise ValueError('own security directory outside image')
+    pointer,limit,_ = struct.unpack_from('>IHH',image,group)
+    base = pointer-0x200000
+    if limit < 9 or base < 0 or base+(limit+1)*8 > len(image):
+        raise ValueError('own security records outside image')
+    records = {}
+    for index,size in ((1,8),(8,4),(9,1)):
+        identifier,offset,length = struct.unpack_from('>IHH',image,base+index*8)
+        if identifier != 0x700+index or length != size or offset+length > 2048:
+            raise ValueError('own security record identity or extent differs')
+        records[identifier] = (offset,length)
+    context,retry = word(0x28f5d4),word(0x28f5dc)
+    if (not 0x100000 <= context <= 0x110000-8 or retry != context+4
+            or records[0x708][0] != records[0x701][0]
+            or records[0x709][0] != records[0x701][0]+4):
+        raise ValueError('own retry field does not match security context')
+    return {'validator':hex(0x28f534+shift),'retry_gate':hex(0x28f4e0+shift),
+            'retry_read':hex(0x28f4e4+shift),'retry_ram':hex(retry),
+            'retry_record':'0x709','retry_eeprom':hex(records[0x709][0]),
+            'encoded_code_eeprom':hex(records[0x708][0]),'rejected_count_at_least':5,
+            'scope':'own retry/record layout, not a factory credential or retry default'}
+
+
 def read_keymap_contract(image, variant):
     shift = {'standard':0,'2915':-0x10}[variant]
     decoder = bytes.fromhex('b500f7fefd7128ffd101203ebd0009c12900d00949167809008a188918404913180838807800bd0021194a1178124351184049105c08bd00')
@@ -148,6 +187,7 @@ def inspect(image,variant):
             'eeprom_output_contract':read_eeprom_output_contract(image,variant),
             'peripheral_contract':read_peripheral_contract(image,variant),
             'keymap_contract':read_keymap_contract(image,variant),
+            'phonecode_contract':phonecode_contract(image,variant),
             'arm_entry':'0x200040','thumb_entry':'0x2000ec',
             'firmware_eeprom_geometry':eeprom_geometry(image[5]),
             'stack_literal':hex(int.from_bytes(image[0x16c:0x170],'big')),
