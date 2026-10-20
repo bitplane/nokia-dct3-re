@@ -38,7 +38,7 @@ def analyze(image):
     checks = {0x2941e4:0x294210,0x26a534:0x13b8,0x218c58:0x13a3,
               0x218950:0x218996,0x218c1c:0x043f,0x24d7dc:0x0834,
               0x26e234:0x03e9,0x26e230:0x10be77,0x2086c4:0x10a444,
-              0x20c914:0x0834}
+              0x20c914:0x0834,0x20c970:0x20a590,0x221374:0x09ec}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -47,6 +47,7 @@ def analyze(image):
                  0x26df9a:'4825794170a1790070e0',
                  0x20cb58:'20a3010146484288d100e53d',
                  0x208588:'484e7fc170a17f0070e0',
+                 0x2091b2:'78a070682801',
                  0x2212ce:'200fe7f9'}
     for address,encoded in fragments.items():
         expected = bytes.fromhex(encoded)
@@ -73,6 +74,10 @@ def analyze(image):
                                    'a30_constructor':'0x221236','target_task':15,
                                    'literal_shift_direct_bl_producers':[hex(address) for address in producers],
                                    'scope':'MOVS/LSLS/direct-BL pattern only; not all argument or descriptor sources'},
+            'mode_request':{'input':'0x09ec','post_task':15,'receive':'0x2092f6',
+                            'mode_handler':'0x2091b2','owner':'0x10a444',
+                            'main_dispatch':'0x20c950','state6_handler':'0x20a590',
+                            'scope':'static mode-storage/state-6 selection contract; runtime state requires its own trace'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,

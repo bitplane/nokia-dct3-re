@@ -141,9 +141,22 @@ observes object header 158b00c1 from caller 22370d before the 09ec request;
 no further helper result is observed through 61 seconds. Own routine 224bdc
 sends 09ec and enters that receive loop, accepting 09f0 or 0434 as exit
 statuses. Constructor 221236's 09ec branch fills a mode byte from its
-firmware owner and posts to task 15. The mode's runtime value and the
-task-15 receive/reply route remain to map; this is an observed earlier
-transaction, not proof that an external peer must fabricate either exit.
+firmware owner and posts to task 15. This is an observed earlier transaction,
+not proof that an external peer must fabricate either exit.
+
+The request is now observed posted to task 15 as object 1014a4/header
+09ec0117: mode byte +2 is 1. Task 15 reads it at 2092f6; its own subtract
+cascade selects 2091b2. This stores mode 1 at owner 10a444 +1 and flag 1
+at +2, clears auxiliary owner 10a464 +1, then calls 280408. The receive
+helper returns 09ec to main dispatcher 20c940. Runtime 20c950 reads lifecycle
+state 6 at owner +42, selecting table 20c958 index 6 -> 20a590.
+That handler recognizes 09ec; mode 1 is not its special mode-4 branch, so
+it takes 20a65c, stores a local flag at owner +1e via 20a83e and continues
+the lifecycle through 20bbf4/20aa2e. This is not a lost mailbox delivery or
+an immediate completion publisher. The next question is which continuation
+or receive input this state-6 lifecycle requires before it acknowledges the
+mode request. The temporary broad RAM read probe was removed once the own
+consumer was found; only targeted read-only probes remain.
 
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
