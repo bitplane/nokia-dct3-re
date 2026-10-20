@@ -27,7 +27,7 @@ class StateContractTest(unittest.TestCase):
                         0x248616,0x248b9e,0x249292,0x24709c,0x24753e,
                         0x2ab522,0x281f16,0x281f50,0x2820a2,0x2820ce,0x281fa8,0x282460,
                         0x2539ba,0x253cbe,0x288170,0x288000,0x2557be,
-                        0x253d24,0x2883fc,0x2882e8):
+                        0x253d24,0x2883fc,0x2882e8,0x208a74,0x208e44,0x208df4):
             changed=bytearray(image)
             changed[address-0x200000]^=1
             with self.subTest(address=hex(address)),self.assertRaises(ValueError):decode(changed)

@@ -753,6 +753,17 @@ at254181/25455f/255737, never mode2. The queue producers and ordinary
 mode2-selection lifecycle remain unresolved; no07ea post is required by
 this path. Contract mutation checks anchor selector, queue owner/store and
 mode-selection instructions without claiming exhaustive producer coverage.
+
+Queue eligibility is narrower than header production. Constructor208a48's
+base07d1 cascade sends07d3 to208e44. A nonzero argument builds a buffer
+via208718 and writes outer byte2=0. A zero argument uses retained pointer
+[10a7d8+54]; only `((buffer[4] >> 1) & 7) == 4` writes outer byte2=3,
+otherwise0. All paths select mailbox11 via208eaa. Thus the many literal
+07d3 loads supplying nonzero scalar arguments are not queue-populating
+forms. The45s qualified `tmp/nsk3-queue-producers` capture observes no
+208a48 construction with07d3/07d4, retains empty queue/mode0 and passes
+the mode-chain/cache/server checks. The retained-buffer producer and other
+constructor families remain open; no queue content is to be invented.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
