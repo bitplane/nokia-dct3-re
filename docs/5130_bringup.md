@@ -95,3 +95,37 @@ This says nothing about provisioned identity/security/calibration contents.
 Both real images pass, along with initializer/payload/null-slot mutation
 controls. The next boundary is the own MCU's catalogue selection and DSP
 release/identity grammar; no release result has been synthesized.
+
+## Cold-transfer contract
+
+The standard image's cold-transfer entry is `273488`; the separately
+located `2915` counterpart is `273478`. The former loads catalogue cell
+`10b2c4` from literal `2737ac`, exactly slot 25 of the initialized table,
+then copies the descriptor payload using its declared count/transfer fields.
+It initializes shared words `10000/10002/10004/10006` with zero plus `ffff`
+sentinels, and constructs seven argument halfwords beginning at `100f6`:
+
+```
+0100 0300 0000 8000 0001 0001 0200
+```
+
+The argument-write fragment is at `2734c6..2734f6` (standard) and
+`2734b6..2734e6` (`2915`). After the firmware's release/control update,
+`27351a` compares shared `10004` against `ffff`; later alternating
+handshake loops are at `2735c8/2735d2`, with final `10002` sentinel polling
+at `2735da`. Runtime transfer counts and successful results are not yet
+observed. Do not replace any of these reads with fabricated values.
+
+The later initializer `273624` clears the shared window, sets ring cursors,
+loads descriptor 0 through catalogue base `10b260` at `27373c`, and copies
+its first five header halfwords to the argument area before signaling it.
+The standard descriptor-0 header matches the established NSE-1 loader
+grammar (`fd00 ff80 0244 0500 0078 0000`), while the `2915` payload count
+is `0241`. Shared grammar does not make the payloads, variants or resident
+masks interchangeable.
+
+These own MCU contracts justify a separately labelled native compatibility
+spike against the acquired NSE-1 ROM4 input. Such a spike must keep own MCU
+and PPM bytes, erased own external storage, and bounded read-only upload/
+CPU observations. It must not promote board/clock/fitted-mask correctness
+from a successful handshake, or seed NSE-1 EEPROM to get past later checks.
