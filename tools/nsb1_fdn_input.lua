@@ -18,6 +18,7 @@ local cells={{1,4},{2,4},{3,2},{2,4},{1,4},{1,4},
 if _G.nsb1_fdn_observe then
     while #cells>4 do table.remove(cells) end
 end
+cells=_G.nsb1_fdn_contacts or cells
 local events={}
 for index,cell in ipairs(cells) do
     local field
@@ -26,10 +27,11 @@ for index,cell in ipairs(cells) do
     end
     assert(field,'own FDN contact missing')
     events[#events+1]={26+(index-1)*2,field,1,index}
-    events[#events+1]={26.2+(index-1)*2,field,0,index}
+    local duration=index==#cells and _G.nsb1_fdn_hold_last or 0.2
+    events[#events+1]={26+(index-1)*2+duration,field,0,index}
 end
 local index,frame=1,1
-local times={33,35,37,39,41,49,51,53}
+local times=_G.nsb1_fdn_frames or {33,35,37,39,41,49,51,53}
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     while events[index] and now>=events[index][1] do

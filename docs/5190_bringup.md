@@ -90,8 +90,29 @@ First preparation uses `nsb1_fdn_prepare.py`; later phases use the unchanged
 `nsb1_fdn_cold.lua` runs40s. A passive SIMI TX tap caps4096 bytes and the gate
 rejects saturation. Own input hashes/native execution, physical security and
 FDN contacts, complete-card effects and reviewed frames remain mandatory.
-FDN record manipulation and local dial restrictions are not yet accepted on
-NSB-1; registration and native speech remain separate unresolved boundaries.
+Physical PIN2-protected FDN record save and cold visible retrieval also pass.
+Numbers/Add receives5678, name A and number12345; one exact absolute UPDATE
+RECORD stores the32-byte ASCII/BCD object in record1. The entire card changes
+only that record. A separate cold Search displays A, and a physical four-second
+`#` hold displays12345; release returns to the same list. No UPDATE RECORD or
+card change occurs during cold retrieval. The hold is a fixture duration, not
+a claim about the firmware's minimum long-press threshold.
+
+An independent wrong5675 Add attempt returns VERIFY9804 and Code error, sends
+no UPDATE RECORD and changes only PIN2 retries3-to2. The record gate checks
+exact PIN/APDU payloads, physical security/FDN contacts, hold duration,
+reviewed Saved/number/list/error frames, native execution and full card/cold
+links. The shared card is not prepopulated to obtain these results.
+
+```sh
+.venv/bin/python tools/nsb1_fdn_record_check.py tmp/nsb1-fdn-off-cold \
+  tmp/nsb1-fdn-write tmp/nsb1-fdn-read-held tmp/nsb1-fdn-write-wrong
+```
+
+The78s save,54s cold view and60s rejection use `nsb1_fdn_write.lua`,
+`nsb1_fdn_read.lua` and `nsb1_fdn_write_wrong.lua`. FDN in-place edit/erase and
+local dial restrictions remain unaccepted on NSB-1; registration and native
+speech remain separate unresolved boundaries.
 
 ### SIM credential changes and recovery
 
