@@ -738,6 +738,21 @@ Its higher-level input is not yet classified. Qualified45s capture
 `tmp/nsk3-server-dynamic` observes no constructor entry and retains the
 empty-server/mode-chain/cache gates. Thus the MCU dynamic route is dormant
 too, but an absent constructor observation does not prove DSP-only ownership.
+
+The own selector2539ba compares helper result07ea (pool253d24), then
+branches253cac ->253cc4. Helper287f70 can return07ea locally at2882d2:
+receive mode2, no prior result, and nonzero[10a400+4] select that return.
+The explicit mode2 call2557d0 is selected only when controller byte+a is
+neither2 nor3; otherwise2557f8 selects mode1. Queueing handler287fc8
+accepts07d3/07d4 (base05ee at2883f4 plus the decoded offsets); nonzero
+message byte2 stores the object to10a404 at288000, while zero takes a
+different forwarding path. These are internal work/return namespaces.
+In qualified45s `tmp/nsk3-server-queue`,10a404 has only zero writes
+(RAM clear and25414c initialization); observed helper entries use mode0
+at254181/25455f/255737, never mode2. The queue producers and ordinary
+mode2-selection lifecycle remain unresolved; no07ea post is required by
+this path. Contract mutation checks anchor selector, queue owner/store and
+mode-selection instructions without claiming exhaustive producer coverage.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
