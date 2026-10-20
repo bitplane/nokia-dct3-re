@@ -15,7 +15,9 @@ wrong-PIN, cold retry persistence and correct-PIN authentication, then reaches
 the separate phone security-code prompt. A blocked-PIN fixture additionally
 passes physical PUK recovery, wrong-PUK rejection and cold authentication using
 the new PIN. Physical PIN-request enable also persists and causes the expected
-cold PIN challenge. Other SIM/security operations and radio remain unaccepted.
+cold PIN challenge; physical disable persists and skips that challenge on cold
+boot without bypassing the separate phone lock. Other SIM/security operations
+and radio remain unaccepted.
 Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
@@ -283,7 +285,7 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The PUK gate below extends this boundary; permanent blocking,
-PIN-request disable and PIN2 remain unaccepted; ordinary PIN change is covered below.
+PIN2 remains unaccepted; ordinary PIN change and request settings are covered below.
 
 ### PUK recovery and new-PIN persistence
 
@@ -329,9 +331,8 @@ accepts physical1234, presents the separate phone lock and preserves the card:
   tmp/nsk3-pin-request-cold
 ```
 
-This accepts enable and its cold challenge, not PIN-request disable. The ordinary
-CHANGE CHV gate below is separate; credentials were not changed to make this
-setting work.
+This enable gate is separate from the disable and ordinary CHANGE CHV gates
+below; credentials were not changed to make this setting work.
 
 ### Ordinary PIN change
 
@@ -354,7 +355,29 @@ recovery and does not re-provision the PIN during cold preparation.
 The fixture composes startup PIN and phone-code input through one idempotent
 passive SIM observer; timing offsets schedule physical contacts only. All
 hardware defaults and declared native/analog/provisioning hypotheses remain
-unchanged. PIN-request disable, permanent blocking and PIN2 remain separate.
+unchanged. PIN-request disable has its own gate below; permanent blocking and
+PIN2 remain unaccepted.
+
+### PIN-request disable
+
+The request-enabled card authenticates1234 and the separate phone code unlocks
+the UI. `nsk3_pin_request_disable.lua` uses the same observed4-5-1 path,
+enters1234, selects Down to Off and confirms. DISABLE CHV `a0 26 00 01 08`
+returns9000, and the exact31s frame shows Off. The whole serialized card changes
+only at enabled1->0. A qualified cold copy preserves the card, performs no
+SIM VERIFY or credential mutation, and presents phone Security code directly.
+
+```sh
+.venv/bin/python tools/nsk3_pin_request_check.py roms/noki6130/source \
+  tmp/nsk3-pin-request-enabled tmp/nsk3-pin-request-disabled \
+  tmp/nsk3-pin-request-off-cold --disabled
+```
+
+The paired On and Off gates preserve credential bytes and independently verify
+the corresponding cold challenge behavior. PIN2, permanent PUK blocking,
+correct idle content and radio remain unaccepted. A Battery low alert appears
+around33s in the longer Off run under the unchanged nominal-input hypothesis;
+that analog/power observation is not hidden by adjusting the fixture voltage.
 
 ## Own firmware inputs
 

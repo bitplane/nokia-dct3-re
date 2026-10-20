@@ -1,5 +1,5 @@
 import unittest
-from tools.nsk3_pin_request_check import check_enable,KEYS
+from tools.nsk3_pin_request_check import check_enable,check_setting,KEYS
 from tools.make_sim_card_profile import make_profile
 from tools.sim_security_trace_check import ENABLED_OFFSET,AOC_NVRAM_SIZE
 
@@ -18,6 +18,9 @@ class PinRequestCheckTest(unittest.TestCase):
         after=bytearray(before)
         after[ENABLED_OFFSET]=1
         check_enable(trace,before,after)
+        disabled=trace.replace('ins=28','ins=26').replace('value=28','value=26').replace('key=17','key=18')
+        check_setting(disabled,after,before,False)
+        with self.assertRaises(ValueError):check_setting(trace,after,before,False)
         for bad in (trace.replace('ins=28','ins=26'),trace.replace('value=28','value=26'),
                     trace.replace('key=17','key=18')):
             with self.assertRaises(ValueError):check_enable(bad,before,after)
