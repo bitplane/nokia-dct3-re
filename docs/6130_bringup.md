@@ -43,8 +43,10 @@ FDN-capable card, including cold retention of the complete card image and
 the IMSI/LOCI rehabilitation handshake. PIN1 authentication precedes phone
 authentication; PIN2 authorizes the ADN validity change. Cold captures show
 the selectable On/Off/Numbers list, not a current-state caption: its highlight
-is not used as a state oracle. FDN record editing and local dial enforcement
-remain unaccepted on this product.
+is not used as a state oracle. Physical PIN2-protected FDN Add entry also saves
+A/12345, and a separate cold process displays12345 without rewriting the card.
+A wrong-PIN2 control changes only its retry counter, not FDN data. In-place FDN
+editing, erasure and local dial enforcement remain unaccepted on this product.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -86,6 +88,21 @@ Later inputs copy the preceding saved card and EEPROM, not RAM or save states.
 The fixture raises its transmit observation cap to4096 bytes; the old1024-byte
 captures were insufficient to qualify the complete exchange. The gate rejects
 cap saturation. These short runs do not supersede the native restart limit.
+
+Record save/cold retrieval and the independent wrong-PIN2 control:
+
+```sh
+.venv/bin/python tools/nsk3_fdn_record_check.py roms/noki6130/source \
+  tmp/nsk3-fdn-write-confirm tmp/nsk3-fdn-read-cold tmp/nsk3-fdn-write-wrong
+```
+
+`nsk3_fdn_write.lua` uses the own physical matrix and an additional OK between
+name and number entry; the shorter sibling sequence does not complete this
+editor. The checker requires one exact PIN2-authorized UPDATE RECORD for
+ASCII A/BCD12345 and no unrelated card changes. Cold retrieval pins the Number
+12345 frame; the independent `nsk3_fdn_write_wrong.lua` control enters5675,
+requires9804 and permits only PIN2 retries3-to2. No ADC, firmware state or DSP
+response is changed to make these short UI transactions succeed.
 
 ### Diagnostic record persistence
 
